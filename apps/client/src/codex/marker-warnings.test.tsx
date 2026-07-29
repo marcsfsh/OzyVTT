@@ -24,7 +24,7 @@ const MAP = (revealed: boolean): CodexMap => ({
 });
 const MARKER = (revealed: boolean): CodexMarker => ({
   id: "k1", mapId: "m1", x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Castle Ravenloft",
-  revealedToPlayers: revealed, pageIds: [], subMapId: null, sceneIds: [], actorId: null, tags: [],
+  revealedToPlayers: revealed, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [],
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 

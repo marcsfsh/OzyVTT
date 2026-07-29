@@ -178,7 +178,10 @@ export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ fields: Readon
 // field in these projections (`codex-projections.ts`), so a tag only ever arrives on a record the player
 // was already permitted to see — a tag is never a side channel onto a secret map, pin, or entry.
 export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null; tags: readonly string[] }>;
-export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null; tags: readonly string[] }>;
+// M12 / CT-7: `isParty` is the one key this projection gains, and it is player-visible on purpose — the
+// party pin is FOR the players. Nothing else about a marker's gate changes: an unrevealed pin, or a pin
+// on an unrevealed map, is absent from this list whether or not it is the party's.
+export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null; isParty: boolean; tags: readonly string[] }>;
 export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: CodexJournalKind; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string }>;
 /**
  * M9: a session as a PLAYER sees it — the tightest projection the server has (`projectPlayerSession`),
@@ -225,6 +228,14 @@ export const playerCodexApi = {
    */
   quests: (token: string) => request<{ quests: PlayerCodexQuest[] }>(token, "/quests").then((data) => data.quests),
   /**
+   * M12 / CT-6: the revealed standings. Same route as `standingApi.list`; the server drops every
+   * unrevealed one and strips the row to two keys (`PlayerCodexStanding`). The player Codex must read
+   * THIS and never `standingApi.list` — the GM method's return type says `revealedToPlayers` is present,
+   * and a player surface typed as the GM's would be one careless render from showing the table which of
+   * its own standings it is not supposed to know about.
+   */
+  standing: (token: string) => request<{ standing: PlayerCodexStanding[] }>(token, "/standing").then((data) => data.standing),
+  /**
    * M11 / O-1: the campaign calendar as a PLAYER receives it. Same route as `calendarApi.get`, and the
    * reason this entry exists at all: since the prep clock, `/codex/calendar` is projected by role, and
    * the player's `currentDate` is the **published** date — never the GM's clock, which has no field on
@@ -251,6 +262,16 @@ export type CodexMap = Readonly<{
 export type CodexMarker = Readonly<{
   id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null;
   revealedToPlayers: boolean; pageIds: string[]; subMapId: string | null; sceneIds: string[]; actorId: string | null;
+  /**
+   * M12 / CT-7: is this the party's pin? **One flag on an ordinary marker**, never a marker type of its
+   * own (spec: "an ordinary marker with a flag"), and M12-C makes it one pin for the WHOLE atlas — the
+   * server clears the previous one when a new one is set, so this client never has to reconcile two.
+   *
+   * Player-visible: it appears on `PlayerCodexMarker` too, because the party pin exists for the players.
+   * It changes nothing about the pin's own gate — a party pin on a hidden map is exactly as hidden as
+   * any other pin there.
+   */
+  isParty: boolean;
   tags: readonly string[]; createdAt: string; updatedAt: string;
 }>;
 /** On every write below, omitting `tags` leaves the stored tags alone; sending `[]` genuinely clears them. */
@@ -283,19 +304,29 @@ export const atlasApi = {
   updateMarker: (token: string, id: string, input: CodexMarkerInput) => request<{ marker: CodexMarker }>(token, `/markers/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.marker),
   moveMarker: (token: string, id: string, x: number, y: number) => request<{ marker: CodexMarker }>(token, `/markers/${id}/move`, { method: "POST", body: JSON.stringify({ x, y }) }).then((data) => data.marker),
   revealMarker: (token: string, id: string, revealed: boolean) => request<{ marker: CodexMarker }>(token, `/markers/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.marker),
+  /**
+   * M12 / CT-7. Its OWN route, exactly as reveal is, and for the same reason: marking the party's
+   * position is not an edit to the pin, so it does not travel on the PATCH that rewrites its label and
+   * links. M12-C: setting a new party pin clears the old one server-side, wherever in the atlas it was —
+   * which is why the caller re-reads rather than patching the answer into its list.
+   *
+   * There is deliberately no move-the-party route. The party pin is moved by moving the PIN
+   * (`moveMarker`), which is the marker-move path every other pin already uses; a second way to move one
+   * marker is exactly the "two ways to say one thing" shape this programme exists to remove.
+   */
+  setPartyMarker: (token: string, id: string, isParty: boolean) => request<{ marker: CodexMarker }>(token, `/markers/${id}/party`, { method: "PUT", body: JSON.stringify({ isParty }) }).then((data) => data.marker),
   deleteMarker: (token: string, id: string) => request<{ deleted: boolean }>(token, `/markers/${id}`, { method: "DELETE" })
 };
 
 // ----- Journal / timeline -----
 
 /**
- * M11: FOUR kinds now. `deadline` and `downtime` are ordinary journal rows — same table, same two
- * layers, same reveal flag, same in-world dating — discriminated for display. Mirrors the server's
- * `CodexJournalKind` (`codex-store.ts`); the DB's CHECK is deliberately wider (it already admits
- * `milestone`/`standing` for M12), and the DB being more permissive than this union is the safe
- * direction.
+ * M12: SIX kinds. `deadline`, `downtime`, `milestone` and `standing` are ordinary journal rows — same
+ * table, same two layers, same reveal flag, same in-world dating — discriminated for display. Mirrors
+ * the server's `CodexJournalKind` (`codex-store.ts`), which M12 widened to exactly this set; the DB's
+ * CHECK has admitted all six since M11's v15, so no table was rebuilt for the two new ones.
  */
-export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime";
+export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing";
 /**
  * M11 / CT-10: what a downtime record carries beyond its prose. Mirrors the server's
  * `CodexDowntimePayload` (`codex-store.ts`) exactly.
@@ -310,12 +341,49 @@ export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime";
  */
 export type CodexDowntimeSummary = Readonly<{ who: string; activity: string; days: number }>;
 export type CodexDowntimePayload = CodexDowntimeSummary & Readonly<{ applied: boolean }>;
+/**
+ * M12 / CT-8. What a level-up record carries beyond its prose. Mirrors the server's
+ * `CodexMilestonePayload` (`codex-store.ts`) exactly — and it is exactly two fields, because CT-8 is
+ * "milestone / level history … **no XP arithmetic**". There is no XP total, no threshold and no next
+ * level: the GM says which level the party reached and why, and the record is the history.
+ */
+export type CodexMilestonePayload = Readonly<{ level: number; reason: string }>;
+/**
+ * M12 / CT-6. What a standing CHANGE carries. `delta` is the change, not the new value — the record says
+ * what happened, the `codex_standing` table says where things stand. A chronicle of new values could not
+ * answer "how much did that betrayal cost us", which is the only question a history of standing is for.
+ */
+export type CodexStandingPayload = Readonly<{ factionPageId: string; delta: number; reason: string }>;
+/**
+ * The same record as a PLAYER receives it, and the one field that differs: `factionPageId` is **nullable**.
+ * The server nulls it when the faction's own page is unrevealed — the identical rule `projectPlayerQuest`
+ * applies to a quest's `entityIds` and `projectPlayerMap` to a parent map: a link to a page the party
+ * cannot open is not a link, and an id they cannot resolve is only the advertisement of a secret.
+ *
+ * The delta and the reason survive, because a revealed standing record with its number stripped would say
+ * nothing at all — see `PlayerCodexChronicleRecord.payload`.
+ */
+export type PlayerCodexStandingPayload = Readonly<{ factionPageId: string | null; delta: number; reason: string }>;
+/**
+ * The widest of the two, and what the shared reader (`standingOf`) hands back: whichever projection a
+ * surface is holding, it must be prepared for the id to be absent. A GM surface simply never sees null.
+ */
+export type CodexStandingChange = PlayerCodexStandingPayload;
+/**
+ * M12: the payload is a **union discriminated by `kind`**, mirroring the server's widened
+ * `CodexJournalRow.payload`. Read it through `chronicle.ts`'s `downtimeOf` / `milestoneOf` /
+ * `standingOf` rather than directly: those apply the kind gate, which is what stops a record's payload
+ * being rendered as a kind it is not. Widening this to a union is deliberate — it makes a call site that
+ * forgot the gate a compile error rather than a silent mis-render.
+ */
+export type CodexJournalPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload;
 export type CodexJournalEntry = Readonly<{
   id: string; playerText: string; gmText: string | null; revealedToPlayers: boolean;
   attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null;
   sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null;
-  /** M11: `null` for every kind except `downtime` — the store parses `payload_json` only for that kind. */
-  payload: CodexDowntimePayload | null;
+  /** M12: `null` for every kind except `downtime`, `milestone` and `standing` — the store parses
+      `payload_json` only for those three. */
+  payload: CodexJournalPayload | null;
   sortKey: number; tags: readonly string[]; createdAt: string; updatedAt: string;
 }>;
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
@@ -331,6 +399,13 @@ export type CodexJournalInput = Readonly<{
  * generic save failure for something the field could have prevented.
  */
 export type CodexDowntimeInput = Readonly<{ who: string; activity: string; days: number }>;
+/**
+ * M12 / CT-8: the milestone pair, sent NESTED beside the ordinary journal input — `createDowntime`'s
+ * shape verbatim, because it is the same kind of thing (a payload that is not prose riding alongside a
+ * record that is). Bounded here as well as on the server so a slip is a disabled field rather than a
+ * generic 400.
+ */
+export type CodexMilestoneInput = Readonly<{ level: number; reason: string }>;
 
 // ----- Calendar (the world's own months / weekdays / era) -----
 export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
@@ -405,7 +480,7 @@ export const calendarApi = {
  * colour alone). `combat` is split from `entry` because a battle already renders with its own badge and
  * its replay edge; it is the same store row, discriminated for display.
  */
-export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime";
+export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing";
 
 /**
  * One chronicle row, GM view. Mirrors `GmCodexChronicleRecord` in `apps/server/src/codex-projections.ts`
@@ -436,9 +511,13 @@ export type CodexChronicleRecord = Readonly<{
   sourceEncounterId: number | null;
   /**
    * M11: the downtime payload, full — `applied` included, because whether the GM has confirmed the
-   * clock move is precisely what the GM's row has to show. `null` on every other kind.
+   * clock move is precisely what the GM's row has to show.
+   *
+   * M12 widens it to the same `kind`-discriminated union the journal row carries, so a milestone's
+   * `{ level, reason }` and a standing change's `{ factionPageId, delta, reason }` arrive here too.
+   * `null` on every other kind. Read it through `chronicle.ts`'s kind-gated helpers, never directly.
    */
-  payload: CodexDowntimePayload | null;
+  payload: CodexJournalPayload | null;
   /**
    * M11 / CT-5: has the campaign clock passed this deadline? **Derived server-side, never stored** —
    * it is `calendarInstant <= the campaign clock`, so rewinding the clock un-fires a deadline, which is
@@ -462,6 +541,14 @@ export type CodexChronicleRecord = Readonly<{
 }>;
 
 /**
+ * The player's half of the payload union. It differs from the GM's in exactly two members — a downtime
+ * arrives as `CodexDowntimeSummary`, without the GM's `applied` workflow flag, and a standing change
+ * arrives with a nullable `factionPageId` — which is why the two unions are named separately rather than
+ * one being reused for both.
+ */
+export type CodexPlayerChroniclePayload = CodexDowntimeSummary | CodexMilestonePayload | PlayerCodexStandingPayload;
+
+/**
  * One chronicle row, PLAYER view — `PlayerCodexJournalEntry` plus `title`, and nothing else. The server
  * has already applied the only gate there is (`projectPlayerChronicleRecord`, which delegates to the
  * journal and page player projections), so this client never filters visibility itself.
@@ -480,8 +567,14 @@ export type PlayerCodexChronicleRecord = Readonly<{
    * long, is campaign fact once the record is revealed; whether the GM has confirmed the clock move is
    * GM workflow and has no player-facing meaning, so the server's allow-list simply never emits it.
    * There is no field here to leak it into.
+   *
+   * M12 adds the two new payloads on the same terms. A milestone's `{ level, reason }` is what the
+   * record IS, so a revealed milestone carries it whole. A standing change carries its `delta` too — the
+   * delta is the entire point of a revealed standing record ("we lost twenty with the Zhentarim"), and a
+   * record the GM chose to reveal with its number stripped would say nothing at all. Both are gated by
+   * the record's own reveal flag exactly as its prose is; neither is a new visibility rule.
    */
-  payload: CodexDowntimeSummary | null;
+  payload: CodexPlayerChroniclePayload | null;
   /** M11: a revealed deadline the campaign has passed must read as passed. Derived server-side. */
   fired: boolean;
   createdAt: string;
@@ -507,6 +600,17 @@ export const journalApi = {
    */
   createDowntime: (token: string, input: CodexJournalInput & { downtime: CodexDowntimeInput }) =>
     request<{ entry: CodexJournalEntry; proposedDate: CodexInWorldDate | null }>(token, "/journal/downtime", { method: "POST", body: JSON.stringify(input) }),
+  /**
+   * M12 / CT-8. A milestone is an ordinary journal row with a `{ level, reason }` payload — the same
+   * two layers, the same reveal flag, the same in-world dating — so this is `createDowntime`'s shape
+   * exactly, with the payload nested under its own key beside the journal input.
+   *
+   * Undated is legitimate here where it is not for a deadline: a deadline with no date can never fire,
+   * but "the party reached 5" is a thing that happened, and the store dates it at the GM's clock when no
+   * explicit date is given.
+   */
+  createMilestone: (token: string, input: CodexJournalInput & { milestone: CodexMilestoneInput }) =>
+    request<{ entry: CodexJournalEntry }>(token, "/journal/milestone", { method: "POST", body: JSON.stringify(input) }).then((data) => data.entry),
   /**
    * O-3's confirmation: mark the downtime applied AND advance the campaign clock by its days, in one
    * server-side transaction. Applying twice is rejected by the store and moves nothing.
@@ -664,4 +768,103 @@ export const questApi = {
   /** The SHARED reveal body (`{ revealed }`) pages, maps, markers, journal entries and sessions all use. */
   reveal: (token: string, id: string, revealed: boolean) => request<{ quest: CodexQuest }>(token, `/quests/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.quest),
   remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/quests/${id}`, { method: "DELETE" })
+};
+
+// ----- Faction standing (M12 / CT-6: where the party stands, and what moved it) -----
+
+/**
+ * One faction's standing, GM view. Mirrors `CodexStandingRow` in `apps/server/src/codex-store.ts`.
+ *
+ * `factionPageId` is the KEY, not `id`: the store carries a unique index on it, so a faction has at most
+ * one standing row and every route below is addressed by the faction's page id rather than the row's.
+ * `value` is signed, −100…+100 (M12-B) — see `standing.ts` for what a number reads as.
+ *
+ * There is no history here on purpose (spec §2.1): every change writes a `kind='standing'` chronicle
+ * record instead, so the timeline is the history and this table is only "where things stand".
+ */
+export type CodexStanding = Readonly<{
+  id: string; factionPageId: string; value: number; revealedToPlayers: boolean;
+  createdAt: string; updatedAt: string;
+}>;
+/**
+ * Standing as a PLAYER sees it — which faction, and where they stand. `revealedToPlayers` is absent for
+ * the reason it is absent from every other player projection (an unrevealed standing is not in the list
+ * at all, so the flag would be a constant), and so are the row's own id and its timestamps: nothing on
+ * the player's side opens a standing row or sorts by when it changed.
+ */
+export type PlayerCodexStanding = Readonly<{ factionPageId: string; value: number }>;
+
+export const standingApi = {
+  /**
+   * Every faction's standing, GM view. Role-projected on the server — the very same route answers a
+   * player with the revealed ones only (`playerCodexApi.standing`).
+   */
+  list: (token: string) => request<{ standing: CodexStanding[] }>(token, "/standing").then((data) => data.standing),
+  /**
+   * Set where a faction stands, and say WHY. The reason is not decoration: the server writes the value
+   * and appends the `kind='standing'` chronicle record carrying `{ factionPageId, delta, reason }` in one
+   * transaction, so a change that reached the table without reaching the timeline is not a state this
+   * client can produce. `value` is the new absolute standing; the server works out the delta.
+   */
+  set: (token: string, factionPageId: string, value: number, reason: string) =>
+    request<{ standing: CodexStanding }>(token, `/standing/${factionPageId}`, { method: "PUT", body: JSON.stringify({ value, reason }) }).then((data) => data.standing),
+  /** The SHARED reveal body (`{ revealed }`) every other Codex record uses. */
+  reveal: (token: string, factionPageId: string, revealed: boolean) =>
+    request<{ standing: CodexStanding }>(token, `/standing/${factionPageId}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.standing)
+};
+
+// ----- The reveal audit (M12 / CT-9: one view of everything players can currently see) -----
+
+/**
+ * The seven Codex record types the audit enumerates. Every one has a reveal flag and a player
+ * projection; nothing else in the Codex does.
+ */
+export type CodexRevealAuditKind = "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
+
+/**
+ * One row of the audit. Uniform across all seven kinds — `CodexSearchHit`'s discipline verbatim: it
+ * carries only what a row needs to render and to name the record it is about, and nothing branches on
+ * key *presence*.
+ *
+ * `id` is the address that record's own reveal route takes, which for `standing` is the FACTION PAGE's
+ * id (`PUT /codex/standing/{factionPageId}/reveal`) and not the standing row's own.
+ */
+export type CodexRevealAuditRow = Readonly<{ kind: CodexRevealAuditKind; id: string; title: string }>;
+
+/**
+ * One section: what players can actually see of this record type, and how much of it exists.
+ *
+ * `revealed` is **not** "how many have their reveal flag set". Membership is decided by running the
+ * PLAYER projections — the audit reports what a player would genuinely receive, proven by the same code
+ * path that serves them. That distinction is the whole point of the screen: two kinds are not
+ * player-visible even with their own flag set (a revealed pin on a hidden map; a revealed standing for
+ * an unrevealed faction), and an audit built on the flags alone would tell the GM their players can see
+ * things the players demonstrably cannot.
+ */
+export type CodexRevealAuditSection = Readonly<{
+  kind: CodexRevealAuditKind;
+  revealed: number;
+  total: number;
+  rows: readonly CodexRevealAuditRow[];
+}>;
+
+/**
+ * What `GET /codex/reveal-audit` answers. **GM-only**, and a READ-ONLY AGGREGATION: it calls the existing
+ * store lists and the existing player projections and restates no visibility rule of its own. It writes
+ * nothing — un-revealing from the audit goes back out through each record type's OWN reveal route (there
+ * is no unreveal route and no bulk operation, by design).
+ *
+ * **All seven sections are always present**, empty ones included (the `CodexSearchHit` precedent). That
+ * is what lets the surface tell "nothing of this kind is revealed" from "this did not load" — a section
+ * that is simply absent is a malformed answer, not an empty one, and the audit says so rather than
+ * rendering it as empty (the CF-2 lesson).
+ *
+ * M12-A: **Codex records only.** Tokens, fog and the shared table viewer are deliberately not here. The
+ * table has its own visibility system with different rules, and folding it in would make this the second
+ * place that decides what a player can see — precisely the risk CT-9 is written against.
+ */
+export type CodexRevealAudit = Readonly<{ sections: readonly CodexRevealAuditSection[] }>;
+
+export const revealAuditApi = {
+  get: (token: string) => request<{ audit: CodexRevealAudit }>(token, "/reveal-audit").then((data) => data.audit)
 };

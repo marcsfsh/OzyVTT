@@ -4,7 +4,14 @@ import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scen
 import { iconChildren } from "./icons";
 
 /** The minimal marker shape the surface renders - satisfied by both the GM marker and the player projection. */
-export type SurfaceMarker = Readonly<{ id: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; revealedToPlayers?: boolean }>;
+export type SurfaceMarker = Readonly<{ id: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; revealedToPlayers?: boolean; isParty?: boolean }>;
+/**
+ * M12 / CT-7: what the party pin SAYS. R2 forbids a state that reads by colour or shape alone, and a
+ * ring around a pin is exactly that — so the words are drawn on the map beside it and also given to
+ * assistive tech as the pin's accessible name. Optional on the type because it is optional on the wire
+ * (a projection that has not been widened yet simply renders every pin as it did before).
+ */
+const PARTY_LABEL = "The party is here";
 
 /**
  * The interactive, out-of-combat atlas surface. Mirrors EncounterMap's approach - an SVG viewBox camera
@@ -148,12 +155,24 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
           const s = glyphSize;
           return (
             <g key={marker.id} data-marker-id={marker.id} transform={`translate(${pos.x} ${pos.y})`}
-              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}`}>
+              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}${marker.isParty ? " is-party" : ""}`}>
+              {/* CT-7 / R2, the accessible half: the party pin's meaning reaches a screen reader as a
+                  NAME, not as a ring it cannot see. Ordinary pins keep no title, exactly as before. */}
+              {marker.isParty && <title>{marker.label ? `${marker.label} — ${PARTY_LABEL.toLowerCase()}` : PARTY_LABEL}</title>}
+              {/* The ring. Drawn OUTSIDE the icon's own scale group so it does not inherit the glyph's
+                  colour, and behind the glyph so it never obscures it. It is decoration — the words
+                  below are what actually say this is the party. */}
+              {marker.isParty && <circle className="codex-marker-partyring" r={s * 0.72} />}
               <g transform={`translate(${-s / 2} ${-s / 2}) scale(${s / 24})`} style={{ color: marker.iconColor }}>
                 <circle cx={12} cy={12} r={11.5} className="codex-marker-bg" />
                 <g className="codex-marker-ico">{iconChildren(marker.iconId)}</g>
               </g>
               {marker.label && <text className="codex-marker-label" y={s / 2 + glyphSize * 0.28} textAnchor="middle" style={{ fontSize: glyphSize * 0.34 }}>{marker.label}</text>}
+              {/* CT-7 / R2: said in WORDS on the map itself, never by the ring alone. It sits under the
+                  pin's own label when there is one, so a named place still reads as that place first. */}
+              {marker.isParty && (
+                <text className="codex-marker-partylabel" y={s / 2 + glyphSize * (marker.label ? 0.66 : 0.28)} textAnchor="middle" style={{ fontSize: glyphSize * 0.3 }}>{PARTY_LABEL}</text>
+              )}
             </g>
           );
         })}

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
+import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
 import { projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
 let directory: string;
@@ -2327,7 +2327,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
     // 1. Creating proposes; it does not decide. The clock has not moved.
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
-    expect(downtime.payload!.applied).toBe(false);
+    expect(downtimePayloadOf(downtime)!.applied).toBe(false);
     // ...and the record is dated where the downtime HAPPENED (the GM's clock), not where it will end.
     expect(downtime.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });
     expect(store.proposedDateFor(downtime)).toEqual({ year: 1492, month: 1, day: 10 });
@@ -2337,7 +2337,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(applied.calendar.currentDate).toEqual({ year: 1492, month: 1, day: 10 });
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
     expect(applied.entry.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
-    expect(store.getEntry(downtime.id)!.payload!.applied).toBe(true);   // re-read, so it is the stored row
+    expect(downtimePayloadOf(store.getEntry(downtime.id)!)!.applied).toBe(true);   // re-read, so it is the stored row
     expect(applied.entry.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });  // the record did not re-date itself
     expect(store.proposedDateFor(applied.entry)).toBeNull();            // nothing left to propose
 
@@ -2390,7 +2390,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     unblock.exec("DROP TRIGGER codex_test_block_calendar");
     unblock.close();
     expect(store.applyDowntime(downtime.id).calendar.currentDate).toEqual({ year: 1492, month: 1, day: 10 });
-    expect(store.getEntry(downtime.id)!.payload!.applied).toBe(true);
+    expect(downtimePayloadOf(store.getEntry(downtime.id)!)!.applied).toBe(true);
   });
 
   /**
@@ -2634,7 +2634,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
     // ...and `applied` rides along, or a restored codex would offer to pass the same 30 days again.
     store.applyDowntime(downtime.id);
-    expect(store.exportBundle().journal.find((entry) => entry.id === downtime.id)!.payload!.applied).toBe(true);
+    expect(downtimePayloadOf(store.exportBundle().journal.find((entry) => entry.id === downtime.id)!)!.applied).toBe(true);
 
     // The real round-trip: shut the service down and bring it back up on the same file.
     const path = join(directory, "vtt.sqlite");
@@ -2646,6 +2646,428 @@ describe("CodexStore deadlines + downtime (M11)", () => {
       expect(reopened.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
       expect(reopened.getEntry(deadline.id)!.kind).toBe("deadline");
       expect(reopened.exportBundle().publishedDate).toEqual({ year: 1492, month: 3, day: 8 });
+    } finally {
+      reopened.close();
+    }
+    // `afterEach` closes `store`; a second close is a no-op, so reopening it here keeps that honest.
+    store = new CodexStore(path);
+    await store.initialize();
+  });
+});
+
+/**
+ * M12 (CT-6 standing, CT-7 party marker, CT-8 milestones) — the STORE layer, below any projection.
+ *
+ * Migration v16 is ADDITIVE, which makes it far less dangerous than v15's rebuild and creates a different
+ * risk: an additive migration looks obviously safe, so nobody checks it. `migration v16 …` below therefore
+ * seeds a genuine v15 database and upgrades it, exactly as a GM's existing `vtt.sqlite` will.
+ *
+ * The other thing this block exists to catch is silence. Two of M12's failure modes produce no error and no
+ * compile error anywhere: a `milestone` row that reads back as `note` because `JOURNAL_KINDS` was not
+ * widened, and a second party marker because `setPartyMarker` forgot to clear the first.
+ */
+describe("CodexStore standing, party marker + milestones (M12)", () => {
+  /** A genuine v1..v15 database on disk, seeded by the caller, ready for a CodexStore to upgrade to v16. */
+  const legacyV15Database = (path: string): DatabaseSync => {
+    const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+    database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 15)) {
+      database.exec(migration.sql);
+      database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+    }
+    return database;
+  };
+  const faction = (title: string) => store.createPage({ title, entityType: "faction" });
+
+  /**
+   * T-1 (K7). Every pre-existing marker and journal row survives v16 untouched, and `is_party` arrives as 0
+   * on all of them.
+   *
+   * Asserted on raw SQL, not through `toMarker`, for the reason M11's equivalent gives: a projection that
+   * dropped a column would read null on both sides and the comparison would pass. The JOURNAL half is here
+   * even though v16 does not name that table — that is precisely the assertion. v15 already widened its
+   * CHECK to admit `milestone` and `standing`, so M12's temptation is a second rebuild "to be safe", and a
+   * second rebuild is the one operation that could lose these rows. If this test ever starts failing on the
+   * journal columns, someone has rebuilt a table that did not need rebuilding.
+   */
+  it("migration v16 adds is_party and codex_standing without disturbing a single existing row (K7, T-1)", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v15-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      const database = legacyV15Database(path);
+      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 7)").run();
+      const mapId = crypto.randomUUID(), pageId = crypto.randomUUID();
+      database.prepare("INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, 'Barovia', 'regional', NULL, 1, 1, '[]', '', '')").run(mapId, crypto.randomUUID());
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'The Harpers', 'faction', '{}', '{}', NULL, '[]', 'a network', 'they are compromised', 0, NULL, 1, '', '')").run(pageId);
+
+      // Three markers with everything a marker can carry, so a rebuilt-instead-of-altered table would show.
+      const insertMarker = database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      const plain = crypto.randomUUID(), linked = crypto.randomUUID(), hidden = crypto.randomUUID();
+      insertMarker.run(plain, mapId, 0.5, 0.5, "pin", "#FF2E9A", "Svalich Road", 1, "[]", null, "[]", null, '[]', "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
+      insertMarker.run(linked, mapId, 12, 34, "castle", "#2DE2FF", "Castle Ravenloft", 1, JSON.stringify([pageId]), null, JSON.stringify([crypto.randomUUID()]), crypto.randomUUID(), '["landmark"]', "2026-01-02T00:00:00.000Z", "2026-01-02T00:00:00.000Z");
+      insertMarker.run(hidden, mapId, 1, 2, "town", "#A45CFF", null, 0, "[]", null, "[]", null, '[]', "2026-01-03T00:00:00.000Z", "2026-01-03T00:00:00.000Z");
+
+      const insertEntry = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      const note = crypto.randomUUID(), downtime = crypto.randomUUID();
+      insertEntry.run(note, "The mists parted.", "Strahd watched.", 1, plain, pageId, "note", null, 2, "2026-01-04", null, null, null, null, null, 1, '["travel"]', null, "2026-01-04T00:00:00.000Z", "2026-01-04T00:00:00.000Z");
+      insertEntry.run(downtime, "Vex brews poison.", null, 0, null, null, "downtime", null, null, null, null, null, null, null, null, 2, '[]', JSON.stringify({ who: "Vex", activity: "Brewing poison", days: 30, applied: true }), "2026-01-05T00:00:00.000Z", "2026-01-05T00:00:00.000Z");
+
+      const markersBefore = database.prepare("SELECT * FROM codex_markers ORDER BY id").all();
+      const journalBefore = database.prepare("SELECT * FROM codex_journal ORDER BY id").all();
+      const journalColumnsBefore = (database.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      expect(markersBefore).toHaveLength(3);
+      expect(journalBefore).toHaveLength(2);
+      database.close();
+
+      upgraded = new CodexStore(path);
+      await upgraded.initialize();                                  // <- v16 runs here
+
+      const reopened = new DatabaseSync(path);
+      const markersAfter = reopened.prepare("SELECT * FROM codex_markers ORDER BY id").all() as Array<Record<string, unknown>>;
+      const journalAfter = reopened.prepare("SELECT * FROM codex_journal ORDER BY id").all();
+      const journalColumnsAfter = (reopened.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      const markerColumns = (reopened.prepare("PRAGMA table_info(codex_markers)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      const standingColumns = (reopened.prepare("PRAGMA table_info(codex_standing)").all() as Array<Record<string, unknown>>).map((column) => column.name);
+      reopened.close();
+
+      expect(markersAfter).toHaveLength(markersBefore.length);      // nothing dropped, nothing duplicated
+      for (const [index, original] of markersBefore.entries()) {
+        const { is_party: isParty, ...carried } = markersAfter[index];
+        expect(carried).toEqual(original);                          // EVERY pre-existing column, value for value
+        expect(isParty).toBe(0);                                    // ...and the new one defaults to "not the party"
+      }
+      // `codex_journal` is byte-identical, rows AND schema: v16 must not touch it (v15 already did the work).
+      expect(journalAfter).toEqual(journalBefore);
+      expect(journalColumnsAfter).toEqual(journalColumnsBefore);
+
+      // The new column is the LAST one and carries the declared type/NOT NULL/DEFAULT, so an existing
+      // codex needs no backfill pass to be correct.
+      expect(markerColumns.at(-1)).toEqual(["is_party", "INTEGER", 1, "0"]);
+      expect(standingColumns).toEqual(["id", "faction_page_id", "value", "revealed", "created_at", "updated_at"]);
+
+      // The rows still READ correctly through the store's own path, and nothing is the party yet.
+      expect(upgraded.getMarker(linked)!.pageIds).toEqual([pageId]);
+      expect(upgraded.getMarker(linked)!.tags).toEqual(["landmark"]);
+      expect(upgraded.getMarker(hidden)!.revealedToPlayers).toBe(false);
+      expect(upgraded.listMarkers(mapId).every((marker) => marker.isParty === false)).toBe(true);
+      expect(upgraded.partyMarker()).toBeNull();
+      expect(upgraded.getEntry(downtime)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+      expect(upgraded.getEntry(note)!.tags).toEqual(["travel"]);
+      // An empty standing table on every existing codex is the correct and complete upgrade — there has
+      // never been a standing to back-fill from (v14's reasoning for quests, verbatim).
+      expect(upgraded.listStanding()).toEqual([]);
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * T-2 (M12-C). Exactly one party marker exists atlas-wide, and flagging a second CLEARS the first in one
+   * step rather than erroring.
+   *
+   * Both halves of the invariant are asserted, because they fail differently and either alone is a trap:
+   *   - the PROCESS half (`setPartyMarker` clears before it sets) — drop the clear and the second flag
+   *     raises a UNIQUE constraint the GM never asked about;
+   *   - the FILE half (v16's partial unique index) — drop it and the store still behaves, right up until a
+   *     repair script or a manual sqlite3 session leaves two party pins that no screen can reconcile.
+   * The second is checked by writing raw SQL AROUND the store, which is the only way to see it at all.
+   *
+   * Crucially the pins are on DIFFERENT MAPS: M12-C is one party marker for the whole ATLAS, not one per
+   * map, so a per-map rule would pass every assertion here except this one.
+   */
+  it("only one marker can be the party at a time, atlas-wide (M12-C, T-2)", () => {
+    const barovia = store.createMap({ assetId: ASSET, name: "Barovia", kind: "regional" });
+    const faerun = store.createMap({ assetId: ASSET, name: "Faerûn", kind: "world" });
+    const village = store.createMarker(barovia.id, { x: 10, y: 10, iconId: "town", iconColor: "#ff2e9a", label: "Village" });
+    const castle = store.createMarker(barovia.id, { x: 20, y: 20, iconId: "castle", iconColor: "#2de2ff", label: "Castle" });
+    const waterdeep = store.createMarker(faerun.id, { x: 30, y: 30, iconId: "town", iconColor: "#a45cff", label: "Waterdeep" });
+
+    expect(store.partyMarker()).toBeNull();                          // nothing is the party until the GM says so
+    expect(store.setPartyMarker(village.id)!.isParty).toBe(true);
+    expect(store.partyMarker()!.id).toBe(village.id);
+
+    // Flagging a second pin on the SAME map moves the party rather than erroring.
+    store.setPartyMarker(castle.id);
+    expect(store.partyMarker()!.id).toBe(castle.id);
+    expect(store.getMarker(village.id)!.isParty).toBe(false);
+
+    // ...and so does flagging one on a DIFFERENT map. This is the assertion a per-map design fails.
+    store.setPartyMarker(waterdeep.id);
+    expect(store.partyMarker()!.id).toBe(waterdeep.id);
+    expect(store.listMarkers(barovia.id).filter((marker) => marker.isParty)).toHaveLength(0);
+    expect(store.listMarkers(faerun.id).filter((marker) => marker.isParty).map((marker) => marker.id)).toEqual([waterdeep.id]);
+
+    // The FILE's half: a write that goes around the store cannot produce a second party pin.
+    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+    try {
+      expect(() => raw.exec(`UPDATE codex_markers SET is_party = 1 WHERE id = '${village.id}'`)).toThrow(/UNIQUE/);
+      // ...while any number of NON-party pins coexist, which is what makes the index's WHERE clause
+      // load-bearing rather than decorative (v13's `codex_sessions_number` predicate is only intent).
+      expect((raw.prepare("SELECT COUNT(*) AS c FROM codex_markers WHERE is_party = 0").get() as { c: number }).c).toBe(2);
+    } finally { raw.close(); }
+
+    // `null` clears it entirely, and a party pin is otherwise an ORDINARY marker: it moves by the ordinary
+    // move path, reveals by the ordinary switch, and deletes by the ordinary delete.
+    store.setPartyMarker(waterdeep.id);
+    expect(store.moveMarker(waterdeep.id, 44, 55).isParty).toBe(true);
+    expect(store.updateMarker(waterdeep.id, { label: "Waterdeep, City of Splendours" }).isParty).toBe(true);
+    expect(store.setMarkerRevealed(waterdeep.id, true).isParty).toBe(true);
+    expect(store.setPartyMarker(null)).toBeNull();
+    expect(store.partyMarker()).toBeNull();
+    expect(store.getMarker(waterdeep.id)!.isParty).toBe(false);
+
+    // Deleting the party pin simply leaves the atlas with no party pin — the state a fresh codex is in.
+    store.setPartyMarker(castle.id);
+    store.deleteMarker(castle.id);
+    expect(store.partyMarker()).toBeNull();
+    // ...and so does deleting the MAP it sat on, via the existing marker cascade.
+    store.setPartyMarker(village.id);
+    store.deleteMap(barovia.id);
+    expect(store.partyMarker()).toBeNull();
+
+    expect(() => store.setPartyMarker(crypto.randomUUID())).toThrow(/no longer exists/);
+  });
+
+  /**
+   * T-3 (F-7). `setStanding` writes the standing table AND appends its chronicle record, and half of it is
+   * worse than neither: a moved bar with no record loses the history the spec puts on the timeline (it
+   * exists nowhere else), and a record with no moved bar leaves the campaign's history disagreeing with the
+   * campaign's state.
+   *
+   * The failure is forced in SQLITE, not in JavaScript, by a trigger that aborts the journal write — so
+   * this exercises the real `BEGIN IMMEDIATE` / `ROLLBACK` path rather than a stubbed method. The standing
+   * write happens FIRST, so if the two were separate transactions (a nested `this.transaction`, which
+   * cannot nest, or two sequential ones) the standing row would already be committed when the record dies.
+   * That is exactly the mutation this catches.
+   */
+  it("setStanding is one transaction: a failed chronicle write rolls the value back too (F-7, T-3)", () => {
+    const harpers = faction("The Harpers");
+    store.setStanding(harpers.id, 40, "Saved the caravan.");
+    expect(store.getStanding(harpers.id)!.value).toBe(40);
+
+    // Fires on the chronicle record specifically, so the standing UPDATE itself is untouched.
+    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+    raw.exec("CREATE TRIGGER codex_test_block_standing_record AFTER INSERT ON codex_journal WHEN NEW.kind = 'standing' BEGIN SELECT RAISE(ABORT, 'no standing records'); END;");
+    raw.close();
+
+    expect(() => store.setStanding(harpers.id, -80, "Betrayed them.")).toThrow();
+
+    // BOTH sides unchanged. Re-read from the store, not from the value captured above.
+    expect(store.getStanding(harpers.id)!.value).toBe(40);
+    expect(store.listChronicle().filter((record) => record.kind === "entry" && record.entry.kind === "standing")).toHaveLength(1);
+
+    // ...and with the obstruction gone it still works, so the assertions above are the rollback and not a
+    // store that had quietly stopped writing anything at all.
+    const unblock = new DatabaseSync(join(directory, "vtt.sqlite"));
+    unblock.exec("DROP TRIGGER codex_test_block_standing_record");
+    unblock.close();
+    expect(store.setStanding(harpers.id, -80, "Betrayed them.").value).toBe(-80);
+    expect(store.listChronicle().filter((record) => record.kind === "entry" && record.entry.kind === "standing")).toHaveLength(2);
+
+    // The reverse direction of the same invariant: a rejected FIRST-ever set leaves NO row behind, so an
+    // aborted create cannot leave a faction sitting at a value with no history explaining it.
+    const zhents = faction("The Zhentarim");
+    const block = new DatabaseSync(join(directory, "vtt.sqlite"));
+    block.exec("CREATE TRIGGER codex_test_block_standing_record AFTER INSERT ON codex_journal WHEN NEW.kind = 'standing' BEGIN SELECT RAISE(ABORT, 'no standing records'); END;");
+    block.close();
+    expect(() => store.setStanding(zhents.id, 25, "An uneasy truce.")).toThrow();
+    expect(store.getStanding(zhents.id)).toBeNull();
+    expect(store.listStanding().map((row) => row.factionPageId)).toEqual([harpers.id]);
+  });
+
+  /**
+   * T-4 (M12-B). The scale is SIGNED and bounded, and the chronicle record says what CHANGED, not where
+   * things ended up.
+   *
+   * The delta half is the one worth stating: the table holds the position and the timeline holds the
+   * movements, so a record carrying the new VALUE would be a second copy of the table's fact — the copy
+   * that goes stale the moment a record is deleted. `+40 then -60` must read as `+40, -60` and leave the
+   * bar at -20; a value-carrying record would read `40, -20` and no reader could tell what happened.
+   */
+  it("standing clamps to -100..100 and its record carries the delta, not the new value (M12-B, T-4)", () => {
+    const harpers = faction("The Harpers");
+    const standingDeltas = () => store.listChronicle()
+      .flatMap((record) => record.kind === "entry" && record.entry.kind === "standing" ? [record.entry.payload as { factionPageId: string; delta: number; reason: string }] : []);
+    // Addressed by REASON, never by list position. `listChronicle` breaks a `created_at` tie on the record
+    // id, which is a random UUID, so two records written inside the same millisecond come back in an
+    // arbitrary (if stable) order — asserting on `.at(-1)` would be a coin flip, not a test.
+    const deltaFor = (reason: string) => standingDeltas().find((payload) => payload.reason === reason)!;
+
+    // A first-ever set moves from 0 (Neutral): the delta IS the value, and only this once.
+    expect(store.setStanding(harpers.id, 40, "Saved the caravan.").value).toBe(40);
+    expect(deltaFor("Saved the caravan.")).toEqual({ factionPageId: harpers.id, delta: 40, reason: "Saved the caravan." });
+
+    // A later set is a MOVEMENT from where things stood. 40 -> -20 is -60, not -20.
+    expect(store.setStanding(harpers.id, -20, "Sold them out.").value).toBe(-20);
+    expect(deltaFor("Sold them out.")).toEqual({ factionPageId: harpers.id, delta: -60, reason: "Sold them out." });
+
+    // Clamped, not rejected: the ends of the scale are meaningful answers, and the DELTA is computed from
+    // the clamped value so the history still adds up to the table (-20 -> 100 is +120, not +1020).
+    expect(store.setStanding(harpers.id, 1000, "Saved the High Harper.").value).toBe(100);
+    expect(deltaFor("Saved the High Harper.").delta).toBe(120);
+    expect(store.setStanding(harpers.id, -9999, "Burned their safehouse.").value).toBe(-100);
+    expect(deltaFor("Burned their safehouse.").delta).toBe(-200);
+    // Fractions truncate rather than writing a REAL into a STRICT INTEGER column.
+    expect(store.setStanding(harpers.id, 12.9, "Made partial amends.").value).toBe(12);
+    // NaN/Infinity are an error, not a clamp — clamping either would write it straight into the column.
+    expect(() => store.setStanding(harpers.id, Number.NaN, "?")).toThrow(/number/);
+    expect(() => store.setStanding(harpers.id, Number.POSITIVE_INFINITY, "?")).toThrow(/number/);
+
+    // The deltas sum to exactly where the bar stands, which is the whole point of storing the change.
+    expect(standingDeltas().reduce((sum, payload) => sum + payload.delta, 0)).toBe(store.getStanding(harpers.id)!.value);
+
+    // A set that changes nothing still records the GM's reason: suppressing it would be a hidden rule.
+    store.setStanding(harpers.id, 12, "We held the line.");
+    expect(deltaFor("We held the line.")).toEqual({ factionPageId: harpers.id, delta: 0, reason: "We held the line." });
+
+    // Adjusting a number is not a disclosure decision: reveal state survives every set, both ways.
+    expect(store.getStanding(harpers.id)!.revealedToPlayers).toBe(false);      // O-2: starts hidden
+    store.setStandingRevealed(harpers.id, true);
+    expect(store.setStanding(harpers.id, 5, "Slipped a little.").revealedToPlayers).toBe(true);
+    store.setStandingRevealed(harpers.id, false);
+    expect(store.setStanding(harpers.id, 50, "Recovered.").revealedToPlayers).toBe(false);
+
+    // Spec §2.1: standing is tracked against a FACTION. SQLite cannot express that in a foreign key, so
+    // this is the only place it can be said, and it is said with a message a GM can read.
+    const strahd = store.createPage({ title: "Strahd", entityType: "character" });
+    expect(() => store.setStanding(strahd.id, 10, "?")).toThrow(/faction/);
+    expect(() => store.setStanding(crypto.randomUUID(), 10, "?")).toThrow(/no longer exists/);
+    expect(() => store.setStandingRevealed(crypto.randomUUID(), true)).toThrow(/no standing/);
+  });
+
+  /**
+   * T-5 (F-3). A `milestone` and a `standing` row round-trip as THEMSELVES rather than collapsing to
+   * `"note"`.
+   *
+   * This is the M12 failure with no symptom. `toEntry` parses `kind` fail-closed, so a `JOURNAL_KINDS` set
+   * that was never widened produces no throw, no compile error and no bad data — just a GM's milestone
+   * rendering as an ordinary note on every screen forever. Read back through a SECOND read, so it is the
+   * stored row talking and not the create call's return value.
+   */
+  it("a milestone and a standing record round-trip as themselves, not as notes (F-3, T-5)", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 14 } });
+    const harpers = faction("The Harpers");
+    const milestone = store.createMilestone({ playerText: "The party cleared the crypt.", milestone: { level: 5, reason: "Sealed the ossuary" } });
+    store.setStanding(harpers.id, 40, "Saved the caravan.");
+    // Asserted BEFORE anything is looked up by kind, so the collapse-to-`note` failure reports itself as
+    // "expected 'note' to be 'milestone'" rather than as an undefined further down the test.
+    expect(milestone.kind).toBe("milestone");
+    const standingEntries = store.listTimeline().filter((entry) => entry.kind === "standing");
+    expect(standingEntries).toHaveLength(1);
+    const standing = standingEntries[0];
+
+    for (const [id, kind] of [[milestone.id, "milestone"], [standing.id, "standing"]] as const) {
+      expect(store.getEntry(id)!.kind).toBe(kind);
+      expect(store.listTimeline().find((entry) => entry.id === id)!.kind).toBe(kind);
+      const record = store.listChronicle().find((candidate) => candidate.kind === "entry" && candidate.entry.id === id)!;
+      expect(record.kind === "entry" && record.entry.kind).toBe(kind);
+    }
+
+    // Each carries ITS OWN payload shape, and only for its own kind — a stray payload cannot cross kinds.
+    expect(store.getEntry(milestone.id)!.payload).toEqual({ level: 5, reason: "Sealed the ossuary" });
+    expect(store.getEntry(standing.id)!.payload).toEqual({ factionPageId: harpers.id, delta: 40, reason: "Saved the caravan." });
+    expect(store.createEntry({ playerText: "plain" }).payload).toBeNull();
+
+    // Dated at the GM's clock when no date is given (`appendCombatEntry` / `createDowntime`'s rule), so
+    // both land where they happened instead of sinking below every dated record forever.
+    expect(store.getEntry(milestone.id)!.inWorldDate).toEqual({ year: 1492, month: 2, day: 14 });
+    expect(store.getEntry(standing.id)!.inWorldDate).toEqual({ year: 1492, month: 2, day: 14 });
+
+    // O-2 / P2: hidden on create, revealed by the ORDINARY switch. No kind-specific reveal path exists.
+    expect(store.getEntry(milestone.id)!.revealedToPlayers).toBe(false);
+    expect(store.getEntry(standing.id)!.revealedToPlayers).toBe(false);
+    expect(store.setEntryRevealed(milestone.id, true).revealedToPlayers).toBe(true);
+
+    // Indexed for search exactly as a note is — VERIFIED, not assumed (`writeEntry` calls `indexEntry`).
+    expect(store.searchAll("gm", "crypt").some((hit) => hit.kind === "journal" && hit.id === milestone.id)).toBe(true);
+    expect(store.searchAll("player", "crypt").some((hit) => hit.id === milestone.id)).toBe(true);     // revealed above
+    // ...and PAYLOAD text is NOT indexed, for any kind. A milestone's `reason` and a standing's `reason`
+    // are GM-authored prose with no reveal gate of their own; indexing them would put them in the PLAYER
+    // index with only the entry's reveal flag between them and a reader. "ossuary" and "caravan" appear
+    // only inside a reason and never in a `playerText`, so a hit on either would BE the leak.
+    expect(store.searchAll("gm", "ossuary").some((hit) => hit.id === milestone.id)).toBe(false);
+    expect(store.searchAll("gm", "caravan").some((hit) => hit.id === standing.id)).toBe(false);
+
+    // A standing record's prose lives in its payload and NOWHERE else — one sentence, one home, one gate.
+    expect(store.getEntry(standing.id)!.playerText).toBe("");
+    expect(store.getEntry(standing.id)!.gmText).toBeNull();
+
+    // The ordinary journal editor must not eat either payload: `updateEntry` names its columns and
+    // `payload_json` is not among them.
+    expect(store.updateEntry(milestone.id, { playerText: "The party cleared the crypt at last." }).payload).toEqual({ level: 5, reason: "Sealed the ossuary" });
+    expect(store.updateEntry(standing.id, { tags: ["harpers"] }).payload).toEqual({ factionPageId: harpers.id, delta: 40, reason: "Saved the caravan." });
+
+    // A level is a stated fact, so it is REJECTED rather than clamped (the deliberate opposite of standing).
+    expect(() => store.createMilestone({ milestone: { level: 0, reason: "?" } })).toThrow(/1 to 20/);
+    expect(() => store.createMilestone({ milestone: { level: 21, reason: "?" } })).toThrow(/1 to 20/);
+    expect(() => store.createMilestone({ milestone: { level: 4.5, reason: "?" } })).toThrow(/1 to 20/);
+
+    // Deleting the faction PAGE cascades its standing row away (there is no "them" to stand with any more)
+    // but must leave its HISTORY standing — the timeline is the campaign's record and a page delete must
+    // not rewrite it. Both halves of v16's ON DELETE CASCADE decision, asserted rather than assumed.
+    store.deletePage(harpers.id);
+    expect(store.getStanding(harpers.id)).toBeNull();
+    expect(store.listStanding()).toEqual([]);
+    expect(store.getEntry(standing.id)).not.toBeNull();          // the history is still THERE...
+    expect(store.getEntry(standing.id)!.kind).toBe("standing");  // ...and still a standing record
+    expect(store.getEntry(standing.id)!.payload).toEqual({ factionPageId: harpers.id, delta: 40, reason: "Saved the caravan." });
+  });
+
+  /**
+   * T-12. A GM's backup is their only copy. `codex_standing` is a table of its own and exists nowhere else,
+   * so a bundle without it restores a codex where every faction is silently back at Neutral — while the
+   * `kind='standing'` records still on the timeline describe movements from a position the restored file no
+   * longer holds.
+   *
+   * There is no `importBundle` in this store, so the round-trip that DOES exist is the one a GM actually
+   * performs — close the service, reopen it on the same file — and it is asserted here too, over a store
+   * that re-runs every migration on the way in (M11's T-14 pattern).
+   */
+  it("carries standing and the party marker through export and a reopen (T-12)", async () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 14 } });
+    const harpers = faction("The Harpers");
+    const zhents = faction("The Zhentarim");
+    const map = store.createMap({ assetId: ASSET, name: "Barovia", kind: "regional" });
+    const village = store.createMarker(map.id, { x: 10, y: 10, iconId: "town", iconColor: "#ff2e9a", label: "Village" });
+    store.createMarker(map.id, { x: 20, y: 20, iconId: "castle", iconColor: "#2de2ff", label: "Castle" });
+    store.setStanding(harpers.id, 40, "Saved the caravan.");
+    store.setStanding(zhents.id, -70, "Burned their safehouse.");
+    store.setStandingRevealed(harpers.id, true);
+    const milestone = store.createMilestone({ playerText: "Level 5.", milestone: { level: 5, reason: "Cleared the crypt" } });
+    store.setPartyMarker(village.id);
+
+    const bundle = store.exportBundle();
+    // Keyed by faction rather than compared positionally: `listStanding` breaks a `created_at` tie on the
+    // row id, which is a random UUID, so the ORDER of two standings written in the same millisecond is
+    // arbitrary. What the bundle must carry is every faction's signed value AND its own reveal state.
+    expect(Object.fromEntries(bundle.standing.map((row) => [row.factionPageId, [row.value, row.revealedToPlayers]])))
+      .toEqual({ [harpers.id]: [40, true], [zhents.id]: [-70, false] });
+    expect(bundle.partyMarkerId).toBe(village.id);
+    expect(bundle.markers.filter((marker) => marker.isParty).map((marker) => marker.id)).toEqual([village.id]);
+    expect(bundle.journal.find((entry) => entry.id === milestone.id)!.payload).toEqual({ level: 5, reason: "Cleared the crypt" });
+    const exportedStandingRecords = bundle.journal.filter((entry) => entry.kind === "standing")
+      .map((entry) => entry.payload as { factionPageId: string; delta: number; reason: string });
+    expect(exportedStandingRecords).toHaveLength(2);
+    expect(Object.fromEntries(exportedStandingRecords.map((payload) => [payload.factionPageId, payload])))
+      .toEqual({
+        [harpers.id]: { factionPageId: harpers.id, delta: 40, reason: "Saved the caravan." },
+        [zhents.id]: { factionPageId: zhents.id, delta: -70, reason: "Burned their safehouse." }
+      });
+
+    // The real round-trip: shut the service down and bring it back up on the same file.
+    const path = join(directory, "vtt.sqlite");
+    store.close();
+    const reopened = new CodexStore(path);
+    await reopened.initialize();
+    try {
+      expect(reopened.getStanding(harpers.id)).toMatchObject({ value: 40, revealedToPlayers: true });
+      expect(reopened.getStanding(zhents.id)).toMatchObject({ value: -70, revealedToPlayers: false });
+      expect(reopened.partyMarker()!.id).toBe(village.id);
+      expect(reopened.getEntry(milestone.id)!.kind).toBe("milestone");
+      expect(reopened.exportBundle().partyMarkerId).toBe(village.id);
+      expect(reopened.exportBundle().standing).toHaveLength(2);
     } finally {
       reopened.close();
     }

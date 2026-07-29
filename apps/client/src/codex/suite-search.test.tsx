@@ -102,7 +102,7 @@ const HITS: readonly CodexSearchHit[] = [HIT_PAGE, HIT_JOURNAL, HIT_MAP, HIT_MAR
     forgets to open `hit.mapId` lands on Castle Ravenloft and every marker assertion below fails. */
 const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia", kind: "regional" };
-const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
+const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 /** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape. */
@@ -319,7 +319,7 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
 describe("Suite-wide search — the player surface (CI-1, viewer safety)", () => {
   const PLAYER_MAP: PlayerCodexMap = { id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null, tags: [] };
   const PLAYER_OTHER: PlayerCodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, tags: [] };
-  const PLAYER_MARKER: PlayerCodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", pageIds: [], subMapId: null, tags: [] };
+  const PLAYER_MARKER: PlayerCodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", pageIds: [], subMapId: null, isParty: false, tags: [] };
 
   beforeEach(() => {
     playerListPages.mockResolvedValue([]);

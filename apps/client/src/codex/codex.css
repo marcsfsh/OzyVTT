@@ -391,11 +391,31 @@
    The `Checklist` primitive owns everything else about it, including its own 44px story — which does not
    arise here, because a read-only checklist renders nothing focusable at all. */
 .codex-campaign-questlist { padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-5)); }
+/* M12 / CT-6: the faction standing card. Each faction is a row plus its bar, so the two need a wrapper
+   of their own — the bar cannot live inside the row, whose name is a <button>. */
+.codex-campaign-standings { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-campaign-standing { display: flex; flex-direction: column; gap: var(--space-1); }
+/* `flex-wrap` on purpose: at 375px the name, the tier word, the signed value and Adjust do not fit one
+   line, and squeezing them would ellipsis away the very word R2 requires. Wrapped, the Adjust control
+   can sit directly above the NEXT faction's — which is exactly why it is `Button` at its default size
+   (§4 route 1: 44px of real paint, no `::after` to overhang into the row below). */
+.codex-campaign-standingrow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+/* The name button IS `.codex-campaign-recentitem` (its 44px floor, its hover, its chassis — R2, one row
+   shape on this surface); this only lets it take the free space. */
+.codex-campaign-standingname { flex: 1 1 180px; min-width: 0; }
+.codex-campaign-standingvalue { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
+/* Indented under its row, like the quest card's checklist, so the bar reads as belonging to the faction
+   above it rather than as a sibling. */
+.codex-campaign-standingmeter { padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-5)); }
+
 @media (max-width: 640px) {
   /* At 375px five stats plus the date chip would wrap into a tall stack that pushes every section
      below the fold; tightening the gap keeps the readout to two rows. */
   .codex-campaign-stats { gap: var(--space-3); }
   .codex-campaign-recentwhen { display: none; } /* the when-label is the first thing to lose, not the title */
+  /* The bar loses its indent before it loses its width — a 200px track squeezed into 120px says less
+     than a full-width one, and the row above it already carries the name. */
+  .codex-campaign-standingmeter { padding: 0 0 var(--space-1); }
 }
 
 /* ----- Sessions (M9): the log destination and the console drawer ----- */
@@ -646,6 +666,19 @@
    at a platform-chosen size in a hue this palette does not own and cannot take a token colour. */
 .codex-descend-lock { display: inline-flex; align-items: center; color: var(--text-dim); font-size: 1em; }
 
+/* M12 / CT-7: "The party is on this map" — R2's text half of the party pin, in the atlas chrome where it
+   is legible without hunting the map for the ring. §4 route 1: the row grows its own paint to the floor
+   and its single control is `Button` at its default size (44px paint, no `::after` to overhang). */
+.codex-atlas-party {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--cyan) 40%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+}
+.codex-atlas-partytext { flex: 1 1 auto; min-width: 0; color: var(--text); font-size: var(--fs-sm); }
+
 .codex-atlas-body { display: flex; gap: var(--space-3); align-items: stretch; min-height: 0; }
 .codex-mapsurface { position: relative; flex: 1 1 auto; min-width: 0; min-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--void); touch-action: none; }
 .codex-mapsurface.is-placing { cursor: crosshair; }
@@ -661,6 +694,18 @@
 .codex-marker.is-hidden { opacity: 0.55; }
 .codex-marker.is-hidden .codex-marker-bg { stroke-dasharray: 3 2; }
 .codex-marker-label { fill: var(--text); paint-order: stroke; stroke: var(--void); stroke-width: 3px; stroke-linejoin: round; font-family: var(--font-display); }
+/* M12 / CT-7: the party pin. The ring is a scanning aid ONLY — R2 forbids a state that reads by colour
+   or shape alone, so `.codex-marker-partylabel` beside it draws the words "The party is here" on the map
+   and the `<title>` gives a screen reader the same sentence. Removing either of those and keeping the
+   ring would break R2; removing the ring alone would cost nothing but a glance. */
+.codex-marker-partyring { fill: none; stroke: var(--cyan); stroke-width: 2.5; stroke-dasharray: 6 4; opacity: 0.9; }
+.codex-marker-partylabel { fill: var(--cyan); paint-order: stroke; stroke: var(--void); stroke-width: 3px; stroke-linejoin: round; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; }
+/* The inspector's party toggle: `Switch` plus its hint, laid out exactly like `.codex-atlas-nestrow`.
+   §4: `Switch` is a `@vtt/ui` primitive and carries its own floor (route 2, 22px paint → 11px overhang
+   per side). Its neighbours in `.codex-inspector` are gapped by --space-3 (12px) and are themselves
+   route 1 with no overhang of their own, so the budget is met with a pixel to spare; directly beneath it
+   is the hint paragraph, which is not a control and has no taps to steal. */
+.codex-marker-party { display: flex; flex-direction: column; gap: var(--space-1); }
 
 /* Inspector */
 .codex-inspector { flex: 0 0 300px; display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); overflow-y: auto; max-height: 72vh; }
@@ -841,3 +886,39 @@
    circle receive pointer events; it is sized in RelationshipGraph.tsx because the radius depends on the
    live zoom and the neighbour spacing, which CSS cannot see. */
 .codex-graph-nodehit { fill: transparent; }
+
+/* ----- M12 / CT-6: adjusting a faction's standing (the GM's modal composition) ----- */
+
+.codex-standing-adjuster { display: flex; flex-direction: column; gap: var(--space-3); }
+/* The tier word, the signed value and what the change would be — the three things the bar below cannot
+   say on its own (R2). The bar itself is `aria-hidden` at the call site; see `StandingAdjuster.tsx`. */
+.codex-standing-preview { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.codex-standing-delta { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
+
+/* ----- M12 / CT-9: the reveal audit ----- */
+
+.codex-audit { display: flex; flex-direction: column; gap: var(--space-4); overflow-y: auto; }
+.codex-audit-head { display: flex; flex-direction: column; gap: var(--space-1); }
+.codex-audit-title { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--text); margin: 0; }
+.codex-audit-count { margin: 0; color: var(--text); }
+.codex-audit-scope { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.codex-audit-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-audit-h { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
+.codex-audit-glyph { color: var(--text-muted); }
+/* The per-category count. It says "not read" in words when a category did not arrive, so an empty
+   category and an unread one can never look the same (the CF-2 lesson). */
+.codex-audit-sectioncount { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); text-transform: none; letter-spacing: 0; }
+.codex-audit-rows { display: flex; flex-direction: column; gap: var(--space-1); }
+/* §4 ROUTE 1 (grow the paint), and here it is not a preference — the audit is a long vertical stack of
+   rows that each carry an action, which is the exact case §4 forbids route 2 for: a `::after` hit box
+   overhangs into the row above and below and steals their taps. The row grows its own paint to the floor
+   and its one control is `Button` at its DEFAULT size, which is 44px of real paint with no `::after` at
+   all — so there is no pseudo hit area anywhere in this stack and no gap budget to compute. */
+.codex-audit-row {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1);
+}
+.codex-audit-note { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; }
+.codex-audit-row .codex-list-title { flex: 1 1 160px; min-width: 0; }

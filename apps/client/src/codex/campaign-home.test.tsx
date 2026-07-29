@@ -29,6 +29,11 @@ const playerListMarkers = vi.fn();
 const playerChronicle = vi.fn();
 const playerListRelationships = vi.fn();
 const playerListLinks = vi.fn();
+// M12: the dashboard's feed gained a fourth read (faction standing). It is UNCAUGHT in `loadCampaign`,
+// like the three beside it, so leaving it unstubbed fails every assertion in this file rather than
+// quietly costing one card — which is exactly the R4 behaviour that read is supposed to have.
+const listStanding = vi.fn();
+const playerStanding = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -46,6 +51,7 @@ vi.mock("./api", async (importOriginal) => {
     },
     journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
+    standingApi: { ...actual.standingApi, list: (...a: unknown[]) => listStanding(...a) },
     atlasApi: {
       ...actual.atlasApi,
       listMaps: (...a: unknown[]) => listMaps(...a),
@@ -62,7 +68,8 @@ vi.mock("./api", async (importOriginal) => {
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
       chronicle: (...a: unknown[]) => playerChronicle(...a),
       listRelationships: (...a: unknown[]) => playerListRelationships(...a),
-      listLinks: (...a: unknown[]) => playerListLinks(...a)
+      listLinks: (...a: unknown[]) => playerListLinks(...a),
+      standing: (...a: unknown[]) => playerStanding(...a)
     }
   };
 });
@@ -130,6 +137,7 @@ const gmDefaults = () => {
   listMarkers.mockResolvedValue([]);
   forMarker.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
+  listStanding.mockResolvedValue([]);
 };
 
 const PLAYER_PAGES: PlayerCodexPageSummary[] = [
@@ -149,6 +157,7 @@ const playerDefaults = () => {
   playerChronicle.mockResolvedValue([PLAYER_OLDER, PLAYER_EVENT, PLAYER_ENTRY]);
   playerListRelationships.mockResolvedValue([]);
   playerListLinks.mockResolvedValue([]);
+  playerStanding.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
 };
 

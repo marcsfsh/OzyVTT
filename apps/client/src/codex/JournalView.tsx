@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "./api";
-import { CHRONICLE_KIND_META, CHRONICLE_LENSES, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, sameInWorldDate, type ChronicleLens } from "./chronicle";
+import { CHRONICLE_KIND_META, CHRONICLE_LENSES, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
 import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
@@ -22,12 +22,18 @@ import { useConfirm } from "../components/feedback";
  * an entry row offers Edit/Delete. One timeline, two kinds of record, each edited where it lives.
  */
 /**
- * M11: the composer writes THREE shapes of the same record — an entry, a deadline (CT-5) and downtime
- * (CT-10). One composer rather than three, because they are one row in one table: two layers of prose, a
- * reveal flag and an in-world date. A deadline adds only the rule that the date is required (a deadline
- * with no date can never fire); downtime adds who/activity/days.
+ * M12: the composer writes FOUR shapes of the same record — an entry, a deadline (CT-5), downtime
+ * (CT-10) and a milestone (CT-8). One composer rather than four, because they are one row in one table:
+ * two layers of prose, a reveal flag and an in-world date. A deadline adds only the rule that the date is
+ * required (a deadline with no date can never fire); downtime adds who/activity/days; a milestone adds
+ * the level reached and why.
+ *
+ * A `standing` record is deliberately NOT a fifth option here. It is not something a GM writes on the
+ * timeline — it is written BY the standing card, as the second half of one transaction that also moves
+ * the number. Offering it in this switch would be a second way to write a record that must never exist
+ * without the table change it describes.
  */
-const COMPOSER_KINDS = ["entry", "deadline", "downtime"] as const;
+const COMPOSER_KINDS = ["entry", "deadline", "downtime", "milestone"] as const;
 type ComposerKind = (typeof COMPOSER_KINDS)[number];
 /** The words each shape uses. The KIND labels come from `CHRONICLE_KIND_META`, so the composer's switch
     and the rows it produces can never call the same record two different things. */
@@ -35,14 +41,19 @@ const COMPOSER_COPY: Readonly<Record<ComposerKind, Readonly<{ heading: string; t
   entry: { heading: "New journal entry", textLabel: "Player-facing summary", textPlaceholder: "What the party knows about this…", submit: "Add entry" },
   // D11-C: a deadline stores no payload — WHAT will happen is this text, WHEN is the record's own date.
   deadline: { heading: "New deadline", textLabel: "What will happen", textPlaceholder: "The duke's ultimatum expires…", submit: "Add deadline" },
-  downtime: { heading: "New downtime", textLabel: "What the party knows", textPlaceholder: "How the time was spent…", submit: "Log downtime" }
+  downtime: { heading: "New downtime", textLabel: "What the party knows", textPlaceholder: "How the time was spent…", submit: "Log downtime" },
+  milestone: { heading: "New milestone", textLabel: "What the party knows", textPlaceholder: "The company came back from the Underdark changed…", submit: "Record milestone" }
 };
 /** The server's bounds, stated here too, so a slip is a disabled field rather than a generic 400. */
 const DOWNTIME_TEXT_MAX = 120;
 const DOWNTIME_DAYS_MAX = 3650;
+/** CT-8: the 5e level range. "No XP arithmetic" — the GM says which level was reached, nothing is computed. */
+const MILESTONE_LEVEL_MIN = 1;
+const MILESTONE_LEVEL_MAX = 20;
+const MILESTONE_REASON_MAX = 120;
 
-type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionNumber: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean; tags: readonly string[]; who: string; activity: string; days: string };
-const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "" };
+type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionNumber: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean; tags: readonly string[]; who: string; activity: string; days: string; level: string; reason: string };
+const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "", level: "", reason: "" };
 const DRAFT_KEY = "codex-journal-draft";
 const LENS_KEY = "codex-chronicle-lens";
 
@@ -123,7 +134,8 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       const pending = stashedDraft ?? (editingId ? null : draft);
       // M11: a downtime draft can be worth keeping with no prose at all — who/activity carry it — so
       // emptiness has to ask about those too, or switching tabs mid-compose would silently drop one.
-      const isEmpty = !pending || (!pending.playerText.trim() && !pending.gmText.trim() && !pending.who.trim() && !pending.activity.trim());
+      // M12: a milestone draft is the same case — its level and reason ARE the record.
+      const isEmpty = !pending || (!pending.playerText.trim() && !pending.gmText.trim() && !pending.who.trim() && !pending.activity.trim() && !pending.level.trim() && !pending.reason.trim());
       if (isEmpty) sessionStorage.removeItem(DRAFT_KEY); else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(pending));
     } catch { /* private mode - fine */ }
   }, [draft, editingId, stashedDraft]);
@@ -182,6 +194,17 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
             days: Math.min(DOWNTIME_DAYS_MAX, Math.max(0, Math.trunc(Number(draft.days) || 0)))
           }
         });
+      } else if (draft.kind === "milestone") {
+        // CT-8: level history, and nothing derived from it. The level is clamped to the 5e range here as
+        // well as on the server, for the same reason downtime's days are — a rejected create is a worse
+        // way to learn a bound than a field that would not accept the value.
+        await journalApi.createMilestone(gmToken, {
+          ...input,
+          milestone: {
+            level: Math.min(MILESTONE_LEVEL_MAX, Math.max(MILESTONE_LEVEL_MIN, Math.trunc(Number(draft.level) || MILESTONE_LEVEL_MIN))),
+            reason: draft.reason.trim().slice(0, MILESTONE_REASON_MAX)
+          }
+        });
       } else await journalApi.create(gmToken, input);
       // Finishing an edit hands the composer back to whatever new entry was in progress; finishing a NEW
       // record keeps the composer on the kind it was on, since a GM setting deadlines usually sets several.
@@ -190,7 +213,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
   };
   const edit = (record: CodexChronicleRecord) => {
     // Set aside an unsaved NEW entry before the composer is reused, so Edit can never destroy it.
-    if (!editingId && (draft.playerText.trim() || draft.gmText.trim() || draft.who.trim() || draft.activity.trim())) setStashedDraft(draft);
+    if (!editingId && (draft.playerText.trim() || draft.gmText.trim() || draft.who.trim() || draft.activity.trim() || draft.level.trim() || draft.reason.trim())) setStashedDraft(draft);
     setEditingId(record.id);
     // What KIND is being edited. The composer's own `kind` is a new-record choice and is parked below, so
     // without this the edit path could not tell a deadline from a note — and a deadline's date is the one
@@ -204,9 +227,9 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       playerText: record.text, gmText: record.gmText ?? "", sessionNumber: record.sessionNumber?.toString() ?? "",
       dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : "",
       attachPageId: record.attachPageId ?? "", revealed: record.revealedToPlayers, tags: record.tags,
-      // A downtime's who/activity/days are not editable in M11 — there is no route that rewrites a
-      // payload — so the composer does not pretend to offer them on the edit path.
-      who: "", activity: "", days: ""
+      // A downtime's who/activity/days and a milestone's level/reason are not editable — there is no
+      // route that rewrites a payload — so the composer does not pretend to offer them on the edit path.
+      who: "", activity: "", days: "", level: "", reason: ""
     });
   };
   /**
@@ -282,6 +305,11 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
     ? hasText
     : draft.kind === "deadline"
     ? hasText && draft.dateYear.trim() !== ""
+    // CT-8: a milestone stands on its LEVEL alone. "The party reached 5" is the whole record; the prose
+    // is optional colour, exactly as a downtime's is, and requiring text would make the one field that
+    // actually carries the record optional and the decoration mandatory.
+    : draft.kind === "milestone"
+    ? draft.level.trim() !== ""
     : hasText || draft.who.trim() !== "" || draft.activity.trim() !== "")
     && (!needsDate || draft.dateYear.trim() !== "");
 
@@ -346,6 +374,26 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
             {composerProposal && calendar && (
               <p className="codex-composer-hint">Logging this proposes advancing the campaign clock to {formatWorldDate(calendar, composerProposal)} — nothing moves until you confirm it on the record.</p>
             )}
+          </>
+        )}
+        {/* CT-8's payload, on downtime's terms exactly: its own row sharing the meta row's column rules,
+            so the composer keeps one grid rather than growing a third layout for two more fields. */}
+        {!editingId && draft.kind === "milestone" && (
+          <>
+            <div className="codex-composer-meta">
+              <Field label="Level reached" htmlFor="j-level">
+                <Input id="j-level" type="number" inputMode="numeric" min={MILESTONE_LEVEL_MIN} max={MILESTONE_LEVEL_MAX}
+                  value={draft.level} placeholder="5" onChange={(event) => set({ level: event.target.value })} />
+              </Field>
+              <Field label="Why" htmlFor="j-reason">
+                <Input id="j-reason" maxLength={MILESTONE_REASON_MAX} value={draft.reason} placeholder="Cleared the Sunless Citadel"
+                  onChange={(event) => set({ reason: event.target.value })} />
+              </Field>
+            </div>
+            {/* CT-8 is level HISTORY, not a level tracker: nothing here computes XP, and the record does
+                not change anyone's sheet. Said out loud so a GM does not go looking for the half that
+                is deliberately absent. */}
+            <p className="codex-composer-hint">A milestone records that the party reached a level, and when. It changes no character sheet and counts no XP — leave the date blank to record it at the campaign's current date.</p>
           </>
         )}
         {/* Its own full-width row rather than a cell in .codex-composer-meta: that row's `flex: 1 1 130px`
@@ -414,7 +462,11 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
               // renders exactly as it did before this milestone.
               const isDeadline = record.kind === "deadline";
               const fired = deadlineFired(record);
-              const downtime = record.kind === "downtime" ? record.payload : null;
+              // M12: every payload is opened through its own kind gate (`chronicle.ts`), so a record's
+              // payload can only ever be rendered as the kind it actually is.
+              const downtime = downtimeOf(record);
+              const milestone = milestoneOf(record);
+              const standing = standingOf(record);
               // The SERVER's proposed date, not a second local computation: Confirm says this date out
               // loud and then the server decides where the clock actually lands, so only one of the two
               // can be authoritative. `downtimeProposedDate` stays for the composer's preview, where no
@@ -468,6 +520,12 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
                       : <p className="codex-downtime-state">Set the campaign's current date in the calendar to advance the clock from this downtime.</p>}
                   </div>
                 )}
+                {/* CT-8 / CT-6: what the record actually says, beyond its prose. Both are read-only — a
+                    milestone's level and a standing change's delta are history, and there is no route
+                    that rewrites a payload. A standing row names its faction where the page is known;
+                    where it is not, the shared label says "A faction" rather than inventing a name. */}
+                {milestone && <p className="codex-downtime-what">{milestoneSummaryLabel(milestone)}</p>}
+                {standing && <p className="codex-downtime-what">{standingChangeLabel(standing, pages.find((page) => page.id === standing.factionPageId)?.title ?? null)}</p>}
                 {/* CI-6: the entry's two return edges sit beside the page edge it already had, so an
                     entry reads as "here is what happened, here is where, here is the fight itself".
                     §4: `Button size="sm"` is a `@vtt/ui` primitive and carries the 44px floor itself

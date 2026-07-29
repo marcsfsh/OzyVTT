@@ -132,6 +132,17 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;
+  /**
+   * CT-7: the party pin, if it is on the map currently open. R2's other half — the surface draws a ring
+   * and the words "The party is here" on the pin itself, and this row says the same thing in the atlas
+   * chrome so it is legible without hunting the map for it.
+   *
+   * Deliberately says NOTHING when the pin is elsewhere. Markers are listed per map (there is no
+   * marker-by-id read on the codex surface), so this view honestly does not know where the party is when
+   * it is not here — and "the party is not on this map" would be a claim it cannot make either, since a
+   * map whose pins have not loaded looks identical.
+   */
+  const partyMarker = markers.find((marker) => marker.isParty) ?? null;
   // Hint from the tags already in use on pages and on other maps — one vocabulary across the suite.
   const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(), [pages, maps]);
 
@@ -265,6 +276,16 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
         </nav>
       )}
 
+      {/* CT-7 / R2: the party's position said in WORDS, not only as a ring on the map. §4 route 1 —
+          `.codex-atlas-party` carries `min-height` and its one control is `Button` at its default size,
+          which grows its own paint to 44px and has no `::after`. */}
+      {partyMarker && (
+        <div className="codex-atlas-party">
+          <span className="codex-atlas-partytext">The party is on this map{partyMarker.label ? <> — <strong>{partyMarker.label}</strong></> : null}.</span>
+          <Button variant="ghost" onClick={() => setSelectedMarkerId(partyMarker.id)}>Show the pin</Button>
+        </div>
+      )}
+
       {error && <Alert tone="danger">{error}</Alert>}
 
       <div className="codex-atlas-body">
@@ -275,7 +296,11 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
           onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={onOpenPage}
-          onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onRevealMap={() => void revealMap(true)} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay} onClose={() => setSelectedMarkerId(null)} />}
+          onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onRevealMap={() => void revealMap(true)} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay}
+          /* M12-C: setting the party clears whichever pin held it before — possibly on another map — so
+             the whole map's pins are re-read rather than one row being patched. */
+          onPartyChanged={async () => { if (currentMapId) await loadMarkers(currentMapId); }}
+          onClose={() => setSelectedMarkerId(null)} />}
       </div>
 
       <Modal open={picking} onClose={() => setPicking(false)} title={currentMap && nestNew ? `Add a sub-map under ${currentMap.name}` : "Add a map"} size="md" ariaLabel="Choose a map">

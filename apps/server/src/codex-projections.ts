@@ -1,5 +1,5 @@
 import { deadlineFired } from "./codex-store.js";
-import type { CodexBacklinkRow, CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexDowntimePayload, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -120,10 +120,20 @@ export function projectPlayerMap(row: CodexMapRow, context: Readonly<{ parentRev
 // ----- Markers -----
 
 export type GmCodexMarker = CodexMarkerRow;
-/** A marker as a player sees it: no scene/actor links (GM-only), and page/sub-map links only when those targets are themselves revealed. */
+/**
+ * A marker as a player sees it: no scene/actor links (GM-only), and page/sub-map links only when those
+ * targets are themselves revealed.
+ *
+ * M12 (CT-7) adds `isParty` and NOTHING else. The party pin is FOR the players - "you are here" is the
+ * whole feature - so the flag is player-facing, and every other key here was re-checked against what a
+ * player already received before M12 rather than being assumed unchanged. There is deliberately no second
+ * marker type and no party-specific projection: the party marker is an ordinary marker with a flag, so it
+ * travels this one function and is gated by this one gate.
+ */
 export type PlayerCodexMarker = Readonly<{
   id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null;
   tags: readonly string[];
+  isParty: boolean;
 }>;
 
 export function projectGmMarker(row: CodexMarkerRow): GmCodexMarker { return row; }
@@ -133,13 +143,19 @@ export function projectGmMarker(row: CodexMarkerRow): GmCodexMarker { return row
  * revealed survive (so a pin never advertises a still-secret page); the sub-map link survives only when
  * that map is revealed; scene and actor links are GM-only and always stripped. The caller resolves which
  * targets are revealed and passes them in.
+ *
+ * `isParty` grants NO visibility and is checked by nothing. It is emitted AFTER the ordinary gate above,
+ * so a hidden party pin - or a revealed party pin on a hidden map, which the caller's map gate stops
+ * before this function is reached (CD-6) - stays hidden exactly like any other pin. A special case for
+ * the party marker here would be a second visibility rule for one row, which is what M12 forbids.
  */
 export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ revealedPageIds: ReadonlySet<string>; subMapRevealed: boolean }>): PlayerCodexMarker | null {
   if (!row.revealedToPlayers) return null;
   return {
     id: row.id, mapId: row.mapId, x: row.x, y: row.y, iconId: row.iconId, iconColor: row.iconColor, label: row.label, tags: row.tags,
     pageIds: row.pageIds.filter((pageId) => context.revealedPageIds.has(pageId)),
-    subMapId: context.subMapRevealed ? row.subMapId : null
+    subMapId: context.subMapRevealed ? row.subMapId : null,
+    isParty: row.isParty
   };
 }
 
@@ -315,6 +331,54 @@ export function projectPlayerQuest(row: CodexQuestRow, context: Readonly<{ revea
   };
 }
 
+// ----- Standing (M12 / CT-6: where the party stands with one faction) -----
+
+export type GmCodexStanding = CodexStandingRow;
+/**
+ * A standing as a PLAYER sees it - two keys, and each omission is a decision:
+ *
+ *   `id`                 - the standing row's own id. A player never addresses a standing (the reveal
+ *                          route is GM-only), and `factionPageId` already identifies the row uniquely
+ *                          (migration v16's unique index), so a second id could only be noise.
+ *   `revealedToPlayers`  - GM-only on every record in this file; a player only ever receives revealed ones.
+ *   `createdAt`/`updatedAt` - GM-only, exactly as on a session and a quest. "When did this last move" is
+ *                          a question the CHRONICLE answers, with the reason attached; a bare timestamp
+ *                          beside a bar would tell the party a change happened without saying what.
+ *
+ * `value` is the signed -100..100 scale (M12-B). It travels unchanged: a revealed standing whose number
+ * the player cannot see would say nothing at all, which is the same reason a revealed quest keeps `status`.
+ */
+export type PlayerCodexStanding = Readonly<{ factionPageId: string; value: number }>;
+
+export function projectGmStanding(row: CodexStandingRow): GmCodexStanding { return row; }
+
+/**
+ * null when this standing is not player-visible; otherwise the player layer. Explicit allow-list literal,
+ * never a spread-and-delete: a field added to `CodexStandingRow` must be added HERE to reach a player.
+ *
+ * TWO gates, and the second is the one worth explaining.
+ *
+ *   1. The standing's own `revealedToPlayers` - the ordinary rule every codex record follows.
+ *   2. The FACTION PAGE must itself be revealed. A standing row is nothing but a faction and a number: it
+ *      carries no title of its own by design (the store keeps no cached name, so a renamed faction cannot
+ *      go stale), so a reader NAMES it by resolving `factionPageId` against the page list. Projected
+ *      without this gate, a revealed standing for a secret faction hands the party a page id they cannot
+ *      open and a bar they cannot label - "something you have never heard of is hostile to you" - which is
+ *      exactly the leak `projectPlayerQuest` filters `entityIds` for and `projectPlayerLinkEdges` refuses
+ *      a dangling edge for. Hiding the ROW rather than nulling the id is the `projectPlayerPageMarker`
+ *      shape (CD-6): when the thing a record hangs off is secret, the record is invisible, because a
+ *      record stripped of the only fact that identifies it is not a record.
+ *
+ * The CALLER resolves the faction's reveal state and passes it in - the `projectPlayerMarker` /
+ * `projectPlayerQuest` division of labour verbatim, because a projection that reached back into the store
+ * would be a second place that decides what a player may see.
+ */
+export function projectPlayerStanding(row: CodexStandingRow, context: Readonly<{ factionRevealed: boolean }>): PlayerCodexStanding | null {
+  if (!row.revealedToPlayers) return null;
+  if (!context.factionRevealed) return null;
+  return { factionPageId: row.factionPageId, value: row.value };
+}
+
 /**
  * A bounded one-line rendering of a record's prose, for any list ROW (a search hit, a chronicle row).
  * One length for the suite: a row that summarises a record the reader can open should look the same
@@ -339,7 +403,7 @@ function excerpt(text: string): string {
  * `Record<CodexChronicleKind, ...>`, so the compiler, not a reviewer, is what notices a new kind has no
  * icon and no word (F-5: nothing else about a new journal kind produces a single compile error).
  */
-export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime";
+export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing";
 
 /**
  * A journal row's STORE kind mapped to its CHRONICLE kind - a real total function over `CodexJournalKind`,
@@ -359,6 +423,10 @@ function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
     case "combat": return "combat";
     case "deadline": return "deadline";
     case "downtime": return "downtime";
+    // M12 (CT-8 / CT-6). Widening `CodexJournalKind` in the store made this switch a compile error until
+    // these two arms existed - which is the design, and it is why no `default` may ever be added here.
+    case "milestone": return "milestone";
+    case "standing": return "standing";
   }
 }
 
@@ -386,15 +454,74 @@ function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
 export type GmCodexDowntime = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
 export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days: number }>;
 
-function projectGmDowntime(payload: CodexDowntimePayload | null): GmCodexDowntime | null {
+/**
+ * M12's two payloads, in the same per-audience allow-listed shape.
+ *
+ * CT-8 MILESTONE - `{ level, reason }`, and both halves reach a revealed record's player row. A milestone
+ * IS "the party reached level 5, because X": a party knows its own level, and the reason is the record's
+ * only content, so a player row without them would be a dated row that says nothing. `reason` is single-line
+ * prose with no reveal split of its own (the store says so), which is exactly why the record's ordinary
+ * `revealedToPlayers` gate is the thing that must hold - a milestone needing a GM-only half writes it in
+ * `gmText`, like every other journal record. GM and player shapes are IDENTICAL today and are still written
+ * as two literals, so a future field defaults to secret rather than to shipped.
+ *
+ * CT-6 STANDING - `{ factionPageId, delta, reason }`, and the DECISION the M12 contract asked for
+ * explicitly: **a player DOES see `delta` on a revealed standing record.** The delta is the point of the
+ * record - "the Harpers fell 15" - and a record the GM chose to publish with its number removed would be a
+ * timeline row reading "something changed with someone". `reason` travels for the same reason a downtime's
+ * `activity` does. What does NOT travel unconditionally is `factionPageId`: it is nulled unless that page is
+ * itself revealed, the same filter `projectPlayerQuest` applies to `entityIds` and `projectPlayerMap` to
+ * `parentMapId`, so a published standing record can never advertise a faction the party has never met.
+ * The row still stands on its own prose (`playerText`) when the id is dropped, which is why nulling the
+ * field is right here and hiding the whole row is right on the standing TABLE (see `projectPlayerStanding`).
+ */
+export type GmCodexMilestone = Readonly<{ level: number; reason: string }>;
+export type PlayerCodexMilestone = Readonly<{ level: number; reason: string }>;
+export type GmCodexStandingChange = Readonly<{ factionPageId: string; delta: number; reason: string }>;
+export type PlayerCodexStandingChange = Readonly<{ factionPageId: string | null; delta: number; reason: string }>;
+
+/** Every payload shape a GM chronicle row can carry. `null` for the kinds that carry none. */
+export type GmCodexChroniclePayload = GmCodexDowntime | GmCodexMilestone | GmCodexStandingChange;
+/** Every payload shape a PLAYER chronicle row can carry - each one narrower than, or equal to, its GM twin. */
+export type PlayerCodexChroniclePayload = PlayerCodexDowntime | PlayerCodexMilestone | PlayerCodexStandingChange;
+
+/**
+ * One entry's payload, per kind, per audience. Dispatching on the ENTRY's `kind` rather than sniffing the
+ * blob is what makes "a downtime payload can never ride out on a milestone row" structural: the store
+ * writes the payload the kind owns, and this reads only the payload that kind owns. The `in` guard beside
+ * each arm is the type-level half of the same statement (the store's `CodexEntryPayload` is a plain union,
+ * deliberately, so `kind` does not narrow it for free) and fails CLOSED - a row whose blob does not match
+ * its kind projects `null`, never a half-filled object.
+ */
+function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | null {
+  const payload = entry.payload;
   if (payload === null) return null;
-  return { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied };
+  switch (entry.kind) {
+    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied } : null;
+    case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
+    case "standing": return "delta" in payload ? { factionPageId: payload.factionPageId, delta: payload.delta, reason: payload.reason } : null;
+    case "note": case "combat": case "deadline": return null;
+  }
 }
-function projectPlayerDowntime(payload: CodexDowntimePayload | null): PlayerCodexDowntime | null {
+/** The quietest possible default for an unsupplied revealed-page set: nothing is revealed, so no id travels. */
+const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
+/**
+ * The player half. Explicit allow-list per kind, never a spread-and-delete: a field added to any stored
+ * payload must be added HERE to reach a player, so the default for anything new is secret. `applied` is the
+ * standing example - GM workflow state, dropped (D11-E) - and `factionPageId` is the M12 one, carried only
+ * when the faction page is itself revealed.
+ */
+function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlySet<string>): PlayerCodexChroniclePayload | null {
+  const payload = entry.payload;
   if (payload === null) return null;
-  // Explicit allow-list, never a spread-and-delete: a field added to `CodexDowntimePayload` must be added
-  // HERE to reach a player, so the default for anything new is secret.
-  return { who: payload.who, activity: payload.activity, days: payload.days };
+  switch (entry.kind) {
+    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days } : null;
+    case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
+    case "standing": return "delta" in payload
+      ? { factionPageId: revealedPageIds.has(payload.factionPageId) ? payload.factionPageId : null, delta: payload.delta, reason: payload.reason }
+      : null;
+    case "note": case "combat": case "deadline": return null;
+  }
 }
 
 /**
@@ -422,7 +549,15 @@ export type GmChronicleContext = Readonly<{
  * assignable to one another by accident, so handing the player projection the GM's clock has to be typed out
  * deliberately rather than reached by a copy-paste of the GM branch.
  */
-export type PlayerChronicleContext = PlayerSessionNumberContext & Readonly<{ publishedInstant?: number | null }>;
+export type PlayerChronicleContext = PlayerSessionNumberContext & Readonly<{
+  publishedInstant?: number | null;
+  /**
+   * M12: which page ids are revealed, for the one payload field that names a page - a `standing` record's
+   * `factionPageId`. Optional, and the absent value is the QUIETEST one (an empty set nulls the id), so a
+   * caller that forgets loses a link and can never leak one.
+   */
+  revealedPageIds?: ReadonlySet<string>;
+}>;
 
 /**
  * One chronicle row as the GM sees it. Flat and uniform on purpose: every key is present on every kind
@@ -457,8 +592,8 @@ export type GmCodexChronicleRecord = Readonly<{
   sourceEncounterId: number | null;
   /** CT-5, derived (D11-C): has the GM's clock reached this deadline's own date? `false` for every other kind. */
   fired: boolean;
-  /** CT-10: the downtime activity, `applied` included - this is the GM's row. `null` for every other kind. */
-  payload: GmCodexDowntime | null;
+  /** CT-10 / CT-8 / CT-6: the kind's structured facts, GM shape (`applied` included). `null` for the kinds with none. */
+  payload: GmCodexChroniclePayload | null;
   /** CT-10 / O-3: where the clock WOULD land if the GM confirms. `null` once applied, and for every other kind. */
   proposedDate: CodexInWorldDate | null;
   createdAt: string;
@@ -484,8 +619,11 @@ export type GmCodexChronicleRecord = Readonly<{
  *   `fired`        - M11 (CT-5). A revealed deadline the campaign has already reached has to READ as passed,
  *                    or the party's copy of the timeline says something different from the GM's. Derived
  *                    against the PUBLISHED date, never the GM's clock (D11-G) - see `deadlineFired`.
- *   `payload`      - M11 (CT-10), and only ever `who`/`activity`/`days`. `applied` is GM workflow state and
- *                    is dropped by `projectPlayerDowntime` (D11-E), like `rev` on every other record here.
+ *   `payload`      - M11 (CT-10) and M12 (CT-8 / CT-6), allow-listed per kind by `projectPlayerPayload`.
+ *                    A downtime carries only `who`/`activity`/`days` - `applied` is GM workflow state and is
+ *                    dropped (D11-E), like `rev` on every other record here. A milestone carries
+ *                    `level`/`reason`; a standing carries `delta`/`reason` and its `factionPageId` only when
+ *                    that page is itself revealed.
  *
  * Absent by construction: `gmText`, `calendarInstant`, `inWorldDate`, `revealedToPlayers`, `attachPageId`,
  * `attachMarkerId`, `sourceEncounterId` (K2 - the replay id never reaches a player), `updatedAt`, `rev`,
@@ -501,7 +639,7 @@ export type PlayerCodexChronicleRecord = Readonly<{
   inWorldLabel: string | null;
   tags: readonly string[];
   fired: boolean;
-  payload: PlayerCodexDowntime | null;
+  payload: PlayerCodexChroniclePayload | null;
   createdAt: string;
 }>;
 
@@ -517,7 +655,7 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord, context: 
       // `fired` is asked of every entry, not only a deadline: `deadlineFired` answers `false` for a
       // non-deadline and for an undated row, so no reader here has to know which kinds can fire.
       fired: deadlineFired(entry, context.campaignInstant ?? null),
-      payload: projectGmDowntime(entry.payload), proposedDate: context.proposedDate ?? null,
+      payload: projectGmPayload(entry), proposedDate: context.proposedDate ?? null,
       createdAt: entry.createdAt, updatedAt: entry.updatedAt
     };
   }
@@ -564,7 +702,7 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
       sessionNumber: projected.sessionNumber, realDate: projected.realDate, inWorldLabel: projected.inWorldLabel,
       tags: projected.tags,
       fired: deadlineFired(record.entry, context.publishedInstant ?? null),
-      payload: projectPlayerDowntime(record.entry.payload),
+      payload: projectPlayerPayload(record.entry, context.revealedPageIds ?? EMPTY_PAGE_IDS),
       createdAt: projected.createdAt
     };
   }
@@ -740,4 +878,150 @@ export function projectPlayerBacklinks(rows: readonly CodexBacklinkRow[]): Codex
   return rows
     .filter((row) => row.layer === "player" && row.sourceRevealed)
     .map((row) => ({ sourcePageId: row.sourcePageId, sourceTitle: row.sourceTitle, section: row.section }));
+}
+
+// ----- The reveal audit (M12 / CT-9: one GM view of everything the party can currently see) -----
+
+/**
+ * **This is a READ-ONLY AGGREGATION and it decides nothing.** The spec's own risk note for CT-9 is that it
+ * must not become a second source of truth about visibility, and the shape below is what keeps that
+ * structural rather than aspirational: every row this emits is produced by asking THAT RECORD KIND'S
+ * EXISTING PLAYER PROJECTION whether it returns something. There is no `revealed` test anywhere in this
+ * section - not one - and adding one would be the defect the risk note names, because a hand-copied
+ * predicate is a predicate that can be weakened alone.
+ *
+ * Delegating rather than restating is also the only way the audit can be RIGHT. "Revealed" is not the same
+ * question as "player-visible" for two of the seven kinds, and both differences fall out for free here:
+ *   - a MARKER flagged revealed on a HIDDEN map is invisible to players (CD-6), and `projectPlayerPageMarker`
+ *     already knows it;
+ *   - a STANDING revealed for an unrevealed FACTION page is invisible (see `projectPlayerStanding`).
+ * An audit written against `revealed = 1` would list both and tell the GM the party can see things it
+ * cannot - the exact failure the M12 verification test (audit counts vs. real player reads) exists to catch.
+ *
+ * Placed at the END of this file on purpose: it may only delegate to projections that are already defined
+ * above it, so it can never be the first place a rule is written.
+ */
+export type CodexRevealAuditKind = "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
+/**
+ * Every reveal surface in the Codex, in the order the audit reports them, and it is exhaustive BY
+ * CONSTRUCTION: each of the six routes that flips a reveal flag today (`pages`, `maps`, `markers`,
+ * `journal` - which covers all six journal kinds - `sessions`, `quests`) plus M12's standing. A seventh
+ * reveal route added later that is not added here is the one failure this list cannot self-detect, which
+ * is why the HTTP test enumerates the audit against the real player endpoints rather than against itself.
+ *
+ * Exported so the router and the client render the same fixed set of sections. The audit always returns
+ * ALL of them, empty ones included: "nothing is revealed here" and "this did not load" must not look the
+ * same on the GM's screen.
+ */
+export const CODEX_REVEAL_AUDIT_KINDS: readonly CodexRevealAuditKind[] = ["page", "map", "marker", "journal", "session", "quest", "standing"];
+
+/**
+ * One record the audit considers, carrying exactly the CONTEXT that record's player projection needs -
+ * resolved by the caller, exactly as every other player read in this file resolves it. The marker arm
+ * reuses `CodexPageMarkerRecord` verbatim rather than restating its three context fields, because it is
+ * the same question (a pin plus its map's gate) and one definition cannot drift from itself.
+ */
+export type CodexRevealAuditRecord =
+  | Readonly<{ kind: "page"; page: CodexPageSummaryRow }>
+  | Readonly<{ kind: "map"; map: CodexMapRow; parentRevealed: boolean }>
+  | (Readonly<{ kind: "marker" }> & CodexPageMarkerRecord)
+  | Readonly<{ kind: "journal"; entry: CodexJournalRow; sessionContext: PlayerSessionNumberContext }>
+  | Readonly<{ kind: "session"; session: CodexSessionRow }>
+  | Readonly<{ kind: "quest"; quest: CodexQuestRow; revealedEntityIds: ReadonlySet<string> }>
+  | Readonly<{ kind: "standing"; standing: CodexStandingRow; factionRevealed: boolean; factionTitle: string | null }>;
+
+/**
+ * One row of the audit: what it is, which record, and a line naming it.
+ *
+ * `id` is the record's OWN id - deliberately the id that kind's EXISTING reveal route already takes, so
+ * un-revealing from the audit is `POST /codex/<kind>/{id}/reveal { revealed: false }` and nothing new.
+ * M12 adds no unreveal route and no bulk operation: CT-9 is a view, not a writer.
+ */
+export type CodexRevealAuditRow = Readonly<{ kind: CodexRevealAuditKind; id: string; title: string }>;
+
+/** One reveal surface's report. Always present, `revealed: 0` and `rows: []` when the party can see none of it. */
+export type CodexRevealAuditSection = Readonly<{
+  kind: CodexRevealAuditKind;
+  /** How many records of this kind the party can currently see. */
+  revealed: number;
+  /** How many exist at all, so "3 of 40" reads as deliberate rather than as an empty screen. */
+  total: number;
+  rows: readonly CodexRevealAuditRow[];
+}>;
+
+export type CodexRevealAudit = Readonly<{ sections: readonly CodexRevealAuditSection[]; revealed: number; total: number }>;
+
+/**
+ * One record's audit row, or null when the party cannot see it.
+ *
+ * Every arm calls the player projection and then reads the row's title OUT OF THAT PROJECTION'S OWN OUTPUT
+ * rather than out of the stored record. The two are equal for every field used here, so this is not about
+ * hiding anything from the GM (the audit is GM-only) - it is so that "this line is what the party has" is
+ * true by construction rather than by a reviewer's say-so, and so a future tightening of any player
+ * projection tightens the audit with it.
+ */
+function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
+  switch (record.kind) {
+    case "page": {
+      const projected = projectPlayerPageSummary(record.page);
+      return projected === null ? null : { kind: "page", id: projected.id, title: projected.title };
+    }
+    case "map": {
+      const projected = projectPlayerMap(record.map, { parentRevealed: record.parentRevealed });
+      return projected === null ? null : { kind: "map", id: projected.id, title: projected.name };
+    }
+    case "marker": {
+      // `projectPlayerPageMarker`, not `projectPlayerMarker`: the map gate is half the answer here (CD-6).
+      const projected = projectPlayerPageMarker(record);
+      return projected === null ? null : { kind: "marker", id: projected.id, title: projected.label ?? "" };
+    }
+    case "journal": {
+      const projected = projectPlayerJournalEntry(record.entry, record.sessionContext);
+      return projected === null ? null : { kind: "journal", id: projected.id, title: excerpt(projected.text) };
+    }
+    case "session": {
+      const projected = projectPlayerSession(record.session);
+      if (projected === null) return null;
+      // A numbered session reads by its number, which is how the party refers to it; an unnumbered one has
+      // only its recap, so the row shows a bounded excerpt of that rather than an empty line.
+      return { kind: "session", id: projected.id, title: projected.sessionNumber === null ? excerpt(projected.recap) : `Session ${projected.sessionNumber}` };
+    }
+    case "quest": {
+      const projected = projectPlayerQuest(record.quest, { revealedEntityIds: record.revealedEntityIds });
+      return projected === null ? null : { kind: "quest", id: projected.id, title: projected.title };
+    }
+    case "standing": {
+      const projected = projectPlayerStanding(record.standing, { factionRevealed: record.factionRevealed });
+      // The faction's title comes from its PAGE, which this projection has just established is revealed -
+      // so the name on this row is one the party can already read. The standing row itself stores no title.
+      return projected === null ? null : { kind: "standing", id: projected.factionPageId, title: record.factionTitle ?? "" };
+    }
+  }
+}
+
+/**
+ * The audit. Counts and rows per reveal surface, plus the whole-codex totals, from ONE pass over the
+ * records the caller loaded.
+ *
+ * `id` on a standing row is the FACTION PAGE id, not the standing row's own - because that is what
+ * `POST /codex/standing/{factionPageId}/reveal` takes, and the audit's ids exist to be handed straight
+ * back to the existing reveal routes.
+ */
+export function projectRevealAudit(records: readonly CodexRevealAuditRecord[]): CodexRevealAudit {
+  const rowsByKind = new Map<CodexRevealAuditKind, CodexRevealAuditRow[]>(CODEX_REVEAL_AUDIT_KINDS.map((kind) => [kind, []]));
+  const totalByKind = new Map<CodexRevealAuditKind, number>(CODEX_REVEAL_AUDIT_KINDS.map((kind) => [kind, 0]));
+  for (const record of records) {
+    totalByKind.set(record.kind, (totalByKind.get(record.kind) ?? 0) + 1);
+    const row = auditRow(record);
+    if (row !== null) rowsByKind.get(record.kind)?.push(row);
+  }
+  const sections = CODEX_REVEAL_AUDIT_KINDS.map((kind) => {
+    const rows = rowsByKind.get(kind) ?? [];
+    return { kind, revealed: rows.length, total: totalByKind.get(kind) ?? 0, rows };
+  });
+  return {
+    sections,
+    revealed: sections.reduce((count, section) => count + section.revealed, 0),
+    total: sections.reduce((count, section) => count + section.total, 0)
+  };
 }

@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Field, IconButton, Input, Select, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Field, IconButton, Input, Select, Switch, TagInput } from "@vtt/ui";
 import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { IconPicker, EntityIcon } from "./icons";
 import { EntityPicker } from "./EntityPicker";
@@ -25,6 +25,12 @@ type MarkerInspectorProps = Readonly<{
   activeSceneId: string | null;
   onUpdated: (marker: CodexMarker) => void;
   onDeleted: (markerId: string) => void;
+  /**
+   * CT-7 / M12-C: the party flag moved. The caller re-reads the map's pins, because setting this one
+   * cleared whichever pin held it before — and that pin may not be on the map currently open, so there
+   * is no single row to patch. Optional so a caller with nothing to refresh still compiles.
+   */
+  onPartyChanged?: () => void | Promise<void>;
   onOpenMap: (mapId: string) => void;
   onOpenPage: (pageId: string) => void;
   onCreatePage: () => void;
@@ -37,7 +43,7 @@ type MarkerInspectorProps = Readonly<{
   onClose: () => void;
 }>;
 
-export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onRevealMap, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
+export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onPartyChanged = () => {}, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onRevealMap, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [label, setLabel] = useState(marker.label ?? "");
   const [busy, setBusy] = useState(false);
@@ -59,6 +65,17 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
     setError(null);
     try { onUpdated(await atlasApi.revealMarker(gmToken, marker.id, revealed)); }
     catch { setError("Couldn't change who can see this pin."); }
+  };
+  /**
+   * CT-7 / M12-C: mark this pin as the party's position. There is exactly ONE party pin for the whole
+   * atlas, so setting this one clears whichever pin held it before — possibly on a different map, which
+   * is why this reports through `onPartyChanged` (the caller re-reads) instead of patching one row.
+   */
+  const setParty = async (isParty: boolean) => {
+    setBusy(true); setError(null);
+    try { onUpdated(await atlasApi.setPartyMarker(gmToken, marker.id, isParty)); await onPartyChanged(); }
+    catch { setError("Couldn't move the party marker."); }
+    finally { setBusy(false); }
   };
   const remove = async () => {
     if (!(await confirm({ title: "Delete marker", body: "Delete this marker? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
@@ -114,6 +131,21 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
           /* DEFAULT slugify — it is the server's own contract (`tags()` throws on a non-slug rather
              than cleaning it up), so normalising here is what keeps a typed "Old Mill" saveable. */ />
       </Field>
+
+      {/* CT-7: the party's position. Sits with Label and Tags because it describes the pin itself, above
+          the link wiring. `Switch` is the `@vtt/ui` primitive (R9) and carries its own 44px floor.
+          The hint is R2's other half — the map draws a ring, but a ring is shape, and shape alone may
+          never carry a state. It also says the two things a GM has to know: there is only one, and it
+          is moved by moving the pin. There is deliberately no coordinate field and no "move the party"
+          button here — a second way to move one marker is exactly what CT-7 must not grow. */}
+      <div className="codex-marker-party">
+        <Switch checked={marker.isParty} disabled={busy} onChange={setParty}
+          aria-label="This pin is the party's position"
+          label={marker.isParty ? "The party is here" : "Not the party's position"} />
+        <p className="codex-inspector-hint">{marker.isParty
+          ? <>Players see this pin marked as the party. Drag it to move the party — it is an ordinary pin, so its own position is the party's.</>
+          : <>Only one pin in the whole atlas can be the party. Turning this on clears whichever pin held it before, wherever it was.</>}</p>
+      </div>
 
       <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
 

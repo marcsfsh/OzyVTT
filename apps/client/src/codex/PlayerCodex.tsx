@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Checklist, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession } from "./api";
-import { CHRONICLE_KIND_META, campaignDeadlines, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeSummaryLabel } from "./chronicle";
+import { formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession, type PlayerCodexStanding } from "./api";
+import { CHRONICLE_KIND_META, campaignDeadlines, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeSummaryLabel, milestoneOf, milestoneSummaryLabel, standingChangeLabel, standingOf } from "./chronicle";
 import { pickNextSession } from "./sessions";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
 import { CodexIcon } from "./icons";
@@ -10,7 +10,7 @@ import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
-import { CampaignHome, type CampaignDeadline, type CampaignEntry } from "./CampaignHome";
+import { CampaignHome, type CampaignDeadline, type CampaignEntry, type CampaignStanding } from "./CampaignHome";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { EntityIcon } from "./icons";
 import { ENTITY_DEFS, entityDef, relationshipLabel, type EntityType } from "./entities";
@@ -87,6 +87,12 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
    */
   const [quests, setQuests] = useState<PlayerCodexQuest[]>([]);
   /**
+   * M12 / CT-6: the standings the GM has revealed. Two keys per row (`projectPlayerStanding`) — which
+   * faction, and where the party stands with it. An unrevealed standing is not in this list at all, so
+   * there is nothing here to filter and nothing to hide.
+   */
+  const [standing, setStanding] = useState<PlayerCodexStanding[]>([]);
+  /**
    * The quest reader — a DESTINATION laid over the Campaign mode, not a sixth tab. The GM's quest log is
    * one for the reason stated in `QuestsView`: five modes already overflow a 375px strip and a sixth
    * would push the overflow past the point where `.codex-modetabs`' cue helps. The player's bar is the
@@ -102,7 +108,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
 
   const load = useCallback(async () => {
     try {
-      const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar, nextSessions, nextQuests] = await Promise.all([
+      const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar, nextSessions, nextQuests, nextStanding] = await Promise.all([
         playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.chronicle(token), playerCodexApi.listRelationships(token),
         // Uncaught, exactly like the typed-edge feed beside it: the two are the Graph's two halves, and
         // half a graph drawn silently is worse than the error Alert this surface already shows (R4).
@@ -112,9 +118,11 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
         // Same bargain for the session card: one card is worth less than the rest of the codex.
         playerCodexApi.sessions(token).catch(() => []),
         // ...and for the quest card, on the same terms.
-        playerCodexApi.quests(token).catch(() => [])
+        playerCodexApi.quests(token).catch(() => []),
+        // ...and for M12's standing card, on the same terms again.
+        playerCodexApi.standing(token).catch(() => [])
       ]);
-      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setLinks(nextLinks); setCalendar(nextCalendar); setSessions(nextSessions); setQuests(nextQuests);
+      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setLinks(nextLinks); setCalendar(nextCalendar); setSessions(nextSessions); setQuests(nextQuests); setStanding(nextStanding);
       setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
       setError(null);
     } catch { setError("Couldn't load the codex - check your connection to the table."); }
@@ -223,6 +231,22 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
     [timeline]
   );
   const campaignToday = useMemo(() => (calendar?.currentDate ? formatWorldDate(calendar, calendar.currentDate) : null), [calendar]);
+  /**
+   * M12 / CT-6: the revealed standings, named against this player's OWN revealed pages.
+   *
+   * A standing whose faction page has NOT been revealed is dropped rather than rendered as "Unknown
+   * faction" — a nameless bar reading "Hunted" would tell the table that something they have never been
+   * told about is hunting them, which is a leak of the page's existence dressed up as a card. The
+   * server's projection is the gate; this is the same "an id with no row is simply not rendered" lookup
+   * the quest reader already does, and it can only ever narrow.
+   */
+  const campaignStanding = useMemo<readonly CampaignStanding[]>(
+    () => standing
+      .map((row) => ({ row, page: pages.find((summary) => summary.id === row.factionPageId) }))
+      .filter((pair): pair is { row: PlayerCodexStanding; page: PlayerCodexPageSummary } => Boolean(pair.page))
+      .map(({ row, page }) => ({ factionPageId: row.factionPageId, name: page.title, value: row.value })),
+    [standing, pages]
+  );
 
   /**
    * The quest being read, resolved out of the ONE quest feed this surface already fetched — there is no
@@ -350,6 +374,9 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
           quests={quests}
           /* M11: the revealed deadlines, through the same shared rule the GM's workspace applies. */
           deadlines={campaignDeadlineCards}
+          /* M12: the revealed standings. No `onAdjustStanding` — a player has nothing to adjust, and the
+             card is then the readout it already is, with nothing to tap. */
+          standing={campaignStanding}
           /* R1: the card's rows now land ON the quest, in the player's own reader. Passing this flips the
              card's existing readout rows to its existing button rows (`.codex-campaign-recentitem`,
              already §4 route 1) — the dashboard itself is unchanged and still lists only OPEN quests. */
@@ -467,6 +494,11 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
               // a deadline's derived `fired`, and a downtime's payload MINUS `applied` (the server's
               // allow-list never sends it, and `downtimeSummaryLabel` never asks for it).
               const fired = deadlineFired(record);
+              // M12: the same kind gates the GM's timeline uses (`chronicle.ts`), so a revealed
+              // milestone and a revealed standing change read here exactly as they read there.
+              const downtime = downtimeOf(record);
+              const milestone = milestoneOf(record);
+              const standing = standingOf(record);
               return (
               <article key={`${record.kind}-${record.id}`} id={`codex-player-entry-${record.id}`} aria-current={record.id === focusedEntryId ? "true" : undefined}
                 className={`codex-entry${record.kind === "combat" ? " is-combat" : ""}${record.kind === "event" ? " is-event" : ""}${record.kind === "deadline" ? " is-deadline" : ""}${record.kind === "downtime" ? " is-downtime" : ""}${record.id === focusedEntryId ? " is-focused" : ""}`}>
@@ -481,7 +513,14 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
                 {/* Who spent the time, on what, for how long. No Confirm and no proposed date: applying a
                     downtime is a GM action against the GM's own clock, and neither the control nor the
                     state that drives it exists on this surface. */}
-                {record.kind === "downtime" && record.payload && <p className="codex-downtime-what">{downtimeSummaryLabel(record.payload)}</p>}
+                {downtime && <p className="codex-downtime-what">{downtimeSummaryLabel(downtime)}</p>}
+                {/* CT-8 / CT-6, on the same terms: a revealed milestone says which level the party
+                    reached, and a revealed standing change says which way a faction moved and why. The
+                    faction's name is resolved against this player's OWN revealed pages — an id with no
+                    row falls back to the shared label's "A faction", never to a name they have not been
+                    given. Neither line is a new gate: an unrevealed record is not in `timeline` at all. */}
+                {milestone && <p className="codex-downtime-what">{milestoneSummaryLabel(milestone)}</p>}
+                {standing && <p className="codex-downtime-what">{standingChangeLabel(standing, pages.find((summary) => summary.id === standing.factionPageId)?.title ?? null)}</p>}
               </article>
               );
             })}

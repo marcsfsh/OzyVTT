@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
-import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, questApi, sessionApi, type CodexBacklink, type CodexChronicleRecord, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexQuest, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type CodexSession, type GmCodexCalendar } from "./api";
+import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, questApi, sessionApi, standingApi, type CodexBacklink, type CodexChronicleRecord, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexQuest, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type CodexSession, type CodexStanding, type GmCodexCalendar } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView } from "./JournalView";
@@ -10,10 +10,12 @@ import { CommandPalette } from "./CommandPalette";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { EntityIcon } from "./icons";
-import { CampaignHome, type CampaignDeadline, type CampaignEntry } from "./CampaignHome";
+import { CampaignHome, type CampaignDeadline, type CampaignEntry, type CampaignStanding } from "./CampaignHome";
 import { SessionsView } from "./SessionsView";
 import { SessionConsole } from "./SessionConsole";
 import { QuestsView } from "./QuestsView";
+import { RevealAudit } from "./RevealAudit";
+import { StandingAdjuster } from "./StandingAdjuster";
 import { pickNextSession } from "./sessions";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
@@ -86,6 +88,15 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    */
   const [questsOpen, setQuestsOpen] = useState(false);
   const [questTarget, setQuestTarget] = useState<string | null>(null);
+  /**
+   * M12 / CT-9: the reveal audit is the THIRD such destination, on identical terms. It has no target
+   * latch because nothing jumps INTO it — it is reached only from the ops row, and it lands on the whole
+   * picture rather than on one record. All three lay over the same content region, so each opener closes
+   * the other two rather than leaving one silently stacked behind another.
+   */
+  const [auditOpen, setAuditOpen] = useState(false);
+  /** M12 / CT-6: which faction's standing the GM is adjusting, or null. GM-only — see `StandingAdjuster`. */
+  const [adjustingFactionId, setAdjustingFactionId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
   });
@@ -161,6 +172,17 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   useEffect(() => { void loadQuests(); }, [loadQuests]);
 
   /**
+   * M12 / CT-6: **the** standing feed, on the quest feed's terms. Two consumers — the Campaign card and
+   * the adjust dialog it opens — and the moment either fetched for itself they could disagree about
+   * where the party stands, which is the one number this feature exists to state once.
+   *
+   * Unlike the session and quest feeds it loads with the DASHBOARD (`loadCampaign` below) rather than on
+   * mount: standing is read and written on the Campaign tab and nowhere else, so a GM who never opens it
+   * should not pay a round-trip for it on the suite's most-loaded surface.
+   */
+  const [standing, setStanding] = useState<readonly CodexStanding[]>([]);
+
+  /**
    * CI-7: the dashboard's own feed — the journal, the atlas and the calendar, which the notebook rail
    * never needed. Deliberately NOT folded into `refreshList`: that runs on mount and on every
    * `codex:changed`, and the workspace lands on Pages, so three extra round-trips would be paid by
@@ -177,8 +199,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       // chronicle record, so the deadlines card cannot be fed from `/journal` at all. The second is that
       // the player's dashboard has always read the chronicle — one feed for one dashboard means the two
       // audiences can no longer be looking at differently-assembled versions of the same card.
-      const [records, maps, calendar] = await Promise.all([journalApi.chronicle(gmToken), atlasApi.listMaps(gmToken), calendarApi.get(gmToken)]);
-      setCampaign({ records, maps, calendar }); setCampaignError(null);
+      // M12: standing rides this same read. It is uncaught, like the three beside it — a dashboard that
+      // silently dropped the standing card would be exactly the "one fewer section, silently" failure
+      // R4's error Alert exists to prevent.
+      const [records, maps, calendar, nextStanding] = await Promise.all([journalApi.chronicle(gmToken), atlasApi.listMaps(gmToken), calendarApi.get(gmToken), standingApi.list(gmToken)]);
+      setCampaign({ records, maps, calendar }); setStanding(nextStanding); setCampaignError(null);
     } catch (loadError) { setCampaignError(loadError instanceof Error ? loadError.message : "Could not load the campaign dashboard."); }
     finally { setCampaignLoading(false); }
   }, [gmToken]);
@@ -221,6 +246,30 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
     [campaign.records]
   );
   const campaignToday = useMemo(() => (campaign.calendar?.currentDate ? formatWorldDate(campaign.calendar, campaign.calendar.currentDate) : null), [campaign.calendar]);
+  /**
+   * M12 / CT-6: the standing card's rows — **every faction PAGE**, not only the ones with a stored row.
+   *
+   * A faction the GM has written but never rated shows at 0 ("Uninvested"), because this card is the one
+   * place standing is adjusted: listing only the rated ones would make a brand-new faction unreachable,
+   * and "add a standing" would have to become a second control answering a question the card already
+   * asks. The store's own model agrees — no row simply means nobody has taken a position yet.
+   *
+   * A stored row whose faction page has since been deleted has nowhere to render and is dropped here;
+   * the server's cascade removes it on the next write, and the reveal audit still lists it meanwhile.
+   */
+  const campaignStanding = useMemo<readonly CampaignStanding[]>(() => {
+    const byFaction = new Map(standing.map((row) => [row.factionPageId, row.value]));
+    return pages
+      .filter((page) => page.entityType === "faction")
+      .map((page) => ({ factionPageId: page.id, name: page.title, value: byFaction.get(page.id) ?? 0 }));
+  }, [pages, standing]);
+  /** The faction the adjust dialog is open on, and its stored row (null = never rated — it starts at 0). */
+  const adjustingFaction = useMemo(() => {
+    if (!adjustingFactionId) return null;
+    const page = pages.find((candidate) => candidate.id === adjustingFactionId);
+    if (!page) return null;
+    return { page, standing: standing.find((row) => row.factionPageId === adjustingFactionId) ?? null };
+  }, [adjustingFactionId, pages, standing]);
 
   // CI-1 / R8: the rail's search is the SUITE's search — pages, journal entries, maps and markers in one
   // list. It overlays the tree while a query is active and re-runs when the notebook changes.
@@ -423,7 +472,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
         <div className="codex-modetabs">
           {/* Picking a mode also leaves the session log: the log is a destination laid over the modes,
               so a tab that changed the mode underneath it without surfacing would look like a dead tab. */}
-          <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => { setMode(id as typeof mode); setSessionsOpen(false); setQuestsOpen(false); }}
+          <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => { setMode(id as typeof mode); setSessionsOpen(false); setQuestsOpen(false); setAuditOpen(false); }}
             tabs={[{ id: "campaign", label: "Campaign" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
         </div>
         <div className="codex-modebar-ops">
@@ -432,9 +481,17 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
               carries the 44px floor itself (§4 route 2, `.nh-btn--sm`), so there is no new control here
               and no new floor to argue about. They live in the ops row rather than as extra tabs because
               the five modes already overflow a 375px strip; this row wraps, which a tab strip does not. */}
-          <Button variant="ghost" size="sm" onClick={() => { setQuestsOpen(false); setSessionTarget(null); setSessionsOpen(true); }}>Sessions</Button>
-          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setQuestTarget(null); setQuestsOpen(true); }}>Quests</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setQuestsOpen(false); setAuditOpen(false); setSessionTarget(null); setSessionsOpen(true); }}>Sessions</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setAuditOpen(false); setQuestTarget(null); setQuestsOpen(true); }}>Quests</Button>
           <Button variant="ghost" size="sm" aria-expanded={consoleOpen} onClick={() => setConsoleOpen((open) => !open)}>Session console</Button>
+          {/* M12 / CT-9. It belongs beside "Preview as player" rather than with the mode tabs because the
+              two answer halves of one question — that one shows what a player sees, this one lists what
+              they are allowed to. `Button size="sm"` is a `@vtt/ui` primitive and carries the 44px floor
+              itself (§4 route 2, `.nh-btn--sm`); the row wraps, where a tab strip would not.
+              Called "Reveal audit" and NOT "What players see", which is already the player-preview
+              modal's title — two buttons a thumb apart with the same words would be worse than a
+              slightly technical one. */}
+          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setQuestsOpen(false); setAuditOpen(true); }}>Reveal audit</Button>
           <Button variant="ghost" size="sm" onClick={openPlayerPreview}>Preview as player</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
           <Button variant="ghost" size="sm" onClick={exportCodex}>Export</Button>
@@ -444,7 +501,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       {/* CF-2: one error surface for the whole workspace. It previously lived inside the Pages rail, so a
           failed load was invisible in Campaign, Atlas, Journal and Graph. */}
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
-      {sessionsOpen
+      {auditOpen
+        ? <RevealAudit gmToken={gmToken} onClose={() => setAuditOpen(false)} />
+        : sessionsOpen
         ? <SessionsView gmToken={gmToken} sessions={sessions} activeSessionId={activeSessionId}
             loading={sessionsLoading} error={sessionsError} onChanged={loadSessions}
             openSessionId={sessionTarget} onOpenedSession={() => setSessionTarget(null)}
@@ -473,6 +532,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
             /* M11: a deadline is a journal record, so its row opens through the SAME jump an ordinary
                journal row uses (`onOpenEntry` below) — the Journal, with that record marked. */
             deadlines={campaignDeadlineCards}
+            /* M12 / CT-6: every faction and where it stands. `onAdjustStanding` is the capability flag
+               that turns the card's readout rows into adjustable ones — the player's Codex passes no
+               such callback, and the shared card type carries no reveal flag for it to leak. */
+            standing={campaignStanding}
+            onAdjustStanding={setAdjustingFactionId}
             onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
             /* R1: both new jumps prepare their destination — the entry is marked on the timeline, the
                map is the one that opens — reusing the very latches search already lands through. */
@@ -575,6 +639,14 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
         <p className="codex-inspector-hint">This is the real player Codex, read through a player session — anything hidden from players is absent here, not just dimmed.</p>
         {previewToken && <PlayerCodex token={previewToken} />}
       </Modal>
+      {/* M12 / CT-6: the GM's write control for standing. It lives HERE and never inside `CampaignHome`,
+          which the player's Codex also renders — the dashboard card only asks for it by id. */}
+      {adjustingFaction && (
+        <StandingAdjuster key={adjustingFaction.page.id} gmToken={gmToken}
+          factionPageId={adjustingFaction.page.id} factionName={adjustingFaction.page.title}
+          standing={adjustingFaction.standing}
+          onSaved={loadCampaign} onClose={() => setAdjustingFactionId(null)} />
+      )}
       {promptDialog}
       {confirmDialog}
     </div>

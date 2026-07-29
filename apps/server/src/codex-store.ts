@@ -144,6 +144,18 @@ export type CodexMarkerRow = Readonly<{
   revealedToPlayers: boolean;
   /** CI-2: the same tag vocabulary pages carry. */
   tags: readonly string[];
+  /**
+   * CT-7 / M12-C: this pin is where the party is, and **at most one marker in the whole atlas** carries
+   * it (migration v16's partial unique index is the file's half of that rule, `setPartyMarker` the
+   * process's half).
+   *
+   * A FLAG on an ordinary marker rather than a marker of its own: the party pin is moved, linked,
+   * labelled, tagged, revealed and deleted by exactly the paths every other pin uses, so there is one
+   * marker projection and one visibility gate rather than two. It is player-visible on purpose - the
+   * party pin is FOR the players - but it grants no visibility: a party pin that is hidden, or that sits
+   * on a hidden map, stays hidden, because `isParty` is not part of any reveal predicate anywhere.
+   */
+  isParty: boolean;
 } & CodexMarkerLinks & { createdAt: string; updatedAt: string }>;
 
 export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean; tags?: readonly string[] }>;
@@ -169,12 +181,15 @@ const DEFAULT_CALENDAR: CodexCalendar = {
 };
 
 /**
- * M11 (CT-5 / CT-10) widens the journal's kinds from two to four. The DATABASE's CHECK is wider still -
- * migration v15 admits `milestone` and `standing` as well, because widening a CHECK in SQLite costs a full
- * table rebuild and M12 needs those two. The DB being more permissive than this union is the existing, safe
- * direction (a row this file cannot classify reads back as `note` via `journalKind`, never as a throw).
+ * M11 (CT-5 / CT-10) widened the journal's kinds from two to four; M12 (CT-6 / CT-8) takes it to six and
+ * the DATABASE needs no migration to accept them - v15 rebuilt the CHECK with all six precisely so this
+ * one word each could be added without a second rebuild (see v16's comment).
+ *
+ * The two halves are now in agreement for the first time since M11. That is the ONLY change here: the DB
+ * being more permissive than this union is still the safe direction, and `journalKind` still fails closed,
+ * so a seventh kind written by a future build reads back as `note` rather than throwing.
  */
-export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime";
+export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing";
 /**
  * CT-10's downtime activity: WHO spent WHICH days doing WHAT, and whether the GM has confirmed the clock
  * move it proposes (O-3).
@@ -191,6 +206,45 @@ export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime";
  * projected to a player (D11-E).
  */
 export type CodexDowntimePayload = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
+/**
+ * CT-8's progression record: the party reached LEVEL n, and WHY.
+ *
+ * `level` is the level reached, not a delta, because that is the fact a GM states and the one a reader
+ * wants ("we hit 5 after the crypt"). A delta would make the current level a sum over the whole timeline
+ * that a single deleted record silently changes. Standing is the opposite (see below) and the difference
+ * is deliberate: standing has a TABLE holding where things stand, so its records carry the change;
+ * a level has no table, so its records carry the state.
+ *
+ * `reason` is the one prose channel that does NOT get a reveal split, so it must be safe for whoever the
+ * record is revealed to. It is short, single-line prose ("cleared the crypt"); a milestone that needs a
+ * GM-only half has `gmText` for it, exactly like every other journal record.
+ */
+export type CodexMilestonePayload = Readonly<{ level: number; reason: string }>;
+/**
+ * CT-6's standing record: what CHANGED and why. The `codex_standing` table says where things stand; this
+ * says what happened. Storing the new value here as well would be a second copy of the same fact, and the
+ * copy that goes stale first - deleting a record would leave a history that no longer adds up to the table.
+ *
+ * `delta` is therefore the change, never the resulting value (spec §2.2). `factionPageId` is a plain id
+ * with no foreign key behind it: deleting a faction page cascades its STANDING ROW away but must leave its
+ * history standing, because "the Harpers turned on us in Marpenoth" remains true after the page is gone.
+ * Readers resolve the id defensively (a missing page is a name they cannot show, not an error).
+ */
+export type CodexStandingPayload = Readonly<{ factionPageId: string; delta: number; reason: string }>;
+/**
+ * Every payload the journal can carry, keyed by the `kind` that owns it - `downtime` -> `CodexDowntimePayload`,
+ * `milestone` -> `CodexMilestonePayload`, `standing` -> `CodexStandingPayload`, and nothing at all for the
+ * other three. `toEntry` is the ONE place that mapping is written, and it reads the stored blob only for
+ * the kind that owns it, so a hand-edited or future-version row can never smuggle one kind's payload onto
+ * another kind's record.
+ *
+ * A UNION rather than a discriminated `CodexJournalRow` per kind, and that is a deliberate, stated
+ * limitation: TypeScript would then narrow `payload` from `kind`, which is genuinely better, but it makes
+ * `CodexJournalRow` a union that `Partial<>`, object spreads and `{ ...row, kind }` all stop accepting -
+ * and those appear in the projection layer and its tests, which M12 does not own. Use `payloadFor*` below
+ * to narrow; they are the type-safe form of the same question and they cannot get the kind wrong.
+ */
+export type CodexEntryPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload;
 export type CodexJournalRow = Readonly<{
   id: string;
   playerText: string;
@@ -209,8 +263,8 @@ export type CodexJournalRow = Readonly<{
   sortKey: number;
   /** CI-2: the same tag vocabulary pages carry. */
   tags: readonly string[];
-  /** M11: kind-specific structured data. `null` for every kind except `downtime` (D11-C / D11-D). */
-  payload: CodexDowntimePayload | null;
+  /** M11/M12: kind-specific structured data. `null` for every kind but `downtime`, `milestone`, `standing`. */
+  payload: CodexEntryPayload | null;
   createdAt: string;
   updatedAt: string;
 }>;
@@ -218,6 +272,35 @@ export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: s
 export type CodexJournalUpdateInput = CodexJournalCreateInput;
 /** CT-10: what `createDowntime` needs beyond an ordinary entry. `applied` is not an input - it starts false. */
 export type CodexDowntimeCreateInput = CodexJournalCreateInput & Readonly<{ downtime: Readonly<{ who: string; activity: string; days: number }> }>;
+/** CT-8: what `createMilestone` needs beyond an ordinary entry - `CodexDowntimeCreateInput`'s shape verbatim. */
+export type CodexMilestoneCreateInput = CodexJournalCreateInput & Readonly<{ milestone: Readonly<{ level: number; reason: string }> }>;
+
+/**
+ * CT-6: where the party stands with ONE faction. The whole record is four facts, and what is NOT here is
+ * the point:
+ *
+ *  - No history. Every change writes a `kind='standing'` chronicle record instead (spec §2.1), so the
+ *    timeline is the one history in this codex rather than the second one.
+ *  - No `rev`. There is no editor behind a standing - it is a number and a reason, set in one action -
+ *    so there is no draft to go stale and nothing for a conflict token to protect.
+ *  - No cached faction TITLE. `faction_page_id` resolves to the live page; a copied name would be the
+ *    thing that goes stale the first time the GM renames the faction.
+ *
+ * `value` is SIGNED, -100..100, because a faction can be actively against the party and an unsigned
+ * "favour" scale cannot say so (M12-B). The WORD a reader shows beside it (`Hostile` ... `Allied`) is a
+ * presentation of this number and is deliberately not stored: two representations of one fact is one of
+ * them being wrong after the next edit.
+ */
+export type CodexStandingRow = Readonly<{
+  id: string;
+  factionPageId: string;
+  /** -100 (Hostile) .. +100 (Allied), 0 = Neutral. Clamped on the way in by `standingValue`. */
+  value: number;
+  /** O-2 / P2: a standing starts hidden. Players may or may not know where they stand. */
+  revealedToPlayers: boolean;
+  createdAt: string;
+  updatedAt: string;
+}>;
 export type CodexCombatEntryInput = Readonly<{ sourceEncounterId: number; attachMarkerId?: string | null; attachPageId?: string | null; playerText: string; gmText?: string | null; revealedToPlayers?: boolean }>;
 
 /**
@@ -834,6 +917,69 @@ export const MIGRATIONS = [{
         CASE WHEN json_type(calendar_json, '$.currentDate.day') IN ('integer', 'real')
           THEN CAST(json_extract(calendar_json, '$.currentDate.day') AS INTEGER) END END;
   `
+}, {
+  version: 16,
+  // M12 (CT-6 standing, CT-7 party marker, CT-8 milestones). ADDITIVE ONLY - and the loudest thing about
+  // this migration is what it does NOT do.
+  //
+  // It does NOT touch `codex_journal`. M12 adds two journal KINDS (`milestone`, `standing`), and v15
+  // already rebuilt the CHECK with all six for exactly this reason: "the cost of this migration is the
+  // REBUILD, and paying it twice four weeks apart for one word each would be silly". Verified against the
+  // shipped v15 SQL above, not remembered - the CHECK reads
+  // `kind IN ('note','combat','deadline','downtime','milestone','standing')` and `payload_json TEXT` is
+  // already there. A second rebuild here would be the most destructive no-op in the file's history.
+  //
+  // `codex_standing` (spec §2.1). One row per faction, and the UNIQUE index is what makes that structural
+  // rather than a convention every writer has to remember - `setStanding` upserts against it, so "adjust
+  // the Harpers twice" can never become two disagreeing rows. `id` is still the primary key so the row has
+  // a stable identity of its own if it ever needs one; the uniqueness that matters is the faction's.
+  //
+  // ON DELETE CASCADE on `faction_page_id`, and this was CONFIRMED against a live database rather than
+  // assumed, because the two halves pull in opposite directions and both are wanted:
+  //   - Foreign keys ARE enforced here (`initialize()` opens with `enableForeignKeyConstraints: true`),
+  //     so deleting a faction page DOES remove its standing row. That is right: a standing is "where we
+  //     stand with THEM", and with the page gone there is no them. A dangling row would render as a bar
+  //     beside a blank name that no screen can delete.
+  //   - Its `kind='standing'` CHRONICLE RECORDS SURVIVE, and must. They are `codex_journal` rows carrying
+  //     `factionPageId` inside `payload_json`, which is TEXT with no foreign key behind it, so no cascade
+  //     reaches them. "The Harpers turned on us in Marpenoth" stays true after the page is deleted, and
+  //     the timeline is the campaign's history - deleting a page must not rewrite it. Probed directly:
+  //     after `DELETE FROM codex_pages`, the standing row was gone and the journal row was still there.
+  //   - The same FK also REJECTS a standing row for a page that does not exist, so `setStanding` cannot
+  //     leave one behind on a typo'd id. It still checks first, to produce a message a GM can read.
+  // No CHECK on `value`. Every other CHECK in this file guards an ENUM (`kind`, `status`, `layer`) where
+  // the set of legal values is structural. -100..100 is a PRODUCT decision (M12-B) about a scale, and
+  // baking it into the file would cost a full table rebuild - the v15 experience - to widen later. The
+  // clamp lives in `standingValue`, and a hand-edited out-of-range row reads back clamped rather than
+  // breaking the codex, which is this file's fail-closed discipline applied to a number instead of a word.
+  //
+  // `is_party` on `codex_markers` (CT-7 / M12-C). NOT NULL DEFAULT 0 so every existing pin is "not the
+  // party" without a backfill pass - K7's cheapest possible shape, and the honest one: no marker in any
+  // existing codex is the party marker, because until now there was no such thing.
+  //
+  // The PARTIAL UNIQUE INDEX is the file's half of "exactly one party marker atlas-wide". v13's
+  // `codex_sessions_number` is the precedent, but this one differs in a way worth stating: v13's
+  // `WHERE session_number IS NOT NULL` is INTENT (SQLite already treats NULLs as distinct), whereas this
+  // predicate is LOad-BEARING - without it the index would demand every marker have a distinct `is_party`,
+  // so a second ordinary pin could not exist. With it, only the `is_party = 1` rows are indexed, so many
+  // zeros are legal and a second one is rejected. Both halves were probed against this build: flagging a
+  // second party raises "UNIQUE constraint failed: codex_markers.is_party", and three markers at 0 coexist.
+  //
+  // That also fixes the ORDER of `setPartyMarker`'s two writes at the file level: clear-then-set commits,
+  // set-then-clear is rejected mid-transaction. Measured, not reasoned about.
+  sql: `
+    CREATE TABLE codex_standing (
+      id TEXT PRIMARY KEY,
+      faction_page_id TEXT NOT NULL REFERENCES codex_pages(id) ON DELETE CASCADE,
+      value INTEGER NOT NULL,
+      revealed INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+    CREATE UNIQUE INDEX codex_standing_faction ON codex_standing (faction_page_id);
+    ALTER TABLE codex_markers ADD COLUMN is_party INTEGER NOT NULL DEFAULT 0;
+    CREATE UNIQUE INDEX codex_markers_party ON codex_markers (is_party) WHERE is_party = 1;
+  `
 }];
 
 /**
@@ -941,8 +1087,10 @@ function pageDateOf(row: Pick<PageRow, "in_world_year" | "in_world_month" | "in_
 type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
 type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; tags_json: string; created_at: string; updated_at: string };
 const MAP_COLUMNS = "id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at";
-type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_ids_json: string | null; sub_map_id: string | null; scene_ids_json: string | null; actor_id: string | null; tags_json: string; created_at: string; updated_at: string };
-const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, created_at, updated_at";
+type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_ids_json: string | null; sub_map_id: string | null; scene_ids_json: string | null; actor_id: string | null; tags_json: string; is_party: number; created_at: string; updated_at: string };
+const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, is_party, created_at, updated_at";
+type StandingRowRaw = { id: string; faction_page_id: string; value: number; revealed: number; created_at: string; updated_at: string };
+const STANDING_COLUMNS = "id, faction_page_id, value, revealed, created_at, updated_at";
 type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string };
 /** One column list per session read, the same discipline PAGE_COLUMNS / JOURNAL_COLUMNS follow. */
 const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at";
@@ -1202,7 +1350,7 @@ function sessionStatus(value: string | undefined): CodexSessionStatus {
   if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new Error("A session is either planned or played.");
   return value as CodexSessionStatus;
 }
-const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime"]);
+const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime", "milestone", "standing"]);
 /**
  * A stored `kind` PARSED, not coerced. Before M11 this was inlined in `toEntry` as
  * `row.kind === "combat" ? "combat" : "note"`, which is fine for two kinds and actively dangerous for four:
@@ -1210,9 +1358,15 @@ const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "
  * errors anywhere - the failure would have been a GM's deadline quietly not existing.
  *
  * Fail-closed to `note`, the same discipline `sessionStatus`/`questStatus` use for their enums, and here it
- * has a second job: migration v15's CHECK admits `milestone` and `standing` for M12, so a row written by a
- * future version reads as a plain note on an older build rather than throwing. Narrowing, never throwing -
- * a read path that can throw turns one bad row into an unopenable codex.
+ * has a second job: a row written by a FUTURE version reads as a plain note on an older build rather than
+ * throwing. Narrowing, never throwing - a read path that can throw turns one bad row into an unopenable
+ * codex.
+ *
+ * M12 is the case that comment was written for, and it is worth recording that the mechanism worked exactly
+ * as designed: `milestone` and `standing` rows were storable from v15 onward and read back as `note` until
+ * this set gained the two words. Nothing threw, nothing failed to compile, and a GM's milestone would have
+ * been an ordinary note on every screen. Forgetting the entry here is therefore SILENT, which is why there
+ * is a test that round-trips both kinds rather than one that only checks they can be inserted.
  */
 function journalKind(value: string): CodexJournalKind {
   return JOURNAL_KINDS.has(value as CodexJournalKind) ? (value as CodexJournalKind) : "note";
@@ -1254,6 +1408,121 @@ function parseDowntimePayload(raw: string | null | undefined): CodexDowntimePayl
     };
   } catch { return null; }
 }
+/**
+ * 5e's level ceiling, and the same number `packages/rules-5e`'s `clampLevel` uses - taken from there rather
+ * than invented here, so a milestone cannot record a level the rules engine would refuse to build.
+ */
+const MAX_LEVEL = 20;
+/**
+ * CT-8's payload on the way IN. `level` is REJECTED rather than clamped when out of range, unlike standing's
+ * `value`: a level is a fact the GM states about their party, and silently turning "level 25" into "level 20"
+ * would answer a POST with something other than what it asked for. A standing is a position on a scale the
+ * GM is dragging, where the ends of the scale ARE the answer.
+ *
+ * An empty `reason` is legal for the reason `questObjectives` and `downtimePayload` both spell out: the real
+ * flow is "record it, then say why", and rejecting the blank would 400 the first save.
+ */
+function milestonePayload(input: Readonly<{ level: number; reason: string }>): CodexMilestonePayload {
+  const level = input?.level;
+  if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL) throw new Error(`A milestone's level must be a whole number from 1 to ${MAX_LEVEL}.`);
+  return { level, reason: shortLabel(input.reason, 120, "milestone reason") ?? "" };
+}
+/** Read a stored milestone payload defensively - malformed JSON degrades to `null` (`parseDowntimePayload`'s rule). */
+function parseMilestonePayload(raw: string | null | undefined): CodexMilestonePayload | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const value = parsed as { level?: unknown; reason?: unknown };
+    return {
+      // Clamped on the way OUT even though it is rejected on the way in: a hand-edited row must read back
+      // as a plausible level rather than break every screen that renders one.
+      level: typeof value.level === "number" && Number.isFinite(value.level) ? Math.min(MAX_LEVEL, Math.max(1, Math.trunc(value.level))) : 1,
+      reason: typeof value.reason === "string" ? value.reason : ""
+    };
+  } catch { return null; }
+}
+/** M12-B: standing runs -100 (Hostile) to +100 (Allied), 0 being Neutral. SIGNED - a faction can be against the party. */
+const MIN_STANDING = -100;
+const MAX_STANDING = 100;
+/**
+ * CT-6's value on the way in: CLAMPED, not rejected. The GM is positioning a faction on a fixed scale, and
+ * the ends of that scale are meaningful answers ("as hostile as it gets"), so a request that overshoots is
+ * asking for the end rather than making a mistake. This is the deliberate opposite of `milestonePayload`'s
+ * level, which is a stated fact and is rejected when it is not one; the two are commented so the difference
+ * reads as a decision rather than an inconsistency.
+ *
+ * A non-finite or non-numeric value is still an error, not a clamp - `Math.trunc(NaN)` is `NaN`, and
+ * clamping that would write NaN into a STRICT INTEGER column.
+ */
+function standingValue(value: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("A standing value must be a number from -100 to 100.");
+  return Math.min(MAX_STANDING, Math.max(MIN_STANDING, Math.trunc(value)));
+}
+/**
+ * CT-6's payload on the way IN. `delta` is passed in already computed by `setStanding` (it is the difference
+ * between two clamped values, so it is bounded by -200..200 and needs no clamp of its own).
+ */
+function standingPayload(input: Readonly<{ factionPageId: string; delta: number; reason: string }>): CodexStandingPayload {
+  return { factionPageId: input.factionPageId, delta: Math.trunc(input.delta), reason: shortLabel(input.reason, 120, "standing reason") ?? "" };
+}
+/** Read a stored standing payload defensively - malformed JSON degrades to `null` (`parseDowntimePayload`'s rule). */
+function parseStandingPayload(raw: string | null | undefined): CodexStandingPayload | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const value = parsed as { factionPageId?: unknown; delta?: unknown; reason?: unknown };
+    return {
+      factionPageId: typeof value.factionPageId === "string" ? value.factionPageId : "",
+      delta: typeof value.delta === "number" && Number.isFinite(value.delta) ? Math.trunc(value.delta) : 0,
+      reason: typeof value.reason === "string" ? value.reason : ""
+    };
+  } catch { return null; }
+}
+
+/**
+ * The type-safe way to ask "does this entry carry MY payload?", one per payload-bearing kind.
+ *
+ * `CodexJournalRow.payload` is a union and `CodexJournalRow` is deliberately not a discriminated union (see
+ * `CodexEntryPayload`), so a reader that wants a downtime's `applied` would otherwise reach for a cast - and
+ * a cast is precisely how a `standing` payload gets read as a `downtime` one, with no error anywhere and a
+ * `delta` rendering as a day count. These check the KIND, not the shape, so they cannot be fooled by a
+ * payload that happens to have compatible fields.
+ *
+ * Free functions taking a `Pick`, exactly as `deadlineFired` is: the rule "which kind owns which payload"
+ * has one home, and every layer above reads it from here rather than restating it.
+ */
+type PayloadBearing = Pick<CodexJournalRow, "kind" | "payload">;
+export function downtimePayloadOf(entry: PayloadBearing): CodexDowntimePayload | null {
+  return entry.kind === "downtime" ? (entry.payload as CodexDowntimePayload | null) : null;
+}
+export function milestonePayloadOf(entry: PayloadBearing): CodexMilestonePayload | null {
+  return entry.kind === "milestone" ? (entry.payload as CodexMilestonePayload | null) : null;
+}
+export function standingPayloadOf(entry: PayloadBearing): CodexStandingPayload | null {
+  return entry.kind === "standing" ? (entry.payload as CodexStandingPayload | null) : null;
+}
+/**
+ * The kind -> payload-parser mapping, written ONCE (`toEntry` is its only caller). An EXHAUSTIVE switch with
+ * no `default`, deliberately: adding a seventh kind to `CodexJournalKind` is then a compile error here, and
+ * whoever adds it has to say what it carries instead of getting a silent `null`. The three kinds that carry
+ * nothing say so by name rather than falling through.
+ */
+function payloadOf(kind: CodexJournalKind, raw: string | null): CodexEntryPayload | null {
+  switch (kind) {
+    case "downtime": return parseDowntimePayload(raw);
+    case "milestone": return parseMilestonePayload(raw);
+    case "standing": return parseStandingPayload(raw);
+    case "note": case "combat": case "deadline": return null;
+  }
+}
+/**
+ * Every column `writeEntry` needs. `payload` is REQUIRED rather than optional, so every kind's creator has
+ * to say what it carries. Three of the six say `null`, and that is the point: an optional field would let a
+ * seventh kind be added that silently stores nothing.
+ */
+type EntryFields = Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[]; payload: CodexEntryPayload | null }>;
 /**
  * CT-5's "fires when the campaign date passes it", and **the only place that comparison is written**
  * (D11-C). Every reader - the store, the projections, any dashboard count - goes through this one function,
@@ -1621,7 +1890,7 @@ export class CodexStore {
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
-  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[]; publishedDate: CodexInWorldDate | null }> {
+  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[]; publishedDate: CodexInWorldDate | null; standing: CodexStandingRow[]; partyMarkerId: string | null }> {
     const pages = (this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
@@ -1643,10 +1912,18 @@ export class CodexStore {
     // fixed opportunistically - it is a real gap (a restored codex re-derives every instant against the
     // default 12x30 calendar), but it is not this milestone's, and widening the bundle is a change every
     // consumer of `GET /codex/export` sees.
+    //
+    // M12, fourth time, same reason: `codex_standing` is a table of its own and exists nowhere else, so a
+    // bundle without it restores a codex where every faction is silently back at Neutral - and the
+    // `kind='standing'` records ON the timeline would then be a history of movements from a position the
+    // restored file no longer holds. `partyMarkerId` is technically redundant now that each marker carries
+    // `isParty`, and it is here anyway: it is the one fact in this bundle that is an atlas-wide SINGLETON,
+    // so a reader can check it directly instead of scanning every pin on every map and hoping exactly one
+    // comes back. Both appended LAST so no existing key moves.
     return {
       pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
       sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests(),
-      publishedDate: this.getPublishedDate()
+      publishedDate: this.getPublishedDate(), standing: this.listStanding(), partyMarkerId: this.partyMarker()?.id ?? null
     };
   }
 
@@ -2060,6 +2337,57 @@ export class CodexStore {
     return row ? this.toMarker(row) : null;
   }
 
+  /**
+   * CT-7 / M12-C: nominate the pin the party is standing on, atlas-wide. `null` clears it entirely.
+   *
+   * ONE marker for the WHOLE atlas, not one per map. "The party is in exactly one place" then needs no
+   * reconciliation rule: one-per-map would leave the GM keeping several pins in step by hand and leave
+   * "which pin is the real one?" unanswerable. Flagging a second pin therefore CLEARS the first rather
+   * than erroring - the GM's action is "the party is HERE now", and refusing it to make them un-flag the
+   * old pin first would be a settings knob wearing a validation error's clothes.
+   *
+   * ONE transaction, and the ORDER of the two writes is load-bearing rather than stylistic: v16's partial
+   * unique index means clear-then-set commits and set-then-clear is rejected mid-statement (probed against
+   * this build). The index is the FILE's half of the invariant and this method is the PROCESS's half - the
+   * same duality every enum CHECK in this store has, and the reason a repair script cannot leave two party
+   * pins behind.
+   *
+   * NOT a marker-shaped record of its own and NOT a pointer on `codex_meta`: it is a flag on an ordinary
+   * marker, so the party pin is moved by the existing marker-move path, revealed by the existing reveal
+   * switch, and deleted by the existing delete (which simply leaves the atlas with no party pin, the same
+   * state a fresh codex is in). A pointer on `codex_meta` would have needed its own dangling-reference
+   * sweep in `deleteMarker` and `deleteMap`; the flag cascades with the row for free.
+   *
+   * Reveal state is NOT touched. Marking a hidden pin as the party does not reveal it, and a party pin on
+   * a hidden map stays hidden - `isParty` appears in no visibility predicate anywhere, which is what keeps
+   * CT-7 out of the reveal system entirely.
+   */
+  setPartyMarker(markerId: string | null): CodexMarkerRow | null {
+    const database = this.requireDatabase();
+    if (markerId !== null && !this.markerRowRaw(markerId)) throw new CodexNotFoundError("That marker no longer exists.");
+    this.transaction(() => {
+      // CLEAR FIRST. With the partial unique index in place the reverse order raises
+      // "UNIQUE constraint failed: codex_markers.is_party" before the clear ever runs.
+      database.prepare("UPDATE codex_markers SET is_party = 0 WHERE is_party = 1").run();
+      if (markerId !== null) database.prepare("UPDATE codex_markers SET is_party = 1 WHERE id = ?").run(markerId);
+      this.bumpRevision();
+    });
+    return markerId === null ? null : this.getMarker(markerId);
+  }
+
+  /**
+   * The party's pin, or `null` when the GM has not nominated one. Reads the `is_party = 1` partial index.
+   *
+   * UNGATED GM-grade row, exactly like `listMarkers` and `markersForPage`: `projectPlayerMarker` is the one
+   * visibility gate for a marker, and a reveal predicate here would be a second, lower one that an HTTP
+   * test could not tell apart from the projection. `LIMIT 1` is belt-and-braces over an index that already
+   * makes a second row impossible.
+   */
+  partyMarker(): CodexMarkerRow | null {
+    const row = this.requireDatabase().prepare(`SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE is_party = 1 LIMIT 1`).get() as MarkerRowRaw | undefined;
+    return row ? this.toMarker(row) : null;
+  }
+
   // ----- Calendar -----
 
   getCalendar(): CodexCalendar {
@@ -2328,6 +2656,36 @@ export class CodexStore {
   }
 
   /**
+   * CT-8: a MILESTONE - "the party reached level 5 after the crypt". A timeline record like any other,
+   * carrying `{ level, reason }` (spec §2.2).
+   *
+   * Deliberately NOT a table, and this is the one place to say why: a level history is an append-only list
+   * of dated facts with two prose layers and a reveal flag, which is precisely what a journal entry already
+   * is. `codex_standing` earns its table because "where do we stand NOW" is a question with one answer that
+   * has to be queryable and editable; "what level were we in Marpenoth" is a question the timeline already
+   * answers by being ordered. A `codex_milestones` table would be a second timeline to sort, reflow and
+   * reveal-gate.
+   *
+   * Dated at the GM's clock when the caller does not say otherwise - the rule `appendCombatEntry` and
+   * `createDowntime` already follow, so a milestone lands where it HAPPENED rather than sinking below every
+   * dated record forever. An explicit `null` is "not given" here for the reason `createDowntime` states.
+   *
+   * Created UNREVEALED like every other record (O-2 / P2). There is no kind-based visibility rule: a
+   * revealed milestone is exactly as visible as a revealed note.
+   */
+  createMilestone(input: CodexMilestoneCreateInput): CodexJournalRow {
+    const payload = milestonePayload(input.milestone);
+    const dated = this.resolveDate(input.inWorldDate ?? this.getCalendar().currentDate ?? null, input.inWorldLabel);
+    return this.insertEntry({
+      playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
+      attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "milestone",
+      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      realDate: shortLabel(input.realDate, 40, "date"),
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload
+    });
+  }
+
+  /**
    * O-3: the date the clock WOULD move to, so the GM confirms a date rather than an arithmetic promise.
    * "Advance the campaign clock to Highsun 3, 1492" is a decision; "advance 30 days" is a request to do
    * mental arithmetic against a calendar the GM invented.
@@ -2340,9 +2698,12 @@ export class CodexStore {
    * the GM has no current date at all (nothing to advance FROM).
    */
   proposedDateFor(entry: CodexJournalRow): CodexInWorldDate | null {
-    if (entry.kind !== "downtime" || !entry.payload || entry.payload.applied) return null;
+    // `downtimePayloadOf` rather than `entry.payload` directly: M12 widened the payload to a union, and the
+    // kind check IS the narrowing - reading `.days` off a milestone's payload would be a cast away otherwise.
+    const payload = downtimePayloadOf(entry);
+    if (!payload || payload.applied) return null;
     const from = this.campaignInstant();
-    return from === null ? null : this.dateForInstant(from + entry.payload.days);
+    return from === null ? null : this.dateForInstant(from + payload.days);
   }
 
   /**
@@ -2363,12 +2724,13 @@ export class CodexStore {
     const existing = this.getEntry(entryId);
     if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
     if (existing.kind !== "downtime") throw new Error("Only a downtime record can pass time.");
-    if (!existing.payload) throw new Error("That downtime record has no activity to apply.");
-    if (existing.payload.applied) throw new CodexRevisionConflictError("That downtime has already passed - the clock has already moved.");
+    const payload = downtimePayloadOf(existing);
+    if (!payload) throw new Error("That downtime record has no activity to apply.");
+    if (payload.applied) throw new CodexRevisionConflictError("That downtime has already passed - the clock has already moved.");
     const target = this.proposedDateFor(existing);
     if (!target) throw new Error("Set the campaign's current date before passing time.");
     const calendar = this.getCalendar();
-    const applied: CodexDowntimePayload = { ...existing.payload, applied: true };
+    const applied: CodexDowntimePayload = { ...payload, applied: true };
     this.transaction(() => {
       database.prepare("UPDATE codex_journal SET payload_json = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(applied), this.stamp(), entryId);
       // Same transaction, leaf-level: `writeCalendar` never opens one, and bumps the revision for both.
@@ -2493,31 +2855,42 @@ export class CodexStore {
     return [];
   }
 
+  /** The ordinary one-record create: `writeEntry` in its own transaction. See `writeEntry` for the rest. */
+  private insertEntry(fields: EntryFields): CodexJournalRow {
+    let entryId = "";
+    this.transaction(() => { entryId = this.writeEntry(fields); });
+    return this.getEntry(entryId)!;
+  }
+
   /**
-   * `payload` is a REQUIRED field rather than an optional one, so every kind's creator has to say what it
-   * carries. Three of the four say `null`, and that is the point: an optional field would let a fifth kind
-   * be added that silently stores nothing.
+   * The one INSERT into `codex_journal`, leaf-level: it assumes it is ALREADY inside a transaction, exactly
+   * as `writeCalendar` / `writePublishedDate` do and for exactly the same reason - `this.transaction` is a
+   * bare `BEGIN IMMEDIATE` and does not nest (F-7).
    *
-   * `indexEntry` runs here, which is what makes a deadline and a downtime searchable on exactly the terms a
-   * note is - no per-kind search path, no per-kind visibility rule (O-2). Verified rather than assumed: a
-   * store test searches for a deadline's own text. A downtime's `who`/`activity` are deliberately NOT added
-   * to the index - payload search is unapproved scope, and adding it here quietly would put payload text
-   * into the PLAYER index where the reveal gate is the only thing standing between it and a reader.
+   * M12 is what forced the split. `setStanding` writes the standing table AND appends this record, and half
+   * of that is worse than neither: a value with no record loses the history the spec puts on the timeline,
+   * and a record with no value leaves the bar disagreeing with its own chronicle. `insertEntry` above is now
+   * this plus a transaction, so every pre-M12 caller behaves byte-for-byte as it did.
+   *
+   * `indexEntry` runs here, which is what makes a deadline, a downtime, a milestone and a standing record
+   * searchable on exactly the terms a note is - no per-kind search path, no per-kind visibility rule (O-2).
+   * Verified rather than assumed: store tests search for a deadline's and a milestone's own text. Payload
+   * text is deliberately NOT indexed for ANY kind - a downtime's `who`, a milestone's `reason`, a standing's
+   * `reason` - because `indexEntry` receives `playerText`/`gmText`/`tags` and nothing else, and adding the
+   * payload here would put GM-authored text into the PLAYER index with only the reveal gate behind it.
    */
-  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[]; payload: CodexDowntimePayload | null }>): CodexJournalRow {
+  private writeEntry(fields: EntryFields): string {
     const database = this.requireDatabase();
     const entryId = this.freshId();
     const stamp = this.stamp();
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
     const date = fields.inWorldDate;
     const tagsJson = JSON.stringify(tags(fields.tags));
-    this.transaction(() => {
-      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
-      this.indexEntry(entryId, fields.playerText, fields.gmText, tagsJson);
-      this.bumpRevision();
-    });
-    return this.getEntry(entryId)!;
+    database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
+    this.indexEntry(entryId, fields.playerText, fields.gmText, tagsJson);
+    this.bumpRevision();
+    return entryId;
   }
 
   private toEntry(row: JournalRowRaw): CodexJournalRow {
@@ -2533,10 +2906,12 @@ export class CodexStore {
       inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant,
       inWorldDate: row.in_world_year !== null && row.in_world_month !== null && row.in_world_day !== null ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day } : null,
       sortKey: row.sort_key, tags: parseTags(row.tags_json),
-      // Read ONLY for the kind that has one. A stray payload on a note is ignored rather than surfaced, so a
-      // hand-edited or future-version row cannot smuggle a payload onto a record type that has no rules for
-      // one - and `null` here is what makes "no payload" the same value for the other three kinds.
-      payload: kind === "downtime" ? parseDowntimePayload(row.payload_json) : null,
+      // Read ONLY for the kind that owns one, and with THAT kind's parser. A stray payload on a note is
+      // ignored rather than surfaced, so a hand-edited or future-version row cannot smuggle one kind's
+      // payload onto another kind's record - and `null` is what makes "no payload" the same value for the
+      // three kinds that have none. This switch is the single home of the kind -> payload mapping;
+      // `downtimePayloadOf` / `milestonePayloadOf` / `standingPayloadOf` are how every reader above asks it.
+      payload: payloadOf(kind, row.payload_json),
       createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
@@ -2549,7 +2924,7 @@ export class CodexStore {
     return { id: row.id, assetId: row.asset_id, name: row.name, kind: mapKind(row.kind), parentMapId: row.parent_map_id, revealedToPlayers: row.revealed === 1, sortKey: row.sort_key, tags: parseTags(row.tags_json), createdAt: row.created_at, updatedAt: row.updated_at };
   }
   private toMarker(row: MarkerRowRaw): CodexMarkerRow {
-    return { id: row.id, mapId: row.map_id, x: row.x, y: row.y, iconId: row.icon_id, iconColor: row.icon_color, label: row.label, revealedToPlayers: row.revealed === 1, pageIds: parseIdArray(row.page_ids_json), subMapId: row.sub_map_id, sceneIds: parseIdArray(row.scene_ids_json), actorId: row.actor_id, tags: parseTags(row.tags_json), createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, mapId: row.map_id, x: row.x, y: row.y, iconId: row.icon_id, iconColor: row.icon_color, label: row.label, revealedToPlayers: row.revealed === 1, pageIds: parseIdArray(row.page_ids_json), subMapId: row.sub_map_id, sceneIds: parseIdArray(row.scene_ids_json), actorId: row.actor_id, tags: parseTags(row.tags_json), isParty: row.is_party === 1, createdAt: row.created_at, updatedAt: row.updated_at };
   }
   private mapRowRaw(mapId: string): MapRowRaw | undefined {
     if (!ID.test(mapId)) return undefined;
@@ -2930,6 +3305,146 @@ export class CodexStore {
   private questRowRaw(questId: string): QuestRowRaw | undefined {
     if (!ID.test(questId)) return undefined;
     return this.requireDatabase().prepare(`SELECT ${QUEST_COLUMNS} FROM codex_quests WHERE id = ?`).get(questId) as QuestRowRaw | undefined;
+  }
+
+  // ----- Standing (M12 / CT-6: where the party stands with each faction) -----
+  //
+  // TWO records per change, and the split is the design (spec §2.1): `codex_standing` holds where things
+  // stand NOW, one row per faction; the timeline holds what HAPPENED, one `kind='standing'` record per
+  // change. Neither is derivable from the other - summing the timeline would make a deleted record silently
+  // move the bar, and the table alone would answer "where are we" while forgetting "how did we get here".
+  //
+  // The two also reveal INDEPENDENTLY, on purpose. A GM can tell the party "you did the Harpers a favour"
+  // (reveal the record) without showing them the bar, or publish the bar without narrating every step that
+  // built it. One shared flag would have quietly coupled two different disclosure decisions.
+
+  /**
+   * Oldest-first, `listQuests`' rule and for its reason: a standing has no number and no in-world date, so
+   * the order it was first recorded in is the only intrinsic one it has. Sorting by VALUE would make a
+   * faction jump position the moment the GM adjusted it - exactly when they are looking at it - and sorting
+   * by faction NAME belongs to whoever renders the card, which has the titles this row deliberately does not.
+   */
+  listStanding(): CodexStandingRow[] {
+    return (this.requireDatabase()
+      .prepare(`SELECT ${STANDING_COLUMNS} FROM codex_standing ORDER BY created_at, id`)
+      .all() as StandingRowRaw[]).map((row) => this.toStanding(row));
+  }
+
+  /** One faction's standing, or `null` when the GM has never set one (which reads as Neutral, not as an error). */
+  getStanding(factionPageId: string): CodexStandingRow | null {
+    const row = this.standingRowRaw(factionPageId);
+    return row ? this.toStanding(row) : null;
+  }
+
+  /**
+   * CT-6's one write: set where the party stands with a faction, AND record what changed, in **one**
+   * transaction (F-7).
+   *
+   * The two writes are one unit because half of this is worse than neither: a moved bar with no record
+   * loses the history the spec puts on the timeline (and there is nowhere else it exists), while a record
+   * with no moved bar leaves the campaign's history disagreeing with the campaign's state. `writeEntry` and
+   * `writeStanding` are leaf-level for exactly this - `this.transaction` is a bare `BEGIN IMMEDIATE` and
+   * does not nest, the same shape `applyDowntime` uses with `writeCalendar`.
+   *
+   * `value` is ABSOLUTE and the record's `delta` is the CHANGE. That asymmetry is the spec's (§2.2) and it
+   * is the right way round: the GM's action is "put the Harpers here", which is a position, while the
+   * history's question is "what happened", which is a movement. Computing the delta here rather than
+   * accepting one is what keeps them consistent - a caller-supplied delta could disagree with the value it
+   * was supposed to explain.
+   *
+   * A faction with no row yet counts as 0 (Neutral), so the first ever set records the full move from
+   * neutral rather than a mysterious delta of nothing.
+   *
+   * A record is written on EVERY set, including one that changes nothing. Suppressing the delta-0 case
+   * would be a hidden rule ("your reason was not saved because the number happened to match"), and
+   * "we held the line; nothing moved" is a legitimate thing for a GM to record.
+   *
+   * The faction must be a page of entity type `faction` (spec §2.1: "FK to a `codex_pages` row with
+   * `entity_type = 'faction'`"). SQLite cannot express that in a foreign key - a CHECK may not subquery -
+   * so this is the only place it can be enforced, and it is enforced with a message a GM can read rather
+   * than left to the FK's "FOREIGN KEY constraint failed".
+   *
+   * Reveal state is NEVER touched here. Adjusting a number is not a disclosure decision, and an update that
+   * silently published the bar would be the worst possible way to find that out.
+   */
+  setStanding(factionPageId: string, value: number, reason: string): CodexStandingRow {
+    const pageId = id(factionPageId);
+    const page = this.pageRow(pageId);
+    if (!page) throw new CodexNotFoundError("That faction page no longer exists.");
+    if (page.entity_type !== "faction") throw new Error("Standing is tracked against a faction - pick a faction page.");
+    const next = standingValue(value);
+    const existing = this.standingRowRaw(pageId);
+    // Measured against the CLAMPED previous value (`toStanding`'s), not the raw column, so the deltas on the
+    // timeline always sum to the number the bar shows. A hand-edited row holding 500 reads as 100
+    // everywhere; a delta computed from 500 would describe a move nobody could see.
+    const payload = standingPayload({ factionPageId: pageId, delta: next - (existing ? this.toStanding(existing).value : 0), reason });
+    // Dated at the GM's clock, `appendCombatEntry` / `createDowntime` / `createMilestone`'s rule: a standing
+    // change lands on the timeline where it happened rather than sinking below every dated record forever.
+    const dated = this.resolveDate(this.getCalendar().currentDate ?? null, null);
+    const stamp = this.stamp();
+    this.transaction(() => {
+      this.writeStanding(pageId, next, existing, stamp);
+      this.writeEntry({
+        // The record's prose lives in the payload's `reason` and NOWHERE else. Copying it into `playerText`
+        // as well would give one sentence two homes with two different reveal gates in front of them, which
+        // is the leak shape K1 exists to prevent - and it would put a GM-authored reason into the PLAYER
+        // search index, which `indexEntry` feeds from `playerText`. A GM who wants a two-layer narrative
+        // around a standing change writes an ordinary note; this record is the structured fact.
+        playerText: "", gmText: null, revealed: 0,
+        attachMarkerId: null, attachPageId: null, kind: "standing",
+        sourceEncounterId: null, sessionNumber: this.activeSessionNumber(), realDate: null,
+        inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, payload
+      });
+    });
+    return this.getStanding(pageId)!;
+  }
+
+  /**
+   * CI-9, exactly `setQuestRevealed` / `setPageRevealed`: publishing a standing is not an EDIT of it, so
+   * this moves neither `updated_at` nor anything else. It writes no chronicle record either - `setStanding`
+   * records CHANGES to the number, and choosing to show the party a number that did not move is not one.
+   */
+  setStandingRevealed(factionPageId: string, revealed: boolean): CodexStandingRow {
+    const database = this.requireDatabase();
+    const pageId = id(factionPageId);
+    if (!this.standingRowRaw(pageId)) throw new CodexNotFoundError("That faction has no standing recorded yet.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_standing SET revealed = ? WHERE faction_page_id = ?").run(revealed ? 1 : 0, pageId);
+      this.bumpRevision();
+    });
+    return this.getStanding(pageId)!;
+  }
+
+  /**
+   * The one write of the standing table. Leaf-level: assumes it is already inside a transaction, the
+   * `writeCalendar` / `writePublishedDate` contract (F-7).
+   *
+   * The UPDATE branch names its columns and `revealed` is not among them, which is what makes "adjusting a
+   * number never changes who can see it" structural rather than a rule every caller has to remember.
+   * `created_at` likewise survives an update, so `listStanding`'s order is stable as values move.
+   */
+  private writeStanding(factionPageId: string, value: number, existing: StandingRowRaw | undefined, stamp: string): void {
+    const database = this.requireDatabase();
+    if (existing) database.prepare("UPDATE codex_standing SET value = ?, updated_at = ? WHERE faction_page_id = ?").run(value, stamp, factionPageId);
+    // O-2 / P2: a brand-new standing starts HIDDEN, like every other record in this codex.
+    else database.prepare(`INSERT INTO codex_standing (${STANDING_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`).run(this.freshId(), factionPageId, value, 0, stamp, stamp);
+  }
+
+  private toStanding(row: StandingRowRaw): CodexStandingRow {
+    return {
+      id: row.id, factionPageId: row.faction_page_id,
+      // Clamped on the way OUT as well as in, the fail-closed discipline `toQuest`/`toEntry` apply to their
+      // enums: v16 puts no CHECK on this column (a scale is a product decision, not a structural one), so a
+      // hand-edited row reads back as the nearest legal position rather than driving a bar off its track.
+      value: Math.min(MAX_STANDING, Math.max(MIN_STANDING, Math.trunc(row.value))),
+      revealedToPlayers: row.revealed === 1,
+      createdAt: row.created_at, updatedAt: row.updated_at
+    };
+  }
+
+  private standingRowRaw(factionPageId: string): StandingRowRaw | undefined {
+    if (!ID.test(factionPageId)) return undefined;
+    return this.requireDatabase().prepare(`SELECT ${STANDING_COLUMNS} FROM codex_standing WHERE faction_page_id = ?`).get(factionPageId) as StandingRowRaw | undefined;
   }
 
   // ----- internals -----

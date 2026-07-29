@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { projectGmCalendar, projectGmChronicleRecord, projectPlayerCalendar, projectPlayerChronicleRecord } from "../src/codex-projections.js";
-import type { CodexCalendar, CodexDowntimePayload, CodexInWorldDate, CodexJournalKind, CodexJournalRow } from "../src/codex-store.js";
+import { projectGmChronicleRecord, projectGmCalendar, projectGmMarker, projectGmStanding, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerMarker, projectPlayerPageMarker, projectPlayerStanding, projectRevealAudit } from "../src/codex-projections.js";
+import type { CodexCalendar, CodexDowntimePayload, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexMarkerRow, CodexStandingRow } from "../src/codex-store.js";
 
 /**
  * M11's two new gates, each tested AT ITS OWN LAYER - which is the whole point of this file existing.
@@ -138,5 +138,176 @@ describe("M11 chronicle projection - deadlines and downtime are gated by reveal 
     const player = projectPlayerChronicleRecord({ kind: "entry", entry: row }, playerContext())!;
     expect(player).not.toHaveProperty("proposedDate");
     expect(JSON.stringify(player)).not.toContain("28");
+  });
+});
+
+// ----- M12 -----
+
+const FACTION_ID = "22222222-2222-4222-8222-222222222222";
+const SECRET_FACTION_ID = "33333333-3333-4333-8333-333333333333";
+
+/** A standing row as the store hands one over. Every field explicit - a projection test must not inherit defaults. */
+function standingRow(overrides: Partial<CodexStandingRow> = {}): CodexStandingRow {
+  return {
+    id: "44444444-4444-4444-8444-444444444444", factionPageId: FACTION_ID, value: -40, revealedToPlayers: false,
+    createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z",
+    ...overrides
+  };
+}
+/** A marker row as the store hands one over, GM-only links included so a leak has something to leak. */
+function markerRow(overrides: Partial<CodexMarkerRow> = {}): CodexMarkerRow {
+  return {
+    id: "55555555-5555-4555-8555-555555555555", mapId: "66666666-6666-4666-8666-666666666666",
+    x: 0.5, y: 0.25, iconId: "pin", iconColor: "#aabbcc", label: "Camp", revealedToPlayers: false, tags: ["travel"],
+    pageIds: [], subMapId: null, sceneIds: ["77777777-7777-4777-8777-777777777777"], actorId: "88888888-8888-4888-8888-888888888888",
+    isParty: false, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z",
+    ...overrides
+  };
+}
+const markerContext = { revealedPageIds: new Set<string>(), subMapRevealed: false };
+
+/**
+ * T-6, point-blank. Nothing here goes near a store or an HTTP request: the rows are literals so a
+ * projection bug cannot hide behind a store that never handed it a dangerous row.
+ */
+describe("M12 standing projection - CT-6, two gates and a signed value", () => {
+  it("hides an unrevealed standing from a player and carries the VALUE once revealed", () => {
+    const hidden = standingRow({ value: -40 });
+    expect(projectPlayerStanding(hidden, { factionRevealed: true })).toBeNull();
+
+    const shown = projectPlayerStanding({ ...hidden, revealedToPlayers: true }, { factionRevealed: true });
+    expect(shown).not.toBeNull();
+    // On the VALUE, not merely on key presence: a projection that emitted `0`, or the absolute of a
+    // negative standing, would pass an "is the key there" test and would be wrong in the way that matters.
+    expect(shown!.value).toBe(-40);
+    expect(shown!.factionPageId).toBe(FACTION_ID);
+    // The EXACT projected key set: this fails if any new field ever enters the player standing projection.
+    expect(Object.keys(shown!).sort()).toEqual(["factionPageId", "value"]);
+    // ...and the GM keeps the whole row, so the assertions above are the gate working, not an empty record.
+    expect(projectGmStanding(hidden)).toEqual(hidden);
+    expect(projectGmStanding(hidden).revealedToPlayers).toBe(false);
+  });
+
+  it("hides a REVEALED standing whose faction page is still secret, so a bar never names a faction the party has not met", () => {
+    const row = standingRow({ factionPageId: SECRET_FACTION_ID, revealedToPlayers: true, value: 75 });
+    expect(projectPlayerStanding(row, { factionRevealed: false })).toBeNull();
+    // The same row with its faction revealed travels - so this is the faction gate, not the record's own.
+    expect(projectPlayerStanding(row, { factionRevealed: true })).toEqual({ factionPageId: SECRET_FACTION_ID, value: 75 });
+  });
+});
+
+/**
+ * T-7, point-blank. The party marker is an ORDINARY marker with a flag, and the two claims that makes are
+ * both asserted here: its projected key set is the ordinary one plus `isParty`, and `isParty` grants no
+ * visibility of its own.
+ */
+describe("M12 party marker projection - CT-7, a flag and nothing else", () => {
+  it("gives a party pin exactly an ordinary pin's key set plus isParty, and no GM-only field", () => {
+    const ordinary = projectPlayerMarker(markerRow({ revealedToPlayers: true }), markerContext);
+    const party = projectPlayerMarker(markerRow({ revealedToPlayers: true, isParty: true }), markerContext);
+    expect(ordinary).not.toBeNull();
+    expect(party).not.toBeNull();
+
+    // The whole key set, enumerated. This fails if ANY new field enters the player marker projection, not
+    // just if a known GM-only one does - which is the point: `isParty` is the only key M12 may add here.
+    expect(Object.keys(party!).sort()).toEqual(["iconColor", "iconId", "id", "isParty", "label", "mapId", "pageIds", "subMapId", "tags", "x", "y"]);
+    expect(Object.keys(party!).sort()).toEqual(Object.keys(ordinary!).sort());
+    expect(party!.isParty).toBe(true);
+    expect(ordinary!.isParty).toBe(false);
+
+    // The GM-only linkage the row is deliberately carrying is nowhere in the serialized party pin.
+    const payload = JSON.stringify(party);
+    expect(payload).not.toContain("77777777-7777-4777-8777-777777777777");   // sceneIds
+    expect(payload).not.toContain("88888888-8888-4888-8888-888888888888");   // actorId
+    expect(payload).not.toContain("revealedToPlayers");
+    expect(payload).not.toContain("createdAt");
+    // ...and the GM's own row still has them, so the absence above is the projection and not an empty row.
+    expect(projectGmMarker(markerRow({ isParty: true })).sceneIds).toHaveLength(1);
+  });
+
+  it("keeps a HIDDEN party pin hidden, and a party pin on a hidden MAP hidden", () => {
+    // `isParty` is checked by no reveal predicate anywhere: the ordinary gate runs first and is unchanged.
+    expect(projectPlayerMarker(markerRow({ isParty: true }), markerContext)).toBeNull();
+    // CD-6, through the projection that owns the map gate: revealed pin, secret map, still invisible.
+    const revealedPartyPin = markerRow({ isParty: true, revealedToPlayers: true });
+    expect(projectPlayerPageMarker({ marker: revealedPartyPin, mapRevealed: false, ...markerContext })).toBeNull();
+    expect(projectPlayerPageMarker({ marker: revealedPartyPin, mapRevealed: true, ...markerContext })).not.toBeNull();
+  });
+});
+
+/**
+ * The two new chronicle payloads (CT-8 / CT-6), allow-listed per kind and per audience. The `delta`
+ * decision M12 asked to be stated explicitly is asserted here rather than left to prose: a player DOES
+ * receive a revealed standing record's delta and reason - the store writes that record with an EMPTY
+ * `playerText`, so a revealed row without them would be a dated line saying nothing at all.
+ */
+describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => {
+  const milestone = entryRow({ kind: "milestone", payload: { level: 5, reason: "Cleared the crypt" } });
+  const standing = entryRow({ kind: "standing", payload: { factionPageId: FACTION_ID, delta: -15, reason: "Killed their envoy" } });
+
+  it("carries a revealed milestone's level and reason to a player, and hides an unrevealed one", () => {
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: milestone }, playerContext())).toBeNull();
+    const shown = projectPlayerChronicleRecord({ kind: "entry", entry: { ...milestone, revealedToPlayers: true } }, playerContext())!;
+    expect(shown.kind).toBe("milestone");
+    expect(shown.payload).toEqual({ level: 5, reason: "Cleared the crypt" });
+    expect(projectGmChronicleRecord({ kind: "entry", entry: milestone }).payload).toEqual({ level: 5, reason: "Cleared the crypt" });
+  });
+
+  it("carries a revealed standing record's DELTA and reason, and nulls the faction id when that page is secret", () => {
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: standing }, playerContext())).toBeNull();
+    const revealed = { ...standing, revealedToPlayers: true };
+
+    // Faction page secret: the change and the reason travel, the id does not - the row still stands on its
+    // own prose, and a published record must not advertise a faction the party has never met.
+    const withoutFaction = projectPlayerChronicleRecord({ kind: "entry", entry: revealed }, playerContext())!;
+    expect(withoutFaction.kind).toBe("standing");
+    expect(withoutFaction.payload).toEqual({ factionPageId: null, delta: -15, reason: "Killed their envoy" });
+    expect(JSON.stringify(withoutFaction)).not.toContain(FACTION_ID);
+
+    // Faction page revealed: the id travels too, so the client can name the faction.
+    const withFaction = projectPlayerChronicleRecord({ kind: "entry", entry: revealed }, { ...playerContext(), revealedPageIds: new Set([FACTION_ID]) })!;
+    expect(withFaction.payload).toEqual({ factionPageId: FACTION_ID, delta: -15, reason: "Killed their envoy" });
+    // The GM always has the id.
+    expect(projectGmChronicleRecord({ kind: "entry", entry: standing }).payload).toEqual({ factionPageId: FACTION_ID, delta: -15, reason: "Killed their envoy" });
+  });
+
+  it("never lets one kind's payload ride out on another kind's row", () => {
+    // A row whose stored blob does not match its kind projects `null`, never a half-filled object: the
+    // dispatch is on the ENTRY's kind, not on the shape of the blob.
+    const mislabelled = entryRow({ kind: "milestone", revealedToPlayers: true, payload: { who: "Brannor", activity: "Forging", days: 8, applied: true } });
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: mislabelled }, playerContext())!.payload).toBeNull();
+    expect(projectGmChronicleRecord({ kind: "entry", entry: mislabelled }).payload).toBeNull();
+  });
+});
+
+/**
+ * CT-9 at the projection layer. The end-to-end proof that the audit agrees with the real player endpoints
+ * is the HTTP test; what this asserts is the property that makes that possible - the audit's membership
+ * test is the PLAYER projection, so a record whose reveal flag is set but which no player can actually see
+ * is absent from it.
+ */
+describe("M12 reveal audit projection - CT-9, an aggregation and not a second opinion", () => {
+  it("counts a revealed pin on a HIDDEN map as not visible, and reports every section even when empty", () => {
+    const onShownMap = markerRow({ id: "99999999-9999-4999-8999-999999999999", revealedToPlayers: true });
+    const onSecretMap = markerRow({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", revealedToPlayers: true, isParty: true });
+    const audit = projectRevealAudit([
+      { kind: "marker", marker: onShownMap, mapRevealed: true, ...markerContext },
+      { kind: "marker", marker: onSecretMap, mapRevealed: false, ...markerContext },
+      { kind: "standing", standing: standingRow({ revealedToPlayers: true }), factionRevealed: true, factionTitle: "The Harpers" }
+    ]);
+
+    const section = (kind: string) => audit.sections.find((entry) => entry.kind === kind)!;
+    // BOTH markers carry `revealed = 1`. An audit written against that flag would say 2; the party can see 1.
+    expect(section("marker").total).toBe(2);
+    expect(section("marker").revealed).toBe(1);
+    expect(section("marker").rows.map((row) => row.id)).toEqual([onShownMap.id]);
+    expect(section("standing").rows).toEqual([{ kind: "standing", id: FACTION_ID, title: "The Harpers" }]);
+
+    // Every surface is reported, empty ones included: "nothing revealed" and "did not load" must not look
+    // the same on the GM's screen, and an omitted section is exactly how they would.
+    expect(audit.sections.map((entry) => entry.kind)).toEqual(["page", "map", "marker", "journal", "session", "quest", "standing"]);
+    expect(section("page")).toEqual({ kind: "page", revealed: 0, total: 0, rows: [] });
+    expect(audit.revealed).toBe(2);
+    expect(audit.total).toBe(3);
   });
 });

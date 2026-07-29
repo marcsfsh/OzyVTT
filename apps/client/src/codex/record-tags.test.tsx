@@ -88,7 +88,7 @@ const MAP = (over: Partial<CodexMap> = {}): CodexMap => ({
 
 const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   id: "k1", mapId: "m1", x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road",
-  revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, tags: ["dungeon"],
+  revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: ["dungeon"],
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmCalendar, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord, type PlayerSessionNumberContext } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmCalendar, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectGmStanding, projectPlayerBacklinks, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, projectPlayerStanding, projectRevealAudit, type CodexRevealAuditRecord, type CodexSearchRecord, type PlayerSessionNumberContext } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -87,6 +87,12 @@ const MarkerUpdateSchema = z.object({
   label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), tags: TagsSchema.optional(), ...MarkerLinks
 }).strict();
 const MarkerMoveSchema = z.object({ x: Coord, y: Coord }).strict();
+/**
+ * CT-7: mark this pin as the party, or stop it being the party. One boolean and nothing else - the pin's
+ * position, label, links and reveal state are all set through the routes that already own them, because the
+ * party marker is an ORDINARY marker with a flag, and moving it IS moving a marker (`POST /markers/{id}/move`).
+ */
+const MarkerPartySchema = z.object({ isParty: z.boolean() }).strict();
 
 const JournalWriteSchema = z.object({
   tags: TagsSchema.optional(),
@@ -134,6 +140,24 @@ const DowntimeInputSchema = z.object({
   days: z.number().int().min(0).max(3650)
 }).strict();
 const DowntimeCreateSchema = JournalWriteSchema.extend({ downtime: DowntimeInputSchema });
+/**
+ * M12 milestones (CT-8) - `DowntimeCreateSchema`'s shape verbatim, one kind later, so the third structured
+ * journal kind is composed the way the first two are rather than inventing a third convention.
+ *
+ * `level` is 1-20, the repo's existing character-level bound (`homebrewLevel` in the contract publishes the
+ * same numbers), because CT-8 is "milestone / level history" and no 5e character is level 0 or 21. There is
+ * no XP field: the spec says "no XP arithmetic" in as many words.
+ *
+ * `reason` is NOT `.min(1)` and carries a `""` default, the `who`/`activity` correction applied before it can
+ * bite: "we hit 5" with the why in the entry's own prose is a legitimate body, and a minimum here would 400 a
+ * state the composer can reach. `max(120)` is the repo's one-line-of-display bound, shared with a marker
+ * label, an `inWorldLabel` and an objective's text.
+ */
+const MilestoneInputSchema = z.object({
+  level: z.number().int().min(1).max(20),
+  reason: z.string().trim().max(120).default("")
+}).strict();
+const MilestoneCreateSchema = JournalWriteSchema.extend({ milestone: MilestoneInputSchema });
 /**
  * M9 sessions. `sessionNumber`'s bounds are the journal's verbatim, on purpose: the two are the SAME
  * number - a journal entry's `sessionNumber` resolves against a session record - and two copies of the
@@ -196,6 +220,23 @@ const QuestUpdateSchema = z.object({
   objectives: ObjectivesSchema.optional(),
   entityIds: QuestEntityIdsSchema.optional(),
   expectedRev: z.number().int().nonnegative().optional()
+}).strict();
+/**
+ * M12 standing (CT-6). `value` is the SIGNED -100..100 scale (M12-B): a faction can be actively against the
+ * party, which an unsigned "favour" bar cannot say.
+ *
+ * The store CLAMPS to the same range and this REJECTS outside it, which is the deliberate arrangement
+ * everywhere in this file (the router is the early rejection, the store is the enforcer) - the client's
+ * control cannot produce 150, so a 150 is a malformed caller and deserves to hear so rather than to be
+ * silently corrected. The clamp still stands behind it for every non-HTTP writer.
+ *
+ * `reason` is optional and may be empty, for the reason `DowntimeInputSchema`'s `who`/`activity` are: the
+ * GM adjusting a standing mid-session should not be blocked on typing a sentence, and the change itself is
+ * still recorded on the chronicle. `max(120)` is the repo's one-line bound.
+ */
+const StandingSetSchema = z.object({
+  value: z.number().int().min(-100).max(100),
+  reason: z.string().trim().max(120).default("")
 }).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
@@ -281,6 +322,15 @@ function loadSearchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearchRe
  */
 function revealedPageIdsIn(store: CodexStore, pageIds: readonly string[]): ReadonlySet<string> {
   return new Set(pageIds.filter((pageId) => store.getPage(pageId)?.revealedToPlayers ?? false));
+}
+
+/**
+ * Is THIS page revealed? The one-page form of `revealedPageIdsIn`, written in terms of it rather than beside
+ * it, so M12's standing routes cannot end up asking the question with a fourth hand-copied expression.
+ * `projectPlayerStanding` still owns whether a standing travels; this only answers the question it asks.
+ */
+function pageRevealedFor(store: CodexStore, pageId: string): boolean {
+  return revealedPageIdsIn(store, [pageId]).has(pageId);
 }
 
 /**
@@ -609,6 +659,34 @@ export function createCodexRouter(options: CodexRouterOptions) {
     catch (error) { return codexError(response, error); }
   });
 
+  /**
+   * CT-7 / M12-C: which pin is the party. ONE marker atlas-wide, so setting a new one clears the old in the
+   * store's single transaction and no reconciliation rule is needed - "the party is in exactly one place".
+   *
+   * `isParty: false` clears the flag on THIS marker only. That is why it is not simply `setPartyMarker(null)`:
+   * that clears whichever marker currently holds the flag, so calling it unconditionally would unset a
+   * DIFFERENT pin whenever the GM switched off a marker that was never the party.
+   *
+   * There is deliberately no party-specific move, reveal or delete route. A party pin is moved by moving the
+   * marker, revealed by revealing the marker, and deleted by deleting the marker - one flag on the record
+   * every existing marker route already owns.
+   */
+  router.put(`${CODEX_BASE}/markers/:id/party`, requireGm, (request, response) => {
+    try {
+      const markerId = pathParam(request, "id");
+      const { isParty } = MarkerPartySchema.parse(request.body);
+      if (isParty) store.setPartyMarker(markerId);
+      else if (store.partyMarker()?.id === markerId) store.setPartyMarker(null);
+      // The one existence check, and it covers both arms: `setPartyMarker` throws `CodexNotFoundError` on an
+      // unknown id, and the clearing arm - which is a no-op for an id that holds no flag - falls through to
+      // this read. An up-front `getMarker` guard as well was measurably dead: no mutation of it failed a test.
+      const marker = store.getMarker(markerId);
+      if (!marker) return failure(response, 404, "not_found", "That marker was not found.");
+      options.notifyChanged("markers");
+      return envelope(response, 200, { marker: projectGmMarker(marker) });
+    } catch (error) { return codexError(response, error); }
+  });
+
   router.delete(`${CODEX_BASE}/markers/:id`, requireGm, (request, response) => {
     store.deleteMarker(pathParam(request, "id"));
     options.notifyChanged("markers");
@@ -672,7 +750,12 @@ export function createCodexRouter(options: CodexRouterOptions) {
     // `sessionNumber` reaches a player through `projectPlayerJournalEntry`, which this delegates to.
     const context = playerSessionNumbers(store);
     const publishedInstant = store.publishedInstant();
-    const records = rows.map((row) => projectPlayerChronicleRecord(row, { ...context, publishedInstant })).filter((record) => record !== null);
+    // M12: a `standing` record's payload names a faction PAGE, and a published record must not advertise a
+    // faction the party has never met. Resolved here, once per request, in the same division of labour the
+    // session context above follows - the caller answers "which pages are revealed", the projection decides
+    // whether the id travels. The set is the one `GET /codex/relationships` and `GET /codex/links` build.
+    const revealedPageIds = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
+    const records = rows.map((row) => projectPlayerChronicleRecord(row, { ...context, publishedInstant, revealedPageIds })).filter((record) => record !== null);
     return envelope(response, 200, { records });
   });
 
@@ -713,6 +796,19 @@ export function createCodexRouter(options: CodexRouterOptions) {
       options.notifyChanged("journal");
       return envelope(response, 201, { entry: projectGmJournalEntry(entry), proposedDate: store.proposedDateFor(entry) });
     } catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * M12: MILESTONES (CT-8) - the third structured journal kind, registered here for the reason the two above
+   * are: its payload is required and an ordinary `POST /codex/journal` could accept neither it nor reject its
+   * absence. Placed BEFORE the `/journal/:id` family so a later `POST /codex/journal/:id` cannot swallow it.
+   *
+   * No reveal route of its own, exactly like a deadline and a downtime: `POST /codex/journal/{id}/reveal`
+   * already works on every journal kind, and a kind-specific gate is a second gate to keep in step.
+   */
+  router.post(`${CODEX_BASE}/journal/milestone`, requireGm, (request, response) => {
+    try { const entry = store.createMilestone(MilestoneCreateSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    catch (error) { return codexError(response, error); }
   });
 
   /**
@@ -883,6 +979,104 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.post(`${CODEX_BASE}/quests/:id/reveal`, requireGm, (request, response) => {
     try { const quest = store.setQuestRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("quests"); return envelope(response, 200, { quest: projectGmQuest(quest) }); }
     catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * M12: STANDING (CT-6) - where the party stands with each faction. The quest routes above are the model:
+   * the read branches on `roleOf` and projects through `codex-projections.ts`, and every write is `requireGm`.
+   *
+   * The one thing a quest route does not do: a standing is addressed by its FACTION PAGE id, not by an id of
+   * its own. That is not a shortcut - migration v16 makes `faction_page_id` unique, so "the standing with the
+   * Harpers" names exactly one row, and a separate id would be a second way to say the same thing (and would
+   * make `PUT` need a create-or-update dance the GM would have to think about).
+   *
+   * A player's read is filtered by `projectPlayerStanding`, which requires BOTH the standing and its faction
+   * page to be revealed - see that function for why. The caller resolves the page's state here, in the
+   * `revealedPageIdsIn` division of labour: this ANSWERS the question, the projection makes the decision.
+   */
+  router.get(`${CODEX_BASE}/standing`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the campaign standing.");
+    const rows = store.listStanding();
+    if (role === "gm") return envelope(response, 200, { standing: rows.map(projectGmStanding) });
+    const standing = rows
+      .map((row) => projectPlayerStanding(row, { factionRevealed: pageRevealedFor(store, row.factionPageId) }))
+      .filter((row) => row !== null);
+    return envelope(response, 200, { standing });
+  });
+
+  /**
+   * Set where the party stands with one faction. The store writes the value AND appends the `standing`
+   * chronicle record in ONE transaction, so the table and the history can never disagree - which is also why
+   * `reason` belongs on this body rather than on a second call.
+   *
+   * `notifyChanged("journal")` rather than a scope of its own: this write really does change the journal (it
+   * appends a chronicle record), the ping is content-free, and every client listener refetches its whole view
+   * regardless of scope. Adding a `"standing"` member would widen `CodexRouterOptions` and break `server.ts`'s
+   * annotated handler for no behavioural gain.
+   */
+  router.put(`${CODEX_BASE}/standing/:factionPageId`, requireGm, (request, response) => {
+    try {
+      const { value, reason } = StandingSetSchema.parse(request.body);
+      const standing = store.setStanding(pathParam(request, "factionPageId"), value, reason);
+      options.notifyChanged("journal");
+      return envelope(response, 200, { standing: projectGmStanding(standing) });
+    } catch (error) { return codexError(response, error); }
+  });
+
+  router.post(`${CODEX_BASE}/standing/:factionPageId/reveal`, requireGm, (request, response) => {
+    try {
+      const standing = store.setStandingRevealed(pathParam(request, "factionPageId"), RevealSchema.parse(request.body).revealed);
+      options.notifyChanged("journal");
+      return envelope(response, 200, { standing: projectGmStanding(standing) });
+    } catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * CT-9: the REVEAL AUDIT - one GM view of everything the party can currently see, across every reveal
+   * surface in the Codex. GM-only: it is a list of what is public, but it also states the SHAPE of what is
+   * not (`total` per section), and it exists to be acted on by the one role that can act.
+   *
+   * **This route loads and resolves; it decides nothing.** Every predicate lives in `projectRevealAudit`,
+   * which in turn delegates to the per-kind PLAYER projections - so there is no `revealed` test in this
+   * handler, and adding one would be the second source of truth CT-9's risk note forbids. What the handler
+   * does own is the CONTEXT each player projection needs, resolved with the same helpers the real player
+   * routes use (`revealedPageIdsIn`, `playerSessionNumbers`, the map-reveal lookup) rather than with a
+   * cheaper local copy - because the audit's whole value is that it agrees with those routes exactly.
+   *
+   * Un-revealing happens through the EXISTING per-kind reveal routes, which is why each row carries the id
+   * that route takes. There is deliberately no unreveal route and no bulk operation: a bulk "hide everything"
+   * is one mis-click that cannot be undone from the same screen.
+   *
+   * Deliberately NOT covered (U-5): tokens, fog, and the shared table viewer. The table has its own
+   * visibility system with different rules, and folding it in would make this the second place that decides
+   * what a player can see - exactly what the aggregation rule above exists to prevent.
+   */
+  router.get(`${CODEX_BASE}/reveal-audit`, requireGm, (_request, response) => {
+    const maps = store.listMaps();
+    const mapRevealed = new Map(maps.map((map) => [map.id, map.revealedToPlayers]));
+    const sessionContext = playerSessionNumbers(store);
+    const records: CodexRevealAuditRecord[] = [
+      ...store.listPages().map((page) => ({ kind: "page", page } as const)),
+      ...maps.map((map) => ({ kind: "map", map, parentRevealed: map.parentMapId ? (mapRevealed.get(map.parentMapId) ?? false) : false } as const)),
+      // Every pin on every map, each carrying ITS map's gate - the resolution `GET /codex/maps/:id/markers`
+      // performs before it projects a single marker (CD-6). A revealed pin on a secret map is invisible
+      // there and must be absent here, or the audit would claim the party can see something it cannot.
+      ...maps.flatMap((map) => store.listMarkers(map.id).map((marker) => ({
+        kind: "marker", marker, mapRevealed: map.revealedToPlayers,
+        revealedPageIds: revealedPageIdsIn(store, marker.pageIds),
+        subMapRevealed: marker.subMapId ? (mapRevealed.get(marker.subMapId) ?? false) : false
+      } as const))),
+      ...store.listTimeline().map((entry) => ({ kind: "journal", entry, sessionContext } as const)),
+      ...store.listSessions().map((session) => ({ kind: "session", session } as const)),
+      ...store.listQuests().map((quest) => ({ kind: "quest", quest, revealedEntityIds: revealedPageIdsIn(store, quest.entityIds) } as const)),
+      ...store.listStanding().map((standing) => ({
+        kind: "standing", standing,
+        factionRevealed: pageRevealedFor(store, standing.factionPageId),
+        factionTitle: store.getPage(standing.factionPageId)?.title ?? null
+      } as const))
+    ];
+    return envelope(response, 200, { audit: projectRevealAudit(records) });
   });
 
   // ----- Calendar (the world's own months / weekdays / era, and M11's two clocks) -----

@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { Alert, Badge, Button, Checklist, Skeleton, type ChecklistItem } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Meter, Skeleton, type ChecklistItem } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
 import { sessionTitle } from "./sessions";
 import { openQuests, questProgress } from "./quests";
-import { CHRONICLE_KIND_META, deadlineStateLabel, deadlineStateTone } from "./chronicle";
+import { CHRONICLE_KIND_META, STANDING_METER_MAX, deadlineStateLabel, deadlineStateTone, standingLabel, standingMeterTone, standingMeterValue, standingTone, standingValueLabel } from "./chronicle";
 import type { CodexChronicleKind, CodexQuestStatus } from "./api";
 
 /**
@@ -85,10 +85,24 @@ export type CampaignQuest = Readonly<{ id: string; title: string; status: CodexQ
  * having the field is the guarantee.
  */
 export type CampaignDeadline = Readonly<{ id: string; summary: string; when: string; fired: boolean }>;
+/**
+ * M12's "Faction standing" card (CT-6), in the shape BOTH projections can supply — which is exactly the
+ * player projection's two keys plus a name the caller resolved from its own page list.
+ *
+ * **There is deliberately no `revealedToPlayers` field, not even an optional one**, on the same reasoning
+ * that keeps `gmBody` off `CampaignQuest` and `prep` off `CampaignSession`: this component is rendered by
+ * the player's Codex too, and whether the GM has shared a standing is GM knowledge with no player-facing
+ * form. The GM's own reveal control lives beside the adjust control, on the GM's card, not in this type.
+ *
+ * `name` is the faction PAGE's title, resolved by the caller against the pages its own token was sent. A
+ * standing whose page the reader cannot see has no name to render, so the caller passes what it has — the
+ * card never reaches for a title of its own.
+ */
+export type CampaignStanding = Readonly<{ factionPageId: string; name: string; value: number }>;
 
 export function CampaignHome({
-  pages, entries = [], maps = [], today = null, session = null, quests = [], deadlines = [],
-  onPickType, onPickTag, onOpenPage, onOpenEntry, onOpenMap, onOpenSession, onOpenQuest, onCreate,
+  pages, entries = [], maps = [], today = null, session = null, quests = [], deadlines = [], standing = [],
+  onPickType, onPickTag, onOpenPage, onOpenEntry, onOpenMap, onOpenSession, onOpenQuest, onAdjustStanding, onCreate,
   showReveal = true, loading = false, error = null
 }: Readonly<{
   pages: readonly CampaignEntity[];
@@ -118,6 +132,12 @@ export function CampaignHome({
    * lives in `chronicle.ts` and is applied identically for both audiences.
    */
   deadlines?: readonly CampaignDeadline[];
+  /**
+   * M12 / CT-6: where the party stands with each faction, as the caller's own token was sent it — every
+   * faction for a GM, only the revealed ones for a player. Ordering is the caller's; this renders them as
+   * given, exactly as it does the deadlines.
+   */
+  standing?: readonly CampaignStanding[];
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
   onOpenPage: (pageId: string) => void;
@@ -138,6 +158,13 @@ export function CampaignHome({
    * must not be able to tell, which audience it is rendering for.
    */
   onOpenQuest?: (questId: string) => void;
+  /**
+   * M12 / CT-6: adjust a faction's standing, and say why. A CAPABILITY FLAG, never a role check — this
+   * component cannot tell, and must not be able to tell, which audience it is rendering for. The GM's
+   * workspace passes it; the player's Codex does not, and their card is then the readout it already is,
+   * with nothing to tap. (`onOpenSession` is the same mechanism and the precedent for it.)
+   */
+  onAdjustStanding?: (factionPageId: string) => void;
   onCreate?: () => void;
   showReveal?: boolean;
   /** CF-2: true while the first fetch is in flight, so the "No entries yet" invitation cannot lie. */
@@ -174,12 +201,26 @@ export function CampaignHome({
    * not push everything else below the fold. The full set is on the chronicle, which every row opens.
    */
   const deadlineList = useMemo(() => deadlines.slice(0, 5), [deadlines]);
+  /**
+   * M12 / CT-6: the standings, strongest feeling first — the factions that have taken a side, either
+   * side, before the ones with no opinion yet, then alphabetically so the tail is stable.
+   *
+   * **Deliberately NOT sliced**, unlike the three lists above. Those are dashboards onto a full list that
+   * lives somewhere else (the chronicle, the quest log); this card is the ONLY place standing is read or
+   * adjusted, so a slice would leave a faction the GM could not reach.
+   */
+  const standingList = useMemo(
+    () => [...standing].sort((a, b) => Math.abs(b.value) - Math.abs(a.value) || a.name.localeCompare(b.name)),
+    [standing]
+  );
 
   // CF-2: settle the fetches before claiming emptiness — for either audience. A campaign with no pages
   // but a running journal or a charted atlas is NOT empty, which is why all three feeds gate this — and
   // M9 adds a fourth: a campaign whose GM has prepped a session has plainly started. M10 adds a fifth,
   // for the same reason: a campaign with a quest in it has plainly started, whatever else is missing.
-  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0 && !session && quests.length === 0 && deadlines.length === 0;
+  // M12 adds a sixth feed to the gate for the same reason: a campaign that has recorded where it stands
+  // with a faction has plainly started, whatever else is missing.
+  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0 && !session && quests.length === 0 && deadlines.length === 0 && standing.length === 0;
   if (loading && nothingYet) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
   if (nothingYet) {
     return (
@@ -313,6 +354,51 @@ export function CampaignHome({
               </button>
             ))}
           </nav>
+        </section>
+      )}
+
+      {/* M12 / CT-6: where the party stands. It sits with the other three "where is this campaign right
+          now" cards because that is what it answers — who is with us and who is coming for us. Like them
+          it renders nothing at all when there is nothing to say. */}
+      {standingList.length > 0 && (
+        <section className="codex-campaign-section">
+          {/* One heading for both audiences, like the quest and deadline cards: a revealed standing means
+              exactly the same thing on either side of the table. */}
+          <h3 className="codex-campaign-h">Faction standing</h3>
+          <div className="codex-campaign-standings">
+            {standingList.map((faction) => (
+              <div key={faction.factionPageId} className="codex-campaign-standing">
+                {/* R2: the tier reads as a WORD and the signed number is spelled with its sign, so the
+                    row survives every stylesheet being stripped. The bar below is a scanning aid and
+                    says nothing on its own — which is exactly why it is hidden from assistive tech. */}
+                <div className="codex-campaign-standingrow">
+                  {/* The same row chassis every list on this surface uses (`.codex-campaign-recentitem`,
+                      §4 route 1 — grow the paint), so there is no new control and no new floor here. The
+                      glyph is the chronicle's own standing glyph, never a second one invented here. */}
+                  <button type="button" className="codex-campaign-recentitem codex-campaign-standingname" onClick={() => onOpenPage(faction.factionPageId)}>
+                    <CodexIcon iconId={CHRONICLE_KIND_META.standing.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
+                    <span className="codex-list-title">{faction.name}</span>
+                  </button>
+                  <Badge tone={standingTone(faction.value)}>{standingLabel(faction.value)}</Badge>
+                  <span className="codex-campaign-standingvalue">{standingValueLabel(faction.value)}</span>
+                  {/* §4 route 1: `Button` at its DEFAULT size grows its own paint to 44px and has no
+                      `::after` at all. That matters here rather than being a preference — this row wraps
+                      at a narrow viewport, so the Adjust control can end up directly above the next
+                      faction's, and a route-2 overhang in that stack would steal its taps. */}
+                  {onAdjustStanding && <Button variant="ghost" onClick={() => onAdjustStanding(faction.factionPageId)}>Adjust</Button>}
+                </div>
+                {/* F-6: `Meter` clamps to 0…1 and cannot draw a negative, so the signed value is mapped
+                    onto its unsigned range by `standingMeterValue` — the primitive is untouched (R9).
+                    `aria-hidden` because the bar is decoration twice over: its meaning is already in the
+                    word and the signed number beside it, and its own `progressbar` value would announce
+                    the MAPPED pair ("140 of 200"), a number that exists only inside this transform. No
+                    `label` is passed for the same reason — `Meter` would render that pair as text. */}
+                <div className="codex-campaign-standingmeter" aria-hidden="true">
+                  <Meter value={standingMeterValue(faction.value)} max={STANDING_METER_MAX} tone={standingMeterTone(faction.value)} />
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

@@ -1357,3 +1357,281 @@ describe("Codex routes vs the published contract", () => {
     }
   });
 });
+
+/**
+ * M12 (CT-6 standing, CT-7 party marker, CT-8 milestones, CT-9 reveal audit) at the HTTP boundary. These
+ * assert on the SERIALIZED RESPONSE BODY rather than on a projection's return value, deliberately: the M6
+ * lesson is that a gate at one layer can be masked by a gate at another, so the end-to-end read has to be
+ * checked where the bytes actually leave the process. The projection half lives in
+ * `codex-projections.test.ts` and the store half in `codex-store.test.ts`; all three are needed.
+ */
+describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8)", () => {
+  const faction = async (base: string, title: string, revealed: boolean) => {
+    const page = await body(await post(base, "/api/v1/codex/pages", GM, { title, entityType: "faction" }));
+    const id = page.data.page.id as string;
+    if (revealed) await post(base, `/api/v1/codex/pages/${id}/reveal`, GM, { revealed: true });
+    return id;
+  };
+  const makeMap = async (base: string, name: string, revealed: boolean) => {
+    const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: randomUUID(), name, kind: "regional" }));
+    const id = map.data.map.id as string;
+    if (revealed) await post(base, `/api/v1/codex/maps/${id}/reveal`, GM, { revealed: true });
+    return id;
+  };
+  const makeMarker = async (base: string, mapId: string, label: string, revealed: boolean) => {
+    const marker = await body(await post(base, `/api/v1/codex/maps/${mapId}/markers`, GM, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label, revealedToPlayers: revealed }));
+    return marker.data.marker.id as string;
+  };
+
+  /**
+   * T-8. Two independent claims in one scenario, each of them the thing a projection break would show up in:
+   * a player's standing list carries ONLY what they may see, and a party pin on a hidden map is still hidden
+   * however loudly it is flagged.
+   */
+  it("gives a player only revealed standing, and keeps a party pin on a hidden map hidden", async () => {
+    const { base } = await fixture();
+    const shownFaction = await faction(base, "The Harpers", true);
+    const secretFaction = await faction(base, "The Zhentarim", true);
+    await put(base, `/api/v1/codex/standing/${shownFaction}`, GM, { value: -40, reason: "Killed their envoy" });
+    await put(base, `/api/v1/codex/standing/${secretFaction}`, GM, { value: 70, reason: "Paid the toll" });
+    await post(base, `/api/v1/codex/standing/${shownFaction}/reveal`, GM, { revealed: true });
+
+    // The GM sees both FIRST, so the player assertions below are the gate working, not an empty payload.
+    const gmStanding = (await body(await get(base, "/api/v1/codex/standing", GM))).data.standing as Json[];
+    expect(gmStanding.map((row) => row.value).sort((a, b) => a - b)).toEqual([-40, 70]);
+
+    const playerStanding = (await body(await get(base, "/api/v1/codex/standing", PLAYER))).data.standing as Json[];
+    expect(playerStanding).toHaveLength(1);
+    expect(playerStanding[0].factionPageId).toBe(shownFaction);
+    expect(playerStanding[0].value).toBe(-40);                      // the signed value survives the wire
+    // The EXACT key set on the serialized row: this fails if any new field enters the player projection.
+    expect(Object.keys(playerStanding[0]).sort()).toEqual(["factionPageId", "value"]);
+    const standingPayload = JSON.stringify(playerStanding);
+    expect(standingPayload).not.toContain(secretFaction);           // the unrevealed standing's faction...
+    expect(standingPayload).not.toContain("70");                    // ...and its value
+    expect(standingPayload).not.toContain("revealedToPlayers");
+
+    // CT-7 / CD-6: the party pin, revealed, on a HIDDEN map.
+    const secretMap = await makeMap(base, "The Under-dark", false);
+    const shownMap = await makeMap(base, "Barovia", true);
+    const hiddenParty = await makeMarker(base, secretMap, "The party", true);
+    await put(base, `/api/v1/codex/markers/${hiddenParty}/party`, GM, { isParty: true });
+
+    // The GM's own read has it, flagged - so the player's 404 below is the gate and not a missing record.
+    const gmMarkers = (await body(await get(base, `/api/v1/codex/maps/${secretMap}/markers`, GM))).data.markers as Json[];
+    expect(gmMarkers[0].isParty).toBe(true);
+    // A player cannot even ask about that map, so the party pin is unreachable.
+    expect((await get(base, `/api/v1/codex/maps/${secretMap}/markers`, PLAYER)).status).toBe(404);
+    expect(JSON.stringify(await body(await get(base, "/api/v1/codex/maps", PLAYER)))).not.toContain(secretMap);
+
+    // Move the party to a pin on a map the party CAN see: now it travels, with `isParty` and nothing else new.
+    const shownPin = await makeMarker(base, shownMap, "Camp", true);
+    await put(base, `/api/v1/codex/markers/${shownPin}/party`, GM, { isParty: true });
+    const playerMarkers = (await body(await get(base, `/api/v1/codex/maps/${shownMap}/markers`, PLAYER))).data.markers as Json[];
+    expect(playerMarkers).toHaveLength(1);
+    expect(playerMarkers[0].isParty).toBe(true);
+    expect(Object.keys(playerMarkers[0]).sort()).toEqual(["iconColor", "iconId", "id", "isParty", "label", "mapId", "pageIds", "subMapId", "tags", "x", "y"]);
+
+    // M12-C: one party pin atlas-wide - flagging the new one cleared the old, with no second call.
+    expect((await body(await get(base, `/api/v1/codex/maps/${secretMap}/markers`, GM))).data.markers[0].isParty).toBe(false);
+  });
+
+  /**
+   * M12-C's other half. Turning the flag OFF is scoped to the pin it was sent to: `setPartyMarker(null)`
+   * clears whichever pin currently holds it, so calling it unconditionally would unset a DIFFERENT party pin
+   * whenever the GM switched off a marker that was never the party - a bug with no visible cause at the table.
+   */
+  it("clears the party flag from the pin it was sent to, and never from a different one", async () => {
+    const { base } = await fixture();
+    const mapId = await makeMap(base, "Barovia", true);
+    const partyPin = await makeMarker(base, mapId, "The party", true);
+    const otherPin = await makeMarker(base, mapId, "The ambush", true);
+    await put(base, `/api/v1/codex/markers/${partyPin}/party`, GM, { isParty: true });
+
+    const cleared = await put(base, `/api/v1/codex/markers/${otherPin}/party`, GM, { isParty: false });
+    expect(cleared.status).toBe(200);
+    expect((await body(cleared)).data.marker.isParty).toBe(false);
+    const markers = (await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, GM))).data.markers as Json[];
+    expect(markers.filter((row) => row.isParty).map((row) => row.id)).toEqual([partyPin]);
+
+    // ...and sent to the party pin itself, it does clear it, leaving no party pin at all.
+    await put(base, `/api/v1/codex/markers/${partyPin}/party`, GM, { isParty: false });
+    expect(((await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, GM))).data.markers as Json[]).filter((row) => row.isParty)).toHaveLength(0);
+    // An unknown marker is a 404, not a silent no-op that clears the flag from somewhere else.
+    expect((await put(base, `/api/v1/codex/markers/${randomUUID()}/party`, GM, { isParty: false })).status).toBe(404);
+  });
+
+  /** T-9: the audit is a GM surface. A player is refused, and so is an anonymous caller. */
+  it("refuses the reveal audit to a player and to an anonymous caller", async () => {
+    const { base } = await fixture();
+    for (const headers of [PLAYER, { "content-type": "application/json" }]) {
+      const response = await get(base, "/api/v1/codex/reveal-audit", headers);
+      expect(response.status).toBe(401);
+      expect((await body(response)).error.code).toBe("unauthenticated");
+    }
+    expect((await get(base, "/api/v1/codex/reveal-audit", GM)).status).toBe(200);
+  });
+
+  /**
+   * T-10, and the most important test in this milestone: **the audit's counts and ids must match what the
+   * player-facing endpoints actually return, for every record type.** That is what proves CT-9 is an
+   * aggregation of the existing projections rather than a second opinion about visibility.
+   *
+   * Every category therefore gets three records - one revealed, one not, and (where the kind has a second
+   * gate) one that is flagged revealed but which the party still cannot see. That third case is the one an
+   * audit written against `revealed = 1` gets wrong, and it is why the comparison is against REAL player
+   * reads rather than against numbers typed into this test.
+   */
+  it("matches the real player reads exactly, for every record type", async () => {
+    const { base } = await fixture();
+
+    // Pages: one revealed, one not. (The faction pages below add two more revealed pages.)
+    const shownPage = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", revealedToPlayers: true }));
+    await post(base, "/api/v1/codex/pages", GM, { title: "The Amber Temple" });
+
+    // Maps: one revealed, one not.
+    const shownMap = await makeMap(base, "Barovia", true);
+    const secretMap = await makeMap(base, "The Amber Vaults", false);
+
+    // Markers: one revealed on the revealed map, one unrevealed on it, and one REVEALED on the SECRET map -
+    // the case that separates "flagged revealed" from "the party can see it".
+    const shownMarker = await makeMarker(base, shownMap, "Camp", true);
+    await makeMarker(base, shownMap, "The ambush", false);
+    await makeMarker(base, secretMap, "The vault door", true);
+
+    // Journal: one revealed note, one hidden, plus a milestone (CT-8) revealed through the ORDINARY route.
+    const shownEntry = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "They reached the gate.", revealedToPlayers: true }));
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "The cult moves." });
+    const milestone = await body(await post(base, "/api/v1/codex/journal/milestone", GM, { playerText: "Level up.", milestone: { level: 5, reason: "Cleared the crypt" } }));
+    expect(milestone.data.entry.kind).toBe("milestone");
+    await post(base, `/api/v1/codex/journal/${milestone.data.entry.id}/reveal`, GM, { revealed: true });
+
+    // Sessions and quests: one revealed each, one not.
+    const shownSession = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 4, recapBody: "They reached the gate.", revealedToPlayers: true }));
+    await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 5, prepBody: "The ambush." });
+    const shownQuest = await body(await post(base, "/api/v1/codex/quests", GM, { title: "The Wyrmwood Contract" }));
+    await post(base, `/api/v1/codex/quests/${shownQuest.data.quest.id}/reveal`, GM, { revealed: true });
+    await post(base, "/api/v1/codex/quests", GM, { title: "The Amber Bargain" });
+
+    // Standing: one revealed on a revealed faction, one revealed on a SECRET faction (the second gate), and
+    // one not revealed at all.
+    const shownFaction = await faction(base, "The Harpers", true);
+    const secretFaction = await faction(base, "The Zhentarim", false);
+    const quietFaction = await faction(base, "The Emerald Enclave", true);
+    for (const [id, value] of [[shownFaction, -40], [secretFaction, 70], [quietFaction, 10]] as const) {
+      await put(base, `/api/v1/codex/standing/${id}`, GM, { value, reason: "Because" });
+    }
+    await post(base, `/api/v1/codex/standing/${shownFaction}/reveal`, GM, { revealed: true });
+    await post(base, `/api/v1/codex/standing/${secretFaction}/reveal`, GM, { revealed: true });
+
+    // ---- what the audit says ----
+    const audit = (await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit as Json;
+    const section = (kind: string) => (audit.sections as Json[]).find((entry) => entry.kind === kind)!;
+    const auditIds = (kind: string) => (section(kind).rows as Json[]).map((row) => row.id as string).sort();
+
+    // ---- what a player actually receives ----
+    const playerPages = (await body(await get(base, "/api/v1/codex/pages", PLAYER))).data.pages as Json[];
+    const playerMaps = (await body(await get(base, "/api/v1/codex/maps", PLAYER))).data.maps as Json[];
+    const playerMarkers: Json[] = [];
+    for (const map of playerMaps) playerMarkers.push(...((await body(await get(base, `/api/v1/codex/maps/${map.id}/markers`, PLAYER))).data.markers as Json[]));
+    const playerEntries = (await body(await get(base, "/api/v1/codex/journal", PLAYER))).data.entries as Json[];
+    const playerSessions = (await body(await get(base, "/api/v1/codex/sessions", PLAYER))).data.sessions as Json[];
+    const playerQuests = (await body(await get(base, "/api/v1/codex/quests", PLAYER))).data.quests as Json[];
+    const playerStanding = (await body(await get(base, "/api/v1/codex/standing", PLAYER))).data.standing as Json[];
+
+    const ids = (rows: Json[], key = "id") => rows.map((row) => row[key] as string).sort();
+    for (const [kind, rows, key] of [
+      ["page", playerPages, "id"], ["map", playerMaps, "id"], ["marker", playerMarkers, "id"],
+      ["journal", playerEntries, "id"], ["session", playerSessions, "id"], ["quest", playerQuests, "id"],
+      // A standing row is addressed by its FACTION page id - which is what its reveal route takes.
+      ["standing", playerStanding, "factionPageId"]
+    ] as const) {
+      expect(section(kind).revealed, `${kind} count`).toBe(rows.length);
+      expect(auditIds(kind), `${kind} ids`).toEqual(ids(rows as Json[], key));
+      // Non-vacuous: every category really does have something in it, so no line above is 0 === 0.
+      expect(section(kind).revealed, `${kind} must not be empty`).toBeGreaterThan(0);
+    }
+
+    // The three cases an audit built on the raw reveal flag gets WRONG, stated explicitly so a regression
+    // reads as the specific mistake it is rather than as an off-by-one:
+    //   a revealed pin on a secret map is not visible...
+    expect(section("marker").total).toBe(3);
+    expect(section("marker").revealed).toBe(1);
+    expect(auditIds("marker")).toEqual([shownMarker]);
+    //   ...and a revealed standing on a secret faction is not visible either.
+    expect(section("standing").total).toBe(3);
+    expect(section("standing").revealed).toBe(1);
+    expect(auditIds("standing")).toEqual([shownFaction]);
+    expect(JSON.stringify(audit)).not.toContain(secretFaction);
+
+    // Totals are the whole codex, and the rows name records the party can genuinely read.
+    expect(section("journal").revealed).toBe(2);                       // the note and the revealed milestone
+    expect(auditIds("journal")).toEqual([milestone.data.entry.id, shownEntry.data.entry.id].sort());
+    expect((section("page").rows as Json[]).map((row) => row.title)).toContain("Vallaki");
+    expect((section("session").rows as Json[])[0].title).toBe("Session 4");
+    expect(audit.revealed).toBe((audit.sections as Json[]).reduce((count, entry) => count + (entry.revealed as number), 0));
+    expect(shownPage.data.page.id).toBeTruthy();
+    expect(shownSession.data.session.id).toBeTruthy();
+  });
+
+  /** Un-revealing from the audit is the EXISTING per-kind route - M12 adds no unreveal verb and no bulk one. */
+  it("drops a record from the audit when the GM un-reveals it through that kind's own reveal route", async () => {
+    const { base } = await fixture();
+    const quest = await body(await post(base, "/api/v1/codex/quests", GM, { title: "The Wyrmwood Contract" }));
+    const questId = quest.data.quest.id as string;
+    await post(base, `/api/v1/codex/quests/${questId}/reveal`, GM, { revealed: true });
+    const auditOf = async () => ((await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit.sections as Json[]).find((entry) => entry.kind === "quest")!;
+    expect((await auditOf()).rows).toEqual([{ kind: "quest", id: questId, title: "The Wyrmwood Contract" }]);
+
+    await post(base, `/api/v1/codex/quests/${questId}/reveal`, GM, { revealed: false });
+    expect((await auditOf()).revealed).toBe(0);
+    expect((await auditOf()).total).toBe(1);                          // still there, just not public
+    expect((await body(await get(base, "/api/v1/codex/quests", PLAYER))).data.quests).toHaveLength(0);
+  });
+
+  /** T-11's boundary half: the M12 routes are documented with the security they actually enforce. */
+  it("documents the M12 routes with the roles they enforce", async () => {
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>>;
+    // The one M12 read a player may make; the audit and every write are GM-only.
+    expect(paths[CODEX_PATHS.standing].get.security).toEqual([{ gmAuth: [] }, { playerAuth: [] }]);
+    for (const [path, method] of [
+      [CODEX_PATHS.revealAudit, "get"], [CODEX_PATHS.standingByFaction, "put"], [CODEX_PATHS.standingReveal, "post"],
+      [CODEX_PATHS.journalMilestone, "post"], [CODEX_PATHS.markerParty, "put"]
+    ] as const) {
+      expect(paths[path][method].security, `${method} ${path}`).toEqual([{ gmAuth: [] }]);
+    }
+  });
+
+  /**
+   * The write schemas are applied at all - which `.strict()` is what proves, because an unknown key is the
+   * one rejection ONLY this layer performs (the store ignores input keys it does not read).
+   *
+   * The missing-payload row beside it is deliberately defence in depth rather than a proof of this layer:
+   * `createMilestone` refuses it too, so making `milestone` optional in the schema leaves this green
+   * (measured, not assumed). That is the intended arrangement - the router is the early rejection, the store
+   * is the enforcer - and it is stated here so a later reader does not mistake it for a test of the schema.
+   */
+  it("parses the M12 bodies through their own schemas", async () => {
+    const { base } = await fixture();
+    const factionId = await faction(base, "The Harpers", true);
+    const mapId = await makeMap(base, "Barovia", true);
+    const markerId = await makeMarker(base, mapId, "Camp", true);
+    for (const [method, path, payload] of [
+      ["PUT", `/api/v1/codex/standing/${factionId}`, { value: 150 }],                                    // outside the signed scale
+      ["PUT", `/api/v1/codex/standing/${factionId}`, { value: 10, revealed: true }],                     // .strict(): reveal is its own route
+      ["POST", "/api/v1/codex/journal/milestone", { milestone: { level: 0, reason: "x" } }],             // no character is level 0
+      ["POST", "/api/v1/codex/journal/milestone", { milestone: { level: 5 }, kind: "milestone" }],       // .strict(): the route names the kind
+      ["POST", "/api/v1/codex/journal/milestone", { playerText: "Level up." }],                          // the payload is required
+      ["PUT", `/api/v1/codex/markers/${markerId}/party`, { isParty: "yes" }]                             // a flag, not a string
+    ] as const) {
+      const response = method === "PUT" ? await put(base, path, GM, payload) : await post(base, path, GM, payload);
+      expect(response.status, `${method} ${path} ${JSON.stringify(payload)}`).toBe(400);
+      expect((await body(response)).error.code).toBe("validation_failed");
+    }
+    // ...and the shapes the client actually sends are accepted, including an omitted reason.
+    expect((await put(base, `/api/v1/codex/standing/${factionId}`, GM, { value: -40 })).status).toBe(200);
+    expect((await post(base, "/api/v1/codex/journal/milestone", GM, { milestone: { level: 5 } })).status).toBe(201);
+    // An unknown faction is a 404, not a silently created standing row.
+    expect((await put(base, `/api/v1/codex/standing/${randomUUID()}`, GM, { value: 10 })).status).toBe(404);
+  });
+});
