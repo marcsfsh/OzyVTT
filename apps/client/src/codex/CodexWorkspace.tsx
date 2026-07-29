@@ -4,7 +4,8 @@ import { socket } from "../socket";
 import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
-import { JournalView, journalWhenLabel } from "./JournalView";
+import { JournalView } from "./JournalView";
+import { chronicleWhenLabel } from "./chronicle";
 import { CommandPalette } from "./CommandPalette";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
@@ -126,7 +127,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    */
   const campaignEntries = useMemo<readonly CampaignEntry[]>(() => [...campaign.entries]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((entry) => ({ id: entry.id, summary: entry.playerText.trim() || (entry.gmText ?? "").trim(), when: journalWhenLabel(entry), kind: entry.kind })), [campaign.entries]);
+    .map((entry) => ({ id: entry.id, summary: entry.playerText.trim() || (entry.gmText ?? "").trim(), when: chronicleWhenLabel(entry), kind: entry.kind })), [campaign.entries]);
   const campaignToday = useMemo(() => (campaign.calendar?.currentDate ? formatWorldDate(campaign.calendar, campaign.calendar.currentDate) : null), [campaign.calendar]);
 
   // CI-1 / R8: the rail's search is the SUITE's search — pages, journal entries, maps and markers in one

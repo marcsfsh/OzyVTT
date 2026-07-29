@@ -601,6 +601,45 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex Phase 4 M8 — chronicle unification (2026-07-28).** Delivers **CT-11, CT-12**. First Phase 4
+  milestone; M9–M12 remain, see `docs/product/codex-phase4-handoff.md`.
+  - **One timeline.** Migration **v12** gives `codex_pages` the same five dating columns `codex_journal`
+    carries, so a dated `event` page joins the chronicle. Additive, no backfill: existing rows are NULL =
+    undated = today's behaviour. `GET /codex/timeline` returns entries, combats and events as one list.
+  - **Dating reuses the existing contract rather than inventing a second.** `createPage`/`updatePage` call
+    the same private `resolveDate` a journal entry goes through — raw date is the source of truth,
+    `calendarInstant` is derived. The columns are named identically so `setCalendar` reflows both from one
+    rule, keyed on `in_world_year IS NOT NULL` rather than `entity_type = 'event'`, so a page promoted to
+    an event later arrives with a current instant.
+  - **K3 (calendar reflow) proven non-destructive at three layers**: a store test, an HTTP test through
+    `PUT /codex/calendar`, and a live round-trip on the populated dev DB — calendar swapped 12×30 → 2×100
+    and back, raw dates byte-identical through both edits, derived values restored exactly. A month index
+    clamped under the 2-month calendar and returned intact *because* the raw month was never rewritten.
+  - **Viewer safety by delegation, not restatement.** `projectPlayerChronicleRecord` calls
+    `projectPlayerJournalEntry` and `projectPlayerPage` rather than re-deriving their gates — the M7
+    `projectPlayerPageMarker` precedent. A hand-rolled check passes the same tests today and drifts the
+    moment either underlying projection tightens. **I re-verified this myself**: breaking the event arm
+    fails 3 tests, at the HTTP boundary *and* at the projection layer directly.
+  - **Mutation testing found a real gap again.** "The editor sends a date on every page type" initially
+    killed **nothing** — 84 tests passed. Three `PageEditor` dating tests were added and it now fails. That
+    mutation would have silently un-dated any event demoted to a note and then edited.
+  - **`when` was relabelled, not removed** — "When, in prose". Dropping the key would delete every existing
+    event's text on its next save, because the server prunes to the type's key set (K7).
+  - **Recorded scope stretch (2 files outside the Owns list):** `hourglass` was the journal-entry glyph in
+    `CampaignHome`/`SearchResults` *and* CT-11 makes it the event-page glyph, so one glyph meant two things
+    on adjacent surfaces. Journal entries now use `scroll`. Revert if M8 should stay strictly inside its
+    files.
+  - **CT-12's lens toggle is GM-only.** Grouping by in-world year needs `calendarInstant`, which the player
+    projection deliberately does not carry; widening a player projection to power a GM feature was the
+    wrong trade. Players get the unified rows in the server's canonical order. **Open question for the
+    owner if CT-12 was meant to reach the player reader.**
+  - **Verified.** `check` / `test` / `build` all exit 0; **1206 tests** (web 89, server 834). Browser pass at
+    1440px and 375px: correct year and session groupings, every row carrying glyph *and* word (R2), zero
+    overflow, 0 controls under 44px on the Journal, player Codex showing exactly the 2 revealed records with
+    0 leaks of 4 GM strings.
+  - **Pre-existing, flagged not fixed:** `.codex-title-input` and `.codex-banner-add` are sub-floor in the
+    page editor — outside what `scripts/tap-audit.mjs` walks, since it never opens an editor.
+
 - **Codex suite overhaul — Stage Six final QA and Stage Seven remediation (2026-07-28).** Three
   independent adversarial reviewers over the whole delivered programme, then remediation. M1–M7 complete.
   - **Viewer safety: no confirmed leak.** The audit independently re-derived every gate and confirmed

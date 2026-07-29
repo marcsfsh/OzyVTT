@@ -51,7 +51,8 @@ import type { CodexPage, CodexPageSummary } from "./api";
  */
 const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"], tags: string[] = []): CodexPageSummary => ({
   id, title, entityType, fields: {}, folder: null, tags, revealedToPlayers: false,
-  bannerAssetId: null, rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 

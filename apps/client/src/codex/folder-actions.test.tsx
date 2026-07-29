@@ -23,7 +23,8 @@ import type { CodexPageSummary } from "./api";
  */
 
 const PAGE = (id: string, title: string, folder: string | null): CodexPageSummary => ({
-  id, title, folder, entityType: "note", fields: {}, tags: [], revealedToPlayers: false, bannerAssetId: null, rev: 1,
+  id, title, folder, entityType: "note", fields: {}, tags: [], revealedToPlayers: false, bannerAssetId: null,
+  inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 1,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 

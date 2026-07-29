@@ -57,8 +57,16 @@ export const ENTITY_DEFS: Readonly<Record<EntityType, EntityDef>> = {
   religion: { type: "religion", label: "Religion", icon: "sun", color: "var(--codex-type-religion)", fields: withKeys("religion", {
     deity: { label: "Deity / power" }, domains: { label: "Domains" }, alignment: { label: "Alignment" }, followers: { label: "Followers" }
   }) },
+  /**
+   * CT-11 gave an `event` page a real in-world DATE, edited above the fields — and that is what places it
+   * on the chronicle. `when` therefore stops being the answer to "when did this happen" and becomes what
+   * it can actually be: prose. It is kept rather than removed because removing the key would silently
+   * delete every existing event's text on its next save (the server prunes to the type's key set, K7), and
+   * because "in the third winter of the siege" is worth writing and cannot be sorted. The label says which
+   * is which, so the GM is never choosing between two fields that look like the same question.
+   */
   event: { type: "event", label: "Event", icon: "hourglass", color: "var(--codex-type-event)", fields: withKeys("event", {
-    when: { label: "When" }, where: { label: "Where" }, participants: { label: "Participants" }, outcome: { label: "Outcome", kind: "textarea" }
+    when: { label: "When, in prose", placeholder: "the third winter of the siege" }, where: { label: "Where" }, participants: { label: "Participants" }, outcome: { label: "Outcome", kind: "textarea" }
   }) }
 };
 

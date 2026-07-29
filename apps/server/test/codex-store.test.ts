@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmLinkEdges, projectGmMarker, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships } from "../src/codex-projections.js";
+import { projectGmChronicleRecord, projectGmLinkEdges, projectGmMarker, projectGmRelationships, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -781,6 +781,53 @@ describe("CodexStore calendar + timeline", () => {
     expect(() => store.setCalendar({ yearName: "", months: [], weekdays: [] })).toThrow(/1 to 24 months/);
   });
 
+  it("dates an `event` page through the SAME contract a journal entry uses (CT-11)", () => {
+    const page = store.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1492, month: 1, day: 15 } });
+    expect(page.inWorldDate).toEqual({ year: 1492, month: 1, day: 15 }); // the RAW date is stored verbatim
+    expect(page.inWorldLabel).toContain("1492");                          // ...and the label is derived from it
+    // The instant is the SAME function's answer, not a parallel one: an entry on the same day agrees exactly.
+    const entry = store.createEntry({ playerText: "the sky tore open", inWorldDate: { year: 1492, month: 1, day: 15 } });
+    expect(page.calendarInstant).toBe(entry.calendarInstant);
+    expect(page.inWorldLabel).toBe(entry.inWorldLabel);
+  });
+
+  it("puts a dated event page on the chronicle in the right in-world year, interleaved with entries (CT-11)", () => {
+    const early = store.createEntry({ playerText: "Founding.", inWorldDate: { year: 1400, month: 0, day: 1 } });
+    const event = store.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1450, month: 0, day: 1 } });
+    const late = store.createEntry({ playerText: "The war.", inWorldDate: { year: 1500, month: 0, day: 1 } });
+    // Created in chronological order here on purpose: the assertion below is about DATES placing records,
+    // so it also checks a later-created record cannot simply ride its insertion order into the middle.
+    const undated = store.createEntry({ playerText: "Someday." });
+
+    expect(store.listChronicle().map((record) => (record.kind === "entry" ? record.entry.id : record.page.id)))
+      .toEqual([early.id, event.id, late.id, undated.id]);
+    expect(store.dateForInstant(event.calendarInstant!)).toEqual({ year: 1450, month: 0, day: 1 });
+  });
+
+  it("keeps an UNDATED event page and a dated non-event page off the chronicle (CT-11)", () => {
+    store.createPage({ title: "A vague legend", entityType: "event" });
+    const note = store.createPage({ title: "Barovia", entityType: "location", inWorldDate: { year: 1492, month: 0, day: 1 } });
+    expect(store.listChronicle()).toHaveLength(0);
+    // The date is not DISCARDED, only unlisted: promoting the page to an event later brings it back with
+    // its date intact, which is what makes a type switch lossless.
+    expect(store.getPage(note.id)!.inWorldDate).toEqual({ year: 1492, month: 0, day: 1 });
+    store.updatePage(note.id, { entityType: "event" }, undefined, "test");
+    expect(store.listChronicle().map((record) => record.kind)).toEqual(["event"]);
+  });
+
+  it("leaves a page's date alone when a write does not mention it, and clears it on an explicit null", () => {
+    // The page editor PATCHes the whole draft on every autosave. If an omitted date meant "clear", editing
+    // an event's body from any surface that does not know about dates would silently un-date it.
+    const page = store.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1492, month: 1, day: 15 } });
+    const bodyEdited = store.updatePage(page.id, { playerBody: "The sky tore open." }, undefined, "test");
+    expect(bodyEdited.inWorldDate).toEqual({ year: 1492, month: 1, day: 15 });
+    const cleared = store.updatePage(page.id, { inWorldDate: null }, undefined, "test");
+    expect(cleared.inWorldDate).toBeNull();
+    expect(cleared.calendarInstant).toBeNull();
+    expect(cleared.inWorldLabel).toBeNull();
+    expect(store.listChronicle()).toHaveLength(0);
+  });
+
   it("reflows already-dated entries when the calendar changes, without corrupting them", () => {
     const early = store.createEntry({ playerText: "Founding.", inWorldDate: { year: 1, month: 0, day: 1 } });
     const late = store.createEntry({ playerText: "The war.", inWorldDate: { year: 2, month: 0, day: 1 } });
@@ -794,6 +841,143 @@ describe("CodexStore calendar + timeline", () => {
     expect(earlyNow.inWorldLabel).toBe("Rise 1, 1 AE");                     // label recomputed from the RAW date
     expect(earlyNow.inWorldDate).toEqual({ year: 1, month: 0, day: 1 });    // raw date preserved verbatim
     expect(reflowed[0].id).toBe(early.id);                                  // chronological order intact
+  });
+
+  /**
+   * K3, the risk M8 is named against: `setCalendar` transactionally recomputes EVERY dated record, and
+   * events joined that set. Three separate properties, because passing one of them proves little:
+   *   1. Events reflow AT ALL (a reflow that skipped `codex_pages` leaves an event on the old year length).
+   *   2. Events and entries reflow TOGETHER, against the same calendar — checked by their interleaved
+   *      chronicle order surviving, which is the thing a half-reflow actually breaks.
+   *   3. Nothing is LOST: every raw date is byte-identical afterwards, because the reflow only ever reads
+   *      the raw date and writes the two derived columns.
+   */
+  it("reflows events and entries TOGETHER when the calendar changes, losing no raw date (K3)", () => {
+    const entryEarly = store.createEntry({ playerText: "Founding.", inWorldDate: { year: 1, month: 0, day: 1 } });
+    const eventMid = store.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1, month: 1, day: 10 } });
+    const entryLate = store.createEntry({ playerText: "The war.", inWorldDate: { year: 2, month: 0, day: 1 } });
+    const eventLast = store.createPage({ title: "The Peace", entityType: "event", inWorldDate: { year: 3, month: 0, day: 5 } });
+    const orderBefore = store.listChronicle().map((record) => (record.kind === "entry" ? record.entry.id : record.page.id));
+    expect(orderBefore).toEqual([entryEarly.id, eventMid.id, entryLate.id, eventLast.id]);
+
+    // A calendar with a different month COUNT and different month LENGTHS: every instant must move, and
+    // the month index 1 now means a month of a different length, so a stale label is visible too.
+    store.setCalendar({ yearName: "AE", months: [{ name: "Rise", days: 100 }, { name: "Fall", days: 100 }], weekdays: [] });
+
+    // 1 + 2: still interleaved in the same order, and every instant now agrees with the NEW calendar.
+    const after = store.listChronicle();
+    expect(after.map((record) => (record.kind === "entry" ? record.entry.id : record.page.id))).toEqual(orderBefore);
+    const eventNow = store.getPage(eventMid.id)!;
+    const entryOnTheSameDay = store.createEntry({ playerText: "same day", inWorldDate: { year: 1, month: 1, day: 10 } });
+    expect(eventNow.calendarInstant).toBe(entryOnTheSameDay.calendarInstant); // reflowed page == freshly dated entry
+    expect(eventNow.inWorldLabel).toBe("Fall 10, 1 AE");                      // label recomputed, not stale
+    // Both instants stated from the new calendar's own arithmetic (year*200 + month offset + day-1),
+    // so this fails if either record kept a value computed against the old 12x30 year.
+    expect(eventNow.calendarInstant).toBe(1 * 200 + 100 + 9);
+    expect(store.getPage(eventLast.id)!.calendarInstant).toBe(3 * 200 + 0 + 4);
+
+    // 3: every raw date survives verbatim - the reflow reads them and never writes them.
+    expect(store.getPage(eventMid.id)!.inWorldDate).toEqual({ year: 1, month: 1, day: 10 });
+    expect(store.getPage(eventLast.id)!.inWorldDate).toEqual({ year: 3, month: 0, day: 5 });
+    expect(store.getEntry(entryEarly.id)!.inWorldDate).toEqual({ year: 1, month: 0, day: 1 });
+    expect(store.getEntry(entryLate.id)!.inWorldDate).toEqual({ year: 2, month: 0, day: 1 });
+
+    // ...and the reflow is idempotent: re-applying the SAME calendar changes nothing at all.
+    const snapshot = store.listChronicle().map((record) => JSON.stringify(record));
+    store.setCalendar({ yearName: "AE", months: [{ name: "Rise", days: 100 }, { name: "Fall", days: 100 }], weekdays: [] });
+    expect(store.listChronicle().map((record) => JSON.stringify(record))).toEqual(snapshot);
+  });
+});
+
+/**
+ * The chronicle's store layer, ON ITS OWN — below any projection.
+ *
+ * Why these exist, in the same spirit as the search tests at the top of this file. `listChronicle()` is
+ * deliberately UNGATED and `projectPlayerChronicleRecord` is the only gate (K1). That is the right design,
+ * but only while it stays true: the moment a filter creeps into the store, an HTTP test can pass because
+ * the store quietly caught what a broken projection let through. These assert the ungatedness directly,
+ * so a later "hardening" of the store fails here instead of silently blinding the tests that matter.
+ */
+describe("CodexStore chronicle — deliberately ungated (CT-11)", () => {
+  it("returns UNREVEALED entries and UNREVEALED event pages to the store's caller", () => {
+    const entry = store.createEntry({ playerText: "secret", inWorldDate: { year: 1, month: 0, day: 1 } });
+    const page = store.createPage({ title: "Secret event", entityType: "event", gmBody: "only the GM knows", inWorldDate: { year: 1, month: 0, day: 2 } });
+    expect(entry.revealedToPlayers).toBe(false);
+    expect(page.revealedToPlayers).toBe(false);
+    const ids = store.listChronicle().map((record) => (record.kind === "entry" ? record.entry.id : record.page.id));
+    expect(ids).toEqual([entry.id, page.id]);
+  });
+
+  it("returns the GM half of both record types raw — the projection, not the store, is what strips it", () => {
+    store.createEntry({ playerText: "seen", gmText: "unseen", inWorldDate: { year: 1, month: 0, day: 1 } });
+    store.createPage({ title: "Event", entityType: "event", playerBody: "seen", gmBody: "unseen", inWorldDate: { year: 1, month: 0, day: 2 } });
+    const raw = store.listChronicle();
+    expect(raw[0].kind === "entry" && raw[0].entry.gmText).toBe("unseen");
+    expect(raw[1].kind === "event" && raw[1].page.gmBody).toBe("unseen");
+  });
+});
+
+/**
+ * The chronicle's PROJECTION layer, on its own — the single gate, exercised directly rather than through
+ * the router. An HTTP test proves the pipeline works; it never proves which layer did the work. Since the
+ * store above is deliberately ungated, this is the layer that has to be right, so it is tested here at
+ * point-blank range, one property per test.
+ */
+describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", () => {
+  const playerChronicle = () => store.listChronicle().map(projectPlayerChronicleRecord).filter((record) => record !== null);
+
+  it("refuses an UNREVEALED event page", () => {
+    const page = store.createPage({ title: "The Sundering", entityType: "event", playerBody: "The sky tore open.", inWorldDate: { year: 1492, month: 0, day: 1 } });
+    expect(store.getPage(page.id)!.revealedToPlayers).toBe(false);
+    expect(projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! })).toBeNull();
+    // Revealing it lets it through, so the null above is the reveal gate and not a broken projection.
+    store.setPageRevealed(page.id, true);
+    expect(projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! })).not.toBeNull();
+  });
+
+  it("refuses an UNREVEALED journal entry", () => {
+    const entry = store.createEntry({ playerText: "The vistani warned us", inWorldDate: { year: 1492, month: 0, day: 1 } });
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })).toBeNull();
+    store.setEntryRevealed(entry.id, true);
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })).not.toBeNull();
+  });
+
+  it("strips GM-only content from a REVEALED event page, and emits exactly the allow-listed keys", () => {
+    const page = store.createPage({
+      title: "The Sundering", entityType: "event", revealedToPlayers: true,
+      playerBody: "The sky tore open.", gmBody: "Strahd engineered it.",
+      fields: { where: "Barovia" }, gmFields: { goals: "conceal the cause" },
+      tags: ["cataclysm"], inWorldDate: { year: 1492, month: 0, day: 1 }
+    });
+    const projected = projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! })!;
+    // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
+    // ever added to the player projection, not merely if this one leaks.
+    expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text", "title"]);
+    expect(projected.text).toBe("The sky tore open.");
+    expect(JSON.stringify(projected)).not.toContain("Strahd engineered it.");
+    expect(JSON.stringify(projected)).not.toContain("conceal the cause");
+    // The GM's own row carries both halves - so the assertions above are the projection working, not an
+    // event page that happened to have no GM content to leak.
+    const gmRow = projectGmChronicleRecord({ kind: "event", page: store.getPage(page.id)! });
+    expect(gmRow.gmText).toContain("Strahd engineered it.");
+    expect(gmRow.revealedToPlayers).toBe(true);
+  });
+
+  it("never hands a player the replay linkage of a revealed combat entry (K2)", () => {
+    const entry = store.appendCombatEntry({ sourceEncounterId: 42, playerText: "A battle was fought here." });
+    store.setEntryRevealed(entry.id, true);
+    const projected = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })!;
+    expect(projected.kind).toBe("combat");
+    expect(projected).not.toHaveProperty("sourceEncounterId");
+  });
+
+  it("filters a mixed chronicle to exactly the revealed half of BOTH kinds", () => {
+    const shownEntry = store.createEntry({ playerText: "seen", revealedToPlayers: true, inWorldDate: { year: 1, month: 0, day: 1 } });
+    store.createEntry({ playerText: "hidden", inWorldDate: { year: 1, month: 0, day: 2 } });
+    const shownEvent = store.createPage({ title: "Shown", entityType: "event", revealedToPlayers: true, inWorldDate: { year: 1, month: 0, day: 3 } });
+    store.createPage({ title: "Hidden", entityType: "event", inWorldDate: { year: 1, month: 0, day: 4 } });
+    expect(store.listChronicle()).toHaveLength(4);                       // the store hands over all four...
+    expect(playerChronicle().map((record) => record.id)).toEqual([shownEntry.id, shownEvent.id]); // ...the gate keeps two
   });
 });
 

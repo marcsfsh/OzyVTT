@@ -107,5 +107,5 @@ Recorded with measurements in `known-bugs.md` and `decision-log.md`:
 
 ## 7. Known-good baseline at handoff
 
-`npm run check`, `npm run test`, `npm run build` all exit 0. See the M8 entry in `current-state.md` for
-the exact test count at handoff. Branch: `claude/codex-suite-overhaul-nyeqg0`, all work pushed.
+`npm run check`, `npm run test`, `npm run build` all exit 0 at **1206 tests** (web 89, server 834,
+api-contract 36, content-srd 80, rules-5e 108, schemas 19, domain 18, pdf 12 + 1 skipped). Branch: `claude/codex-suite-overhaul-nyeqg0`, all work pushed.

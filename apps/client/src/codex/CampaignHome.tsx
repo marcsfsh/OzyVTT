@@ -121,7 +121,7 @@ export function CampaignHome({
                 icon AND text — the battle glyph plus a "Battle" badge, never by colour alone. */}
             {recentEntries.map((entry) => (
               <button key={entry.id} type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(entry.id)}>
-                <CodexIcon iconId={entry.kind === "combat" ? "battle" : "hourglass"} className="codex-ent-icon codex-campaign-recentglyph" />
+                <CodexIcon iconId={entry.kind === "combat" ? "battle" : "scroll"} className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{entry.summary || "Untitled entry"}</span>
                 {entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}
                 {entry.when && <span className="codex-campaign-recentwhen">{entry.when}</span>}

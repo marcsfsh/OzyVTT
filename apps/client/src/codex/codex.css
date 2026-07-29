@@ -294,6 +294,11 @@
 
 /* Calendar + chronicle */
 .codex-composer-head-actions { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* CT-12: the lens toggle. Its own row above the timeline, right-aligned like the composer's actions, so
+   it reads as a control over the whole list rather than a heading of the first group. `SegmentedControl`
+   brings its own 44px floor (§4), so there is no new tap route to argue about here. */
+.codex-timeline-lens { display: flex; justify-content: flex-end; margin-bottom: var(--space-2); }
+.codex-timeline-lens .nh-segmented { max-width: 100%; }
 .codex-timeline-group { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-timeline-year { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); margin-top: var(--space-3); }
 .codex-now-chip { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); padding: 2px var(--space-2); border-radius: var(--radius-pill); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
@@ -574,12 +579,26 @@
 .codex-timeline { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-entry { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-entry.is-combat { border-left-color: var(--caution); }
+/* CT-11: a dated `event` page on the chronicle. The accent is the SAME token the event entity type uses
+   everywhere else (tree, graph, badges), so one record has one colour across the suite. R2: the accent is
+   never the only signal — every row also carries the kind's glyph and its word ("Event"). */
+.codex-entry.is-event { border-left-color: var(--codex-type-event); }
 /* CI-1 / R1: the entry a search hit landed on. R6 — selection owns the edge, so this marks the arrival
    with a border rather than a second background treatment. */
 .codex-entry.is-focused { border-color: var(--magenta); }
 .codex-entry-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.codex-entry-meta { display: flex; align-items: center; gap: var(--space-2); }
+/* Wraps: at 375px a row can carry a glyph, a kind badge, a date and a session number, and an unwrapped
+   flex row would push the RevealSwitch off the card instead. */
+.codex-entry-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0; }
+/* R2: the kind's glyph, beside the kind's word. Tinted from the row's own accent so the icon reads as
+   part of the record rather than as a control. */
+.codex-entry-kindglyph { color: var(--text-dim); }
+.codex-entry.is-combat .codex-entry-kindglyph { color: var(--caution); }
+.codex-entry.is-event .codex-entry-kindglyph { color: var(--codex-type-event); }
 .codex-entry-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
+/* An event page's name. A journal entry has none, so this element simply does not render for it — the
+   row shape is unchanged, the slot is just empty (R2). */
+.codex-entry-title { font-family: var(--font-display); font-size: var(--fs-h3); color: var(--text); margin: 0; }
 .codex-entry-body { color: var(--text); }
 .codex-entry-gm { border-top: 1px dashed var(--line); padding-top: var(--space-2); color: var(--text-dim); position: relative; display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-start; }
 /* CI-2: an entry's stored tags, read-only. Badges, not chips or buttons — nothing here is interactive,

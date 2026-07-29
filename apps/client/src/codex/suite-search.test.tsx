@@ -22,14 +22,14 @@ const search = vi.fn();
 const listMaps = vi.fn();
 const listAssets = vi.fn();
 const listMarkers = vi.fn();
-const timeline = vi.fn();
+const chronicle = vi.fn();
 const forMarker = vi.fn();
 const getCalendar = vi.fn();
 const playerSearch = vi.fn();
 const playerListPages = vi.fn();
 const playerListMaps = vi.fn();
 const playerListMarkers = vi.fn();
-const playerTimeline = vi.fn();
+const playerChronicle = vi.fn();
 const playerListRelationships = vi.fn();
 const playerListLinks = vi.fn();
 
@@ -53,7 +53,7 @@ vi.mock("./api", async (importOriginal) => {
       listAssets: (...a: unknown[]) => listAssets(...a),
       listMarkers: (...a: unknown[]) => listMarkers(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     playerCodexApi: {
       ...actual.playerCodexApi,
@@ -61,7 +61,7 @@ vi.mock("./api", async (importOriginal) => {
       listPages: (...a: unknown[]) => playerListPages(...a),
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
-      timeline: (...a: unknown[]) => playerTimeline(...a),
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
       listRelationships: (...a: unknown[]) => playerListRelationships(...a),
       listLinks: (...a: unknown[]) => playerListLinks(...a)
     }
@@ -71,7 +71,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { CodexWorkspace } from "./CodexWorkspace";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexCalendar, CodexJournalEntry, CodexMap, CodexMarker, CodexSearchHit, PlayerCodexMap, PlayerCodexMarker } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker, CodexSearchHit, PlayerCodexMap, PlayerCodexMarker } from "./api";
 
 /**
  * CI-1 (client): **suite-wide search — one box, one result list, every record kind.**
@@ -102,10 +102,12 @@ const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Bar
 const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
-const ENTRY = (id: string, playerText: string): CodexJournalEntry => ({
-  id, playerText, gmText: null, revealedToPlayers: false, kind: "note", attachMarkerId: null, attachPageId: null,
-  sourceEncounterId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+/** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape. */
+const RECORD = (id: string, text: string): CodexChronicleRecord => ({
+  kind: "entry", id, title: null, text, gmText: null, revealedToPlayers: false,
+  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
 const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
@@ -189,7 +191,7 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
     listAssets.mockResolvedValue([]);
     listMarkers.mockImplementation(async (_token: string, mapId: string) => (mapId === "m1" ? [MARKER] : []));
     forMarker.mockResolvedValue([]);
-    timeline.mockResolvedValue([ENTRY("j0", "Nothing to do with this."), ENTRY("j1", "The party crossed the mists.")]);
+    chronicle.mockResolvedValue([RECORD("j0", "Nothing to do with this."), RECORD("j1", "The party crossed the mists.")]);
     getCalendar.mockResolvedValue(CALENDAR);
   });
 
@@ -320,7 +322,7 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     playerListPages.mockResolvedValue([]);
     // `m0` first, so a player jump that ignores `hit.mapId` lands on Castle Ravenloft instead.
     playerListMaps.mockResolvedValue([PLAYER_OTHER, PLAYER_MAP]);
-    playerTimeline.mockResolvedValue([]);
+    playerChronicle.mockResolvedValue([]);
     playerListRelationships.mockResolvedValue([]);
     playerListLinks.mockResolvedValue([]);
     playerListMarkers.mockResolvedValue([PLAYER_MARKER]);
@@ -390,7 +392,7 @@ describe("Suite-wide search — one settled query, one request", () => {
     listMaps.mockResolvedValue([]);
     listAssets.mockResolvedValue([]);
     listMarkers.mockResolvedValue([]);
-    timeline.mockResolvedValue([]);
+    chronicle.mockResolvedValue([]);
     getCalendar.mockResolvedValue(CALENDAR);
     search.mockResolvedValue(HITS);
   };
@@ -424,7 +426,7 @@ describe("Suite-wide search — one settled query, one request", () => {
     playerListPages.mockResolvedValue([]);
     playerListMaps.mockResolvedValue([]);
     playerListMarkers.mockResolvedValue([]);
-    playerTimeline.mockResolvedValue([]);
+    playerChronicle.mockResolvedValue([]);
     playerListRelationships.mockResolvedValue([]);
     playerListLinks.mockResolvedValue([]);
     playerSearch.mockResolvedValue([HIT_MAP]);

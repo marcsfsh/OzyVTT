@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, type CodexSearchRecord } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, type CodexSearchRecord } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -17,6 +17,11 @@ import { projectGmBacklinks, projectGmJournalEntry, projectGmLinkEdges, projectG
 const CODEX_BASE = "/api/v1/codex";
 
 const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
+/**
+ * A raw in-world date. Declared once and shared by the journal and page write schemas (CT-11) - two copies
+ * of the same bounds is how one surface silently accepts a date the other rejects.
+ */
+const InWorldDateSchema = z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable();
 const EntityTypeSchema = z.enum(["note", "character", "location", "faction", "item", "species", "religion", "event"]);
 const FieldsSchema = z.record(z.string().max(40), z.string().max(2000));
 const PageCreateSchema = z.object({
@@ -29,7 +34,9 @@ const PageCreateSchema = z.object({
   playerBody: z.string().max(100_000).optional(),
   gmBody: z.string().max(100_000).optional(),
   revealedToPlayers: z.boolean().optional(),
-  bannerAssetId: z.string().uuid().nullable().optional()
+  bannerAssetId: z.string().uuid().nullable().optional(),
+  /** CT-11: what places an `event` page on the chronicle. Omitted = undated; `null` = clear the date. */
+  inWorldDate: InWorldDateSchema.optional()
 }).strict();
 const PageUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
@@ -41,6 +48,7 @@ const PageUpdateSchema = z.object({
   playerBody: z.string().max(100_000).optional(),
   gmBody: z.string().max(100_000).optional(),
   bannerAssetId: z.string().uuid().nullable().optional(),
+  inWorldDate: InWorldDateSchema.optional(),
   expectedRev: z.number().int().nonnegative().optional()
 }).strict();
 const RelationshipCreateSchema = z.object({ toPageId: z.string().uuid(), type: z.string().trim().min(1).max(40) }).strict();
@@ -89,7 +97,7 @@ const JournalWriteSchema = z.object({
   sessionNumber: z.number().int().min(0).max(100_000).nullable().optional(),
   realDate: z.string().max(40).nullable().optional(),
   inWorldLabel: z.string().max(120).nullable().optional(),
-  inWorldDate: z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable().optional()
+  inWorldDate: InWorldDateSchema.optional()
 }).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
@@ -494,6 +502,29 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();
     const entries = role === "gm" ? rows.map(projectGmJournalEntry) : rows.map(projectPlayerJournalEntry).filter((entry) => entry !== null);
     return envelope(response, 200, { entries });
+  });
+
+  /**
+   * CT-11 / CT-12: **the one chronicle** - journal entries and dated `event` pages in one chronological
+   * list, one row shape (R2). Both lenses read this; "by session" is a REGROUPING of these same records,
+   * not a second fetch, so the two lenses cannot disagree about what exists.
+   *
+   * A NEW player-reachable read, and the design doc calls out exactly why that matters: the player Codex
+   * fetches the timeline, so every record kind that resolves onto the chronicle is player-reachable by
+   * DEFAULT rather than by decision. Nothing here filters - `store.listChronicle()` is ungated on purpose
+   * and `projectPlayerChronicleRecord` is the single gate (K1), which in turn delegates to the page and
+   * journal player projections rather than restating them.
+   *
+   * Deliberately a NEW route rather than a widened `GET /codex/journal`: that route's `entries` are journal
+   * rows, read by the page mini-timeline, the marker mini-timeline and the Campaign dashboard. Making it
+   * polymorphic would hand three unrelated callers records they never asked for.
+   */
+  router.get(`${CODEX_BASE}/timeline`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the chronicle.");
+    const rows = store.listChronicle();
+    const records = role === "gm" ? rows.map(projectGmChronicleRecord) : rows.map(projectPlayerChronicleRecord).filter((record) => record !== null);
+    return envelope(response, 200, { records });
   });
 
   router.post(`${CODEX_BASE}/journal`, requireGm, (request, response) => {

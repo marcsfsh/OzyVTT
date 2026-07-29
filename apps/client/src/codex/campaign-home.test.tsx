@@ -17,6 +17,7 @@ const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
 const timeline = vi.fn();
+const chronicle = vi.fn();
 const forMarker = vi.fn();
 const getCalendar = vi.fn();
 const listMaps = vi.fn();
@@ -25,7 +26,7 @@ const listMarkers = vi.fn();
 const playerListPages = vi.fn();
 const playerListMaps = vi.fn();
 const playerListMarkers = vi.fn();
-const playerTimeline = vi.fn();
+const playerChronicle = vi.fn();
 const playerListRelationships = vi.fn();
 const playerListLinks = vi.fn();
 
@@ -43,7 +44,7 @@ vi.mock("./api", async (importOriginal) => {
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     atlasApi: {
       ...actual.atlasApi,
@@ -56,7 +57,7 @@ vi.mock("./api", async (importOriginal) => {
       listPages: (...a: unknown[]) => playerListPages(...a),
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
-      timeline: (...a: unknown[]) => playerTimeline(...a),
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
       listRelationships: (...a: unknown[]) => playerListRelationships(...a),
       listLinks: (...a: unknown[]) => playerListLinks(...a)
     }
@@ -66,7 +67,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { CodexWorkspace } from "./CodexWorkspace";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexCalendar, CodexJournalEntry, CodexMap, CodexPageSummary, PlayerCodexJournalEntry, PlayerCodexMap, PlayerCodexPageSummary } from "./api";
+import type { CodexCalendar, CodexJournalEntry, CodexMap, CodexPageSummary, PlayerCodexChronicleRecord, PlayerCodexMap, PlayerCodexPageSummary } from "./api";
 
 /**
  * CI-7: **`World` is renamed `Campaign`, and becomes the dashboard.**
@@ -86,7 +87,8 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 
 const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"], tags: string[] = []): CodexPageSummary => ({
   id, title, entityType, fields: {}, folder: null, tags, revealedToPlayers: false,
-  bannerAssetId: null, rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
@@ -111,6 +113,7 @@ const gmDefaults = () => {
   getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
   search.mockResolvedValue([]);
   timeline.mockResolvedValue([]);
+  chronicle.mockResolvedValue([]);
   listMaps.mockResolvedValue([]);
   listAssets.mockResolvedValue([]);
   listMarkers.mockResolvedValue([]);
@@ -122,14 +125,17 @@ const PLAYER_PAGES: PlayerCodexPageSummary[] = [
   { id: "p1", title: "Strahd", entityType: "character", folder: null, tags: ["villain"], bannerAssetId: null, updatedAt: "2026-07-28T00:00:00.000Z" }
 ];
 const PLAYER_MAPS: PlayerCodexMap[] = [{ id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", parentMapId: null, tags: [] }];
-const PLAYER_ENTRY: PlayerCodexJournalEntry = { id: "j1", text: "The party crossed the mists.", kind: "note", sessionNumber: 3, realDate: null, inWorldLabel: null, tags: [], createdAt: "2026-07-20T00:00:00.000Z" };
-const PLAYER_OLDER: PlayerCodexJournalEntry = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
+// CT-11: the player Journal reads the CHRONICLE, so a player's rows arrive in the unified record shape.
+const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionNumber: 3, realDate: null, inWorldLabel: null, tags: [], createdAt: "2026-07-20T00:00:00.000Z" };
+const PLAYER_OLDER: PlayerCodexChronicleRecord = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
+/** A revealed dated `event` page on the same chronicle — the record kind CT-11 added to this feed. */
+const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", tags: [], createdAt: "2026-07-10T00:00:00.000Z" };
 const playerDefaults = () => {
   playerListPages.mockResolvedValue(PLAYER_PAGES);
   playerListMaps.mockResolvedValue(PLAYER_MAPS);
   playerListMarkers.mockResolvedValue([]);
   // Oldest first, as the server's revealed timeline arrives.
-  playerTimeline.mockResolvedValue([PLAYER_OLDER, PLAYER_ENTRY]);
+  playerChronicle.mockResolvedValue([PLAYER_OLDER, PLAYER_EVENT, PLAYER_ENTRY]);
   playerListRelationships.mockResolvedValue([]);
   playerListLinks.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
@@ -181,6 +187,12 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     timeline.mockResolvedValue([
       ENTRY({ id: "j1", playerText: "The party crossed the mists.", createdAt: "2026-07-01T00:00:00.000Z" }),
       ENTRY({ id: "j2", playerText: "A battle was fought here.", kind: "combat", sourceEncounterId: 7, createdAt: "2026-07-20T00:00:00.000Z" })
+    ]);
+    // The Journal reads the chronicle (CT-11), so the same two records must exist there for the
+    // dashboard's jump to land on one - the dashboard's own feed is still the journal-entry read.
+    chronicle.mockResolvedValue([
+      { kind: "entry" as const, id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z" },
+      { kind: "combat" as const, id: "j2", title: null, text: "A battle was fought here.", gmText: null, revealedToPlayers: false, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: 7, createdAt: "2026-07-20T00:00:00.000Z", updatedAt: "2026-07-20T00:00:00.000Z" }
     ]);
     listMaps.mockResolvedValue([MAP_OTHER, MAP_TARGET]);
   });

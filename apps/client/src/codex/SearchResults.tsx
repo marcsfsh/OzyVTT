@@ -75,7 +75,12 @@ export function useCodexSearch(
  * not carry a marker's own `iconId`/`iconColor`.
  */
 const KIND_MARKS: Readonly<Record<Exclude<CodexRecordKind, "page">, Readonly<{ icon: string; label: string; color: string }>>> = {
-  journal: { icon: "hourglass", label: "Journal", color: "var(--codex-type-event)" },
+  // `scroll`, not `hourglass`: CT-11 made `hourglass` the chronicle's glyph for a dated `event` PAGE (it
+  // is `ENTITY_DEFS.event.icon`), so a journal hit wearing it would name the wrong record type on the one
+  // list where both kinds appear side by side. `scroll` is `ENTITY_DEFS.note.icon` - prose the GM wrote.
+  // `--cyan` because that is already the journal's own accent (`.codex-entry`'s left rule, the timeline's
+  // year headings) - not `--codex-type-note`, which resolves to `--text-muted` and would dim the glyph.
+  journal: { icon: "scroll", label: "Journal", color: "var(--cyan)" },
   map: { icon: "compass", label: "Map", color: "var(--codex-type-location)" },
   marker: { icon: "pin", label: "Marker", color: "var(--magenta)" }
 };

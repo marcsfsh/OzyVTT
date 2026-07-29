@@ -20,6 +20,7 @@ const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
 const timeline = vi.fn();
+const chronicle = vi.fn();
 const forMarker = vi.fn();
 const getCalendar = vi.fn();
 const listMaps = vi.fn();
@@ -40,7 +41,7 @@ vi.mock("./api", async (importOriginal) => {
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     atlasApi: {
       ...actual.atlasApi,
@@ -53,7 +54,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { CodexWorkspace } from "./CodexWorkspace";
-import type { CodexCalendar, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
 
 /**
  * CI-6: **return edge — a journal entry back to its marker and to its combat replay.**
@@ -84,6 +85,14 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
+/** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape, not as raw entries. */
+const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
+  kind: "entry", id: "j1", title: null, text: "A battle was fought here.", gmText: null, revealedToPlayers: false,
+  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+});
+
 /** The atlas defaults to `maps[0]`, so the pin's map is deliberately SECOND: a jump that never resolves
     the marker's map lands on Castle Ravenloft and every assertion below fails. */
 const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
@@ -93,11 +102,11 @@ const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pi
 const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>
   render(<ToastProvider><CodexWorkspace gmToken="gm" onOpenReplay={onOpenReplay} /></ToastProvider>);
 
-/** Land on the Journal the way a GM does — via the mode bar — and wait for the timeline to arrive. */
+/** Land on the Journal the way a GM does — via the mode bar — and wait for the chronicle to arrive. */
 const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
   await user.click(screen.getByRole("tab", { name: "Journal" }));
-  await waitFor(() => expect(timeline).toHaveBeenCalled());
+  await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 
 describe("Journal entry → its marker (CI-6 / R1)", () => {
@@ -118,7 +127,7 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
   });
 
   it("opens the Atlas on the pin's own map AND selects the pin — both halves", async () => {
-    timeline.mockResolvedValue([ENTRY({ attachMarkerId: "k1" })]);
+    chronicle.mockResolvedValue([RECORD({ attachMarkerId: "k1" })]);
     const user = userEvent.setup();
     renderWorkspace();
     await openJournal(user);
@@ -139,7 +148,7 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
 
   it("says the pin is gone rather than silently landing on some other map (R4)", async () => {
     // The entry still names a pin the atlas no longer has — deleted since the battle was logged.
-    timeline.mockResolvedValue([ENTRY({ attachMarkerId: "vanished" })]);
+    chronicle.mockResolvedValue([RECORD({ attachMarkerId: "vanished" })]);
     const user = userEvent.setup();
     renderWorkspace();
     await openJournal(user);
@@ -151,7 +160,7 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
   });
 
   it("offers no marker jump on an entry that names no pin", async () => {
-    timeline.mockResolvedValue([ENTRY({ attachMarkerId: null })]);
+    chronicle.mockResolvedValue([RECORD({ attachMarkerId: null })]);
     const user = userEvent.setup();
     renderWorkspace();
     await openJournal(user);
@@ -179,7 +188,7 @@ describe("Journal entry → its combat replay (CI-6)", () => {
   });
 
   it("opens the encounter the entry came from, through the same handler the page timeline uses", async () => {
-    timeline.mockResolvedValue([ENTRY({ kind: "combat", sourceEncounterId: 7, attachMarkerId: "k1" })]);
+    chronicle.mockResolvedValue([RECORD({ kind: "combat", sourceEncounterId: 7, attachMarkerId: "k1" })]);
     const onOpenReplay = vi.fn();
     const user = userEvent.setup();
     renderWorkspace(onOpenReplay);
@@ -193,7 +202,7 @@ describe("Journal entry → its combat replay (CI-6)", () => {
   });
 
   it("offers no replay when the entry records no encounter", async () => {
-    timeline.mockResolvedValue([ENTRY({ kind: "combat", sourceEncounterId: null })]);
+    chronicle.mockResolvedValue([RECORD({ kind: "combat", sourceEncounterId: null })]);
     const user = userEvent.setup();
     renderWorkspace(vi.fn());
     await openJournal(user);

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { CHRONICLE_KIND_META, chronicleWhenLabel } from "./chronicle";
+import { CodexIcon } from "./icons";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
@@ -18,12 +20,17 @@ type PlayerView = "campaign" | "lore" | "atlas" | "journal" | "graph";
 /**
  * The player-facing Codex: a read-only window onto the worldbuilding the GM has revealed. Lore browses
  * revealed pages (player body only), Atlas pans revealed maps and follows revealed markers, Journal
- * shows the revealed timeline. Everything here is the server's player projection - GM-secret content and
- * unrevealed entities never reach this surface.
+ * shows the revealed **chronicle** — revealed journal entries AND revealed dated `event` pages (CT-11),
+ * in the one row shape the GM's timeline uses (R2). Everything here is the server's player projection;
+ * GM-secret content and unrevealed records never reach this surface.
+ *
+ * Reading rules (`chronicleWhenLabel`, `CHRONICLE_KIND_META`) are imported rather than re-stated: the two
+ * readers are deliberately separate implementations (D-2), but they must not disagree about what a row
+ * *says*. The lens toggle is deliberately NOT ported here - grouping by in-world year needs the sort key,
+ * and widening the player projection to carry one for a feature the spec asks of the GM's Journal would
+ * be paying in viewer-safety surface for a convenience nobody requested. The player's chronicle is the
+ * server's single canonical chronological order.
  */
-function whenLabel(entry: PlayerCodexJournalEntry): string {
-  return entry.inWorldLabel ?? (entry.sessionNumber !== null ? `Session ${entry.sessionNumber}` : entry.realDate ?? new Date(entry.createdAt).toLocaleDateString());
-}
 
 export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () => void }>) {
   const [view, setView] = useState<PlayerView>("campaign");
@@ -42,7 +49,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const [currentMapId, setCurrentMapId] = useState<string | null>(null);
   const [markers, setMarkers] = useState<PlayerCodexMarker[]>([]);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
-  const [timeline, setTimeline] = useState<PlayerCodexJournalEntry[]>([]);
+  const [timeline, setTimeline] = useState<PlayerCodexChronicleRecord[]>([]);
   const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +62,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const load = useCallback(async () => {
     try {
       const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar] = await Promise.all([
-        playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token), playerCodexApi.listRelationships(token),
+        playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.chronicle(token), playerCodexApi.listRelationships(token),
         // Uncaught, exactly like the typed-edge feed beside it: the two are the Graph's two halves, and
         // half a graph drawn silently is worse than the error Alert this surface already shows (R4).
         playerCodexApi.listLinks(token),
@@ -129,9 +136,14 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
     // Newest first by `createdAt` — the same notion of "recent" the GM dashboard uses, and the only one
     // a player entry can express (the timeline arrives in in-world chronological order, which is a
     // different question). The revealed set itself is the server's; this only reorders it.
-    () => [...timeline]
+    // CT-11: dated `event` pages share the chronicle but not this list. The dashboard's section is
+    // "Recent journal activity" and its rows open the Journal by entry id; an event is a wiki page that
+    // already appears in the entity counts above, and giving it a second home here would be the same
+    // record in two places on one screen. Widening the dashboard's feed is CI-7's question, not M8's.
+    () => timeline
+      .filter((record) => record.kind !== "event")
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((entry) => ({ id: entry.id, summary: entry.text, when: whenLabel(entry), kind: entry.kind })),
+      .map((record) => ({ id: record.id, summary: record.text, when: chronicleWhenLabel(record), kind: record.kind === "combat" ? "combat" as const : "note" as const })),
     [timeline]
   );
   const campaignToday = useMemo(() => (calendar?.currentDate ? formatWorldDate(calendar, calendar.currentDate) : null), [calendar]);
@@ -252,13 +264,24 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
         <div className="codex-journal">
           <div className="codex-timeline">
             {timeline.length === 0 && <p className="codex-list-empty">No entries revealed yet.</p>}
-            {timeline.map((entry) => (
-              <article key={entry.id} id={`codex-player-entry-${entry.id}`} aria-current={entry.id === focusedEntryId ? "true" : undefined}
-                className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}${entry.id === focusedEntryId ? " is-focused" : ""}`}>
-                <header className="codex-entry-head codex-entry-meta">{entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}<span className="codex-entry-when">{whenLabel(entry)}</span></header>
-                <div className="codex-entry-body"><CodexMarkdown text={entry.text} onNavigate={navigate} token={token} knownTitles={knownTitles} /></div>
+            {/* R2: the same row shape the GM's chronicle uses — icon + kind label + date + body — so a
+                record reads the same on both sides of the table, and an event is never mistaken for a
+                note because the two only differed by colour. */}
+            {timeline.map((record) => {
+              const meta = CHRONICLE_KIND_META[record.kind];
+              return (
+              <article key={`${record.kind}-${record.id}`} id={`codex-player-entry-${record.id}`} aria-current={record.id === focusedEntryId ? "true" : undefined}
+                className={`codex-entry${record.kind === "combat" ? " is-combat" : ""}${record.kind === "event" ? " is-event" : ""}${record.id === focusedEntryId ? " is-focused" : ""}`}>
+                <header className="codex-entry-head codex-entry-meta">
+                  <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-entry-kindglyph" />
+                  <Badge tone={meta.tone}>{meta.label}</Badge>
+                  <span className="codex-entry-when">{chronicleWhenLabel(record)}</span>
+                </header>
+                {record.title && <h4 className="codex-entry-title">{record.title}</h4>}
+                <div className="codex-entry-body"><CodexMarkdown text={record.text} onNavigate={navigate} token={token} knownTitles={knownTitles} /></div>
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

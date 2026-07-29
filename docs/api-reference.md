@@ -2259,6 +2259,7 @@ Creates a page.
 | `gmBody` | string | no |  |
 | `revealedToPlayers` | boolean | no |  |
 | `bannerAssetId` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date that places an `event` page on the chronicle. Omit for undated. |
 
 **Responses:** `201` Success - envelope of `CodexPageData` · errors `400` `401`
 
@@ -2303,6 +2304,7 @@ Edits a page. `expectedRev` rejects a stale write with 409.
 | `playerBody` | string | no |  |
 | `gmBody` | string | no |  |
 | `bannerAssetId` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date. Omitted leaves the stored date alone; `null` clears it. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the page moved on. |
 
 **Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404` `409`
@@ -2656,6 +2658,14 @@ Shows/hides a marker to players.
 | `revealed` | boolean | yes |  |
 
 **Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/timeline`
+
+The ONE chronicle: every journal entry and every dated `event` page, interleaved in one in-world chronological order and returned in one row shape (`kind` discriminates - `entry`, `combat`, `event`). The client's "by session" lens is a regrouping of these same records, never a second fetch. Role-scoped: a player receives only revealed entries and revealed event pages, with GM-only text (`gmText`, an event's GM body), the replay linkage and the raw sort key stripped - the projection delegates to the journal and page player projections rather than restating them, so this read can never be weaker than either.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexChronicleListData` · errors `401`
 
 ### `GET /api/v1/codex/journal`
 

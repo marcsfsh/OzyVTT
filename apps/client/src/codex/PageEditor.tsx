@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Field, IconButton, Input, Modal, SaveState, SegmentedControl, Select, TagInput, Textarea, type SaveStatus } from "@vtt/ui";
-import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship } from "./api";
+import { calendarApi, codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexCalendar, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { PageTimeline } from "./PageTimeline";
@@ -13,11 +13,23 @@ import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type Entit
 
 type BodyTab = "player" | "gm";
 
-type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tagsText: string; playerBody: string; gmBody: string; bannerAssetId: string | null };
+/**
+ * `dateYear`/`dateMonth`/`dateDay` are CT-11: the in-world date that puts an `event` page on the
+ * chronicle. They are STRINGS here, exactly as the journal composer holds them, because a half-typed
+ * year is a normal state of an input and coercing it to a number every keystroke is how "1" becomes 1
+ * and then a saved date of year 1. The raw date is the source of truth; the sort key and label are the
+ * server's to derive.
+ */
+type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tagsText: string; playerBody: string; gmBody: string; bannerAssetId: string | null; dateYear: string; dateMonth: string; dateDay: string };
 
 function draftOf(page: CodexPage): Draft {
   // The editor holds one flat value map; public `fields` + GM-only `gmFields` merge for editing and re-split on save.
-  return { title: page.title, entityType: page.entityType, fields: { ...page.fields, ...page.gmFields }, folder: page.folder ?? "", tagsText: page.tags.join(", "), playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId };
+  const date = page.inWorldDate; // the RAW date the GM typed - correct even if the calendar has since changed
+  return {
+    title: page.title, entityType: page.entityType, fields: { ...page.fields, ...page.gmFields }, folder: page.folder ?? "",
+    tagsText: page.tags.join(", "), playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId,
+    dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : ""
+  };
 }
 function serialize(draft: Draft): string { return JSON.stringify(draft); }
 function parseTags(text: string): string[] {
@@ -126,7 +138,12 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
       const updated = await codexApi.updatePage(gmToken, page.id, {
         title: draftNow.title.trim() || "Untitled", entityType: draftNow.entityType, fields, gmFields,
         folder: draftNow.folder.trim() || null, tags: parseTags(draftNow.tagsText),
-        playerBody: draftNow.playerBody, gmBody: draftNow.gmBody, bannerAssetId: draftNow.bannerAssetId, expectedRev: revRef.current
+        playerBody: draftNow.playerBody, gmBody: draftNow.gmBody, bannerAssetId: draftNow.bannerAssetId,
+        // CT-11: only an `event` page has a date control, so only an `event` page states a date. On any
+        // other type the key is OMITTED, and an omitted date leaves the stored one alone - which is what
+        // makes switching an event to a note and back lossless rather than a silent erase.
+        ...(draftNow.entityType === "event" ? { inWorldDate: draftNow.dateYear.trim() ? { year: Math.trunc(Number(draftNow.dateYear) || 0), month: Number(draftNow.dateMonth || 0), day: Math.max(1, Math.trunc(Number(draftNow.dateDay) || 1)) } : null } : {}),
+        expectedRev: revRef.current
       });
       savedRef.current = snapshot;
       revRef.current = updated.rev;
@@ -173,6 +190,20 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
   const setBody = (next: string) => setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
   const setField = (key: string, value: string) => setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
   const typeDef = entityDef(draft.entityType);
+
+  /**
+   * CT-11: the world calendar, for the month names of an `event` page's date control. Fetched LAZILY and
+   * once - only an event page has the control, and making every page open pay a calendar round-trip for a
+   * field it does not have would be a cost on the suite's most-opened surface.
+   */
+  const isEvent = draft.entityType === "event";
+  const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
+  useEffect(() => {
+    if (!isEvent || calendar) return;
+    let live = true;
+    void calendarApi.get(gmToken).then((next) => { if (live) setCalendar(next); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [isEvent, calendar, gmToken]);
 
   const format = (kind: string) => {
     const textarea = textareaRef.current;
@@ -331,6 +362,19 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
                    save failure. The primitive's default is the server's contract; adopting it fixes that. */ />
             </Field>
           </div>
+
+          {/* CT-11: what puts this event on the chronicle. Deliberately OUTSIDE `fields`: entity fields are
+              a flat string map, so a date living there could be neither sorted nor reflowed when the world
+              calendar changes. The prose "When" field beside it is colour, not a sort key - the two answer
+              different questions and are labelled to say so. The controls are the journal composer's,
+              control for control, so dating a record works the same way wherever the GM does it. */}
+          {isEvent && (
+            <div className="codex-meta-row codex-event-date">
+              <Field label="Year" htmlFor="codex-date-year" help="Places this event on the campaign chronicle."><Input id="codex-date-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => setDraft((prev) => ({ ...prev, dateYear: event.target.value }))} /></Field>
+              <Field label="Month" htmlFor="codex-date-month"><Select id="codex-date-month" value={draft.dateMonth} disabled={!draft.dateYear.trim()} onChange={(event) => setDraft((prev) => ({ ...prev, dateMonth: event.target.value }))}>{(calendar?.months ?? []).map((month, index) => <option key={index} value={String(index)}>{month.name}</option>)}</Select></Field>
+              <Field label="Day" htmlFor="codex-date-day"><Input id="codex-date-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => setDraft((prev) => ({ ...prev, dateDay: event.target.value }))} /></Field>
+            </div>
+          )}
 
           {typeDef.fields.some((field) => !field.secret) && (
             <div className="codex-fields">

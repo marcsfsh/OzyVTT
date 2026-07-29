@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, Input, Panel, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
+import { Alert, Badge, Button, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, formatWorldYear, journalApi, type CodexCalendar, type CodexJournalEntry, type CodexPageSummary } from "./api";
+import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexCalendar, type CodexChronicleRecord, type CodexPageSummary } from "./api";
+import { CHRONICLE_KIND_META, CHRONICLE_LENSES, chronicleWhenLabel, groupChronicle, type ChronicleLens } from "./chronicle";
+import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 import { EntityPicker } from "./EntityPicker";
@@ -9,25 +11,19 @@ import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 
 /**
- * The campaign journal + chronicle: GM-written two-layer entries placed on the world's own calendar.
- * A structured in-world date sorts the timeline chronologically and groups it by year; entries can also
+ * The campaign chronicle (CT-11 / CT-12): **one** timeline carrying GM-written two-layer journal entries
+ * AND dated `event` pages, placed on the world's own calendar and readable through two lenses — by
+ * in-world date or by session. A structured in-world date is what puts a record on it; entries can also
  * carry a session #, be pinned to a page, and reveal to players. Logged encounters auto-post here.
+ *
+ * The composer below writes JOURNAL ENTRIES only. An `event` row is a wiki page: its two layers, its
+ * fields and its date are edited on the page itself, which is why an event row offers "Open page" where
+ * an entry row offers Edit/Delete. One timeline, two kinds of record, each edited where it lives.
  */
 type Draft = { playerText: string; gmText: string; sessionNumber: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean; tags: readonly string[] };
 const EMPTY: Draft = { playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [] };
 const DRAFT_KEY = "codex-journal-draft";
-
-/**
- * How an entry says *when* it happened, in the journal's own order of preference. Exported because the
- * Campaign dashboard (CI-7) lists the same entries: two independent answers to "when was this" is how
- * a dashboard ends up disagreeing with the timeline it links into.
- */
-export function journalWhenLabel(entry: CodexJournalEntry): string {
-  if (entry.inWorldLabel) return entry.inWorldLabel;
-  if (entry.sessionNumber !== null) return `Session ${entry.sessionNumber}`;
-  if (entry.realDate) return entry.realDate;
-  return new Date(entry.createdAt).toLocaleDateString();
-}
+const LENS_KEY = "codex-chronicle-lens";
 
 /**
  * CI-6 (return edge): an entry knows where it happened (`attachMarkerId`, set by the combat bridge when
@@ -38,7 +34,7 @@ export function journalWhenLabel(entry: CodexJournalEntry): string {
  */
 export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, openEntryId = null, onOpenedEntry = () => {} }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void; onOpenMarker?: (markerId: string) => void; onOpenReplay?: (archiveId: number) => void; openEntryId?: string | null; onOpenedEntry?: () => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
+  const [records, setRecords] = useState<CodexChronicleRecord[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -61,10 +57,17 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
   // asserts "No journal entries yet." over a campaign that simply has not loaded.
   const [loading, setLoading] = useState(true);
 
+  // CT-12: the lens is a reading preference, so it survives leaving and returning to the mode — the same
+  // sessionStorage discipline the composer draft uses, and for the same reason.
+  const [lens, setLens] = useState<ChronicleLens>(() => {
+    try { return sessionStorage.getItem(LENS_KEY) === "session" ? "session" : "date"; } catch { return "date"; }
+  });
+  useEffect(() => { try { sessionStorage.setItem(LENS_KEY, lens); } catch { /* private mode - fine */ } }, [lens]);
+
   const load = useCallback(async () => {
     try {
-      const [nextEntries, nextPages, nextCalendar] = await Promise.all([journalApi.timeline(gmToken), codexApi.listPages(gmToken), calendarApi.get(gmToken)]);
-      setEntries(nextEntries); setPages(nextPages); setCalendar(nextCalendar); setError(null);
+      const [nextRecords, nextPages, nextCalendar] = await Promise.all([journalApi.chronicle(gmToken), codexApi.listPages(gmToken), calendarApi.get(gmToken)]);
+      setRecords(nextRecords); setPages(nextPages); setCalendar(nextCalendar); setError(null);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the journal."); }
     finally { setLoading(false); }
   }, [gmToken]);
@@ -94,11 +97,11 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
     setFocusedEntryId(openEntryId);
     onOpenedEntry();
   }, [openEntryId, loading, onOpenedEntry]);
-  // Runs on `entries` too: the article only exists once the timeline has rendered it.
+  // Runs on `records` too: the article only exists once the timeline has rendered it.
   useEffect(() => {
     if (!focusedEntryId) return;
     document.getElementById(`codex-entry-${focusedEntryId}`)?.scrollIntoView({ block: "center" });
-  }, [focusedEntryId, entries]);
+  }, [focusedEntryId, records]);
 
   const set = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const submit = async () => {
@@ -120,38 +123,37 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       setDraft(editingId ? (stashedDraft ?? EMPTY) : EMPTY); setStashedDraft(null); setEditingId(null); await load();
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : "Could not save the entry."); }
   };
-  const edit = (entry: CodexJournalEntry) => {
+  const edit = (record: CodexChronicleRecord) => {
     // Set aside an unsaved NEW entry before the composer is reused, so Edit can never destroy it.
     if (!editingId && (draft.playerText.trim() || draft.gmText.trim())) setStashedDraft(draft);
-    setEditingId(entry.id);
-    const date = entry.inWorldDate; // the raw date the GM typed - correct even if the calendar has since changed
+    setEditingId(record.id);
+    const date = record.inWorldDate; // the raw date the GM typed - correct even if the calendar has since changed
     setDraft({
-      playerText: entry.playerText, gmText: entry.gmText ?? "", sessionNumber: entry.sessionNumber?.toString() ?? "",
+      playerText: record.text, gmText: record.gmText ?? "", sessionNumber: record.sessionNumber?.toString() ?? "",
       dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : "",
-      attachPageId: entry.attachPageId ?? "", revealed: entry.revealedToPlayers, tags: entry.tags
+      attachPageId: record.attachPageId ?? "", revealed: record.revealedToPlayers, tags: record.tags
     });
   };
   const cancelEdit = () => { setEditingId(null); setDraft(stashedDraft ?? EMPTY); setStashedDraft(null); };
-  const reveal = async (entry: CodexJournalEntry, revealed: boolean) => { await journalApi.reveal(gmToken, entry.id, revealed); await load(); };
-  const remove = async (entry: CodexJournalEntry) => { if (await confirm({ title: "Delete entry", body: "Delete this journal entry? This cannot be undone.", confirmLabel: "Delete", danger: true })) { await journalApi.remove(gmToken, entry.id); await load(); } };
+  /**
+   * Reveal from the row, whichever kind it is. Both branches call the record type's OWN reveal route —
+   * an event row's switch flips the page's reveal flag, which is the same flag the page editor shows,
+   * because there is one reveal state per record and the chronicle is a view of it, not a second copy.
+   */
+  const reveal = async (record: CodexChronicleRecord, revealed: boolean) => {
+    if (record.kind === "event") await codexApi.revealPage(gmToken, record.id, revealed);
+    else await journalApi.reveal(gmToken, record.id, revealed);
+    await load();
+  };
+  const remove = async (record: CodexChronicleRecord) => { if (await confirm({ title: "Delete entry", body: "Delete this journal entry? This cannot be undone.", confirmLabel: "Delete", danger: true })) { await journalApi.remove(gmToken, record.id); await load(); } };
 
   // One vocabulary across the suite: hint with the tags already in use on pages AND on other entries, so
   // the GM reuses "session-recap" instead of inventing a near-duplicate. Free entry stays open (datalist).
-  const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...entries.flatMap((entry) => entry.tags)])].sort(), [pages, entries]);
+  const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...records.flatMap((record) => record.tags)])].sort(), [pages, records]);
 
-  // Group the timeline by in-world year (dated years ascending, undated last).
-  const groups = useMemo(() => {
-    const byYear = new Map<number | null, CodexJournalEntry[]>();
-    for (const entry of entries) {
-      const year = entry.calendarInstant !== null && calendar ? calendarYearOf(calendar, entry.calendarInstant) : null;
-      const bucket = byYear.get(year) ?? [];
-      bucket.push(entry);
-      byYear.set(year, bucket);
-    }
-    return [...byYear.keys()]
-      .sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b))
-      .map((year) => ({ key: year === null ? "undated" : String(year), label: year === null ? "Undated" : (calendar ? formatWorldYear(calendar, year) : String(year)), entries: byYear.get(year)! }));
-  }, [entries, calendar]);
+  // CT-12: the same records, grouped for whichever lens is on. Regrouping only — nothing is refetched and
+  // nothing is written, so toggling can never change what the chronicle contains.
+  const groups = useMemo(() => groupChronicle(records, lens, calendar), [records, lens, calendar]);
 
   // The world's "now": a readout + a Today marker placed in its year on the timeline.
   const now = calendar?.currentDate ?? null;
@@ -199,49 +201,70 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
 
       {error && <Alert tone="danger">{error}</Alert>}
 
+      {/* CT-12: the lens toggle. Above the timeline and outside the groups, because it governs all of
+          them; `SegmentedControl` is the `@vtt/ui` primitive (R9) and carries its own 44px floor. */}
+      <div className="codex-timeline-lens">
+        <SegmentedControl ariaLabel="Timeline lens" value={lens} onChange={(next) => setLens(next as ChronicleLens)}
+          options={CHRONICLE_LENSES.map((option) => ({ value: option.id, label: option.label }))} />
+      </div>
+
       <div className="codex-timeline">
         {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
-        {!loading && entries.length === 0 && <p className="codex-list-empty">No journal entries yet.</p>}
+        {!loading && records.length === 0 && <p className="codex-list-empty">No journal entries yet.</p>}
         {groups.map((group) => (
           <section key={group.key} className="codex-timeline-group">
             <div className="codex-timeline-year">{group.label}</div>
-            {nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today — {nowLabel}</div>}
-            {group.entries.map((entry) => (
-              <article key={entry.id} id={`codex-entry-${entry.id}`} aria-current={entry.id === focusedEntryId ? "true" : undefined}
-                className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}${entry.id === focusedEntryId ? " is-focused" : ""}`}>
+            {/* The "Today" marker belongs to the in-world reading; under the session lens a calendar year
+                is not what the groups mean, so placing it there would be an answer to a question nobody asked. */}
+            {lens === "date" && nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today — {nowLabel}</div>}
+            {group.records.map((record) => {
+              // R2: ONE row shape for every record; the kind reads by icon + label, never by colour alone.
+              const meta = CHRONICLE_KIND_META[record.kind];
+              const isEvent = record.kind === "event";
+              return (
+              <article key={`${record.kind}-${record.id}`} id={`codex-entry-${record.id}`} aria-current={record.id === focusedEntryId ? "true" : undefined}
+                className={`codex-entry${record.kind === "combat" ? " is-combat" : ""}${isEvent ? " is-event" : ""}${record.id === focusedEntryId ? " is-focused" : ""}`}>
                 <header className="codex-entry-head">
                   <div className="codex-entry-meta">
-                    <Badge tone={entry.kind === "combat" ? "caution" : "neutral"}>{entry.kind === "combat" ? "Battle" : journalWhenLabel(entry)}</Badge>
-                    {entry.kind === "combat" && <span className="codex-entry-when">{journalWhenLabel(entry)}</span>}
-                    {entry.sessionNumber !== null && <span className="codex-entry-when">Session {entry.sessionNumber}</span>}
+                    <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-entry-kindglyph" />
+                    <Badge tone={meta.tone}>{meta.label}</Badge>
+                    <span className="codex-entry-when">{chronicleWhenLabel(record)}</span>
+                    {record.sessionNumber !== null && <span className="codex-entry-when">Session {record.sessionNumber}</span>}
                   </div>
-                  <RevealSwitch revealed={entry.revealedToPlayers} onChange={(revealed) => reveal(entry, revealed)} ariaLabel="Show this entry to players" />
+                  <RevealSwitch revealed={record.revealedToPlayers} onChange={(revealed) => reveal(record, revealed)} ariaLabel={isEvent ? "Show this event to players" : "Show this entry to players"} />
                 </header>
-                {entry.playerText.trim() && <div className="codex-entry-body"><CodexMarkdown text={entry.playerText} token={gmToken} onNavigate={(target) => { const page = pages.find((candidate) => candidate.title.toLowerCase() === target.toLowerCase()); if (page) onOpenPage(page.id); }} /></div>}
-                {entry.gmText && <div className="codex-entry-gm"><GmOnlyTag /><CodexMarkdown text={entry.gmText} token={gmToken} /></div>}
+                {/* An event page has a name; a journal entry does not. Same slot either way, so the row
+                    shape does not change - it is simply empty for the kind that has nothing to put in it. */}
+                {record.title && <h4 className="codex-entry-title">{record.title}</h4>}
+                {record.text.trim() && <div className="codex-entry-body"><CodexMarkdown text={record.text} token={gmToken} onNavigate={(target) => { const page = pages.find((candidate) => candidate.title.toLowerCase() === target.toLowerCase()); if (page) onOpenPage(page.id); }} /></div>}
+                {record.gmText && <div className="codex-entry-gm"><GmOnlyTag /><CodexMarkdown text={record.gmText} token={gmToken} /></div>}
                 {/* Read-only on purpose. An entry's tags are otherwise invisible until you open Edit, but
                     making them clickable would be the cross-type tag navigation that belongs to a later
                     milestone — clicking a tag still filters Pages and nothing else. */}
-                {entry.tags.length > 0 && (
+                {record.tags.length > 0 && (
                   <ul className="codex-entry-tags" aria-label="Entry tags">
-                    {entry.tags.map((tag) => <li key={tag}><Badge>{tag}</Badge></li>)}
+                    {record.tags.map((tag) => <li key={tag}><Badge>{tag}</Badge></li>)}
                   </ul>
                 )}
                 {/* CI-6: the entry's two return edges sit beside the page edge it already had, so an
                     entry reads as "here is what happened, here is where, here is the fight itself".
                     §4: `Button size="sm"` is a `@vtt/ui` primitive and carries the 44px floor itself
-                    (route 2, `.nh-btn--sm`) — no new control and no new floor to argue about. */}
+                    (route 2, `.nh-btn--sm`) — no new control and no new floor to argue about.
+                    An EVENT row's actions are deliberately just "Open page": the record is a wiki page,
+                    and editing or deleting it from a timeline row would be a second place to do both. */}
                 <footer className="codex-entry-foot">
-                  {entry.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(entry.attachPageId!)}>Open page</Button>}
-                  {entry.attachMarkerId && onOpenMarker &&
-                    <Button variant="ghost" size="sm" onClick={() => onOpenMarker(entry.attachMarkerId!)}>Open marker</Button>}
-                  {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&
-                    <Button variant="ghost" size="sm" onClick={() => onOpenReplay(entry.sourceEncounterId!)}>Open replay</Button>}
-                  <Button variant="ghost" size="sm" onClick={() => edit(entry)}>Edit</Button>
-                  <Button variant="ghost" size="sm" onClick={() => remove(entry)}>Delete</Button>
+                  {isEvent && <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.id)}>Open page</Button>}
+                  {!isEvent && record.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.attachPageId!)}>Open page</Button>}
+                  {record.attachMarkerId && onOpenMarker &&
+                    <Button variant="ghost" size="sm" onClick={() => onOpenMarker(record.attachMarkerId!)}>Open marker</Button>}
+                  {record.kind === "combat" && record.sourceEncounterId !== null && onOpenReplay &&
+                    <Button variant="ghost" size="sm" onClick={() => onOpenReplay(record.sourceEncounterId!)}>Open replay</Button>}
+                  {!isEvent && <Button variant="ghost" size="sm" onClick={() => edit(record)}>Edit</Button>}
+                  {!isEvent && <Button variant="ghost" size="sm" onClick={() => remove(record)}>Delete</Button>}
                 </footer>
               </article>
-            ))}
+              );
+            })}
           </section>
         ))}
       </div>

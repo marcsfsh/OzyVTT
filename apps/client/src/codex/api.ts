@@ -16,6 +16,16 @@ export type CodexPageSummary = Readonly<{
   tags: readonly string[];
   revealedToPlayers: boolean;
   bannerAssetId: string | null;
+  /**
+   * CT-11 dating — the SAME contract journal entries use. `inWorldDate` is the raw date the GM typed and
+   * is the source of truth; `inWorldLabel` and `calendarInstant` are DERIVED server-side and recomputed
+   * for every dated record whenever the calendar changes. Edit from `inWorldDate`, never from the label.
+   * Only a dated `event` page appears on the chronicle; the fields exist on every page so switching a
+   * page's type away and back loses nothing.
+   */
+  inWorldLabel: string | null;
+  calendarInstant: number | null;
+  inWorldDate: CodexInWorldDate | null;
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -84,6 +94,8 @@ export type CodexPageInput = Readonly<{
   gmBody?: string;
   revealedToPlayers?: boolean;
   bannerAssetId?: string | null;
+  /** CT-11: omitted leaves the stored date alone; `null` clears it (the journal's contract exactly). */
+  inWorldDate?: CodexInWorldDate | null;
   expectedRev?: number;
 }>;
 
@@ -185,7 +197,13 @@ export const playerCodexApi = {
   listLinks: (token: string) => request<{ links: CodexLinkEdge[] }>(token, "/links").then((data) => data.links),
   listMaps: (token: string) => request<{ maps: PlayerCodexMap[] }>(token, "/maps").then((data) => data.maps),
   listMarkers: (token: string, mapId: string) => request<{ markers: PlayerCodexMarker[] }>(token, `/maps/${mapId}/markers`).then((data) => data.markers),
-  timeline: (token: string) => request<{ entries: PlayerCodexJournalEntry[] }>(token, "/journal").then((data) => data.entries)
+  /**
+   * CT-11: the player's chronicle — revealed journal entries AND revealed dated `event` pages, in one
+   * list. This replaces the old journal-only `timeline` read here: the moment `event` pages resolved onto
+   * the chronicle, a player Journal that kept reading `/journal` would have been the ONLY surface in the
+   * app showing a different set of records than the timeline it claims to be.
+   */
+  chronicle: (token: string) => request<{ records: PlayerCodexChronicleRecord[] }>(token, "/timeline").then((data) => data.records)
 };
 
 // ----- Atlas: maps + markers -----
@@ -288,7 +306,66 @@ export const calendarApi = {
   set: (token: string, calendar: CodexCalendar) => request<{ calendar: CodexCalendar }>(token, "/calendar", { method: "PUT", body: JSON.stringify(calendar) }).then((data) => data.calendar)
 };
 
+// ----- The chronicle (CT-11 / CT-12: ONE timeline — journal entries + dated `event` pages) -----
+
+/**
+ * What a chronicle row IS. R2: one row shape for every record, the kind read by icon + label (never by
+ * colour alone). `combat` is split from `entry` because a battle already renders with its own badge and
+ * its replay edge; it is the same store row, discriminated for display.
+ */
+export type CodexChronicleKind = "entry" | "combat" | "event";
+
+/**
+ * One chronicle row, GM view. Mirrors `GmCodexChronicleRecord` in `apps/server/src/codex-projections.ts`
+ * exactly, including the deliberate uniformity: every key is present on every kind (null where it does
+ * not apply), so nothing here branches on key *presence*.
+ *
+ * `id` is the record's OWN id — a journal-entry id for `entry`/`combat`, a PAGE id for `event` — and
+ * `kind` is what says which, so "open this row" has exactly one thing to look at.
+ *
+ * `text`/`gmText` are the row's two layers: a journal entry's full text (an entry IS its text), or a
+ * bounded excerpt of an event page's two bodies (the page is where those are read).
+ */
+export type CodexChronicleRecord = Readonly<{
+  kind: CodexChronicleKind;
+  id: string;
+  title: string | null;
+  text: string;
+  gmText: string | null;
+  revealedToPlayers: boolean;
+  sessionNumber: number | null;
+  realDate: string | null;
+  inWorldLabel: string | null;
+  calendarInstant: number | null;
+  inWorldDate: CodexInWorldDate | null;
+  tags: readonly string[];
+  attachPageId: string | null;
+  attachMarkerId: string | null;
+  sourceEncounterId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
+/**
+ * One chronicle row, PLAYER view — `PlayerCodexJournalEntry` plus `title`, and nothing else. The server
+ * has already applied the only gate there is (`projectPlayerChronicleRecord`, which delegates to the
+ * journal and page player projections), so this client never filters visibility itself.
+ */
+export type PlayerCodexChronicleRecord = Readonly<{
+  kind: CodexChronicleKind;
+  id: string;
+  title: string | null;
+  text: string;
+  sessionNumber: number | null;
+  realDate: string | null;
+  inWorldLabel: string | null;
+  tags: readonly string[];
+  createdAt: string;
+}>;
+
 export const journalApi = {
+  /** CT-11/CT-12: the one chronicle, GM view. BOTH lenses read this — "by session" regroups these records. */
+  chronicle: (token: string) => request<{ records: CodexChronicleRecord[] }>(token, "/timeline").then((data) => data.records),
   timeline: (token: string) => request<{ entries: CodexJournalEntry[] }>(token, "/journal").then((data) => data.entries),
   forPage: (token: string, pageId: string) => request<{ entries: CodexJournalEntry[] }>(token, `/journal?pageId=${pageId}`).then((data) => data.entries),
   forMarker: (token: string, markerId: string) => request<{ entries: CodexJournalEntry[] }>(token, `/journal?markerId=${markerId}`).then((data) => data.entries),

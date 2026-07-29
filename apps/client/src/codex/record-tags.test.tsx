@@ -8,6 +8,7 @@ vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn()
 vi.mock("./MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
 
 const timeline = vi.fn();
+const chronicle = vi.fn();
 const createEntry = vi.fn();
 const updateEntry = vi.fn();
 const listPages = vi.fn();
@@ -28,6 +29,7 @@ vi.mock("./api", async (importOriginal) => {
     journalApi: {
       ...actual.journalApi,
       timeline: (...a: unknown[]) => timeline(...a),
+      chronicle: (...a: unknown[]) => chronicle(...a),
       forMarker: (...a: unknown[]) => forMarker(...a),
       create: (...a: unknown[]) => createEntry(...a),
       update: (...a: unknown[]) => updateEntry(...a)
@@ -46,7 +48,7 @@ vi.mock("./api", async (importOriginal) => {
 import { JournalView } from "./JournalView";
 import { MarkerInspector } from "./MarkerInspector";
 import { AtlasView } from "./AtlasView";
-import type { CodexCalendar, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
 
 /**
  * CI-2 (client): **tags are no longer a pages-only idea.**
@@ -71,6 +73,14 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   sortKey: 0, tags: ["dark-gift"], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
+/** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape, not as raw entries. */
+const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
+  kind: "entry", id: "j1", title: null, text: "The party reached Barovia.", gmText: null, revealedToPlayers: false,
+  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  tags: ["dark-gift"], attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+});
+
 const MAP = (over: Partial<CodexMap> = {}): CodexMap => ({
   id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null, revealedToPlayers: false,
   sortKey: 0, tags: ["faerun"], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
@@ -85,16 +95,16 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
 // ----- Journal entries -----
 
 describe("Journal entry tags (CI-2)", () => {
-  const renderJournal = async (entries: CodexJournalEntry[]) => {
-    timeline.mockResolvedValue(entries);
+  const renderJournal = async (records: CodexChronicleRecord[]) => {
+    chronicle.mockResolvedValue(records);
     listPages.mockResolvedValue([]);
     getCalendar.mockResolvedValue(CALENDAR);
     render(<JournalView gmToken="gm" onOpenPage={vi.fn()} />);
-    await waitFor(() => expect(timeline).toHaveBeenCalled());
+    await waitFor(() => expect(chronicle).toHaveBeenCalled());
   };
 
   it("shows an entry's stored tags on its card, without opening the editor", async () => {
-    await renderJournal([ENTRY({ tags: ["dark-gift", "session-3"] })]);
+    await renderJournal([RECORD({ tags: ["dark-gift", "session-3"] })]);
     const tags = await screen.findByRole("list", { name: "Entry tags" });
     expect(tags).toHaveTextContent("dark-gift");
     expect(tags).toHaveTextContent("session-3");
@@ -115,7 +125,7 @@ describe("Journal entry tags (CI-2)", () => {
   });
 
   it("loads an existing entry's tags into the composer on Edit and saves them back", async () => {
-    await renderJournal([ENTRY({ tags: ["dark-gift"] })]);
+    await renderJournal([RECORD({ tags: ["dark-gift"] })]);
     updateEntry.mockResolvedValue(ENTRY());
     const user = userEvent.setup();
 

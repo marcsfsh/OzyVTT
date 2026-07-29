@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -183,6 +183,147 @@ export function projectPlayerJournalEntry(row: CodexJournalRow): PlayerCodexJour
   return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: row.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
 }
 
+/**
+ * A bounded one-line rendering of a record's prose, for any list ROW (a search hit, a chronicle row).
+ * One length for the suite: a row that summarises a record the reader can open should look the same
+ * everywhere, and two nearly-equal excerpt lengths is the kind of near-duplicate this overhaul removes.
+ */
+const EXCERPT_LENGTH = 160;
+function excerpt(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length <= EXCERPT_LENGTH ? flat : `${flat.slice(0, EXCERPT_LENGTH - 1)}…`;
+}
+
+// ----- The chronicle (CT-11 / CT-12: one timeline, journal entries + dated `event` pages) -----
+
+/**
+ * What a chronicle row IS, for the reader. R2: one row shape for every record; the kind reads by icon +
+ * label, never by colour alone. `combat` is split out from `entry` because it already renders with its own
+ * badge and replay edge today and must keep doing so - it is the same store row, discriminated for display.
+ */
+export type CodexChronicleKind = "entry" | "combat" | "event";
+
+/**
+ * One chronicle row as the GM sees it. Flat and uniform on purpose: every key is present on every kind
+ * (null where it does not apply), so no reader branches on key *presence* - the same discipline
+ * `CodexSearchHit` follows.
+ *
+ * `id` is the record's OWN id - a journal-entry id for `entry`/`combat`, a page id for `event` - and `kind`
+ * is what says which. That is also what "open this row" means, so there is exactly one thing to look at.
+ *
+ * `text` / `gmText` are the row's two layers. For a journal entry they are the entry's full text, because
+ * an entry IS its text and has nowhere else to be read. For an `event` page they are a bounded EXCERPT of
+ * the page's two bodies, because the page itself is the place to read them and a chronicle that inlined
+ * 100k-character wiki bodies would be a page list wearing a timeline's clothes. The excerpt helper is the
+ * one search rows already use - one bounded-row-text rule for the suite, not two.
+ */
+export type GmCodexChronicleRecord = Readonly<{
+  kind: CodexChronicleKind;
+  id: string;
+  /** An `event` page's title. `null` for a journal entry, which has no name. */
+  title: string | null;
+  text: string;
+  gmText: string | null;
+  revealedToPlayers: boolean;
+  sessionNumber: number | null;
+  realDate: string | null;
+  inWorldLabel: string | null;
+  calendarInstant: number | null;
+  inWorldDate: CodexInWorldDate | null;
+  tags: readonly string[];
+  attachPageId: string | null;
+  attachMarkerId: string | null;
+  sourceEncounterId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
+/**
+ * One chronicle row as a PLAYER sees it. This is `PlayerCodexJournalEntry` plus `title`, and nothing else -
+ * every key was re-checked against the player LIST projection it must not exceed:
+ *
+ *   `title`        - `projectPlayerPageSummary` emits a revealed page's title; null for an entry.
+ *   `text`         - an entry's `playerText` (via `projectPlayerJournalEntry`) or an excerpt of a revealed
+ *                    page's `body`, which is `playerBody` (via `projectPlayerPage`). Never `gmText`/`gmBody`.
+ *   `inWorldLabel` - already player-visible on entries; on an event it is the whole point of CT-11 (the row
+ *                    has to land in a year), and it is DERIVED from the date the GM chose to publish by
+ *                    revealing the page. A reviewed addition, like `tags` in CI-2.
+ *   `createdAt`    - already player-visible on entries; for a page it is strictly less informative than the
+ *                    `updatedAt` a player already receives from `projectPlayerPageSummary`.
+ *   `sessionNumber`/`realDate`/`tags` - already in `projectPlayerJournalEntry`; null/empty on an event.
+ *
+ * Absent by construction: `gmText`, `calendarInstant`, `inWorldDate`, `revealedToPlayers`, `attachPageId`,
+ * `attachMarkerId`, `sourceEncounterId` (K2 - the replay id never reaches a player), `updatedAt`, `rev`.
+ */
+export type PlayerCodexChronicleRecord = Readonly<{
+  kind: CodexChronicleKind;
+  id: string;
+  title: string | null;
+  text: string;
+  sessionNumber: number | null;
+  realDate: string | null;
+  inWorldLabel: string | null;
+  tags: readonly string[];
+  createdAt: string;
+}>;
+
+export function projectGmChronicleRecord(record: CodexChronicleRecord): GmCodexChronicleRecord {
+  if (record.kind === "entry") {
+    const entry = record.entry;
+    return {
+      kind: entry.kind === "combat" ? "combat" : "entry", id: entry.id, title: null,
+      text: entry.playerText, gmText: entry.gmText, revealedToPlayers: entry.revealedToPlayers,
+      sessionNumber: entry.sessionNumber, realDate: entry.realDate, inWorldLabel: entry.inWorldLabel,
+      calendarInstant: entry.calendarInstant, inWorldDate: entry.inWorldDate, tags: entry.tags,
+      attachPageId: entry.attachPageId, attachMarkerId: entry.attachMarkerId, sourceEncounterId: entry.sourceEncounterId,
+      createdAt: entry.createdAt, updatedAt: entry.updatedAt
+    };
+  }
+  const page = record.page;
+  return {
+    kind: "event", id: page.id, title: page.title,
+    text: excerpt(page.playerBody), gmText: page.gmBody.trim() ? excerpt(page.gmBody) : null,
+    revealedToPlayers: page.revealedToPlayers,
+    sessionNumber: null, realDate: null, inWorldLabel: page.inWorldLabel,
+    calendarInstant: page.calendarInstant, inWorldDate: page.inWorldDate, tags: page.tags,
+    attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+    createdAt: page.createdAt, updatedAt: page.updatedAt
+  };
+}
+
+/**
+ * null when this record is not player-visible - **the only gate the chronicle has** (`listChronicle()` is
+ * deliberately ungated, K1). Neither arm invents a predicate; each DELEGATES to the projection that already
+ * owns that record type, so the chronicle can never be weaker than the read it duplicates:
+ *
+ *   entry / combat -> `projectPlayerJournalEntry`. Revealed only, `playerText` only, `gmText` and the
+ *                     replay id (K2) dropped. Exactly `GET /codex/journal` for a player.
+ *   event          -> `projectPlayerPage`. Revealed only, `body` = `playerBody`, `gmBody` and `gmFields`
+ *                     dropped. Exactly `GET /codex/pages/{id}` for a player.
+ *
+ * That delegation is the point, and it is the `projectPlayerPageMarker` precedent (M7): a hand-rolled
+ * `record.page.revealedToPlayers ? {...} : null` would pass the same tests today and drift the first time
+ * either underlying projection tightens.
+ */
+export function projectPlayerChronicleRecord(record: CodexChronicleRecord): PlayerCodexChronicleRecord | null {
+  if (record.kind === "entry") {
+    const projected = projectPlayerJournalEntry(record.entry);
+    if (!projected) return null;
+    return {
+      kind: projected.kind === "combat" ? "combat" : "entry", id: projected.id, title: null, text: projected.text,
+      sessionNumber: projected.sessionNumber, realDate: projected.realDate, inWorldLabel: projected.inWorldLabel,
+      tags: projected.tags, createdAt: projected.createdAt
+    };
+  }
+  const projected = projectPlayerPage(record.page);
+  if (!projected) return null;
+  return {
+    kind: "event", id: projected.id, title: projected.title, text: excerpt(projected.body),
+    sessionNumber: null, realDate: null, inWorldLabel: record.page.inWorldLabel,
+    tags: projected.tags, createdAt: record.page.createdAt
+  };
+}
+
 // ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----
 
 /**
@@ -222,12 +363,7 @@ export type CodexSearchHit = Readonly<{
   mapId: string | null;
 }>;
 
-const EXCERPT_LENGTH = 160;
-/** A journal entry has no title, so the result row shows a bounded one-line excerpt of its text. */
-function excerpt(text: string): string {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length <= EXCERPT_LENGTH ? flat : `${flat.slice(0, EXCERPT_LENGTH - 1)}…`;
-}
+/* A journal entry has no title, so its result row shows a bounded excerpt of its text - see `excerpt` above. */
 
 export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
   switch (record.kind) {

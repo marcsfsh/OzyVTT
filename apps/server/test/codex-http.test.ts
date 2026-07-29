@@ -641,3 +641,104 @@ describe("codex suite-wide search viewer safety (CI-1)", () => {
     expect(marker.id).toBe(shownMarker);
   });
 });
+
+/**
+ * CT-11 / CT-12 at the HTTP boundary (A-8). `PlayerCodex` fetches the timeline, so every record kind that
+ * joins the chronicle is player-reachable BY DEFAULT — an event page is a projection surface, not a
+ * display change. These are the pipeline tests; the layer that actually decides is exercised point-blank
+ * in `codex-store.test.ts` ("Codex chronicle — the projection layer, on its own"), because an HTTP test
+ * can only ever say the pipeline as a whole behaved, never which layer made it behave.
+ */
+describe("codex chronicle HTTP boundary (CT-11, A-8)", () => {
+  const chronicle = async (base: string, headers: Record<string, string>) =>
+    (await body(await get(base, "/api/v1/codex/timeline", headers))).data.records as Json[];
+
+  it("returns no UNREVEALED event and no GM-only event content to a player", async () => {
+    const { base, store } = await fixture();
+    const secret = store.createPage({
+      title: "The Sundering", entityType: "event", playerBody: "The sky tore open.", gmBody: "Strahd engineered it.",
+      gmFields: { goals: "conceal the cause" }, inWorldDate: { year: 1492, month: 0, day: 1 }
+    });
+    const shown = store.createPage({
+      title: "The Festival of the Blazing Sun", entityType: "event", revealedToPlayers: true,
+      playerBody: "Vallaki celebrated.", gmBody: "The wolves were already inside.",
+      inWorldDate: { year: 1492, month: 0, day: 2 }
+    });
+
+    // The GM sees both, with both layers - so the player assertions below are the gate working, not an
+    // empty chronicle or an event with nothing to leak.
+    const gmRows = await chronicle(base, GM);
+    expect(gmRows.map((row) => row.id)).toEqual([secret.id, shown.id]);
+    expect(JSON.stringify(gmRows)).toContain("Strahd engineered it.");
+
+    const playerRows = await chronicle(base, PLAYER);
+    expect(playerRows.map((row) => row.id)).toEqual([shown.id]);          // the unrevealed event is absent
+    const payload = JSON.stringify(playerRows);
+    expect(payload).not.toContain("Strahd engineered it.");               // the revealed event's GM body
+    expect(payload).not.toContain("The wolves were already inside.");
+    expect(payload).not.toContain("conceal the cause");                   // GM fields
+    expect(payload).not.toContain("The Sundering");                       // even the secret event's TITLE
+    // The EXACT projected key set, as the journal timeline test above asserts for an entry: this fails if
+    // any new field ever enters the player chronicle projection, not only if this one leaks.
+    expect(Object.keys(playerRows[0]).sort())
+      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text", "title"]);
+  });
+
+  it("interleaves a dated event with journal entries in one in-world order, for both roles", async () => {
+    const { base, store } = await fixture();
+    const early = store.createEntry({ playerText: "Founding.", revealedToPlayers: true, inWorldDate: { year: 1400, month: 0, day: 1 } });
+    const event = store.createPage({ title: "The Sundering", entityType: "event", revealedToPlayers: true, playerBody: "The sky tore open.", inWorldDate: { year: 1450, month: 0, day: 1 } });
+    const late = store.createEntry({ playerText: "The war.", revealedToPlayers: true, inWorldDate: { year: 1500, month: 0, day: 1 } });
+
+    for (const headers of [GM, PLAYER]) {
+      const rows = await chronicle(base, headers);
+      expect(rows.map((row) => row.id)).toEqual([early.id, event.id, late.id]);
+      expect(rows.map((row) => row.kind)).toEqual(["entry", "event", "entry"]);
+    }
+  });
+
+  it("reflows events and entries together when the calendar changes, seen through the API", async () => {
+    // K3 end to end: the same PUT the calendar editor sends, then the chronicle re-read. The order and the
+    // labels both have to move, and the raw dates must be exactly what was typed.
+    const { base, store } = await fixture();
+    // Ten days apart on purpose. Identically-dated records fall to the comparator's last tiebreaker (the
+    // id), which is a real total order but not a predictable one, and asserting an ORDER over it would be
+    // asserting a coin flip. Distinct dates also prove each record reflowed to its OWN new instant rather
+    // than both being written the same value.
+    const entry = store.createEntry({ playerText: "Founding.", inWorldDate: { year: 1, month: 1, day: 10 } });
+    const event = store.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1, month: 1, day: 20 } });
+
+    const response = await put(base, "/api/v1/codex/calendar", GM, { yearName: "AE", months: [{ name: "Rise", days: 100 }, { name: "Fall", days: 100 }], weekdays: [] });
+    expect(response.status).toBe(200);
+
+    const rows = await chronicle(base, GM);
+    expect(rows.map((row) => row.id)).toEqual([entry.id, event.id]);
+    expect(rows.map((row) => row.inWorldLabel)).toEqual(["Fall 10, 1 AE", "Fall 20, 1 AE"]);
+    expect(rows.map((row) => row.calendarInstant)).toEqual([309, 319]);   // 1*200 + 100 + (day-1), on the NEW year
+    expect(rows.map((row) => row.inWorldDate)).toEqual([{ year: 1, month: 1, day: 10 }, { year: 1, month: 1, day: 20 }]);
+  });
+
+  it("dates an event page through the page routes, and clears it with an explicit null", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Sundering", entityType: "event", inWorldDate: { year: 1492, month: 0, day: 1 } }));
+    const id = created.data.page.id as string;
+    expect(created.data.page.inWorldDate).toEqual({ year: 1492, month: 0, day: 1 });
+    expect(created.data.page.calendarInstant).not.toBeNull();
+    expect((await chronicle(base, GM)).map((row) => row.id)).toEqual([id]);
+
+    // A PATCH that never mentions the date leaves it alone - the page editor's autosave path.
+    await patch(base, `/api/v1/codex/pages/${id}`, GM, { playerBody: "The sky tore open." });
+    expect((await chronicle(base, GM))[0].inWorldDate).toEqual({ year: 1492, month: 0, day: 1 });
+
+    // An explicit null clears it, and the page leaves the chronicle.
+    const cleared = await body(await patch(base, `/api/v1/codex/pages/${id}`, GM, { inWorldDate: null }));
+    expect(cleared.data.page.inWorldDate).toBeNull();
+    expect(await chronicle(base, GM)).toEqual([]);
+  });
+
+  it("refuses the chronicle to an unauthenticated caller", async () => {
+    const { base } = await fixture();
+    const response = await get(base, "/api/v1/codex/timeline", { "content-type": "application/json" });
+    expect(response.status).toBe(401);
+  });
+});

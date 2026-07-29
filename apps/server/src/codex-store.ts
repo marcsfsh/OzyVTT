@@ -39,6 +39,15 @@ export type CodexPageRow = Readonly<{
   gmBody: string;
   revealedToPlayers: boolean;
   bannerAssetId: string | null;
+  /**
+   * CT-11 dating, the SAME contract journal entries use (see `CodexJournalRow` below and `resolveDate`):
+   * `inWorldDate` is the literal date the GM typed and is the source of truth; `calendarInstant` and
+   * `inWorldLabel` are DERIVED from it and recomputed by `setCalendar`. Only an `event` page joins the
+   * chronicle, but the columns live on every page so switching a page's type away and back is lossless.
+   */
+  inWorldLabel: string | null;
+  calendarInstant: number | null;
+  inWorldDate: CodexInWorldDate | null;
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -173,6 +182,18 @@ export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: s
 export type CodexJournalUpdateInput = CodexJournalCreateInput;
 export type CodexCombatEntryInput = Readonly<{ sourceEncounterId: number; attachMarkerId?: string | null; attachPageId?: string | null; playerText: string; gmText?: string | null; revealedToPlayers?: boolean }>;
 
+/**
+ * CT-11 / CT-12: one record on the ONE chronicle, still in its own store shape.
+ *
+ * Deliberately a discriminated union of RAW rows rather than a pre-flattened row: this store returns raw
+ * records and `codex-projections.ts` is the single audited place that decides what each audience may see
+ * (see the file header). Flattening here would put half the projection in the store, where nothing audits
+ * it. The flat, one-shape-per-row form (R2) is `Gm/PlayerCodexChronicleRecord` in the projections module.
+ */
+export type CodexChronicleRecord =
+  | Readonly<{ kind: "entry"; entry: CodexJournalRow }>
+  | Readonly<{ kind: "event"; page: CodexPageRow }>;
+
 export type CodexPageCreateInput = Readonly<{
   title: string;
   entityType?: CodexEntityType;
@@ -184,6 +205,8 @@ export type CodexPageCreateInput = Readonly<{
   gmBody?: string;
   revealedToPlayers?: boolean;
   bannerAssetId?: string | null;
+  /** CT-11: the raw in-world date. `null` clears it; omitted leaves it alone (the journal's contract exactly). */
+  inWorldDate?: CodexInWorldDate | null;
 }>;
 
 export type CodexPageUpdateInput = Readonly<{
@@ -196,6 +219,7 @@ export type CodexPageUpdateInput = Readonly<{
   playerBody?: string;
   gmBody?: string;
   bannerAssetId?: string | null;
+  inWorldDate?: CodexInWorldDate | null;
 }>;
 
 /** Thrown when an update's `expectedRev` does not match the stored row - the client's page is stale. */
@@ -428,6 +452,25 @@ export const MIGRATIONS = [{
     DROP TABLE codex_fts_player;
     DROP TABLE codex_fts_gm;
   `
+}, {
+  version: 12,
+  // CT-11: an `event` page can carry an in-world DATE, so it takes its place on the one chronicle beside
+  // the journal's entries. The columns are exactly the ones `codex_journal` already carries (migration
+  // v1 + v6), deliberately named identically, because the dating CONTRACT is the same one: the raw
+  // `in_world_{year,month,day}` the GM typed is the source of truth, and `calendar_instant` +
+  // `in_world_label` are DERIVED from it by `resolveDate` and recomputed wholesale by `setCalendar`.
+  // A second dating contract for pages would be a second thing to reflow and a second thing to get wrong.
+  //
+  // Additive with no backfill (K7): every existing page is NULL in all five, which is exactly "undated",
+  // which is exactly today's behaviour. Nothing existing changes meaning.
+  sql: `
+    ALTER TABLE codex_pages ADD COLUMN in_world_year INTEGER;
+    ALTER TABLE codex_pages ADD COLUMN in_world_month INTEGER;
+    ALTER TABLE codex_pages ADD COLUMN in_world_day INTEGER;
+    ALTER TABLE codex_pages ADD COLUMN in_world_label TEXT;
+    ALTER TABLE codex_pages ADD COLUMN calendar_instant INTEGER;
+    CREATE INDEX codex_pages_instant ON codex_pages (calendar_instant);
+  `
 }];
 
 /**
@@ -507,8 +550,24 @@ function searchOrderBySql(table: "codex_search_player" | "codex_search_gm"): str
 
 type PageRow = {
   id: string; title: string; entity_type: string; fields_json: string; gm_fields_json: string; folder: string | null; tags_json: string; player_body: string;
-  gm_body: string; revealed: number; banner_asset_id: string | null; rev: number; created_at: string; updated_at: string;
+  gm_body: string; revealed: number; banner_asset_id: string | null;
+  in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null;
+  rev: number; created_at: string; updated_at: string;
 };
+/**
+ * One column list per page read, so a new column cannot land in the row type and be forgotten in one of
+ * the three SELECTs (the CT-11 date columns are read by all of them). Same discipline as JOURNAL_COLUMNS.
+ * The SUMMARY list is the full one minus the two bodies and the GM field map — `CodexPageSummaryRow`.
+ */
+const PAGE_DATE_COLUMNS = "in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day";
+const PAGE_COLUMNS = `id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, ${PAGE_DATE_COLUMNS}, rev, created_at, updated_at`;
+const PAGE_SUMMARY_COLUMNS = `id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, ${PAGE_DATE_COLUMNS}, rev, created_at, updated_at`;
+/** The raw stored date, reassembled. All three parts or none - the same rule `toEntry` applies to a journal row. */
+function pageDateOf(row: Pick<PageRow, "in_world_year" | "in_world_month" | "in_world_day">): CodexInWorldDate | null {
+  return row.in_world_year !== null && row.in_world_month !== null && row.in_world_day !== null
+    ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day }
+    : null;
+}
 type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
 type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; tags_json: string; created_at: string; updated_at: string };
 const MAP_COLUMNS = "id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at";
@@ -625,6 +684,37 @@ function calendarInstantOf(calendar: CodexCalendar, date: CodexInWorldDate): num
   const day = Math.max(1, Math.min(Math.trunc(date.day), calendar.months[monthIdx].days));
   return Math.trunc(date.year) * calendarDaysPerYear(calendar) + dayOfYear + (day - 1);
 }
+/**
+ * The chronicle's sort key, and the ONE comparator over it (CT-12's "by in-world date" lens).
+ *
+ * This is `listTimeline()`'s `ORDER BY` restated in TypeScript, clause for clause:
+ *   `(calendar_instant IS NULL), calendar_instant, (session_number IS NULL), session_number, created_at`
+ * It has to be restated because two tables with different columns cannot share one SQL `ORDER BY` without
+ * a UNION that would then need every column of both. Stated once here and used for the merge, so the
+ * chronicle cannot order the journal differently from the journal's own read - and `listTimeline()` is
+ * already sorted by that SQL, so a stable sort leaves entry-vs-entry order exactly as SQL produced it.
+ *
+ * `id` is the final tiebreaker, which the SQL has no equivalent of: it only breaks ties SQL leaves
+ * arbitrary, and it is what makes the two lenses provably re-orderings of one another rather than two
+ * orders that happen to agree today.
+ */
+type ChronicleSortKey = Readonly<{ calendarInstant: number | null; sessionNumber: number | null; createdAt: string; id: string }>;
+function chronicleSortKey(record: CodexChronicleRecord): ChronicleSortKey {
+  return record.kind === "entry"
+    ? { calendarInstant: record.entry.calendarInstant, sessionNumber: record.entry.sessionNumber, createdAt: record.entry.createdAt, id: record.entry.id }
+    : { calendarInstant: record.page.calendarInstant, sessionNumber: null, createdAt: record.page.createdAt, id: record.page.id };
+}
+function compareChronicle(a: ChronicleSortKey, b: ChronicleSortKey): number {
+  const undated = Number(a.calendarInstant === null) - Number(b.calendarInstant === null);
+  if (undated !== 0) return undated;
+  if (a.calendarInstant !== null && b.calendarInstant !== null && a.calendarInstant !== b.calendarInstant) return a.calendarInstant - b.calendarInstant;
+  const unsessioned = Number(a.sessionNumber === null) - Number(b.sessionNumber === null);
+  if (unsessioned !== 0) return unsessioned;
+  if (a.sessionNumber !== null && b.sessionNumber !== null && a.sessionNumber !== b.sessionNumber) return a.sessionNumber - b.sessionNumber;
+  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 function formatInWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
   const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
   const month = calendar.months[monthIdx];
@@ -782,15 +872,21 @@ export class CodexStore {
       pruneCodexFields(createdType, entityFields(input.fields)),
       pruneCodexFields(createdType, entityFields(input.gmFields))
     );
+    // CT-11: one call, the SAME `resolveDate` a journal entry goes through - so a page's instant and label
+    // are derived from its raw date by identical code, and `setCalendar` can reflow both from the same rule.
+    const dated = this.resolveDate(input.inWorldDate, null);
     const row: PageRow = {
       id: pageId, title: title(input.title), entity_type: createdType, fields_json: JSON.stringify(sealed.fields), gm_fields_json: JSON.stringify(sealed.gmFields),
       folder: folder(input.folder), tags_json: JSON.stringify(tags(input.tags)),
       player_body: body(input.playerBody), gm_body: body(input.gmBody), revealed: input.revealedToPlayers ? 1 : 0,
-      banner_asset_id: input.bannerAssetId ? id(input.bannerAssetId) : null, rev: 1, created_at: stamp, updated_at: stamp
+      banner_asset_id: input.bannerAssetId ? id(input.bannerAssetId) : null,
+      in_world_label: dated.label, calendar_instant: dated.instant,
+      in_world_year: dated.date ? dated.date.year : null, in_world_month: dated.date ? dated.date.month : null, in_world_day: dated.date ? dated.date.day : null,
+      rev: 1, created_at: stamp, updated_at: stamp
     };
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.in_world_label, row.calendar_instant, row.in_world_year, row.in_world_month, row.in_world_day, row.rev, row.created_at, row.updated_at);
       this.rebuildLinks(pageId, row.player_body, row.gm_body);
       this.indexPage(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json, row.tags_json);
       this.registerFolderPath(row.folder, stamp);
@@ -825,6 +921,11 @@ export class CodexStore {
       fieldsJson = JSON.stringify(sealed.fields);
       gmFieldsJson = JSON.stringify(sealed.gmFields);
     }
+    // CT-11, the journal's `updateEntry` contract verbatim: an OMITTED `inWorldDate` leaves the stored date
+    // alone, an explicit `null` clears it. That matters for the page editor, which PATCHes the whole draft on
+    // every autosave - a rule of "absent means clear" would erase an event's date the first time its body
+    // was touched from any surface that does not know about dates.
+    const dated = input.inWorldDate !== undefined ? this.resolveDate(input.inWorldDate, null) : null;
     const next: PageRow = {
       ...existing,
       title: input.title === undefined ? existing.title : title(input.title),
@@ -836,12 +937,17 @@ export class CodexStore {
       player_body: input.playerBody === undefined ? existing.player_body : body(input.playerBody),
       gm_body: input.gmBody === undefined ? existing.gm_body : body(input.gmBody),
       banner_asset_id: input.bannerAssetId === undefined ? existing.banner_asset_id : (input.bannerAssetId ? id(input.bannerAssetId) : null),
+      in_world_label: dated ? dated.label : existing.in_world_label,
+      calendar_instant: dated ? dated.instant : existing.calendar_instant,
+      in_world_year: dated ? (dated.date ? dated.date.year : null) : existing.in_world_year,
+      in_world_month: dated ? (dated.date ? dated.date.month : null) : existing.in_world_month,
+      in_world_day: dated ? (dated.date ? dated.date.day : null) : existing.in_world_day,
       rev: existing.rev + 1,
       updated_at: this.stamp()
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, rev = ?, updated_at = ? WHERE id = ?")
-        .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
+      database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, rev = ?, updated_at = ? WHERE id = ?")
+        .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.rev, next.updated_at, pageId);
       this.rebuildLinks(pageId, next.player_body, next.gm_body);
       this.indexPage(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json, next.tags_json);
       this.registerFolderPath(next.folder, next.updated_at);
@@ -960,20 +1066,22 @@ export class CodexStore {
 
   listPages(filter?: Readonly<{ folder?: string | null; tag?: string }>): CodexPageSummaryRow[] {
     const rows = this.requireDatabase()
-      .prepare("SELECT id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE")
+      .prepare(`SELECT ${PAGE_SUMMARY_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`)
       .all() as Array<Omit<PageRow, "player_body" | "gm_body">>;
     return rows
       .map((row) => ({
         id: row.id, title: row.title, entityType: (row.entity_type as CodexEntityType) ?? "note", fields: parseFields(row.fields_json),
         folder: row.folder, tags: JSON.parse(row.tags_json) as string[],
-        revealedToPlayers: row.revealed === 1, bannerAssetId: row.banner_asset_id, rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
+        revealedToPlayers: row.revealed === 1, bannerAssetId: row.banner_asset_id,
+        inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant, inWorldDate: pageDateOf(row),
+        rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
       }))
       .filter((page) => (filter?.folder === undefined || page.folder === filter.folder) && (filter?.tag === undefined || page.tags.includes(filter.tag)));
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
   exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[] }> {
-    const pages = (this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE").all() as PageRow[]).map((row) => this.toPage(row));
+    const pages = (this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
     return { pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships() };
@@ -1060,7 +1168,14 @@ export class CodexStore {
       .map((row) => ({ id: row.id, pageId: row.page_id, rev: row.rev, title: row.title, playerBody: row.player_body, gmBody: row.gm_body, bannerAssetId: row.banner_asset_id, tags: JSON.parse(row.tags_json) as string[], authoredAt: row.authored_at, authorTag: row.author_tag }));
   }
 
-  /** Restore a past revision by writing it forward as a new revision (history is never rewritten). */
+  /**
+   * Restore a past revision by writing it forward as a new revision (history is never rewritten).
+   *
+   * CT-11: revisions deliberately do NOT snapshot the in-world date, and this call omits `inWorldDate`, so a
+   * restore keeps the page's CURRENT chronicle placement. Restoring older prose is a content edit, not a
+   * statement about when the event happened - and the alternative (snapshotting it) would silently move an
+   * event years across the timeline as a side effect of undoing a typo.
+   */
   restoreRevision(pageId: string, revisionId: number, authorTag: string): CodexPageRow {
     const snap = this.requireDatabase().prepare("SELECT title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json FROM codex_page_revisions WHERE id = ? AND page_id = ?").get(revisionId, pageId) as { title: string; entity_type: string; fields_json: string; gm_fields_json: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string } | undefined;
     if (!snap) throw new CodexNotFoundError("That revision no longer exists.");
@@ -1390,16 +1505,30 @@ export class CodexStore {
     try { return normalizeCalendar(JSON.parse(row.calendar_json) as CodexCalendar); } catch { return DEFAULT_CALENDAR; }
   }
 
+  /**
+   * Replace the world calendar and reflow **every dated record** in one transaction (K3).
+   *
+   * Reflow means: recompute the sort instant + display label from the RAW date the GM typed. Nothing reads
+   * the old instant to produce the new one, so the operation is idempotent and lossless - the raw date is
+   * never written here, only read. Changing month lengths/count therefore re-places existing dates on the
+   * new calendar rather than corrupting them.
+   *
+   * CT-11 put `codex_pages` in this set beside `codex_journal`. Both loops run inside the SAME transaction
+   * as the calendar write: a chronicle half-reflowed against two different calendars would order entries
+   * and events against each other wrongly, and that is exactly the record set the one timeline interleaves.
+   * The page predicate is `in_world_year IS NOT NULL`, NOT `entity_type = 'event'` - a page that is not an
+   * event today may be one tomorrow, and its stored date must be current when it gets there.
+   */
   setCalendar(input: CodexCalendar): CodexCalendar {
     const calendar = normalizeCalendar(input);
     this.transaction(() => {
       const database = this.requireDatabase();
       database.prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(calendar));
-      // Reflow every dated entry: recompute its sort instant + display label from the RAW date the GM typed,
-      // so changing month lengths/count never corrupts existing dates (they just re-place on the new calendar).
-      const dated = database.prepare("SELECT id, in_world_year AS year, in_world_month AS month, in_world_day AS day FROM codex_journal WHERE in_world_year IS NOT NULL").all() as Array<{ id: string; year: number; month: number; day: number }>;
-      const update = database.prepare("UPDATE codex_journal SET calendar_instant = ?, in_world_label = ? WHERE id = ?");
-      for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
+      for (const table of ["codex_journal", "codex_pages"] as const) {
+        const dated = database.prepare(`SELECT id, in_world_year AS year, in_world_month AS month, in_world_day AS day FROM ${table} WHERE in_world_year IS NOT NULL`).all() as Array<{ id: string; year: number; month: number; day: number }>;
+        const update = database.prepare(`UPDATE ${table} SET calendar_instant = ?, in_world_label = ? WHERE id = ?`);
+        for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
+      }
       this.bumpRevision();
     });
     return calendar;
@@ -1416,7 +1545,15 @@ export class CodexStore {
     return { year, month, day: remainder + 1 };
   }
 
-  /** Resolve a journal entry's date: a structured in-world date wins (computes instant + label + keeps the raw date); else free-text label, no instant. */
+  /**
+   * Resolve a dated record's date: a structured in-world date wins (computes instant + label + keeps the raw
+   * date); else free-text label, no instant.
+   *
+   * Used by journal entries AND, since CT-11, by pages - one function, so both share one dating contract.
+   * A page passes `label: null`: an event's placement on the chronicle is the structured date or nothing,
+   * because a free-text "when" cannot be sorted or reflowed. (Event pages keep their prose `when` FIELD for
+   * colour; it is content, not a sort key, and the two are deliberately not the same thing.)
+   */
   private resolveDate(date: CodexInWorldDate | null | undefined, label: string | null | undefined): { instant: number | null; label: string | null; date: CodexInWorldDate | null } {
     if (date && Number.isFinite(date.year) && Number.isFinite(date.month) && Number.isFinite(date.day)) {
       const calendar = this.getCalendar();
@@ -1515,6 +1652,38 @@ export class CodexStore {
     ).all() as JournalRowRaw[]).map((row) => this.toEntry(row));
   }
 
+  /**
+   * CT-11: the dated `event` pages, the second half of the one chronicle. Undated event pages are simply
+   * not on it - a page with no date has no place in a chronology, and inventing one (created-at, say) would
+   * scatter the GM's wiki through the timeline in the order they happened to write it.
+   *
+   * Filtering on `entity_type` here rather than clearing the date on a type switch keeps the type switch
+   * lossless: an event demoted to a note and promoted back arrives with its date intact.
+   */
+  listDatedEventPages(): CodexPageRow[] {
+    return (this.requireDatabase()
+      .prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages WHERE entity_type = 'event' AND calendar_instant IS NOT NULL ORDER BY calendar_instant, created_at`)
+      .all() as PageRow[]).map((row) => this.toPage(row));
+  }
+
+  /**
+   * CT-11 / CT-12: **the one chronicle** - every journal entry and every dated `event` page, interleaved in
+   * one chronological order.
+   *
+   * **Deliberately UNGATED.** It returns every record for both audiences; `projectPlayerChronicleRecord`
+   * is the ONLY visibility gate (K1), exactly as M7's page->marker reverse lookup is gated only by its
+   * projection. A second filter here would let a broken projection keep passing its tests because this
+   * layer quietly caught the leak - which is how M6's SQL predicate bug survived 787 tests. A store test
+   * asserts this ungatedness on purpose, so a later "hardening" cannot reintroduce the blind spot.
+   */
+  listChronicle(): CodexChronicleRecord[] {
+    const records: CodexChronicleRecord[] = [
+      ...this.listTimeline().map((entry) => ({ kind: "entry", entry }) as const),
+      ...this.listDatedEventPages().map((page) => ({ kind: "event", page }) as const)
+    ];
+    return records.sort((a, b) => compareChronicle(chronicleSortKey(a), chronicleSortKey(b)));
+  }
+
   /** Entries pinned to a specific marker or page (the per-entity mini-timeline). */
   listEntriesFor(attach: Readonly<{ markerId?: string; pageId?: string }>): CodexJournalRow[] {
     const database = this.requireDatabase();
@@ -1573,7 +1742,7 @@ export class CodexStore {
 
   private pageRow(pageId: string): PageRow | undefined {
     if (!ID.test(pageId)) return undefined;
-    return this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages WHERE id = ?").get(pageId) as PageRow | undefined;
+    return this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages WHERE id = ?`).get(pageId) as PageRow | undefined;
   }
 
   private toPage(row: PageRow): CodexPageRow {
@@ -1581,7 +1750,9 @@ export class CodexStore {
       id: row.id, title: row.title, entityType: (row.entity_type as CodexEntityType) ?? "note", fields: parseFields(row.fields_json), gmFields: parseFields(row.gm_fields_json),
       folder: row.folder, tags: JSON.parse(row.tags_json) as string[],
       playerBody: row.player_body, gmBody: row.gm_body, revealedToPlayers: row.revealed === 1,
-      bannerAssetId: row.banner_asset_id, rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
+      bannerAssetId: row.banner_asset_id,
+      inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant, inWorldDate: pageDateOf(row),
+      rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
 

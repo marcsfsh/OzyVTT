@@ -19,7 +19,7 @@ const getPage = vi.fn();
 const search = vi.fn();
 const markersForPage = vi.fn();
 const forPage = vi.fn();
-const timeline = vi.fn();
+const chronicle = vi.fn();
 const forMarker = vi.fn();
 const getCalendar = vi.fn();
 const listMaps = vi.fn();
@@ -28,7 +28,7 @@ const listMarkers = vi.fn();
 const playerListPages = vi.fn();
 const playerListMaps = vi.fn();
 const playerListMarkers = vi.fn();
-const playerTimeline = vi.fn();
+const playerChronicle = vi.fn();
 const playerListRelationships = vi.fn();
 const playerListLinks = vi.fn();
 
@@ -46,7 +46,7 @@ vi.mock("./api", async (importOriginal) => {
       search: (...a: unknown[]) => search(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a)
     },
-    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), chronicle: (...a: unknown[]) => chronicle(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     atlasApi: {
       ...actual.atlasApi,
@@ -59,7 +59,7 @@ vi.mock("./api", async (importOriginal) => {
       listPages: (...a: unknown[]) => playerListPages(...a),
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
-      timeline: (...a: unknown[]) => playerTimeline(...a),
+      chronicle: (...a: unknown[]) => playerChronicle(...a),
       listRelationships: (...a: unknown[]) => playerListRelationships(...a),
       listLinks: (...a: unknown[]) => playerListLinks(...a)
     }
@@ -69,7 +69,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { CodexWorkspace } from "./CodexWorkspace";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexCalendar, CodexJournalEntry, CodexMap, CodexMarker, CodexPage, CodexPageSummary, PlayerCodexPageSummary } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker, CodexPage, CodexPageSummary, PlayerCodexPageSummary } from "./api";
 
 /**
  * **M7's three page return edges (CI-3, CI-4, CI-5) and the Graph telling the truth (CI-8).**
@@ -92,7 +92,8 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 
 const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"] = "location"): CodexPageSummary => ({
   id, title, entityType, fields: {}, folder: null, tags: [], revealedToPlayers: false,
-  bannerAssetId: null, rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  rev: 1, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const full = (row: CodexPageSummary): CodexPage => ({ ...row, playerBody: "", gmBody: "", gmFields: {} });
 
@@ -104,6 +105,14 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+});
+
+/** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape. */
+const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
+  kind: "entry", id: "j1", title: null, text: "The mists closed behind them.", gmText: null, revealedToPlayers: false,
+  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  tags: [], attachPageId: "p1", attachMarkerId: null, sourceEncounterId: null,
+  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
 /** The atlas defaults to `maps[0]`, so the pin's map is deliberately SECOND: a jump that drops the map
@@ -123,7 +132,7 @@ const gmDefaults = () => {
   search.mockResolvedValue([]);
   markersForPage.mockResolvedValue([]);
   forPage.mockResolvedValue([]);
-  timeline.mockResolvedValue([]);
+  chronicle.mockResolvedValue([]);
   forMarker.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
   listMaps.mockResolvedValue([MAP_OTHER, MAP_TARGET]);
@@ -160,9 +169,8 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
   it("CI-3: a journal row lands on the Journal WITH that entry focused", async () => {
     // Two entries, and the page's is the SECOND: a jump that reaches the Journal but focuses whatever
     // is first would pass a mode-only assertion and fail this one.
-    const OTHER_ENTRY = ENTRY({ id: "j0", playerText: "They left Daggerford.", attachPageId: null });
     forPage.mockResolvedValue([ENTRY({ id: "j9", playerText: "The mists closed behind them." })]);
-    timeline.mockResolvedValue([OTHER_ENTRY, ENTRY({ id: "j9", playerText: "The mists closed behind them." })]);
+    chronicle.mockResolvedValue([RECORD({ id: "j0", text: "They left Daggerford.", attachPageId: null }), RECORD({ id: "j9" })]);
     const user = userEvent.setup();
     renderWorkspace();
     const connections = await openPage(user);
@@ -313,7 +321,7 @@ describe("The player Graph reads the PLAYER links feed (CI-8, viewer safety)", (
     playerListPages.mockResolvedValue(PLAYER_PAGES);
     playerListMaps.mockResolvedValue([]);
     playerListMarkers.mockResolvedValue([]);
-    playerTimeline.mockResolvedValue([]);
+    playerChronicle.mockResolvedValue([]);
     playerListRelationships.mockResolvedValue([]);
     // What the SERVER chose to send this player: one edge. The GM feed below is a different, larger
     // answer to the same question — if the player surface ever read that one, the extra edge appears.

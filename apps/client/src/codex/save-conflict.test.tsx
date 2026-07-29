@@ -36,7 +36,8 @@ import { CodexRequestError, type CodexPage } from "./api";
  */
 const page: CodexPage = {
   id: "page-1", title: "Barovia", entityType: "location", fields: {}, gmFields: {},
-  folder: null, tags: [], revealedToPlayers: false, bannerAssetId: null, rev: 3,
+  folder: null, tags: [], revealedToPlayers: false, bannerAssetId: null,
+  inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 3,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z",
   playerBody: "Fog.", gmBody: ""
 };
