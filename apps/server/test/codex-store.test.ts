@@ -782,6 +782,11 @@ describe("CodexStore journal", () => {
 
     const updated = store.updateEntry(first.id, { playerText: "We rode into Bree at dusk." });
     expect(updated.playerText).toBe("We rode into Bree at dusk.");
+    // M9's create/update ASYMMETRY, pinned. `createEntry` auto-files an entry under the active session;
+    // `updateEntry` must not - an omitted field means unchanged, so editing a typo cannot re-file the
+    // entry under whatever session happens to be running now. Unpinned, a one-word change here silently
+    // rewrote every edited entry's session on save and all 887 tests still passed.
+    expect(updated.sessionNumber).toBe(1);
     expect(store.setEntryRevealed(first.id, true).revealedToPlayers).toBe(true);
     store.deleteEntry(combat.id);
     expect(store.listTimeline()).toHaveLength(2);
@@ -1395,6 +1400,52 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.activeSessionId).toBeNull();
     expect(() => sessions.deleteSession(session.id)).not.toThrow();    // idempotent
     expect(() => sessions.deleteSession("not-a-uuid")).not.toThrow();  // malformed id: early return
+
+    // ...and the clear is SCOPED to the session being deleted. Deleting a DIFFERENT record must leave
+    // the pointer alone: a GM tidying up old sessions mid-campaign would otherwise silently un-file
+    // every subsequent note and auto-logged battle, which is the whole feature. Unpinned, dropping the
+    // WHERE clause left all 887 tests green.
+    const running = sessions.createSession({ sessionNumber: 12 });
+    const stale = sessions.createSession({ sessionNumber: 4 });
+    sessions.setActiveSession(running.id);
+    sessions.deleteSession(stale.id);
+    expect(sessions.activeSessionId).toBe(running.id);
+  });
+
+  /**
+   * Session number 0 is legal at every layer (`sessionNo` and the route schema both admit it), and it is
+   * the one value a truthiness check silently eats. The player gate is written `=== null` for exactly
+   * this reason; nothing pinned that until now, so `!sessionNumber` passed the suite while blanking a
+   * revealed session 0 for every player.
+   */
+  it("treats session number 0 as a real number, not as absent", () => {
+    const zero = sessions.createSession({ sessionNumber: 0 });
+    expect(zero.sessionNumber).toBe(0);
+    const entry = sessions.createEntry({ playerText: "The session before the first.", sessionNumber: 0, revealedToPlayers: true });
+    expect(entry.sessionNumber).toBe(0);
+
+    // Unrevealed record -> gated to null, exactly as any other number.
+    expect(projectPlayerJournalEntry(entry, { unrevealedSessionNumbers: sessions.unrevealedSessionNumbers() })!.sessionNumber).toBeNull();
+    // Revealed -> the number survives, and 0 is not mistaken for "no session".
+    sessions.setSessionRevealed(zero.id, true);
+    expect(projectPlayerJournalEntry(entry, { unrevealedSessionNumbers: sessions.unrevealedSessionNumbers() })!.sessionNumber).toBe(0);
+  });
+
+  /**
+   * The create/update asymmetry again, this time with a session actually ACTIVE — the state the store
+   * test above cannot reach, because its fixture never activates anything. Editing an entry must not
+   * re-file it under the running session.
+   */
+  it("editing an entry never re-files it under the ACTIVE session", () => {
+    const older = sessions.createSession({ sessionNumber: 2 });
+    const running = sessions.createSession({ sessionNumber: 9 });
+    void older;
+    sessions.setActiveSession(running.id);
+
+    const entry = sessions.createEntry({ playerText: "Filed under two.", sessionNumber: 2 });
+    expect(entry.sessionNumber).toBe(2);
+    const edited = sessions.updateEntry(entry.id, { playerText: "Filed under two, with a typo fixed." });
+    expect(edited.sessionNumber).toBe(2);          // NOT 9
   });
 
   it("sets and clears the active session without touching the session record at all", () => {
@@ -1817,8 +1868,17 @@ describe("CodexStore migration v13 — sessions arrive with NO backfill (M9)", (
       expect(upgraded.createEntry({ playerText: "Written after the upgrade." }).sessionNumber).toBeNull();
       expect(upgraded.appendCombatEntry({ sourceEncounterId: 9, playerText: "A brawl." }).sessionNumber).toBeNull();
 
-      // Making a session record for a number the legacy entries already use is allowed (the constraint is
-      // over SESSIONS, not entries) and starts the linking from there on, without rewriting history.
+      // Making a session record for a number the legacy entries ALREADY use is allowed (the constraint is
+      // over SESSIONS, not entries). Number 1 on purpose: the entries above carry 1 and 2, so this is the
+      // stated case rather than an adjacent one — the comment used to claim this while creating 3, which
+      // no legacy row used. It matters more since the player gate landed: an UNREVEALED record for a
+      // number legacy entries carry is exactly what blanks those long-correct labels for players.
+      const legacyNumbered = upgraded.createSession({ sessionNumber: 1 });
+      expect(upgraded.unrevealedSessionNumbers().has(1)).toBe(true);
+      expect(projectPlayerJournalEntry(upgraded.setEntryRevealed(one, true), { unrevealedSessionNumbers: upgraded.unrevealedSessionNumbers() })!.sessionNumber).toBeNull();
+      upgraded.setSessionRevealed(legacyNumbered.id, true);
+      expect(projectPlayerJournalEntry(upgraded.getEntry(one)!, { unrevealedSessionNumbers: upgraded.unrevealedSessionNumbers() })!.sessionNumber).toBe(1);
+
       const third = upgraded.createSession({ sessionNumber: 3 });
       upgraded.setActiveSession(third.id);
       expect(upgraded.createEntry({ playerText: "Session three." }).sessionNumber).toBe(3);

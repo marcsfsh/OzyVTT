@@ -10,6 +10,19 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex] Renumbering a session orphans its entries and republishes numbers the player gate was
+  hiding — OPEN, awaiting an owner decision (2026-07-29, found by M9's correctness review).** The join
+  between a session record and its journal entries is the **number**, not the id, and `updateSession`
+  does not touch `codex_journal`. So: create session #4, leave it unrevealed, play — entries are stamped
+  4 and correctly show players nothing. Then correct the record's number to 5. No record now claims 4,
+  the gate's third rule ("no record → unchanged") applies, and **every one of those revealed entries
+  starts showing "Session 4" to players again**. The by-session lens simultaneously loses the group, and
+  the new #5 has no entries under it.
+  The **delete** case behaves the same way but is deliberate and documented in three places ("the number
+  on an entry is a label, not a foreign key"); the **renumber** case is documented nowhere and tested
+  nowhere. Options for the owner: (1) propagate a renumber to the entries carrying the old number;
+  (2) refuse to renumber a session that has entries; (3) accept and warn in the editor, as delete does.
+
 - **[codex] The Graph's sub-floor node count is data-dependent, not 3.** `known-bugs` has recorded "the
   Graph's 3 remain by design" since Stage Six. Measured against a populated database (10 pages) the audit
   reports **30** — the nodes are 36–40px and there is one entry per node element, so the figure scales
