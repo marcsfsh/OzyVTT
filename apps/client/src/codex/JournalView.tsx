@@ -400,7 +400,11 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
               const isDeadline = record.kind === "deadline";
               const fired = deadlineFired(record);
               const downtime = record.kind === "downtime" ? record.payload : null;
-              const proposed = downtime && !downtime.applied ? downtimeProposedDate(calendar, downtime.days) : null;
+              // The SERVER's proposed date, not a second local computation: Confirm says this date out
+              // loud and then the server decides where the clock actually lands, so only one of the two
+              // can be authoritative. `downtimeProposedDate` stays for the composer's preview, where no
+              // record exists yet for the server to answer about.
+              const proposed = downtime && !downtime.applied ? record.proposedDate : null;
               return (
               <article key={`${record.kind}-${record.id}`} id={`codex-entry-${record.id}`} aria-current={record.id === focusedEntryId ? "true" : undefined}
                 className={`codex-entry${record.kind === "combat" ? " is-combat" : ""}${isEvent ? " is-event" : ""}${isDeadline ? " is-deadline" : ""}${downtime ? " is-downtime" : ""}${record.id === focusedEntryId ? " is-focused" : ""}`}>

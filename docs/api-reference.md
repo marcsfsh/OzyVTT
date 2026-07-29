@@ -2700,6 +2700,53 @@ Adds a journal/timeline entry.
 
 **Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
 
+### `POST /api/v1/codex/journal/deadline`
+
+CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the campaign clock can reach. Its own text is the "what" and its own `inWorldDate` is the "when", so a deadline stores no extra payload at all; `fired` is DERIVED from that date against the clock on every read and never stored, which is why rewinding the clock correctly un-fires one. `inWorldDate` is REQUIRED and may not be null - an undated deadline can never fire, so it is a note, not a deadline. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`: there is no kind-specific reveal and no kind-based visibility rule anywhere.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | no |  |
+| `playerText` | string | no | The deadline itself, in the party's words - a deadline IS its text, which is why it stores no separate 'what'. |
+| `gmText` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `attachMarkerId` | string \| null | no |  |
+| `attachPageId` | string \| null | no |  |
+| `sessionNumber` | integer \| null | no |  |
+| `realDate` | string \| null | no |  |
+| `inWorldLabel` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate | yes | WHEN it happens - the date the campaign clock has to reach for this to fire. Required, and never null. |
+
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
+
+### `POST /api/v1/codex/journal/downtime`
+
+CT-10: records DOWNTIME - who spent how many days doing what between adventures. Creating it NEVER moves the campaign clock; it answers with `proposedDate`, the date the clock WOULD move to, so the GM's confirm affordance can state what it will do before it does it. `POST /codex/journal/{id}/apply-downtime` is the only thing that moves the clock. Dated at the GM's current campaign date when no `inWorldDate` is given, the same rule an auto-logged battle follows, so the record lands where it happened.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | no |  |
+| `playerText` | string | no |  |
+| `gmText` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `attachMarkerId` | string \| null | no |  |
+| `attachPageId` | string \| null | no |  |
+| `sessionNumber` | integer \| null | no |  |
+| `realDate` | string \| null | no |  |
+| `inWorldLabel` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no |  |
+| `downtime` | CodexDowntimeInput | yes |  |
+
+**Responses:** `201` Success - envelope of `CodexDowntimeCreatedData` · errors `400` `401`
+
 ### `PATCH /api/v1/codex/journal/{id}`
 
 Edits a journal entry.
@@ -2737,7 +2784,7 @@ Deletes a journal entry; idempotent.
 
 ### `POST /api/v1/codex/journal/{id}/reveal`
 
-Shows/hides a journal entry to players.
+Shows/hides a journal entry to players. Works on EVERY journal kind, deadlines and downtime included - there is deliberately no kind-specific reveal route, because a second gate is a second thing to keep in step with the first.
 
 **Auth:** GM session
 
@@ -2750,6 +2797,16 @@ Shows/hides a journal entry to players.
 | `revealed` | boolean | yes |  |
 
 **Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/journal/{id}/apply-downtime`
+
+Confirms a downtime record's time cost and ADVANCES the campaign clock by its `days`. The GM's explicit yes - the owner asked to be asked rather than have the clock move itself. Entry and calendar move together in one transaction and are returned together, so a client cannot render a moved clock beside an unapplied record. Applying an already-applied downtime, or any entry that is not downtime, is refused and moves nothing. Advancing the clock does NOT publish it: players keep seeing the published date until `POST /codex/calendar/publish`.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDowntimeAppliedData` · errors `400` `401` `404` `409`
 
 ### `GET /api/v1/codex/sessions`
 
@@ -2935,7 +2992,7 @@ Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev`
 
 ### `GET /api/v1/codex/calendar`
 
-The world's calendar (months, weekdays, era, current date).
+The world's calendar (months, weekdays, era, current date), ROLE-PROJECTED. The campaign has two clocks: the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. A GM receives their own clock as `currentDate` plus `publishedDate` so they can tell whether the table is behind them; a player receives `currentDate` sourced ONLY from the published date, and never `publishedDate` (for a player the two are the same value) and never the GM's clock by any path. Months, weekdays and era are the world's own and are player-facing on both.
 
 **Auth:** GM session · Player session (own-character limits apply)
 
@@ -2943,7 +3000,7 @@ The world's calendar (months, weekdays, era, current date).
 
 ### `PUT /api/v1/codex/calendar`
 
-Replaces the world calendar.
+Replaces the world calendar and reflows every dated record's sort instant and label from the raw dates. Moves the GM's clock only: advancing NEVER publishes, so the party's `currentDate` does not move until `POST /codex/calendar/publish`. `publishedDate` is deliberately not settable here - this body replaces the whole calendar, and a player-facing value inside a wholesale replacement is one careless PUT from being cleared.
 
 **Auth:** GM session
 
@@ -2957,6 +3014,14 @@ Replaces the world calendar.
 | `currentDate` | CodexInWorldDate \| null | no |  |
 
 **Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401`
+
+### `POST /api/v1/codex/calendar/publish`
+
+Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - "publish" means exactly "the table now sees where I am", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one.
+
+**Auth:** GM session
+
+**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `401`
 
 ### `GET /api/v1/codex/export`
 
@@ -3003,6 +3068,16 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | --- | --- | --- | --- |
 | `name` | string | yes |  |
 | `days` | integer (1–400) | yes |  |
+
+### `CodexDowntimeInput`
+
+The downtime facts themselves. `applied` is deliberately not an input: confirming the clock move is a separate, explicit act (O-3), and accepting it here would let one POST both record the week off and move the campaign clock.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `who` | string | yes | Who spent the time. May be empty: downtime is often party-wide with nobody in particular to name. |
+| `activity` | string | yes | What they did. May be empty, for the same reason as `who` - the record's prose carries it when the fields do not. |
+| `days` | integer (0–3650) | yes | The time cost in in-world days. Ten years is already well past the point where a GM would set a date instead of counting days. |
 
 ### `CodexInWorldDate`
 

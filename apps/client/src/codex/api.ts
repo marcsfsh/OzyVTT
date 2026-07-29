@@ -446,6 +446,17 @@ export type CodexChronicleRecord = Readonly<{
    * rather than directly, so "has this fired" has exactly one answer on this client.
    */
   fired: boolean;
+  /**
+   * M11 / O-3: where applying this downtime would put the campaign clock — **the server's answer**, not
+   * ours. GM rows only; `null` on every other kind and on a downtime already applied.
+   *
+   * The client can compute this (`downtimeProposedDate`), and for the composer's live preview it must,
+   * because the record does not exist yet. But once a row exists the server is the authority on where
+   * its own clock lands, and the Confirm affordance promises a date out loud. Two implementations of one
+   * answer is the "two ways to say one thing" shape this overhaul exists to remove — they agree today
+   * only because `downtimeProposedDate` hand-clamps a case `dateToInstant` does not.
+   */
+  proposedDate: CodexInWorldDate | null;
   createdAt: string;
   updatedAt: string;
 }>;

@@ -106,7 +106,7 @@ const S8 = SESSION({ id: "s8", sessionNumber: 8, realDate: "2026-07-26", prepBod
 const record = (id: string, sessionNumber: number | null): CodexChronicleRecord => ({
   kind: "entry", id, title: null, text: `Entry ${id}`, gmText: null, revealedToPlayers: false,
   sessionNumber, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 

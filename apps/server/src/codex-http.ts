@@ -120,10 +120,17 @@ const DeadlineCreateSchema = JournalWriteSchema.extend({ inWorldDate: InWorldDat
  * `applied` is deliberately not an input. O-3 makes confirming the clock move a separate, explicit act
  * (`POST /journal/{id}/apply-downtime`); accepting it here would let one POST both record the week off and
  * move the campaign clock, which is the exact side effect the owner asked us to stop doing.
+ *
+ * `who`/`activity` are NOT `.min(1)`, and that is a correction rather than a looseness. Downtime is often
+ * party-wide ("the party rests a week") with nobody in particular to name, the store accepts a blank half
+ * on the `questObjectives` precedent, and the composer's submit arms on prose OR who OR activity - so a
+ * `.min(1)` here made a state the UI offers fail with a raw "String must contain at least 1 character(s)".
+ * Caught by driving the real route with the body the composer builds; the two suites mock each other and
+ * neither could see it. `downtimeSummaryLabel` already drops a blank half without stray punctuation.
  */
 const DowntimeInputSchema = z.object({
-  who: z.string().trim().min(1).max(120),
-  activity: z.string().trim().min(1).max(120),
+  who: z.string().trim().max(120),
+  activity: z.string().trim().max(120),
   days: z.number().int().min(0).max(3650)
 }).strict();
 const DowntimeCreateSchema = JournalWriteSchema.extend({ downtime: DowntimeInputSchema });

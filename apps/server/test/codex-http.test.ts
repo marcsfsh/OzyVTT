@@ -1283,6 +1283,30 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
       expect((await body(response)).error.code).toBe("validation_failed");
     }
   });
+
+  /**
+   * Every downtime body the COMPOSER can actually produce is accepted.
+   *
+   * The composer arms its submit on prose OR who OR activity (`JournalView`'s `canSubmit`), so all three
+   * rows below are one click away in the UI. A `.min(1)` on `who`/`activity` made the first two fail with
+   * a raw "String must contain at least 1 character(s)" - and neither suite could see it, because the
+   * client tests mock the server and the server tests write their own bodies. Found by driving the real
+   * route with the body the composer builds; this test is that probe, kept.
+   *
+   * Party-wide downtime with nobody in particular to name is the normal case, not a degenerate one.
+   */
+  it("accepts every downtime body the composer can produce, including a blank who or activity", async () => {
+    const { base } = await fixture();
+    for (const payload of [
+      { playerText: "The party rests a week.", downtime: { who: "", activity: "", days: 7 } },   // prose only
+      { playerText: "", downtime: { who: "Brannor", activity: "Forging", days: 8 } },            // fields only
+      { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "", days: 3 } }       // one half blank
+    ]) {
+      const response = await post(base, "/api/v1/codex/journal/downtime", GM, payload);
+      expect(response.status, JSON.stringify(payload)).toBe(201);
+      expect((await body(response)).data.entry.kind).toBe("downtime");
+    }
+  });
 });
 
 describe("Codex routes vs the published contract", () => {

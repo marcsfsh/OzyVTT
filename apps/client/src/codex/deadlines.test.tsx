@@ -88,7 +88,7 @@ const CALENDAR: GmCodexCalendar = {
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
@@ -99,6 +99,10 @@ const DEADLINE = RECORD({
 const DOWNTIME = RECORD({
   kind: "downtime", id: "w1", text: "A quiet tenday in Daggerford.",
   payload: { who: "Aldric", activity: "Forging a blade", days: 7, applied: false },
+  // The server's answer for where the clock lands. Hammer 3 + 7 = Hammer 10 — the same date local
+  // arithmetic would reach, so the ordinary tests below read naturally; the test that proves WHICH of
+  // the two the row is showing deliberately makes them disagree.
+  proposedDate: { year: 1492, month: 0, day: 10 },
   inWorldLabel: "Hammer 3, 1492 DR", calendarInstant: 1492 * 60 + 2, inWorldDate: { year: 1492, month: 0, day: 3 }
 });
 
@@ -189,6 +193,33 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
 
     await user.click(row.getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(applyDowntime).toHaveBeenCalledWith("gm", "w1"));
+  });
+
+  /**
+   * The Confirm sentence names the SERVER's date, not a second local computation of it.
+   *
+   * The client can do this arithmetic and for the composer's live preview it must — no record exists yet
+   * to ask about. But once a row exists the server decides where its own clock lands, and Confirm promises
+   * that date out loud. Two implementations of one answer is the shape this overhaul exists to remove.
+   *
+   * Proved by making them DISAGREE: local arithmetic on Hammer 3 + 7 days reaches Hammer 10, so a row
+   * whose server-supplied date is Alturiak 12 can only render that if it is reading the server's value.
+   */
+  it("names the SERVER's proposed date, not a locally recomputed one", async () => {
+    await renderJournal([RECORD({ ...DOWNTIME, id: "w3", proposedDate: { year: 1492, month: 1, day: 12 } })]);
+    const row = within(rowOf("w3"));
+
+    expect(row.getByText("Advance the campaign clock to Alturiak 12, 1492 DR")).toBeInTheDocument();
+    expect(row.queryByText(/Hammer 10/)).not.toBeInTheDocument();
+  });
+
+  /** A row the server gave no proposed date offers no promise — and therefore no Confirm to break it. */
+  it("promises nothing when the server proposed no date", async () => {
+    await renderJournal([RECORD({ ...DOWNTIME, id: "w4", proposedDate: null })]);
+    const row = within(rowOf("w4"));
+
+    expect(row.queryByText(/Advance the campaign clock/)).not.toBeInTheDocument();
+    expect(row.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
   });
 
   it("offers no second confirmation once the clock has already been advanced", async () => {

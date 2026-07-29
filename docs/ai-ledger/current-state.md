@@ -601,8 +601,62 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex Phase 4 M11 — deadlines and downtime (2026-07-29).** Delivers **CT-5** and **CT-10**. Excludes
+  manual segment clocks (D-9). M12 remains.
+  - **The spec's premise was wrong and the milestone is bigger than it reads.** §2.2 says "one additive
+    `payload_json` column". `codex_journal.kind` has carried `CHECK (kind IN ('note','combat'))` since v1
+    and SQLite cannot widen a CHECK in place — verified by probe, not by reading: inserting a `deadline`
+    row failed with `CHECK constraint failed`, and `ALTER TABLE … MODIFY` is a syntax error. **Migration
+    v15 is a full table rebuild** (create → `INSERT … SELECT` with explicit columns → drop → rename →
+    recreate all three indexes), the only rebuild in the file. The CHECK is *widened*, not dropped, for
+    the reason v13 and v14 both state: a TypeScript gate protects the process, not the file.
+    **Widened to all six kinds** (`milestone`/`standing` included) so M12 needs no second rebuild.
+  - **Verified against a real upgrade, not a unit test.** A v14 database was built with the pre-M11 code
+    from git, filled with the awkward cases (dated + tagged, marker-pinned, page-pinned, GM-text-only,
+    auto-logged combat), then opened with the new code: every row byte-identical, all three indexes back,
+    published date backfilled, timeline query plan unchanged, and the old file confirmed to reject a
+    `deadline` row.
+  - **The prep clock (owner decision O-1).** `calendar_json.currentDate` is now the **GM's** clock;
+    `codex_meta.published_{year,month,day}` is what players see, backfilled from `currentDate` so nothing
+    visibly changes until the GM first advances it. `GET /codex/calendar` was **unprojected to any
+    authenticated role** and is now role-projected — the gate `known-bugs.md` said did not exist. The
+    player's field keeps the name `currentDate`; only its source changes, so no player-side client change
+    was needed. Closes the open product question recorded there.
+  - **A deadline stores no payload** (D11-C). Its target date *is* its date on the chronicle, and `fired`
+    is **derived, never stored** — a stored flag would be a second derived cache for reflow to maintain.
+    Deviates from the spec's literal `{what,targetDate,fired}`; recorded in `decision-log.md`.
+  - **`fired` needed two clocks, and the Director's contract got this wrong.** It mandated `fired` on the
+    player row *and* forbade the GM clock reaching a player payload — contradictory, because a player
+    watching that flag flip learns the prep clock has passed a date they have never been shown. Both
+    server agents found it independently. Resolved with `deadlineFired(entry, at)` plus separate
+    `campaignInstant()` / `publishedInstant()` accessors, so every caller must name its audience.
+  - **Downtime proposes, the GM confirms (O-3).** Creating downtime never moves the clock;
+    `POST /journal/{id}/apply-downtime` does, once, in **one leaf-level transaction** — `setCalendar`'s
+    body was extracted into a private `writeCalendar` because `this.transaction` is a bare
+    `BEGIN IMMEDIATE` and does not nest.
+  - **K3 is smaller than the spec claims.** The reflow reads only the calendar's *shape*; `currentDate` is
+    not an input to `calendarInstantOf` or `formatInWorldDate`. A date-only change therefore rewrites
+    every dated record with identical values — wasted work, not corruption. Proven by a test that seeds
+    dated records, moves the date, and asserts byte-identity.
+  - **Two integration defects the two suites could not see**, both found by driving the real routes with
+    the body the composer builds (client tests mock the server; server tests write their own bodies):
+    (1) `who`/`activity` were `.min(1)` while the composer's submit arms on prose OR who OR activity, so a
+    reachable UI state failed with a raw 400 — schema relaxed, matching the store; (2) the client
+    recomputed the proposed date locally while the server was already sending it — the row now names the
+    **server's** date, since the server decides where its own clock lands. The client helper stays for the
+    composer preview, where no record exists yet to ask about.
+  - **R9: nothing new was added to `@vtt/ui`** — every control is an existing primitive
+    (`SegmentedControl`, `Button`, `Badge`) or the existing dashboard row chassis. `packages/ui` untouched.
+  - **Verified.** `check` / `test` / `build` all exit 0; **1328 passed + 1 skipped** (1279 at M10).
+    A 32-check end-to-end run against a live server on a fresh database, including the leak case: GM clock
+    past a deadline, published clock behind it, `fired` true for the GM and false for the player, and the
+    player's calendar payload carrying no trace of the GM's date. Tap audit at **375px: 0 sub-floor and 0
+    stolen taps across all five modes**; Confirm and Publish measured **44px via route 1** (they sit in
+    vertical stacks, where the `::after` route steals neighbours' taps), the composer's kind switch 44px
+    via route 2 in a horizontal row, 0px horizontal scroll, and all four new sentences on screen.
+
 - **Codex Phase 4 M10 — quests (2026-07-29).** Delivers **CT-4**. Excludes graph representation
-  (DQ-4 default: no). M11–M12 remain.
+  (DQ-4 default: no). M12 remains.
   - **`codex_quests` (migration v14)** with a queryable `status` (indexed — the dashboard counts open
     quests), an ordered `{text, done}` objective list, linked entities, and the two-layer body every
     codex record carries. Kept as a table, not a 9th entity type: D-12 rejected that, because flat string

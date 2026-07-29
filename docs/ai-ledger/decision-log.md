@@ -7,6 +7,83 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-29 — M11: three owner decisions on deadlines and downtime
+
+Put to the owner in plain language before implementation, because each changes behaviour and the spec
+either had no default or contradicted itself.
+
+**O-1 — a private prep clock.** The GM's clock and the players' clock are now two stored values. The GM
+advances time while prepping and players keep seeing the old date until the GM publishes it. This makes a
+supported workflow out of the open question `known-bugs.md` recorded after M7: `GET /codex/calendar`
+returned `store.getCalendar()` **unprojected to any authenticated role**, so `currentDate` had always
+reached players and there was no server-side gate to run the clock ahead of them. There is one now.
+The player's field keeps the name `currentDate` and only its source changes, so the existing player
+"Now:" chip needed no change at all.
+
+**O-2 — deadlines and downtime are hidden, revealable like anything else.** The spec's verification clause
+contradicted itself here ("GM-only until explicitly revealed"). The owner chose the default: created
+hidden, published by the ordinary reveal switch, no kind-based visibility filter anywhere. Writing
+`if (kind === 'deadline') return null` in a projection is now explicitly wrong, not merely redundant.
+
+**O-3 — downtime proposes, the GM confirms.** Creating downtime never moves the campaign clock. It answers
+with the date the clock *would* move to, the GM sees that date on the row, and a separate explicit action
+applies it. The reflow-adjacent write is therefore always deliberate, never a side effect of writing a
+note about the week off.
+
+## 2026-07-29 — M11: rebuild the journal table rather than drop its CHECK
+
+`codex_journal.kind` has carried `CHECK (kind IN ('note', 'combat'))` since migration v1. SQLite cannot
+widen a CHECK in place — no `MODIFY`, no `DROP CONSTRAINT` — so adding `deadline`/`downtime` needs a full
+table rebuild: create, `INSERT … SELECT` with explicit column lists, drop, rename, recreate all three
+indexes. Verified by probe before deciding, not inferred: inserting a `deadline` row on a v14 file failed
+with `CHECK constraint failed`, and `ALTER TABLE … MODIFY` was a syntax error.
+
+**Dropping the CHECK would have been one line and it is the wrong line**, for the reason v13 and v14 each
+record: a TypeScript gate protects this *process*, not this *file*. A repair script or a manual `sqlite3`
+session could then write `kind = 'quest'`, which the parser coerces to `"note"` — a bad row reading back
+as a plausible one instead of failing loudly.
+
+**Widened to all six kinds now** (`milestone` and `standing` are M12's), because the cost of this
+migration is the rebuild and paying it twice for one word each would be silly. The DB being more
+permissive than `CodexJournalKind` is the direction that already exists and the safe one.
+
+## 2026-07-29 — M11: a deadline stores no payload, and `fired` is derived
+
+The spec's §2.2 gives `deadline` a payload of `{ what, targetDate, fired }`. All three dissolve:
+
+- `what` is the entry's own `playerText`. A deadline *is* its text.
+- `targetDate` is the entry's own in-world date. A deadline is "a thing that will happen at a time" — the
+  spec's own definition of a timeline record. A second date inside a JSON blob would sit **outside**
+  `setCalendar`'s reflow, which is precisely the corruption K3 exists to prevent.
+- **`fired` is derived on every read, never stored.** K3 makes raw dates the source of truth and instants
+  derived; a stored `fired` is a second derived cache reflow would have to maintain. Deriving satisfies
+  CT-5 exactly. The only behavioural difference is that rewinding the clock un-fires a deadline, which is
+  correct.
+
+Likewise **downtime's `outcome` is not a payload field** — it is prose, and prose already has two layers
+on this record. A third prose channel inside a JSON blob would sit outside the reveal split.
+
+## 2026-07-29 — M11: `fired` must be measured against the audience's own clock
+
+The Director's implementation contract mandated `fired` on the player chronicle row *and* forbade the GM
+clock reaching a player payload by any path. Those are contradictory once O-1 exists: a `fired` derived
+from the GM's private clock is one bit of that clock on a player surface — a player watching the flag flip
+learns the prep clock has passed a date they have never been shown.
+
+Both server agents found this independently and it was not in the contract as issued. Resolved by making
+the instant an **argument** — `deadlineFired(entry, at)` — with two accessors, `campaignInstant()` for GM
+readers and `publishedInstant()` for player readers, so no caller can be audience-agnostic by accident.
+There is exactly one `<=` comparison in the codebase and every caller must name whose clock it means.
+
+## 2026-07-29 — M11: the server owns where its own clock lands
+
+The client can compute a downtime's proposed new date, and for the composer's live preview it must —
+the record does not exist yet for the server to answer about. But once the row exists, the **server's**
+`proposedDate` is what the Confirm affordance names, because the server decides where the clock actually
+goes and the affordance promises that date out loud. Two implementations of one answer is the
+"two ways to say one thing" shape this overhaul exists to remove; they agreed only because the client
+helper hand-clamps a case its shared `dateToInstant` does not.
+
 ## 2026-07-29 — M9: four owner decisions on sessions, prep and recap
 
 Put to the owner before implementation, because each materially changes behaviour and none had a safe

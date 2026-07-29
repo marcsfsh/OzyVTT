@@ -337,6 +337,31 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   centre-to-centre; go one step further given the M5 sub-pixel lesson) plus a `/styleguide` case that
   actually wraps.
 
+- **[codex/client] The client's `dateToInstant` does not clamp the day to its month's length; the
+  server's `calendarInstantOf` does.** `normalizeCalendar` stores a `currentDate` day above the month's
+  length verbatim (it clamps only at the bottom), so the state is reachable, and the two then disagree by
+  a day. **Measured, not theorised**: with the clock on day 31 of a 30-day month, a 5-day downtime has the
+  server landing on Alturiak 5 while unclamped client arithmetic reaches Alturiak 6. M11 is not exposed —
+  `downtimeProposedDate` hand-clamps before calling it, and the Confirm row now names the server's date
+  regardless — but `dateToInstant` still drives the timeline's Today marker and its year grouping, which
+  are unclamped. The real fix is to clamp inside `dateToInstant` itself (or to clamp `currentDate`'s day
+  in `normalizeCalendar`, which is the lossy write underneath). Both change existing behaviour beyond
+  M11's scope, so both were deliberately left.
+
+- **[repo/tooling] `apps/client/test/setup.ts` is outside the client tsconfig and is never typechecked.**
+  `tsconfig.app.json` includes `src`, and every client test lives in `src/codex/` — so test files *are*
+  checked (confirmed: widening the M11 types produced 14 errors across seven existing test files). But
+  the shared setup file is not: appending `const deliberate: number = "not a number";` to it produced no
+  error from `tsc`. Anything that moves into that file is invisible to `npm run check`.
+
+- **[RESOLVED 2026-07-29 by M11 / owner decision O-1] The campaign's current in-world date reaches
+  players, and always has.** The open product question this entry raised — "if a GM is meant to be able to
+  run the campaign clock ahead of the party while prepping, `currentDate` needs a server-side gate, and no
+  such gate exists today" — was put to the owner, who chose a private prep clock. `GET /codex/calendar` is
+  now role-projected: the GM's `currentDate` is their own clock, players receive the separately stored
+  published date, and publishing is an explicit act. Backfilled from `currentDate`, so nothing visibly
+  changed for an existing campaign. Original entry kept below for its reasoning.
+
 - **[codex/viewer] The campaign's current in-world date reaches players, and always has.** M7's Campaign
   dashboard shows a "Now: …" chip to players as well as the GM. That is **not** a new exposure:
   `GET /api/v1/codex/calendar` (`codex-http.ts:522`) returns `store.getCalendar()` **unprojected to any
