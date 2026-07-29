@@ -1,8 +1,10 @@
 import { useMemo } from "react";
-import { Alert, Badge, Button, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Skeleton, type ChecklistItem } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
 import { sessionTitle } from "./sessions";
+import { openQuests, questProgress } from "./quests";
+import type { CodexQuestStatus } from "./api";
 
 /**
  * CI-7: the Codex's landing surface. Formerly `World`; renamed `Campaign` because it answers
@@ -43,10 +45,28 @@ export type CampaignMap = Readonly<{ id: string; name: string; revealedToPlayers
  * could not fill it in and the card must not read differently for the two audiences.
  */
 export type CampaignSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string }>;
+/**
+ * M10's "Open quests" card, in the shape BOTH projections can supply — a strict subset of the player
+ * projection (`projectPlayerQuest`), which is itself a strict subset of the GM row.
+ *
+ * **There is deliberately no `gmBody` field, not even an optional one**, and no `body` either. `gmBody`
+ * is why a quest is two-layer at all — "where this is really going" — and it has no player-facing form;
+ * a shared type that could carry it would put the GM's plan one careless `{...quest}` away from a
+ * component that BOTH audiences render. The type not having the field is the guarantee; a comment saying
+ * "don't pass gmBody" is not. (`CampaignSession` above makes exactly this promise about `prep`.)
+ *
+ * `status` IS here, and that is the one place this differs from `CampaignSession`, which drops a
+ * session's status because it is GM-only. A quest's status is player-facing: "what is still open" is the
+ * entire point of the card, and it is what `openQuests` filters on for both audiences alike.
+ *
+ * `objectives` is `ChecklistItem[]` — the very type the `@vtt/ui` primitive that renders them publishes,
+ * so the dashboard's shape is tied to the control rather than restating it.
+ */
+export type CampaignQuest = Readonly<{ id: string; title: string; status: CodexQuestStatus; objectives: readonly ChecklistItem[] }>;
 
 export function CampaignHome({
-  pages, entries = [], maps = [], today = null, session = null,
-  onPickType, onPickTag, onOpenPage, onOpenEntry, onOpenMap, onOpenSession, onCreate,
+  pages, entries = [], maps = [], today = null, session = null, quests = [],
+  onPickType, onPickTag, onOpenPage, onOpenEntry, onOpenMap, onOpenSession, onOpenQuest, onCreate,
   showReveal = true, loading = false, error = null
 }: Readonly<{
   pages: readonly CampaignEntity[];
@@ -62,6 +82,13 @@ export function CampaignHome({
    * at all rather than a placeholder, exactly as the dashboard's other sections do.
    */
   session?: CampaignSession | null;
+  /**
+   * M10: every quest the caller's own token was sent — GM rows mapped down, or the player's revealed
+   * ones. This component picks the OPEN ones itself (`openQuests`), unlike `session` above: which
+   * session is "next" depends on a pointer only a GM is sent, but "still open" is one predicate on a
+   * field both audiences receive, so answering it twice at two call sites could only produce drift.
+   */
+  quests?: readonly CampaignQuest[];
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
   onOpenPage: (pageId: string) => void;
@@ -74,6 +101,12 @@ export function CampaignHome({
    * open — the card is then the readout it already is for them, with nothing to tap.
    */
   onOpenSession?: (sessionId: string) => void;
+  /**
+   * R1: opens the quest log ON this quest. Omitted by the player Codex, which has no quest log to open —
+   * the card is then the readout it already is for them, with nothing to tap. Same capability flag the
+   * session card uses to tell the two callers apart, so this component still knows nothing about roles.
+   */
+  onOpenQuest?: (questId: string) => void;
   onCreate?: () => void;
   showReveal?: boolean;
   /** CF-2: true while the first fetch is in flight, so the "No entries yet" invitation cannot lie. */
@@ -94,11 +127,18 @@ export function CampaignHome({
   const recent = useMemo(() => [...pages].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 10), [pages]);
   const revealed = useMemo(() => pages.filter((page) => page.revealedToPlayers).length, [pages]);
   const recentEntries = useMemo(() => entries.slice(0, 5), [entries]);
+  /**
+   * M10: the open quests, the same predicate for both audiences (`openQuests`). Sliced to five for the
+   * same reason `recentEntries` is: this is a dashboard, and a campaign with thirty live threads must
+   * not push every other section below the fold. The quest log is where all of them are.
+   */
+  const openQuestList = useMemo(() => openQuests(quests).slice(0, 5), [quests]);
 
   // CF-2: settle the fetches before claiming emptiness — for either audience. A campaign with no pages
   // but a running journal or a charted atlas is NOT empty, which is why all three feeds gate this — and
-  // M9 adds a fourth: a campaign whose GM has prepped a session has plainly started.
-  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0 && !session;
+  // M9 adds a fourth: a campaign whose GM has prepped a session has plainly started. M10 adds a fifth,
+  // for the same reason: a campaign with a quest in it has plainly started, whatever else is missing.
+  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0 && !session && quests.length === 0;
   if (loading && nothingYet) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
   if (nothingYet) {
     return (
@@ -161,6 +201,48 @@ export function CampaignHome({
           {/* The recap, and never the prep — the shared type has no prep field to render (see
               `CampaignSession`), so this card reads identically for both audiences by construction. */}
           {session.recap.trim() && <p className="codex-campaign-sessionrecap">{session.recap}</p>}
+        </section>
+      )}
+
+      {/* M10 / CT-4: what the party is still chasing. It sits directly under the session card because
+          the two together answer "where is this campaign right now"; it renders nothing at all when
+          nothing is open, rather than a placeholder panel for a state that is genuinely empty. */}
+      {openQuestList.length > 0 && (
+        <section className="codex-campaign-section">
+          {/* One heading for both audiences, unlike the session card's — "open quests" means exactly the
+              same thing on either side of the table, because a quest's status is player-facing. */}
+          <h3 className="codex-campaign-h">Open quests</h3>
+          <nav className="codex-campaign-recent" aria-label="Open quests">
+            {openQuestList.map((quest) => {
+              const progress = questProgress(quest.objectives);
+              return (
+                <div key={quest.id} className="codex-campaign-quest">
+                  {/* R2: the same row chassis every list on this surface uses, which is also where its
+                      44px floor comes from — `.codex-campaign-recentitem` is §4 route 1 (grow the paint).
+                      A player has no quest log to open, so `onOpenQuest` is absent for them and the row
+                      is a plain readout: a button that navigates nowhere is worse than no button. */}
+                  {onOpenQuest
+                    ? <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenQuest(quest.id)}>
+                        <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />
+                        <span className="codex-list-title">{quest.title}</span>
+                        {progress.total > 0 && <span className="codex-campaign-questprogress">{progress.label}</span>}
+                      </button>
+                    : <div className="codex-campaign-questrow">
+                        <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />
+                        <span className="codex-list-title">{quest.title}</span>
+                        {progress.total > 0 && <span className="codex-campaign-questprogress">{progress.label}</span>}
+                      </div>}
+                  {/* READ-ONLY on purpose, for BOTH audiences: `onChange` is omitted, so the primitive
+                      renders no checkbox, no field, no remove and nothing focusable at all. A player
+                      must see progress and never a tickable box, and the GM's own tickable copy lives in
+                      the quest log — this dashboard is presentational and writes nothing, ever. */}
+                  {quest.objectives.length > 0 && (
+                    <Checklist items={quest.objectives} ariaLabel={`Objectives for ${quest.title}`} className="codex-campaign-questlist" />
+                  )}
+                </div>
+              );
+            })}
+          </nav>
         </section>
       )}
 

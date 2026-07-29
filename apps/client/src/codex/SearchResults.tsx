@@ -82,7 +82,12 @@ const KIND_MARKS: Readonly<Record<Exclude<CodexRecordKind, "page">, Readonly<{ i
   // year headings) - not `--codex-type-note`, which resolves to `--text-muted` and would dim the glyph.
   journal: { icon: "scroll", label: "Journal", color: "var(--cyan)" },
   map: { icon: "compass", label: "Map", color: "var(--codex-type-location)" },
-  marker: { icon: "pin", label: "Marker", color: "var(--magenta)" }
+  marker: { icon: "pin", label: "Marker", color: "var(--magenta)" },
+  // M10. `--caution` is the one accent no entity type has claimed on this list; the design tokens
+  // already say near-neighbour hues are fine here "because the entity icon + label always carry the
+  // finer distinction", and R2 means the WORD "Quest" is what actually names the kind. The glyph is the
+  // registry's `quest` (a circled `!`, the tabletop quest marker), which no other kind uses.
+  quest: { icon: "quest", label: "Quest", color: "var(--caution)" }
 };
 
 /** The kind label as it reads on the row — a page reads as its entity type ("Character"), which is what the rest of the suite calls it. */

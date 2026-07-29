@@ -79,7 +79,9 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onGoto, onClo
           ref={inputRef}
           className="codex-palette-input"
           value={query}
-          placeholder="Search pages, entries, maps and markers…"
+          /* M10: quests joined the index, so the placeholder had to follow — a box that lists the kinds
+             it searches must not go stale, or it becomes the one place the suite denies a record exists. */
+          placeholder="Search pages, entries, maps, markers and quests…"
           aria-label="Command palette"
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {

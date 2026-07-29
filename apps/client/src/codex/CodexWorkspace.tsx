@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
-import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, sessionApi, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type CodexSession } from "./api";
+import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, questApi, sessionApi, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexQuest, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type CodexSession } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView } from "./JournalView";
@@ -13,6 +13,7 @@ import { EntityIcon } from "./icons";
 import { CampaignHome, type CampaignEntry } from "./CampaignHome";
 import { SessionsView } from "./SessionsView";
 import { SessionConsole } from "./SessionConsole";
+import { QuestsView } from "./QuestsView";
 import { pickNextSession } from "./sessions";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
@@ -78,6 +79,13 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    */
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [sessionTarget, setSessionTarget] = useState<string | null>(null);
+  /**
+   * M10: the quest log is the SECOND such destination, and it is deliberately the same three lines. The
+   * two are mutually exclusive — they lay over the same content region — so each opener closes the other
+   * rather than leaving one silently stacked behind the other.
+   */
+  const [questsOpen, setQuestsOpen] = useState(false);
+  const [questTarget, setQuestTarget] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
   });
@@ -132,6 +140,25 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
     finally { setSessionsLoading(false); }
   }, [gmToken]);
   useEffect(() => { void loadSessions(); }, [loadSessions]);
+
+  /**
+   * M10: **the** quest feed, on the session feed's terms exactly. One read, one copy, two consumers —
+   * the Campaign dashboard card and the quest log — because the moment either fetched for itself they
+   * could disagree about which quests exist and which are still open.
+   *
+   * Loaded on mount rather than lazily like `loadCampaign` below, because the quest log is reachable
+   * from EVERY mode through the ops row: a feed that only arrived on the Campaign tab would leave the
+   * log empty in exactly the modes a GM reaches it from mid-game.
+   */
+  const [quests, setQuests] = useState<readonly CodexQuest[]>([]);
+  const [questsLoading, setQuestsLoading] = useState(true);
+  const [questsError, setQuestsError] = useState<string | null>(null);
+  const loadQuests = useCallback(async () => {
+    try { setQuests(await questApi.list(gmToken)); setQuestsError(null); }
+    catch (loadError) { setQuestsError(loadError instanceof Error ? loadError.message : "Could not load the quests."); }
+    finally { setQuestsLoading(false); }
+  }, [gmToken]);
+  useEffect(() => { void loadQuests(); }, [loadQuests]);
 
   /**
    * CI-7: the dashboard's own feed — the journal, the atlas and the calendar, which the notebook rail
@@ -197,6 +224,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       // silently swallowed (which is what `setAtlasTarget(null)` used to do here).
       case "marker": setAtlasTarget({ mapId: hit.mapId, markerId: hit.id }); setMode("atlas"); break;
       case "journal": setJournalTarget(hit.id); setMode("journal"); break;
+      // M10: a quest hit lands ON the quest in the log, the same latch every other jump uses. It also
+      // closes the session log, since the two destinations share one region.
+      case "quest": setSessionsOpen(false); setQuestTarget(hit.id); setQuestsOpen(true); break;
     }
   }, []);
 
@@ -213,10 +243,10 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   // The session feed rides the same ping: a session write from another device (or from the session log
   // here) has to reach the console and the journal lens, which read no other source.
   useEffect(() => {
-    const onChanged = () => { void refreshList(); void loadSessions(); };
+    const onChanged = () => { void refreshList(); void loadSessions(); void loadQuests(); };
     socket.on("codex:changed", onChanged);
     return () => { socket.off("codex:changed", onChanged); };
-  }, [refreshList, loadSessions]);
+  }, [refreshList, loadSessions, loadQuests]);
 
   // Cmd/Ctrl-K toggles the quick-switcher.
   useEffect(() => {
@@ -374,16 +404,17 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
         <div className="codex-modetabs">
           {/* Picking a mode also leaves the session log: the log is a destination laid over the modes,
               so a tab that changed the mode underneath it without surfacing would look like a dead tab. */}
-          <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => { setMode(id as typeof mode); setSessionsOpen(false); }}
+          <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => { setMode(id as typeof mode); setSessionsOpen(false); setQuestsOpen(false); }}
             tabs={[{ id: "campaign", label: "Campaign" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
         </div>
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
-          {/* M9. Both are `Button size="sm"` — a `@vtt/ui` primitive that carries the 44px floor itself
-              (§4 route 2, `.nh-btn--sm`), so there is no new control here and no new floor to argue
-              about. They live in the ops row rather than as a sixth tab because the five modes already
-              overflow a 375px strip; this row wraps, which a tab strip does not. */}
-          <Button variant="ghost" size="sm" onClick={() => { setSessionTarget(null); setSessionsOpen(true); }}>Sessions</Button>
+          {/* M9's two, and M10's third. Every one is `Button size="sm"` — a `@vtt/ui` primitive that
+              carries the 44px floor itself (§4 route 2, `.nh-btn--sm`), so there is no new control here
+              and no new floor to argue about. They live in the ops row rather than as extra tabs because
+              the five modes already overflow a 375px strip; this row wraps, which a tab strip does not. */}
+          <Button variant="ghost" size="sm" onClick={() => { setQuestsOpen(false); setSessionTarget(null); setSessionsOpen(true); }}>Sessions</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setQuestTarget(null); setQuestsOpen(true); }}>Quests</Button>
           <Button variant="ghost" size="sm" aria-expanded={consoleOpen} onClick={() => setConsoleOpen((open) => !open)}>Session console</Button>
           <Button variant="ghost" size="sm" onClick={openPlayerPreview}>Preview as player</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
@@ -399,6 +430,13 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
             loading={sessionsLoading} error={sessionsError} onChanged={loadSessions}
             openSessionId={sessionTarget} onOpenedSession={() => setSessionTarget(null)}
             onClose={() => setSessionsOpen(false)} />
+        : questsOpen
+        ? <QuestsView gmToken={gmToken} quests={quests} pages={pages}
+            loading={questsLoading} error={questsError} onChanged={loadQuests}
+            openQuestId={questTarget} onOpenedQuest={() => setQuestTarget(null)}
+            /* R1: a linked entity opens the notebook ON that page, which means leaving this destination. */
+            onOpenPage={(pageId) => { setQuestsOpen(false); setMode("pages"); setSelectedId(pageId); }}
+            onClose={() => setQuestsOpen(false)} />
         : mode === "campaign"
         ? <CampaignHome pages={pages} entries={campaignEntries} maps={campaign.maps} today={campaignToday}
             loading={loading || campaignLoading} error={campaignError}
@@ -408,6 +446,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
                projection can also produce; `prepBody` has nowhere to go, which is the point. */
             session={(() => { const next = pickNextSession(sessions, activeSessionId); return next && { id: next.id, sessionNumber: next.sessionNumber, realDate: next.realDate, recap: next.recapBody }; })()}
             onOpenSession={(sessionId) => { setSessionTarget(sessionId); setSessionsOpen(true); }}
+            /* M10: mapped down to the four keys the shared card type carries, exactly as the session is
+               above. `gmBody` has nowhere to go — the type has no field for it — which is the point:
+               this component is rendered by the player's Codex too. */
+            quests={quests.map((quest) => ({ id: quest.id, title: quest.title, status: quest.status, objectives: quest.objectives }))}
+            onOpenQuest={(questId) => { setQuestTarget(questId); setQuestsOpen(true); }}
             onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
             /* R1: both new jumps prepare their destination — the entry is marked on the timeline, the
                map is the one that opens — reusing the very latches search already lands through. */
@@ -493,7 +536,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       <SessionConsole open={consoleOpen} onClose={() => setConsoleOpen(false)} gmToken={gmToken}
         session={sessions.find((session) => session.id === activeSessionId) ?? null}
         loading={sessionsLoading} error={sessionsError}
-        onOpenSession={(sessionId) => { setConsoleOpen(false); setSessionTarget(sessionId); setSessionsOpen(true); }} />
+        /* The console is mounted in every mode AND over both destinations, so this is the one session
+           jump that has to close the quest log on its way (M10: the two destinations share one region). */
+        onOpenSession={(sessionId) => { setConsoleOpen(false); setQuestsOpen(false); setSessionTarget(sessionId); setSessionsOpen(true); }} />
       {/* Same `openHit` the rail uses: one search, one result list, one set of destinations (R8 + R1). */}
       {paletteOpen && <CommandPalette gmToken={gmToken} onOpenHit={openHit} onCreatePage={createPageTitled} onGoto={(target) => setMode(target)} onClose={() => setPaletteOpen(false)} />}
       <Modal open={!!movingPageId} onClose={() => setMovingPageId(null)} title="Move to folder" size="sm" ariaLabel="Move to folder">

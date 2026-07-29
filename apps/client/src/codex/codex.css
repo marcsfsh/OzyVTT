@@ -373,6 +373,22 @@
 .codex-campaign-sessionrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text); }
 /* The recap, clamped: the card answers "where are we", and the whole recap is the Journal's job. */
 .codex-campaign-sessionrecap { margin: 0; padding: 0 var(--space-3); color: var(--text-dim); font-size: var(--fs-sm); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+/* M10: the "Open quests" card. Each quest is a row plus its read-only objective list, so the two need a
+   wrapper of their own — the checklist cannot live inside the row, which is a <button> for the GM. */
+.codex-campaign-quest { display: flex; flex-direction: column; gap: var(--space-1); }
+/* The GM's row IS `.codex-campaign-recentitem` (its floor, its hover, its chassis — R2, one row shape on
+   this surface); this is the PLAYER's non-interactive twin, exactly as `.codex-campaign-sessionrow` is.
+   §4 states no route for it because nothing here is tappable — inventing a 44px box around a static row
+   would only steal taps from whatever sits beneath it. */
+.codex-campaign-questrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text); }
+/* Looks like `.codex-campaign-recentwhen` and is deliberately NOT that class: the media query below
+   hides the when-label at 640px ("the first thing to lose"), and on a quest row the progress is the
+   payload, not the metadata. It is ten characters — the title's ellipsis absorbs the cost at 375px. */
+.codex-campaign-questprogress { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
+/* Indented under its quest so the list reads as belonging to the row above it rather than as a sibling.
+   The `Checklist` primitive owns everything else about it, including its own 44px story — which does not
+   arise here, because a read-only checklist renders nothing focusable at all. */
+.codex-campaign-questlist { padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-5)); }
 @media (max-width: 640px) {
   /* At 375px five stats plus the date chip would wrap into a tall stack that pushes every section
      below the fold; tightening the gap keeps the readout to two rows. */
@@ -417,6 +433,64 @@
    panel is the one most likely to be open while a screen is shared, so it must look GM-only at a glance. */
 .codex-console-prep { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; padding: var(--space-3); width: 100%; }
 .codex-console-empty { display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; color: var(--text-muted); }
+
+/* ----- Quests (M10): the quest log destination ----- */
+
+/* The log reuses the notebook's two-pane chassis and the session log's exit row (`.codex-sessions-exit`,
+   `.codex-sessions-railtitle`), which is also where its narrow-viewport behaviour comes from:
+   `has-selection` already hides the rail and shows the `‹` back link at <=760px. Two destinations, one
+   chassis — a second near-identical set of rules is exactly what R2 exists to prevent. */
+
+/* §4 ROUTE 1 (grow the paint). The log rows are a vertical stack, where §4 requires route 1 outright:
+   any `::after` box taller than the row overhangs into the rows above and below and steals their taps.
+   Same chassis and same reasoning as `.codex-session-row` one milestone earlier, and there is no gap
+   budget to compute because route 2 is not on the table. */
+.codex-quest-row {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2);
+  width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--text); cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+}
+.codex-quest-row:hover { background: var(--surface-2); border-color: var(--line); }
+/* R6: selection owns the edge, hover owns the surface lift — the notebook's rule, unchanged. */
+.codex-quest-row.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-quest-rowglyph { flex: none; color: var(--caution); } /* the same hue the search row's quest kind wears */
+
+.codex-quest-editor { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Shorter than the session log's `.codex-session-body`: a quest's prose is a hook and its truth, not an
+   evening's plan. Still `resize: vertical`, so the GM has the last word. */
+.codex-quest-body { min-height: 6rem; resize: vertical; }
+.codex-quest-objectives { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-quest-objectives-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.codex-quest-subhead { margin: 0; font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+/* Not a Badge: progress is a readout, not a status, and the words carry it (R2 — never a bare "2/5"). */
+.codex-quest-progress { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); }
+
+/* The linked-entity rows. Deliberately NOT `.codex-marker-link*`, which this would otherwise have
+   reused: those are 24×24 and sit below the §4 floor (a known, pre-existing gap), and copying them here
+   would have doubled a bug instead of a pattern.
+   §4 ROUTE 1 (grow the paint) on BOTH controls, for the reason `Checklist.css` spells out for its own
+   near-identical row: these are a vertical stack gapped by --space-1 (4px), so a route-2 `::after` on a
+   24px control would overhang by 10px per side and reach straight through the gap into the neighbouring
+   row. Real paint cannot overlap, so there is no gap budget left to get wrong. */
+.codex-quest-links { display: flex; flex-direction: column; gap: var(--space-1); }
+.codex-quest-link { display: flex; align-items: center; gap: var(--space-2); }
+.codex-quest-link-open {
+  flex: 1; min-width: 0; min-height: var(--tap-min);
+  display: flex; align-items: center; gap: var(--space-2); text-align: left;
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2);
+  color: var(--text); padding: var(--space-1) var(--space-3); cursor: pointer; font-size: var(--fs-sm);
+}
+.codex-quest-link-open:hover { border-color: var(--cyan); }
+.codex-quest-link-x {
+  flex: none; width: var(--tap-min); height: var(--tap-min);
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--text-dim); cursor: pointer;
+  border-radius: var(--radius-md); font-size: var(--fs-sm); line-height: 1;
+}
+.codex-quest-link-x:hover { color: var(--magenta); background: var(--surface-2); }
 
 /* Relationship graph */
 .codex-graph { display: flex; flex-direction: column; min-height: 64vh; gap: var(--space-2); }
@@ -480,7 +554,12 @@
 /* Distinct register from the GM tab bar directly above it: a bordered sub-toolbar strip, so the two
    nav levels don't read as one long tab list. */
 .codex-modebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-1) var(--space-2); margin-bottom: var(--space-3); }
-.codex-modebar-ops { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+/* §4 GAP BUDGET, corrected when M10's "Quests" made this row seven controls wide. Every button here is
+   `Button size="sm"`, which takes §4 route 2: a --tap-min `::after` over 32px of paint, overhanging by
+   (44 − 32) / 2 = 6px per side. Neighbours must therefore be gapped by 6 + 6 = 12px, and this row was
+   gapped by --space-1 (4px) — 8px short, so each button was quietly stealing part of its left
+   neighbour's tap area. --space-3 is exactly the documented pressable-chip budget for a 32px paint. */
+.codex-modebar-ops { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 
 /* The five modes overflow the strip on a phone: measured at 375px the tabs total 392px inside a 325px
    scrollport, so "Graph" starts at x=348 with the strip ending at 350. `Tabs` already fades its own edge,

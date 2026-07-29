@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexSession } from "./api";
+import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession } from "./api";
 import { CHRONICLE_KIND_META, chronicleWhenLabel } from "./chronicle";
 import { pickNextSession } from "./sessions";
 import { CodexIcon } from "./icons";
@@ -64,10 +64,17 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
    * four keys, no prep, no status, no attendees — so there is nothing here to filter and nothing to hide.
    */
   const [sessions, setSessions] = useState<PlayerCodexSession[]>([]);
+  /**
+   * M10 / CT-4: the quests the GM has revealed. The server's player projection — no `gmBody`, no `rev`,
+   * and each quest's `entityIds` already filtered to pages this player may also see — so there is
+   * nothing here to filter and nothing to hide. `status` IS in it, deliberately: "what is still open" is
+   * the point of the record, and the dashboard's card filters on it for both audiences alike.
+   */
+  const [quests, setQuests] = useState<PlayerCodexQuest[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar, nextSessions] = await Promise.all([
+      const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar, nextSessions, nextQuests] = await Promise.all([
         playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.chronicle(token), playerCodexApi.listRelationships(token),
         // Uncaught, exactly like the typed-edge feed beside it: the two are the Graph's two halves, and
         // half a graph drawn silently is worse than the error Alert this surface already shows (R4).
@@ -75,9 +82,11 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
         // A missing calendar costs the dashboard one chip; it must not cost the player the whole codex.
         calendarApi.get(token).catch(() => null),
         // Same bargain for the session card: one card is worth less than the rest of the codex.
-        playerCodexApi.sessions(token).catch(() => [])
+        playerCodexApi.sessions(token).catch(() => []),
+        // ...and for the quest card, on the same terms.
+        playerCodexApi.quests(token).catch(() => [])
       ]);
-      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setLinks(nextLinks); setCalendar(nextCalendar); setSessions(nextSessions);
+      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setLinks(nextLinks); setCalendar(nextCalendar); setSessions(nextSessions); setQuests(nextQuests);
       setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
       setError(null);
     } catch { setError("Couldn't load the codex - check your connection to the table."); }
@@ -103,6 +112,12 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
       case "map": setSelectedMarkerId(null); setCurrentMapId(hit.id); setView("atlas"); break;
       case "marker": { if (hit.mapId) setCurrentMapId(hit.mapId); setSelectedMarkerId(hit.id); setView("atlas"); break; }
       case "journal": setFocusedEntryId(hit.id); setView("journal"); break;
+      /* M10: a player has no quest reader to land in — the Campaign dashboard's "Open quests" card is
+         where a quest lives for them, so that is where the jump goes. A quest the GM has already marked
+         completed is not on that card, and the honest consequence is that the jump lands them on the
+         surface quests live on rather than on the record; inventing a player-side quest reader for that
+         case is a decision M10 did not make. */
+      case "quest": setView("campaign"); break;
     }
   }, []);
   useEffect(() => {
@@ -175,6 +190,10 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
              through to the highest-numbered session they can actually see. No `onOpenSession`: there is
              no player session log to open, and a button that navigates nowhere is worse than no button. */
           session={pickNextSession(sessions)}
+          /* M10: handed straight through. `PlayerCodexQuest` is already a superset of the card's shape —
+             it carries `body` and `entityIds` too — and the card renders neither, because `CampaignQuest`
+             has no field for them. There is no `onOpenQuest`: a player has no quest log to open. */
+          quests={quests}
           /* R1: a player's jumps prepare their destination too — the entry is marked, the map is open. */
           onOpenEntry={(entryId) => { setFocusedEntryId(entryId); setView("journal"); }}
           onOpenMap={(mapId) => { setSelectedMarkerId(null); setCurrentMapId(mapId); setView("atlas"); }}

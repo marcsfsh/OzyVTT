@@ -59,8 +59,8 @@ export type CodexPageRevision = Readonly<{
 
 // ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----
 
-/** The four things the codex indexes. Mirrors the server's `CodexRecordKind` (`codex-store.ts`). */
-export type CodexRecordKind = "page" | "journal" | "map" | "marker";
+/** The five things the codex indexes. Mirrors the server's `CodexRecordKind` (`codex-store.ts`). */
+export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest";
 /**
  * One row of the single result list, discriminated by `kind`. Mirrors `CodexSearchHit` in
  * `apps/server/src/codex-projections.ts` EXACTLY, including the deliberate narrowness: it carries only
@@ -216,7 +216,14 @@ export const playerCodexApi = {
    * unrevealed ones out and always answers a player `activeSessionId: null`, which is why only `sessions`
    * is unwrapped here — a pointer that is constantly null is not state worth carrying.
    */
-  sessions: (token: string) => request<{ sessions: PlayerCodexSession[] }>(token, "/sessions").then((data) => data.sessions)
+  sessions: (token: string) => request<{ sessions: PlayerCodexSession[] }>(token, "/sessions").then((data) => data.sessions),
+  /**
+   * M10 / CT-4: the revealed quests. Same route as `questApi.list`; the server drops every unrevealed
+   * quest, strips `gmBody` and `rev`, and filters each quest's `entityIds` down to the pages this player
+   * may also see. `PlayerCodexQuest` and the rest of the quest surface live in the QUESTS section at the
+   * bottom of this file — one home for the whole record, rather than half of it up here.
+   */
+  quests: (token: string) => request<{ quests: PlayerCodexQuest[] }>(token, "/quests").then((data) => data.quests)
 };
 
 // ----- Atlas: maps + markers -----
@@ -449,4 +456,85 @@ export const sessionApi = {
    */
   activate: (token: string, id: string) => request<{ activeSessionId: string | null }>(token, `/sessions/${id}/activate`, { method: "POST" }).then((data) => data.activeSessionId),
   remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/sessions/${id}`, { method: "DELETE" })
+};
+
+// ----- Quests (M10 / CT-4: what is still open) -----
+
+export type CodexQuestStatus = "active" | "completed" | "failed";
+/**
+ * One line on a quest's checklist. Deliberately exactly `{ text, done }` — the store, the route schema
+ * and `@vtt/ui`'s `Checklist` all publish this same pair, and anything richer is unapproved scope.
+ *
+ * A blank `text` is a LEGITIMATE transient state, not a bug to filter out: the editor's flow is
+ * "add a row, then type into it", so the server's `ObjectiveSchema` deliberately omits `.min(1)`. Never
+ * strip blank rows before sending — dropping one would delete a row the GM is in the middle of writing.
+ */
+export type CodexQuestObjective = Readonly<{ text: string; done: boolean }>;
+/**
+ * One quest, GM view. Mirrors `CodexQuestRow` in `apps/server/src/codex-store.ts` exactly.
+ *
+ * Two bodies, two audiences, like a page and a session: `playerBody` is what the party was actually
+ * told, `gmBody` is where the quest is really going and never leaves the GM projection. `rev` is the
+ * same optimistic-concurrency token pages and sessions carry, so an edit sends it back as `expectedRev`.
+ *
+ * `objectives` is ORDERED and the order is content — the GM's sequence is the meaning. Nothing on this
+ * client sorts, dedupes or re-keys it; it is sent back exactly as it was rendered.
+ *
+ * `entityIds` are codex PAGE ids this quest concerns. The server filters them to the revealed subset on
+ * the way to a player, so a revealed quest never advertises the id of a still-secret page.
+ */
+export type CodexQuest = Readonly<{
+  id: string;
+  title: string;
+  status: CodexQuestStatus;
+  playerBody: string;
+  gmBody: string;
+  objectives: readonly CodexQuestObjective[];
+  entityIds: readonly string[];
+  revealedToPlayers: boolean;
+  rev: number;
+  createdAt: string;
+  updatedAt: string;
+}>;
+/**
+ * The fields BOTH writes share — narrower than `CodexQuest` at each end, exactly as `CodexSessionInput`
+ * is, because the server's two schemas are `.strict()` and differ: create takes `revealedToPlayers` but
+ * no `expectedRev`, update takes `expectedRev` but no `revealedToPlayers` (reveal is its own route, so a
+ * PATCH can never publish a quest as a side effect of an edit). Each call site below intersects the one
+ * extra key it may legitimately send.
+ */
+export type CodexQuestInput = Readonly<{
+  title?: string;
+  status?: CodexQuestStatus;
+  playerBody?: string;
+  gmBody?: string;
+  objectives?: readonly CodexQuestObjective[];
+  entityIds?: readonly string[];
+}>;
+/**
+ * A quest as a PLAYER sees it — the server's `projectPlayerQuest`, six keys. `gmBody` and `rev` are
+ * absent by design, and `playerBody` arrives renamed `body` (the layer prefix only means something where
+ * there are two layers). An unrevealed quest is not in this list at all.
+ *
+ * `status` is KEPT, and that is the one place a quest differs from a session, whose status is GM-only:
+ * "what is still open" is the whole point of the feature, so a revealed quest whose state the player
+ * cannot see would tell them nothing.
+ */
+export type PlayerCodexQuest = Readonly<{
+  id: string;
+  title: string;
+  status: CodexQuestStatus;
+  body: string;
+  objectives: readonly CodexQuestObjective[];
+  entityIds: readonly string[];
+}>;
+
+export const questApi = {
+  list: (token: string) => request<{ quests: CodexQuest[] }>(token, "/quests").then((data) => data.quests),
+  get: (token: string, id: string) => request<{ quest: CodexQuest }>(token, `/quests/${id}`).then((data) => data.quest),
+  create: (token: string, input: CodexQuestInput & { title: string; revealedToPlayers?: boolean }) => request<{ quest: CodexQuest }>(token, "/quests", { method: "POST", body: JSON.stringify(input) }).then((data) => data.quest),
+  update: (token: string, id: string, input: CodexQuestInput & { expectedRev?: number }) => request<{ quest: CodexQuest }>(token, `/quests/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.quest),
+  /** The SHARED reveal body (`{ revealed }`) pages, maps, markers, journal entries and sessions all use. */
+  reveal: (token: string, id: string, revealed: boolean) => request<{ quest: CodexQuest }>(token, `/quests/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.quest),
+  remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/quests/${id}`, { method: "DELETE" })
 };
