@@ -337,6 +337,25 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   centre-to-centre; go one step further given the M5 sub-pixel lesson) plus a `/styleguide` case that
   actually wraps.
 
+- **[codex/store] Migration v15 is not idempotent, and its failure mode is "the codex will not open".**
+  Re-running it (only reachable if its `codex_schema_migrations` row is lost) aborts on
+  `ALTER TABLE codex_meta ADD COLUMN published_year` → `duplicate column name`. **Verified**: deleting the
+  v15 row from a healthy database and re-initializing throws, and the file is left fully intact — no data
+  loss, no stray `codex_journal_new`, all indexes present. Every migration in the file behaves this way
+  (none use `IF NOT EXISTS`), so this is consistent rather than new; v15 is simply the first whose failure
+  is total rather than partial. The version INSERT is inside the same transaction as the migration, so a
+  crash can never record a migration that did not run. Left as-is because making one migration idempotent
+  and not the rest would be the worse inconsistency.
+
+- **[codex/chronicle] A calendar reshape can flip a revealed deadline's state from "Passed" back to
+  "Approaching".** `fired` derives from `calendar_instant`, which is recomputed from the raw date on every
+  calendar write; `normalizeCalendar` clamps a date's month into the new month count. **Verified**: a
+  deadline dated month 1, day 25 has instant 89574; shrinking the calendar to a single month clamps it to
+  44784, and a deadline the party had seen pass reads as approaching again. The raw date is preserved
+  correctly and the reflow is doing exactly what K3 specifies — the flip is inherent to deriving `fired`
+  rather than storing it (D11-C), which remains the right trade. Recorded because nothing else says so,
+  and because a GM who reshapes their calendar mid-campaign will see it.
+
 - **[codex/client] The client's `dateToInstant` does not clamp the day to its month's length; the
   server's `calendarInstantOf` does.** `normalizeCalendar` stores a `currentDate` day above the month's
   length verbatim (it clamps only at the bottom), so the state is reachable, and the two then disagree by

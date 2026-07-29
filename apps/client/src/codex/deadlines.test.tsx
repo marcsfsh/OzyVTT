@@ -12,6 +12,7 @@ const createEntry = vi.fn();
 const createDeadline = vi.fn();
 const createDowntime = vi.fn();
 const applyDowntime = vi.fn();
+const updateEntry = vi.fn();
 const setCalendar = vi.fn();
 const playerListPages = vi.fn();
 const playerListMaps = vi.fn();
@@ -38,7 +39,8 @@ vi.mock("./api", async (importOriginal) => {
       create: (...a: unknown[]) => createEntry(...a),
       createDeadline: (...a: unknown[]) => createDeadline(...a),
       createDowntime: (...a: unknown[]) => createDowntime(...a),
-      applyDowntime: (...a: unknown[]) => applyDowntime(...a)
+      applyDowntime: (...a: unknown[]) => applyDowntime(...a),
+      update: (...a: unknown[]) => updateEntry(...a)
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
@@ -220,6 +222,34 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
 
     expect(row.queryByText(/Advance the campaign clock/)).not.toBeInTheDocument();
     expect(row.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * A deadline's date cannot be edited away — the composer will not arm, and it says why.
+   *
+   * The create path guarded this from the start; the EDIT path did not, and it is the door a GM uses more
+   * often. Clearing the Year field on an existing deadline produced a row reading "Deadline · Approaching"
+   * forever that could never fire, on the GM journal, the dashboard card and every player's timeline.
+   * The store refuses it too; this is the affordance, so the GM never meets that refusal.
+   */
+  it("will not let an edit take a deadline's date away", async () => {
+    await renderJournal([DEADLINE, RECORD()]);   // a deadline and an ordinary entry, so the contrast is real
+    const user = userEvent.setup();
+    await user.click(within(rowOf(DEADLINE.id)).getByRole("button", { name: "Edit" }));
+
+    const save = screen.getByRole("button", { name: "Save entry" });
+    expect(save).not.toBeDisabled();                                  // as loaded, the date is there
+
+    await user.clear(screen.getByLabelText("Year"));
+    expect(save).toBeDisabled();
+    expect(screen.getByText(/A deadline needs a date/)).toBeInTheDocument();
+    expect(updateEntry).not.toHaveBeenCalled();
+
+    // Editing an ORDINARY entry is unaffected — only a deadline's date is load-bearing.
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(within(rowOf("j1")).getByRole("button", { name: "Edit" }));
+    await user.clear(screen.getByLabelText("Year"));
+    expect(screen.getByRole("button", { name: "Save entry" })).not.toBeDisabled();
   });
 
   it("offers no second confirmation once the clock has already been advanced", async () => {

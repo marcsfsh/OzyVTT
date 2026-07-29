@@ -2352,8 +2352,10 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(store.proposedDateFor(note)).toBeNull();
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
 
-    // D11-H: none of this published anything. The players' clock is exactly where the migration left it.
-    expect(store.getPublishedDate()).toBeNull();
+    // D11-H: none of this published anything. The party's clock is still the FIRST date this codex was
+    // given (which publishes itself — see the O-1 test below); every move after that one is private, and
+    // this test's setCalendar and applyDowntime are all moves after it.
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
   });
 
   /**
@@ -2470,10 +2472,73 @@ describe("CodexStore deadlines + downtime (M11)", () => {
    * The rewind is the assertion that can only pass if it is genuinely derived: nothing un-sets a stored
    * flag, so a cached `fired` survives the clock going backwards and the deadline stays fired forever.
    */
+  /**
+   * A deadline may not have its date EDITED away (D11-C / CT-5).
+   *
+   * `createDeadline` has always enforced "a deadline IS its date"; `updateEntry` did not, and it is the
+   * door a GM uses more often. Clearing the date left `kind = 'deadline'` on a row with no instant to
+   * compare — so it read "Deadline · Approaching" on the GM journal, the dashboard card and every
+   * player's timeline, and could never fire however far the clock ran. Found by adversarial review,
+   * reproduced through the real HTTP route before this was written.
+   */
+  it("refuses to edit a deadline's date away, and leaves the record untouched when it refuses (D11-C)", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
+    const deadline = store.createDeadline({ playerText: "The ultimatum expires.", inWorldDate: { year: 1492, month: 2, day: 14 } });
+
+    expect(() => store.updateEntry(deadline.id, { inWorldDate: null })).toThrow(/needs an in-world date/);
+
+    // The refusal is total: the date it already had is still there, so a rejected edit cannot half-apply.
+    const after = store.getEntry(deadline.id)!;
+    expect(after.inWorldDate).toEqual({ year: 1492, month: 2, day: 14 });
+    expect(after.calendarInstant).toBe(deadline.calendarInstant);
+    expect(after.kind).toBe("deadline");
+    // ...and it still fires when the clock reaches it, which is the property the bug destroyed.
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 14 } });
+    expect(deadlineFired(store.getEntry(deadline.id)!, store.campaignInstant())).toBe(true);
+
+    // Moving a deadline's date is still ordinary editing — only REMOVING it is refused.
+    const moved = store.updateEntry(deadline.id, { inWorldDate: { year: 1492, month: 3, day: 1 } });
+    expect(moved.inWorldDate).toEqual({ year: 1492, month: 3, day: 1 });
+    // And every other kind may still be undated, which is how a note works.
+    const note = store.createEntry({ playerText: "a note", inWorldDate: { year: 1492, month: 0, day: 5 } });
+    expect(store.updateEntry(note.id, { inWorldDate: null }).inWorldDate).toBeNull();
+  });
+
+  /**
+   * The FIRST campaign date a codex is ever given reaches players without a separate publish (O-1).
+   *
+   * v15 backfills the published date for an EXISTING campaign, so upgrading changes nothing. A campaign
+   * created after M11 has nothing to backfill, and without this the GM sets "the world's now" and every
+   * player's date stays blank — a silent regression against what every pre-M11 campaign did, with the
+   * only explanation on a different screen. Publishing here leaks nothing: the prep clock exists to run
+   * AHEAD of the party, and there is no ahead of a date they have never been given.
+   */
+  it("publishes the first campaign date automatically, and keeps every later move private (O-1)", () => {
+    expect(store.getPublishedDate()).toBeNull();
+
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });   // the party has a date
+
+    // From here the prep clock is private again — this is the whole of O-1 and the automatic publish
+    // must not have weakened it.
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 5, day: 2 } });
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 5, day: 2 });
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
+
+    // Applying downtime is a clock move like any other, so it must not publish either.
+    const downtime = store.createDowntime({ playerText: "A week off.", downtime: { who: "Vex", activity: "Resting", days: 7 } });
+    store.applyDowntime(downtime.id);
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
+
+    store.publishCampaignDate();
+    expect(store.getPublishedDate()).toEqual(store.getCalendar().currentDate);
+  });
+
   it("a deadline's fired state is derived from the clock, in both directions (D11-C)", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
     const deadline = store.createDeadline({ playerText: "The ultimatum expires.", inWorldDate: { year: 1492, month: 2, day: 14 } });
-    const fired = () => store.deadlineStatus(store.getEntry(deadline.id)!).fired;
+    // Reads exactly as a GM-facing caller does: `deadlineFired` against the GM's own clock.
+    const fired = () => deadlineFired(store.getEntry(deadline.id)!, store.campaignInstant());
 
     expect(fired()).toBe(false);                                                        // the day has not come
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 13 } });
@@ -2493,15 +2558,19 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
     // Only a deadline fires, and an undated record never can.
     const note = store.createEntry({ playerText: "a note", inWorldDate: { year: 1000, month: 0, day: 1 } });
-    expect(store.deadlineStatus(note).fired).toBe(false);
+    expect(deadlineFired(note, store.campaignInstant())).toBe(false);
     expect(deadlineFired({ kind: "deadline", calendarInstant: null }, 999_999)).toBe(false);
     expect(deadlineFired({ kind: "deadline", calendarInstant: 0 }, null)).toBe(false);   // no clock, nothing to pass
 
     // D11-G / prohibition 3: the two clocks answer this question separately. With the GM's clock past the
-    // deadline and NOTHING published, the player-facing derivation must still read "not fired" — otherwise
-    // one boolean tells the party the GM has run their private prep clock ahead.
+    // deadline and the published clock BEHIND it, the player-facing derivation must still read "not fired"
+    // — otherwise one boolean tells the party the GM has run their private prep clock ahead.
+    //
+    // The published clock is behind rather than absent because the first date a codex is given publishes
+    // itself (there is no "ahead of the party" before the party has any date at all); it is every LATER
+    // move that is private, and that is the one under test here.
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1493, month: 0, day: 1 } });
-    expect(store.getPublishedDate()).toBeNull();
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 1 });
     expect(deadlineFired(store.getEntry(deadline.id)!, store.campaignInstant())).toBe(true);
     expect(deadlineFired(store.getEntry(deadline.id)!, store.publishedInstant())).toBe(false);
     // ...and publishing is what lets the party in on it.

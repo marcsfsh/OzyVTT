@@ -2113,6 +2113,21 @@ export class CodexStore {
       const update = database.prepare(`UPDATE ${table} SET calendar_instant = ?, in_world_label = ? WHERE id = ?`);
       for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
     }
+    /**
+     * The FIRST campaign date a codex is ever given publishes itself.
+     *
+     * v15 backfills `published_*` from `currentDate`, so an EXISTING campaign sees no change on upgrade
+     * (K7). A campaign created after M11 has no such row to backfill, and without this the GM would set
+     * "Current date - the world's now" in the calendar editor and every player's date would stay blank,
+     * with the only explanation living on a different screen. That is a silent regression against the
+     * behaviour every pre-M11 campaign had, and nobody approved removing it.
+     *
+     * Publishing here cannot leak anything: the prep clock exists to run AHEAD of the party, and there is
+     * no "ahead" of a date they have never been given. Only the transition from "no published date" to
+     * "a published date" is automatic - once players have a date, every later move of the GM's clock is
+     * private until published, which is the whole of O-1.
+     */
+    if (calendar.currentDate && this.getPublishedDate() === null) this.writePublishedDate(calendar.currentDate);
     this.bumpRevision();
   }
 
@@ -2147,13 +2162,23 @@ export class CodexStore {
    */
   publishCampaignDate(): CodexCalendar {
     const calendar = this.getCalendar();
-    const date = calendar.currentDate ?? null;
     this.transaction(() => {
-      this.requireDatabase().prepare("UPDATE codex_meta SET published_year = ?, published_month = ?, published_day = ? WHERE id = 1")
-        .run(date ? date.year : null, date ? date.month : null, date ? date.day : null);
+      this.writePublishedDate(calendar.currentDate ?? null);
       this.bumpRevision();
     });
     return calendar;
+  }
+
+  /**
+   * The one write of the published date. Leaf-level: assumes it is already inside a transaction, the same
+   * contract `writeCalendar` follows and for the same reason - `writeCalendar` calls it (first-publish) and
+   * `publishCampaignDate` calls it, and `this.transaction` does not nest (F-2).
+   *
+   * A null clears it: a GM who removes the campaign date entirely and publishes has published "no date".
+   */
+  private writePublishedDate(date: CodexInWorldDate | null): void {
+    this.requireDatabase().prepare("UPDATE codex_meta SET published_year = ?, published_month = ?, published_day = ? WHERE id = 1")
+      .run(date ? date.year : null, date ? date.month : null, date ? date.day : null);
   }
 
   /**
@@ -2352,24 +2377,28 @@ export class CodexStore {
     return { entry: this.getEntry(entryId)!, calendar: this.getCalendar() };
   }
 
-  /**
-   * A deadline's derived state for a GM-facing reader. Delegates to `deadlineFired` rather than restating
-   * the comparison - there is exactly one `<=` in this codebase and it lives there.
-   *
-   * GM-facing on purpose: it compares against the GM's clock. A PLAYER-facing reader must call
-   * `deadlineFired(entry, publishedInstant())` instead, or a player learns from a flipped boolean that the
-   * GM has run their private prep clock past a date they have not published.
-   */
-  deadlineStatus(entry: CodexJournalRow): Readonly<{ fired: boolean }> {
-    return { fired: deadlineFired(entry, this.campaignInstant()) };
-  }
-
   updateEntry(entryId: string, input: CodexJournalUpdateInput): CodexJournalRow {
     const database = this.requireDatabase();
     const existing = this.journalRowRaw(entryId);
     if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
     // A structured date (or a changed free-text label) recomputes the sort instant + display label together.
     const dated = (input.inWorldDate !== undefined || input.inWorldLabel !== undefined) ? this.resolveDate(input.inWorldDate ?? null, input.inWorldLabel) : null;
+    /**
+     * A deadline may not have its date taken away (D11-C / CT-5).
+     *
+     * `createDeadline` enforces "a deadline IS its date" and this route did not, so an EDIT could clear
+     * the date while leaving `kind = 'deadline'` - producing a row that reads "Deadline - Approaching"
+     * on the GM journal, the dashboard card AND every player's timeline, and can never fire, because
+     * `deadlineFired` needs an instant to compare. The one invariant the kind exists for, unenforced at
+     * the one door that is used more often than create.
+     *
+     * Rejected rather than ignored: silently keeping the old date would answer a PATCH with something
+     * other than what it asked for, and the GM would not learn that the field they just cleared is not
+     * optional. The composer disables Save and says so, so this is the second line, not the first.
+     */
+    if (existing.kind === "deadline" && dated && dated.instant === null) {
+      throw new Error("A deadline needs an in-world date - that is what makes it a deadline. Change its date, or delete it and write a note instead.");
+    }
     const next = {
       player_text: input.playerText === undefined ? existing.player_text : entryText(input.playerText),
       gm_text: input.gmText === undefined ? existing.gm_text : entryGmText(input.gmText),

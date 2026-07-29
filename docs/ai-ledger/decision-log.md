@@ -7,6 +7,44 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-29 — M11 (operating): implementation contracts must not forbid regenerating the docs
+
+The M11 agent contract forbade running `npm run docs:generate` and `npm run map`, reserving both for the
+Director. That is unimplementable: `apps/server/test/app-map.test.ts` and
+`packages/api-contract/test/reference.test.ts` each require their committed doc to equal the generator's
+output byte-for-byte, and **every milestone in this programme adds routes**. The agents therefore had to
+hand back a red suite and say why. They did, and the Director regenerated — but the contract's own rule
+was "STOP and report the contradiction", and it went unreported until the adversarial review found it.
+
+**For M12: either let the agent regenerate both docs, or state in the contract that two named tests are
+expected red on handoff.** The first is simpler and is what the rule should have said.
+
+## 2026-07-29 — M11: the first campaign date a codex is ever given publishes itself
+
+O-1 makes the GM's clock private, and migration v15 backfills the published date so an existing campaign
+sees no change. A campaign created *after* M11 has nothing to backfill — so the GM would set "Current
+date — the world's now" and every player's date would stay blank, with the only explanation living on a
+different screen. That is a silent regression against what every pre-M11 campaign did, and nobody approved
+removing it.
+
+So the transition from "no published date" to "a published date" happens automatically; every later move
+of the GM's clock stays private until published. This cannot leak: the prep clock exists to run **ahead**
+of the party, and there is no ahead of a date they have never been given. Found by adversarial review,
+reproduced through the real HTTP routes, and fixed with the leak direction ("publish every move") proven
+by mutation to fail five tests.
+
+## 2026-07-29 — M11: a deadline's date cannot be edited away
+
+`createDeadline` enforced "a deadline IS its date" from the start; `updateEntry` did not — and it is the
+door a GM uses more often. Clearing the date left `kind = 'deadline'` on a row with no instant to compare,
+so it read "Deadline · Approaching" forever on the GM journal, the dashboard card and every player's
+timeline, and could never fire however far the clock ran. Two clicks from the Journal, with no test
+covering it.
+
+Now refused at the store (loudly, rather than silently keeping the old date — a PATCH must not answer with
+something other than what it asked for) and disarmed in the composer, which says why. Moving a deadline's
+date is still ordinary editing; only removing it is refused, and every other kind may still be undated.
+
 ## 2026-07-29 — M11: three owner decisions on deadlines and downtime
 
 Put to the owner in plain language before implementation, because each changes behaviour and the spec

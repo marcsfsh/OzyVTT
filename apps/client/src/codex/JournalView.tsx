@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "./api";
+import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "./api";
 import { CHRONICLE_KIND_META, CHRONICLE_LENSES, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, sameInWorldDate, type ChronicleLens } from "./chronicle";
 import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -90,6 +90,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
     } catch { return EMPTY; }
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingKind, setEditingKind] = useState<CodexChronicleKind | null>(null);
   // An in-progress NEW entry, set aside while the composer is borrowed to edit an existing one. Without
   // this, clicking Edit overwrote the draft AND (via the effect below) deleted its sessionStorage backup.
   const [stashedDraft, setStashedDraft] = useState<Draft | null>(null);
@@ -184,13 +185,17 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       } else await journalApi.create(gmToken, input);
       // Finishing an edit hands the composer back to whatever new entry was in progress; finishing a NEW
       // record keeps the composer on the kind it was on, since a GM setting deadlines usually sets several.
-      setDraft(editingId ? (stashedDraft ?? EMPTY) : { ...EMPTY, kind: draft.kind }); setStashedDraft(null); setEditingId(null); await load();
+      setDraft(editingId ? (stashedDraft ?? EMPTY) : { ...EMPTY, kind: draft.kind }); setStashedDraft(null); setEditingId(null); setEditingKind(null); await load();
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : "Could not save the entry."); }
   };
   const edit = (record: CodexChronicleRecord) => {
     // Set aside an unsaved NEW entry before the composer is reused, so Edit can never destroy it.
     if (!editingId && (draft.playerText.trim() || draft.gmText.trim() || draft.who.trim() || draft.activity.trim())) setStashedDraft(draft);
     setEditingId(record.id);
+    // What KIND is being edited. The composer's own `kind` is a new-record choice and is parked below, so
+    // without this the edit path could not tell a deadline from a note — and a deadline's date is the one
+    // field an edit must not be allowed to clear (D11-C).
+    setEditingKind(record.kind);
     const date = record.inWorldDate; // the raw date the GM typed - correct even if the calendar has since changed
     setDraft({
       // The composer's kind is a NEW-record choice; on the edit path it is never read (see `submit`), so
@@ -219,7 +224,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
     try { await calendarApi.publish(gmToken); await load(); }
     catch (publishError) { setError(publishError instanceof Error ? publishError.message : "Could not publish the date."); }
   };
-  const cancelEdit = () => { setEditingId(null); setDraft(stashedDraft ?? EMPTY); setStashedDraft(null); };
+  const cancelEdit = () => { setEditingId(null); setEditingKind(null); setDraft(stashedDraft ?? EMPTY); setStashedDraft(null); };
   /**
    * Reveal from the row, whichever kind it is. Both branches call the record type's OWN reveal route —
    * an event row's switch flips the page's reveal flag, which is the same flag the page editor shows,
@@ -264,11 +269,21 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
    * without it); downtime can stand on its who/activity alone, because the payload IS the record for a
    * downtime that nobody has written prose about yet.
    */
-  const canSubmit = editingId || draft.kind === "entry"
+  /**
+   * A deadline needs its date on the EDIT path too, not only on create.
+   *
+   * The store rejects an edit that clears it, but a disabled button is a better way to learn that a field
+   * is not optional than a save that fails. The create path guarded this from the start; the edit path did
+   * not, and clearing the Year field on an existing deadline produced a row that says "Deadline -
+   * Approaching" forever and can never fire.
+   */
+  const needsDate = editingId ? editingKind === "deadline" : draft.kind === "deadline";
+  const canSubmit = (editingId || draft.kind === "entry"
     ? hasText
     : draft.kind === "deadline"
     ? hasText && draft.dateYear.trim() !== ""
-    : hasText || draft.who.trim() !== "" || draft.activity.trim() !== "";
+    : hasText || draft.who.trim() !== "" || draft.activity.trim() !== "")
+    && (!needsDate || draft.dateYear.trim() !== "");
 
   return (
     <div className="codex-journal">
@@ -313,7 +328,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
         </div>
         {/* A deadline's date is not optional metadata, it is half the record — so say so where the button
             will not arm, rather than letting the GM discover it as a save failure. */}
-        {!editingId && draft.kind === "deadline" && !draft.dateYear.trim() && (
+        {needsDate && !draft.dateYear.trim() && (
           <p className="codex-composer-hint">A deadline needs a date — that is what makes it fire when the campaign passes it.</p>
         )}
         {/* CT-10's payload. Its own row, sharing the meta row's column rules so the composer keeps one

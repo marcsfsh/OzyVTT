@@ -3017,11 +3017,11 @@ Replaces the world calendar and reflows every dated record's sort instant and la
 
 ### `POST /api/v1/codex/calendar/publish`
 
-Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - "publish" means exactly "the table now sees where I am", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one.
+Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - "publish" means exactly "the table now sees where I am", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one. The 400 is not reachable through any input today - the handler routes every failure through the shared codex error mapper, and documenting only the statuses currently reachable would make the document wrong the moment that changes.
 
 **Auth:** GM session
 
-**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401`
 
 ### `GET /api/v1/codex/export`
 

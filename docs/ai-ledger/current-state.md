@@ -647,10 +647,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     composer preview, where no record exists yet to ask about.
   - **R9: nothing new was added to `@vtt/ui`** — every control is an existing primitive
     (`SegmentedControl`, `Button`, `Badge`) or the existing dashboard row chassis. `packages/ui` untouched.
-  - **Verified.** `check` / `test` / `build` all exit 0; **1328 passed + 1 skipped** (1279 at M10).
+  - **Adversarial review found one HIGH defect and one silent regression**, both reproduced through the
+    real routes before fixing. (1) `PATCH /codex/journal/{id}` had no kind awareness, so **editing a
+    deadline could clear its date** — leaving `kind = 'deadline'` on a row with no instant, reading
+    "Deadline · Approaching" forever on the GM journal, the dashboard card and every player's timeline,
+    and unable to fire however far the clock ran. Two clicks from the Journal, past a create-path guard
+    that had always existed. Now refused at the store and disarmed in the composer, which says why.
+    (2) A campaign created *after* M11 has no published date to backfill, so the GM would set the world's
+    "now" and every player's date would stay blank. **The first date a codex is ever given now publishes
+    itself**; every later move stays private, which is the whole of O-1 and is mutation-proven in both
+    directions.
+  - **Verified.** `check` / `test` / `build` all exit 0; **1331 passed + 1 skipped** (1279 at M10).
     A 32-check end-to-end run against a live server on a fresh database, including the leak case: GM clock
     past a deadline, published clock behind it, `fired` true for the GM and false for the player, and the
-    player's calendar payload carrying no trace of the GM's date. Tap audit at **375px: 0 sub-floor and 0
+    player's calendar payload carrying no trace of the GM's date — re-run green after remediation. Tap audit at **375px: 0 sub-floor and 0
     stolen taps across all five modes**; Confirm and Publish measured **44px via route 1** (they sit in
     vertical stacks, where the `::after` route steals neighbours' taps), the composer's kind switch 44px
     via route 2 in a horizontal row, 0px horizontal scroll, and all four new sentences on screen.

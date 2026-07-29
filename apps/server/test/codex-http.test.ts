@@ -1250,8 +1250,11 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     expect(applied.status).toBe(200);
     expect((await body(applied)).data.calendar.currentDate).toEqual({ year: 1492, month: 0, day: 18 });
     expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 18 });
-    // Applying moved the GM's clock and NOT the party's - only publish does that (D11-H).
-    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+    // Applying moved the GM's clock and NOT the party's - only publish does that (D11-H). The party is on
+    // the FIRST date this codex was given, which publishes itself; every move after that one is private,
+    // and applying downtime is such a move. Asserting the party is on day 10 rather than merely "not day
+    // 18" is the stronger claim: it proves the two clocks diverged, not just that one of them is empty.
+    expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 0, day: 10 });
 
     const again = await post(base, `/api/v1/codex/journal/${created.entry.id}/apply-downtime`, GM, {});
     expect([400, 409]).toContain(again.status);
