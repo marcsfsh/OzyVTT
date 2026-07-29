@@ -2847,6 +2847,92 @@ Marks this session the ACTIVE one - the single session new journal entries (incl
 
 **Responses:** `200` Success - envelope of `CodexSessionActiveData` · errors `400` `401` `404`
 
+### `GET /api/v1/codex/quests`
+
+Every quest - what the party is chasing, and whether it is still open. Role-scoped: a GM receives the whole record for every quest; a player receives only REVEALED quests, reduced to the player layer (`id`, `title`, `status`, `body`, `objectives`, `entityIds`). `status` IS player-facing here, unlike a session's: "what is still open" is the point of the feature, and a revealed quest whose state the player cannot see is useless. `entityIds` is filtered to the revealed subset, exactly as a marker's `pageIds` is.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexQuestListData` · errors `401`
+
+### `POST /api/v1/codex/quests`
+
+Creates a quest. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `title` | string | yes |  |
+| `status` | `active` \| `completed` \| `failed` | no |  |
+| `playerBody` | string | no |  |
+| `gmBody` | string | no |  |
+| `objectives` | CodexQuestObjective[] | no |  |
+| `entityIds` | string (uuid)[] | no |  |
+| `revealedToPlayers` | boolean | no |  |
+
+**Responses:** `201` Success - envelope of `CodexQuestData` · errors `400` `401`
+
+### `GET /api/v1/codex/quests/{id}`
+
+One quest, projected for the caller. An unrevealed quest is **404** to a player - the same 404 an absent quest gets, and never 403, because a 403 would confirm the record exists and its very existence ("there is a quest about the duke") is GM information.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `401` `404`
+
+### `PATCH /api/v1/codex/quests/{id}`
+
+Edits a quest; an omitted field is left alone. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `title` | string | no |  |
+| `status` | `active` \| `completed` \| `failed` | no |  |
+| `playerBody` | string | no |  |
+| `gmBody` | string | no |  |
+| `objectives` | CodexQuestObjective[] | no |  |
+| `entityIds` | string (uuid)[] | no |  |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the quest moved on. |
+
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `404` `409`
+
+### `DELETE /api/v1/codex/quests/{id}`
+
+Deletes a quest; idempotent. The pages named by `entityIds` are untouched - the link is a reference, not ownership.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/quests/{id}/reveal`
+
+Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot make an untouched quest look freshly changed.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `404`
+
 ### `GET /api/v1/codex/calendar`
 
 The world's calendar (months, weekdays, era, current date).
@@ -2925,6 +3011,15 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | `year` | integer | yes |  |
 | `month` | integer (0–23) | yes |  |
 | `day` | integer (1–400) | yes |  |
+
+### `CodexQuestObjective`
+
+One tickable step of a quest. Deliberately exactly two keys - a shape richer than `{ text, done }` (assignees, due dates, sub-objectives) is unapproved scope. The text is PLAYER-FACING: it lives beside `playerBody`, never beside `gmBody`, so a GM-only detail belongs in the quest's GM body and never in an objective.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `text` | string | yes | What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after "Add item" — and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state, not a malformed one. The server accepts it; this says so rather than publishing a rule it does not enforce. |
+| `done` | boolean | yes |  |
 
 ### `HomebrewActionOnHit`
 

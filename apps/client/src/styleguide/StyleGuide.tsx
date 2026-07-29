@@ -6,6 +6,8 @@ import {
   Avatar,
   Badge,
   Button,
+  Checklist,
+  type ChecklistItem,
   ChoiceCard,
   ChoiceGrid,
   Chip,
@@ -173,6 +175,36 @@ function SaveStateDemo() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** The editable and the read-only checklist SIDE BY SIDE, because the split is the
+    component: the same items render as the GM's editor and as the player's status, and
+    the player's copy has to be visibly (and, in a screen reader, audibly) not-a-control. */
+function ChecklistDemo() {
+  const [objectives, setObjectives] = useState<readonly ChecklistItem[]>([
+    { text: "Find the missing ledger in the counting house", done: true },
+    { text: "Learn who paid the harbourmaster", done: true },
+    { text: "Confront Vessily before the tide turns", done: false }
+  ]);
+
+  return (
+    <div className="sg-stack">
+      <h3 className="sg-h3">Editable — the GM console (onChange present)</h3>
+      {/* Distinct names on purpose: two lists on one page called "Quest objectives" are
+          two identical stops in a screen reader's landmark/list rota. */}
+      <Checklist
+        ariaLabel="Quest objectives (editable)"
+        items={objectives}
+        onChange={setObjectives}
+        onAdd={() => setObjectives((prev) => [...prev, { text: "", done: false }])}
+        addLabel="Add an objective"
+        max={5}
+      />
+
+      <h3 className="sg-h3">Read-only — the player's view (onChange omitted)</h3>
+      <Checklist ariaLabel="Quest objectives (read-only)" items={objectives} />
     </div>
   );
 }
@@ -1034,6 +1066,10 @@ export function StyleGuide() {
 
           <Section id="roweditor" title="Row editor" blurb="Repeating rows behind every 'rows' field — monster actions, starting-equipment options, ability bonuses, damage parts. rowKey IS A STABLE ID, NEVER THE INDEX: keying by index means removing row 2 of 5 hands row 3's DOM to row 2, so the focused input, the open disclosure and any uncommitted keystrokes silently belong to a different record. The caller mints that id with newId() when it mints the row, which is also why onAdd returns the row rather than the primitive inventing data. ONE ⋯ MENU PER ROW, NOT FOUR ICON BUTTONS: move up, move down and remove would each need a 44px hit area in a dense list; collapsed into one menu they cost one target, they match .nh-card-tools, and there is no gap budget to get wrong. The drag grip on the left is a pointer-only enhancement on top — every reorder it offers is also in the menu, so nothing is mouse-only, and it sets touch-action: none so dragging on a phone does not scroll the page out from under the row. Reorders and removals announce politely, with row-scoped names throughout: five bare 'Remove's in a list tell a screen reader nothing. Collapse is UI-local and derived, never stored — a newly added row opens because you just asked for it. At the cap the Add button disables with its reason at full strength beside it.">
             <RowEditorDemo />
+          </Section>
+
+          <Section id="checklist" title="Checklist" blurb="An ordered list of short tickable lines — a quest's objectives, and any other 'what is still open' list. Items are exactly {text, done}; anything richer is a different component. READ-ONLY WHEN onChange IS ABSENT, and that split is the whole point: the same array serves the GM console and the player's view of a revealed record, and the player must see PROGRESS without ever seeing a tickable box — no checkbox, no field, no remove, no Add, nothing focusable. It is deliberately not a DISABLED editor: a disabled checkbox still announces itself as a control you are being refused, which is a different and worse statement than 'this is a status'. Done reads three ways at once and never by hue alone — the glyph, the strike, and an sr-only word — and the tick is cyan rather than the encounter panel's magenta because a completed objective is a STATE (a Step's done ring, the selection edge), not an action. IT IS NOT BUILT ON RowEditor, for one fatal reason and three supporting ones: rowKey must be a stable id and an item has no identity it is allowed to grow, so there is nothing to hand it; RowEditor has no read-only mode (onChange and onAdd are required and the ⋯ menu always renders); its shape is a whole collapsible form per row, which would spend three touch targets on a two-key record; and its onAdd returns the row for the primitive to append, where here the caller owns what a blank item means. Reach for RowEditor the moment a row grows a second field. Order is content: nothing sorts, dedupes or reorders, and there is no reorder affordance. Every control takes the 44px floor as REAL PAINT (route 1) — a route-2 ::after on a 20px checkbox overhangs 12px per side into an 8px row gap and would steal the neighbouring row's tap.">
+            <ChecklistDemo />
           </Section>
 
           <Section id="review" title="Review summary" blurb="The final 'here's your character' step: every choice grouped by the step that made it, each group with its own way back. It extends .nh-statlist rather than inventing a second key/value grid, and anything still missing is called out in words beside its Edit link.">

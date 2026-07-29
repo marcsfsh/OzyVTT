@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -220,6 +220,59 @@ export function projectPlayerSession(row: CodexSessionRow): PlayerCodexSession |
   return { id: row.id, sessionNumber: row.sessionNumber, realDate: row.realDate, recap: row.recapBody };
 }
 
+// ----- Quests (M10: playerBody is what the party was told, gmBody is where it is really going) -----
+
+export type GmCodexQuest = CodexQuestRow;
+/**
+ * A quest as a PLAYER sees it. Each omission and each inclusion is a decision:
+ *
+ *   `gmBody`     - dropped. It is why the record is two-layer at all, exactly as `gmBody` on a page and
+ *                  `prepBody` on a session are, and it has no player-facing form.
+ *   `rev`        - dropped. The editor's conflict token, absent from every other player projection here.
+ *   `status`     - KEPT, and this is the one place a quest differs from a session (whose `status` is
+ *                  GM-only). "What is still open" is the entire point of CT-4: a revealed quest whose
+ *                  state the player cannot see would tell them nothing they did not already know, and
+ *                  active-vs-completed is a fact about the party's own adventure, not GM scheduling.
+ *   `objectives` - KEPT. An objective's text lives beside `playerBody`, not `gmBody` (§2 of the M10
+ *                  contract), so it ships with the quest. Order is preserved exactly as stored.
+ *   `entityIds`  - KEPT but FILTERED, see below.
+ *
+ * `playerBody` is renamed `body` on the way out, matching `playerBody`->`body` on a page and
+ * `recapBody`->`recap` on a session: the layer prefix only means something when there are two layers.
+ */
+export type PlayerCodexQuest = Readonly<{
+  id: string;
+  title: string;
+  status: CodexQuestStatus;
+  body: string;
+  objectives: readonly CodexQuestObjective[];
+  entityIds: readonly string[];
+}>;
+
+export function projectGmQuest(row: CodexQuestRow): GmCodexQuest { return row; }
+
+/**
+ * null when unrevealed; otherwise the player layer. `gmBody` and `rev` never enter it.
+ *
+ * `entityIds` survives only for the entities that are THEMSELVES revealed - the identical rule
+ * `projectPlayerMarker` applies to a pin's `pageIds`, and it is copied rather than re-derived, including
+ * the shape: the CALLER resolves which targets are revealed and passes the set in, because a projection
+ * that reached back into the store would be a second place that decides what a player may see.
+ *
+ * Without the filter a revealed quest would advertise the ids of still-secret pages - "this quest
+ * concerns something you cannot see" is the same leak a dangling graph edge is (`projectPlayerLinkEdges`).
+ */
+export function projectPlayerQuest(row: CodexQuestRow, context: Readonly<{ revealedEntityIds: ReadonlySet<string> }>): PlayerCodexQuest | null {
+  if (!row.revealedToPlayers) return null;
+  // Explicit allow-list, never a spread-and-delete: a field added to `CodexQuestRow` must be added HERE
+  // to reach a player, so the default for anything new is secret.
+  return {
+    id: row.id, title: row.title, status: row.status, body: row.playerBody,
+    objectives: row.objectives,
+    entityIds: row.entityIds.filter((entityId) => context.revealedEntityIds.has(entityId))
+  };
+}
+
 /**
  * A bounded one-line rendering of a record's prose, for any list ROW (a search hit, a chronicle row).
  * One length for the suite: a row that summarises a record the reader can open should look the same
@@ -371,7 +424,10 @@ export type CodexSearchRecord =
   | Readonly<{ kind: "page"; page: CodexPageRow }>
   | Readonly<{ kind: "journal"; entry: CodexJournalRow }>
   | Readonly<{ kind: "map"; map: CodexMapRow }>
-  | Readonly<{ kind: "marker"; marker: CodexMarkerRow; mapRevealed: boolean }>;
+  | Readonly<{ kind: "marker"; marker: CodexMarkerRow; mapRevealed: boolean }>
+  // A quest needs NO extra context: its own `revealedToPlayers` is the whole predicate (see
+  // `PLAYER_VISIBLE_SQL`), and a hit carries no entity linkage that would need resolving.
+  | Readonly<{ kind: "quest"; quest: CodexQuestRow }>;
 
 /**
  * One row in the single result list. Uniform on purpose - `kind` tells the client where to navigate,
@@ -390,6 +446,12 @@ export type CodexSearchRecord =
  *              is revealed, so this can never name a secret map; null for the other kinds.
  * Nothing else is added without re-running this check. No bodies, no reveal flags, no parent links,
  * no scene/actor ids, no `rev`.
+ *
+ * A QUEST (M10) fits without widening the shape: `title` is the quest's title, and `tags` is `[]` because
+ * quests carry no tags at all (not in the spec's column list). The empty array rather than a `null` or a
+ * missing key is the point of "every key present on every kind" - a row renderer must not branch on which
+ * kind it got. Its `status` and `objectives` are deliberately NOT here: they are read on the record, and a
+ * result row exists to navigate, not to summarise.
  */
 export type CodexSearchHit = Readonly<{
   kind: CodexRecordKind;
@@ -409,6 +471,7 @@ export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
     case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
     case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
     case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
+    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: [], entityType: null, mapId: null };
   }
 }
 
@@ -420,8 +483,14 @@ export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
  *   map     -> `projectPlayerMap`: revealed only.
  *   marker  -> `projectPlayerMarker` PLUS the map gate `GET /codex/maps/:id/markers` applies before
  *              projecting anything (CD-6): a revealed pin on a secret map is invisible to players.
+ *   quest   -> `projectPlayerQuest`: revealed only. Its `entityIds` are not carried by a hit at all, so
+ *              the entity filter that projection also applies has nothing to do here.
  * The store's SQL applies the same predicate so hidden records don't crowd the result cap; this is
  * the layer that makes it a safety property rather than an optimization.
+ *
+ * Both layers matter and neither is redundant: the M6 lesson recorded in `codex-store.test.ts` is that
+ * weakening the SQL predicate left every test passing because THIS function quietly caught it - which is
+ * also true in reverse. Each is tested at its own layer for exactly that reason.
  */
 export function projectPlayerSearchHit(record: CodexSearchRecord): CodexSearchHit | null {
   switch (record.kind) {
@@ -434,6 +503,10 @@ export function projectPlayerSearchHit(record: CodexSearchRecord): CodexSearchHi
     case "marker":
       return record.marker.revealedToPlayers && record.mapRevealed
         ? { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId }
+        : null;
+    case "quest":
+      return record.quest.revealedToPlayers
+        ? { kind: "quest", id: record.quest.id, title: record.quest.title, tags: [], entityType: null, mapId: null }
         : null;
   }
 }

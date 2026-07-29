@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -127,6 +127,41 @@ const SessionUpdateSchema = z.object({
   status: SessionStatusSchema.optional(),
   expectedRev: z.number().int().nonnegative().optional()
 }).strict();
+/**
+ * M10 quests. The body bound is `z.string().max(100_000)`, the page/session bound verbatim, because a
+ * quest body IS a two-layer prose body and `body()` in the store enforces exactly that number - two
+ * copies of one bound is how one surface silently accepts a value the other rejects.
+ *
+ * `ObjectiveSchema` mirrors `questObjectives` in the store: 24 items and 120 characters, the numbers
+ * `CodexQuestObjective` publishes. `text` is NOT `.min(1)`, deliberately - the checklist's real flow is
+ * "add a row, then type into it" and the editor autosaves the whole draft, so a minimum would 400 the
+ * first save after "Add item". The published schema agreed to this rather than the reverse, and says so
+ * in its own description, so the contract is not advertising a rule nobody enforces. See
+ * `questObjectives` for the full reasoning; the store is the enforcer, this is the early rejection.
+ */
+const QuestStatusSchema = z.enum(["active", "completed", "failed"]);
+const ObjectiveSchema = z.object({ text: z.string().max(120), done: z.boolean() }).strict();
+const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
+const QuestEntityIdsSchema = z.array(z.string().uuid()).max(24);
+const QuestCreateSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  status: QuestStatusSchema.optional(),
+  playerBody: z.string().max(100_000).optional(),
+  gmBody: z.string().max(100_000).optional(),
+  objectives: ObjectivesSchema.optional(),
+  entityIds: QuestEntityIdsSchema.optional(),
+  revealedToPlayers: z.boolean().optional()
+}).strict();
+/** No `revealedToPlayers`: reveal is its own route, so a PATCH cannot publish a quest as a side effect of an edit. */
+const QuestUpdateSchema = z.object({
+  title: z.string().trim().min(1).max(160).optional(),
+  status: QuestStatusSchema.optional(),
+  playerBody: z.string().max(100_000).optional(),
+  gmBody: z.string().max(100_000).optional(),
+  objectives: ObjectivesSchema.optional(),
+  entityIds: QuestEntityIdsSchema.optional(),
+  expectedRev: z.number().int().nonnegative().optional()
+}).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
   months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
@@ -141,7 +176,7 @@ type CodexRouterOptions = Readonly<{
   authorizeGm: (token: string | undefined) => boolean;
   authorizePlayer: (token: string | undefined) => boolean;
   /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
-  notifyChanged: (scope: "pages" | "maps" | "markers" | "journal" | "sessions") => void;
+  notifyChanged: (scope: "pages" | "maps" | "markers" | "journal" | "sessions" | "quests") => void;
   /**
    * Mints a short-lived PLAYER token so the GM can preview the player Codex truthfully. The preview must
    * be a real player principal - `roleOf` below checks `authorizeGm` FIRST, so reusing the GM's own token
@@ -193,7 +228,24 @@ function loadSearchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearchRe
       if (!marker) return null;
       return { kind: "marker", marker, mapRevealed: store.getMap(marker.mapId)?.revealedToPlayers ?? false };
     }
+    // No context to resolve: a quest's own reveal flag is the whole player predicate, and a hit carries
+    // no entity linkage (unlike the quest RECORD, whose `entityIds` the list route filters).
+    case "quest": { const quest = store.getQuest(ref.id); return quest ? { kind: "quest", quest } : null; }
   }
+}
+
+/**
+ * Of a record's linked PAGE ids, the subset that is itself revealed. This is the resolution both marker
+ * routes were already performing inline (`store.getPage(id)?.revealedToPlayers ?? false`, a missing page
+ * counting as NOT revealed), lifted out when M10's quest routes became the third caller: three hand-copies
+ * of one viewer-safety predicate is three chances for one of them to be weakened alone.
+ *
+ * It answers the question; it does not make the decision. `projectPlayerMarker` / `projectPlayerQuest`
+ * still own what a player may see, and each takes the resolved set as context so no projection reaches
+ * back into the store.
+ */
+function revealedPageIdsIn(store: CodexStore, pageIds: readonly string[]): ReadonlySet<string> {
+  return new Set(pageIds.filter((pageId) => store.getPage(pageId)?.revealedToPlayers ?? false));
 }
 
 export function createCodexRouter(options: CodexRouterOptions) {
@@ -447,7 +499,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!map.revealedToPlayers) return failure(response, 404, "not_found", "That map was not found.");
     const markers = rows
       .map((row) => projectPlayerMarker(row, {
-        revealedPageIds: new Set(row.pageIds.filter((pageId) => store.getPage(pageId)?.revealedToPlayers ?? false)),
+        revealedPageIds: revealedPageIdsIn(store, row.pageIds),
         subMapRevealed: row.subMapId ? (store.getMap(row.subMapId)?.revealedToPlayers ?? false) : false
       }))
       .filter((marker) => marker !== null);
@@ -481,7 +533,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
       .map((row) => projectPlayerPageMarker({
         marker: row,
         mapRevealed: store.getMap(row.mapId)?.revealedToPlayers ?? false,
-        revealedPageIds: new Set(row.pageIds.filter((linkedId) => store.getPage(linkedId)?.revealedToPlayers ?? false)),
+        revealedPageIds: revealedPageIdsIn(store, row.pageIds),
         subMapRevealed: row.subMapId ? (store.getMap(row.subMapId)?.revealedToPlayers ?? false) : false
       }))
       .filter((marker) => marker !== null);
@@ -645,6 +697,70 @@ export function createCodexRouter(options: CodexRouterOptions) {
    */
   router.post(`${CODEX_BASE}/sessions/:id/activate`, requireGm, (request, response) => {
     try { const activeSessionId = store.setActiveSession(pathParam(request, "id")); options.notifyChanged("sessions"); return envelope(response, 200, { activeSessionId }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * M10: QUESTS - what is still open. The session routes directly above are the model, verbatim: the reads
+   * branch on `roleOf` and project through `codex-projections.ts`, every write is `requireGm`, and an
+   * unrevealed quest 404s a player rather than 403ing, because a status code that distinguishes "secret"
+   * from "absent" IS the leak (the `GET /codex/pages/:id` rule).
+   *
+   * The one thing a session route does not have to do: a quest's `entityIds` ARE codex page ids, and a
+   * player's copy carries them, so the caller resolves which of those pages are themselves revealed and
+   * hands the set to the projection - `revealedPageIdsIn`, the same helper both marker routes use for a
+   * pin's `pageIds`. Resolved here rather than inside the projection so there is still exactly one place
+   * that decides what a player may see.
+   *
+   * There is deliberately NO `/codex/quests/:id/objectives`: objectives are a field of the quest, replaced
+   * wholesale by PATCH. A sub-resource would be a second write path into one record, with its own `rev`
+   * story to get wrong - and reordering, inserting and deleting would each need their own verb.
+   */
+  router.get(`${CODEX_BASE}/quests`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the quest log.");
+    const rows = store.listQuests();
+    if (role === "gm") return envelope(response, 200, { quests: rows.map(projectGmQuest) });
+    const quests = rows
+      .map((row) => projectPlayerQuest(row, { revealedEntityIds: revealedPageIdsIn(store,row.entityIds) }))
+      .filter((quest) => quest !== null);
+    return envelope(response, 200, { quests });
+  });
+
+  router.post(`${CODEX_BASE}/quests`, requireGm, (request, response) => {
+    try { const quest = store.createQuest(QuestCreateSchema.parse(request.body)); options.notifyChanged("quests"); return envelope(response, 201, { quest: projectGmQuest(quest) }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  router.get(`${CODEX_BASE}/quests/:id`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the quest log.");
+    const quest = store.getQuest(pathParam(request, "id"));
+    if (!quest) return failure(response, 404, "not_found", "That quest was not found.");
+    if (role === "gm") return envelope(response, 200, { quest: projectGmQuest(quest) });
+    const projected = projectPlayerQuest(quest, { revealedEntityIds: revealedPageIdsIn(store,quest.entityIds) });
+    // The SAME 404 an absent quest gets, deliberately - never 403.
+    if (!projected) return failure(response, 404, "not_found", "That quest was not found.");
+    return envelope(response, 200, { quest: projected });
+  });
+
+  router.patch(`${CODEX_BASE}/quests/:id`, requireGm, (request, response) => {
+    try {
+      const { expectedRev, ...fields } = QuestUpdateSchema.parse(request.body);
+      const quest = store.updateQuest(pathParam(request, "id"), fields, expectedRev);
+      options.notifyChanged("quests");
+      return envelope(response, 200, { quest: projectGmQuest(quest) });
+    } catch (error) { return codexError(response, error); }
+  });
+
+  router.delete(`${CODEX_BASE}/quests/:id`, requireGm, (request, response) => {
+    store.deleteQuest(pathParam(request, "id"));
+    options.notifyChanged("quests");
+    return envelope(response, 200, { deleted: true });
+  });
+
+  router.post(`${CODEX_BASE}/quests/:id/reveal`, requireGm, (request, response) => {
+    try { const quest = store.setQuestRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("quests"); return envelope(response, 200, { quest: projectGmQuest(quest) }); }
     catch (error) { return codexError(response, error); }
   });
 

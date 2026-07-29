@@ -885,6 +885,163 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
 });
 
 /**
+ * M10 quests at the HTTP boundary (A-8). A quest is a NEW player-reachable read with the same two-layer
+ * shape a session has, plus two things a session does not have: it joins the ONE suite-wide search index,
+ * and its `entityIds` point at pages that may themselves be secret.
+ *
+ * These are the PIPELINE tests. The layers that actually decide are exercised point-blank in
+ * `codex-store.test.ts` — "gate 1, with no second line of defence" for the index text, the SQL-visibility
+ * describe for `PLAYER_VISIBLE_SQL`, and "the projection layer, on its own" for `projectPlayerQuest` /
+ * `projectPlayerSearchHit`. An HTTP test can only ever say the pipeline as a whole behaved, never which
+ * layer made it behave, and for search this file has been burned by exactly that before.
+ */
+describe("codex quests HTTP boundary (M10, A-8)", () => {
+  const GM_BODY = "The ledger is a forgery; Strahd burned the real one.";
+  const PLAYER_BODY = "Recover the ledger from the counting house.";
+  const OBJECTIVES = [{ text: "Find the counting house", done: true }, { text: "Recover the ledger", done: false }];
+
+  it("gives a player the player layer and NEVER the gmBody, and 404s an unrevealed quest", async () => {
+    const { base } = await fixture();
+    const shown = await body(await post(base, "/api/v1/codex/quests", GM, {
+      title: "The Wyrmwood Contract", status: "active", playerBody: PLAYER_BODY, gmBody: GM_BODY, objectives: OBJECTIVES
+    }));
+    const shownId = shown.data.quest.id as string;
+    const secret = await body(await post(base, "/api/v1/codex/quests", GM, {
+      title: "The Amber Bargain", playerBody: "Nobody has been told about this.", gmBody: "Vasili is Strahd."
+    }));
+    const secretId = secret.data.quest.id as string;
+
+    // The GM sees BOTH layers of both quests FIRST — so the player assertions below are the gate working,
+    // not an empty payload or a quest with nothing to leak.
+    const gmList = await body(await get(base, "/api/v1/codex/quests", GM));
+    // Sorted, deliberately: `fixture()` freezes the clock, so two quests share a `created_at` and
+    // `listQuests` falls through to its `id` tiebreak — a random uuid. LIST ORDER is asserted in
+    // `codex-store.test.ts`, where the clock ticks; here the claim is only that both quests come back.
+    expect((gmList.data.quests as Json[]).map((row) => row.title).sort()).toEqual(["The Amber Bargain", "The Wyrmwood Contract"]);
+    expect(JSON.stringify(gmList)).toContain(GM_BODY);
+    expect(JSON.stringify(gmList)).toContain(PLAYER_BODY);
+    expect((gmList.data.quests as Json[]).find((row) => row.id === shownId)!.objectives).toEqual(OBJECTIVES);
+
+    // Unrevealed: the player list is empty and the direct read is a 404, never a 403 — a status code that
+    // distinguishes "secret" from "absent" is itself the leak.
+    expect((await body(await get(base, "/api/v1/codex/quests", PLAYER))).data.quests).toHaveLength(0);
+    expect((await get(base, `/api/v1/codex/quests/${shownId}`, PLAYER)).status).toBe(404);
+
+    await post(base, `/api/v1/codex/quests/${shownId}/reveal`, GM, { revealed: true });
+    const playerList = await body(await get(base, "/api/v1/codex/quests", PLAYER));
+    const rows = playerList.data.quests as Json[];
+    expect(rows).toHaveLength(1);                                   // the still-secret quest is absent
+    // The EXACT projected key set: this fails if any new field ever enters the player quest projection,
+    // not only if this one leaks. `status` is deliberately PRESENT — "what is still open" is the feature.
+    expect(Object.keys(rows[0]).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(rows[0].body).toBe(PLAYER_BODY);
+    expect(rows[0].status).toBe("active");
+    expect(rows[0].objectives).toEqual(OBJECTIVES);                 // order and tick state survive the wire
+
+    const payload = JSON.stringify(playerList);
+    expect(payload).not.toContain("forgery");                       // the revealed quest's own GM body
+    expect(payload).not.toContain("Vasili is Strahd");              // the unrevealed quest's GM body...
+    expect(payload).not.toContain("Nobody has been told");          // ...and even its player body
+    expect(payload).not.toContain(secretId);                        // ...and its id
+
+    // The single read is gated identically, and carries the same key set.
+    const single = await body(await get(base, `/api/v1/codex/quests/${shownId}`, PLAYER));
+    expect(Object.keys(single.data.quest).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(JSON.stringify(single)).not.toContain("forgery");
+    expect((await get(base, `/api/v1/codex/quests/${secretId}`, PLAYER)).status).toBe(404);
+    expect((await get(base, `/api/v1/codex/quests/${secretId}`, GM)).status).toBe(200);
+  });
+
+  it("hands a player only the linked entities that are themselves revealed", async () => {
+    const { base } = await fixture();
+    const shown = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", revealedToPlayers: true }));
+    const hidden = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Amber Temple" }));
+    const shownPageId = shown.data.page.id as string, hiddenPageId = hidden.data.page.id as string;
+    const quest = await body(await post(base, "/api/v1/codex/quests", GM, { title: "Escort", entityIds: [shownPageId, hiddenPageId] }));
+    await post(base, `/api/v1/codex/quests/${quest.data.quest.id}/reveal`, GM, { revealed: true });
+
+    // The GM's copy links both, so the player's filtered list is the projection at work.
+    expect((await body(await get(base, `/api/v1/codex/quests/${quest.data.quest.id}`, GM))).data.quest.entityIds).toEqual([shownPageId, hiddenPageId]);
+    const playerCopy = await body(await get(base, `/api/v1/codex/quests/${quest.data.quest.id}`, PLAYER));
+    expect(playerCopy.data.quest.entityIds).toEqual([shownPageId]);
+    // A revealed quest must not advertise the id of a page the party cannot see.
+    expect(JSON.stringify(playerCopy)).not.toContain(hiddenPageId);
+  });
+
+  it("puts quests in the ONE suite-wide search list, gated end to end", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/quests", GM, {
+      title: "The Wyrmwood Contract", playerBody: PLAYER_BODY, gmBody: GM_BODY, objectives: OBJECTIVES
+    }));
+    const questId = created.data.quest.id as string;
+    const search = async (term: string, headers: Record<string, string>) =>
+      (await body(await get(base, `/api/v1/codex/search?q=${term}`, headers))).data.hits as Json[];
+
+    // Unrevealed: the GM finds it, the player does not.
+    expect(await search("Wyrmwood", GM)).toEqual([expect.objectContaining({ kind: "quest", id: questId })]);
+    expect(await search("Wyrmwood", PLAYER)).toEqual([]);
+
+    await post(base, `/api/v1/codex/quests/${questId}/reveal`, GM, { revealed: true });
+    const hits = await search("Wyrmwood", PLAYER);
+    expect(hits).toEqual([expect.objectContaining({ kind: "quest", id: questId })]);
+    // The same uniform row shape every other kind emits, so nothing branches on key presence. Quests carry
+    // no tags at all, hence `[]` rather than a missing key.
+    expect(Object.keys(hits[0]).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(hits[0].tags).toEqual([]);
+    // ...and the GM half of a quest the player legitimately HAS is still unreachable by search.
+    expect(await search("forgery", PLAYER)).toEqual([]);
+    expect(await search("forgery", GM)).toEqual([expect.objectContaining({ kind: "quest", id: questId })]);
+  });
+
+  it("refuses player writes and unauthenticated reads with the right envelopes", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/quests", GM, { title: "Q" }));
+    const questId = created.data.quest.id as string;
+    for (const response of [
+      await post(base, "/api/v1/codex/quests", PLAYER, { title: "mine" }),
+      await patch(base, `/api/v1/codex/quests/${questId}`, PLAYER, { gmBody: "mine now" }),
+      await post(base, `/api/v1/codex/quests/${questId}/reveal`, PLAYER, { revealed: true }),
+      await fetch(`${base}/api/v1/codex/quests/${questId}`, { method: "DELETE", headers: PLAYER })
+    ]) expect(response.status).toBe(401);
+    const noauth = await get(base, "/api/v1/codex/quests", { "content-type": "application/json" });
+    expect(noauth.status).toBe(401);
+    expect((await body(noauth)).ok).toBe(false);
+    // ...and the record is exactly as the GM left it.
+    expect((await body(await get(base, `/api/v1/codex/quests/${questId}`, GM))).data.quest.rev).toBe(1);
+  });
+
+  it("maps a stale expectedRev to 409 and a bad status to 400, and deletes idempotently", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/quests", GM, { title: "Q" }));
+    const questId = created.data.quest.id as string;
+    const stale = await patch(base, `/api/v1/codex/quests/${questId}`, GM, { gmBody: "later", expectedRev: 0 });
+    expect(stale.status).toBe(409);
+    expect((await body(stale)).error.code).toBe("conflict");
+
+    const bad = await post(base, "/api/v1/codex/quests", GM, { title: "Q", status: "abandoned" });
+    expect(bad.status).toBe(400);
+    expect((await body(bad)).error.code).toBe("validation_failed");
+
+    const first = await fetch(`${base}/api/v1/codex/quests/${questId}`, { method: "DELETE", headers: GM });
+    expect(first.status).toBe(200);
+    expect((await fetch(`${base}/api/v1/codex/quests/${questId}`, { method: "DELETE", headers: GM })).status).toBe(200);
+    expect((await get(base, `/api/v1/codex/quests/${questId}`, GM)).status).toBe(404);
+  });
+
+  it("round-trips objective ORDER through the API, including a reorder", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/quests", GM, { title: "Order", objectives: OBJECTIVES }));
+    const questId = created.data.quest.id as string;
+    expect(created.data.quest.objectives).toEqual(OBJECTIVES);
+
+    const reordered = [OBJECTIVES[1], { text: "A newly inserted step", done: false }, OBJECTIVES[0]];
+    const updated = await body(await patch(base, `/api/v1/codex/quests/${questId}`, GM, { objectives: reordered, expectedRev: 1 }));
+    expect(updated.data.quest.objectives).toEqual(reordered);
+    expect((await body(await get(base, `/api/v1/codex/quests/${questId}`, GM))).data.quest.objectives).toEqual(reordered);
+  });
+});
+
+/**
  * The route/contract mount check the codex surface has never had. Homebrew has one; this file, until now,
  * imported `@vtt/api-contract` nowhere at all, so a route added to `codex-http.ts` without a matching
  * `CODEX_PATHS` entry (or the reverse) was caught by nothing. `packages/api-contract`'s own tests compare

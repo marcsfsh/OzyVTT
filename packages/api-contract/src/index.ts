@@ -87,6 +87,9 @@ export const CODEX_PATHS = {
   sessionById: `${API_NAMESPACE}/codex/sessions/{id}`,
   sessionReveal: `${API_NAMESPACE}/codex/sessions/{id}/reveal`,
   sessionActivate: `${API_NAMESPACE}/codex/sessions/{id}/activate`,
+  quests: `${API_NAMESPACE}/codex/quests`,
+  questById: `${API_NAMESPACE}/codex/quests/{id}`,
+  questReveal: `${API_NAMESPACE}/codex/quests/{id}/reveal`,
   calendar: `${API_NAMESPACE}/codex/calendar`,
   export: `${API_NAMESPACE}/codex/export`
 } as const;
@@ -839,6 +842,16 @@ const codexCoord = { type: "number", minimum: 0, maximum: 1_000_000 } as const;
 const codexSessionNumber = { type: ["integer", "null"], minimum: 0, maximum: 100_000 } as const;
 const codexSessionAttendees = { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } } as const;
 const codexSessionStatus = { type: "string", enum: ["planned", "played"] } as const;
+/**
+ * M10 quest vocabulary. `codexQuestObjectives` is the FIRST ordered mutable list in the Codex, and
+ * its bounds are the repo's existing ones rather than new numbers: 24 items (every codex list -
+ * `tags`, `attendees`, `pageIds`, `sceneIds` - caps at 24) and 120 characters of text (the repo's
+ * one-line-of-display bound, shared with a marker `label` and an `inWorldLabel`). Nothing richer than
+ * `{ text, done }`: a shape beyond that is unapproved scope (M10 escalation clause).
+ */
+const codexQuestStatus = { type: "string", enum: ["active", "completed", "failed"] } as const;
+const codexQuestObjectives = { type: "array", maxItems: 24, items: { $ref: "#/components/schemas/CodexQuestObjective" } } as const;
+const codexQuestEntityIds = { type: "array", maxItems: 24, items: codexUuid } as const;
 const codexArrayRef = (schemaRef: string) => ({ type: "array", items: { $ref: `#/components/schemas/${schemaRef}` } });
 const codexDataObject = (key: string, valueSchema: unknown) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: valueSchema } });
 /** One codex operation. `bad`/`notFound`/`conflict` decide which error responses the route can actually return. */
@@ -1257,6 +1270,16 @@ export const openApiDocument = {
     },
     [CODEX_PATHS.sessionReveal]: { post: codexOp("revealCodexSession", codexGmOnly, "CodexSessionResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Publishes/retracts a session's recap to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot light the players' recap badge for text nobody changed." }) },
     [CODEX_PATHS.sessionActivate]: { post: codexOp("activateCodexSession", codexGmOnly, "CodexSessionActiveResponse", { params: [uuidParam("id")], notFound: true, description: "Marks this session the ACTIVE one - the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, not as a flag on each session, so \"two active sessions\" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE, not an edit of the record, and it moves neither `rev` nor `updatedAt` - returning the row would imply otherwise." }) },
+    [CODEX_PATHS.quests]: {
+      get: codexOp("listCodexQuests", codexReadRoles, "CodexQuestListResponse", { bad: false, description: "Every quest - what the party is chasing, and whether it is still open. Role-scoped: a GM receives the whole record for every quest; a player receives only REVEALED quests, reduced to the player layer (`id`, `title`, `status`, `body`, `objectives`, `entityIds`). `status` IS player-facing here, unlike a session's: \"what is still open\" is the point of the feature, and a revealed quest whose state the player cannot see is useless. `entityIds` is filtered to the revealed subset, exactly as a marker's `pageIds` is." }),
+      post: codexOp("createCodexQuest", codexGmOnly, "CodexQuestResponse", { ok: "201", body: "CodexQuestCreateRequest", description: "Creates a quest. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later." })
+    },
+    [CODEX_PATHS.questById]: {
+      get: codexOp("getCodexQuest", codexReadRoles, "CodexQuestResponse", { bad: false, notFound: true, params: [uuidParam("id")], description: "One quest, projected for the caller. An unrevealed quest is **404** to a player - the same 404 an absent quest gets, and never 403, because a 403 would confirm the record exists and its very existence (\"there is a quest about the duke\") is GM information." }),
+      patch: codexOp("updateCodexQuest", codexGmOnly, "CodexQuestResponse", { body: "CodexQuestUpdateRequest", params: [uuidParam("id")], notFound: true, conflict: true, description: "Edits a quest; an omitted field is left alone. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position." }),
+      delete: codexOp("deleteCodexQuest", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a quest; idempotent. The pages named by `entityIds` are untouched - the link is a reference, not ownership." })
+    },
+    [CODEX_PATHS.questReveal]: { post: codexOp("revealCodexQuest", codexGmOnly, "CodexQuestResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot make an untouched quest look freshly changed." }) },
     [CODEX_PATHS.calendar]: {
       get: codexOp("getCodexCalendar", codexReadRoles, "CodexCalendarResponse", { bad: false, description: "The world's calendar (months, weekdays, era, current date)." }),
       put: codexOp("setCodexCalendar", codexGmOnly, "CodexCalendarResponse", { body: "CodexCalendarRequest", description: "Replaces the world calendar." })
@@ -1508,6 +1531,33 @@ export const openApiDocument = {
           updatedAt: { type: "string", format: "date-time", description: "GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal or an activate - neither is an edit." }
         }
       },
+      CodexQuestObjective: {
+        type: "object", additionalProperties: false,
+        description: "One tickable step of a quest. Deliberately exactly two keys - a shape richer than `{ text, done }` (assignees, due dates, sub-objectives) is unapproved scope. The text is PLAYER-FACING: it lives beside `playerBody`, never beside `gmBody`, so a GM-only detail belongs in the quest's GM body and never in an objective.",
+        required: ["text", "done"],
+        properties: {
+          text: { type: "string", maxLength: 120, description: "What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after \"Add item\" — and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state, not a malformed one. The server accepts it; this says so rather than publishing a rule it does not enforce." },
+          done: { type: "boolean" }
+        }
+      },
+      CodexQuest: {
+        type: "object", additionalProperties: false,
+        description: "One quest: a thread the party is pulling on, and whether it is still open. Two layers in one record, like a page's `playerBody`/`gmBody` - `playerBody` is what the table may read and `gmBody` is the GM's own half (who is really behind it, what happens if they fail). A player projection of a REVEALED quest is exactly `id`, `title`, `status`, `body` (the player body, renamed the way a page's `playerBody` becomes `body`), `objectives`, and `entityIds`; everything else here is GM-only. `status` is the one field that is player-facing here but GM-only on a session: \"what is still open\" is the whole point of the feature, and a revealed quest whose state the player cannot see is useless. Objectives are the Codex's first ORDERED mutable list - the array is stored and returned exactly as given, never sorted, deduped, or keyed by position across a write.",
+        required: ["id", "title", "status", "playerBody", "gmBody", "objectives", "entityIds", "revealedToPlayers", "rev", "createdAt", "updatedAt"],
+        properties: {
+          id: codexUuid,
+          title: { type: "string", description: "The quest's name - the line that appears on the dashboard's open-quests card." },
+          status: { ...codexQuestStatus, description: "Player-facing (unlike a session's `status`). Queryable server-side: the dashboard counts the `active` ones." },
+          playerBody: { type: "string", description: "The player-facing description (markdown). Reaches a revealed quest's player projection as `body`." },
+          gmBody: { type: "string", description: "GM-only notes (markdown). NEVER present in a player projection, revealed or not - revealing a quest publishes its player body, never its GM body. It is also kept out of the player search index, because a HIT on a GM-only phrase leaks the phrase even when the body itself is never returned." },
+          objectives: { ...codexQuestObjectives, description: "The ordered checklist. Player-facing in full - order is content, not incidental." },
+          entityIds: { ...codexQuestEntityIds, description: "Codex pages this quest involves (the NPC who gave it, the location it points at). Player-facing, but filtered to the revealed subset - the same rule a marker's `pageIds` follows, so a quest can never name a page the player cannot open." },
+          revealedToPlayers: { type: "boolean", description: "GM-only field; absent from a player projection (a player only ever receives revealed quests)." },
+          rev: { type: "integer", minimum: 0, description: "GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit." },
+          createdAt: { type: "string", format: "date-time", description: "GM-only; absent from a player projection." },
+          updatedAt: { type: "string", format: "date-time", description: "GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal - a reveal is not an edit." }
+        }
+      },
       CodexCalendarMonth: { type: "object", additionalProperties: false, required: ["name", "days"], properties: { name: { type: "string" }, days: { type: "integer", minimum: 1, maximum: 400 } } },
       CodexCalendar: { type: "object", additionalProperties: false, required: ["yearName", "months", "weekdays"], properties: { yearName: { type: "string" }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string" } }, currentDate: { ...codexInWorldDateOrNull, description: "Where the campaign 'now' sits; optional." } } },
       CodexAsset: { type: "object", additionalProperties: false, required: ["id", "width", "height", "mediaType"], properties: { id: codexUuid, width: { type: "integer", minimum: 1 }, height: { type: "integer", minimum: 1 }, mediaType: { type: "string" } } },
@@ -1526,12 +1576,14 @@ export const openApiDocument = {
       CodexJournalWriteRequest: { type: "object", additionalProperties: false, properties: { tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } }, playerText: { type: "string", maxLength: 20_000 }, gmText: { type: ["string", "null"], maxLength: 20_000 }, revealedToPlayers: { type: "boolean" }, attachMarkerId: codexNullableUuid, attachPageId: codexNullableUuid, sessionNumber: codexSessionNumber, realDate: { type: ["string", "null"], maxLength: 40 }, inWorldLabel: { type: ["string", "null"], maxLength: 120 }, inWorldDate: codexInWorldDateOrNull } },
       CodexSessionCreateRequest: { type: "object", additionalProperties: false, description: "Every field is optional: an empty body opens a blank `planned` session for the GM to prep into.", properties: { sessionNumber: { ...codexSessionNumber, description: "Must not already be in use by another session." }, realDate: { type: ["string", "null"], maxLength: 40 }, attendees: codexSessionAttendees, prepBody: { type: "string", maxLength: 100_000 }, recapBody: { type: "string", maxLength: 100_000 }, status: codexSessionStatus, revealedToPlayers: { type: "boolean" } } },
       CodexSessionUpdateRequest: { type: "object", additionalProperties: false, description: "An omitted field is left alone - the console PATCHes a whole draft on every autosave, so \"absent means clear\" would wipe the half of the record the editing surface does not carry. `revealed` is deliberately NOT here: reveal is its own route because it is not an edit (it moves neither `rev` nor `updatedAt`), exactly as on a page.", properties: { sessionNumber: { ...codexSessionNumber, description: "Must not already be in use by another session; `null` clears it." }, realDate: { type: ["string", "null"], maxLength: 40 }, attendees: codexSessionAttendees, prepBody: { type: "string", maxLength: 100_000 }, recapBody: { type: "string", maxLength: 100_000 }, status: codexSessionStatus, expectedRev: { type: "integer", minimum: 0, description: "Optimistic concurrency: reject with 409 if the session moved on." } } },
+      CodexQuestCreateRequest: { type: "object", additionalProperties: false, description: "Only `title` is required - a lead can be named the moment it appears at the table and filled in later.", required: ["title"], properties: { title: { type: "string", minLength: 1, maxLength: 160 }, status: codexQuestStatus, playerBody: { type: "string", maxLength: 100_000 }, gmBody: { type: "string", maxLength: 100_000 }, objectives: codexQuestObjectives, entityIds: codexQuestEntityIds, revealedToPlayers: { type: "boolean" } } },
+      CodexQuestUpdateRequest: { type: "object", additionalProperties: false, description: "An omitted field is left alone - the console PATCHes a whole draft on every autosave, so \"absent means clear\" would wipe the half of the record the editing surface does not carry. `objectives` and `entityIds` are REPLACED wholesale when present, and objectives are stored in exactly the order given. `revealed` is deliberately NOT here: reveal is its own route because it is not an edit (it moves neither `rev` nor `updatedAt`), exactly as on a page.", properties: { title: { type: "string", minLength: 1, maxLength: 160 }, status: codexQuestStatus, playerBody: { type: "string", maxLength: 100_000 }, gmBody: { type: "string", maxLength: 100_000 }, objectives: codexQuestObjectives, entityIds: codexQuestEntityIds, expectedRev: { type: "integer", minimum: 0, description: "Optimistic concurrency: reject with 409 if the quest moved on." } } },
       CodexCalendarRequest: { type: "object", additionalProperties: false, required: ["yearName", "months", "weekdays"], properties: { yearName: { type: "string", maxLength: 20 }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 40 } }, currentDate: codexInWorldDateOrNull } },
       CodexDeletedData: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } },
       CodexDeletedResponse: envelopeSchema("#/components/schemas/CodexDeletedData"),
       CodexPageListData: codexDataObject("pages", codexArrayRef("CodexPageSummary")),
       CodexPageListResponse: envelopeSchema("#/components/schemas/CodexPageListData"),
-      CodexSearchHit: { type: "object", additionalProperties: false, required: ["kind", "id", "title", "tags", "entityType", "mapId"], description: "One row of the single suite-wide result list. Uniform across record types - every key is present on every kind, null where it does not apply, so a consumer never branches on key presence. Deliberately narrow: enough to render a row and open the record, and nothing more. A player's hit list is gated by exactly the reveal predicate that kind's LIST endpoint applies (a marker additionally requires ITS MAP to be revealed), and a journal `title` is excerpted from the player text alone.", properties: { kind: { type: "string", enum: ["page", "journal", "map", "marker"], description: "Which record matched; decides where the client navigates." }, id: codexUuid, title: { type: "string", description: "Page title, map name, or marker label; for a journal entry, a bounded one-line excerpt of its text (empty string when the record has no name)." }, tags: { type: "array", items: { type: "string" } }, entityType: { oneOf: [codexEntityType, { type: "null" }], description: "The page's entity type; null for every other kind." }, mapId: { ...codexNullableUuid, description: "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed." } } },
+      CodexSearchHit: { type: "object", additionalProperties: false, required: ["kind", "id", "title", "tags", "entityType", "mapId"], description: "One row of the single suite-wide result list. Uniform across record types - every key is present on every kind, null where it does not apply, so a consumer never branches on key presence. Deliberately narrow: enough to render a row and open the record, and nothing more. A player's hit list is gated by exactly the reveal predicate that kind's LIST endpoint applies (a marker additionally requires ITS MAP to be revealed), and a journal `title` is excerpted from the player text alone.", properties: { kind: { type: "string", enum: ["page", "journal", "map", "marker", "quest"], description: "Which record matched; decides where the client navigates." }, id: codexUuid, title: { type: "string", description: "Page title, map name, marker label, or quest title; for a journal entry, a bounded one-line excerpt of its text (empty string when the record has no name)." }, tags: { type: "array", items: { type: "string" }, description: "Always present, so no consumer branches on key presence: empty for a kind that carries no tags at all (a quest)." }, entityType: { oneOf: [codexEntityType, { type: "null" }], description: "The page's entity type; null for every other kind." }, mapId: { ...codexNullableUuid, description: "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed." } } },
       CodexSearchData: { type: "object", additionalProperties: false, required: ["hits"], properties: { hits: { ...codexArrayRef("CodexSearchHit"), description: "The one ranked result list, all record kinds." } } },
       CodexSearchResponse: envelopeSchema("#/components/schemas/CodexSearchData"),
       CodexPageDocumentData: { type: "object", additionalProperties: false, required: ["page", "backlinks", "relationships"], properties: { page: { $ref: "#/components/schemas/CodexPage" }, backlinks: codexArrayRef("CodexBacklink"), relationships: codexArrayRef("CodexRelationship") } },
@@ -1578,6 +1630,12 @@ export const openApiDocument = {
       // about the record (no `rev`, no `updatedAt`), so echoing it back would imply it did.
       CodexSessionActiveData: codexDataObject("activeSessionId", codexNullableUuid),
       CodexSessionActiveResponse: envelopeSchema("#/components/schemas/CodexSessionActiveData"),
+      // Quests need no sibling pointer beside the array, so unlike the session list this IS a plain
+      // `codexDataObject`: "which quests are open" is answered by each row's own `status`.
+      CodexQuestListData: codexDataObject("quests", codexArrayRef("CodexQuest")),
+      CodexQuestListResponse: envelopeSchema("#/components/schemas/CodexQuestListData"),
+      CodexQuestData: codexDataObject("quest", { $ref: "#/components/schemas/CodexQuest" }),
+      CodexQuestResponse: envelopeSchema("#/components/schemas/CodexQuestData"),
       CodexCalendarData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendar" }),
       CodexCalendarResponse: envelopeSchema("#/components/schemas/CodexCalendarData"),
       CodexExportData: { type: "object", additionalProperties: false, required: ["codex", "exportedAt"], properties: { codex: { type: "object", additionalProperties: true, description: "Opaque backup bundle (round-trips via the codex import surface)." }, exportedAt: { type: "string", format: "date-time" } } },

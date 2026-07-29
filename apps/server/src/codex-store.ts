@@ -98,11 +98,23 @@ export type CodexBacklinkRow = Readonly<{
 
 /**
  * The record kinds the ONE suite-wide search index carries (CI-1 / R8). Adding a kind here is a
- * viewer-safety change: every new kind needs its own row in `PLAYER_VISIBLE_SQL` below AND its own
- * branch in `projectPlayerSearchHit`, copied from that kind's player LIST endpoint.
+ * viewer-safety change, and it takes THREE gates, not two. This comment listed only the last two
+ * until M10; the missing one is the easiest of the three to get wrong, because nothing downstream
+ * can compensate for it:
+ *
+ *  1. INDEX TEXT - the `index*` twin that writes this kind's rows must put ONLY player-layer text in
+ *     `codex_search_player`. A `gm_body` that reaches the player table makes a player's query on a
+ *     GM-only phrase MATCH; the hit's existence is the leak even though the body is never returned,
+ *     and gates 2 and 3 both pass it, because the record really is revealed and really did match.
+ *  2. `PLAYER_VISIBLE_SQL` below - one arm per kind, copied from that kind's player LIST endpoint.
+ *  3. `projectPlayerSearchHit` - one branch per kind, copied from the same place.
+ *
+ * Gates 2 and 3 are belt and braces for each other (either alone hides an unrevealed record), which
+ * is why each needs a test at ITS OWN layer - see the CI-1 describe blocks in `codex-store.test.ts`.
+ * Gate 1 has no second line of defence at all.
  */
-export type CodexRecordKind = "page" | "journal" | "map" | "marker";
-export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker"];
+export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest";
+export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest"];
 /** One search hit as the store returns it: what kind of record matched, and which one. */
 export type CodexSearchRef = Readonly<{ kind: CodexRecordKind; id: string }>;
 
@@ -240,6 +252,64 @@ export type CodexSessionUpdateInput = Readonly<{
   prepBody?: string;
   recapBody?: string;
   status?: CodexSessionStatus;
+}>;
+
+/**
+ * M10: a QUEST - "what is still open". Two-layer exactly as a page and a session are: `gmBody` is the
+ * GM's own notes on where this is really going and never enters a player projection, `playerBody` is
+ * what the party has been told, gated by `revealedToPlayers`.
+ *
+ * `revealedToPlayers` on the row, `revealed` as the SQL column, exactly like every other codex record
+ * type (M9 had to be corrected for getting this pair the other way round).
+ *
+ * Two things make this the first record of its shape in the codex:
+ *  - `objectives` is an ORDERED MUTABLE LIST, the first one here. Its order is CONTENT, not incidental -
+ *    see `questObjectives`.
+ *  - `status` is the first enum a DASHBOARD queries rather than merely displays, which is what the
+ *    `codex_quests_status` index in migration v14 is for.
+ */
+export type CodexQuestStatus = "active" | "completed" | "failed";
+/**
+ * One line on the quest's checklist. Deliberately nothing richer than `{ text, done }`: the M10 spec's
+ * escalation clause makes a shape beyond this unapproved scope, so assignees / due dates / sub-quests
+ * are a later decision rather than an unreviewed field that arrives with the first implementation.
+ */
+export type CodexQuestObjective = Readonly<{ text: string; done: boolean }>;
+export type CodexQuestRow = Readonly<{
+  id: string;
+  title: string;
+  status: CodexQuestStatus;
+  /** The player-facing half, gated by `revealedToPlayers` - what the party has actually been told. */
+  playerBody: string;
+  /** GM-only. Where this quest is really going; never projected to a player. */
+  gmBody: string;
+  /** ORDERED. The GM's sequence is the meaning; nothing sorts, dedupes, or re-keys this. */
+  objectives: readonly CodexQuestObjective[];
+  /** Codex PAGE ids this quest concerns (via the client's `EntityPicker`), filtered on the way to a player. */
+  entityIds: readonly string[];
+  revealedToPlayers: boolean;
+  rev: number;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
+export type CodexQuestCreateInput = Readonly<{
+  title: string;
+  status?: CodexQuestStatus;
+  playerBody?: string;
+  gmBody?: string;
+  objectives?: readonly CodexQuestObjective[];
+  entityIds?: readonly string[];
+  revealedToPlayers?: boolean;
+}>;
+/** No `revealedToPlayers`: reveal has its own endpoint and its own recency rule, exactly as `CodexSessionUpdateInput` omits it. */
+export type CodexQuestUpdateInput = Readonly<{
+  title?: string;
+  status?: CodexQuestStatus;
+  playerBody?: string;
+  gmBody?: string;
+  objectives?: readonly CodexQuestObjective[];
+  entityIds?: readonly string[];
 }>;
 
 export type CodexPageCreateInput = Readonly<{
@@ -575,6 +645,51 @@ export const MIGRATIONS = [{
     CREATE UNIQUE INDEX codex_sessions_number ON codex_sessions (session_number) WHERE session_number IS NOT NULL;
     ALTER TABLE codex_meta ADD COLUMN active_session_id TEXT;
   `
+}, {
+  version: 14,
+  // M10 (CT-4): a QUEST becomes a record - "what is still open" stops being a paragraph the GM keeps
+  // re-reading in a prep note. Two-layer exactly as v13's session is: `gm_body` is the GM half and never
+  // leaves `projectGmQuest`; `player_body` is the player half, gated by `revealed`.
+  //
+  // NO BACKFILL, deliberately, and for a stronger reason than v12/v13 had: there is nothing to back-fill.
+  // A quest has never existed in any form in this database - not as an entity type, not as a journal kind -
+  // so no legacy row is a quest waiting to be promoted. An empty table on every existing codex is the
+  // correct and complete upgrade.
+  //
+  // NOT a 9th entity type on `codex_pages` (D-12 rejected exactly that, and §8 of the campaign-tracking
+  // doc records why): entity `fields` are a flat `Record<string,string>`, so objectives would be JSON
+  // stuffed into a string, and `status` could not be queried. Do not revert this without re-reading D-12.
+  //
+  // `status` carries a CHECK for the same reason v13's does, and the reasoning is worth repeating rather
+  // than cross-referencing: `questStatus()` gates it in TS, but a TS gate protects this PROCESS, not the
+  // FILE. A repair script or a manual sqlite3 session would otherwise be free to write
+  // `status = 'abandoned'`, which `toQuest` then coerces to "active" - so a bad row reads back as a
+  // plausible one instead of failing loudly. The constraint is what makes the column honest. It matches
+  // every comparable enum already here: `codex_journal.kind`, `codex_maps.kind`,
+  // `codex_links.layer`/`target_kind`, and `codex_sessions.status`.
+  //
+  // The `status` INDEX is not decoration: §2.1 of the spec requires the status to be QUERYABLE because
+  // the Campaign dashboard counts open quests, and that count is a per-render read.
+  //
+  // `objectives_json` and `entity_ids_json` are TEXT holding JSON arrays, the same shape v8's
+  // `page_ids_json` / `scene_ids_json` established. NOT NULL with no default because every row is written
+  // by `createQuest`, which always supplies at least "[]" - there is no legacy row to default for.
+  sql: `
+    CREATE TABLE codex_quests (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'failed')),
+      player_body TEXT NOT NULL,
+      gm_body TEXT NOT NULL,
+      objectives_json TEXT NOT NULL,
+      entity_ids_json TEXT NOT NULL,
+      revealed INTEGER NOT NULL,
+      rev INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX codex_quests_status ON codex_quests (status);
+  `
 }];
 
 /**
@@ -592,8 +707,14 @@ export const MIGRATIONS = [{
  *   marker  - `revealed = 1` AND ITS MAP'S `revealed = 1`. The marker's own flag is NOT sufficient:
  *             `GET /codex/maps/:id/markers` 404s a player on an unrevealed map before projecting a
  *             single pin (CD-6), so a revealed pin on a secret map is invisible and search must agree.
+ *   quest   - `revealed = 1`. Same as `projectPlayerQuest` / `GET /codex/quests`. A quest's own flag is
+ *             the WHOLE predicate: its `entityIds` are a LINK to pages, not a gate on the quest, and the
+ *             player list already drops the unrevealed ones from that array (the `projectPlayerMarker`
+ *             rule). A quest linked to a secret page is still a quest the party legitimately has.
  *
- * `ELSE 0` fails closed: an unrecognized kind is never player-visible.
+ * `ELSE 0` fails closed: an unrecognized kind is never player-visible. That is why FORGETTING an arm
+ * hides a kind from player search rather than leaking it - a weakened arm is the dangerous edit, not a
+ * missing one, which is what the store-level test per kind is watching for.
  */
 const PLAYER_VISIBLE_SQL = `(CASE codex_search_player.kind
   WHEN 'page' THEN EXISTS (SELECT 1 FROM codex_pages WHERE codex_pages.id = codex_search_player.record_id AND codex_pages.revealed = 1)
@@ -601,6 +722,7 @@ const PLAYER_VISIBLE_SQL = `(CASE codex_search_player.kind
   WHEN 'map' THEN EXISTS (SELECT 1 FROM codex_maps WHERE codex_maps.id = codex_search_player.record_id AND codex_maps.revealed = 1)
   WHEN 'marker' THEN EXISTS (SELECT 1 FROM codex_markers JOIN codex_maps ON codex_maps.id = codex_markers.map_id
     WHERE codex_markers.id = codex_search_player.record_id AND codex_markers.revealed = 1 AND codex_maps.revealed = 1)
+  WHEN 'quest' THEN EXISTS (SELECT 1 FROM codex_quests WHERE codex_quests.id = codex_search_player.record_id AND codex_quests.revealed = 1)
   ELSE 0 END)`;
 
 /**
@@ -680,6 +802,9 @@ const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, 
 type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string };
 /** One column list per session read, the same discipline PAGE_COLUMNS / JOURNAL_COLUMNS follow. */
 const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at";
+type QuestRowRaw = { id: string; title: string; status: string; player_body: string; gm_body: string; objectives_json: string; entity_ids_json: string; revealed: number; rev: number; created_at: string; updated_at: string };
+/** One column list per quest read, and the INSERT's value order is bound to it - the SESSION_COLUMNS discipline. */
+const QUEST_COLUMNS = "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at";
 type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; created_at: string; updated_at: string };
 const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at";
 
@@ -695,9 +820,13 @@ function id(value: string): string {
   if (!ID.test(value)) throw new Error("Codex id is malformed.");
   return value;
 }
+/**
+ * A record's display title. Shared by pages and (M10) quests rather than near-copied, because the rule
+ * really is the same one - which is why the message no longer says "page".
+ */
 function title(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 160 || CONTROL_CHARS.test(trimmed)) throw new Error("A page title must be 1 to 160 printable characters.");
+  if (!trimmed || trimmed.length > 160 || CONTROL_CHARS.test(trimmed)) throw new Error("A title must be 1 to 160 printable characters.");
   return trimmed;
 }
 /** A nested notebook folder PATH ("NPCs/Villains"): "/"-separated segments, normalized and bounded. */
@@ -919,11 +1048,72 @@ function attendees(value: readonly string[] | undefined): string[] {
   return out;
 }
 const SESSION_STATUSES = new Set<CodexSessionStatus>(["planned", "played"]);
-/** The status enum lives in TS, not a SQL CHECK - this is the one gate, so it is the one to keep correct. */
+/**
+ * The TS half of the status gate. The SQL CHECK in migration v13 is the other half and neither replaces
+ * the other: this one produces a message a GM can read, that one keeps the FILE honest against anything
+ * that writes this database without going through the store.
+ */
 function sessionStatus(value: string | undefined): CodexSessionStatus {
   if (value === undefined) return "planned";
   if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new Error("A session is either planned or played.");
   return value as CodexSessionStatus;
+}
+const QUEST_STATUSES = new Set<CodexQuestStatus>(["active", "completed", "failed"]);
+/** The TS half of the quest status gate; migration v14's CHECK is the other half (see `sessionStatus`). */
+function questStatus(value: string | undefined): CodexQuestStatus {
+  if (value === undefined) return "active";
+  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new Error("A quest is active, completed, or failed.");
+  return value as CodexQuestStatus;
+}
+const MAX_OBJECTIVES = 24;
+/** 120 = the repo's one-line-of-display bound (a marker `label`, an `inWorldLabel`), and the number `CodexQuestObjective` publishes. */
+const MAX_OBJECTIVE_TEXT = 120;
+/**
+ * The Codex's FIRST ordered mutable list, so the rules it establishes are worth stating outright:
+ *
+ *  - ORDER IS CONTENT. A quest's objectives are a sequence the GM authored ("find the key, then open the
+ *    vault"), not a set that happens to arrive in an order. This `map` is therefore the whole
+ *    transformation: it never sorts, never dedupes (two steps may legitimately read the same), and never
+ *    keys identity off the array index across a write - a write replaces the list wholesale, so no index
+ *    has to survive one. Any of those three would silently rewrite what the GM wrote.
+ *  - AN EMPTY `text` IS LEGAL, and that is a decision rather than a gap. The checklist's real flow is "add
+ *    a row, then type into it" - `@vtt/ui`'s `Checklist` renders a blank row as "Item N" and leaves the
+ *    caller to append it - and the editor PATCHes the whole draft on autosave. Rejecting the blank row
+ *    would 400 the very first save after "Add item", while DROPPING it would renumber the list under the
+ *    GM's cursor. Both are worse than storing an empty line the GM can see and fill in.
+ *
+ *    KNOWN DIVERGENCE, flagged rather than silently resolved: `CodexQuestObjective` in
+ *    `packages/api-contract` publishes `minLength: 1` on this field, so the document is stricter here
+ *    than the server. The length CAP (120) matches it deliberately; the minimum does not, because
+ *    enforcing it would break the Add-then-type flow the UI primitive is built around. One of the two
+ *    should move - this comment exists so the choice is made rather than discovered.
+ *  - `done` is coerced, not trusted: anything that is not exactly `true` is `false`, so a malformed value
+ *    can never mark an objective complete.
+ *
+ * The 24-item cap is the bound this file already uses for "a list of things on one record" (`MAX_TAGS`,
+ * `idArray`), rather than a new number invented for quests.
+ */
+function questObjectives(value: readonly CodexQuestObjective[] | undefined): CodexQuestObjective[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error("Objectives must be a list.");
+  if (value.length > MAX_OBJECTIVES) throw new Error(`A quest may carry at most ${MAX_OBJECTIVES} objectives.`);
+  return value.map((objective) => {
+    const text = typeof objective?.text === "string" ? objective.text.trim() : "";
+    if (text.length > MAX_OBJECTIVE_TEXT || CONTROL_CHARS.test(text)) throw new Error(`An objective is up to ${MAX_OBJECTIVE_TEXT} printable characters.`);
+    return { text, done: objective?.done === true };
+  });
+}
+/** Read stored objectives defensively - a malformed column degrades to an empty list, as `parseTags` does. */
+function parseObjectives(raw: string | null | undefined): CodexQuestObjective[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    // Order-preserving, exactly as written: this is the read side of "order is content".
+    return parsed
+      .filter((entry): entry is { text?: unknown; done?: unknown } => !!entry && typeof entry === "object" && !Array.isArray(entry))
+      .map((entry) => ({ text: typeof entry.text === "string" ? entry.text : "", done: entry.done === true }));
+  } catch { return []; }
 }
 
 /** A page title reduced to a stable link target: lowercased, trimmed, whitespace collapsed. */
@@ -1211,16 +1401,21 @@ export class CodexStore {
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
-  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null }> {
+  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[] }> {
     const pages = (this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
     // M9: sessions and the active pointer travel with the backup. A record type that exists but is not
     // exported is a silent hole in a GM's only copy of their prep - and unlike everything else here, a
     // session's `prepBody` is the one thing in the codex that exists nowhere else at all.
+    //
+    // M10: quests join for the same reason, stated once so it does not have to be rediscovered a third
+    // time. M9 shipped without this and had to be corrected for it; a quest's `gmBody` and its objective
+    // list exist nowhere else either, so an export that omitted them would look healthy in a directory
+    // listing and be incomplete on restore. Appended LAST so no existing key moves.
     return {
       pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
-      sessions: this.listSessions(), activeSessionId: this.activeSessionId
+      sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests()
     };
   }
 
@@ -2088,6 +2283,155 @@ export class CodexStore {
     return this.requireDatabase().prepare(`SELECT ${SESSION_COLUMNS} FROM codex_sessions WHERE id = ?`).get(sessionId) as SessionRowRaw | undefined;
   }
 
+  // ----- Quests (M10 / CT-4: what is still open) -----
+  //
+  // The session section directly above is the model, one milestone later, and deliberately so: a quest is
+  // the third record with an editor behind it, so `rev` is the editor's conflict token (stale
+  // `expectedRev` -> 409), create stamps `created_at === updated_at`, and every write runs inside
+  // `this.transaction` with a `bumpRevision()` so clients refetch. Where quests differ from sessions they
+  // differ for a stated reason, at the method that makes the difference.
+  //
+  // The ONE structural difference: a quest joins the suite-wide search index and a session does not, so
+  // every write here has an `indexQuest` twin inside the same transaction and `deleteQuest` unindexes.
+
+  createQuest(input: CodexQuestCreateInput): CodexQuestRow {
+    const database = this.requireDatabase();
+    const questId = this.freshId();
+    const stamp = this.stamp();
+    const row: QuestRowRaw = {
+      id: questId,
+      title: title(input.title),
+      status: questStatus(input.status),
+      player_body: body(input.playerBody),
+      gm_body: body(input.gmBody),
+      objectives_json: JSON.stringify(questObjectives(input.objectives)),
+      // `idArray` validates, caps at 24 and drops duplicates - the marker link contract verbatim. Dropping
+      // duplicates is right HERE and wrong for `objectives`: a linked entity is a SET (linking Strahd twice
+      // means nothing), while two objectives may legitimately read the same and still be two steps.
+      entity_ids_json: JSON.stringify(idArray(input.entityIds)),
+      revealed: input.revealedToPlayers ? 1 : 0,
+      rev: 1, created_at: stamp, updated_at: stamp
+    };
+    this.transaction(() => {
+      database.prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(row.id, row.title, row.status, row.player_body, row.gm_body, row.objectives_json, row.entity_ids_json, row.revealed, row.rev, row.created_at, row.updated_at);
+      this.indexQuest(row.id, row.title, row.player_body, row.gm_body, row.objectives_json);
+      this.bumpRevision();
+    });
+    return this.getQuest(questId)!;
+  }
+
+  /**
+   * Omitted-field-means-unchanged, the page/journal/session update contract verbatim: the quest editor
+   * PATCHes a whole draft on every autosave, and a rule of "absent means clear" would wipe the objectives
+   * the first time the body was edited from a surface that does not carry them.
+   *
+   * An `objectives` array that IS supplied replaces the stored list WHOLESALE - it is not merged item by
+   * item and no index is matched across the write. That is what makes reordering, deleting and inserting a
+   * row all the same operation, and it is why nothing in this file needs a per-objective identity.
+   */
+  updateQuest(questId: string, input: CodexQuestUpdateInput, expectedRev: number | undefined): CodexQuestRow {
+    const database = this.requireDatabase();
+    const existing = this.questRowRaw(questId);
+    if (!existing) throw new CodexNotFoundError("That quest no longer exists.");
+    if (expectedRev !== undefined && expectedRev !== existing.rev) throw new CodexRevisionConflictError("This quest was changed somewhere else after you opened it.");
+    const next: QuestRowRaw = {
+      ...existing,
+      title: input.title === undefined ? existing.title : title(input.title),
+      status: input.status === undefined ? existing.status : questStatus(input.status),
+      player_body: input.playerBody === undefined ? existing.player_body : body(input.playerBody),
+      gm_body: input.gmBody === undefined ? existing.gm_body : body(input.gmBody),
+      objectives_json: input.objectives === undefined ? existing.objectives_json : JSON.stringify(questObjectives(input.objectives)),
+      entity_ids_json: input.entityIds === undefined ? existing.entity_ids_json : JSON.stringify(idArray(input.entityIds)),
+      // `rev` and `updated_at` move TOGETHER on an edit, exactly as `updateSession` does - the conflict
+      // token and the recency stamp both mean "this record was written". `setQuestRevealed` is the
+      // documented exception (CI-9).
+      rev: existing.rev + 1,
+      updated_at: this.stamp()
+    };
+    this.transaction(() => {
+      database.prepare("UPDATE codex_quests SET title = ?, status = ?, player_body = ?, gm_body = ?, objectives_json = ?, entity_ids_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+        .run(next.title, next.status, next.player_body, next.gm_body, next.objectives_json, next.entity_ids_json, next.rev, next.updated_at, questId);
+      // The indexed TEXT really can change here (title, player body, objective text), so this write has an
+      // index twin; `setQuestRevealed` below deliberately does not, because reveal is resolved at read time.
+      this.indexQuest(questId, next.title, next.player_body, next.gm_body, next.objectives_json);
+      this.bumpRevision();
+    });
+    return this.getQuest(questId)!;
+  }
+
+  /**
+   * CI-9, exactly `setPageRevealed` / `setSessionRevealed`: publishing a quest is not an EDIT of it, so
+   * this moves neither `rev` (an open editor would 409 on a reveal nobody typed) nor `updated_at`.
+   *
+   * It also does NOT reindex, and that is not an omission: reveal state is resolved against the live row
+   * at read time by `PLAYER_VISIBLE_SQL`, so the index rows are already correct for both audiences the
+   * instant this returns. Reindexing here would be a no-op that implied the opposite.
+   */
+  setQuestRevealed(questId: string, revealed: boolean): CodexQuestRow {
+    const database = this.requireDatabase();
+    if (!this.questRowRaw(questId)) throw new CodexNotFoundError("That quest no longer exists.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_quests SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, questId);
+      this.bumpRevision();
+    });
+    return this.getQuest(questId)!;
+  }
+
+  /** Idempotent, and an early return on a malformed id - every other codex delete behaves this way. */
+  deleteQuest(questId: string): void {
+    const database = this.requireDatabase();
+    if (!ID.test(questId)) return;
+    this.transaction(() => {
+      database.prepare("DELETE FROM codex_quests WHERE id = ?").run(questId);
+      // Unindexing is PART of the delete: an orphaned index row keeps matching forever with no live row
+      // left for `PLAYER_VISIBLE_SQL` to gate it on - and `ELSE 0`-style safety does not apply, because
+      // the row's `kind` is still a recognised one. The map-delete cascade taught this the hard way.
+      this.unindex("quest", questId);
+      this.bumpRevision();
+    });
+  }
+
+  getQuest(questId: string): CodexQuestRow | null {
+    const row = this.questRowRaw(questId);
+    return row ? this.toQuest(row) : null;
+  }
+
+  /**
+   * Oldest-first. A quest has no number and no in-world date, so the order it was STARTED in is the only
+   * intrinsic one it has - alphabetical (the page list's rule) would scatter a campaign's arc, and
+   * status-first would make a quest jump position the moment it was completed, which is exactly when the
+   * GM is looking at it.
+   *
+   * Note what this deliberately is NOT: the dashboard's "what is still open" is a `status` FILTER over
+   * this list, not a different order. That filter is what migration v14's `codex_quests_status` index
+   * serves; ordering by status as well would bake one caller's view into every caller's read.
+   */
+  listQuests(): CodexQuestRow[] {
+    return (this.requireDatabase()
+      .prepare(`SELECT ${QUEST_COLUMNS} FROM codex_quests ORDER BY created_at, id`)
+      .all() as QuestRowRaw[]).map((row) => this.toQuest(row));
+  }
+
+  private toQuest(row: QuestRowRaw): CodexQuestRow {
+    return {
+      id: row.id, title: row.title,
+      // Anything unrecognised reads as `active`, the same fail-safe `toSession` applies to a status and
+      // `toEntry` to a journal kind. A quest that cannot be classified is one that is still open.
+      status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "active",
+      playerBody: row.player_body, gmBody: row.gm_body,
+      objectives: parseObjectives(row.objectives_json),
+      entityIds: parseIdArray(row.entity_ids_json),
+      revealedToPlayers: row.revealed === 1,
+      rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
+    };
+  }
+
+  private questRowRaw(questId: string): QuestRowRaw | undefined {
+    if (!ID.test(questId)) return undefined;
+    return this.requireDatabase().prepare(`SELECT ${QUEST_COLUMNS} FROM codex_quests WHERE id = ?`).get(questId) as QuestRowRaw | undefined;
+  }
+
   // ----- internals -----
 
   private pageRow(pageId: string): PageRow | undefined {
@@ -2160,6 +2504,28 @@ export class CodexStore {
   private indexMarker(markerId: string, label: string | null, tagsJson: string) {
     const row = { title: label ?? "", body: parseTags(tagsJson).join(" ") };
     this.indexRecord("marker", markerId, row, row);
+  }
+
+  /**
+   * A quest is two-layer like a page: `gmBody` goes ONLY into the GM index. This is search gate 1 (see
+   * `CodexRecordKind`), and the one with no second line of defence - `PLAYER_VISIBLE_SQL` and
+   * `projectPlayerSearchHit` both PASS a revealed quest, so if `gmBody` were in the player row a player
+   * typing a GM-only phrase would get a hit on a quest they are entitled to see. The body is never
+   * returned, but the hit's EXISTENCE is the leak: it confirms the phrase appears somewhere secret.
+   *
+   * Objective text goes in the PLAYER row on purpose. An objective lives beside `playerBody`, not
+   * `gmBody` - it is the checklist the party is working from, and it ships with the quest on reveal, so
+   * indexing it for players matches what they already receive. The GM row carries it too, or the GM's
+   * search would be strictly weaker than the player's on the same record.
+   *
+   * Quests carry NO tags (they are not in the spec's column list), so unlike every other kind here there
+   * is no tag text to append.
+   */
+  private indexQuest(questId: string, questTitle: string, playerBody: string, gmBody: string, objectivesJson: string) {
+    const objectiveText = parseObjectives(objectivesJson).map((objective) => objective.text).join(" ");
+    this.indexRecord("quest", questId,
+      { title: questTitle, body: `${playerBody}\n${objectiveText}` },
+      { title: questTitle, body: `${playerBody}\n${gmBody}\n${objectiveText}` });
   }
 
   /** A journal entry is two-layer like a page: `gmText` goes ONLY into the GM index. */

@@ -64,6 +64,7 @@ export { FieldGrid, type FieldGridProps } from "./primitives/FieldGrid";
 export { NumberField, type NumberFieldProps } from "./primitives/NumberField";
 export { TagInput, slugify, type TagInputProps } from "./primitives/TagInput";
 export { RowEditor, type RowEditorProps } from "./primitives/RowEditor";
+export { Checklist, type ChecklistProps, type ChecklistItem } from "./primitives/Checklist";
 export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/SaveState";
 
 /* Icons — the design system's own SVG glyphs (no emoji in a primitive). The app's

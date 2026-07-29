@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmChronicleRecord, projectGmLinkEdges, projectGmMarker, projectGmRelationships, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerSession } from "../src/codex-projections.js";
+import { projectGmChronicleRecord, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -38,6 +38,28 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
     const entry = store.createEntry({ playerText: "The vistani warned us" });
     expect(store.searchAll("gm", "vistani").some((hit) => hit.kind === "journal" && hit.id === entry.id)).toBe(true);
     expect(store.searchAll("player", "vistani").some((hit) => hit.id === entry.id)).toBe(false);
+  });
+
+  /**
+   * M10 SEARCH GATE 2 of 3 — `PLAYER_VISIBLE_SQL`'s `WHEN 'quest'` arm, on its own.
+   *
+   * This is the gate the M6 incident was about, which is why it is asserted HERE rather than over HTTP:
+   * `projectPlayerSearchHit` re-applies the same predicate on the way out, so a weakened SQL arm leaves
+   * the whole HTTP suite green. `searchAll` is below that projection, so nothing can catch the break for
+   * it. Both directions are asserted, because the two ways to get this arm wrong fail differently:
+   * weakening it (`THEN 1`) surfaces the secret quest, and DELETING it drops through to `ELSE 0` and
+   * hides a quest that ought to be findable.
+   */
+  it("does not return an UNREVEALED quest to a player, and does return a revealed one (M10, at the SQL layer)", () => {
+    const quest = store.createQuest({ title: "The Wyrmwood Contract", playerBody: "Recover the ledger." });
+    expect(quest.revealedToPlayers).toBe(false);
+    // The GM finds it, so the player's miss below is the visibility arm and not a quest that never indexed.
+    expect(store.searchAll("gm", "ledger").some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
+    expect(store.searchAll("player", "ledger").some((hit) => hit.id === quest.id)).toBe(false);
+
+    // ...and revealing it makes it findable, so the miss above is the reveal gate and not a missing arm.
+    store.setQuestRevealed(quest.id, true);
+    expect(store.searchAll("player", "ledger").some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
   });
 
   it("does not return a REVEALED marker sitting on a SECRET map to a player (CD-6, at the SQL layer)", () => {
@@ -1408,6 +1430,321 @@ describe("CodexStore sessions (M9)", () => {
   });
 });
 
+describe("CodexStore quests (M10)", () => {
+  let questDirectory: string;
+  let clock: number;
+  let quests: CodexStore;
+
+  beforeEach(async () => {
+    questDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-quests-"));
+    clock = Date.parse("2026-07-29T00:00:00.000Z");
+    quests = new CodexStore(join(questDirectory, "vtt.sqlite"), () => clock);
+    await quests.initialize();
+  });
+  afterEach(async () => { quests.close(); await rm(questDirectory, { recursive: true, force: true }); });
+
+  /** The injected clock the sessions + CI-9 describes use: without it "reveal does not move recency" is vacuous. */
+  const tick = () => { clock += 60_000; };
+
+  it("creates, reads back, updates with a rev bump, and persists through a restart", async () => {
+    const created = quests.createQuest({
+      title: "The Wyrmwood Contract", status: "active",
+      playerBody: "Recover the ledger from the counting house.",
+      gmBody: "The ledger is a forgery; the real one burned.",
+      objectives: [{ text: "Find the counting house", done: true }, { text: "Recover the ledger", done: false }]
+    });
+    expect(created).toMatchObject({
+      title: "The Wyrmwood Contract", status: "active", revealedToPlayers: false, rev: 1,
+      playerBody: "Recover the ledger from the counting house.", gmBody: "The ledger is a forgery; the real one burned."
+    });
+    expect(created.createdAt).toBe(created.updatedAt);          // born, so the two stamps agree
+    expect(created.entityIds).toEqual([]);
+
+    tick();
+    const updated = quests.updateQuest(created.id, { status: "completed" }, created.rev);
+    expect(updated.rev).toBe(2);
+    expect(updated.status).toBe("completed");
+    expect(updated.playerBody).toBe("Recover the ledger from the counting house."); // omitted = UNCHANGED
+    expect(updated.objectives).toHaveLength(2);                                     // ...including the list
+    expect(updated.updatedAt > created.updatedAt).toBe(true);                       // an edit moves recency
+
+    quests.close();
+    quests = new CodexStore(join(questDirectory, "vtt.sqlite"), () => clock);
+    await quests.initialize();
+    const reopened = quests.getQuest(created.id)!;
+    expect(reopened).toMatchObject({ rev: 2, status: "completed" });
+    expect(reopened.objectives).toEqual([{ text: "Find the counting house", done: true }, { text: "Recover the ledger", done: false }]);
+    expect(quests.listQuests()).toHaveLength(1);
+  });
+
+  it("rejects a stale expectedRev with a conflict, and accepts an omitted one", () => {
+    const quest = quests.createQuest({ title: "Q", gmBody: "v1" });
+    quests.updateQuest(quest.id, { gmBody: "v2" }, quest.rev);
+    expect(() => quests.updateQuest(quest.id, { gmBody: "v3" }, 1)).toThrow(CodexRevisionConflictError);
+    // An omitted expectedRev is the "I know I might be behind" path and must still write.
+    expect(quests.updateQuest(quest.id, { gmBody: "v3" }, undefined).gmBody).toBe("v3");
+  });
+
+  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision (CI-9)", () => {
+    const quest = quests.createQuest({ title: "The Vault", playerBody: "Open it." });
+    const born = quest.updatedAt;
+    const revisionBefore = quests.revision;
+    tick();
+    const revealed = quests.setQuestRevealed(quest.id, true);
+    expect(revealed.revealedToPlayers).toBe(true);                     // the reveal really happened...
+    expect(revealed.updatedAt).toBe(born);                             // ...without moving recency
+    expect(revealed.rev).toBe(quest.rev);                              // ...or the editor's conflict token
+    expect(quests.revision).toBeGreaterThan(revisionBefore);           // ...but clients still refetch
+  });
+
+  /**
+   * The M10 rule that has no precedent anywhere else in the Codex: objectives are the first ORDERED
+   * MUTABLE list, and their order is CONTENT. "Find the key, then open the vault" is not the same quest
+   * as its reverse, so nothing may sort, dedupe, or key identity off an index across a write.
+   */
+  it("keeps objective ORDER exactly as written, through a round-trip and through an edit", () => {
+    // Deliberately adversarial input: reverse-alphabetical, with a genuine DUPLICATE in the middle. A sort
+    // would reorder it, a dedupe would shorten it, and either would pass a test that only checked contents.
+    const written = [
+      { text: "Zero the ledger", done: false },
+      { text: "Ask Blinsky", done: true },
+      { text: "Ask Blinsky", done: false },
+      { text: "Burn the counting house", done: false }
+    ];
+    const quest = quests.createQuest({ title: "Order matters", objectives: written });
+    expect(quest.objectives).toEqual(written);
+    expect(quests.getQuest(quest.id)!.objectives).toEqual(written);     // ...and it survives the DB round-trip
+
+    // An EDIT replaces the list wholesale. Reordering, ticking and inserting arrive as one array, and the
+    // stored order must be that array — not a merge against the previous one by position or by text.
+    const edited = [
+      { text: "Burn the counting house", done: false },
+      { text: "A newly inserted step", done: false },
+      { text: "Zero the ledger", done: true },
+      { text: "Ask Blinsky", done: true },
+      { text: "Ask Blinsky", done: false }
+    ];
+    const after = quests.updateQuest(quest.id, { objectives: edited }, quest.rev);
+    expect(after.objectives).toEqual(edited);
+    expect(quests.getQuest(quest.id)!.objectives).toEqual(edited);
+    // An empty array genuinely CLEARS the list rather than reading as "absent" — the tags contract.
+    expect(quests.updateQuest(quest.id, { objectives: [] }, after.rev).objectives).toEqual([]);
+  });
+
+  it("bounds objectives, coerces `done`, and allows a blank row without renumbering the list", () => {
+    expect(() => quests.createQuest({ title: "Too many", objectives: Array.from({ length: 25 }, () => ({ text: "x", done: false })) })).toThrow(/at most 24 objectives/);
+    expect(() => quests.createQuest({ title: "Too long", objectives: [{ text: "x".repeat(121), done: false }] })).toThrow(/up to 120 printable characters/);
+    expect(quests.createQuest({ title: "At the cap", objectives: [{ text: "x".repeat(120), done: false }] }).objectives[0].text).toHaveLength(120);
+
+    // A blank row is LEGAL and keeps its slot: the checklist's real flow is "add a row, then type", and
+    // the editor autosaves the whole draft. Dropping it would renumber the list under the GM's cursor.
+    const quest = quests.createQuest({ title: "Blank rows", objectives: [{ text: "First", done: false }, { text: "  ", done: false }, { text: "Third", done: false }] });
+    expect(quest.objectives).toEqual([{ text: "First", done: false }, { text: "", done: false }, { text: "Third", done: false }]);
+
+    // `done` is coerced, never trusted: anything that is not exactly `true` reads as false, so no malformed
+    // value can mark an objective complete.
+    const coerced = quests.createQuest({ title: "Coercion", objectives: [{ text: "a", done: "yes" as unknown as boolean }, { text: "b", done: true }] });
+    expect(coerced.objectives.map((objective) => objective.done)).toEqual([false, true]);
+  });
+
+  it("stores linked entity ids as a deduped set, and rejects a malformed one", () => {
+    const strahd = quests.createPage({ title: "Strahd" });
+    const ireena = quests.createPage({ title: "Ireena" });
+    // `idArray`'s contract, the marker-links one verbatim: order of first appearance, duplicates dropped.
+    // Deduping is right for a LINK SET and wrong for objectives — two objectives may legitimately match.
+    const quest = quests.createQuest({ title: "Escort", entityIds: [ireena.id, strahd.id, ireena.id] });
+    expect(quest.entityIds).toEqual([ireena.id, strahd.id]);
+    expect(() => quests.createQuest({ title: "Bad link", entityIds: ["not-a-uuid"] })).toThrow(/malformed/);
+    // Omitting the field leaves the stored links alone; an empty array clears them.
+    expect(quests.updateQuest(quest.id, { title: "Escort Ireena" }, quest.rev).entityIds).toEqual([ireena.id, strahd.id]);
+    expect(quests.updateQuest(quest.id, { entityIds: [] }, undefined).entityIds).toEqual([]);
+  });
+
+  it("rejects an unknown status, lists oldest-first, and deletes idempotently", () => {
+    expect(() => quests.createQuest({ title: "Bad", status: "abandoned" as never })).toThrow(/active, completed, or failed/);
+    expect(() => quests.createQuest({ title: "" })).toThrow(/1 to 160 printable characters/);
+
+    const first = quests.createQuest({ title: "First" });
+    tick();
+    const second = quests.createQuest({ title: "Second" });
+    // A quest has no number and no in-world date, so the order it was STARTED in is the only intrinsic
+    // one. Completing one must NOT move it in the list — that is a dashboard FILTER, not an ordering.
+    quests.updateQuest(first.id, { status: "completed" }, first.rev);
+    expect(quests.listQuests().map((quest) => quest.id)).toEqual([first.id, second.id]);
+
+    quests.deleteQuest(first.id);
+    expect(quests.getQuest(first.id)).toBeNull();
+    expect(() => quests.deleteQuest(first.id)).not.toThrow();     // idempotent
+    expect(() => quests.deleteQuest("not-a-uuid")).not.toThrow(); // malformed id: early return
+    // The index row goes with the record: an orphan would keep matching forever with no live row for
+    // `PLAYER_VISIBLE_SQL` to gate it on.
+    expect(quests.searchAll("gm", "First")).toEqual([]);
+  });
+
+  /**
+   * M9 shipped without this and had to be corrected for it ("a backup that dropped every session"). A
+   * quest's `gmBody` and its objective list exist nowhere else either, so the same hole would be silent.
+   */
+  it("carries quests into the backup bundle, GM layer and objectives included", () => {
+    const quest = quests.createQuest({
+      title: "The Wyrmwood Contract", gmBody: "The ledger is a forgery.",
+      objectives: [{ text: "Find it", done: true }, { text: "Burn it", done: false }]
+    });
+    const bundle = quests.exportBundle();
+    expect(bundle.quests.map((row) => row.id)).toEqual([quest.id]);
+    expect(bundle.quests[0].gmBody).toBe("The ledger is a forgery.");
+    expect(bundle.quests[0].objectives).toEqual([{ text: "Find it", done: true }, { text: "Burn it", done: false }]);
+  });
+});
+
+/**
+ * M10 SEARCH GATE 1 of 3 — the text written INTO `codex_search_player`.
+ *
+ * The gate `codex-store.ts` did not name until M10, and the only one of the three with no second line of
+ * defence. Gates 2 and 3 both PASS a revealed quest, correctly, so if `gmBody` reached the player index a
+ * player typing a GM-only phrase would get a HIT on a quest they are entitled to see. The body is never
+ * returned — the hit's EXISTENCE is the leak, because it confirms the phrase appears somewhere secret.
+ *
+ * The quest here is REVEALED on purpose. An unrevealed one would be masked by gate 2, and the test would
+ * pass for the wrong reason.
+ */
+describe("CodexStore quest search index text — gate 1, with no second line of defence (M10)", () => {
+  const GM_PHRASE = "the ledger is a forgery";
+  const seedRevealed = () => {
+    const quest = store.createQuest({
+      title: "The Wyrmwood Contract",
+      playerBody: "Recover the ledger from the counting house.",
+      gmBody: `Nobody can find it: ${GM_PHRASE} and the real one burned.`,
+      objectives: [{ text: "Search the counting house", done: false }]
+    });
+    return store.setQuestRevealed(quest.id, true);
+  };
+
+  it("gives a player ZERO hits on a phrase that exists only in `gmBody`", () => {
+    const quest = seedRevealed();
+    expect(quest.revealedToPlayers).toBe(true);                            // gate 2 would pass this quest
+    expect(store.searchAll("player", "forgery")).toEqual([]);              // ...and yet the phrase is unreachable
+    expect(store.searchAll("player", GM_PHRASE)).toEqual([]);
+
+    // The GM DOES find it, so the miss above is the two indexes being kept apart, not a quest that never
+    // indexed at all.
+    expect(store.searchAll("gm", "forgery")).toEqual([{ kind: "quest", id: quest.id }]);
+  });
+
+  it("still lets a player find that same quest by its player body and by an objective", () => {
+    // This is what makes the assertions above meaningful: the quest IS in the player's index and IS
+    // player-visible, so the GM phrase missing is about the TEXT written, not about the record.
+    const quest = seedRevealed();
+    expect(store.searchAll("player", "counting")).toEqual([{ kind: "quest", id: quest.id }]);
+    // An objective's text is player-facing — it lives beside `playerBody`, not `gmBody`.
+    expect(store.searchAll("player", "Search")).toEqual([{ kind: "quest", id: quest.id }]);
+    // ...and the title, which is the same string in both indexes.
+    expect(store.searchAll("player", "Wyrmwood")).toEqual([{ kind: "quest", id: quest.id }]);
+  });
+
+  it("keeps the index in step with an edit and re-splits the layers on the way", () => {
+    const quest = seedRevealed();
+    store.updateQuest(quest.id, {
+      playerBody: "Escort Ireena to Vallaki.", gmBody: "Ireena is Strahd's true target.",
+      objectives: [{ text: "Reach the gates", done: false }]
+    }, undefined);
+    // The old player text stops matching — body AND objective, since both feed the same index row.
+    expect(store.searchAll("player", "counting")).toEqual([]);
+    expect(store.searchAll("gm", "counting")).toEqual([]);
+    expect(store.searchAll("player", "Vallaki")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "gates")).toEqual([{ kind: "quest", id: quest.id }]);
+    // ...and the NEW GM half is in the GM index only, so an update cannot be the way a secret phrase
+    // sneaks into the player table.
+    expect(store.searchAll("player", "target")).toEqual([]);
+    expect(store.searchAll("gm", "target")).toEqual([{ kind: "quest", id: quest.id }]);
+  });
+});
+
+/**
+ * M10 SEARCH GATE 3 of 3, plus the record projection — both called POINT-BLANK.
+ *
+ * `codex-http.test.ts` proves the pipeline; only this proves the layer. That is not pedantry: this file's
+ * own CI-1 lesson is that a weakened SQL gate left all 787 tests passing because a projection quietly
+ * caught it, and the blind spot exists in reverse — an HTTP test cannot tell a working projection from a
+ * SQL predicate that happened to compensate for a broken one.
+ */
+describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
+  const GM_PHRASE = "The ledger is a forgery; the real one burned.";
+  const seed = () => store.createQuest({
+    title: "The Wyrmwood Contract", status: "active",
+    playerBody: "Recover the ledger from the counting house.",
+    gmBody: GM_PHRASE,
+    objectives: [{ text: "Find the counting house", done: true }, { text: "Recover the ledger", done: false }]
+  });
+  const noEntities = { revealedEntityIds: new Set<string>() };
+
+  it("refuses an UNREVEALED quest outright", () => {
+    const quest = seed();
+    expect(quest.revealedToPlayers).toBe(false);
+    expect(projectPlayerQuest(quest, noEntities)).toBeNull();
+    // Revealing it lets it through, so the null above is the reveal gate and not a broken projection.
+    expect(projectPlayerQuest(store.setQuestRevealed(quest.id, true), noEntities)).not.toBeNull();
+  });
+
+  it("emits exactly the allow-listed keys of a REVEALED quest, and never the GM body", () => {
+    const revealed = store.setQuestRevealed(seed().id, true);
+    const projected = projectPlayerQuest(revealed, noEntities)!;
+    // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
+    // ever added to the player projection, not merely if this one leaks. `gmBody` and `rev` are absent;
+    // `status` is deliberately PRESENT, unlike a session's, because "what is still open" is the feature.
+    expect(Object.keys(projected).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(projected.body).toBe("Recover the ledger from the counting house.");
+    expect(projected.status).toBe("active");
+    // Objective order and tick state are the player's copy of the checklist, unchanged.
+    expect(projected.objectives).toEqual([{ text: "Find the counting house", done: true }, { text: "Recover the ledger", done: false }]);
+    expect(JSON.stringify(projected)).not.toContain("forgery");
+
+    // The GM's own row carries all of it — so the assertions above are the projection working, not a quest
+    // that happened to have nothing to leak.
+    const gmRow = projectGmQuest(revealed);
+    expect(gmRow.gmBody).toBe(GM_PHRASE);
+    expect(gmRow.rev).toBe(1);
+    expect(gmRow.revealedToPlayers).toBe(true);
+  });
+
+  it("filters `entityIds` to the revealed subset, the rule `projectPlayerMarker` applies to pageIds", () => {
+    const shown = store.createPage({ title: "Vallaki" });
+    const secret = store.createPage({ title: "The Amber Temple" });
+    store.setPageRevealed(shown.id, true);
+    const quest = store.setQuestRevealed(store.createQuest({ title: "Escort", entityIds: [shown.id, secret.id] }).id, true);
+    expect(quest.entityIds).toEqual([shown.id, secret.id]);   // the GM's row links both
+
+    const projected = projectPlayerQuest(quest, { revealedEntityIds: new Set([shown.id]) })!;
+    // A revealed quest must not advertise the id of a still-secret page: "this quest concerns something
+    // you cannot see" is the same leak a dangling graph edge is.
+    expect(projected.entityIds).toEqual([shown.id]);
+    expect(JSON.stringify(projected)).not.toContain(secret.id);
+  });
+
+  it("refuses an UNREVEALED quest at the SEARCH projection too — gate 3, on its own", () => {
+    const quest = seed();
+    // Called directly, with no SQL in front of it. `PLAYER_VISIBLE_SQL` would already have dropped this
+    // row over HTTP, which is exactly why breaking this arm is invisible from there.
+    expect(projectPlayerSearchHit({ kind: "quest", quest })).toBeNull();
+    // The GM's hit exists for the same record, so the null is the reveal gate and not a missing arm.
+    expect(projectGmSearchHit({ kind: "quest", quest })).toMatchObject({ kind: "quest", id: quest.id, title: "The Wyrmwood Contract" });
+  });
+
+  it("emits a REVEALED quest as a uniform hit row: no body, no reveal flag, and `tags: []`", () => {
+    const revealed = store.setQuestRevealed(seed().id, true);
+    const hit = projectPlayerSearchHit({ kind: "quest", quest: revealed })!;
+    // The same key set every other kind emits — a row renderer must never branch on which kind it got.
+    expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    // Quests carry no tags at all (not in the spec's column list), so this is `[]` rather than a missing
+    // key or a null. `status`/`objectives` are read on the RECORD: a result row exists to navigate.
+    expect(hit.tags).toEqual([]);
+    expect(hit.entityType).toBeNull();
+    expect(hit.mapId).toBeNull();
+    expect(JSON.stringify(hit)).not.toContain("forgery");
+    expect(JSON.stringify(hit)).not.toContain("counting house");
+  });
+});
+
 /**
  * The K7 discipline v11/v12 follow: a fresh-database test can never catch a bad upgrade, because every
  * table is empty. This builds a genuine v12 database out of the shipped migration SQL, fills it with the
@@ -1485,6 +1822,77 @@ describe("CodexStore migration v13 — sessions arrive with NO backfill (M9)", (
     // statement being broken for every input.
     expect(() => insert("planned")).not.toThrow();
     expect(() => insert("played")).not.toThrow();
+    database.close();
+  });
+});
+
+/**
+ * Migration v14 (M10). There is nothing to back-fill — a quest has never existed in this database in any
+ * form — so the only claims worth asserting are the ones a fresh-database test CAN make: the table and its
+ * status index really ship, and the CHECK that keeps the column honest really discriminates.
+ */
+describe("CodexStore migration v14 — quests arrive with nothing to back-fill (M10)", () => {
+  it("creates the quest table and its status index, and back-fills nothing", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v13-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      // A genuine v13 database, built from the shipped SQL and given a page and a numbered session — the
+      // rows most plausibly mistaken for "quests waiting to be promoted".
+      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+      database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 13)) {
+        database.exec(migration.sql);
+        database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+      }
+      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Ireena', 'character', '{}', '{}', NULL, '[]', 'Escort her to Vallaki.', '', 1, NULL, 1, '', '')").run(crypto.randomUUID());
+      database.prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, 1, NULL, '[]', 'Find the ledger.', '', 0, 'planned', 1, '', '')").run(crypto.randomUUID());
+      database.close();
+
+      upgraded = new CodexStore(path);
+      await upgraded.initialize();
+
+      expect(upgraded.listQuests()).toEqual([]);              // nothing was promoted into a quest
+      expect(upgraded.listSessions()).toHaveLength(1);        // ...and the v13 rows are untouched
+      expect(upgraded.listPages()).toHaveLength(1);
+
+      // The status INDEX is what makes the dashboard's open-quest count a query rather than a scan, so it
+      // is asserted rather than assumed present.
+      const reopened = new DatabaseSync(path);
+      const indexes = (reopened.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_quests'").all() as Array<{ name: string }>).map((row) => row.name);
+      reopened.close();
+      expect(indexes).toContain("codex_quests_status");
+
+      // ...and the upgraded database really accepts a quest, so the empty list above is "nothing to
+      // back-fill" and not a table that failed to arrive.
+      expect(upgraded.createQuest({ title: "The Wyrmwood Contract" }).status).toBe("active");
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * `questStatus()` gates the status in TS, so nothing reachable through the store can write a fourth
+   * value — which is exactly why the CHECK is worth asserting at the SQL layer instead. A TS-only gate
+   * protects this process, not the file: a repair script or a manual `sqlite3` session would otherwise be
+   * free to write `status = 'abandoned'`, and `toQuest` coerces anything unrecognised to "active", so the
+   * bad row would read back as a plausible one rather than failing loudly.
+   */
+  it("the status CHECK rejects a value the TS gate would never produce", () => {
+    const database = new DatabaseSync(":memory:");
+    for (const migration of MIGRATIONS) database.exec(migration.sql);
+    const insert = (status: string) => database
+      .prepare("INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Q', ?, '', '', '[]', '[]', 0, 1, '', '')")
+      .run(`id-${status}`, status);
+
+    expect(() => insert("abandoned")).toThrow();
+    // All three legal values still insert, so the throw above is the CHECK discriminating rather than the
+    // statement being broken for every input.
+    expect(() => insert("active")).not.toThrow();
+    expect(() => insert("completed")).not.toThrow();
+    expect(() => insert("failed")).not.toThrow();
     database.close();
   });
 });
