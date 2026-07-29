@@ -129,7 +129,13 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
   const sections: ReadonlyArray<Readonly<{ kind: CodexRevealAuditKind; section: CodexRevealAuditSection | undefined }>> =
     KIND_ORDER.map((kind) => ({ kind, section: audit?.sections.find((candidate) => candidate.kind === kind) }));
   const missing = audit ? sections.filter((entry) => entry.section === undefined) : [];
-  const revealed = sections.reduce((sum, entry) => sum + (entry.section?.revealed ?? 0), 0);
+  /**
+   * The SERVER's whole-codex figure, not a sum of the sections. The two agree while every section is
+   * present — but this surface exists to survive an answer with sections missing (see `missing` above), and
+   * in exactly that case a sum silently under-counts where the server's number is still right. The comment
+   * below used to call the sum "the server's own count"; it was the client's.
+   */
+  const revealed = audit?.revealed ?? 0;
 
   return (
     <>
@@ -139,7 +145,7 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
       <div className="codex-audit">
         <header className="codex-audit-head">
           <h3 className="codex-audit-title">Everything shared with players</h3>
-          {/* The server's own count, summed. It is what a player would genuinely RECEIVE, not how many
+          {/* The server's own count, taken whole. It is what a player would genuinely RECEIVE, not how many
               records have their reveal flag set — the two differ for a pin on a hidden map and for a
               standing whose faction is still secret, and this screen exists to report the former. */}
           {!loading && <p className="codex-audit-count">{revealed} {revealed === 1 ? "record is" : "records are"} shown to players across the Codex.</p>}

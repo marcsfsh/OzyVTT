@@ -260,7 +260,10 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   const campaignStanding = useMemo<readonly CampaignStanding[]>(() => {
     const byFaction = new Map(standing.map((row) => [row.factionPageId, row.value]));
     return pages
-      .filter((page) => page.entityType === "faction")
+      // Faction pages, PLUS any page that already has a standing row whatever its type is now. Filtering on
+      // type alone made a re-typed faction vanish from the only surface that adjusts standing, while its
+      // number stayed visible to players — reachable in two clicks and unrepairable from the UI.
+      .filter((page) => page.entityType === "faction" || byFaction.has(page.id))
       .map((page) => ({ factionPageId: page.id, name: page.title, value: byFaction.get(page.id) ?? 0 }));
   }, [pages, standing]);
   /** The faction the adjust dialog is open on, and its stored row (null = never rated — it starts at 0). */

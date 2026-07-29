@@ -10,6 +10,32 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex/store] A page that HAD standing and is re-typed away from `faction` keeps its standing row.**
+  `setStanding` now requires `entity_type = 'faction'` only to CREATE a row, not to update one, and the
+  Campaign card lists any page that already has a row whatever its type is now — otherwise the GM had a
+  player-visible number they could neither edit nor reach (verified through the real routes before the fix).
+  What remains: a standing row can sit against a character or location page if the GM re-types one. Harmless
+  and repairable (zero it, unreveal it, or delete the page), but the data model no longer guarantees what the
+  spec asks for. The stricter alternative — refusing to demote a faction that has standing — was rejected as
+  the worse trade: it blocks an ordinary edit to protect a rule nothing depends on.
+
+- **[repo/tooling] `apps/server/test/**` is not typechecked by anything.** `apps/server/tsconfig.json` is
+  `"include": ["src"]`, so `npm run check` sees no server test file. There are **41 pre-existing type errors**
+  across nine non-codex test files (`character-build` 14, `combat-rules-regression` 9,
+  `viewer-presentation` 8, …), and M12 briefly added four more to M11's downtime assertions that no command
+  in the repo would have reported. Found by an agent typechecking with a temporary config. Fixing the 41 is
+  its own job; the gap itself is worth knowing about before trusting "check is clean" for a test-only change.
+
+- **[codex/client] `clampStanding(Infinity)` returns 0, not 100.** `Math.trunc(Infinity)` is not finite, so
+  a non-finite value falls through to the `Uninvested` centre rather than the `Exalted` end. Not reachable
+  from the bounded number input; documented as intentional in the helper. Recorded because "an overflowing
+  control lands on neutral" is a surprising failure direction if it ever becomes reachable.
+
+- **[codex/audit] The published campaign date is not in the reveal audit.** It is a player-visible thing the
+  GM publishes (M11's O-1), and the audit lists seven record kinds and not that. Contract-compliant — the
+  seven kinds were frozen deliberately — but a GM asking "what can they see?" may reasonably expect the
+  party's current date to be on that list. Raised by adversarial review as a scope observation, not a defect.
+
 - **[codex] Renumbering a session orphans its entries and republishes numbers the player gate was
   hiding — OPEN, awaiting an owner decision (2026-07-29, found by M9's correctness review).** The join
   between a session record and its journal entries is the **number**, not the id, and `updateSession`

@@ -1408,8 +1408,40 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
     expect(Object.keys(playerStanding[0]).sort()).toEqual(["factionPageId", "value"]);
     const standingPayload = JSON.stringify(playerStanding);
     expect(standingPayload).not.toContain(secretFaction);           // the unrevealed standing's faction...
-    expect(standingPayload).not.toContain("70");                    // ...and its value
+    // ...and its value. Asserted as the SERIALIZED FIELD, not as the bare substring "70": a page id is a
+    // random uuid and 9.4% of them contain the digraph "70" (measured over 200k), so `not.toContain("70")`
+    // failed about one run in eleven. This file already warns about exactly that trap ~1330 lines up, for
+    // "42"; the warning was written and then walked past. The row's own key set and value are asserted
+    // above, so this is the narrow claim it was always meant to be: no OTHER standing's value rode along.
+    expect(standingPayload).not.toContain('"value":70');
     expect(standingPayload).not.toContain("revealedToPlayers");
+
+    /**
+     * A-8, at the boundary: a REVEALED standing RECORD whose faction page is secret reaches no player.
+     *
+     * This is a separate gate from the standing table above, and it shipped broken. The record's faction id
+     * was nulled but its `delta` and `reason` travelled, on the theory that the row "still stands on its own
+     * prose" — except `setStanding` writes an empty player text, so a player received
+     * "A faction · up 70 · Paid the toll" for a faction they had never heard of: the existence of a secret
+     * faction, the size of the move, and the sentence behind it.
+     *
+     * Asserted on the SERIALIZED body and by searching for the reason text, because that is the half a
+     * key-set assertion would have missed. `secretFaction` was created REVEALED above, so it is unrevealed
+     * here only after this explicit change — which also proves the fixture is not doing the work.
+     */
+    await post(base, `/api/v1/codex/pages/${secretFaction}/reveal`, GM, { revealed: false });
+    const secretRecord = ((await body(await get(base, "/api/v1/codex/timeline", GM))).data.records as Json[])
+      .find((row) => row.kind === "standing" && row.payload?.reason === "Paid the toll")!;
+    expect(secretRecord).toBeDefined();
+    await post(base, `/api/v1/codex/journal/${secretRecord.id}/reveal`, GM, { revealed: true });
+
+    const playerTimeline = await body(await get(base, "/api/v1/codex/timeline", PLAYER));
+    const timelineRaw = JSON.stringify(playerTimeline);
+    expect(timelineRaw).not.toContain("Paid the toll");
+    expect(timelineRaw).not.toContain(secretFaction);
+    expect((playerTimeline.data.records as Json[]).some((row) => row.kind === "standing")).toBe(false);
+    // The GM still has it, so the absence above is the gate and not a missing record.
+    expect(JSON.stringify(await body(await get(base, "/api/v1/codex/timeline", GM)))).toContain("Paid the toll");
 
     // CT-7 / CD-6: the party pin, revealed, on a HIDDEN map.
     const secretMap = await makeMap(base, "The Under-dark", false);

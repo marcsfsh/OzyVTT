@@ -863,7 +863,17 @@ export type CodexRevealAuditSection = Readonly<{
  * table has its own visibility system with different rules, and folding it in would make this the second
  * place that decides what a player can see — precisely the risk CT-9 is written against.
  */
-export type CodexRevealAudit = Readonly<{ sections: readonly CodexRevealAuditSection[] }>;
+export type CodexRevealAudit = Readonly<{
+  sections: readonly CodexRevealAuditSection[];
+  /**
+   * The server's own whole-codex totals. Mirrored because they exist and are `required` in the published
+   * document — the client was re-deriving `revealed` by summing sections, which is the same number only
+   * while every section is present. This surface explicitly handles a malformed answer with sections
+   * missing, and in exactly that case the sum under-counts where the server's figure is right.
+   */
+  revealed: number;
+  total: number;
+}>;
 
 export const revealAuditApi = {
   get: (token: string) => request<{ audit: CodexRevealAudit }>(token, "/reveal-audit").then((data) => data.audit)

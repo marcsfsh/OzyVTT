@@ -3371,9 +3371,22 @@ export class CodexStore {
     const pageId = id(factionPageId);
     const page = this.pageRow(pageId);
     if (!page) throw new CodexNotFoundError("That faction page no longer exists.");
-    if (page.entity_type !== "faction") throw new Error("Standing is tracked against a faction - pick a faction page.");
-    const next = standingValue(value);
     const existing = this.standingRowRaw(pageId);
+    /**
+     * The entity type is required to START tracking standing, not to keep tracking it.
+     *
+     * The spec asks for `faction_page_id` to reference a page "with `entity_type = 'faction'`", which SQLite
+     * cannot express (a CHECK may not subquery), so it is enforced here. But enforcing it on EVERY write
+     * created a trap: change a faction page's type afterwards and its standing row becomes permanently
+     * uneditable while STILL being projected to players — a player-visible number the GM could not zero,
+     * hide or correct. Found by adversarial review and reproduced through the real routes.
+     *
+     * Grandfathering an existing row keeps the bad state repairable, which matters more than refusing it
+     * tidily: the GM can always zero it, unreveal it, or delete the page. Creating a new row still requires
+     * a faction, so the rule holds where it is actually doing work.
+     */
+    if (!existing && page.entity_type !== "faction") throw new Error("Standing is tracked against a faction - pick a faction page.");
+    const next = standingValue(value);
     // Measured against the CLAMPED previous value (`toStanding`'s), not the raw column, so the deltas on the
     // timeline always sum to the number the bar shows. A hand-edited row holding 500 reads as 100
     // everywhere; a delta computed from 500 would describe a move nobody could see.

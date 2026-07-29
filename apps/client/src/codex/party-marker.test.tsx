@@ -101,18 +101,29 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
     expect(pin.querySelector(".codex-marker-partyring")).toBeNull();
   });
 
-  it("the atlas says where the party is in its own chrome, and says nothing when the pin is elsewhere", async () => {
+  it("the atlas says where the party is in its own chrome", async () => {
     await renderAtlas([MARKER({ isParty: true })]);
     expect(await screen.findByText(/The party is on this map/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show the pin" })).toBeInTheDocument();
+  });
 
-    // A map with no party pin makes NO claim either way: markers are listed per map, so this view
-    // genuinely does not know where the party is when it is not here.
-    listMarkers.mockResolvedValue([MARKER()]);
-    const { unmount } = render(<AtlasView gmToken="gm" scenes={[]} activeSceneId={null} onOpenPage={vi.fn()} onActivateScene={vi.fn()} />);
-    await waitFor(() => expect(listMarkers).toHaveBeenCalledTimes(2));
-    expect(screen.queryAllByText(/is not on this map/)).toHaveLength(0);
-    unmount();
+  /**
+   * A map whose pins are NOT the party says nothing about the party.
+   *
+   * This replaces an assertion that could not fail. It searched for `/is not on this map/` — a phrase no
+   * implementation produces — inside a DOM that still held the previous render, because the first
+   * `render()` was never unmounted. An adversarial review proved it vacuous by replacing
+   * `markers.find(m => m.isParty)` with `markers[0]`, so every map with any pin announced the party: all
+   * 180 client tests passed.
+   *
+   * Written as its own test with ONE render and the real phrase, so the claim is "this map does not say the
+   * party is here" — which is what CT-7 actually requires, and what the mutation breaks.
+   */
+  it("says nothing about the party on a map whose pins are not the party", async () => {
+    await renderAtlas([MARKER({ isParty: false })]);
+    await waitFor(() => expect(listMarkers).toHaveBeenCalled());
+    expect(screen.queryByText(/The party is on this map/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show the pin" })).not.toBeInTheDocument();
   });
 });
 

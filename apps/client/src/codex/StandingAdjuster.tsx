@@ -21,6 +21,13 @@ import { RevealSwitch } from "./SecretMarkers";
  * `{ factionPageId, delta, reason }` — so a standing that moved without the timeline saying why is not a
  * state this client can produce.
  */
+/**
+ * The server's bound, stated here so an over-long reason is a field that stops accepting characters rather
+ * than a raw "String must contain at most 120 character(s)" in the dialog's error strip. The milestone
+ * composer already does this with `MILESTONE_REASON_MAX`; this input was the one that did not.
+ */
+const STANDING_REASON_MAX = 120;
+
 export function StandingAdjuster({ gmToken, factionPageId, factionName, standing, onSaved, onClose }: Readonly<{
   gmToken: string;
   factionPageId: string;
@@ -80,7 +87,7 @@ export function StandingAdjuster({ gmToken, factionPageId, factionName, standing
             value={value} onChange={(event) => setValue(event.target.value)} />
         </Field>
         <Field label="Why it moved" htmlFor="standing-reason" help="Recorded on the chronicle with the change. Required — a standing that moved for no stated reason is a number nobody can explain later.">
-          <Input id="standing-reason" value={reason} disabled={busy} placeholder="Returned the Duke's signet"
+          <Input id="standing-reason" maxLength={STANDING_REASON_MAX} value={reason} disabled={busy} placeholder="Returned the Duke's signet"
             onChange={(event) => setReason(event.target.value)} />
         </Field>
 

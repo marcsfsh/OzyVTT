@@ -253,16 +253,24 @@ describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => 
     expect(projectGmChronicleRecord({ kind: "entry", entry: milestone }).payload).toEqual({ level: 5, reason: "Cleared the crypt" });
   });
 
-  it("carries a revealed standing record's DELTA and reason, and nulls the faction id when that page is secret", () => {
+  it("carries a revealed standing record's DELTA and reason, and HIDES it whole when the faction is secret", () => {
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: standing }, playerContext())).toBeNull();
     const revealed = { ...standing, revealedToPlayers: true };
 
-    // Faction page secret: the change and the reason travel, the id does not - the row still stands on its
-    // own prose, and a published record must not advertise a faction the party has never met.
-    const withoutFaction = projectPlayerChronicleRecord({ kind: "entry", entry: revealed }, playerContext())!;
-    expect(withoutFaction.kind).toBe("standing");
-    expect(withoutFaction.payload).toEqual({ factionPageId: null, delta: -15, reason: "Killed their envoy" });
-    expect(JSON.stringify(withoutFaction)).not.toContain(FACTION_ID);
+    /**
+     * Faction page secret: the record is hidden WHOLE, not merely stripped of its id.
+     *
+     * This assertion is the inverse of what it first said. The original nulled `factionPageId` and let
+     * `delta` and `reason` travel, justified by "the row still stands on its own prose" — but `setStanding`
+     * writes `playerText: ""`, so there is no prose, and what actually shipped to a player was
+     * "A faction - up 70 · The party paid the toll" for a faction they had never heard of. Found by an
+     * adversarial review and reproduced through the real HTTP routes before this changed.
+     *
+     * Asking "is the thing this record is ABOUT visible?" is not O-2's forbidden kind filter — it is the
+     * question `projectPlayerMarker` asks about a pin's map and `projectPlayerStanding` asks about this very
+     * faction page. The two standing surfaces now give the same answer.
+     */
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: revealed }, playerContext())).toBeNull();
 
     // Faction page revealed: the id travels too, so the client can name the faction.
     const withFaction = projectPlayerChronicleRecord({ kind: "entry", entry: revealed }, { ...playerContext(), revealedPageIds: new Set([FACTION_ID]) })!;

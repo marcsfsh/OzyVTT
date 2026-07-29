@@ -471,9 +471,15 @@ export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days
  * timeline row reading "something changed with someone". `reason` travels for the same reason a downtime's
  * `activity` does. What does NOT travel unconditionally is `factionPageId`: it is nulled unless that page is
  * itself revealed, the same filter `projectPlayerQuest` applies to `entityIds` and `projectPlayerMap` to
- * `parentMapId`, so a published standing record can never advertise a faction the party has never met.
- * The row still stands on its own prose (`playerText`) when the id is dropped, which is why nulling the
- * field is right here and hiding the whole row is right on the standing TABLE (see `projectPlayerStanding`).
+ * `parentMapId`.
+ *
+ * **CORRECTION.** This comment used to end "the row still stands on its own prose (`playerText`) when the
+ * id is dropped, which is why nulling the field is right here and hiding the whole row is right on the
+ * standing TABLE". That premise was false: `setStanding` writes `playerText: ""` unconditionally, so a
+ * standing record has NO prose to stand on, and nulling the id alone shipped "A faction - up 70 · The party
+ * paid the toll" to a table that had never heard of that faction. A record whose faction is secret is now
+ * hidden WHOLE, matching `projectPlayerStanding` — see the gate in `projectPlayerChronicleRecord`. The
+ * per-field filter below still applies, as the second line of defence rather than the only one.
  */
 export type GmCodexMilestone = Readonly<{ level: number; reason: string }>;
 export type PlayerCodexMilestone = Readonly<{ level: number; reason: string }>;
@@ -694,6 +700,28 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
   if (record.kind === "entry") {
     const projected = projectPlayerJournalEntry(record.entry, context);
     if (!projected) return null;
+    /**
+     * A `standing` record whose faction page is unrevealed is HIDDEN WHOLE, exactly as the standing TABLE
+     * row is (`projectPlayerStanding`). This is not a kind filter in O-2's sense - it does not ask "is this
+     * a standing?", it asks "is the thing this record is ABOUT visible?", the same question
+     * `projectPlayerMarker` asks about a pin's map (CD-6) and `projectPlayerQuest` about a linked page.
+     *
+     * Nulling `factionPageId` alone is not enough, and the reasoning that said it was rested on a false
+     * premise: it claimed "the row still stands on its own prose", but `setStanding` writes
+     * `playerText: ""` unconditionally, so there is no prose. What shipped was a row reading
+     * "A faction - up 70 · The party paid the toll" for a faction the party has never heard of - the
+     * existence of a secret faction, the size of the move, and the sentence that caused it. Measured
+     * against the real routes, not argued.
+     *
+     * The client said the same thing in `PlayerCodex.tsx` about the standing CARD ("a nameless bar reading
+     * 'Hunted' would tell the table that something they have never been told about is hunting them"). The
+     * two surfaces now agree, which is the point.
+     */
+    if (record.entry.kind === "standing") {
+      const payload = record.entry.payload;
+      const faction = payload !== null && "delta" in payload ? payload.factionPageId : null;
+      if (faction === null || !(context.revealedPageIds ?? EMPTY_PAGE_IDS).has(faction)) return null;
+    }
     // O-2: NO kind filter here or anywhere. A deadline and a downtime are gated by the ordinary reveal flag
     // - the one `projectPlayerJournalEntry` just applied - and by nothing else, so a revealed deadline is
     // exactly as visible as a revealed note. `payload` still rides through the per-kind allow-list.
@@ -960,6 +988,22 @@ export type CodexRevealAudit = Readonly<{ sections: readonly CodexRevealAuditSec
  * true by construction rather than by a reviewer's say-so, and so a future tightening of any player
  * projection tightens the audit with it.
  */
+/**
+ * What an audit row calls a record that carries no player-facing prose of its own. Keyed by journal kind so
+ * a seventh kind is a compile error rather than a silent blank line (the same discipline `chronicleKindOf`
+ * and `CHRONICLE_KIND_META` follow). Deliberately not the client's `CHRONICLE_KIND_META` labels: those are a
+ * reading rule on the client and this is a server payload, and one import across that boundary to save six
+ * words would be the wrong trade.
+ */
+const AUDIT_JOURNAL_FALLBACK: Readonly<Record<CodexJournalKind, string>> = {
+  note: "Journal entry",
+  combat: "Battle",
+  deadline: "Deadline",
+  downtime: "Downtime",
+  milestone: "Milestone",
+  standing: "Faction standing changed"
+};
+
 function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
   switch (record.kind) {
     case "page": {
@@ -977,7 +1021,17 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
     }
     case "journal": {
       const projected = projectPlayerJournalEntry(record.entry, record.sessionContext);
-      return projected === null ? null : { kind: "journal", id: projected.id, title: excerpt(projected.text) };
+      if (projected === null) return null;
+      /**
+       * A row on THIS surface must name itself. `excerpt(text)` alone did not: `setStanding` writes a
+       * standing record with an empty player text, so every revealed standing change rendered as a blank
+       * line with a Hide button beside it — on the one screen whose whole job is telling the GM what the
+       * party can see, the GM could not tell what they were about to hide. That was the DEFAULT for a whole
+       * kind, not an edge case. An unlabelled pin has the same problem and always has.
+       *
+       * So: the record's own text when it has any, else what KIND of record it is. Never an empty string.
+       */
+      return { kind: "journal", id: projected.id, title: excerpt(projected.text) || AUDIT_JOURNAL_FALLBACK[record.entry.kind] };
     }
     case "session": {
       const projected = projectPlayerSession(record.session);

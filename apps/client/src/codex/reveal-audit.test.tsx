@@ -55,11 +55,21 @@ const KINDS: readonly CodexRevealAuditKind[] = ["page", "map", "marker", "journa
 const section = (kind: CodexRevealAuditKind, rows: Array<{ id: string; title: string }>, total = rows.length): CodexRevealAuditSection =>
   ({ kind, revealed: rows.length, total, rows: rows.map((row) => ({ kind, ...row })) });
 
-/** A well-formed answer with nothing revealed: all seven sections present, all empty. */
-const EMPTY: CodexRevealAudit = { sections: KINDS.map((kind) => section(kind, [])) };
+/**
+ * Wraps a section list into the whole answer, deriving the codex-wide totals the way the SERVER does.
+ * The surface reads `audit.revealed` rather than summing sections, because the sum is only the same number
+ * while every section is present — and the malformed case below is exactly when it is not.
+ */
+const answer = (sections: readonly CodexRevealAuditSection[]): CodexRevealAudit => ({
+  sections,
+  revealed: sections.reduce((sum, entry) => sum + entry.revealed, 0),
+  total: sections.reduce((sum, entry) => sum + entry.total, 0)
+});
 
-const AUDIT: CodexRevealAudit = {
-  sections: [
+/** A well-formed answer with nothing revealed: all seven sections present, all empty. */
+const EMPTY: CodexRevealAudit = answer(KINDS.map((kind) => section(kind, [])));
+
+const AUDIT: CodexRevealAudit = answer([
     section("page", [{ id: "p1", title: "Strahd" }], 12),
     section("map", [{ id: "m1", title: "Barovia" }], 3),
     section("marker", [{ id: "k1", title: "Vallaki" }], 8),
@@ -68,8 +78,7 @@ const AUDIT: CodexRevealAudit = {
     section("quest", [{ id: "q1", title: "Find the Sunsword" }], 5),
     // Addressed by the FACTION PAGE id, which is what the standing reveal route takes.
     section("standing", [{ id: "f1", title: "The Zhentarim" }], 2)
-  ]
-};
+]);
 
 const renderAudit = async (audit: unknown = AUDIT) => {
   getAudit.mockResolvedValue(audit);
@@ -116,7 +125,7 @@ describe("It aggregates; it does not decide (CT-9's stated risk)", () => {
     // rows than there are flagged records — a pin on a hidden map is flagged and still invisible. The
     // surface must report the answer it was given rather than recomputing anything: here `total` is 8
     // and one row came back, and the screen says exactly that.
-    await renderAudit({ sections: [...EMPTY.sections.filter((s) => s.kind !== "marker"), section("marker", [{ id: "k1", title: "Vallaki" }], 8)] });
+    await renderAudit(answer([...EMPTY.sections.filter((s) => s.kind !== "marker"), section("marker", [{ id: "k1", title: "Vallaki" }], 8)]));
 
     expect(within(sectionOf("Map pins")).getByText("Vallaki")).toBeInTheDocument();
     expect(within(sectionOf("Map pins")).getByText("1 of 8 shared")).toBeInTheDocument();
