@@ -601,6 +601,72 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex Phase 4 M9 — sessions, prep and recap (2026-07-29).** Delivers **CT-1, CT-2, CT-3** and
+  **CP-9's session half** — the milestone the owner called the key part. M10–M12 remain.
+  - **The session is a record.** Migration **v13** adds `codex_sessions` (two-layer: `prep_body` GM-only,
+    `recap_body` player-facing behind `revealed`) plus `codex_meta.active_session_id`. The active pointer
+    lives on the one-row meta table so "exactly one active session" is *structural* — a flag column on
+    `codex_sessions` would have made it a convention every write has to remember.
+  - **No backfill, by owner decision.** Legacy `codex_journal.session_number` integers keep grouping
+    entries exactly as before; a numbered group gains a real record only when the GM creates one, at which
+    point the existing entries join it with nothing rewritten. Proven on a genuine v12 database built from
+    the shipped migration SQL and filled with legacy rows.
+  - **Auto-linking delivers CT-1's "automatic".** With a session active, `createEntry` and
+    `appendCombatEntry` default to its number; an explicit value always wins, including an explicit
+    `null`; with nothing active the behaviour is byte-for-byte pre-M9. This is also CP-9's session half —
+    combat entries hardcoded `sessionNumber: null` before, which is why that half was undeliverable until
+    sessions existed.
+  - **Viewer safety is structural on the client, not procedural.** `CampaignSession` — the type
+    `CampaignHome` accepts — is exactly the player projection's four keys, with deliberately no `prep`
+    field even as an optional. The dashboard is rendered by both audiences, so a type that *could* carry
+    prep would put it one careless spread from the player. Verified live against a running server with a
+    real player token: the player receives exactly `id,realDate,recap,sessionNumber`; prep, attendees, an
+    unrevealed session and `activeSessionId` are all absent; a direct GET of an unrevealed session is 404.
+  - **CT-3's badge cannot use `updatedAt`, and the spec's assumption that it could was wrong in both
+    directions.** `setSessionRevealed` deliberately does not move `updated_at` (CI-9), so the one event the
+    badge exists for would never fire it; and `updated_at` *does* move on prep edits, so it would announce
+    GM activity a player must not infer. The badge counts revealed sessions this reader has not opened,
+    keyed by id — already in the projection, nothing new exposed.
+  - **A defect only the browser pass could find.** The dashboard card was headed "Next session" for both
+    audiences, but a player only ever sees a *revealed* recap — by definition a session already played —
+    so their card announced the last game as the next one. Every test passed, because they asserted the
+    string they were written against. The player's copy now reads "Latest recap".
+  - **Adversarial review found two more.** Sessions were absent from `exportBundle`, so a GM backup
+    silently dropped every session — worse here than for any other record type, because `prepBody` exists
+    nowhere else in the codex and the backup was its only copy. And a viewer-safety test asserted the
+    absence of a prep string that was *unreachable* from the render it guarded; it would have passed with
+    `{session.prepBody}` rendered verbatim. Both fixed and mutation-proven.
+  - **New: a route↔contract mount test the Codex has never had** — and the homebrew one it was to be
+    copied from is **vacuous**. That test treats the router's headers as proof a path is mounted; measured,
+    `GET /completely/unrelated/path` returns 404 carrying both `x-request-id` and `cache-control: no-store`,
+    because `router.use(...)` is declared with no path and the router mounts bare. The Codex version reads
+    Express's real route table and checks methods as well as paths — PATCH→PUT fails only the method
+    assertion, which is the case a path check structurally cannot catch.
+  - **`Drawer` is a new `@vtt/ui` primitive** (R9), non-modal by construction: an `<aside>`, never
+    `<dialog>.showModal()`, so the console is usable alongside the mode behind it, and Escape closes it
+    only from inside. First consumer of the previously unused `--ease-drawer` token.
+  - **Recorded scope stretch (2 areas outside the Owns list):** `@vtt/ui` + `/styleguide` for `Drawer`
+    (R9 requires it; the Owns list omitted it), and `apps/client/src/main.tsx` for CT-3's badge, which sits
+    on the player's "Open Codex" button outside the Codex entirely.
+  - **Corrections to the M9 contract during integration:** the reveal field is `revealedToPlayers`,
+    matching every other record type; `status` carries a `CHECK` like every comparable v1 enum; a duplicate
+    `sessionNumber` is a 400, not a 409.
+  - **Open, awaiting the owner:** auto-linking publishes the *active* session's number to players even when
+    that session is unrevealed (see `known-bugs.md`).
+  - **Verified.** `check` / `test` / `build` all exit 0; **1232 passed + 1 skipped** (baseline 1196 — see
+    the correction below). Browser pass at 1440px and 375px against a **populated** database: 0 sub-floor
+    controls across Pages (65 controls), the session full view (64) and the open console drawer, and no
+    real horizontal scroll on any of them.
+
+- **Corrections to earlier ledger claims (2026-07-29).**
+  - **The M8 handoff and this file both say "1206 tests". The real number was 1196 passed + 1 skipped.**
+    The handoff's own per-workspace breakdown (89/834/36/80/108/19/18/12) sums to 1196; every component
+    figure is right and only the total is wrong.
+  - **`scrollWidth` is not a valid horizontal-overflow test in this app.** A closed `Menu` panel is still
+    laid out off-screen, so `document.documentElement.scrollWidth` reads 734 on a 375px viewport while
+    `window.scrollTo(900, 0)` leaves `scrollX` at 0 — nothing is cut off and nothing scrolls. Any overflow
+    figure measured by scrollWidth alone should be re-measured by whether `scrollX` can actually move.
+
 - **Codex Phase 4 M8 — chronicle unification (2026-07-28).** Delivers **CT-11, CT-12**. First Phase 4
   milestone; M9–M12 remain, see `docs/product/codex-phase4-handoff.md`.
   - **One timeline.** Migration **v12** gives `codex_pages` the same five dating columns `codex_journal`

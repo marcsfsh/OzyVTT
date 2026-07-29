@@ -7,6 +7,51 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-29 — M9: four owner decisions on sessions, prep and recap
+
+Put to the owner before implementation, because each materially changes behaviour and none had a safe
+default in the spec.
+
+**No backfill of legacy `session_number`.** The spec recommended minting a `codex_sessions` row per
+distinct non-null number found in `codex_journal`; the owner declined. Existing numbered entries therefore
+keep grouping exactly as they did, under a number with no record behind it, and a group becomes openable
+only once the GM creates that session for real — at which point the entries join it with nothing rewritten.
+This is strictly safer than the recommendation: it invents no prep, recap or attendance nobody wrote, and
+guesses at no numbers. The by-session lens degrades gracefully rather than lying.
+
+**An active session exists, and new records attach to it.** CT-1 asks for "automatic links to the journal
+entries and encounters"; nothing was automatic, and `appendCombatEntry` hardcoded `sessionNumber: null` —
+which is precisely why CP-9's session half was undeliverable before M9. The pointer lives on `codex_meta`,
+so "exactly one active session" is structural rather than a rule every write must remember.
+
+**CT-3's recap badge ships, and it is keyed on session id, not a timestamp.** The requirement names a "new
+since you last looked" indicator on the Codex button — which lives in `main.tsx`, outside the Codex and
+outside M9's Owns list. Included anyway, because partial delivery of an approved requirement is the worse
+outcome; the out-of-Owns file is recorded as a stated stretch. The spec assumed the badge compares
+`updatedAt`; it cannot. Reveal deliberately does not move `updated_at` (CI-9), so the one event the badge
+exists for would never fire it, and prep edits *do* move it, so it would broadcast GM activity a player
+must not infer.
+
+**Sessions are Codex-only (U-3 default), and do not join `/codex/timeline`.** A session has no
+`calendarInstant`, and `compareChronicle` sorts every undated record below every dated one, so sessions
+would clump beneath their own entries. M8 had already set the precedent of adding a route rather than
+widening one.
+
+## 2026-07-29 — Two measurement methods this repo should stop trusting
+
+Both found while verifying M9, both contradicting something previously written down.
+
+**`scrollWidth` does not measure horizontal overflow here.** A closed `Menu` panel is still laid out
+off-screen, so `documentElement.scrollWidth` read 734 against a 375px viewport while the page did not
+scroll at all — `window.scrollTo(900, 0)` left `scrollX` at 0. The honest test is whether `scrollX` can
+move. Any prior overflow figure obtained by subtracting `clientWidth` from `scrollWidth` is suspect.
+
+**A router-header probe cannot prove a route is mounted.** `homebrew-http.test.ts` requests each declared
+path and treats the presence of `x-request-id` / `cache-control` as proof of mounting. Because
+`router.use(...)` carries no path and the router is mounted bare, those headers come back for any path
+whatsoever — `/completely/unrelated/path` returns 404 with both. M9's Codex equivalent enumerates Express's
+real route table instead, and checks methods as well as paths.
+
 ## 2026-07-28 — Stage Six: the world calendar is player-readable by design (accepted, not overlooked)
 
 The final viewer-safety audit found exactly one un-gated GM-authored value in the whole Codex, and asked

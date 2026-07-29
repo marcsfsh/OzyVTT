@@ -10,6 +10,38 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — OPEN,
+  awaiting an owner decision (2026-07-29, M9).** Reproduced live: a GM creates session 4, leaves it
+  unrevealed and activates it; any revealed journal entry written during play carries `sessionNumber: 4`
+  to the player, who sees "Session 4", while their session list shows only `[3]` and a direct fetch of
+  session 4 is 404. Content never travels — no prep, attendees or recap — only the ordinal and the fact
+  that the session exists.
+  **Not a new channel:** `sessionNumber` was already in the player journal projection before M9
+  (`7e6480d:183`, and in the pre-M9 exact-key-set assertion). What M9 changed is that the number now
+  arrives *automatically*, where a GM previously had to type it.
+  **Why it is still worth a decision:** the routes go to real trouble to return 404-not-403 on an
+  unrevealed session and to null `activeSessionId` for players, both on the stated grounds that a
+  session's existence is GM information. Auto-linking routes around that.
+  Options put to the owner: (1) accept, and soften the 404-not-403 rationale so it stops over-claiming;
+  (2) null `sessionNumber` in the player projection when a real session record exists for it and is
+  unrevealed — legacy numbers with no record behind them unaffected, so nothing that works today changes;
+  (3) do not auto-link to an unrevealed session — rejected in advance, it breaks the prep workflow the
+  feature exists for.
+
+- **[codex] `.codex-back` ("‹ All pages" / "‹ All sessions") is sub-floor** — 13px text with no
+  `min-height`. Pre-existing; M9 reuses it for the session log rather than adding a third variant.
+  Widening it also unclamps other surfaces, so it wants its own pass.
+
+- **[tooling] `apps/server/test/homebrew-http.test.ts`'s per-path mount probe is vacuous.** It asserts the
+  router's own headers prove a path is mounted; because `router.use(...)` is declared with no path and the
+  router mounts bare, those headers come back for *any* path — measured, `/completely/unrelated/path`
+  returns 404 carrying both. Its path-set assertion is sound; only the probe loop proves nothing. Left
+  alone as another milestone's file; the Codex equivalent added in M9 reads Express's route table instead.
+
+- **[codex] `GET /codex/export` documents a round-trip that does not exist.** `CodexExportData` is
+  described as "round-trips via the codex import surface", but no route ingests a bundle — the client's
+  Import reads `.md`/`.txt` files and creates pages. The export is a one-way backup. Pre-existing.
+
 - **[mobile] The encounter *replay viewer* overflows horizontally at 390px (~99px).** **Pre-existing, not
   introduced by the Codex overhaul** — proven by measuring both paths at 390px: opening a replay via the
   existing "▶ Watch" button on the Replays list (`ReplayPanel.tsx:221`) gives the same 99px as arriving via
