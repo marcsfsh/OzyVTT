@@ -7,6 +7,61 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-29 — M12: three decisions closing the campaign-tracking programme
+
+**M12-A — the reveal audit covers Codex records only**, not tokens, fog, or the shared table viewer.
+This is the spec's own recorded default for open question **U-5**, and the owner confirmed it. The table
+side has its own visibility system with different rules; folding it in would make CT-9 the second place
+that decides what a player can see, which is precisely what its "read-only aggregation" risk warns against.
+
+**M12-B — standing is signed −100…+100 on seven tiers, always read as a word.**
+`Hunted · Hostile · Unfriendly · Uninvested · Friendly · Allied · Exalted`. The owner specified the middle
+five verbatim — notably **`Uninvested` rather than `Neutral`**, because a faction that has taken no
+position is not the same as one that has weighed the party and landed at zero — and delegated the outer
+two. `Hunted` is below Hostile (the faction is not merely against the party, it is coming for them);
+`Exalted` is above Allied (not merely allies but honoured within it). Bands are symmetric with
+`Uninvested` centred, so neutral is genuinely neutral.
+
+**The tier table is a reading rule, not stored state.** It lives in `chronicle.ts` beside
+`CHRONICLE_KIND_META`; the server stores only the integer. Tiers can be renamed or rebanded later with no
+migration and no record rewritten. `Meter` is reused unmodified (it is shared with token health) and the
+signed value is mapped onto its unsigned range at the call site.
+
+**M12-C — one party marker for the whole atlas**, not one per map. "The party is in exactly one place"
+needs no reconciliation rule; one-per-map would leave "which pin is real?" unanswerable and require the GM
+to keep several in step by hand. Enforced by a partial unique index as well as in code.
+
+## 2026-07-29 — M12: the reveal audit reports VISIBILITY, not flags
+
+The Director's contract told the implementer to build CT-9's membership from the existing **GM**
+projections. That was wrong twice over, and the server-boundary agent caught it rather than complying.
+
+Every GM projection is an identity passthrough, so membership would have had to come from re-reading each
+record's own `revealed` column — the exact `revealed = 1` predicate the same paragraph forbids two
+sentences later. Worse, for two of the seven kinds the flag is simply not the answer: **a marker revealed
+on a hidden map** (CD-6: a player 404s on the map before a single pin is projected) and **a standing
+revealed for an unrevealed faction** are both flagged revealed and neither is player-visible.
+
+An audit built on flags therefore tells the GM their players can see things they cannot — on the one
+screen whose entire purpose is answering that question. Membership now runs the **player** projections
+directly: the audit asks the same code that serves the party. It is structurally incapable of becoming a
+second source of truth, because it holds no predicate of its own.
+
+Proven directly rather than argued: with a pin revealed on a secret map and a standing revealed for a
+secret faction, the audit reports zero visible for both and its counts match what a real player token
+receives; a flag-based audit would have reported both.
+
+## 2026-07-29 — M12 (operating): a stale dev server silently serves old code
+
+While verifying M12 the Director recorded a defect that did not exist — the faction-only guard on standing
+appeared to accept a character page over HTTP while refusing it at the store. The cause was a **stale
+`tsx` server still holding port 3199**: a kill loop matched the npm/sh wrappers but left the node child
+alive, the replacement logged "server ready" without binding, and every probe went to the old process.
+
+**Before trusting any HTTP probe: kill by PID, then confirm the port actually returns nothing.** A server
+that answers is not evidence that it is running the code you just wrote. This cost a false finding that
+was only caught by testing the same guard directly at the store layer and getting the opposite answer.
+
 ## 2026-07-29 — M11 (operating): implementation contracts must not forbid regenerating the docs
 
 The M11 agent contract forbade running `npm run docs:generate` and `npm run map`, reserving both for the

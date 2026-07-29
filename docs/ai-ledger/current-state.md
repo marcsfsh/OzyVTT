@@ -601,6 +601,49 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex Phase 4 M12 — standing, party marker, milestones, reveal audit (2026-07-29).** Delivers
+  **CT-6, CT-7, CT-8, CT-9** and **completes the campaign-tracking programme** (M8–M12). All 12 CT
+  requirements plus CP-9's session half are now built.
+  - **Faction standing (CT-6)** — `codex_standing` (migration v16, additive: M11's rebuild already widened
+    the journal `kind` CHECK to cover `milestone` and `standing`, so no second rebuild). Signed
+    **−100…+100**, one row per faction, `revealed` like anything else. Setting a value writes the row
+    **and** appends its `standing` chronicle record in **one transaction** — a standing that moved without
+    the timeline saying why is not a state this can produce. `delta` on the record is the change, not the
+    new value. **Restricted to pages whose `entity_type` is `faction`**: the spec asks for that as a
+    foreign key, SQLite cannot express it (a CHECK may not subquery), so it is enforced in TS and is
+    HTTP-visible as a 400.
+  - **Seven tiers, owner-specified**: `Hunted · Hostile · Unfriendly · Uninvested · Friendly · Allied ·
+    Exalted`. The owner gave the middle five verbatim and delegated the outer two. Bands are symmetric
+    with `Uninvested` centred (−14…+14). The tier table is a **reading rule** in `chronicle.ts`, not
+    stored state — the server keeps only the integer, so tiers can be renamed or rebanded with no
+    migration. R2: the word always renders as text beside the bar. `Meter` was **not** modified.
+  - **Party marker (CT-7)** — an `is_party` flag on `codex_markers` with a **partial unique index**, so
+    exactly one pin is the party atlas-wide (M12-C). It projects through the ordinary marker path: the
+    player key set is **identical** to any other revealed pin's, and a party pin on a hidden map stays
+    hidden. Verified by comparing key sets rather than guessing a forbidden-field list.
+  - **Milestones (CT-8)** — `kind='milestone'` with `{ level, reason }`, composed from the existing
+    composer's kind switch rather than a fourth composer. No XP arithmetic (D-8).
+  - **The reveal audit (CT-9) — the Director's contract was wrong here, and following it would have made
+    the audit lie.** The contract said to build membership from the existing **GM** projections. Those are
+    identity passthroughs, so membership would have had to come from re-reading each record's own
+    `revealed` flag — the exact predicate the same paragraph forbids — and for two kinds that flag is not
+    the answer: **a marker revealed on a hidden map, and a standing revealed for an unrevealed faction,
+    are not player-visible.** An audit built that way tells the GM their players can see things they
+    cannot, on the one screen whose entire job is answering that question. Membership now runs the
+    **player** projections directly, so the audit reports what a player would actually receive, proven by
+    the same code path that serves them. Caught by the server-boundary agent, not by the contract.
+  - **Un-reveal reuses the existing per-kind reveal routes.** No unreveal route, no bulk operation — CT-9
+    is a view, not a writer. All seven sections are always present so "nothing revealed" and "not loaded"
+    cannot look alike.
+  - **R9: nothing new in `@vtt/ui`** — every control is an existing primitive or the existing dashboard
+    row chassis. `packages/ui` untouched.
+  - **Verified.** `check` / `test` / `build` all exit 0; **1396 passed + 1 skipped** (1331 at M11).
+    A 30-check end-to-end run against a live server on a fresh database, including the two cases the
+    contract got wrong: with a pin revealed on a secret map and a standing revealed for a secret faction,
+    the audit reports **zero** visible for both and its counts match what a real player token receives,
+    where a flag-based audit would have reported both.
+
+
 - **Codex Phase 4 M11 — deadlines and downtime (2026-07-29).** Delivers **CT-5** and **CT-10**. Excludes
   manual segment clocks (D-9). M12 remains.
   - **The spec's premise was wrong and the milestone is bigger than it reads.** §2.2 says "one additive
