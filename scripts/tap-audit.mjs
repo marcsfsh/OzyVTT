@@ -31,18 +31,40 @@ const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-cor
 const EXEC = process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const OUT = process.env.AUDIT_OUT ?? ".";
 const width = Number(process.argv[2] || 375);
+// The URL and password are OVERRIDABLE because they were hardcoded to one developer's dev server, and
+// a tool that has to be hand-edited before every run cannot serve its purpose - which is letting the
+// next session re-check the A-3 number rather than trust it. Defaults stay `npm run dev`, so the
+// documented invocation is unchanged; `npm run start` on :3001 now works with two env vars.
+const BASE = process.env.AUDIT_URL ?? "http://localhost:5173/";
+const PASSWORD = process.env.AUDIT_PASSWORD ?? "testpassword123";
 
 const b = await chromium.launch({ executablePath: EXEC, args: ["--no-sandbox"] });
 const p = await b.newPage({ viewport: { width, height: 900 }, hasTouch: true, isMobile: width < 700 });
-await p.goto("http://localhost:5173/", { waitUntil: "networkidle" });
+await p.goto(BASE, { waitUntil: "networkidle" });
 await p.getByText("Enter as GM").click();
 await p.waitForTimeout(400);
 const pw = p.locator('input[type="password"]').first();
-await pw.fill("testpassword123");
+await pw.fill(PASSWORD);
 await pw.press("Enter");
 await p.waitForTimeout(2400);
-await p.locator("text=Codex").first().click();
+// By ROLE, not by text. `locator("text=Codex")` matches any node containing the word, so it resolved to
+// an ancestor and every click timed out with "<main> intercepts pointer events" - which is why this tool
+// could not be run as committed. The GM tab strip is a real tablist; ask for the tab.
+//
+// `force` because the app plays an entrance transition after login (`.anim-view`), during which the
+// roster section still intercepts pointer events at the tab's coordinates. Waiting it out is timing
+// roulette on a slower machine. Forcing is right HERE and only here: this click is navigation to the
+// surface under test, not part of what is being measured - the measurement below does its own
+// elementFromPoint walk and would catch a genuinely unreachable control.
+const codexTab = p.getByRole("tab", { name: "Codex", exact: true });
+await codexTab.waitFor({ state: "visible", timeout: 15_000 });
+await codexTab.scrollIntoViewIfNeeded();
+await codexTab.click({ force: true });
 await p.waitForTimeout(1600);
+if ((await codexTab.getAttribute("aria-selected")) !== "true") {
+  // Fail loudly rather than measuring the wrong surface and reporting a reassuring zero.
+  throw new Error("tap-audit: the Codex tab did not become selected - the audit would measure the wrong surface.");
+}
 // The app sets `html { scroll-behavior: smooth }`; leave it on and every scrolled measurement is stale.
 await p.addStyleTag({ content: "html, * { scroll-behavior: auto !important; }" });
 
@@ -74,8 +96,15 @@ const MEASURE = `(() => {
     el.scrollIntoView({ block: "center", behavior: "instant" });
     const r2 = el.getBoundingClientRect();
     const cx = r2.left + r2.width / 2, cy = r2.top + r2.height / 2;
+    // The walk must be able to reach the control's OWN size, or every control taller than the cap is
+    // flagged unconditionally. The old fixed d <= 30 capped reach at 30*2+1 = 61, so a 64px type card
+    // and a 72px composer textarea could never demonstrate their full height and were reported as having
+    // taps stolen on every run - 7 false positives against a populated database. A false steal is the
+    // same disease as a false sub-floor: it sends the next reader to fix working code. Walk far enough
+    // to prove the control's own extent, and no further.
+    const maxD = Math.ceil(Math.max(44, h) / 2) + 1;
     let reach = 0;
-    for (let d = 1; d <= 30; d++) {
+    for (let d = 1; d <= maxD; d++) {
       const up = document.elementFromPoint(cx, cy - d), dn = document.elementFromPoint(cx, cy + d);
       // owner: a wrapping label counts as the control (see the size note above).
       const isOwn = (node) => node === el || el.contains(node) || node === owner || owner.contains(node);
@@ -96,10 +125,18 @@ const MEASURE = `(() => {
 const MODES = ["Pages", "Campaign", "Atlas", "Journal", "Graph"];
 const report = [];
 for (const mode of MODES) {
-  const tab = p.getByRole("tab", { name: mode });
+  const tab = p.getByRole("tab", { name: mode }).first();
   if (await tab.count() === 0) { report.push(`### ${mode}: TAB NOT FOUND`); continue; }
-  await tab.first().click();
+  // `force` for the same reason as the Codex tab above: the combat roster sits over these coordinates
+  // and intercepts, so a plain click times out. Switching modes is navigation, not the measurement.
+  await tab.scrollIntoViewIfNeeded();
+  await tab.click({ force: true });
   await p.waitForTimeout(1300);
+  if ((await tab.getAttribute("aria-selected")) !== "true") {
+    // Never measure a surface we did not actually reach - a silent zero is worse than a loud failure.
+    report.push(`### ${mode}: TAB DID NOT ACTIVATE - not measured`);
+    continue;
+  }
   const { out, error } = await p.evaluate(MEASURE);
   if (error) { report.push(`### ${mode}: ${error}`); continue; }
   const bad = out.filter((c) => c.h < 44 || c.w < 44);

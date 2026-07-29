@@ -10,12 +10,26 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
-- **[tooling] `scripts/tap-audit.mjs` cannot be run as committed.** It hardcodes
-  `http://localhost:5173/` and the password `testpassword123`, and navigates with
-  `p.locator("text=Codex").first().click()`, which at 375px resolves ambiguously and times out with
-  "&lt;main&gt; intercepts pointer events". Every run in M9 and M10 needed a patched copy. The tool exists so
-  the A-3 number stays checkable by the next session; as committed it is not. Wants URL/password env
-  overrides and a `getByRole("tab", { name: "Codex" })` selector — small, but outside M10's scope.
+- **[codex] The Graph's sub-floor node count is data-dependent, not 3.** `known-bugs` has recorded "the
+  Graph's 3 remain by design" since Stage Six. Measured against a populated database (10 pages) the audit
+  reports **30** — the nodes are 36–40px and there is one entry per node element, so the figure scales
+  with the campaign. The design decision is unchanged; the number is not a constant and should not be
+  quoted as one.
+
+- **[tooling] `scripts/tap-audit.mjs` could not be run as committed — FIXED 2026-07-29.** It hardcoded
+  `http://localhost:5173/` and the password `testpassword123`, and navigated by `text=Codex`, which
+  matches any ancestor containing the word and timed out with "&lt;main&gt; intercepts pointer events". Every
+  run in M9 and M10 needed a hand-patched copy, which defeats the point of committing it. Now takes
+  `AUDIT_URL` / `AUDIT_PASSWORD` (defaults unchanged, so the documented `npm run dev` invocation still
+  works), selects tabs by role, forces the two navigation clicks the combat roster intercepts, and
+  **throws rather than measuring a surface it failed to reach** — a silent zero is worse than a loud
+  failure. Verified end to end against `npm run start` on :3001 with env vars only, no edits.
+
+- **[tooling] The audit's "taps stolen" column reported 7 false positives — FIXED 2026-07-29.** The
+  outward walk was capped at 30 steps, so reach could never exceed 61px; every control TALLER than 61px
+  was therefore flagged unconditionally — 5 Campaign type cards (64px) and 2 Journal composer textareas
+  (72px), on every run against a populated database. The walk is now bounded by the control's own size.
+  This is the second arithmetic defect found in that predicate; the first was fixed in Stage Six.
 
 - **[tooling] The tap audit over-reported label-wrapped controls — FIXED 2026-07-29 (M10).** A checkbox
   painting 20×20 inside a 44×44 `&lt;label&gt;` was reported sub-floor, though a tap anywhere in the label
