@@ -102,9 +102,11 @@ export function CampaignHome({
    */
   onOpenSession?: (sessionId: string) => void;
   /**
-   * R1: opens the quest log ON this quest. Omitted by the player Codex, which has no quest log to open —
-   * the card is then the readout it already is for them, with nothing to tap. Same capability flag the
-   * session card uses to tell the two callers apart, so this component still knows nothing about roles.
+   * R1: opens THIS quest — the GM's quest log, or the player's quest reader. Both audiences now supply
+   * it, because both have somewhere for a quest to open; it stays optional so a caller without a
+   * destination still renders a card (the row falls back to a readout rather than a button that
+   * navigates nowhere). Still a capability flag, never a role check: this component cannot tell, and
+   * must not be able to tell, which audience it is rendering for.
    */
   onOpenQuest?: (questId: string) => void;
   onCreate?: () => void;
@@ -130,7 +132,11 @@ export function CampaignHome({
   /**
    * M10: the open quests, the same predicate for both audiences (`openQuests`). Sliced to five for the
    * same reason `recentEntries` is: this is a dashboard, and a campaign with thirty live threads must
-   * not push every other section below the fold. The quest log is where all of them are.
+   * not push every other section below the fold.
+   *
+   * Deliberately still OPEN-ONLY, for both audiences. "Open quests" must not keep offering a thread the
+   * party can no longer pull, so a finished quest is not smuggled in here — it lives in the full list
+   * behind `onOpenQuest` (the GM's quest log, the player's quest reader), which is where every quest is.
    */
   const openQuestList = useMemo(() => openQuests(quests).slice(0, 5), [quests]);
 
@@ -219,8 +225,9 @@ export function CampaignHome({
                 <div key={quest.id} className="codex-campaign-quest">
                   {/* R2: the same row chassis every list on this surface uses, which is also where its
                       44px floor comes from — `.codex-campaign-recentitem` is §4 route 1 (grow the paint).
-                      A player has no quest log to open, so `onOpenQuest` is absent for them and the row
-                      is a plain readout: a button that navigates nowhere is worse than no button. */}
+                      BOTH audiences pass `onOpenQuest` now, so both get the button: the GM lands in the
+                      quest log, the player in their quest reader. The readout branch survives for a
+                      caller with no destination — a button that navigates nowhere is worse than none. */}
                   {onOpenQuest
                     ? <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenQuest(quest.id)}>
                         <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />

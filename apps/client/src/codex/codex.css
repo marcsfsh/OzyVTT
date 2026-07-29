@@ -492,6 +492,23 @@
 }
 .codex-quest-link-x:hover { color: var(--magenta); background: var(--surface-2); }
 
+/* ----- The PLAYER's quest reader -----
+   A destination over the Campaign mode, reusing the GM log's two-pane chassis, its rail rows
+   (`.codex-quest-row`), its exit row (`.codex-sessions-exit`) and its linked-entity rows
+   (`.codex-quest-link-open`) — every one of which already takes §4 route 1. Two audiences, one chassis;
+   a second near-identical set of rules is exactly what R2 exists to prevent. */
+
+/* §4 ROUTE 1 (grow the paint), and route 1 is the only option here: this back link sits at the top of
+   `.codex-main`, directly above the reader's own content, so a route-2 `::after` box would hang 12px
+   past the paint and swallow taps meant for the first thing under it. `.codex-back` itself is a bare
+   text button with no floor of its own — a pre-existing gap on the notebook and the GM log that this
+   scoped rule deliberately does NOT reach into, because widening it would resize two surfaces this
+   change was not asked to touch. A `<button>` centres its own content, so no extra alignment is needed. */
+.codex-questreader .codex-back { min-height: var(--tap-min); }
+/* The quest's own prose. `pre-wrap` because the GM writes it in a bare `Textarea` and their blank lines
+   ARE the paragraphing — there is no markdown pass here to rebuild them (see `PlayerCodex`). */
+.codex-quest-readerbody { margin: 0; white-space: pre-wrap; }
+
 /* Relationship graph */
 .codex-graph { display: flex; flex-direction: column; min-height: 64vh; gap: var(--space-2); }
 .codex-graph-bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }

@@ -36,6 +36,9 @@ const playerListRelationships = vi.fn();
 const playerListLinks = vi.fn();
 const playerSessions = vi.fn();
 const playerQuests = vi.fn();
+// The PLAYER's search, mocked separately from the GM's: the reader's whole reason for existing is that a
+// quest hit has somewhere to land, and a test driving that through the real `fetch` would prove nothing.
+const playerSearch = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -62,7 +65,8 @@ vi.mock("./api", async (importOriginal) => {
       listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a), chronicle: (...a: unknown[]) => playerChronicle(...a),
       listRelationships: (...a: unknown[]) => playerListRelationships(...a), listLinks: (...a: unknown[]) => playerListLinks(...a),
-      sessions: (...a: unknown[]) => playerSessions(...a), quests: (...a: unknown[]) => playerQuests(...a)
+      sessions: (...a: unknown[]) => playerSessions(...a), quests: (...a: unknown[]) => playerQuests(...a),
+      search: (...a: unknown[]) => playerSearch(...a)
     }
   };
 });
@@ -275,24 +279,39 @@ describe("The GM's objective checklist (M10)", () => {
   });
 });
 
+/**
+ * The player's quest fixtures, module-level because the dashboard card and the quest reader are two views
+ * of the SAME feed. Giving each describe its own copy is precisely how two surfaces start disagreeing
+ * about what a quest says.
+ */
+const PLAYER_QUEST: PlayerCodexQuest = {
+  id: "q1", title: "The Sunless Crown", status: "active",
+  body: "The burgomaster wants the crown returned.",
+  objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
+  entityIds: []
+};
+/** The quest the reader exists for: finished, so the open-quests card never lists it. */
+const PLAYER_DONE: PlayerCodexQuest = {
+  id: "q2", title: "The Bell of Vallaki", status: "completed",
+  body: "The bell was hauled back up the hill.", objectives: [{ text: "Raise the bell", done: true }], entityIds: []
+};
+const PLAYER_LOST: PlayerCodexQuest = { id: "q3", title: "The Missing Caravan", status: "failed", body: "", objectives: [], entityIds: [] };
+
+const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
+  playerListPages.mockResolvedValue([]);
+  playerListMaps.mockResolvedValue([]);
+  playerListMarkers.mockResolvedValue([]);
+  playerChronicle.mockResolvedValue([]);
+  playerListRelationships.mockResolvedValue([]);
+  playerListLinks.mockResolvedValue([]);
+  playerSessions.mockResolvedValue([]);
+  playerSearch.mockResolvedValue([]);
+  getCalendar.mockResolvedValue(CALENDAR);
+  playerQuests.mockResolvedValue(quests);
+};
+
 describe("The player's copy of the card (M10, viewer safety)", () => {
-  const PLAYER_QUEST: PlayerCodexQuest = {
-    id: "q1", title: "The Sunless Crown", status: "active",
-    body: "The burgomaster wants the crown returned.",
-    objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
-    entityIds: []
-  };
-  beforeEach(() => {
-    playerListPages.mockResolvedValue([]);
-    playerListMaps.mockResolvedValue([]);
-    playerListMarkers.mockResolvedValue([]);
-    playerChronicle.mockResolvedValue([]);
-    playerListRelationships.mockResolvedValue([]);
-    playerListLinks.mockResolvedValue([]);
-    playerSessions.mockResolvedValue([]);
-    getCalendar.mockResolvedValue(CALENDAR);
-    playerQuests.mockResolvedValue([PLAYER_QUEST]);
-  });
+  beforeEach(() => { playerDefaults(); });
 
   it("shows progress and never a tickable box — no checkbox, no field, nothing focusable", async () => {
     render(<PlayerCodex token="player" />);
@@ -309,8 +328,10 @@ describe("The player's copy of the card (M10, viewer safety)", () => {
     // ("a control you are refused") than a status; the read-only branch renders no control at all.
     expect(card.queryAllByRole("checkbox")).toHaveLength(0);
     expect(card.queryAllByRole("textbox")).toHaveLength(0);
-    // A button that navigates nowhere is worse than no button: there is no player quest log to open.
-    expect(card.queryByRole("button")).not.toBeInTheDocument();
+    // The ROW itself is now a button, because a player finally has somewhere for it to go. The old
+    // assertion here was `queryByRole("button")` → absent, on the premise that there was no player quest
+    // reader to open; that premise is what this change removes.
+    expect(card.getByRole("button", { name: /The Sunless Crown/ })).toBeInTheDocument();
   });
 
   /**
@@ -324,12 +345,12 @@ describe("The player's copy of the card (M10, viewer safety)", () => {
    * component does not reach around the type.
    */
   it("renders nothing from extra keys if the server ever regresses and sends a GM row", async () => {
-    playerQuests.mockResolvedValue([{
+    playerDefaults([{
       ...PLAYER_QUEST,
       gmBody: "The crown is a phylactery and the burgomaster knows it.",
       playerBody: "a GM-shaped duplicate of the hook",
       revealedToPlayers: true, rev: 3
-    } as never]);
+    }]);
     render(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
@@ -343,12 +364,149 @@ describe("The player's copy of the card (M10, viewer safety)", () => {
   it("hides a quest the GM has finished, on the same rule the GM's own card uses", async () => {
     // A player is sent a revealed quest whatever its status, so "open" is decided on this side for both
     // audiences — the player's card must not be the one place a completed quest lingers.
-    playerQuests.mockResolvedValue([{ ...PLAYER_QUEST, id: "q2", title: "The Bell of Vallaki", status: "completed", objectives: [] }]);
+    playerDefaults([PLAYER_DONE]);
     render(<PlayerCodex token="player" />);
 
     await screen.findByRole("heading", { name: "By type" });
     expect(screen.queryByRole("navigation", { name: "Open quests" })).not.toBeInTheDocument();
     expect(screen.queryByText("The Bell of Vallaki")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The player's quest reader — the gap M10 left, closed.
+ *
+ * What each test below is actually for, stated so a later reader does not soften it:
+ *  - **A tap on a quest lands ON the quest.** Both entrances (the dashboard card and search) go through
+ *    one handler, so a search result can never again be dropped on a dashboard that does not mention it.
+ *  - **Finished quests have a home, and it is NOT the dashboard card.** The card stays open-only — a
+ *    thread the party can no longer pull must not keep being offered — so the reader's rail is where
+ *    every revealed quest lives, whatever its status.
+ *  - **The reader is READ-ONLY.** Same `Checklist` contract the card uses: no `onChange`, so no checkbox,
+ *    no field, nothing focusable. A player sees progress; the GM's tickable copy is in their own log.
+ *  - **Viewer safety is tested against a payload that could actually leak.** The player endpoint is armed
+ *    with a GM-shaped row, so `gmBody` genuinely reaches the reader's props and its absence means
+ *    something — and the same test pins that this surface never calls the GM's `questApi` at all.
+ */
+describe("The player's quest reader", () => {
+  const railOf = async () => within(await screen.findByRole("navigation", { name: "Quests" }));
+  const readerOf = async () => within(await screen.findByRole("article"));
+
+  it("opens a quest from the dashboard and reads it — title, status, description, objectives", async () => {
+    playerDefaults();
+    const user = userEvent.setup();
+    render(<PlayerCodex token="player" />);
+
+    const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
+    await user.click(card.getByRole("button", { name: /The Sunless Crown/ }));
+
+    // R1: "landed" means the record is OPEN, not merely that some quest surface appeared — the rail marks
+    // this quest and the reader is showing it.
+    const rail = await railOf();
+    await waitFor(() => expect(rail.getByRole("button", { name: /The Sunless Crown/ })).toHaveAttribute("aria-current", "true"));
+
+    const reader = await readerOf();
+    expect(reader.getByRole("heading", { name: /The Sunless Crown/ })).toBeInTheDocument();
+    // R2: the status reads as a WORD, and progress in words — never a bare ratio and never by colour.
+    expect(reader.getByText("Active")).toBeInTheDocument();
+    expect(reader.getByText("1 of 2 done")).toBeInTheDocument();
+    // The description — the `playerBody` the GM wrote, arriving as `body`.
+    expect(reader.getByText("The burgomaster wants the crown returned.")).toBeInTheDocument();
+    const objectives = within(reader.getByRole("list", { name: "Objectives for The Sunless Crown" }));
+    expect(objectives.getByText("Find the crypt")).toBeInTheDocument();
+    expect(objectives.getByText("— done")).toBeInTheDocument();
+    expect(objectives.getByText("— not done")).toBeInTheDocument();
+    // Read-only, on the same terms as the card: nothing here is operable, anywhere on the surface.
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+  });
+
+  it("is where the FINISHED quests live — the dashboard card stays open-only", async () => {
+    playerDefaults([PLAYER_QUEST, PLAYER_DONE, PLAYER_LOST]);
+    const user = userEvent.setup();
+    render(<PlayerCodex token="player" />);
+
+    // The card is untouched by this change: still open-only, both finished states absent, and they are
+    // separate assertions because they fail separately.
+    const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
+    expect(card.queryByText("The Bell of Vallaki")).not.toBeInTheDocument();
+    expect(card.queryByText("The Missing Caravan")).not.toBeInTheDocument();
+
+    await user.click(card.getByRole("button", { name: /The Sunless Crown/ }));
+
+    // The rail is the other half: every revealed quest, each saying its status as a word.
+    const rail = await railOf();
+    expect(rail.getByRole("button", { name: /The Bell of Vallaki/ })).toHaveTextContent("Completed");
+    expect(rail.getByRole("button", { name: /The Missing Caravan/ })).toHaveTextContent("Failed");
+
+    // ...and a finished one is one tap from there, with its own body on screen.
+    await user.click(rail.getByRole("button", { name: /The Bell of Vallaki/ }));
+    const reader = await readerOf();
+    await waitFor(() => expect(reader.getByRole("heading", { name: /The Bell of Vallaki/ })).toBeInTheDocument());
+    expect(reader.getByText("The bell was hauled back up the hill.")).toBeInTheDocument();
+  });
+
+  it("lands a search hit ON a completed quest — the jump that used to go nowhere", async () => {
+    /**
+     * Only finished quests exist here, and that is the whole point: the dashboard's card does not render
+     * at all, so before the reader a `quest` hit sent the player to a surface that never mentions the
+     * record they searched for. Nothing about this test can pass by accident on the old behaviour.
+     */
+    playerDefaults([PLAYER_DONE]);
+    playerSearch.mockResolvedValue([{ kind: "quest", id: "q2", title: "The Bell of Vallaki", tags: [], entityType: null, mapId: null } as CodexSearchHit]);
+    const user = userEvent.setup();
+    render(<PlayerCodex token="player" />);
+
+    await screen.findByRole("heading", { name: "By type" });
+    expect(screen.queryByRole("navigation", { name: "Open quests" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Lore" }));
+    await user.type(screen.getByLabelText("Search the codex"), "bell");
+    const results = within(screen.getByRole("navigation", { name: "Revealed pages" }));
+    // R2: the row names its kind as a word before it is ever tapped.
+    expect(await results.findByText("Quest")).toBeInTheDocument();
+    await user.click(results.getByText("The Bell of Vallaki"));
+
+    const reader = await readerOf();
+    expect(reader.getByRole("heading", { name: /The Bell of Vallaki/ })).toBeInTheDocument();
+    expect(reader.getByText("Completed")).toBeInTheDocument();
+    expect(reader.getByText("The bell was hauled back up the hill.")).toBeInTheDocument();
+    // The mode bar stays honest about where the jump landed: a quest is part of the campaign, and
+    // "Campaign" is the tab lit — the reader is a destination over that mode, not a sixth tab.
+    expect(screen.getByRole("tab", { name: "Campaign" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  /**
+   * The armed-payload rule again, now for the reader — and it matters MORE here than on the card. The
+   * card is safe by its type: `CampaignQuest` has no `gmBody` field to fill in. The reader renders a
+   * `PlayerCodexQuest` straight out of this surface's own state, so a regressed `projectPlayerQuest` puts
+   * the GM's plan one property access away from the article. Arming the PLAYER endpoint is what makes the
+   * absence assertion below mean anything at all.
+   */
+  it("survives a GM-shaped row from a regressed server, and never asks the GM feed for one", async () => {
+    playerDefaults([{
+      ...PLAYER_QUEST,
+      gmBody: "The crown is a phylactery and the burgomaster knows it.",
+      playerBody: "a GM-shaped duplicate of the hook",
+      revealedToPlayers: true, rev: 3
+    }]);
+    const user = userEvent.setup();
+    render(<PlayerCodex token="player" />);
+
+    const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
+    await user.click(card.getByRole("button", { name: /The Sunless Crown/ }));
+
+    const reader = await readerOf();
+    expect(reader.getByRole("heading", { name: /The Sunless Crown/ })).toBeInTheDocument();   // the legitimate keys render...
+    expect(reader.getByText("The burgomaster wants the crown returned.")).toBeInTheDocument();
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("The crown is a phylactery");                                  // ...and none of the smuggled ones do
+    expect(text).not.toContain("a GM-shaped duplicate of the hook");
+
+    // And the reader added no second path to a quest: it reads the player projection this surface already
+    // fetched, and the GM's own quest feed is never touched from here.
+    expect(playerQuests).toHaveBeenCalledWith("player");
+    expect(listQuests).not.toHaveBeenCalled();
   });
 });
 
