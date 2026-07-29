@@ -88,8 +88,17 @@ The method that produced M1–M8, in order of how much it mattered:
   Its "taps stolen" column is a heuristic that over-reports; confirm real theft by tapping.
 - **`bm25()` counts UNINDEXED columns as weight slots.** `bm25(t, 10.0, 1.0)` on a 4-column FTS table
   does not error — it weights the two unindexed columns and silently changes nothing.
-- The dev DB is populated with QA fixtures (folders, several maps, ~8 graph nodes, journal entries).
-  **Keep it populated.**
+- **YOU START WITH AN EMPTY DATABASE, AND THAT IS A TRAP.** `data/` is gitignored, so none of the QA
+  fixtures from the M1–M8 sessions reach you. This matters more than it sounds: a sparse database
+  renders no folders, no nested maps, no dense graph — so those controls are never measured, and that
+  is precisely how **14 sub-floor tap targets hid for six milestones** while every audit reported zero.
+  **Before you trust any UI measurement, populate the database through the app**: at least 2 folders
+  with pages in them, 2+ maps with one nested and a few markers, 8+ pages so the graph clusters, and
+  several journal entries with tags. Then measure. An audit against an empty campaign proves nothing.
+- **`playwright-core` is not installed** — it is deliberately not a repo dependency. Install it
+  out-of-tree (`npm i --no-save playwright-core`, or anywhere and point `PLAYWRIGHT_CORE` at its
+  `index.mjs`). A Chromium binary ships at `/opt/pw-browsers/chromium-*/chrome-linux/chrome` in this
+  environment; set `CHROMIUM_PATH` if yours differs.
 
 ## 6. Decisions waiting on the owner — do not resolve these yourself
 
