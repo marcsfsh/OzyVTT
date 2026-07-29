@@ -2204,6 +2204,28 @@ export class CodexStore {
       .all() as SessionRowRaw[]).map((row) => this.toSession(row));
   }
 
+  /**
+   * The `session_number`s that name a session record the players have NOT been shown. The resolution the
+   * player journal reads need before they may hand a player an entry's `sessionNumber` - a session's very
+   * EXISTENCE is GM information (`GET /codex/sessions/:id` 404s a player on an unrevealed one rather than
+   * 403ing, and the list omits it), so a number that resolves to a hidden record announces it.
+   *
+   * Deliberately the UNREVEALED set rather than the revealed one, and that asymmetry IS the rule: a number
+   * with no session record at all - every entry from before M9, which shipped with no backfill - is in
+   * NEITHER set, and must keep travelling exactly as it does today, because there is no record whose
+   * existence it could give away. The mirror-image question ("which numbers are revealed?") would answer no
+   * for those too and blank a label that has always been correct.
+   *
+   * Rows with `session_number IS NULL` are excluded: they name no number, and a set that could contain a
+   * null would only be a value every caller has to remember not to look up.
+   */
+  unrevealedSessionNumbers(): ReadonlySet<number> {
+    const rows = this.requireDatabase()
+      .prepare("SELECT session_number FROM codex_sessions WHERE revealed = 0 AND session_number IS NOT NULL")
+      .all() as Array<{ session_number: number }>;
+    return new Set(rows.map((row) => row.session_number));
+  }
+
   /** The session the table is currently playing, or null. One meta row, therefore one pointer (v13). */
   get activeSessionId(): string | null {
     return (this.requireDatabase().prepare("SELECT active_session_id FROM codex_meta WHERE id = 1").get() as { active_session_id: string | null } | undefined)?.active_session_id ?? null;

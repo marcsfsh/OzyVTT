@@ -882,6 +882,58 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     const pinned = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "A retcon.", sessionNumber: 4 }));
     expect(pinned.data.entry.sessionNumber).toBe(4);
   });
+
+  it("never lets an UNREVEALED session's number ride out on a revealed journal entry", async () => {
+    // The live scenario, end to end. The GM opens session 4, leaves it unrevealed and activates it; M9's
+    // auto-linking then stamps 4 onto the note written during play. Revealing the NOTE must not publish the
+    // SESSION, and the number is the only thing on that entry that could - the same fact the 404 and the
+    // nulled `activeSessionId` above are spent hiding.
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 4, prepBody: PREP }));
+    const sessionId = created.data.session.id as string;
+    await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, GM, {});
+
+    const auto = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "We reached Vallaki." }));
+    const autoId = auto.data.entry.id as string;
+    expect(auto.data.entry.sessionNumber).toBe(4);                        // auto-linked, exactly as M9 intends
+    // A LEGACY-shaped entry beside it: a number no session record claims, which must be unaffected. Without
+    // it a router that simply blanked every number for players would pass this whole test.
+    const legacy = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Undated lore.", sessionNumber: 9 }));
+    const legacyId = legacy.data.entry.id as string;
+    for (const id of [autoId, legacyId]) await post(base, `/api/v1/codex/journal/${id}/reveal`, GM, { revealed: true });
+
+    // The session itself is still hidden - the list omits it, the direct read 404s. That is the fact a
+    // number on a revealed entry would give away.
+    expect((await body(await get(base, "/api/v1/codex/sessions", PLAYER))).data.sessions).toHaveLength(0);
+    expect((await get(base, `/api/v1/codex/sessions/${sessionId}`, PLAYER)).status).toBe(404);
+
+    // Both player-reachable reads that carry the field: the journal AND the chronicle.
+    const rowsFor = async (headers: Record<string, string>) => {
+      const journal = (await body(await get(base, "/api/v1/codex/journal", headers))).data.entries as Json[];
+      const timeline = (await body(await get(base, "/api/v1/codex/timeline", headers))).data.records as Json[];
+      const find = (rows: Json[], id: string) => rows.find((row) => row.id === id)!;
+      return [find(journal, autoId), find(timeline, autoId), find(journal, legacyId), find(timeline, legacyId)];
+    };
+
+    const [pJournal, pTimeline, pLegacyJournal, pLegacyTimeline] = await rowsFor(PLAYER);
+    expect(pJournal.text).toBe("We reached Vallaki.");                    // the entry itself is readable...
+    expect(pJournal.sessionNumber).toBeNull();                            // ...without naming the session
+    expect(pTimeline.sessionNumber).toBeNull();
+    expect(pLegacyJournal.sessionNumber).toBe(9);                         // nothing legacy changed
+    expect(pLegacyTimeline.sessionNumber).toBe(9);
+
+    // The GM's copy of both reads still carries 4, so the nulls above are the gate and not a lost field.
+    const [gJournal, gTimeline] = await rowsFor(GM);
+    expect(gJournal.sessionNumber).toBe(4);
+    expect(gTimeline.sessionNumber).toBe(4);
+
+    // Revealing the SESSION publishes the number on the very same entries - so the nulls are the reveal
+    // gate rather than a projection that simply drops the field.
+    await post(base, `/api/v1/codex/sessions/${sessionId}/reveal`, GM, { revealed: true });
+    const [afterJournal, afterTimeline] = await rowsFor(PLAYER);
+    expect(afterJournal.sessionNumber).toBe(4);
+    expect(afterTimeline.sessionNumber).toBe(4);
+  });
 });
 
 /**

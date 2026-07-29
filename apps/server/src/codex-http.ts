@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord, type PlayerSessionNumberContext } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -246,6 +246,20 @@ function loadSearchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearchRe
  */
 function revealedPageIdsIn(store: CodexStore, pageIds: readonly string[]): ReadonlySet<string> {
   return new Set(pageIds.filter((pageId) => store.getPage(pageId)?.revealedToPlayers ?? false));
+}
+
+/**
+ * The session context every PLAYER journal read needs, resolved once per request rather than per row: which
+ * `sessionNumber`s name a session record the players have not been shown. Sibling of `revealedPageIdsIn`
+ * above, with the same division of labour - it ANSWERS the question, it does not make the decision;
+ * `projectPlayerJournalEntry` still owns whether the number travels.
+ *
+ * It exists as a helper for the reason that one did: `GET /codex/journal` and `GET /codex/timeline` are two
+ * call sites for one viewer-safety resolution, and two hand-copies is two chances for one to be weakened
+ * alone. A GM read never calls it - the GM projection is not gated.
+ */
+function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
+  return { unrevealedSessionNumbers: store.unrevealedSessionNumbers() };
 }
 
 export function createCodexRouter(options: CodexRouterOptions) {
@@ -580,7 +594,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
       if (pageId && !store.getPage(pageId)?.revealedToPlayers) return failure(response, 404, "not_found", "That was not found.");
     }
     const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();
-    const entries = role === "gm" ? rows.map(projectGmJournalEntry) : rows.map(projectPlayerJournalEntry).filter((entry) => entry !== null);
+    if (role === "gm") return envelope(response, 200, { entries: rows.map(projectGmJournalEntry) });
+    // An entry's `sessionNumber` is gated on the SESSION's reveal state, not the entry's, so the caller
+    // resolves that set here - the `revealedPageIdsIn` division of labour, one record type later.
+    const context = playerSessionNumbers(store);
+    const entries = rows.map((row) => projectPlayerJournalEntry(row, context)).filter((entry) => entry !== null);
     return envelope(response, 200, { entries });
   });
 
@@ -603,7 +621,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = roleOf(request);
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the chronicle.");
     const rows = store.listChronicle();
-    const records = role === "gm" ? rows.map(projectGmChronicleRecord) : rows.map(projectPlayerChronicleRecord).filter((record) => record !== null);
+    if (role === "gm") return envelope(response, 200, { records: rows.map(projectGmChronicleRecord) });
+    // The same session context `GET /codex/journal` resolves, for the same reason: an `entry` row's
+    // `sessionNumber` reaches a player through `projectPlayerJournalEntry`, which this delegates to.
+    const context = playerSessionNumbers(store);
+    const records = rows.map((row) => projectPlayerChronicleRecord(row, context)).filter((record) => record !== null);
     return envelope(response, 200, { records });
   });
 

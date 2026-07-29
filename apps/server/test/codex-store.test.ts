@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmChronicleRecord, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
+import { projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -18,6 +18,13 @@ afterEach(async () => {
   store.close();
   await rm(directory, { recursive: true, force: true });
 });
+
+/**
+ * The session context `projectPlayerJournalEntry` / `projectPlayerChronicleRecord` take, resolved from the
+ * store exactly as `codex-http.ts` resolves it per request. A CALL, not a constant: a session's reveal
+ * state changes mid-test, and a context captured once would go stale and quietly make the gate look broken.
+ */
+const playerSessionNumbers = (from: CodexStore = store) => ({ unrevealedSessionNumbers: from.unrevealedSessionNumbers() });
 
 describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", () => {
   /**
@@ -782,9 +789,9 @@ describe("CodexStore journal", () => {
 
   it("player journal projection hides unrevealed entries and strips gmText", () => {
     const secret = store.createEntry({ playerText: "The gate stood open.", gmText: "It was a trap set by the cult." });
-    expect(projectPlayerJournalEntry(secret)).toBeNull();
+    expect(projectPlayerJournalEntry(secret, playerSessionNumbers())).toBeNull();
     const shown = store.setEntryRevealed(secret.id, true);
-    const projected = projectPlayerJournalEntry(shown)!;
+    const projected = projectPlayerJournalEntry(shown, playerSessionNumbers())!;
     expect(projected.text).toBe("The gate stood open.");
     expect(Object.keys(projected)).not.toContain("gmText");
     expect(JSON.stringify(projected)).not.toContain("cult");
@@ -966,22 +973,22 @@ describe("CodexStore chronicle — deliberately ungated (CT-11)", () => {
  * point-blank range, one property per test.
  */
 describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", () => {
-  const playerChronicle = () => store.listChronicle().map(projectPlayerChronicleRecord).filter((record) => record !== null);
+  const playerChronicle = () => store.listChronicle().map((record) => projectPlayerChronicleRecord(record, playerSessionNumbers())).filter((record) => record !== null);
 
   it("refuses an UNREVEALED event page", () => {
     const page = store.createPage({ title: "The Sundering", entityType: "event", playerBody: "The sky tore open.", inWorldDate: { year: 1492, month: 0, day: 1 } });
     expect(store.getPage(page.id)!.revealedToPlayers).toBe(false);
-    expect(projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! })).toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! }, playerSessionNumbers())).toBeNull();
     // Revealing it lets it through, so the null above is the reveal gate and not a broken projection.
     store.setPageRevealed(page.id, true);
-    expect(projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! })).not.toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! }, playerSessionNumbers())).not.toBeNull();
   });
 
   it("refuses an UNREVEALED journal entry", () => {
     const entry = store.createEntry({ playerText: "The vistani warned us", inWorldDate: { year: 1492, month: 0, day: 1 } });
-    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })).toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }, playerSessionNumbers())).toBeNull();
     store.setEntryRevealed(entry.id, true);
-    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })).not.toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }, playerSessionNumbers())).not.toBeNull();
   });
 
   it("strips GM-only content from a REVEALED event page, and emits exactly the allow-listed keys", () => {
@@ -991,7 +998,7 @@ describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", ()
       fields: { where: "Barovia" }, gmFields: { goals: "conceal the cause" },
       tags: ["cataclysm"], inWorldDate: { year: 1492, month: 0, day: 1 }
     });
-    const projected = projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! })!;
+    const projected = projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! }, playerSessionNumbers())!;
     // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
     // ever added to the player projection, not merely if this one leaks.
     expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text", "title"]);
@@ -1008,7 +1015,7 @@ describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", ()
   it("never hands a player the replay linkage of a revealed combat entry (K2)", () => {
     const entry = store.appendCombatEntry({ sourceEncounterId: 42, playerText: "A battle was fought here." });
     store.setEntryRevealed(entry.id, true);
-    const projected = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })!;
+    const projected = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }, playerSessionNumbers())!;
     expect(projected.kind).toBe("combat");
     expect(projected).not.toHaveProperty("sourceEncounterId");
   });
@@ -1346,6 +1353,26 @@ describe("CodexStore sessions (M9)", () => {
     const seven = sessions.listSessions().find((row) => row.sessionNumber === 7)!;
     sessions.deleteSession(seven.id);
     expect(sessions.createSession({ sessionNumber: 7 }).sessionNumber).toBe(7);
+  });
+
+  it("names exactly the session numbers whose RECORD is still hidden from players", () => {
+    // The resolution the player journal reads gate `sessionNumber` on. It must be the UNREVEALED set, not
+    // the complement of the revealed one: a number with no session record at all is in neither, which is
+    // what keeps every pre-M9 entry's label working.
+    const hidden = sessions.createSession({ sessionNumber: 4 });
+    const shown = sessions.createSession({ sessionNumber: 5 });
+    sessions.setSessionRevealed(shown.id, true);
+    // Unrevealed, but it names no number — a set that let a null through would be a value every caller has
+    // to remember not to look up, and this is what catches one arriving.
+    sessions.createSession({});
+    expect([...sessions.unrevealedSessionNumbers()]).toEqual([4]);
+
+    // Revealing 4 empties the set, so the 4 above is the reveal flag being read and not "every session".
+    sessions.setSessionRevealed(hidden.id, true);
+    expect([...sessions.unrevealedSessionNumbers()]).toEqual([]);
+    // ...and hiding 5 again puts a DIFFERENT number in, so this is a per-row read rather than a constant.
+    sessions.setSessionRevealed(shown.id, false);
+    expect([...sessions.unrevealedSessionNumbers()]).toEqual([5]);
   });
 
   it("orders numbered sessions by number, with the unnumbered ones below them", () => {
@@ -1938,5 +1965,81 @@ describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
     expect(gmRow.attendees).toEqual(["Ozy", "Mara"]);
     expect(gmRow.status).toBe("planned");
     expect(gmRow.rev).toBe(1);
+  });
+});
+
+/**
+ * The journal projection's SESSION-NUMBER gate, called POINT-BLANK. `codex-http.test.ts` proves the
+ * pipeline; only this proves the layer, for the reason the describe above states.
+ *
+ * What it is for. A session's very EXISTENCE is GM information — an unrevealed session 404s a player rather
+ * than 403ing, the list omits it, and `activeSessionId` is nulled for players, all on that ground. But M9's
+ * auto-linking stamps the ACTIVE session's number onto every entry written during play, so a single
+ * revealed entry was announcing "Session 4" for a session all of that goes to trouble to hide.
+ *
+ * The rule has three cases and the edge cases ARE the point, so each gets its own test: an unrevealed
+ * record's number is blanked, a revealed record's number is not, and a number with NO record is not —
+ * the last being every entry from before M9, which shipped with no backfill.
+ */
+describe("Codex journal — the unrevealed-session number gate, on its own (M9 follow-up, A-8)", () => {
+  /** An entry a player may read, carrying a number the GM never has to retype — the shape M9 auto-linking produces. */
+  const revealedEntry = (sessionNumber: number) => store.createEntry({ playerText: "We reached Vallaki.", sessionNumber, revealedToPlayers: true });
+
+  it("blanks the number of an UNREVEALED session, and hands it back the moment that session is revealed", () => {
+    const session = store.createSession({ sessionNumber: 4, recapBody: "The party crossed." });
+    expect(session.revealedToPlayers).toBe(false);
+    const entry = revealedEntry(4);
+    expect(entry.sessionNumber).toBe(4);                                            // the row really carries it...
+
+    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())!.sessionNumber).toBeNull();
+    // ...and the GM's own row is untouched, so the null above is the gate and not a number that never arrived.
+    expect(projectGmJournalEntry(entry).sessionNumber).toBe(4);
+
+    // Revealing the SESSION — the entry row is not rewritten, only the context changes — hands the number
+    // straight back, so the null is provably the reveal gate rather than a projection that drops the field.
+    store.setSessionRevealed(session.id, true);
+    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())!.sessionNumber).toBe(4);
+  });
+
+  it("leaves a number with NO session record alone — every entry written before M9, which shipped no backfill", () => {
+    // The case most likely to regress: asking "is 4 revealed?" instead of "is 4 hidden?" would blank this
+    // one too, and nothing about it can leak — there is no record whose existence the number names.
+    const legacy = revealedEntry(4);
+    expect(store.listSessions()).toEqual([]);
+    expect(projectPlayerJournalEntry(legacy, playerSessionNumbers())!.sessionNumber).toBe(4);
+
+    // ...and the gate is live in the same breath: an unrevealed session 5 blanks 5 and still not 4, so the
+    // 4 above is this rule holding rather than the gate being switched off in this fixture.
+    store.createSession({ sessionNumber: 5 });
+    expect(projectPlayerJournalEntry(revealedEntry(5), playerSessionNumbers())!.sessionNumber).toBeNull();
+    expect(projectPlayerJournalEntry(legacy, playerSessionNumbers())!.sessionNumber).toBe(4);
+  });
+
+  it("gates ONLY the number — the rest of a revealed entry travels exactly as it did", () => {
+    store.createSession({ sessionNumber: 4 });
+    const entry = store.createEntry({
+      playerText: "We reached Vallaki.", gmText: "The burgomaster lied about the wolves.",
+      sessionNumber: 4, realDate: "2026-07-26", tags: ["travel"], revealedToPlayers: true
+    });
+    const projected = projectPlayerJournalEntry(entry, playerSessionNumbers())!;
+    // The EXACT key set: the field is NULLED, never dropped, so one response shape still serves both roles.
+    expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text"]);
+    expect(projected.sessionNumber).toBeNull();
+    expect(projected.text).toBe("We reached Vallaki.");                             // the entry is still readable...
+    expect(projected.realDate).toBe("2026-07-26");                                  // ...and its neighbours untouched
+    expect(projected.tags).toEqual(["travel"]);
+    expect(JSON.stringify(projected)).not.toContain("burgomaster");                 // gmText still gone, as ever
+  });
+
+  it("carries the same gate onto the chronicle by DELEGATION, not a second copy", () => {
+    const session = store.createSession({ sessionNumber: 4 });
+    const entry = store.createEntry({ playerText: "We reached Vallaki.", sessionNumber: 4, revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 1 } });
+    const playerRow = () => projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }, playerSessionNumbers())!;
+    expect(playerRow().sessionNumber).toBeNull();
+    // The GM's chronicle row still carries it, and revealing the session gives the player's row it back —
+    // the same two controls the journal test above uses, at the surface that merely delegates.
+    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }).sessionNumber).toBe(4);
+    store.setSessionRevealed(session.id, true);
+    expect(playerRow().sessionNumber).toBe(4);
   });
 });

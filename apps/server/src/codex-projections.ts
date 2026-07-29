@@ -172,15 +172,51 @@ export function projectPlayerPageMarker(record: CodexPageMarkerRecord): PlayerCo
 // ----- Journal -----
 
 export type GmCodexJournalEntry = CodexJournalRow;
-/** A journal entry as a player sees it: player text only, no gmText, no GM-only linkage, only when revealed. */
+/**
+ * A journal entry as a player sees it: player text only, no gmText, no GM-only linkage, only when revealed.
+ * `sessionNumber` additionally passes through the session gate below - it is the one field here whose
+ * visibility is not the entry's own flag alone.
+ */
 export type PlayerCodexJournalEntry = Readonly<{
   id: string; text: string; kind: CodexJournalRow["kind"]; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
 }>;
 
+/**
+ * The context the player journal/chronicle projections need: which `sessionNumber`s name a session record
+ * the GM has not revealed. The CALLER resolves it and passes it in - the `projectPlayerMarker` /
+ * `projectPlayerQuest` shape verbatim, because a projection that reached back into the store would be a
+ * second place that decides what a player may see.
+ */
+export type PlayerSessionNumberContext = Readonly<{ unrevealedSessionNumbers: ReadonlySet<number> }>;
+
+/**
+ * A player's copy of an entry's `sessionNumber`: null when a session record EXISTS with that number and is
+ * not revealed, otherwise the number unchanged.
+ *
+ * The leak this closes. A session's very existence is GM information - `GET /codex/sessions/:id` 404s a
+ * player on an unrevealed session rather than 403ing, the list omits it, and `activeSessionId` is nulled
+ * for players, all on that ground. M9's auto-linking then stamps the ACTIVE session's number onto every
+ * entry written during play, so one revealed entry from an unrevealed session made the UI render
+ * "Session 4" for a session the same code goes to trouble to hide.
+ *
+ * Note WHICH set this is, because the edge cases are the point:
+ *   - no session record for the number -> unchanged. Every entry from before M9 (which shipped with no
+ *     backfill) is in this case, and there is no record whose existence the number could give away. The
+ *     mirror-image test - "is this number revealed?" - would blank those too, breaking behaviour that has
+ *     always been correct.
+ *   - record exists and IS revealed -> unchanged. The player can already open that session by id.
+ *   - record exists and is NOT revealed -> null. The only case that changes.
+ * The GM projection never consults this at all.
+ */
+function playerSessionNumber(sessionNumber: number | null, context: PlayerSessionNumberContext): number | null {
+  if (sessionNumber === null) return null;
+  return context.unrevealedSessionNumbers.has(sessionNumber) ? null : sessionNumber;
+}
+
 export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry { return row; }
-export function projectPlayerJournalEntry(row: CodexJournalRow): PlayerCodexJournalEntry | null {
+export function projectPlayerJournalEntry(row: CodexJournalRow, context: PlayerSessionNumberContext): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
-  return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: row.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
+  return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: playerSessionNumber(row.sessionNumber, context), realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
 }
 
 // ----- Sessions (M9: prep is the GM half, recap is the player half) -----
@@ -341,6 +377,8 @@ export type GmCodexChronicleRecord = Readonly<{
  *   `createdAt`    - already player-visible on entries; for a page it is strictly less informative than the
  *                    `updatedAt` a player already receives from `projectPlayerPageSummary`.
  *   `sessionNumber`/`realDate`/`tags` - already in `projectPlayerJournalEntry`; null/empty on an event.
+ *                    `sessionNumber` therefore inherits that projection's session gate too, rather than
+ *                    restating it: an unrevealed session's number never reaches this row either.
  *
  * Absent by construction: `gmText`, `calendarInstant`, `inWorldDate`, `revealedToPlayers`, `attachPageId`,
  * `attachMarkerId`, `sourceEncounterId` (K2 - the replay id never reaches a player), `updatedAt`, `rev`.
@@ -387,17 +425,19 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord): GmCodexC
  * owns that record type, so the chronicle can never be weaker than the read it duplicates:
  *
  *   entry / combat -> `projectPlayerJournalEntry`. Revealed only, `playerText` only, `gmText` and the
- *                     replay id (K2) dropped. Exactly `GET /codex/journal` for a player.
+ *                     replay id (K2) dropped, and `sessionNumber` through the unrevealed-session gate.
+ *                     Exactly `GET /codex/journal` for a player.
  *   event          -> `projectPlayerPage`. Revealed only, `body` = `playerBody`, `gmBody` and `gmFields`
  *                     dropped. Exactly `GET /codex/pages/{id}` for a player.
  *
  * That delegation is the point, and it is the `projectPlayerPageMarker` precedent (M7): a hand-rolled
  * `record.page.revealedToPlayers ? {...} : null` would pass the same tests today and drift the first time
- * either underlying projection tightens.
+ * either underlying projection tightens - which is exactly what the session gate is, one milestone later.
+ * `context` exists only for that delegation; an `event` row carries no session number to gate.
  */
-export function projectPlayerChronicleRecord(record: CodexChronicleRecord): PlayerCodexChronicleRecord | null {
+export function projectPlayerChronicleRecord(record: CodexChronicleRecord, context: PlayerSessionNumberContext): PlayerCodexChronicleRecord | null {
   if (record.kind === "entry") {
-    const projected = projectPlayerJournalEntry(record.entry);
+    const projected = projectPlayerJournalEntry(record.entry, context);
     if (!projected) return null;
     return {
       kind: projected.kind === "combat" ? "combat" : "entry", id: projected.id, title: null, text: projected.text,
