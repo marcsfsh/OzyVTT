@@ -1953,9 +1953,14 @@ export class CodexStore {
 
   /**
    * CI-9, exactly `setPageRevealed`: publishing a recap is not an EDIT of it, so this moves neither `rev`
-   * (an open console would 409 on a reveal nobody typed) nor `updated_at`. `updated_at` matters more here
-   * than anywhere else - it is what the player recap badge compares against - and a reveal sweep that
-   * re-stamped every session would light the badge for recaps whose text never changed.
+   * (an open console would 409 on a reveal nobody typed) nor `updated_at`.
+   *
+   * A consequence worth stating, because the obvious guess is wrong in BOTH directions: `updated_at` is
+   * not a usable signal for CT-3's "new since you last looked" badge. It does not move here, so the one
+   * event the badge exists for - a recap becoming visible - would never fire it; and it DOES move when the
+   * GM edits `prep_body`, so it would fire on GM prep activity the player is not supposed to know about.
+   * The badge therefore keys on WHICH revealed sessions this reader has already opened, by id, which is
+   * already in the player projection and leaks nothing new.
    */
   setSessionRevealed(sessionId: string, revealed: boolean): CodexSessionRow {
     const database = this.requireDatabase();

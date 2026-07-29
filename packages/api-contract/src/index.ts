@@ -83,6 +83,10 @@ export const CODEX_PATHS = {
   journal: `${API_NAMESPACE}/codex/journal`,
   journalById: `${API_NAMESPACE}/codex/journal/{id}`,
   journalReveal: `${API_NAMESPACE}/codex/journal/{id}/reveal`,
+  sessions: `${API_NAMESPACE}/codex/sessions`,
+  sessionById: `${API_NAMESPACE}/codex/sessions/{id}`,
+  sessionReveal: `${API_NAMESPACE}/codex/sessions/{id}/reveal`,
+  sessionActivate: `${API_NAMESPACE}/codex/sessions/{id}/activate`,
   calendar: `${API_NAMESPACE}/codex/calendar`,
   export: `${API_NAMESPACE}/codex/export`
 } as const;
@@ -826,6 +830,15 @@ const codexPageDating = {
   inWorldDate: { ...codexInWorldDateOrNull, description: "The raw in-world date; the source of truth the other two are derived from." }
 } as const;
 const codexCoord = { type: "number", minimum: 0, maximum: 1_000_000 } as const;
+/**
+ * M9 session vocabulary. `codexSessionNumber` is shared with the JOURNAL write body rather than
+ * repeated beside it, because they are the SAME number - a journal entry's `sessionNumber` resolves
+ * against a session record - and two copies of one bound is how a surface silently accepts a value
+ * its counterpart rejects. The server shares the bound for the same reason (`SessionNumberSchema`).
+ */
+const codexSessionNumber = { type: ["integer", "null"], minimum: 0, maximum: 100_000 } as const;
+const codexSessionAttendees = { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } } as const;
+const codexSessionStatus = { type: "string", enum: ["planned", "played"] } as const;
 const codexArrayRef = (schemaRef: string) => ({ type: "array", items: { $ref: `#/components/schemas/${schemaRef}` } });
 const codexDataObject = (key: string, valueSchema: unknown) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: valueSchema } });
 /** One codex operation. `bad`/`notFound`/`conflict` decide which error responses the route can actually return. */
@@ -1233,6 +1246,17 @@ export const openApiDocument = {
       delete: codexOp("deleteCodexJournalEntry", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a journal entry; idempotent." })
     },
     [CODEX_PATHS.journalReveal]: { post: codexOp("revealCodexJournalEntry", codexGmOnly, "CodexJournalEntryResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Shows/hides a journal entry to players." }) },
+    [CODEX_PATHS.sessions]: {
+      get: codexOp("listCodexSessions", codexReadRoles, "CodexSessionListResponse", { bad: false, description: "Every play session - the GM's prep-and-recap record of one evening at the table. Numbered sessions first in number order, then the unnumbered ones oldest-first (the same tier-separator idiom the chronicle uses for undated records). Role-scoped: a GM receives the whole record for every session plus `activeSessionId`; a player receives only REVEALED sessions, reduced to the recap layer (`id`, `sessionNumber`, `realDate`, `recap`), and `activeSessionId` is always null for a player because it can name a session they cannot see." }),
+      post: codexOp("createCodexSession", codexGmOnly, "CodexSessionResponse", { ok: "201", body: "CodexSessionCreateRequest", description: "Creates a session. Every field is optional - an empty POST opens a blank `planned` session to prep into. A `sessionNumber` another session already carries is refused with 400: the journal's by-session lens resolves a number to at most one session, so numbers are unique." })
+    },
+    [CODEX_PATHS.sessionById]: {
+      get: codexOp("getCodexSession", codexReadRoles, "CodexSessionResponse", { bad: false, notFound: true, params: [uuidParam("id")], description: "One session, projected for the caller. An unrevealed session is **404** to a player - the same 404 an absent session gets, and never 403, because a 403 would confirm the record exists and its very existence (\"session 14 is being prepped\") is GM information." }),
+      patch: codexOp("updateCodexSession", codexGmOnly, "CodexSessionResponse", { body: "CodexSessionUpdateRequest", params: [uuidParam("id")], notFound: true, conflict: true, description: "Edits a session; an omitted field is left alone. `expectedRev` rejects a stale write with 409. A `sessionNumber` another session already carries is a 400, not a 409 - it is a bad value, not a lost race." }),
+      delete: codexOp("deleteCodexSession", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a session; idempotent. If it was the active session the pointer is cleared in the same transaction, so `activeSessionId` can never name a record that is gone. Journal entries that carry its `sessionNumber` are NOT deleted or renumbered - the number on an entry is a label, not a foreign key." })
+    },
+    [CODEX_PATHS.sessionReveal]: { post: codexOp("revealCodexSession", codexGmOnly, "CodexSessionResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Publishes/retracts a session's recap to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot light the players' recap badge for text nobody changed." }) },
+    [CODEX_PATHS.sessionActivate]: { post: codexOp("activateCodexSession", codexGmOnly, "CodexSessionActiveResponse", { params: [uuidParam("id")], notFound: true, description: "Marks this session the ACTIVE one - the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, not as a flag on each session, so \"two active sessions\" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE, not an edit of the record, and it moves neither `rev` nor `updatedAt` - returning the row would imply otherwise." }) },
     [CODEX_PATHS.calendar]: {
       get: codexOp("getCodexCalendar", codexReadRoles, "CodexCalendarResponse", { bad: false, description: "The world's calendar (months, weekdays, era, current date)." }),
       put: codexOp("setCodexCalendar", codexGmOnly, "CodexCalendarResponse", { body: "CodexCalendarRequest", description: "Replaces the world calendar." })
@@ -1466,6 +1490,24 @@ export const openApiDocument = {
           updatedAt: { type: "string", format: "date-time", description: "GM-only; absent from a player projection." }
         }
       },
+      CodexSession: {
+        type: "object", additionalProperties: false,
+        description: "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody` - `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on - so it is unique across sessions, and a number already in use is refused rather than silently making a group ambiguous.",
+        required: ["id", "sessionNumber", "realDate", "attendees", "prepBody", "recapBody", "revealedToPlayers", "status", "rev", "createdAt", "updatedAt"],
+        properties: {
+          id: codexUuid,
+          sessionNumber: { type: ["integer", "null"], description: "\"Session 12\" - the number journal entries are stamped with. Unique across sessions; null until the GM assigns one." },
+          realDate: { type: ["string", "null"], description: "The real-world date the group played, as the GM typed it. Free text, not a calendar instant - a session sits on the real calendar, never the world's, which is why sessions are their own route and not rows on `/codex/timeline`." },
+          attendees: { type: "array", items: { type: "string" }, description: "Who was at the table. GM-only; absent from a player projection." },
+          prepBody: { type: "string", description: "GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not - revealing a session publishes its recap, never its prep." },
+          recapBody: { type: "string", description: "The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`." },
+          revealedToPlayers: { type: "boolean", description: "GM-only field; absent from a player projection (a player only ever receives revealed sessions)." },
+          status: { ...codexSessionStatus, description: "GM-only; absent from a player projection." },
+          rev: { type: "integer", minimum: 0, description: "GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit." },
+          createdAt: { type: "string", format: "date-time", description: "GM-only; absent from a player projection." },
+          updatedAt: { type: "string", format: "date-time", description: "GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal or an activate - neither is an edit." }
+        }
+      },
       CodexCalendarMonth: { type: "object", additionalProperties: false, required: ["name", "days"], properties: { name: { type: "string" }, days: { type: "integer", minimum: 1, maximum: 400 } } },
       CodexCalendar: { type: "object", additionalProperties: false, required: ["yearName", "months", "weekdays"], properties: { yearName: { type: "string" }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string" } }, currentDate: { ...codexInWorldDateOrNull, description: "Where the campaign 'now' sits; optional." } } },
       CodexAsset: { type: "object", additionalProperties: false, required: ["id", "width", "height", "mediaType"], properties: { id: codexUuid, width: { type: "integer", minimum: 1 }, height: { type: "integer", minimum: 1 }, mediaType: { type: "string" } } },
@@ -1481,7 +1523,9 @@ export const openApiDocument = {
       CodexMarkerCreateRequest: { type: "object", additionalProperties: false, required: ["x", "y", "iconId", "iconColor"], properties: { tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } }, x: codexCoord, y: codexCoord, iconId: { type: "string", pattern: "^[a-z0-9][a-z0-9-]*$", maxLength: 60 }, iconColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, label: { type: ["string", "null"], maxLength: 120 }, revealedToPlayers: { type: "boolean" }, pageIds: { type: "array", maxItems: 24, items: codexUuid }, subMapId: codexNullableUuid, sceneIds: { type: "array", maxItems: 24, items: codexUuid }, actorId: codexNullableUuid } },
       CodexMarkerUpdateRequest: { type: "object", additionalProperties: false, properties: { tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } }, x: codexCoord, y: codexCoord, iconId: { type: "string", pattern: "^[a-z0-9][a-z0-9-]*$", maxLength: 60 }, iconColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, label: { type: ["string", "null"], maxLength: 120 }, revealedToPlayers: { type: "boolean" }, pageIds: { type: "array", maxItems: 24, items: codexUuid }, subMapId: codexNullableUuid, sceneIds: { type: "array", maxItems: 24, items: codexUuid }, actorId: codexNullableUuid } },
       CodexMarkerMoveRequest: { type: "object", additionalProperties: false, required: ["x", "y"], properties: { x: codexCoord, y: codexCoord } },
-      CodexJournalWriteRequest: { type: "object", additionalProperties: false, properties: { tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } }, playerText: { type: "string", maxLength: 20_000 }, gmText: { type: ["string", "null"], maxLength: 20_000 }, revealedToPlayers: { type: "boolean" }, attachMarkerId: codexNullableUuid, attachPageId: codexNullableUuid, sessionNumber: { type: ["integer", "null"], minimum: 0, maximum: 100_000 }, realDate: { type: ["string", "null"], maxLength: 40 }, inWorldLabel: { type: ["string", "null"], maxLength: 120 }, inWorldDate: codexInWorldDateOrNull } },
+      CodexJournalWriteRequest: { type: "object", additionalProperties: false, properties: { tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } }, playerText: { type: "string", maxLength: 20_000 }, gmText: { type: ["string", "null"], maxLength: 20_000 }, revealedToPlayers: { type: "boolean" }, attachMarkerId: codexNullableUuid, attachPageId: codexNullableUuid, sessionNumber: codexSessionNumber, realDate: { type: ["string", "null"], maxLength: 40 }, inWorldLabel: { type: ["string", "null"], maxLength: 120 }, inWorldDate: codexInWorldDateOrNull } },
+      CodexSessionCreateRequest: { type: "object", additionalProperties: false, description: "Every field is optional: an empty body opens a blank `planned` session for the GM to prep into.", properties: { sessionNumber: { ...codexSessionNumber, description: "Must not already be in use by another session." }, realDate: { type: ["string", "null"], maxLength: 40 }, attendees: codexSessionAttendees, prepBody: { type: "string", maxLength: 100_000 }, recapBody: { type: "string", maxLength: 100_000 }, status: codexSessionStatus, revealedToPlayers: { type: "boolean" } } },
+      CodexSessionUpdateRequest: { type: "object", additionalProperties: false, description: "An omitted field is left alone - the console PATCHes a whole draft on every autosave, so \"absent means clear\" would wipe the half of the record the editing surface does not carry. `revealed` is deliberately NOT here: reveal is its own route because it is not an edit (it moves neither `rev` nor `updatedAt`), exactly as on a page.", properties: { sessionNumber: { ...codexSessionNumber, description: "Must not already be in use by another session; `null` clears it." }, realDate: { type: ["string", "null"], maxLength: 40 }, attendees: codexSessionAttendees, prepBody: { type: "string", maxLength: 100_000 }, recapBody: { type: "string", maxLength: 100_000 }, status: codexSessionStatus, expectedRev: { type: "integer", minimum: 0, description: "Optimistic concurrency: reject with 409 if the session moved on." } } },
       CodexCalendarRequest: { type: "object", additionalProperties: false, required: ["yearName", "months", "weekdays"], properties: { yearName: { type: "string", maxLength: 20 }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 40 } }, currentDate: codexInWorldDateOrNull } },
       CodexDeletedData: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } },
       CodexDeletedResponse: envelopeSchema("#/components/schemas/CodexDeletedData"),
@@ -1524,6 +1568,16 @@ export const openApiDocument = {
       CodexChronicleListResponse: envelopeSchema("#/components/schemas/CodexChronicleListData"),
       CodexJournalEntryData: codexDataObject("entry", { $ref: "#/components/schemas/CodexJournalEntry" }),
       CodexJournalEntryResponse: envelopeSchema("#/components/schemas/CodexJournalEntryData"),
+      // The one Codex list payload that carries a sibling field beside its array, so it cannot use
+      // `codexDataObject`: the active-session pointer belongs to the codex, not to any one session.
+      CodexSessionListData: { type: "object", additionalProperties: false, required: ["sessions", "activeSessionId"], properties: { sessions: codexArrayRef("CodexSession"), activeSessionId: { ...codexNullableUuid, description: "The session new journal entries are stamped from. GM-only: always `null` for a player, because the active session is frequently the unrevealed one being prepped and naming it would leak that it exists." } } },
+      CodexSessionListResponse: envelopeSchema("#/components/schemas/CodexSessionListData"),
+      CodexSessionData: codexDataObject("session", { $ref: "#/components/schemas/CodexSession" }),
+      CodexSessionResponse: envelopeSchema("#/components/schemas/CodexSessionData"),
+      // Activate answers with the POINTER alone, never the session row. Activating changes nothing
+      // about the record (no `rev`, no `updatedAt`), so echoing it back would imply it did.
+      CodexSessionActiveData: codexDataObject("activeSessionId", codexNullableUuid),
+      CodexSessionActiveResponse: envelopeSchema("#/components/schemas/CodexSessionActiveData"),
       CodexCalendarData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendar" }),
       CodexCalendarResponse: envelopeSchema("#/components/schemas/CodexCalendarData"),
       CodexExportData: { type: "object", additionalProperties: false, required: ["codex", "exportedAt"], properties: { codex: { type: "object", additionalProperties: true, description: "Opaque backup bundle (round-trips via the codex import surface)." }, exportedAt: { type: "string", format: "date-time" } } },

@@ -10,6 +10,7 @@ import {
   ChoiceGrid,
   Chip,
   DiceInputRow,
+  Drawer,
   Eyebrow,
   FeatureList,
   Field,
@@ -595,6 +596,8 @@ export function StyleGuide() {
   const [seg, setSeg] = useState("all");
   const [dockSide, setDockSide] = useState("right");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerSide, setDrawerSide] = useState<"right" | "left">("right");
   const [cardPick, setCardPick] = useState("fighter");
 
   return (
@@ -1124,6 +1127,24 @@ export function StyleGuide() {
             >
               <p className="sg-muted">The scrim blurs the background, focus is trapped and returns to the opener on close, and Escape or a backdrop click dismisses it.</p>
             </Modal>
+          </Section>
+
+          <Section id="drawer" title="Drawer (non-modal side panel)" blurb="The console you keep open WHILE you work — the Codex session panel beside a live Codex mode, the way devtools sit beside a page. That one word, non-modal, is the whole component: no dialog.showModal(), no scrim, no focus trap, no scroll lock, so the view behind it stays scrollable, clickable and fully usable — open one and try the buttons underneath. It is an <aside> landmark rather than role='dialog' for the same reason: a dialog role promises focus containment this deliberately does not provide, and tabbing straight out of an announced 'dialog' serves a screen-reader user worse than tabbing out of a named complementary region. Escape closes it, but only while focus is inside it — a global key listener would eat Escape from the mode still running behind. It stays mounted when closed (translated off, visibility:hidden + inert) so the slide plays both ways on --ease-drawer while nothing inside is focusable or announced in between. SHRINK THE WINDOW below 760px to watch the side panel become a full-width sheet.">
+            <div className="sg-row">
+              <Button variant="primary" onClick={() => { setDrawerSide("right"); setDrawerOpen(true); }}>Open drawer (right)</Button>
+              <Button variant="secondary" onClick={() => { setDrawerSide("left"); setDrawerOpen(true); }}>Open drawer (left)</Button>
+            </div>
+            <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} side={drawerSide} title="Session 14">
+              <div className="sg-stack">
+                <p className="sg-muted">A drawer is a view onto something that already exists elsewhere, not a second place to edit it. This one reads the session; the full view owns the writing.</p>
+                <Panel><PanelHeader eyebrow="Prep" title="Tonight" /><p className="sg-muted">The council summons the party at dusk. Three factions want the same writ.</p></Panel>
+                <Panel><PanelHeader eyebrow="Recap" title="Last time" /><p className="sg-muted">The bridge fell. Nobody has told the quartermaster yet.</p></Panel>
+                <div className="sg-row">
+                  <Badge tone="info">4 entries</Badge>
+                  <Badge tone="neutral">Planned</Badge>
+                </div>
+              </div>
+            </Drawer>
           </Section>
 
           <Section id="states" title="States, glow & texture" blurb="Neon is a state, not a wallpaper. One glowing element per region; nothing pulses.">

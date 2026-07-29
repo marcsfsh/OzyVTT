@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
+import { CODEX_ASSET_PATHS, CODEX_PATHS, openApiDocument } from "@vtt/api-contract";
 
 /**
  * HTTP-boundary tests for the codex router - the layer that actually enforces viewer safety by picking a
@@ -880,5 +881,68 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     // An explicit value still wins over the active session.
     const pinned = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "A retcon.", sessionNumber: 4 }));
     expect(pinned.data.entry.sessionNumber).toBe(4);
+  });
+});
+
+/**
+ * The route/contract mount check the codex surface has never had. Homebrew has one; this file, until now,
+ * imported `@vtt/api-contract` nowhere at all, so a route added to `codex-http.ts` without a matching
+ * `CODEX_PATHS` entry (or the reverse) was caught by nothing. `packages/api-contract`'s own tests compare
+ * `CODEX_PATHS` to `openApiDocument.paths` - both inside that package - so they prove the document is
+ * self-consistent, never that the server actually serves it.
+ *
+ * **Why this introspects the router instead of probing over HTTP.** The homebrew version sends a request
+ * per declared path and asserts the router's own headers came back, on the stated reasoning that "a
+ * request that falls THROUGH the router never gets the router's own headers". That reasoning does not
+ * hold: `router.use(...)` there and here is declared with no path, and the router is mounted with a bare
+ * `app.use(router)`, so the header middleware runs for EVERY request reaching the app. Measured, not
+ * assumed - `GET /completely/unrelated/path` comes back 404 carrying both `x-request-id` and
+ * `cache-control: no-store`. That loop therefore passes for any string whatsoever and proves nothing
+ * about mounting. Reading Express's route table is exact instead: it is the set of routes that were
+ * really registered, so a documented-but-unmounted path cannot hide in it.
+ */
+describe("Codex routes vs the published contract", () => {
+  const mountedRoutes = async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-codex-mount-"));
+    const store = new CodexStore(join(directory, "vtt.sqlite"));
+    const assets = new MapAssetStore(join(directory, "codex-assets"));
+    await store.initialize(); await assets.initialize();
+    cleanups.push(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+    const router = createCodexRouter({
+      store, assets, authorizeGm: (token) => token === "gm-token", authorizePlayer: () => false,
+      notifyChanged: () => {}, issuePreviewSession: () => PREVIEW_TOKEN
+    }) as unknown as { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };
+    const byPath = new Map<string, Set<string>>();
+    for (const layer of router.stack) {
+      if (!layer.route) continue;
+      // Express names a parameter `:id`; OpenAPI writes `{id}`. Same path, two spellings.
+      const path = layer.route.path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+      const methods = byPath.get(path) ?? new Set<string>();
+      for (const [method, on] of Object.entries(layer.route.methods)) if (on) methods.add(method.toLowerCase());
+      byPath.set(path, methods);
+    }
+    return byPath;
+  };
+
+  it("mounts exactly the codex paths the contract declares", async () => {
+    const mounted = await mountedRoutes();
+    // `/api/v1/codex-assets` also starts with "/api/v1/codex", which is why the declared set is the union
+    // of both constants rather than a prefix filter over one of them.
+    const declared = [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)];
+    expect([...mounted.keys()].sort()).toEqual([...declared].sort());
+    // ...and the document agrees with the constants, so the three-way tie is closed.
+    expect(Object.keys(openApiDocument.paths).filter((path) => path.startsWith("/api/v1/codex")).sort())
+      .toEqual([...declared].sort());
+  });
+
+  it("mounts exactly the METHODS the contract declares on each codex path", async () => {
+    const mounted = await mountedRoutes();
+    const documented = (path: string) => Object.keys((openApiDocument.paths as Record<string, Record<string, unknown>>)[path] ?? {})
+      .filter((key) => ["get", "post", "patch", "put", "delete"].includes(key)).sort();
+    for (const [path, methods] of mounted) {
+      // A path-level match is not enough: `PATCH /codex/sessions/{id}` could be mounted while the contract
+      // documented only GET, and the path-set assertion above would still pass.
+      expect([...methods].sort(), `${path} methods`).toEqual(documented(path));
+    }
   });
 });

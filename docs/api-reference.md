@@ -2751,6 +2751,102 @@ Shows/hides a journal entry to players.
 
 **Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `404`
 
+### `GET /api/v1/codex/sessions`
+
+Every play session - the GM's prep-and-recap record of one evening at the table. Numbered sessions first in number order, then the unnumbered ones oldest-first (the same tier-separator idiom the chronicle uses for undated records). Role-scoped: a GM receives the whole record for every session plus `activeSessionId`; a player receives only REVEALED sessions, reduced to the recap layer (`id`, `sessionNumber`, `realDate`, `recap`), and `activeSessionId` is always null for a player because it can name a session they cannot see.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexSessionListData` · errors `401`
+
+### `POST /api/v1/codex/sessions`
+
+Creates a session. Every field is optional - an empty POST opens a blank `planned` session to prep into. A `sessionNumber` another session already carries is refused with 400: the journal's by-session lens resolves a number to at most one session, so numbers are unique.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `sessionNumber` | integer \| null | no | Must not already be in use by another session. |
+| `realDate` | string \| null | no |  |
+| `attendees` | string[] | no |  |
+| `prepBody` | string | no |  |
+| `recapBody` | string | no |  |
+| `status` | `planned` \| `played` | no |  |
+| `revealedToPlayers` | boolean | no |  |
+
+**Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401`
+
+### `GET /api/v1/codex/sessions/{id}`
+
+One session, projected for the caller. An unrevealed session is **404** to a player - the same 404 an absent session gets, and never 403, because a 403 would confirm the record exists and its very existence ("session 14 is being prepped") is GM information.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `401` `404`
+
+### `PATCH /api/v1/codex/sessions/{id}`
+
+Edits a session; an omitted field is left alone. `expectedRev` rejects a stale write with 409. A `sessionNumber` another session already carries is a 400, not a 409 - it is a bad value, not a lost race.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `sessionNumber` | integer \| null | no | Must not already be in use by another session; `null` clears it. |
+| `realDate` | string \| null | no |  |
+| `attendees` | string[] | no |  |
+| `prepBody` | string | no |  |
+| `recapBody` | string | no |  |
+| `status` | `planned` \| `played` | no |  |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the session moved on. |
+
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `404` `409`
+
+### `DELETE /api/v1/codex/sessions/{id}`
+
+Deletes a session; idempotent. If it was the active session the pointer is cleared in the same transaction, so `activeSessionId` can never name a record that is gone. Journal entries that carry its `sessionNumber` are NOT deleted or renumbered - the number on an entry is a label, not a foreign key.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/sessions/{id}/reveal`
+
+Publishes/retracts a session's recap to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot light the players' recap badge for text nobody changed.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/sessions/{id}/activate`
+
+Marks this session the ACTIVE one - the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, not as a flag on each session, so "two active sessions" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE, not an edit of the record, and it moves neither `rev` nor `updatedAt` - returning the row would imply otherwise.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexSessionActiveData` · errors `400` `401` `404`
+
 ### `GET /api/v1/codex/calendar`
 
 The world's calendar (months, weekdays, era, current date).
