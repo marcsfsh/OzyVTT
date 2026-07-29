@@ -1211,11 +1211,17 @@ export class CodexStore {
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
-  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[] }> {
+  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null }> {
     const pages = (this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
-    return { pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships() };
+    // M9: sessions and the active pointer travel with the backup. A record type that exists but is not
+    // exported is a silent hole in a GM's only copy of their prep - and unlike everything else here, a
+    // session's `prepBody` is the one thing in the codex that exists nowhere else at all.
+    return {
+      pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
+      sessions: this.listSessions(), activeSessionId: this.activeSessionId
+    };
   }
 
   // ----- Relationships (typed entity edges) -----

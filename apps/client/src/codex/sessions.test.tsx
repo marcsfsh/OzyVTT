@@ -290,9 +290,33 @@ describe("The player's session card (M9, viewer safety)", () => {
     expect(await screen.findByText("They reached the spire.")).toBeInTheDocument();
     // A button that navigates nowhere is worse than no button.
     expect(card.queryByRole("button")).not.toBeInTheDocument();
-    // The GM's plan has no route to this surface at all: the shared card type has no prep field, and
-    // the player projection carries no such key. Both halves would have to fail for this to appear.
-    expect(document.body.textContent).not.toContain("The heart of the castle.");
+  });
+
+  /**
+   * The assertion this replaces read `expect(document.body.textContent).not.toContain(S8.prepBody)` and
+   * could not fail: `S8` is only ever fed to `sessionApi.list`, which `PlayerCodex` does not import, so
+   * that string was unreachable from this render no matter what the card did. It would have passed with
+   * `{session.prepBody}` rendered verbatim. Adversarial review caught it; recorded because it is the
+   * exact shape of the trap this suite's own header warns about.
+   *
+   * This version arms the PLAYER endpoint with a GM-shaped row — the payload a regressed
+   * `projectPlayerSession` would actually send — so the type guard is no longer the only thing between
+   * prep and the screen, and the card is asked to survive being handed secrets it should never receive.
+   */
+  it("renders nothing from extra keys if the server ever regresses and sends a GM row", async () => {
+    playerSessions.mockResolvedValue([{
+      ...PLAYER_SESSION,
+      prepBody: "The heart of the castle.", attendees: ["Ana", "Bo"], status: "planned", rev: 7,
+      recapBody: "a GM-shaped duplicate of the recap"
+    } as never]);
+    render(<PlayerCodex token="player" />);
+
+    const card = within(await screen.findByRole("navigation", { name: "Latest recap" }));
+    expect(card.getByText("Session 8")).toBeInTheDocument();       // the legitimate keys still render...
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("The heart of the castle.");        // ...and none of the smuggled ones do
+    expect(text).not.toContain("Ana");
+    expect(text).not.toContain("a GM-shaped duplicate of the recap");
   });
 });
 

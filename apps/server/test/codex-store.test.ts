@@ -627,6 +627,26 @@ describe("CodexStore entities + relationships", () => {
     expect(store.restoreRevision(page.id, rev.id, "gm").fields.goals).toBeUndefined();
   });
 
+  /**
+   * M9. The export bundle is a GM's only copy of their prep, and `prepBody` is the one thing in the codex
+   * that exists nowhere else — not on a page, not in the journal, not recoverable from a revision. A
+   * record type that ships without joining the backup loses data silently, which is exactly the class of
+   * bug the gmFields case above is a regression guard for. Found by adversarial review, not by a test.
+   */
+  it("carries sessions and the active pointer into the backup bundle", () => {
+    const played = store.createSession({ sessionNumber: 1, prepBody: "Ambush at the bridge.", recapBody: "They crossed." });
+    const next = store.createSession({ sessionNumber: 2, prepBody: "The vault opens for a sacrifice." });
+    store.setActiveSession(next.id);
+
+    const bundle = store.exportBundle();
+    expect(bundle.sessions.map((session) => session.sessionNumber)).toEqual([1, 2]);
+    expect(bundle.activeSessionId).toBe(next.id);
+    // The GM layer specifically — an export that carried the recap but dropped the prep would look
+    // healthy in a directory listing and be worthless on restore.
+    expect(bundle.sessions.find((session) => session.id === played.id)!.prepBody).toBe("Ambush at the bridge.");
+    expect(bundle.sessions.find((session) => session.id === next.id)!.prepBody).toBe("The vault opens for a sacrifice.");
+  });
+
   it("migration v8 backfills a legacy marker's single page/scene id into one-element arrays", () => {
     // A DB written before markers linked to MANY pages/scenes: single page_id/scene_id columns. The M1
     // review flagged that v8 had never been run against legacy rows.
