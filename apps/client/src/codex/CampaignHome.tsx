@@ -133,8 +133,14 @@ export function CampaignHome({
           panel for a record that does not exist. */}
       {session && (
         <section className="codex-campaign-section">
-          <h3 className="codex-campaign-h">Next session</h3>
-          <nav className="codex-campaign-recent" aria-label="Next session">
+          {/* The two audiences are looking at different things through the same card, so it must not
+              claim to be one of them for both. The GM sees the session they are prepping — "next". A
+              player only ever sees a session whose recap has been revealed, which is by definition one
+              that has already happened; heading that "Next session" told them the last game was the
+              next one. Keyed off `onOpenSession`, the capability flag this component already uses to
+              tell the two callers apart, so it still knows nothing about roles. */}
+          <h3 className="codex-campaign-h">{onOpenSession ? "Next session" : "Latest recap"}</h3>
+          <nav className="codex-campaign-recent" aria-label={onOpenSession ? "Next session" : "Latest recap"}>
             {/* R2: the same row chassis the journal and atlas rows above use, which is also where its
                 44px floor comes from — `.codex-campaign-recentitem` is §4 route 1 (grow the paint), so
                 there is no new control and no new floor to argue about here.

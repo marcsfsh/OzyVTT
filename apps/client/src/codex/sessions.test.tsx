@@ -281,7 +281,10 @@ describe("The player's session card (M9, viewer safety)", () => {
 
   it("shows the recap as a readout — never a button, because there is no player session log", async () => {
     render(<PlayerCodex token="player" />);
-    const card = within(await screen.findByRole("navigation", { name: "Next session" }));
+    // "Latest recap", not "Next session": a player only ever sees a session whose recap was revealed,
+    // which has already been played. The GM's copy of this card is the one that says "Next session".
+    expect(screen.queryByRole("navigation", { name: "Next session" })).not.toBeInTheDocument();
+    const card = within(await screen.findByRole("navigation", { name: "Latest recap" }));
 
     expect(card.getByText("Session 8")).toBeInTheDocument();
     expect(await screen.findByText("They reached the spire.")).toBeInTheDocument();
