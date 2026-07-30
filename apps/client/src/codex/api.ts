@@ -73,7 +73,19 @@ export type CodexPageRevision = Readonly<{
  * Nested under `revisionHistory` on purpose: `codex_meta` is the codex's settings row, so this gives later
  * codex-wide settings a home without inventing fields for them today.
  */
-export type CodexSettings = Readonly<{ revisionHistory: Readonly<{ enabled: boolean; windowMinutes: number }> }>;
+export type CodexRevisionHistorySettings = Readonly<{ enabled: boolean; windowMinutes: number }>;
+/**
+ * What the GM READS: the two settings plus what the history currently costs. The usage figures are
+ * server-computed and read-only, which is why they are not on `CodexSettingsInput` below — a client that
+ * could send them could disagree with the table they describe.
+ *
+ * `versionBytes` is the summed LENGTH of the stored bodies, not disk usage. Named and rendered as
+ * approximate on purpose: it exists to answer "is my history worth trimming?", and a figure precise enough
+ * to invite comparison against the sqlite file's size would be a figure that disagrees with it.
+ */
+export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistorySettings & Readonly<{ versionCount: number; versionBytes: number }> }>;
+/** What the GM WRITES. Deliberately narrower than the read: the usage figures are the server's to report. */
+export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionHistorySettings }>;
 /** Bounds the server clamps to, restated so a control can refuse a value rather than hand back a 400. */
 export const REVISION_WINDOW_MIN = 0;
 export const REVISION_WINDOW_MAX = 10_080;
@@ -175,7 +187,19 @@ export const codexApi = {
    * GM devices disagree about a codex they share.
    */
   getSettings: (token: string) => request<{ settings: CodexSettings }>(token, "/settings").then((data) => data.settings),
-  setSettings: (token: string, input: CodexSettings) => request<{ settings: CodexSettings }>(token, "/settings", { method: "PUT", body: JSON.stringify(input) }).then((data) => data.settings),
+  setSettings: (token: string, input: CodexSettingsInput) => request<{ settings: CodexSettings }>(token, "/settings", { method: "PUT", body: JSON.stringify(input) }).then((data) => data.settings),
+  /**
+   * OWNER DECISION (2026-07-30): trim the version history. **Destructive and irreversible** — the one such
+   * action on the settings screen, which is why the caller confirms with the real count first.
+   *
+   * `olderThanDays: 0` deletes every version, and that is arithmetic rather than a magic number: nothing is
+   * younger than zero days old. It is still reached from its own button behind its own confirm, never by
+   * winding a day field down to zero.
+   *
+   * Never touches `codex_pages` — a page as it stands now is not a version of itself.
+   */
+  deleteRevisions: (token: string, olderThanDays: number) =>
+    request<{ deleted: number }>(token, "/page-revisions", { method: "DELETE", body: JSON.stringify({ olderThanDays }) }),
   /** Mints a short-lived PLAYER token so the GM can preview the player Codex through the real player projection. */
   createPreviewSession: (token: string) => request<{ token: string }>(token, "/preview-session", { method: "POST" }).then((data) => data.token),
   exportBundle: (token: string) => request<{ codex: unknown; exportedAt: string }>(token, "/export")

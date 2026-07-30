@@ -589,13 +589,21 @@
 .codex-graph-nodelabel { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--void); stroke-width: 3px; }
 .codex-editor-foot { display: flex; }
 
-/* The two history knobs, above the list they govern. A COLUMN, not a row: §4 route 1 is required of a
-   vertical stack of controls, and the `Switch` and the minutes `Field` both grow their own paint — a row
-   would put them side by side at 320px and force the field to shrink below the floor. The rule below
-   separates them from the list so they read as settings rather than as a version. */
-.codex-revsettings { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
-/* Bounded so the minutes field does not stretch across a laptop-width modal, and free to shrink on a phone. */
-.codex-revsettings .nh-field { max-width: 22rem; }
+/* The codex-wide settings destination (owner decision, 2026-07-30). A COLUMN throughout, and not a
+   preference: §4 route 1 is what a vertical stack of controls requires, and every control here grows its own
+   paint — a row would sit them side by side and force the narrow ones under the floor at 320px. */
+.codex-settings { display: flex; flex-direction: column; gap: var(--space-4); }
+.codex-settings-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-settings-lede { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); max-width: 60ch; }
+/* Bounded so a minutes field does not stretch the width of a laptop, and free to shrink on a phone. */
+.codex-settings-section .nh-field { max-width: 22rem; }
+.codex-settings-usage { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+/* The one destructive area in the Codex outside a record's own editor, so it is fenced rather than inlined:
+   a GM must not arrive at "delete all version history" while scanning for the frequency field. */
+.codex-settings-danger { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line)); border-radius: var(--radius-md); }
+/* WRAPS, and that is load-bearing: the two buttons carry long self-describing labels ("Delete versions older
+   than 30 days"), so a nowrap row would push the second off a 320px screen. */
+.codex-settings-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .codex-revisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-revision { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); }
 .codex-revision-title { grid-column: 1; color: var(--text-dim); font-size: var(--fs-sm); }

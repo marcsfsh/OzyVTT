@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Field, IconButton, Input, Modal, SaveState, SegmentedControl, Select, Switch, TagInput, Textarea, type SaveStatus } from "@vtt/ui";
-import { calendarApi, codexApi, CodexRequestError, REVISION_WINDOW_MAX, REVISION_WINDOW_MIN, uploadCodexAsset, type CodexBacklink, type CodexCalendar, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship, type CodexSettings } from "./api";
+import { Button, Field, IconButton, Input, Modal, SaveState, SegmentedControl, Select, TagInput, Textarea, type SaveStatus } from "@vtt/ui";
+import { calendarApi, codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexCalendar, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship, type CodexSettings } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { PageTimeline } from "./PageTimeline";
@@ -114,7 +114,6 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
   const [revisions, setRevisions] = useState<CodexPageRevision[]>([]);
   /** `null` = not read yet, or the read failed. The panel then shows the list without claiming a setting. */
   const [settings, setSettings] = useState<CodexSettings | null>(null);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
   const revRef = useRef(page.rev);
   const savedRef = useRef(serialize(draftOf(page)));
   const draftRef = useRef(draft);
@@ -282,23 +281,6 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
     // in place rather than collapsed into one alert that would blame the wrong half.
     try { setRevisions(await codexApi.listRevisions(gmToken, page.id)); } catch { setRevisions([]); }
     try { setSettings(await codexApi.getSettings(gmToken)); } catch { setSettings(null); }
-  };
-  /**
-   * OWNER DECISION (2026-07-30): the two history knobs live HERE, on the panel where history is read.
-   *
-   * They are codex-WIDE and this panel is per-page, which is why the copy says so out loud. They are here
-   * anyway because this is the screen where the question arises — a GM who wonders why there are only three
-   * versions is looking at this list — and a codex-wide settings destination for two fields would be a
-   * screen the GM has to go find in order to answer a question they are already holding.
-   *
-   * Written straight through to the server on change, with no Save button: each is one value, and the
-   * response is the CLAMPED result, so the field shows what the server actually stored rather than what was
-   * typed at it.
-   */
-  const saveSettings = async (next: CodexSettings) => {
-    setSettings(next);
-    try { setSettings(await codexApi.setSettings(gmToken, next)); }
-    catch { setSettingsError("That setting could not be saved."); try { setSettings(await codexApi.getSettings(gmToken)); } catch { /* leave the optimistic value; the error says it did not land */ } }
   };
   const restore = async (revisionId: number) => {
     try {
@@ -511,40 +493,23 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
 
       {revisionsOpen && (
         <Modal open onClose={() => setRevisionsOpen(false)} title="Revision history" size="md" ariaLabel="Revision history">
-          {/* How much history the codex keeps. Codex-wide, said so in the copy, and placed here because this
-              is the screen where a GM asks why the list is as long as it is. */}
+          {/*
+            OWNER DECISION (2026-07-30): the controls live on the Codex settings screen; this panel keeps a
+            read-only sentence naming the setting in force.
+
+            That sentence is the whole reason this is not simply nothing. With a window set, the newest saved
+            version is normally BEHIND the page as it stands, and the list being short is the setting working
+            rather than history being lost — which, unexplained, is the one thing here that reads as a bug.
+          */}
           {settings && (
-            <div className="codex-revsettings">
-              <Switch checked={settings.revisionHistory.enabled}
-                onChange={(enabled) => void saveSettings({ revisionHistory: { ...settings.revisionHistory, enabled } })}
-                label="Keep version history" />
-              {settings.revisionHistory.enabled ? (
-                <>
-                  <Field label="Save a version at most once every" htmlFor="rev-window"
-                    help="Minutes. 0 keeps every save. At most this much work can be lost if you go back a version.">
-                    <Input id="rev-window" type="number" inputMode="numeric" min={REVISION_WINDOW_MIN} max={REVISION_WINDOW_MAX}
-                      value={String(settings.revisionHistory.windowMinutes)}
-                      onChange={(event) => {
-                        // Clamped here as well as on the server, so the field cannot ask for something that
-                        // will come back changed; the server's answer is still what lands in state.
-                        const typed = Math.trunc(Number(event.target.value));
-                        const windowMinutes = Number.isFinite(typed) ? Math.min(REVISION_WINDOW_MAX, Math.max(REVISION_WINDOW_MIN, typed)) : REVISION_WINDOW_MIN;
-                        void saveSettings({ revisionHistory: { ...settings.revisionHistory, windowMinutes } });
-                      }} />
-                  </Field>
-                  {/* With a window set, the newest version is normally BEHIND the page as it stands now —
-                      which is the one thing about this list that would otherwise read as a bug. */}
-                  {settings.revisionHistory.windowMinutes > 0 && (
-                    <p className="codex-composer-hint">Your page always keeps what you last typed. This list is what you can go back to, so the newest version here can be up to {settings.revisionHistory.windowMinutes} minutes behind it.</p>
-                  )}
-                </>
-              ) : (
-                <p className="codex-composer-hint">New versions are not being saved. The ones below are kept and can still be restored.</p>
-              )}
-              <p className="codex-composer-hint">Applies to every page in the codex.</p>
-            </div>
+            <p className="codex-composer-hint">
+              {!settings.revisionHistory.enabled
+                ? "Version history is off, so nothing new is being saved. These can still be restored. Change it in Codex settings."
+                : settings.revisionHistory.windowMinutes > 0
+                ? `One version is saved per ${settings.revisionHistory.windowMinutes} minutes, so the newest below can be that far behind the page. Change it in Codex settings.`
+                : "Every save is kept as a version. Change it in Codex settings."}
+            </p>
           )}
-          {settingsError && <Alert tone="danger">{settingsError}</Alert>}
           {revisions.length === 0 ? <p className="codex-preview-empty">No earlier revisions.</p> : (
             <ul className="codex-revisions">
               {revisions.map((revision) => (

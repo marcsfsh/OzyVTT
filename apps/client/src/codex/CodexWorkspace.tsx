@@ -15,6 +15,7 @@ import { SessionsView } from "./SessionsView";
 import { SessionConsole } from "./SessionConsole";
 import { QuestsView } from "./QuestsView";
 import { RevealAudit } from "./RevealAudit";
+import { CodexSettingsView } from "./CodexSettings";
 import { StandingAdjuster } from "./StandingAdjuster";
 import { pickNextSession } from "./sessions";
 import { RelationshipGraph } from "./RelationshipGraph";
@@ -96,6 +97,12 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    * the other two rather than leaving one silently stacked behind another.
    */
   const [auditOpen, setAuditOpen] = useState(false);
+  /**
+   * OWNER DECISION (2026-07-30): codex-wide settings are the FOURTH destination, on identical terms — no
+   * target latch (nothing jumps into it), and each of the four openers closes the other three rather than
+   * leaving one silently stacked behind another.
+   */
+  const [settingsOpen, setSettingsOpen] = useState(false);
   /** M12 / CT-6: which faction's standing the GM is adjusting, or null. GM-only — see `StandingAdjuster`. */
   const [adjustingFactionId, setAdjustingFactionId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
@@ -486,8 +493,8 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
               carries the 44px floor itself (§4 route 2, `.nh-btn--sm`), so there is no new control here
               and no new floor to argue about. They live in the ops row rather than as extra tabs because
               the five modes already overflow a 375px strip; this row wraps, which a tab strip does not. */}
-          <Button variant="ghost" size="sm" onClick={() => { setQuestsOpen(false); setAuditOpen(false); setSessionTarget(null); setSessionsOpen(true); }}>Sessions</Button>
-          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setAuditOpen(false); setQuestTarget(null); setQuestsOpen(true); }}>Quests</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setQuestsOpen(false); setAuditOpen(false); setSettingsOpen(false); setSessionTarget(null); setSessionsOpen(true); }}>Sessions</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setAuditOpen(false); setSettingsOpen(false); setQuestTarget(null); setQuestsOpen(true); }}>Quests</Button>
           <Button variant="ghost" size="sm" aria-expanded={consoleOpen} onClick={() => setConsoleOpen((open) => !open)}>Session console</Button>
           {/* M12 / CT-9. It belongs beside "Preview as player" rather than with the mode tabs because the
               two answer halves of one question — that one shows what a player sees, this one lists what
@@ -496,17 +503,22 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
               Called "Reveal audit" and NOT "What players see", which is already the player-preview
               modal's title — two buttons a thumb apart with the same words would be worse than a
               slightly technical one. */}
-          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setQuestsOpen(false); setAuditOpen(true); }}>Reveal audit</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setQuestsOpen(false); setSettingsOpen(false); setAuditOpen(true); }}>Reveal audit</Button>
           <Button variant="ghost" size="sm" onClick={openPlayerPreview}>Preview as player</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
           <Button variant="ghost" size="sm" onClick={exportCodex}>Export</Button>
+          {/* Last in the row on purpose: it is the one a GM opens least, and this row reads by frequency.
+              `Button size="sm"` carries the 44px floor itself (§4 route 2, `.nh-btn--sm`) and the row wraps. */}
+          <Button variant="ghost" size="sm" onClick={() => { setSessionsOpen(false); setQuestsOpen(false); setAuditOpen(false); setSettingsOpen(true); }}>Codex settings</Button>
           <input ref={importInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.target.value = ""; }} />
         </div>
       </div>
       {/* CF-2: one error surface for the whole workspace. It previously lived inside the Pages rail, so a
           failed load was invisible in Campaign, Atlas, Journal and Graph. */}
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
-      {auditOpen
+      {settingsOpen
+        ? <CodexSettingsView gmToken={gmToken} onClose={() => setSettingsOpen(false)} />
+        : auditOpen
         ? <RevealAudit gmToken={gmToken} onClose={() => setAuditOpen(false)} />
         : sessionsOpen
         ? <SessionsView gmToken={gmToken} sessions={sessions} activeSessionId={activeSessionId}
