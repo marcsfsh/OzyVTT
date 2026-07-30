@@ -5,7 +5,7 @@ import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkK
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView } from "./JournalView";
-import { campaignDeadlines, chronicleWhenLabel } from "./chronicle";
+import { campaignDeadlines, chronicleWhenLabel, chronicleRowSummary } from "./chronicle";
 import { CommandPalette } from "./CommandPalette";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
@@ -234,7 +234,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
     // while an event is a wiki page already counted in the entity totals above.
     .filter((record) => record.kind !== "event")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((record) => ({ id: record.id, summary: record.text.trim() || (record.gmText ?? "").trim(), when: chronicleWhenLabel(record), kind: record.kind })), [campaign.records]);
+    .map((record) => ({ id: record.id, summary: chronicleRowSummary(record), when: chronicleWhenLabel(record), kind: record.kind })), [campaign.records]);
   /**
    * M11: the deadlines, ordered by the SHARED rule (`campaignDeadlines` — passed first, then approaching)
    * and mapped down to the keys the shared card type carries. `fired` rides across from the server's
@@ -242,7 +242,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    * renders this same component.
    */
   const campaignDeadlineCards = useMemo<readonly CampaignDeadline[]>(
-    () => campaignDeadlines(campaign.records).map((record) => ({ id: record.id, summary: record.text.trim() || (record.gmText ?? "").trim(), when: chronicleWhenLabel(record), fired: record.fired })),
+    () => campaignDeadlines(campaign.records).map((record) => ({ id: record.id, summary: chronicleRowSummary(record), when: chronicleWhenLabel(record), fired: record.fired })),
     [campaign.records]
   );
   const campaignToday = useMemo(() => (campaign.calendar?.currentDate ? formatWorldDate(campaign.calendar, campaign.calendar.currentDate) : null), [campaign.calendar]);

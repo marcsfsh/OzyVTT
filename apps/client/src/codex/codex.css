@@ -386,6 +386,15 @@
    payload, not the metadata. It is ten characters — the title's ellipsis absorbs the cost at 375px.
    M11's deadline card borrows the same rule for the same reason: a deadline's DATE is the payload of
    that row, not metadata about it — "Approaching" with the date hidden says almost nothing. */
+/* A deadline row's TITLE gets a floor, the same one the audit row uses (`.codex-audit-row`, below).
+   Measured before this existed: at 320px — the documented supported floor — the title rendered 0–5px wide
+   on 4 of 4 rows, so the card showed a warning triangle, "Passed" and a date with none of what the deadline
+   IS. At 375px it rendered 47–60px against a 155–246px need. The comment above claims "the title's ellipsis
+   absorbs the cost"; it annihilated it instead, because the title was the only flexible child and lost every
+   fight. A basis keeps the title in the negotiation rather than making it the sole loser; the date and badge
+   still hold their ground, and the title ellipses like every other list row. Found by the final QA pass,
+   measured at both widths. The Deadlines card was the ONLY card with this fault. */
+.codex-campaign-recentitem .codex-list-title { flex: 1 1 140px; min-width: 0; }
 .codex-campaign-questprogress, .codex-campaign-deadlinewhen { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
 /* Indented under its quest so the list reads as belonging to the row above it rather than as a sibling.
    The `Checklist` primitive owns everything else about it, including its own 44px story — which does not

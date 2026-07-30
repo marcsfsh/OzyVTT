@@ -10,6 +10,81 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex/ux] Seven friction points from the final QA pass, left for an owner decision (2026-07-30).**
+  Each is a design call rather than a defect, so none was changed unilaterally. Ranked as the reviewer ranked
+  them, by how much they would annoy a GM mid-session:
+  1. **Confirming a downtime can fire deadlines silently.** Measured: a 7-day confirm moved the clock 16→23
+     and flipped two deadlines to "Passed" with no notice anywhere. The affordance names the date and nothing
+     else. One clause would fix it: "…this passes 2 deadlines."
+  2. **A deadline appears twice on the dashboard with two different words** — in the Deadlines card badged
+     "Approaching", and again in Recent journal activity badged "Deadline". `campaignEntries` filters only
+     `kind !== "event"`, so downtime, milestones and standing double up too. This is the "two ways to say one
+     thing" pathology the overhaul exists to remove; fix by excluding kinds that have their own card, or by
+     dropping the separate card.
+  3. **The four new dashboard cards do not show reveal state** while the two older ones do (Atlas and
+     Recently updated show "Shown" / "GM only"). A GM-only deadline and a shared one render identically — on
+     the same screen as a feature premised on reveal state mattering.
+  4. **Reveal audit: Hide is one-way, and one tap can remove two rows.** Hiding a faction page also removes
+     its standing (correctly — the standing is only visible while its page is), with nothing on screen saying
+     so, and no way back from where you hid it. The file argues against a bulk un-hide on safety grounds; the
+     same argument applies to one mis-tap on a 20-row list.
+  5. **"Show the pin" does not show the pin** (`AtlasView.tsx`) — it selects the marker without scrolling or
+     re-centring, so on a phone the pin stays off-screen. Breaks `ux-principles.md` §9, "actions name their
+     result."
+  6. **Publishing the campaign date gives no confirmation** — the row simply disappears, and because it only
+     renders while the clocks disagree there is afterwards no way to ask what date the players think it is.
+  7. **The Faction standing card is unbounded and 3 rows tall per faction**, listing every faction page
+     whether rated or not, sitting 4th of 9 sections. Deliberately unsliced (it is the only place standing is
+     adjusted), but a campaign with 25 factions buries everything below it.
+  Also: audit rows do not name their kind, so a revealed deadline and a revealed note look identical on the
+  surface where "is that deadline visible?" is the question; "GM only" means two different things on one row
+  (the reveal switch's off state and the GM-text tag); and the session console is a full-screen takeover at
+  ≤384px, which undercuts its "consult prep while browsing" rationale on a phone.
+
+- **[codex/viewer] Downtime, milestone and standing records are auto-dated from the GM's PRIVATE clock, and
+  that date ships to players on reveal.** Measured with the GM prepping 48 days ahead: a revealed milestone
+  carried `inWorldLabel: "Second, Alturiak 28, 1492 DR"` to a player whose own "now" was Hammer 10 — a date
+  they have not been shown. `createDowntime`, `createMilestone` and `setStanding` all default to
+  `getCalendar().currentDate` (the prep clock) rather than the published date. The same auto-dating predates
+  M11 for `appendCombatEntry`, so this is inherited rather than introduced — but M11 created the private clock
+  and M11/M12 then wired three new kinds to it, and nothing warns the GM that revealing such a record
+  discloses their date. Options: date them at the published clock; warn on reveal; or accept and document.
+  **Left for the owner: it is a product decision about what "when did this happen" means, not a slip.**
+
+- **[repo/tooling] The committed tap audit cannot see five of the surfaces this programme added.** Its
+  `MODES` loop visits the five mode tabs only, and switching mode closes the destinations — so the Sessions
+  log, Quests log, Reveal audit, session console drawer and standing dialog have never appeared in a reported
+  number. The final QA pass measured all five separately (0 sub-floor, 0 stolen taps at 375 and 320), but the
+  script should learn the ops row so the claim stays checkable without hand-written harnesses.
+
+- **[codex/ui] A closed session-console drawer inflates `document.body.scrollWidth`.** `position: fixed;
+  translate: 100%` stretches the initial containing block, so `scrollWidth` reads 1648 at a 1280 viewport and
+  `innerWidth` reads 734 on a 375px phone. **Inert for users** — `canScrollRightBy: 0`, visual viewport scale
+  1, drawer `visibility: hidden`, and the only stretched element is `.app-texture` (`z-index: -1`,
+  `pointer-events: none`). But it desynchronises `getBoundingClientRect` from synthesized input coordinates,
+  which produced two convincing false findings (a "broken" mobile pin drag, an "unreachable" drawer close)
+  before the reviewer caught it. Anyone writing automated mobile tests against this app will hit it.
+
+- **[codex/audit] A revealed unnumbered session with an empty recap renders a blank audit row.** Same defect
+  the M12 remediation fixed for journal rows with `AUDIT_JOURNAL_FALLBACK`, left in place one arm over
+  (`codex-projections.ts`, the session arm). A row with a Hide button and no label, on the screen whose job is
+  saying what the party can see.
+
+- **[codex/search] Four of the five arms of `projectPlayerSearchHit` have no test that fails when broken.**
+  Measured: making the page, journal, map or marker arm unconditionally visible leaves all 224 codex tests
+  passing; only the quest arm fails. The SQL layer IS covered, which is exactly why the projection's gate is
+  never exercised over HTTP — `PLAYER_VISIBLE_SQL` filters the ids first. M10 applied the direct-unit-test
+  discipline to the arm it added and never retrofitted the four older ones, while the file claims "Each is
+  tested at its own layer for exactly that reason." Not a live leak; a load-bearing gate with no alarm on it,
+  and the M6 lesson recurring in the mirror direction. (The journal arm now delegates to
+  `projectPlayerJournalEntry`, so it is covered — the other three are not.)
+
+- **[codex/realtime] The `codex:changed` ping tells every player which KIND of record the GM is working on.**
+  Measured on a real player socket while the GM created three entirely unrevealed records: `scope: "sessions"`,
+  then `"quests"`, then `"journal"`. No content leaks. But the homebrew notifier eight lines below refuses to
+  do this on stated principle — "telling players which kind of thing the GM is working on … is a small leak of
+  GM intent" — and M9/M10 added `sessions` and `quests` to that union. Two adjacent notifiers, opposite rules.
+
 - **[codex/store] A page that HAD standing and is re-typed away from `faction` keeps its standing row.**
   `setStanding` now requires `entity_type = 'faction'` only to CREATE a row, not to update one, and the
   Campaign card lists any page that already has a row whatever its type is now — otherwise the GM had a

@@ -326,6 +326,28 @@ export function downtimeProposedDate(calendar: CodexCalendar | null, days: numbe
  * and the composer requires only one of them, so "— forging a blade · 7 days" must not be a thing a row
  * can say.
  */
+/**
+ * What ONE chronicle row says on a summary surface — the dashboard's activity feed and its Deadlines card.
+ *
+ * A record's prose is the right answer for most kinds, but `standing` and `milestone` carry their meaning in
+ * the PAYLOAD: `setStanding` writes an empty player text on purpose, so five end-of-session standing
+ * adjustments turned the dashboard's feed into five identical rows reading "Untitled entry · Standing",
+ * pushing every real entry out of a list sliced to 5. The Journal rendered those same records correctly the
+ * whole time, from these same helpers — the dashboard simply never called them. Found by the final QA pass.
+ *
+ * Lives here beside the other reading rules so the dashboard and the timeline cannot describe one record two
+ * different ways, which is the pathology this overhaul exists to remove.
+ */
+export function chronicleRowSummary(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload> & Readonly<{ text: string; gmText?: string | null }>): string {
+  const standing = standingOf(record);
+  if (standing) return standingChangeLabel(standing, null);
+  const milestone = milestoneOf(record);
+  if (milestone) return milestoneSummaryLabel(milestone);
+  const downtime = downtimeOf(record);
+  if (downtime) return record.text.trim() || (record.gmText ?? "").trim() || downtimeSummaryLabel(downtime);
+  return record.text.trim() || (record.gmText ?? "").trim();
+}
+
 export function downtimeSummaryLabel(payload: CodexDowntimeSummary): string {
   const span = `${payload.days} ${payload.days === 1 ? "day" : "days"}`;
   const said = [payload.who.trim(), payload.activity.trim()].filter(Boolean).join(" — ");

@@ -47,7 +47,18 @@ export function StandingAdjuster({ gmToken, factionPageId, factionName, standing
   const delta = next - current;
   // Nothing to record when nothing moved: a chronicle row saying "unchanged, because…" is a record of
   // the GM having opened a dialog, not of anything that happened in the world.
-  const canSave = reason.trim() !== "" && delta !== 0;
+  /**
+   * Only the thing that makes the change meaningless blocks the save: a value that has not moved.
+   *
+   * `reason` was required here while `StandingSetSchema` on the server makes it OPTIONAL and says why —
+   * "the GM adjusting a standing mid-session should not be blocked on typing a sentence." The client won
+   * that argument silently, and the button simply sat inert: the reason requirement is spelled out in the
+   * field help, the value-must-change requirement was stated nowhere at all. Found by the final QA pass.
+   *
+   * The remaining rule earns its keep — recording a change of zero would write a chronicle row saying
+   * nothing happened — and unlike before, it now SAYS so, the way the deadline composer does.
+   */
+  const canSave = delta !== 0;
 
   const save = async () => {
     setBusy(true); setError(null);
@@ -99,6 +110,8 @@ export function StandingAdjuster({ gmToken, factionPageId, factionName, standing
           {standing
             ? <RevealSwitch revealed={standing.revealedToPlayers} onChange={reveal} ariaLabel="Show this standing to players" />
             : <span className="codex-inspector-hint">Record a change first — there is nothing to show players yet.</span>}
+          {/* R: a disabled control must say why. The deadline composer's hint is the precedent. */}
+          {delta === 0 && <p className="codex-composer-hint">Move the slider or the number to record a change — a change of zero would say nothing happened.</p>}
           <Button variant="primary" disabled={busy || !canSave} onClick={save}>{busy ? "Saving…" : "Record change"}</Button>
         </div>
       </div>

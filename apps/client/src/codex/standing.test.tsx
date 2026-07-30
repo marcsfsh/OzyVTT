@@ -20,8 +20,7 @@ import { StandingAdjuster } from "./StandingAdjuster";
 import {
   CHRONICLE_KIND_META, STANDING_MAX, STANDING_METER_MAX, STANDING_MIN, STANDING_TIERS,
   clampStanding, milestoneOf, milestoneSummaryLabel, standingChangeLabel, standingLabel,
-  standingMeterValue, standingOf, standingTier, standingValueLabel, downtimeOf
-} from "./chronicle";
+  standingMeterValue, standingOf, standingTier, standingValueLabel, downtimeOf, chronicleRowSummary } from "./chronicle";
 import { CODEX_ICONS } from "./icons";
 import type { CodexChronicleRecord, CodexStanding } from "./api";
 
@@ -194,16 +193,54 @@ describe("Adjusting standing writes the reason with it (CT-6)", () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
-  it("will not arm without a reason — the chronicle record is the point of the change", async () => {
+  /**
+   * A reason is INVITED, not required — and this assertion is the inverse of what it first said.
+   *
+   * It used to require one, while `StandingSetSchema` on the server makes `reason` optional and states the
+   * reason: "the GM adjusting a standing mid-session should not be blocked on typing a sentence." The client
+   * quietly overruled that and the button just sat inert, with the value-must-change rule stated nowhere.
+   * Found by the final QA pass. The field help still asks for a sentence, which is the right amount of
+   * pressure for something worth having but not worth blocking on.
+   */
+  it("arms as soon as the value moves, reason or not — the server does not require one", async () => {
     renderAdjuster(STANDING(10));
     const user = userEvent.setup();
 
     await user.clear(screen.getByLabelText("Standing"));
     await user.type(screen.getByLabelText("Standing"), "40");
-    expect(screen.getByRole("button", { name: "Record change" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Record change" })).toBeEnabled();
 
+    // A reason still travels when given — that is the record's whole value.
     await user.type(screen.getByLabelText("Why it moved"), "Returned the signet");
     expect(screen.getByRole("button", { name: "Record change" })).toBeEnabled();
+  });
+
+  /**
+   * A standing change reads on the DASHBOARD the way it reads on the timeline.
+   *
+   * `setStanding` writes an empty player text on purpose, so the dashboard's feed — which summarised a row
+   * as `text || gmText` — rendered five end-of-session standing adjustments as five identical
+   * "Untitled entry" rows, pushing every real entry out of a list sliced to five. The Journal rendered the
+   * same records correctly from the shared helpers the whole time; the dashboard never called them.
+   * Found by the final QA pass.
+   */
+  it("summarises a standing change and a milestone from their payload, not from empty prose", () => {
+    expect(chronicleRowSummary({ kind: "standing", text: "", gmText: null, payload: { factionPageId: "f1", delta: -80, reason: "Stole the Crown from under them." } }))
+      .toContain("Stole the Crown from under them.");
+    expect(chronicleRowSummary({ kind: "milestone", text: "", gmText: null, payload: { level: 5, reason: "Survived the drow city." } }))
+      .toContain("Survived the drow city.");
+    // A record that DOES have prose still reads as its prose — the payload is the fallback, not the winner.
+    expect(chronicleRowSummary({ kind: "entry", text: "The party crossed the mists.", gmText: null, payload: null }))
+      .toBe("The party crossed the mists.");
+    // And nothing invents a summary for a record that genuinely has none.
+    expect(chronicleRowSummary({ kind: "entry", text: "", gmText: null, payload: null })).toBe("");
+  });
+
+  /** A disabled control must say why. Nothing said this before; the deadline composer's hint is the model. */
+  it("explains why it will not arm when nothing has moved", async () => {
+    renderAdjuster(STANDING(10));
+    expect(screen.getByRole("button", { name: "Record change" })).toBeDisabled();
+    expect(screen.getByText(/a change of zero would say nothing happened/)).toBeInTheDocument();
   });
 
   it("will not arm when nothing actually moved", async () => {
