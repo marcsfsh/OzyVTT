@@ -1863,6 +1863,18 @@ export class CodexStore {
       // Drop the deleted page from every marker's page_ids array (json_group_array is NULL for an empty set).
       database.prepare("UPDATE codex_markers SET page_ids_json = COALESCE((SELECT json_group_array(value) FROM json_each(codex_markers.page_ids_json) WHERE value != ?), '[]'), updated_at = ? WHERE EXISTS (SELECT 1 FROM json_each(codex_markers.page_ids_json) WHERE value = ?)").run(pageId, this.stamp(), pageId);
       database.prepare("UPDATE codex_journal SET attach_page_id = NULL, updated_at = ? WHERE attach_page_id = ?").run(this.stamp(), pageId);
+      /**
+       * M10's quests are the THIRD referrer to a page and were not joined to this cleanup, so a deleted
+       * page's id stayed inside `entity_ids_json` — a link the GM sees on the quest and cannot follow.
+       * Verified before fixing: delete a linked page, and `getQuest().entityIds` still contains its id.
+       *
+       * Same shape as the marker clean-up two lines up, and the same reason: a reference to a record that no
+       * longer exists is worse than no reference. `projectPlayerQuest` already dropped it incidentally (a
+       * deleted page is never in `revealedEntityIds`), so this fixes the GM's view, which is the broken one.
+       * A page's OWN links and revisions still go by FK cascade; `entity_ids_json` is a JSON array and has
+       * no FK to cascade through, which is precisely why it needs saying here.
+       */
+      database.prepare("UPDATE codex_quests SET entity_ids_json = COALESCE((SELECT json_group_array(value) FROM json_each(codex_quests.entity_ids_json) WHERE value != ?), '[]'), updated_at = ? WHERE EXISTS (SELECT 1 FROM json_each(codex_quests.entity_ids_json) WHERE value = ?)").run(pageId, this.stamp(), pageId);
       database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades links + revisions
       this.bumpRevision();
     });
@@ -2472,9 +2484,31 @@ export class CodexStore {
    * clocks in agreement and nothing visibly changes until the GM first runs ahead.
    */
   getPublishedDate(): CodexInWorldDate | null {
-    const row = this.requireDatabase().prepare("SELECT published_year, published_month, published_day FROM codex_meta WHERE id = 1")
-      .get() as { published_year: number | null; published_month: number | null; published_day: number | null } | undefined;
+    /**
+     * Read inside a `try`, because an INTEGER column can hold a value JavaScript cannot represent.
+     *
+     * `node:sqlite` throws `RangeError: Value is too large to be represented as a JavaScript number` for
+     * anything past 2^53-1, and v15's backfill guards the JSON's TYPE but not its magnitude — so a
+     * hand-edited `calendar_json` carrying a huge year lands in `published_year` and the migration
+     * COMPLETES. After that, this read threw, and it is on the path of `exportBundle` (the GM's only
+     * backup), both calendar reads, publish, the timeline and apply-downtime. A codex that opens fine and
+     * cannot be backed up is the worst shape this could take, and nothing surfaced until backup time.
+     *
+     * Reading it as "nothing published" is right rather than merely safe: an unrepresentable year is not a
+     * date, which is exactly what the all-three-parts-or-none rule below already says about a half-written
+     * one. The GM's own clock is untouched, so publishing again repairs it. The guard lives on the READ
+     * because the write is not the only way in — a repair script or a hand-edited `codex_standing.value`
+     * reaches the same place, and one guard at the door covers all of them.
+     *
+     * Found by the final QA data-integrity pass; threshold measured, not assumed (2^53-1 reads, 2^53 throws).
+     */
+    let row: { published_year: number | null; published_month: number | null; published_day: number | null } | undefined;
+    try {
+      row = this.requireDatabase().prepare("SELECT published_year, published_month, published_day FROM codex_meta WHERE id = 1")
+        .get() as { published_year: number | null; published_month: number | null; published_day: number | null } | undefined;
+    } catch { return null; }
     if (!row || row.published_year === null || row.published_month === null || row.published_day === null) return null;
+    if (![row.published_year, row.published_month, row.published_day].every((part) => Number.isSafeInteger(part))) return null;
     return { year: row.published_year, month: row.published_month, day: row.published_day };
   }
 

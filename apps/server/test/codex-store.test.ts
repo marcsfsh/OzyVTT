@@ -2513,6 +2513,57 @@ describe("CodexStore deadlines + downtime (M11)", () => {
    * only explanation on a different screen. Publishing here leaks nothing: the prep clock exists to run
    * AHEAD of the party, and there is no ahead of a date they have never been given.
    */
+  /**
+   * An INTEGER column can hold a value JavaScript cannot represent, and that must not take the backup down.
+   *
+   * v15's backfill guards the JSON's TYPE but not its magnitude, so a hand-edited `calendar_json` carrying a
+   * huge year lands in `published_year` and the migration COMPLETES. `node:sqlite` then throws on reading it
+   * — and that read is on the path of `exportBundle` (the GM's only backup), both calendar reads, publish,
+   * the timeline and apply-downtime. A codex that opens fine and cannot be backed up is the worst shape,
+   * because nothing surfaces until backup time. Found by the final QA data-integrity pass.
+   *
+   * 2^53 is used deliberately: 2^53-1 is the largest value that reads back, so this is the first that throws.
+   */
+  it("reads an unrepresentable published date as 'nothing published' rather than taking the export down", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
+
+    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+    raw.prepare("UPDATE codex_meta SET published_year = ? WHERE id = 1").run(9007199254740992n);
+    raw.close();
+
+    expect(store.getPublishedDate()).toBeNull();          // not a date, so: nothing published
+    expect(() => store.exportBundle()).not.toThrow();     // the backup still works, which is the point
+    expect(store.exportBundle().publishedDate).toBeNull();
+    // The GM's OWN clock is untouched, so publishing again repairs it without losing anything.
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
+    store.publishCampaignDate();
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
+  });
+
+  /**
+   * Deleting a page must not leave a quest pointing at it.
+   *
+   * `deletePage` cleaned markers and journal pins ("label-only rather than dangling") and leaned on FK
+   * cascade for links, revisions and standing — but M10's quests are a THIRD referrer stored as a JSON
+   * array, which has no FK to cascade through, and were never joined to the cleanup. The GM saw a link they
+   * could not follow. Found by the final QA data-integrity pass and reproduced before fixing.
+   */
+  it("removes a deleted page from every quest's linked entities (M10 x page deletion)", () => {
+    const doomed = store.createPage({ title: "Volo", entityType: "character" });
+    const kept = store.createPage({ title: "Elminster", entityType: "character" });
+    const quest = store.createQuest({ title: "Find Volo", entityIds: [doomed.id, kept.id] });
+    const untouched = store.createQuest({ title: "Unrelated", entityIds: [kept.id] });
+    expect(store.getQuest(quest.id)!.entityIds).toEqual([doomed.id, kept.id]);
+
+    store.deletePage(doomed.id);
+
+    expect(store.getQuest(quest.id)!.entityIds).toEqual([kept.id]);       // the dangling id is gone...
+    expect(store.getQuest(untouched.id)!.entityIds).toEqual([kept.id]);   // ...and nothing else moved
+    // Scoped: the quest itself, its title and the surviving link are all intact, not collateral.
+    expect(store.getQuest(quest.id)!.title).toBe("Find Volo");
+  });
+
   it("publishes the first campaign date automatically, and keeps every later move private (O-1)", () => {
     expect(store.getPublishedDate()).toBeNull();
 
