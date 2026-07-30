@@ -399,8 +399,13 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
                 warning would have mattered — so the GM meets the switch at the moment they want it, instead
                 of having to remember which dialog they dismissed. Absent while the warning is on: nothing to
                 offer a GM who never turned it off. */}
+            {/* §4 ROUTE 1, like `Publish the date` beside it and for the row's stated reason: this row sits
+                directly above the composer's stack of fields, so a `size="sm"` control here would meet the
+                floor through `.tap-target`'s ::after — a 44px box centred on 32px of paint, overhanging 6px
+                into the first Textarea's top edge. Measured at 176x32 paint before this was corrected.
+                Default size grows the paint itself and carries no ::after at all. */}
             {!revealWarn && (
-              <Button variant="ghost" size="sm" onClick={() => { setRevealWarn(true); writeRevealWarn(true); }}>Warn me again on reveal</Button>
+              <Button variant="ghost" onClick={() => { setRevealWarn(true); writeRevealWarn(true); }}>Warn me again on reveal</Button>
             )}
           </div>
         )}

@@ -659,6 +659,24 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     after restore. One test survived its mutation (the confirm dialog's per-request reset was untested) and
     got a real assertion added. The export size was measured independently rather than taken from the
     implementing agent's report.
+  - **And verified in a real browser at 375px and 320px** — `scripts/prep-clock-ux-check.mjs`, committed so
+    the claim stays re-runnable. 31 checks green at both widths: the confirm reads "…— this passes 2
+    deadlines."; the warning names both dates, fits the viewport (343px at 375, 288px at 320), every control
+    in it clears 44px, and its buttons are reachable (`elementFromPoint` + in-viewport bounds); cancelling
+    leaves the switch off; the full suppress round trip persists to `localStorage`, stops the next warning,
+    and re-arms from the prep-clock row without a reload; publishing reads "Players now see Alturiak 28,
+    1492 DR."; audit rows badge Milestone / Downtime / Deadline; nothing anywhere is wider than the viewport.
+  - **One defect the browser found that the suite could not.** "Warn me again on reveal" shipped as
+    `size="sm"`, which meets the floor through `.tap-target`'s `::after` — a 44px box centred on 32px of
+    paint, overhanging 6px into the composer's first Textarea. The row's own comment already said route 1 is
+    required there for exactly that reason, and `Publish the date` beside it is default-size for it.
+    Corrected to default size (44px of real paint, no `::after`) and now asserted, route explicitly included.
+  - **Two measurement traps, both of which produced a false PASS before being caught** (documented in the
+    script so they are not re-walked): Playwright's `isMobile: true` lets Chrome WIDEN the layout viewport to
+    fit overflowing content, so `body.scrollWidth <= window.innerWidth` compared 734 to 734 and passed
+    vacuously — overflow is now measured by walking elements against the real viewport; and
+    `getBoundingClientRect()` alone misses the `::after` box, which is how the sub-floor button above first
+    read as compliant. §4's measurement is max(paint, ::after), and the script now uses it everywhere.
   - **Found while doing this, and worth knowing: there is no restore route.** "Import" imports markdown
     files as pages, one per file; nothing reads the export bundle back, and there is no `importBundle`
     anywhere. So the bundle is now a complete *record* and restoring it still means hand-editing the sqlite
