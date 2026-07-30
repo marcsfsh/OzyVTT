@@ -24,6 +24,7 @@ export interface MenuProps {
     activation. Default marker is hidden. */
 export function Menu({ trigger, children, align = "start", label, hideCaret = false, icon = false, className, triggerClassName }: MenuProps) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -37,11 +38,41 @@ export function Menu({ trigger, children, align = "start", label, hideCaret = fa
         el.querySelector<HTMLElement>("summary")?.focus();
       }
     };
+    /* Keep the open popover inside the viewport (Menu.css "Popover" note). CSS alone can
+       cap the box's WIDTH but cannot know where in the viewport its trigger landed, so
+       the offset is measured once per open and again on resize/rotate. Both edges are
+       handled: a `--start` menu deep in a rail overflows right, a `--end` menu near the
+       left margin overflows left. When the box cannot fit at all, the LEFT edge wins —
+       labels read left to right.
+
+       Geometry comes from offsetLeft/offsetWidth, NOT getBoundingClientRect(): the box
+       carries `.anim-popover`, whose entrance keyframes animate `transform`, and a client
+       rect includes that transform — measuring on open therefore read the box 10px right
+       of where it settles and left it 10px out of place. Layout offsets are transform-free.
+       Resetting the shift first keeps the function idempotent across repeat opens. */
+    const clampToViewport = () => {
+      const pop = popoverRef.current;
+      if (!el.open || !pop) return;
+      pop.style.setProperty("--nh-menu-shift", "0px");
+      const gutter = parseFloat(getComputedStyle(pop).getPropertyValue("--nh-menu-gutter")) || 0;
+      const viewport = document.documentElement.clientWidth;
+      const host = pop.offsetParent as HTMLElement | null;
+      const left = (host ? host.getBoundingClientRect().left + host.clientLeft : 0) + pop.offsetLeft;
+      const right = left + pop.offsetWidth;
+      let shift = 0;
+      if (right > viewport - gutter) shift = viewport - gutter - right;
+      if (left + shift < gutter) shift = gutter - left;
+      if (shift) pop.style.setProperty("--nh-menu-shift", `${Math.round(shift)}px`);
+    };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    el.addEventListener("toggle", clampToViewport);
+    window.addEventListener("resize", clampToViewport);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      el.removeEventListener("toggle", clampToViewport);
+      window.removeEventListener("resize", clampToViewport);
     };
   }, []);
 
@@ -56,7 +87,7 @@ export function Menu({ trigger, children, align = "start", label, hideCaret = fa
         <span className="nh-menu-trigger-label">{trigger}</span>
         {!hideCaret && !icon && <span className="nh-menu-caret" aria-hidden="true">▾</span>}
       </summary>
-      <div className="nh-menu-popover anim-popover" role="menu" onClick={closeAfterItem}>
+      <div ref={popoverRef} className="nh-menu-popover anim-popover" role="menu" onClick={closeAfterItem}>
         {children}
       </div>
     </details>

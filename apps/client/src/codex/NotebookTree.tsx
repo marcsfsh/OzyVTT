@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge } from "@vtt/ui";
+import { Badge, IconPencil, Menu, MenuItem } from "@vtt/ui";
 import { type CodexPageSummary } from "./api";
 import { CodexIcon, EntityIcon } from "./icons";
 
@@ -103,11 +103,24 @@ function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode
           <span className="codex-tree-folder-name">{folder.name}</span>
           <span className="codex-tree-count">{countPages(folder)}</span>
         </button>
+        {/*
+          §4 touch floor. Four 13-15px icon buttons used to sit here and NEITHER §4 route could reach 44px:
+          route 2 centres a 44px box on ~15px of paint (a 14.5px overhang per side) on buttons gapped by ~8px,
+          so each would silently steal its neighbour's taps - the precise failure the gap budget exists to
+          prevent; route 1 needs 4x44 = 176px of actions inside a row measured at 223px on a ~343px rail,
+          leaving the folder name ~47px. So the fix is not CSS: four controls do not belong on a tree row.
+          They collapse into ONE `Menu`, the same single-dots shape `.codex-tree-page-move` already gives a
+          note row, and the primitive carries the floor itself (`.nh-menu-trigger--icon` is §4 route 2 on 28px
+          of paint; `.nh-menu-item` is route 1). Gap budget for the 8px-per-side trigger overhang is paid by
+          `.codex-tree-folder-actions`' margin in codex.css.
+        */}
         <div className="codex-tree-folder-actions">
-          <button type="button" className="codex-tree-folder-btn" aria-label={`New subfolder in ${folder.name}`} title="New subfolder" onClick={() => handlers.onNewSubfolder(folder.path)}><CodexIcon iconId="folder-plus" className="codex-tree-folder-ic" /></button>
-          <button type="button" className="codex-tree-folder-btn" aria-label={`New note in ${folder.name}`} title="New note here" onClick={() => handlers.onNewInFolder(folder.path)}>＋</button>
-          <button type="button" className="codex-tree-folder-btn" aria-label={`Rename ${folder.name}`} title="Rename folder" onClick={() => handlers.onRenameFolder(folder.path)}>✎</button>
-          <button type="button" className="codex-tree-folder-btn" aria-label={`Delete ${folder.name}`} title="Delete folder" onClick={() => handlers.onDeleteFolder(folder.path)}><CodexIcon iconId="trash" className="codex-tree-folder-ic" /></button>
+          <Menu trigger="⋯" icon align="end" label={`Actions for ${folder.name}`} className="codex-tree-folder-menu">
+            <MenuItem icon={<CodexIcon iconId="folder-plus" className="codex-tree-folder-ic" />} onClick={() => handlers.onNewSubfolder(folder.path)}>New subfolder</MenuItem>
+            <MenuItem icon={<CodexIcon iconId="scroll" className="codex-tree-folder-ic" />} onClick={() => handlers.onNewInFolder(folder.path)}>New note here</MenuItem>
+            <MenuItem icon={<IconPencil />} onClick={() => handlers.onRenameFolder(folder.path)}>Rename folder</MenuItem>
+            <MenuItem icon={<CodexIcon iconId="trash" className="codex-tree-folder-ic" />} tone="danger" onClick={() => handlers.onDeleteFolder(folder.path)}>Delete folder</MenuItem>
+          </Menu>
         </div>
       </div>
       {open && <NotebookTree node={folder} depth={depth + 1} {...handlers} />}
@@ -148,7 +161,7 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
             <span className="codex-list-title">{page.title}</span>
             {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
           </button>
-          <button type="button" className="codex-tree-page-move" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}>⋯</button>
+          <button type="button" className="codex-tree-page-move tap-target" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}>⋯</button>
         </div>
       ))}
       {folders.map((folder) => <FolderBranch key={folder.path} folder={folder} depth={depth} handlers={handlers} />)}

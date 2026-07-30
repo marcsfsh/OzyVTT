@@ -46,6 +46,7 @@ export { Tabs, type TabsProps, type TabItem } from "./primitives/Tabs";
 export { Menu, MenuItem, type MenuProps, type MenuItemProps } from "./primitives/Menu";
 export { Tooltip, type TooltipProps } from "./primitives/Tooltip";
 export { Modal, type ModalProps } from "./primitives/Modal";
+export { Drawer, type DrawerProps } from "./primitives/Drawer";
 export { ToastProvider, useToast, useToastMute, type ToastApi, type ToastOptions, type ToastTone } from "./primitives/Toast";
 export { Badge, type BadgeProps, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarProps, type AvatarSize, type AvatarPresence } from "./primitives/Avatar";
@@ -63,6 +64,7 @@ export { FieldGrid, type FieldGridProps } from "./primitives/FieldGrid";
 export { NumberField, type NumberFieldProps } from "./primitives/NumberField";
 export { TagInput, slugify, type TagInputProps } from "./primitives/TagInput";
 export { RowEditor, type RowEditorProps } from "./primitives/RowEditor";
+export { Checklist, type ChecklistProps, type ChecklistItem } from "./primitives/Checklist";
 export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/SaveState";
 
 /* Icons — the design system's own SVG glyphs (no emoji in a primitive). The app's

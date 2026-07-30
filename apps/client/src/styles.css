@@ -193,6 +193,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .notice-success { border-left-color: var(--success); }
 .notice-error { border-left-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); }
 .notice-info { border-left-color: var(--info); }
+/* `useConfirm`'s optional "don't ask again" row. Separated from the body prose by a rule so it reads as a
+   setting rather than as another sentence of the warning it turns off. */
+.confirm-suppress { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); }
 /* "The table is offline" outranks whatever is on top of the page, because every command the surface
    above it can issue is one that will not land. As a STATIC in-flow <p> it had no z-index to compare
    at all, so any positioned overlay won by default and the builder (`.cb-page`, z-index 40) simply

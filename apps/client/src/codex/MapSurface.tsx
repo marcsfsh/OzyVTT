@@ -1,9 +1,17 @@
+import { Skeleton } from "@vtt/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
 import { iconChildren } from "./icons";
 
 /** The minimal marker shape the surface renders - satisfied by both the GM marker and the player projection. */
-export type SurfaceMarker = Readonly<{ id: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; revealedToPlayers?: boolean }>;
+export type SurfaceMarker = Readonly<{ id: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; revealedToPlayers?: boolean; isParty?: boolean }>;
+/**
+ * M12 / CT-7: what the party pin SAYS. R2 forbids a state that reads by colour or shape alone, and a
+ * ring around a pin is exactly that — so the words are drawn on the map beside it and also given to
+ * assistive tech as the pin's accessible name. Optional on the type because it is optional on the wire
+ * (a projection that has not been widened yet simply renders every pin as it did before).
+ */
+const PARTY_LABEL = "The party is here";
 
 /**
  * The interactive, out-of-combat atlas surface. Mirrors EncounterMap's approach - an SVG viewBox camera
@@ -30,12 +38,22 @@ type MapSurfaceProps = Readonly<{
   placing: boolean;
   selectedMarkerId: string | null;
   readOnly?: boolean;
+  /**
+   * A request to bring ONE pin into view (`ux-principles.md` §9 — actions name their result). The camera
+   * lives in here, so a caller cannot move it; it asks, and this honours the ask once per request.
+   *
+   * Deliberately separate from `selectedMarkerId`: selecting a pin the GM just tapped must NOT yank the
+   * camera out from under their finger, so centring is only ever what somebody explicitly asked for.
+   */
+  centerOnMarkerId?: string | null;
+  /** Clears the request above (the same handled-latch shape the journal's `openEntryId` uses), so the same pin can be asked for again. */
+  onCentered?: () => void;
   onBackgroundClick: (point: { x: number; y: number }) => void;
   onMarkerClick: (markerId: string) => void;
   onMarkerDragEnd: (markerId: string, point: { x: number; y: number }) => void;
 }>;
 
-export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, readOnly = false, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
+export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, readOnly = false, centerOnMarkerId = null, onCentered, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
   const image = useAuthorizedMapImage(assetId, token);
   const svgRef = useRef<SVGSVGElement>(null);
   const gesture = useRef<Gesture>({ mode: "idle" });
@@ -48,6 +66,27 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
 
   // Fit the map when it loads (center, zoom 1 = whole image in view via preserveAspectRatio).
   useEffect(() => { if (image.status === "ready") setCamera({ cx: image.width / 2, cy: image.height / 2, zoom: 1 }); }, [image.status, assetId]);
+
+  /**
+   * Honour a centring request: move the camera to the pin, at the zoom the GM is already on.
+   *
+   * The zoom is deliberately untouched. At zoom 1 the whole image is in view, so centring is a no-op there
+   * and nothing is lost; the case this exists for is a GM who has zoomed and panned somewhere else, and
+   * re-scaling their map to "help" would be the surface overruling a choice they made deliberately.
+   *
+   * Waits for `image.status === "ready"`, because until then there is no camera to move and the fit effect
+   * above would overwrite it the moment there was.
+   */
+  const centeredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!centerOnMarkerId) { centeredRef.current = null; return; }
+    if (image.status !== "ready" || centeredRef.current === centerOnMarkerId) return;
+    const target = markers.find((marker) => marker.id === centerOnMarkerId);
+    if (!target) return;
+    centeredRef.current = centerOnMarkerId;
+    setCamera((prev) => ({ cx: target.x, cy: target.y, zoom: prev?.zoom ?? 1 }));
+    onCentered?.();
+  }, [centerOnMarkerId, markers, image.status, onCentered]);
 
   const viewBox = camera && width
     ? `${camera.cx - width / (2 * camera.zoom)} ${camera.cy - height / (2 * camera.zoom)} ${width / camera.zoom} ${height / camera.zoom}`
@@ -132,7 +171,7 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
     if (pointers.current.size < 2) gesture.current = { mode: "idle" };
   }, [dragPreview, placing, width, height, onMarkerClick, onMarkerDragEnd, onBackgroundClick]);
 
-  if (image.status === "loading") return <div className="codex-map-status">Loading map…</div>;
+  if (image.status === "loading") return <div className="codex-map-status"><Skeleton variant="block" width="100%" height="100%" /></div>;
   if (image.status === "error") return <div className="codex-map-status codex-map-error">{image.message}</div>;
 
   const glyphSize = Math.min(Math.max(Math.min(width, height) * 0.045, 26), 120);
@@ -147,12 +186,24 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
           const s = glyphSize;
           return (
             <g key={marker.id} data-marker-id={marker.id} transform={`translate(${pos.x} ${pos.y})`}
-              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}`}>
+              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}${marker.isParty ? " is-party" : ""}`}>
+              {/* CT-7 / R2, the accessible half: the party pin's meaning reaches a screen reader as a
+                  NAME, not as a ring it cannot see. Ordinary pins keep no title, exactly as before. */}
+              {marker.isParty && <title>{marker.label ? `${marker.label} — ${PARTY_LABEL.toLowerCase()}` : PARTY_LABEL}</title>}
+              {/* The ring. Drawn OUTSIDE the icon's own scale group so it does not inherit the glyph's
+                  colour, and behind the glyph so it never obscures it. It is decoration — the words
+                  below are what actually say this is the party. */}
+              {marker.isParty && <circle className="codex-marker-partyring" r={s * 0.72} />}
               <g transform={`translate(${-s / 2} ${-s / 2}) scale(${s / 24})`} style={{ color: marker.iconColor }}>
                 <circle cx={12} cy={12} r={11.5} className="codex-marker-bg" />
                 <g className="codex-marker-ico">{iconChildren(marker.iconId)}</g>
               </g>
               {marker.label && <text className="codex-marker-label" y={s / 2 + glyphSize * 0.28} textAnchor="middle" style={{ fontSize: glyphSize * 0.34 }}>{marker.label}</text>}
+              {/* CT-7 / R2: said in WORDS on the map itself, never by the ring alone. It sits under the
+                  pin's own label when there is one, so a named place still reads as that place first. */}
+              {marker.isParty && (
+                <text className="codex-marker-partylabel" y={s / 2 + glyphSize * (marker.label ? 0.66 : 0.28)} textAnchor="middle" style={{ fontSize: glyphSize * 0.3 }}>{PARTY_LABEL}</text>
+              )}
             </g>
           );
         })}

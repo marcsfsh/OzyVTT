@@ -4,6 +4,13 @@ import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema, type Actor, ty
 /** The `fromCatalog` choice-slug resolver (shared by the wizard UI and server-side character.create validation). */
 export * from "./catalog-choice.js";
 
+/**
+ * The Codex entity field vocabulary. Shared for the same reason as the rider gates below: the GM UI
+ * renders from it and the server prunes + seals from it, and a hand-synced copy on each side is how
+ * a secret field silently stops being sealed.
+ */
+export * from "./codex-entities.js";
+
 export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSchema, EffectModifierSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type DeathSaves, type EffectInstance, type EffectModifier, type HealthDisplay, type HealthDisplayAudience, type HealthDisplayStyle } from "@vtt/schemas";
 /**
  * The rider gate vocabulary, for the same reason: the homebrew authoring UI has to offer the fifteen
@@ -457,7 +464,7 @@ export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" |
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
 export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save"; text: string; actorIds: readonly string[]; at: number }>;
 /** Which slice of the worldbuilding codex changed; the `codex:changed` ping carries no content, so it is viewer-safe - every recipient refetches only its own projected view over HTTP. */
-export type CodexChangeScope = "pages" | "maps" | "markers" | "journal";
+export type CodexChangeScope = "pages" | "maps" | "markers" | "journal" | "sessions" | "quests";
 export type CodexChangedEvent = Readonly<{ scope: CodexChangeScope; codexRevision: number }>;
 /** The homebrew library changed. Like `codex:changed` this carries NO content - only a revision, so every recipient refetches its own audience-filtered view over HTTP. A ping that carried the record would hand a player a GM-only draft. */
 export type HomebrewChangedEvent = Readonly<{ revision: number }>;

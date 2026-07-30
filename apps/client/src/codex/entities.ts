@@ -1,47 +1,76 @@
 /**
- * The worldbuilding entity model, client side: what each entity TYPE is and the structured fields it
- * carries, plus the relationship vocabulary (with human labels for each direction). The server stores
- * types + fields + relationship slugs opaquely; this file is the schema the GM UI renders from.
+ * The worldbuilding entity model, client side: how each entity TYPE presents, plus the relationship
+ * vocabulary (with human labels for each direction).
+ *
+ * **Which field keys exist, and which are secret, is no longer decided here** — that table lives in
+ * `@vtt/domain` (`CODEX_ENTITY_FIELD_KEYS`) because the server prunes and seals from it. This file
+ * supplies only presentation: label, placeholder, and input kind. Keys and `secret` flags are read
+ * off the shared table by `withKeys` below, so the GM UI cannot render a field the server will drop,
+ * and cannot mark a field secret that the server will not seal.
  */
 
-export type EntityType = "note" | "character" | "location" | "faction" | "item" | "species" | "religion" | "event";
+import { CODEX_ENTITY_FIELD_KEYS, CODEX_ENTITY_TYPES, type CodexEntityType } from "@vtt/domain";
+
+export type EntityType = CodexEntityType;
 
 export type FieldDef = Readonly<{ key: string; label: string; kind?: "text" | "textarea"; placeholder?: string; secret?: boolean }>;
-/** One source of truth per entity type: its label, glyph id (see icons.tsx CODEX_ICONS), accent color, and structured fields — used by the tree, World cards, graph, badges, and editor alike. */
+/** Presentation for one field key, joined onto the shared key table. */
+type FieldPresentation = Readonly<{ label: string; kind?: "text" | "textarea"; placeholder?: string }>;
+/**
+ * Join presentation onto the shared key list, preserving the shared table's order.
+ * Presentation is keyed per *type*, not per key, because the same key reads differently by type —
+ * `kind` is "city / dungeon / region" on a location but "weapon / relic / consumable" on an item, and
+ * `goals` is "Goals & motives" on a character but "Secret agenda" on a faction.
+ */
+function withKeys(type: EntityType, present: Readonly<Record<string, FieldPresentation>>): readonly FieldDef[] {
+  return CODEX_ENTITY_FIELD_KEYS[type].map(({ key, secret }) => {
+    const meta = present[key];
+    return { key, secret, label: meta?.label ?? key, kind: meta?.kind, placeholder: meta?.placeholder };
+  });
+}
+/** One source of truth per entity type: its label, glyph id (see icons.tsx CODEX_ICONS), accent color, and structured fields — used by the tree, Campaign dashboard cards, graph, badges, and editor alike. */
 export type EntityDef = Readonly<{ type: EntityType; label: string; icon: string; color: string; fields: readonly FieldDef[] }>;
 
 export const ENTITY_DEFS: Readonly<Record<EntityType, EntityDef>> = {
-  note: { type: "note", label: "Note", icon: "scroll", color: "var(--codex-type-note)", fields: [] },
-  character: { type: "character", label: "Character", icon: "person", color: "var(--codex-type-character)", fields: [
-    { key: "race", label: "Race / species" }, { key: "gender", label: "Gender" }, { key: "age", label: "Age" },
-    { key: "role", label: "Role / occupation" }, { key: "status", label: "Status", placeholder: "alive / dead / missing" },
-    { key: "location", label: "Location" }, { key: "goals", label: "Goals & motives", kind: "textarea", secret: true }
-  ] },
-  location: { type: "location", label: "Location", icon: "castle", color: "var(--codex-type-location)", fields: [
-    { key: "kind", label: "Type", placeholder: "city / dungeon / region" }, { key: "region", label: "Region" },
-    { key: "population", label: "Population" }, { key: "ruler", label: "Ruler / owner" }, { key: "climate", label: "Climate" }
-  ] },
-  faction: { type: "faction", label: "Faction", icon: "banner", color: "var(--codex-type-faction)", fields: [
-    { key: "kind", label: "Type", placeholder: "guild / cult / kingdom" }, { key: "leader", label: "Leader" },
-    { key: "headquarters", label: "Headquarters" }, { key: "size", label: "Size" }, { key: "goals", label: "Secret agenda", kind: "textarea", secret: true }
-  ] },
-  item: { type: "item", label: "Item", icon: "sword", color: "var(--codex-type-item)", fields: [
-    { key: "kind", label: "Type", placeholder: "weapon / relic / consumable" }, { key: "rarity", label: "Rarity" },
-    { key: "owner", label: "Current owner" }, { key: "attunement", label: "Attunement" }, { key: "properties", label: "Properties", kind: "textarea" }
-  ] },
-  species: { type: "species", label: "Species", icon: "dragon", color: "var(--codex-type-species)", fields: [
-    { key: "category", label: "Category", placeholder: "beast / humanoid / aberration" }, { key: "habitat", label: "Habitat" },
-    { key: "diet", label: "Diet" }, { key: "size", label: "Size" }, { key: "traits", label: "Traits", kind: "textarea" }
-  ] },
-  religion: { type: "religion", label: "Religion", icon: "sun", color: "var(--codex-type-religion)", fields: [
-    { key: "deity", label: "Deity / power" }, { key: "domains", label: "Domains" }, { key: "alignment", label: "Alignment" }, { key: "followers", label: "Followers" }
-  ] },
-  event: { type: "event", label: "Event", icon: "hourglass", color: "var(--codex-type-event)", fields: [
-    { key: "when", label: "When" }, { key: "where", label: "Where" }, { key: "participants", label: "Participants" }, { key: "outcome", label: "Outcome", kind: "textarea" }
-  ] }
+  note: { type: "note", label: "Note", icon: "scroll", color: "var(--codex-type-note)", fields: withKeys("note", {}) },
+  character: { type: "character", label: "Character", icon: "person", color: "var(--codex-type-character)", fields: withKeys("character", {
+    race: { label: "Race / species" }, gender: { label: "Gender" }, age: { label: "Age" },
+    role: { label: "Role / occupation" }, status: { label: "Status", placeholder: "alive / dead / missing" },
+    location: { label: "Location" }, goals: { label: "Goals & motives", kind: "textarea" }
+  }) },
+  location: { type: "location", label: "Location", icon: "castle", color: "var(--codex-type-location)", fields: withKeys("location", {
+    kind: { label: "Type", placeholder: "city / dungeon / region" }, region: { label: "Region" },
+    population: { label: "Population" }, ruler: { label: "Ruler / owner" }, climate: { label: "Climate" }
+  }) },
+  faction: { type: "faction", label: "Faction", icon: "banner", color: "var(--codex-type-faction)", fields: withKeys("faction", {
+    kind: { label: "Type", placeholder: "guild / cult / kingdom" }, leader: { label: "Leader" },
+    headquarters: { label: "Headquarters" }, size: { label: "Size" }, goals: { label: "Secret agenda", kind: "textarea" }
+  }) },
+  item: { type: "item", label: "Item", icon: "sword", color: "var(--codex-type-item)", fields: withKeys("item", {
+    kind: { label: "Type", placeholder: "weapon / relic / consumable" }, rarity: { label: "Rarity" },
+    owner: { label: "Current owner" }, attunement: { label: "Attunement" }, properties: { label: "Properties", kind: "textarea" }
+  }) },
+  species: { type: "species", label: "Species", icon: "dragon", color: "var(--codex-type-species)", fields: withKeys("species", {
+    category: { label: "Category", placeholder: "beast / humanoid / aberration" }, habitat: { label: "Habitat" },
+    diet: { label: "Diet" }, size: { label: "Size" }, traits: { label: "Traits", kind: "textarea" }
+  }) },
+  religion: { type: "religion", label: "Religion", icon: "sun", color: "var(--codex-type-religion)", fields: withKeys("religion", {
+    deity: { label: "Deity / power" }, domains: { label: "Domains" }, alignment: { label: "Alignment" }, followers: { label: "Followers" }
+  }) },
+  /**
+   * CT-11 gave an `event` page a real in-world DATE, edited above the fields — and that is what places it
+   * on the chronicle. `when` therefore stops being the answer to "when did this happen" and becomes what
+   * it can actually be: prose. It is kept rather than removed because removing the key would silently
+   * delete every existing event's text on its next save (the server prunes to the type's key set, K7), and
+   * because "in the third winter of the siege" is worth writing and cannot be sorted. The label says which
+   * is which, so the GM is never choosing between two fields that look like the same question.
+   */
+  event: { type: "event", label: "Event", icon: "hourglass", color: "var(--codex-type-event)", fields: withKeys("event", {
+    when: { label: "When, in prose", placeholder: "the third winter of the siege" }, where: { label: "Where" }, participants: { label: "Participants" }, outcome: { label: "Outcome", kind: "textarea" }
+  }) }
 };
 
-export const ENTITY_TYPE_LIST: readonly EntityType[] = ["note", "character", "location", "faction", "item", "species", "religion", "event"];
+export const ENTITY_TYPE_LIST: readonly EntityType[] = CODEX_ENTITY_TYPES;
 export function entityDef(type: EntityType | undefined): EntityDef { return ENTITY_DEFS[type ?? "note"] ?? ENTITY_DEFS.note; }
 /** The CODEX_ICONS glyph id for a type (drawn via <EntityIcon>). Replaces the old emoji. */
 export function entityIconId(type: EntityType | undefined): string { return entityDef(type).icon; }

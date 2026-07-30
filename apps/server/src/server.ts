@@ -123,7 +123,7 @@ export function createServer(options: CreateServerOptions) {
     }
   }
   /** Ping every client that the worldbuilding codex changed so it refetches its own projected view. Content-free (scope + revision only), so it carries nothing GM-only - the projection boundary lives in the HTTP reads. */
-  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal") {
+  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal" | "sessions" | "quests") {
     io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
   }
   /**
@@ -406,7 +406,8 @@ export function createServer(options: CreateServerOptions) {
     assets: codexAssets,
     authorizeGm,
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
-    notifyChanged: notifyCodexChanged
+    notifyChanged: notifyCodexChanged,
+    issuePreviewSession: () => auth.issuePreviewPlayerSession()
   }));
   // GM-only end to end: `authorizePlayer` is supplied ONLY so an authenticated player gets a 403
   // rather than the 401 an unauthenticated caller gets. There is no player-readable homebrew route.

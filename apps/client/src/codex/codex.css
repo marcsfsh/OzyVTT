@@ -27,9 +27,19 @@
 .codex-move-opt { display: block; width: 100%; text-align: left; border: 1px solid transparent; background: var(--surface-2); color: var(--text); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm); }
 .codex-move-opt:hover { border-color: var(--cyan); }
 .codex-move-opt.is-new { color: var(--cyan); background: none; }
-.codex-rail-error { color: var(--danger); font-size: var(--fs-sm); margin: 0; }
 
 .codex-list { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
+/* `overflow-y: auto` is here so a long notebook scrolls inside a rail stretched by a taller editor — but
+   it also makes this box CLIP, and the box hugs its content, so the folder row's ⋯ menu opened into thin
+   air: measured at 375px, the popover ran from y=505 to y=694 inside a list ending at y=647 and the
+   "Delete folder" item was genuinely unreachable (`elementFromPoint` did not return it). The clip is lifted
+   only while a folder menu is open, so scrolling is unchanged at every other moment. The proper fix is for
+   `Menu`'s popover to escape clipping ancestors, which is the primitive's business, not the Codex's (R9). */
+.codex-list:has(.codex-tree-folder-menu[open]) { overflow: visible; }
+.codex-list-loading { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-2); }
+/* CF-2: the main-pane counterpart of the rail's loading rows. Sized like `.codex-main-empty` so a mode
+   does not jump when the fetch settles and the skeleton is replaced by the real content or the invitation. */
+.codex-main-loading { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-6) var(--space-4); max-width: 34rem; margin-inline: auto; width: 100%; }
 .codex-list-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--space-3) var(--space-2); }
 .codex-list-group { display: flex; flex-direction: column; gap: var(--space-1); }
 .codex-list-folder {
@@ -46,16 +56,48 @@
 .codex-list-item:hover { background: var(--surface-2); border-color: var(--line); }
 .codex-list-item.is-active { background: var(--surface-2); border-color: var(--magenta); }
 .codex-list-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* CI-1 / R2: THE search-result row. One shape for all four record kinds, rendered identically by the
+   Pages rail, the command palette and the player Codex. Kind reads by glyph + a text label; the accent
+   colours below are a scanning aid layered on top of that label, never the signal on their own.
+   §4 route 1 (grow the paint): results are a vertical stack, so route 2's 44px ::after would overhang
+   into the rows above and below and steal their taps — min-height carries the floor instead. The two
+   text lines already push past 44px at the body/2xs sizes; min-height guarantees it for a bare,
+   tag-less, single-line row. */
+.codex-hit {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--text); cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+}
+.codex-hit:hover { background: var(--surface-2); border-color: var(--line); }
+/* R6: selection owns the edge, hover owns the surface lift. */
+.codex-hit.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-hit-glyph { display: flex; flex: none; align-items: center; }
+.codex-hit-ic { width: 1.2em; height: 1.2em; }
+.codex-hit-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.codex-hit-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codex-hit-meta { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.codex-hit-kind { flex: none; font-family: var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
+.codex-hit-tag { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; }
 /* Typed-entity glyph (SVG, coloured by its type) rendered inline next to a title, everywhere. */
 .codex-ent-icon { width: 1.05em; height: 1.05em; flex: none; vertical-align: -0.16em; }
 .codex-reader-titleicon { width: 0.82em; height: 0.82em; margin-right: 0.28em; vertical-align: -0.02em; }
 .codex-tool-ic { width: 1.05em; height: 1.05em; }
-.codex-world-typeglyph { width: 20px; height: 20px; }
+.codex-campaign-typeglyph { width: 20px; height: 20px; }
 
 /* Notebook tree: collapsible nested folders holding the whole campaign's notes. */
 .codex-tree { display: flex; flex-direction: column; gap: 1px; }
 .codex-tree-branch { display: flex; flex-direction: column; gap: 1px; }
+/* §4 route 1 (grow the paint). Measured 33.6px tall at 375px — the row was simply never measured when
+   `.codex-tree-page` below it was fixed. A folder row is one entry in a vertical stack, so §4 forbids
+   route 2 here: a 44px ::after would overhang into the rows above and below and steal their taps. The
+   taller row also gives the ⋯ menu beside it a 44px-tall box to sit inside, which is what keeps ITS hit
+   area off the neighbouring rows. */
 .codex-tree-folder {
+  min-height: var(--tap-min);
   display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left;
   padding: var(--space-1) var(--space-2); border: none; background: transparent; cursor: pointer;
   font-family: var(--font-display); font-size: var(--fs-2xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
@@ -65,7 +107,12 @@
 .codex-tree-caret { display: inline-block; width: 0.9em; color: var(--text-muted); }
 .codex-tree-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .codex-tree-count { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
+/* CF-3 §4 route 1 (grow the paint). The notebook rows are a vertical stack, so route 2 is not
+   available to them — a 44px ::after would overhang into the row above and below. Growing the row
+   also gives the ⋯ move button below a 44px-tall box to sit inside, which is what keeps ITS hit
+   area from reaching the neighbouring rows. */
 .codex-tree-page {
+  min-height: var(--tap-min);
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; text-align: left;
   padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md);
   background: transparent; color: var(--text); cursor: pointer;
@@ -75,7 +122,10 @@
 .codex-tree-page-row { display: flex; align-items: center; }
 .codex-tree-page-row .codex-tree-page { flex: 1; min-width: 0; }
 .codex-tree-page[draggable="true"], .codex-tree-folder[draggable="true"] { cursor: grab; }
-.codex-tree-page-move { opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-body); border-radius: var(--radius-sm); line-height: 1; }
+/* CF-3 §4 route 2 + gap budget. Paint stays 15px wide, so the 44px ::after overhangs by 14.5px per
+   side; --space-4 (16px) of separation keeps it off the title button beside it. Vertically the row is
+   now 44px (above), so the box lands inside this row and cannot reach the rows above or below. */
+.codex-tree-page-move { margin-inline-start: var(--space-4); opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-body); border-radius: var(--radius-sm); line-height: 1; }
 .codex-tree-page-row:hover .codex-tree-page-move, .codex-tree-page-move:focus-visible { opacity: 1; }
 .codex-tree-page-move:hover { color: var(--cyan); background: var(--surface-2); }
 
@@ -102,32 +152,35 @@
 .codex-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
 .codex-crumb-sep { opacity: 0.6; }
 .codex-editor-head { padding-inline: var(--space-4); }
-.codex-editor-cols { display: flex; gap: var(--space-4); align-items: flex-start; min-height: 0; }
+.codex-editor-cols { display: flex; flex-direction: column; gap: var(--space-4); align-items: stretch; min-height: 0; }
 /* Editor form/body — its own card. */
 .codex-editor-center { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-4); }
 /* Relationships / journal / outline — its own card window, beside the editor. */
-.codex-editor-context { flex: 0 0 288px; display: flex; flex-direction: column; gap: var(--space-4); position: sticky; top: var(--space-2); max-height: 84vh; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-4); }
+.codex-editor-context { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--space-4); position: static; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-4); }
 .codex-outline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
 .codex-outline-item { display: block; width: 100%; text-align: left; border: none; background: transparent; color: var(--text-dim); padding: 3px var(--space-2); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .codex-outline-item:hover { background: var(--surface-2); color: var(--text); }
 .codex-tree-folder-row { display: flex; align-items: center; border: 1px solid transparent; border-radius: var(--radius-sm); }
 .codex-tree-folder-row .codex-tree-folder { flex: 1; min-width: 0; }
 .codex-tree-folder-row.is-drop { background: color-mix(in srgb, var(--cyan) 16%, transparent); border-color: var(--cyan); border-style: dashed; }
-.codex-tree-folder-actions { display: flex; align-items: center; }
-.codex-tree-folder-btn { opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-sm); border-radius: var(--radius-sm); line-height: 1; }
-.codex-tree-folder-row:hover .codex-tree-folder-btn, .codex-tree-folder-btn:focus-visible { opacity: 1; }
-.codex-tree-folder-btn:hover { color: var(--cyan); background: var(--surface-2); }
-.codex-tree-folder-ic { width: 15px; height: 15px; display: block; }
-@media (max-width: 900px) {
-  /* Below three-pane width, the context pane drops beneath the editor and row actions are always shown (no hover on touch). */
-  .codex-editor-cols { flex-direction: column; }
-  .codex-editor-context { flex: 1 1 auto; width: auto; position: static; max-height: none; }
-  .codex-tree-folder-btn, .codex-tree-page-move { opacity: 1; }
+/* The folder row's ONE action control (see NotebookTree.tsx for why four separate buttons could not meet
+   §4). The floor comes from the primitive: `.nh-menu-trigger--icon` is §4 route 2 on 28px of paint, so its
+   ::after overhangs 8px per side — `--space-2` of separation is exactly the gap budget that keeps it off
+   the folder-name button beside it, and the 44px row above keeps it off the rows. */
+.codex-tree-folder-actions { display: flex; align-items: center; margin-inline-start: var(--space-2); }
+.codex-tree-folder-menu { opacity: 0; }
+.codex-tree-folder-row:hover .codex-tree-folder-menu, .codex-tree-folder-menu:focus-within, .codex-tree-folder-menu[open] { opacity: 1; }
+.codex-tree-folder-ic { width: 1em; height: 1em; display: block; }
+/* Three panes are EARNED at the ladder's 850px step (design-language §3) rather than lost at an
+   off-ladder 900px. Below it the context pane stacks under the editor, which is the default above. */
+@media (min-width: 850px) {
+  .codex-editor-cols { flex-direction: row; align-items: flex-start; }
+  .codex-editor-context { flex: 0 0 288px; width: auto; position: sticky; top: var(--space-2); max-height: 84vh; }
 }
-.codex-save-status { font-size: var(--fs-xs); color: var(--text-muted); min-width: 6ch; font-family: var(--font-mono); }
-.codex-save-saving { color: var(--caution); }
-.codex-save-saved { color: var(--success); }
-.codex-save-conflict, .codex-save-error { color: var(--danger); }
+/* Row actions can't rely on hover on touch, so they stay visible below the three-pane width. */
+@media (max-width: 849px) {
+  .codex-tree-folder-menu, .codex-tree-page-move { opacity: 1; }
+}
 
 /* Entity meta (type/folder/tags) and the typed fields share ONE responsive grid so their columns line
    up exactly (auto-fit collapses 3→2→1 as the panel narrows; min(220px,100%) prevents overflow). */
@@ -167,15 +220,34 @@
 .codex-md-link-inert { color: var(--text-muted); border-bottom-style: dashed; cursor: default; }
 
 /* Backlinks + revisions */
-.codex-backlinks { border-top: 1px solid var(--line); padding-top: var(--space-3); }
+/* `.codex-backlinks` retired with CI-3/4/5: "Linked from" is a block inside `.codex-connections` now,
+   and the section owns the rule + spacing that used to sit on each panel. */
 .codex-backlinks-title { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 var(--space-2); }
 .codex-backlinks-list { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
 /* A page's pinned campaign history (journal entries attached here). */
-.codex-page-timeline { border-top: 1px solid var(--line); padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+/* CI-3/CI-4/CI-5: the page's return edges as ONE area — "where else does this entity appear?" — with a
+   sub-heading per place it can appear. One border for the whole group rather than one per block, so it
+   reads as a section instead of four stacked panels. */
+.codex-connections { border-top: 1px solid var(--line); padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-4); }
+.codex-connections-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.codex-connections-head .codex-backlinks-title { margin: 0; }
+.codex-connections-block { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-connections-sub { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
+.codex-connections-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+/* §4 route 1 (grow the paint): a stacked list, where §4 requires it — an invisible `::after` overhang
+   in a vertical list steals the neighbouring row's taps. Matches `.codex-campaign-recentitem`, the same
+   row shape on the dashboard. */
+.codex-connections-item { min-height: var(--tap-min); width: 100%; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.codex-connections-item:hover { background: var(--surface-2); border-color: var(--line); }
+.codex-connections-item.is-static, .codex-connections-item:disabled { cursor: default; }
+.codex-connections-item.is-static:hover, .codex-connections-item:disabled:hover { background: transparent; border-color: transparent; }
+.codex-connections-aside { align-self: flex-start; padding-inline-start: var(--space-2); font-size: var(--fs-sm); }
+
+.codex-page-timeline { display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-page-timeline-empty { color: var(--text-muted); font-size: var(--fs-sm); margin: 0; }
 .codex-page-timeline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.codex-page-timeline-item { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--fs-sm); }
+.codex-page-timeline-item { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); font-size: var(--fs-sm); }
 .codex-page-timeline-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .codex-page-timeline-text { color: var(--text-dim); min-width: 0; }
 .codex-page-timeline-add { display: flex; gap: var(--space-2); align-items: center; }
@@ -202,6 +274,10 @@
 .codex-gm-block { border-left: 3px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); border-radius: var(--radius-md); }
 .codex-gm-pill { display: inline-block; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--violet-hi); background: color-mix(in srgb, var(--violet) 20%, transparent); padding: 2px 8px; border-radius: var(--radius-pill); }
 .codex-gm-pill.is-floating { position: absolute; top: var(--space-2); right: var(--space-2); pointer-events: none; }
+/* The RECORD axis (`HiddenFromPlayers`), deliberately NOT violet: R5 reserves violet for GM-only CONTENT,
+   which is the other axis and the one the pill above owns. Muted rather than a second accent, because this
+   is the ordinary resting state of a record the GM has not shared yet — not a warning about anything. */
+.codex-hidden-pill { display: inline-block; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); background: var(--surface-3); padding: 2px 8px; border-radius: var(--radius-pill); }
 .codex-fields-secret { margin-top: var(--space-3); padding: var(--space-3); }
 .codex-fields-secret-tag { grid-column: 1 / -1; justify-self: start; margin-bottom: var(--space-1); }
 .codex-tree-icon { flex-shrink: 0; }
@@ -222,8 +298,33 @@
 
 /* Calendar + chronicle */
 .codex-composer-head-actions { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* CT-12: the lens toggle. Its own row above the timeline, right-aligned like the composer's actions, so
+   it reads as a control over the whole list rather than a heading of the first group. `SegmentedControl`
+   brings its own 44px floor (§4), so there is no new tap route to argue about here. */
+.codex-timeline-lens { display: flex; justify-content: flex-end; margin-bottom: var(--space-2); }
+.codex-timeline-lens .nh-segmented { max-width: 100%; }
 .codex-timeline-group { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-timeline-year { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); margin-top: var(--space-3); }
+/* M9: under the by-session lens a heading with a real session record behind it opens that session, so
+   it becomes a control and needs the floor. §4 ROUTE 1 (grow the paint): the headings sit in a vertical
+   stack with entry rows immediately above and below, and §4 forbids route 2 there — a 44px `::after`
+   centred on this heading would overhang into the last entry of the previous group and steal its taps.
+   The paint computes to ~34px (--fs-h2 20px x --lh-body 1.5, plus --space-1 of padding-bottom), so the
+   floor adds about ten pixels of height and nothing else changes.
+   `is-openable` also carries a visible affordance (the ›): a heading that silently became clickable is
+   the hidden control the UX rules forbid, and the un-backfilled headings beside it are NOT clickable —
+   the two must not look alike. */
+.codex-timeline-year.is-openable {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  /* Explicit: a <button> carries the UA's own `padding: 1px 6px`, which would inset this heading's
+     text relative to the plain-<div> headings beside it under the same lens. */
+  padding: 0 0 var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.codex-timeline-year.is-openable:hover { color: var(--text); border-bottom-color: var(--cyan); }
+.codex-timeline-year-open { font-size: var(--fs-body); color: var(--text-muted); }
 .codex-now-chip { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); padding: 2px var(--space-2); border-radius: var(--radius-pill); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .codex-timeline-now { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.06em; color: var(--cyan); background: color-mix(in srgb, var(--cyan) 10%, transparent); border-left: 3px solid var(--cyan); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); margin: var(--space-2) 0; }
 .codex-calendar-editor { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -231,42 +332,225 @@
 .codex-cal-months-head { display: flex; align-items: center; justify-content: space-between; }
 .codex-cal-month { display: grid; grid-template-columns: 1fr 90px auto; gap: var(--space-2); align-items: center; }
 .codex-cal-current { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: var(--space-2); align-items: center; }
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .codex-cal-month { grid-template-columns: 1fr 72px auto; }
   .codex-cal-current { grid-template-columns: 1fr 1fr; }
 }
 .codex-cal-foot { display: flex; justify-content: flex-end; }
 
-/* World home dashboard */
-.codex-world { display: flex; flex-direction: column; gap: var(--space-5); overflow-y: auto; }
-.codex-world-stats { display: flex; gap: var(--space-4); flex-wrap: wrap; }
-.codex-world-stat { display: flex; flex-direction: column; color: var(--text-muted); font-size: var(--fs-sm); }
-.codex-world-statnum { font-family: var(--font-display); font-size: var(--fs-h1); color: var(--magenta); }
-.codex-world-section { display: flex; flex-direction: column; gap: var(--space-3); }
-.codex-world-h { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
-.codex-world-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
-.codex-world-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--radius-lg); background: var(--surface-1); cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
-.codex-world-typecard:hover { background: var(--surface-2); transform: translateY(-1px); }
-.codex-world-typeicon { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
-.codex-world-typelabel { flex: 1; color: var(--text); }
-.codex-world-typecount { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); }
-.codex-world-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.codex-tag-chip { display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
+/* Campaign home dashboard (CI-7 — formerly the World home) */
+.codex-campaign { display: flex; flex-direction: column; gap: var(--space-5); overflow-y: auto; }
+.codex-campaign-stats { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.codex-campaign-stat { display: flex; flex-direction: column; color: var(--text-muted); font-size: var(--fs-sm); }
+.codex-campaign-statnum { font-family: var(--font-display); font-size: var(--fs-h1); color: var(--magenta); }
+.codex-campaign-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-campaign-h { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
+.codex-campaign-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
+.codex-campaign-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--radius-lg); background: var(--surface-1); cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
+.codex-campaign-typecard:hover { background: var(--surface-2); transform: translateY(-1px); }
+.codex-campaign-typeicon { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.codex-campaign-typelabel { flex: 1; color: var(--text); }
+.codex-campaign-typecount { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); }
+.codex-campaign-tags { display: flex; flex-wrap: wrap; gap: var(--space-3); } /* --space-3: see the chip gap budget below */
+/* CF-3 §4 route 2, using the documented pressable-chip precedent verbatim: 32px paint leaves a 6px
+   overhang per side, which --space-3 (12px) of row gap covers. Going straight to 44px paint would
+   make a wrapping cloud of tag pills far too heavy. */
+.codex-tag-chip { min-height: 32px; display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
 .codex-tag-chip:hover { border-color: var(--cyan); color: var(--text); }
 .codex-tag-count { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
-.codex-world-recent { display: flex; flex-direction: column; gap: var(--space-1); }
-.codex-world-recentitem { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); cursor: pointer; text-align: left; }
-.codex-world-recentitem:hover { background: var(--surface-2); border-color: var(--line); }
-.codex-filter-chip { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; padding: 2px var(--space-2); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); margin-bottom: var(--space-2); }
-.codex-filter-chip button { border: none; background: transparent; color: var(--text-muted); cursor: pointer; }
-.codex-filter-chip button:hover { color: var(--danger); }
+.codex-campaign-recent { display: flex; flex-direction: column; gap: var(--space-1); }
+/* CF-3 §4 route 1. This measured 43.6px BEFORE the rule below — a rounding miss rather than a
+   deliberate size, which is why the floor is stated explicitly here. */
+.codex-campaign-recentitem { min-height: var(--tap-min); display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); cursor: pointer; text-align: left; }
+.codex-campaign-recentitem:hover { background: var(--surface-2); border-color: var(--line); }
+/* CI-7: the journal and atlas rows share the row chassis above, so they inherit its 44px floor and
+   need only their own glyph tint and trailing meta. No second row shape on this surface (R2). */
+.codex-campaign-recentglyph { color: var(--text-muted); }
+.codex-campaign-recentwhen { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; }
+/* The in-world "now" reads as a stat, so it sits in the stat row rather than above it. It is a chip,
+   not a number, so it aligns to the numbers' baseline instead of stretching the row. */
+.codex-campaign-today { display: flex; align-items: flex-end; }
+/* M9: the "Next session" card. The GM's row IS `.codex-campaign-recentitem` (its floor, its hover, its
+   chassis — R2, one row shape on this surface); this is the PLAYER's non-interactive twin, which has no
+   session log to open. No floor applies to it precisely because nothing here is tappable — inventing a
+   44px box around a static row would only steal taps from whatever sits beneath it. */
+.codex-campaign-sessionrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text); }
+/* The recap, clamped: the card answers "where are we", and the whole recap is the Journal's job. */
+.codex-campaign-sessionrecap { margin: 0; padding: 0 var(--space-3); color: var(--text-dim); font-size: var(--fs-sm); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+/* M10: the "Open quests" card. Each quest is a row plus its read-only objective list, so the two need a
+   wrapper of their own — the checklist cannot live inside the row, which is a <button> for the GM. */
+.codex-campaign-quest { display: flex; flex-direction: column; gap: var(--space-1); }
+/* The GM's row IS `.codex-campaign-recentitem` (its floor, its hover, its chassis — R2, one row shape on
+   this surface); this is the PLAYER's non-interactive twin, exactly as `.codex-campaign-sessionrow` is.
+   §4 states no route for it because nothing here is tappable — inventing a 44px box around a static row
+   would only steal taps from whatever sits beneath it. */
+.codex-campaign-questrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text); }
+/* Looks like `.codex-campaign-recentwhen` and is deliberately NOT that class: the media query below
+   hides the when-label at 640px ("the first thing to lose"), and on a quest row the progress is the
+   payload, not the metadata. It is ten characters — the title's ellipsis absorbs the cost at 375px.
+   M11's deadline card borrows the same rule for the same reason: a deadline's DATE is the payload of
+   that row, not metadata about it — "Approaching" with the date hidden says almost nothing. */
+/* A deadline row's TITLE gets a floor, the same one the audit row uses (`.codex-audit-row`, below).
+   Measured before this existed: at 320px — the documented supported floor — the title rendered 0–5px wide
+   on 4 of 4 rows, so the card showed a warning triangle, "Passed" and a date with none of what the deadline
+   IS. At 375px it rendered 47–60px against a 155–246px need. The comment above claims "the title's ellipsis
+   absorbs the cost"; it annihilated it instead, because the title was the only flexible child and lost every
+   fight. A basis keeps the title in the negotiation rather than making it the sole loser; the date and badge
+   still hold their ground, and the title ellipses like every other list row. Found by the final QA pass,
+   measured at both widths. The Deadlines card was the ONLY card with this fault. */
+.codex-campaign-recentitem .codex-list-title { flex: 1 1 140px; min-width: 0; }
+.codex-campaign-questprogress, .codex-campaign-deadlinewhen { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
+/* Indented under its quest so the list reads as belonging to the row above it rather than as a sibling.
+   The `Checklist` primitive owns everything else about it, including its own 44px story — which does not
+   arise here, because a read-only checklist renders nothing focusable at all. */
+.codex-campaign-questlist { padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-5)); }
+/* M12 / CT-6: the faction standing card. Each faction is a row plus its bar, so the two need a wrapper
+   of their own — the bar cannot live inside the row, whose name is a <button>. */
+.codex-campaign-standings { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-campaign-standing { display: flex; flex-direction: column; gap: var(--space-1); }
+/* `flex-wrap` on purpose: at 375px the name, the tier word, the signed value and Adjust do not fit one
+   line, and squeezing them would ellipsis away the very word R2 requires. Wrapped, the Adjust control
+   can sit directly above the NEXT faction's — which is exactly why it is `Button` at its default size
+   (§4 route 1: 44px of real paint, no `::after` to overhang into the row below). */
+.codex-campaign-standingrow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+/* The name button IS `.codex-campaign-recentitem` (its 44px floor, its hover, its chassis — R2, one row
+   shape on this surface); this only lets it take the free space. */
+.codex-campaign-standingname { flex: 1 1 180px; min-width: 0; }
+.codex-campaign-standingvalue { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
+/* Indented under its row, like the quest card's checklist, so the bar reads as belonging to the faction
+   above it rather than as a sibling. */
+.codex-campaign-standingmeter { padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-5)); }
+
+@media (max-width: 640px) {
+  /* At 375px five stats plus the date chip would wrap into a tall stack that pushes every section
+     below the fold; tightening the gap keeps the readout to two rows. */
+  .codex-campaign-stats { gap: var(--space-3); }
+  .codex-campaign-recentwhen { display: none; } /* the when-label is the first thing to lose, not the title */
+  /* The bar loses its indent before it loses its width — a 200px track squeezed into 120px says less
+     than a full-width one, and the row above it already carries the name. */
+  .codex-campaign-standingmeter { padding: 0 0 var(--space-1); }
+}
+
+/* ----- Sessions (M9): the log destination and the console drawer ----- */
+
+/* The log reuses the notebook's two-pane chassis (`.codex-workspace` + `.codex-rail` + `.codex-main`),
+   which is also where its narrow-viewport behaviour comes from: `has-selection` already hides the rail
+   and shows the `‹` back link at <=760px, so a phone gets list-then-detail with no new rules. */
+.codex-sessions-exit { display: flex; margin-bottom: var(--space-2); }
+.codex-sessions-railtitle { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); flex: 1 1 auto; }
+/* §4 ROUTE 1 (grow the paint). The log rows are a vertical stack, where §4 requires route 1 outright:
+   any `::after` box taller than the row overhangs into the rows above and below and steals their taps,
+   whatever the exact paint height turns out to be. Same chassis and same reasoning as `.codex-tree-page`
+   in the notebook rail, and there is no gap budget to compute because route 2 is not on the table. */
+.codex-session-row {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2);
+  width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--text); cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+}
+.codex-session-row:hover { background: var(--surface-2); border-color: var(--line); }
+/* R6: selection owns the edge, hover owns the surface lift — the notebook's rule, unchanged. */
+.codex-session-row.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-session-editor { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Taller than the journal composer's `.codex-composer-body`: prep is written in long sittings, and a
+   4.5rem window over an evening's plan is the kind of scrolling-in-a-slot the composer can afford and
+   this cannot. Still `resize: vertical`, so the GM has the last word. */
+.codex-session-body { min-height: 9rem; resize: vertical; }
+
+/* The console drawer's contents. The panel itself is `@vtt/ui`'s `Drawer` (R9) — nothing here restyles
+   it; these are the Codex-local blocks that sit INSIDE its body. */
+.codex-console { display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
+.codex-console-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.codex-console-attendees { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* R5: the GM-secret block wears the shared violet marking (`.codex-gm-block`) and nothing else — this
+   panel is the one most likely to be open while a screen is shared, so it must look GM-only at a glance. */
+.codex-console-prep { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; padding: var(--space-3); width: 100%; }
+.codex-console-empty { display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; color: var(--text-muted); }
+
+/* ----- Quests (M10): the quest log destination ----- */
+
+/* The log reuses the notebook's two-pane chassis and the session log's exit row (`.codex-sessions-exit`,
+   `.codex-sessions-railtitle`), which is also where its narrow-viewport behaviour comes from:
+   `has-selection` already hides the rail and shows the `‹` back link at <=760px. Two destinations, one
+   chassis — a second near-identical set of rules is exactly what R2 exists to prevent. */
+
+/* §4 ROUTE 1 (grow the paint). The log rows are a vertical stack, where §4 requires route 1 outright:
+   any `::after` box taller than the row overhangs into the rows above and below and steals their taps.
+   Same chassis and same reasoning as `.codex-session-row` one milestone earlier, and there is no gap
+   budget to compute because route 2 is not on the table. */
+.codex-quest-row {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2);
+  width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--text); cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+}
+.codex-quest-row:hover { background: var(--surface-2); border-color: var(--line); }
+/* R6: selection owns the edge, hover owns the surface lift — the notebook's rule, unchanged. */
+.codex-quest-row.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-quest-rowglyph { flex: none; color: var(--caution); } /* the same hue the search row's quest kind wears */
+
+.codex-quest-editor { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Shorter than the session log's `.codex-session-body`: a quest's prose is a hook and its truth, not an
+   evening's plan. Still `resize: vertical`, so the GM has the last word. */
+.codex-quest-body { min-height: 6rem; resize: vertical; }
+.codex-quest-objectives { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-quest-objectives-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.codex-quest-subhead { margin: 0; font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+/* Not a Badge: progress is a readout, not a status, and the words carry it (R2 — never a bare "2/5"). */
+.codex-quest-progress { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); }
+
+/* The linked-entity rows. Deliberately NOT `.codex-marker-link*`, which this would otherwise have
+   reused: those are 24×24 and sit below the §4 floor (a known, pre-existing gap), and copying them here
+   would have doubled a bug instead of a pattern.
+   §4 ROUTE 1 (grow the paint) on BOTH controls, for the reason `Checklist.css` spells out for its own
+   near-identical row: these are a vertical stack gapped by --space-1 (4px), so a route-2 `::after` on a
+   24px control would overhang by 10px per side and reach straight through the gap into the neighbouring
+   row. Real paint cannot overlap, so there is no gap budget left to get wrong. */
+.codex-quest-links { display: flex; flex-direction: column; gap: var(--space-1); }
+.codex-quest-link { display: flex; align-items: center; gap: var(--space-2); }
+.codex-quest-link-open {
+  flex: 1; min-width: 0; min-height: var(--tap-min);
+  display: flex; align-items: center; gap: var(--space-2); text-align: left;
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2);
+  color: var(--text); padding: var(--space-1) var(--space-3); cursor: pointer; font-size: var(--fs-sm);
+}
+.codex-quest-link-open:hover { border-color: var(--cyan); }
+.codex-quest-link-x {
+  flex: none; width: var(--tap-min); height: var(--tap-min);
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--text-dim); cursor: pointer;
+  border-radius: var(--radius-md); font-size: var(--fs-sm); line-height: 1;
+}
+.codex-quest-link-x:hover { color: var(--magenta); background: var(--surface-2); }
+
+/* ----- The PLAYER's quest reader -----
+   A destination over the Campaign mode, reusing the GM log's two-pane chassis, its rail rows
+   (`.codex-quest-row`), its exit row (`.codex-sessions-exit`) and its linked-entity rows
+   (`.codex-quest-link-open`) — every one of which already takes §4 route 1. Two audiences, one chassis;
+   a second near-identical set of rules is exactly what R2 exists to prevent. */
+
+/* §4 ROUTE 1 (grow the paint), and route 1 is the only option here: this back link sits at the top of
+   `.codex-main`, directly above the reader's own content, so a route-2 `::after` box would hang 12px
+   past the paint and swallow taps meant for the first thing under it. `.codex-back` itself is a bare
+   text button with no floor of its own — a pre-existing gap on the notebook and the GM log that this
+   scoped rule deliberately does NOT reach into, because widening it would resize two surfaces this
+   change was not asked to touch. A `<button>` centres its own content, so no extra alignment is needed. */
+.codex-questreader .codex-back { min-height: var(--tap-min); }
+/* The quest's own prose. `pre-wrap` because the GM writes it in a bare `Textarea` and their blank lines
+   ARE the paragraphing — there is no markdown pass here to rebuild them (see `PlayerCodex`). */
+.codex-quest-readerbody { margin: 0; white-space: pre-wrap; }
 
 /* Relationship graph */
 .codex-graph { display: flex; flex-direction: column; min-height: 64vh; gap: var(--space-2); }
 .codex-graph-bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .codex-graph-hint { font-size: var(--fs-sm); color: var(--text-muted); }
 .codex-graph-legend { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-left: auto; }
-.codex-graph-legenditem { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
+/* CF-3 §4 route 1: these wrap into rows, so growing the paint is harmless and avoids any overhang. */
+.codex-graph-legenditem { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
 .codex-graph-legenditem:hover { border-color: var(--line); color: var(--text); }
 .codex-graph-legenditem.is-off { opacity: 0.4; text-decoration: line-through; }
 .codex-graph-legenditem i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -277,17 +561,49 @@
 .codex-graph-edge line { stroke: var(--line-strong); stroke-width: 1.2; opacity: 0.5; transition: opacity var(--dur-hover) var(--ease-settle), stroke var(--dur-hover) var(--ease-settle); }
 .codex-graph-edge.is-lit line { stroke: var(--cyan); opacity: 0.95; stroke-width: 1.8; }
 .codex-graph-edge.is-dim { opacity: 0.15; }
+/* CI-8 / R2: a wiki-link edge, distinguished from a typed relationship by DASH PATTERN and WEIGHT — not
+   by colour, which it deliberately shares with its sibling so a lit neighbourhood reads as one thing.
+   The arrowhead is dropped in the markup (a mention has no direction to claim) and the edge labels
+   itself "mentions", so the difference survives greyscale, colour-blindness, and a stylesheet that fails
+   to load. Placed AFTER `.is-lit` so equal-specificity dash/weight wins, with the lit case restated. */
+.codex-graph-edge.is-link line { stroke-width: 0.9; stroke-dasharray: 6 5; opacity: 0.42; }
+.codex-graph-edge.is-link.is-lit line { stroke: var(--cyan); stroke-width: 1.4; opacity: 0.95; }
 .codex-graph-edgelabel { fill: var(--text-dim); font-size: 9px; font-family: var(--font-mono); pointer-events: none; }
+.codex-graph-edgekey { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.codex-graph-edgekey-item { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; }
+.codex-graph-edgekey-swatch { width: 26px; height: 4px; flex: 0 0 auto; overflow: visible; }
+.codex-graph-edgekey-line { stroke: var(--line-strong); stroke-width: 1.4; }
+.codex-graph-edgekey-line.is-link { stroke-width: 1; stroke-dasharray: 6 5; }
 .codex-graph-node { cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle); }
 .codex-graph-node:focus { outline: none; }
 .codex-graph-node circle { stroke: var(--void); stroke-width: 2; transition: stroke var(--dur-hover) var(--ease-settle); }
 .codex-graph-node.is-hover circle { stroke: var(--text); stroke-width: 2.5; }
 .codex-graph-node:focus-visible circle { stroke: var(--cyan); stroke-width: 3; }
+/* CI-5: the node a jump landed on, held after the pointer leaves. Selection owns the edge (R6). */
+.codex-graph-node.is-focus circle { stroke: var(--cyan); stroke-width: 3; }
+/* …but never on the invisible 44px hit circle, which would paint that ring at tap radius instead of
+   around the node. Three classes + a type, so it outranks the state rules above. */
+.codex-graph-node.is-focus circle.codex-graph-nodehit { stroke: none; }
 .codex-graph-node.is-dim { opacity: 0.28; }
 .codex-graph-nodeicon { fill: rgba(8, 6, 20, 0.85); pointer-events: none; }
 .codex-graph-nodelabel { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--void); stroke-width: 3px; }
 .codex-editor-foot { display: flex; }
 
+/* The codex-wide settings destination (owner decision, 2026-07-30). A COLUMN throughout, and not a
+   preference: §4 route 1 is what a vertical stack of controls requires, and every control here grows its own
+   paint — a row would sit them side by side and force the narrow ones under the floor at 320px. */
+.codex-settings { display: flex; flex-direction: column; gap: var(--space-4); }
+.codex-settings-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-settings-lede { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); max-width: 60ch; }
+/* Bounded so a minutes field does not stretch the width of a laptop, and free to shrink on a phone. */
+.codex-settings-section .nh-field { max-width: 22rem; }
+.codex-settings-usage { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+/* The one destructive area in the Codex outside a record's own editor, so it is fenced rather than inlined:
+   a GM must not arrive at "delete all version history" while scanning for the frequency field. */
+.codex-settings-danger { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line)); border-radius: var(--radius-md); }
+/* WRAPS, and that is load-bearing: the two buttons carry long self-describing labels ("Delete versions older
+   than 30 days"), so a nowrap row would push the second off a 320px screen. */
+.codex-settings-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .codex-revisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-revision { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); }
 .codex-revision-title { grid-column: 1; color: var(--text-dim); font-size: var(--fs-sm); }
@@ -305,7 +621,36 @@
 /* Distinct register from the GM tab bar directly above it: a bordered sub-toolbar strip, so the two
    nav levels don't read as one long tab list. */
 .codex-modebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-1) var(--space-2); margin-bottom: var(--space-3); }
-.codex-modebar-ops { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+/* §4 GAP BUDGET, corrected when M10's "Quests" made this row seven controls wide. Every button here is
+   `Button size="sm"`, which takes §4 route 2: a --tap-min `::after` over 32px of paint, overhanging by
+   (44 − 32) / 2 = 6px per side. Neighbours must therefore be gapped by 6 + 6 = 12px, and this row was
+   gapped by --space-1 (4px) — 8px short, so each button was quietly stealing part of its left
+   neighbour's tap area. --space-3 is exactly the documented pressable-chip budget for a 32px paint. */
+.codex-modebar-ops { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+/* The five modes overflow the strip on a phone: measured at 375px the tabs total 392px inside a 325px
+   scrollport, so "Graph" starts at x=348 with the strip ending at 350. `Tabs` already fades its own edge,
+   but a mask can only dim CONTENT — and at rest that boundary lands in the 4px of whitespace between
+   "Journal" (ends 344) and "Graph", so there was nothing for it to bite on and the phone showed four modes
+   with no sign of a fifth. This mark does not depend on where the boundary falls.
+
+   It is keyed off the primitive's OWN state classes rather than a second measurement of its own:
+   `is-scrollable` means the bar overflows, `is-scrolled-end`/`is-scrolled-start` mean that end is already
+   in view. So it appears only when there genuinely is more that way, which is the same rule Tabs.css states
+   for its fade — a permanent arrow would be decoration claiming to be an affordance.
+
+   `flex: 0 1 auto` (not `1 1`) keeps the wide-screen layout exactly as it was: the strip stays shrink-to-fit
+   so its bottom rule still runs under the tabs rather than the whole row. */
+.codex-modetabs { position: relative; flex: 0 1 auto; min-width: 0; }
+.codex-modetabs::before, .codex-modetabs::after {
+  content: ""; position: absolute; top: 50%; width: 7px; height: 7px; pointer-events: none;
+  border-right: 2px solid var(--text-dim); border-bottom: 2px solid var(--text-dim);
+  opacity: 0; transition: opacity var(--dur-base) var(--ease-settle);
+}
+.codex-modetabs::after { right: 2px; transform: translateY(-50%) rotate(-45deg); }
+.codex-modetabs::before { left: 2px; transform: translateY(-50%) rotate(135deg); }
+.codex-modetabs:has(.is-scrollable:not(.is-scrolled-end))::after { opacity: 1; }
+.codex-modetabs:has(.is-scrolled-start)::before { opacity: 1; }
 
 /* Command palette */
 .codex-palette-scrim { position: fixed; inset: 0; background: color-mix(in srgb, var(--void) 70%, transparent); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 60; }
@@ -313,15 +658,21 @@
 .codex-palette-input { width: 100%; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font-family: var(--font-body); font-size: var(--fs-body); padding: var(--space-3) var(--space-4); }
 .codex-palette-input:focus { outline: none; border-bottom-color: var(--cyan); }
 .codex-palette-list { list-style: none; margin: 0; padding: var(--space-1); max-height: 46vh; overflow-y: auto; }
-.codex-palette-item { display: block; width: 100%; text-align: left; padding: var(--space-2) var(--space-3); border: none; background: transparent; color: var(--text); border-radius: var(--radius-md); cursor: pointer; }
+/* §4 route 1, same reasoning as .codex-hit: the palette list is a vertical stack of commands. */
+.codex-palette-item { min-height: var(--tap-min); display: flex; align-items: center; width: 100%; text-align: left; padding: var(--space-2) var(--space-3); border: none; background: transparent; color: var(--text); border-radius: var(--radius-md); cursor: pointer; }
 .codex-palette-item.is-active { background: var(--surface-3); }
 .codex-palette-item.is-action { color: var(--cyan); }
 .codex-palette-empty { padding: var(--space-3); color: var(--text-muted); }
+.codex-palette-loading { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); }
 
 .codex-atlas { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-atlas-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .codex-breadcrumb { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; min-width: 0; }
-.codex-crumb { background: none; border: none; color: var(--cyan); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
+/* §4 route 1 (grow the paint). Measured 27.5px tall at 375px. Route 2 is not available: the overhang would
+   be (44 − 27.5) / 2 = 8.25px per side and `.codex-breadcrumb` gaps its crumbs by `--space-1` (4px), well
+   under the 16.5px the gap budget demands — and the bar wraps at 375px, so a 44px ::after would also reach
+   the crumb row below it. A breadcrumb bar has the vertical room, so the paint simply grows. */
+.codex-crumb { min-height: var(--tap-min); display: inline-flex; align-items: center; background: none; border: none; color: var(--cyan); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
 .codex-crumb:hover { background: var(--surface-2); }
 .codex-crumb.is-current { color: var(--text); cursor: default; }
 .codex-crumb-sep { color: var(--text-muted); }
@@ -329,10 +680,32 @@
 /* Drill-DOWN chips: the maps nested under the current one (breadcrumb is the way up, these are the way down). */
 .codex-atlas-descend { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: calc(-1 * var(--space-1)); }
 .codex-descend-label { font-family: var(--font-mono); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-.codex-descend-chip { display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); }
+/* §4 route 1 (grow the paint). Measured 29.5px tall at 375px, and it only renders at all once a campaign
+   has two top-level maps or a nested one — which is why six milestones of sparse-database checks never saw
+   it. Route 2 is not available: the overhang would be (44 − 29.5) / 2 = 7.25px per side against this row's
+   `--space-2` (8px) gap, under the 14.5px budget, and the row wraps at 375px so the ::after would reach the
+   chips stacked below it as well. */
+.codex-descend-chip { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill); }
 .codex-descend-chip:hover { background: var(--surface-3); border-color: var(--cyan); }
+/* Selection owns the edge, hover owns the fill (design-language §5) — the atlas you are currently in. */
+.codex-descend-chip.is-current { border-color: var(--magenta); color: var(--text); }
 .codex-descend-arrow { color: var(--cyan); font-weight: 700; }
-.codex-descend-lock { font-size: var(--fs-2xs); opacity: 0.8; }
+/* The "players can't see this map yet" mark. An SVG glyph, never an emoji (design-language §0): 🔒 renders
+   at a platform-chosen size in a hue this palette does not own and cannot take a token colour. */
+.codex-descend-lock { display: inline-flex; align-items: center; color: var(--text-dim); font-size: 1em; }
+
+/* M12 / CT-7: "The party is on this map" — R2's text half of the party pin, in the atlas chrome where it
+   is legible without hunting the map for the ring. §4 route 1: the row grows its own paint to the floor
+   and its single control is `Button` at its default size (44px paint, no `::after` to overhang). */
+.codex-atlas-party {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--cyan) 40%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+}
+.codex-atlas-partytext { flex: 1 1 auto; min-width: 0; color: var(--text); font-size: var(--fs-sm); }
 
 .codex-atlas-body { display: flex; gap: var(--space-3); align-items: stretch; min-height: 0; }
 .codex-mapsurface { position: relative; flex: 1 1 auto; min-width: 0; min-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--void); touch-action: none; }
@@ -349,12 +722,27 @@
 .codex-marker.is-hidden { opacity: 0.55; }
 .codex-marker.is-hidden .codex-marker-bg { stroke-dasharray: 3 2; }
 .codex-marker-label { fill: var(--text); paint-order: stroke; stroke: var(--void); stroke-width: 3px; stroke-linejoin: round; font-family: var(--font-display); }
+/* M12 / CT-7: the party pin. The ring is a scanning aid ONLY — R2 forbids a state that reads by colour
+   or shape alone, so `.codex-marker-partylabel` beside it draws the words "The party is here" on the map
+   and the `<title>` gives a screen reader the same sentence. Removing either of those and keeping the
+   ring would break R2; removing the ring alone would cost nothing but a glance. */
+.codex-marker-partyring { fill: none; stroke: var(--cyan); stroke-width: 2.5; stroke-dasharray: 6 4; opacity: 0.9; }
+.codex-marker-partylabel { fill: var(--cyan); paint-order: stroke; stroke: var(--void); stroke-width: 3px; stroke-linejoin: round; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; }
+/* The inspector's party toggle: `Switch` plus its hint, laid out exactly like `.codex-atlas-nestrow`.
+   §4: `Switch` is a `@vtt/ui` primitive and carries its own floor (route 2, 22px paint → 11px overhang
+   per side). Its neighbours in `.codex-inspector` are gapped by --space-3 (12px) and are themselves
+   route 1 with no overhang of their own, so the budget is met with a pixel to spare; directly beneath it
+   is the hint paragraph, which is not a control and has no taps to steal. */
+.codex-marker-party { display: flex; flex-direction: column; gap: var(--space-1); }
 
 /* Inspector */
 .codex-inspector { flex: 0 0 300px; display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); overflow-y: auto; max-height: 72vh; }
 .codex-inspector-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .codex-inspector-head-actions { display: flex; align-items: center; gap: var(--space-2); }
 .codex-inspector-foot { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+/* Map settings (name / kind / parent / delete) and the "nest inside" choice on the new-map picker. */
+.codex-map-settings { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-atlas-nestrow { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); }
 /* Launch/navigate actions lead the inspector; editing follows. */
 .codex-inspector-go { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-bottom: var(--space-2); border-bottom: 1px solid var(--line); }
 .codex-inspector-hint { font-size: var(--fs-sm); color: var(--text-muted); margin: calc(-1 * var(--space-1)) 0 0; }
@@ -396,6 +784,21 @@
   .codex-inspector { flex-basis: auto; max-height: none; }
 }
 
+/* CF-4: Campaign (then called World), Journal and Graph had no narrow-viewport rules at all — they
+   survived by flex/grid default, not by design, and the two places that actually broke are both in
+   the Graph.
+
+   1. The canvas is `flex: 1 1 auto` inside a container the app shell stretches, so it ignored its own
+      62vh floor: measured **532px tall inside a 360px-tall landscape phone**, 1.5x the viewport, which
+      makes it impossible to see the graph and its toolbar at once. Clamp it to the viewport here.
+   2. `.codex-graph-legend` uses `margin-left: auto` to sit opposite the hint on a wide bar. Once the bar
+      wraps (76px tall at 375px) that auto margin just strands the legend mid-row. Left-align it. */
+@media (max-width: 760px) {
+  .codex-graph { min-height: 0; }
+  .codex-graph-svg { max-height: 68vh; }
+  .codex-graph-legend { margin-left: 0; }
+}
+
 /* ----- Journal ----- */
 .codex-journal { display: flex; flex-direction: column; gap: var(--space-4); max-width: 820px; margin: 0 auto; width: 100%; }
 .codex-composer { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -408,16 +811,76 @@
 .codex-composer-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; }
 .codex-composer-meta > * { flex: 1 1 130px; }
 .codex-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+/* M11: the composer's kind switch. Layout only — `SegmentedControl` is the `@vtt/ui` primitive and owns
+   its own 44px story (route 2, 36px paint, 4px overhang). §4's gap budget is met by the composer's own
+   --space-3 (12px) row gap against the head's `Button size="sm"` below it (4px + 6px = 10px needed). */
+.codex-composer-kind { display: flex; }
+/* A sentence the composer says about what it is about to do — the deadline's missing date, and the date
+   logging downtime would PROPOSE. Deliberately prose rather than a warning box: neither is an error. */
+.codex-composer-hint { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* O-1, the prep clock. Rendered ONLY while the GM's clock and the players' clock disagree, so there is
+   no "in sync" state to style — the quiet state is no element at all. The Publish control is `Button` at
+   its default size: §4 route 1 (`min-height: var(--tap-min)`, no `::after`), which is what a control
+   sitting directly above the composer's field stack needs. */
+.codex-prepclock { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-3); border: 1px solid color-mix(in srgb, var(--caution) 35%, transparent); border-left: 3px solid var(--caution); border-radius: var(--radius-md); background: color-mix(in srgb, var(--caution) 8%, transparent); }
+.codex-prepclock-label { font-size: var(--fs-sm); color: var(--text-dim); }
 
 .codex-timeline { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-entry { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-entry.is-combat { border-left-color: var(--caution); }
+/* CT-11: a dated `event` page on the chronicle. The accent is the SAME token the event entity type uses
+   everywhere else (tree, graph, badges), so one record has one colour across the suite. R2: the accent is
+   never the only signal — every row also carries the kind's glyph and its word ("Event"). */
+.codex-entry.is-event { border-left-color: var(--codex-type-event); }
+/* M11: the two new kinds. A deadline takes the SAME caution accent a battle does, and that is deliberate
+   rather than an oversight — both are threats, and R2 says colour is never what tells the two apart: the
+   warning glyph and the word "Deadline" do that, and they survive with the stylesheet stripped. Downtime
+   takes `--info`, matching the tone its badge carries. */
+.codex-entry.is-deadline { border-left-color: var(--caution); }
+.codex-entry.is-downtime { border-left-color: var(--info); }
+/* CI-1 / R1: the entry a search hit landed on. R6 — selection owns the edge, so this marks the arrival
+   with a border rather than a second background treatment. */
+.codex-entry.is-focused { border-color: var(--magenta); }
 .codex-entry-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.codex-entry-meta { display: flex; align-items: center; gap: var(--space-2); }
+/* Wraps: at 375px a row can carry a glyph, a kind badge, a date and a session number, and an unwrapped
+   flex row would push the RevealSwitch off the card instead. */
+.codex-entry-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0; }
+/* R2: the kind's glyph, beside the kind's word. Tinted from the row's own accent so the icon reads as
+   part of the record rather than as a control. */
+.codex-entry-kindglyph { color: var(--text-dim); }
+.codex-entry.is-combat .codex-entry-kindglyph { color: var(--caution); }
+.codex-entry.is-event .codex-entry-kindglyph { color: var(--codex-type-event); }
+.codex-entry.is-deadline .codex-entry-kindglyph { color: var(--caution); }
+.codex-entry.is-downtime .codex-entry-kindglyph { color: var(--info); }
 .codex-entry-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
+/* An event page's name. A journal entry has none, so this element simply does not render for it — the
+   row shape is unchanged, the slot is just empty (R2). */
+.codex-entry-title { font-family: var(--font-display); font-size: var(--fs-h3); color: var(--text); margin: 0; }
 .codex-entry-body { color: var(--text); }
 .codex-entry-gm { border-top: 1px dashed var(--line); padding-top: var(--space-2); color: var(--text-dim); position: relative; display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-start; }
-.codex-entry-foot { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+/* CI-2: an entry's stored tags, read-only. Badges, not chips or buttons — nothing here is interactive,
+   so the 44px floor (§4) does not apply; a tag click still belongs to Pages and to a later milestone. */
+.codex-entry-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.codex-entry-tags .nh-badge { font-family: var(--font-mono); }
+/* §4 gap budget. These are `Button size="sm"` — route 2, 32px paint, so each carries a 44px ::after
+   that overhangs 6px above and below. The row wraps at 375px, and CI-6 gives it a fourth button
+   ("Open marker"), so wrapping is now the normal case rather than the edge: at the old --space-1 (4px)
+   the lower row's invisible box overlapped the upper row's by 8px and stole its taps. --space-3 (12px)
+   is exactly the documented precedent for 32px paint (6px + 6px). Horizontally there is nothing to
+   budget for — `width: max(100%, 44px)` means a text button this wide never overhangs sideways. */
+.codex-entry-foot { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+
+/* M11 / CT-10: a downtime row's payload, and O-3's confirmation.
+   The confirmation states its effect in full BEFORE the button — the sentence is the affordance, and the
+   button only agrees with it. §4: `Button` at its DEFAULT size is route 1 (grows its own paint to 44px,
+   no `::after`), which is required here rather than merely tidy — this block sits directly above
+   `.codex-entry-foot`'s route-2 small buttons, and a `::after` overhang stacked against theirs would have
+   the two rows quietly stealing each other's taps. */
+.codex-downtime { display: flex; flex-direction: column; gap: var(--space-2); border-top: 1px dashed var(--line); padding-top: var(--space-2); }
+.codex-downtime-what { margin: 0; color: var(--text); font-size: var(--fs-sm); }
+.codex-downtime-state { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.codex-downtime-apply { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.codex-downtime-proposal { color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* ----- Player Codex ----- */
 .player-codex-row { display: flex; justify-content: flex-end; margin-bottom: var(--space-2); }
@@ -444,10 +907,45 @@
 
 /* New-page template menu */
 .codex-newpage { position: relative; }
-.codex-menu-scrim { position: fixed; inset: 0; z-index: 30; background: transparent; border: none; cursor: default; }
-.codex-template-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; z-index: 31; min-width: 160px; display: flex; flex-direction: column; padding: var(--space-1); background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: 0 12px 32px color-mix(in srgb, var(--void) 55%, transparent); }
-.codex-template-item { text-align: left; padding: var(--space-2) var(--space-3); border: none; background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; }
-.codex-template-item:hover { background: var(--surface-3); }
 .codex-md-img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-md); margin: var(--space-2) 0; border: 1px solid var(--line); }
-.codex-img-loading { display: inline-block; min-height: 1.2em; min-width: 3em; background: var(--surface-2); border-radius: var(--radius-sm); }
 .codex-img-failed { color: var(--text-muted); font-style: italic; }
+
+/* CF-3: the graph node's touch floor. `fill: transparent` (never `none`) is what makes an invisible
+   circle receive pointer events; it is sized in RelationshipGraph.tsx because the radius depends on the
+   live zoom and the neighbour spacing, which CSS cannot see. */
+.codex-graph-nodehit { fill: transparent; }
+
+/* ----- M12 / CT-6: adjusting a faction's standing (the GM's modal composition) ----- */
+
+.codex-standing-adjuster { display: flex; flex-direction: column; gap: var(--space-3); }
+/* The tier word, the signed value and what the change would be — the three things the bar below cannot
+   say on its own (R2). The bar itself is `aria-hidden` at the call site; see `StandingAdjuster.tsx`. */
+.codex-standing-preview { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.codex-standing-delta { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
+
+/* ----- M12 / CT-9: the reveal audit ----- */
+
+.codex-audit { display: flex; flex-direction: column; gap: var(--space-4); overflow-y: auto; }
+.codex-audit-head { display: flex; flex-direction: column; gap: var(--space-1); }
+.codex-audit-title { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--text); margin: 0; }
+.codex-audit-count { margin: 0; color: var(--text); }
+.codex-audit-scope { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.codex-audit-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-audit-h { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
+.codex-audit-glyph { color: var(--text-muted); }
+/* The per-category count. It says "not read" in words when a category did not arrive, so an empty
+   category and an unread one can never look the same (the CF-2 lesson). */
+.codex-audit-sectioncount { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); text-transform: none; letter-spacing: 0; }
+.codex-audit-rows { display: flex; flex-direction: column; gap: var(--space-1); }
+/* §4 ROUTE 1 (grow the paint), and here it is not a preference — the audit is a long vertical stack of
+   rows that each carry an action, which is the exact case §4 forbids route 2 for: a `::after` hit box
+   overhangs into the row above and below and steals their taps. The row grows its own paint to the floor
+   and its one control is `Button` at its DEFAULT size, which is 44px of real paint with no `::after` at
+   all — so there is no pseudo hit area anywhere in this stack and no gap budget to compute. */
+.codex-audit-row {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1);
+}
+.codex-audit-row .codex-list-title { flex: 1 1 160px; min-width: 0; }

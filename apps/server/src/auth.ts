@@ -56,6 +56,18 @@ export class AuthService {
     const now = Date.now();
     return this.sign({ role: "player", sessionId: randomUUID(), issuedAt: now, expiresAt: now + 30 * 24 * 60 * 60 * 1000 });
   }
+  /**
+   * A short-lived PLAYER principal for the GM's own preview of the player Codex. Deliberately a real
+   * player token rather than a role flag on the GM's session: every read then walks the same
+   * `authorizePlayer` path and the same projection a genuine player gets, so the preview cannot show
+   * anything a player could not see. Mirrors the viewer's `mintPreviewSession`. Minting does NOT
+   * register presence - that happens on socket join - so no phantom player appears at the table.
+   */
+  issuePreviewPlayerSession(ttlMs = 12 * 60 * 60 * 1000) {
+    if (!this.data) throw new Error("The host must complete GM setup before players join.");
+    const now = Date.now();
+    return this.sign({ role: "player", sessionId: randomUUID(), issuedAt: now, expiresAt: now + ttlMs });
+  }
   verify(token: string | undefined): GmSession | null {
     const session = this.verifySession(token);
     return session?.role === "gm" ? session : null;

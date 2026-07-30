@@ -172,11 +172,12 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
   </section>;
 }
 
-export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
+export function ReplayPanel({ gmToken, openArchiveId = null, onOpenedArchive = () => {} }: Readonly<{ gmToken: string; openArchiveId?: number | null; onOpenedArchive?: () => void }>) {
   const [archives, setArchives] = useState<readonly ArchiveSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<ArchiveSummary | null>(null);
   const [exporting, setExporting] = useState<number | null>(null);
+  const handledArchiveRef = useRef<number | null>(null);
 
   const refresh = () => {
     setError(null);
@@ -185,6 +186,17 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       .catch((cause: Error) => { setArchives([]); setError(cause.message); });
   };
   useEffect(refresh, [gmToken]);
+  // Arriving from a Codex combat entry ("Open replay"): jump straight into that archive once the list
+  // has loaded, then clear the request so a later manual Back doesn't re-open it.
+  useEffect(() => {
+    if (openArchiveId === null || !archives || handledArchiveRef.current === openArchiveId) return;
+    // Latch the id locally as well as asking the caller to clear it: without this, a caller that passes
+    // `openArchiveId` and no `onOpenedArchive` would re-open the viewer every time Back refreshes the list.
+    handledArchiveRef.current = openArchiveId;
+    const match = archives.find((archive) => archive.id === openArchiveId);
+    if (match) setOpen(match); // No match (e.g. the archive was deleted) => the GM simply lands on the list.
+    onOpenedArchive();
+  }, [openArchiveId, archives, onOpenedArchive]);
 
   const exportArchive = async (archive: ArchiveSummary) => {
     setExporting(archive.id); setError(null);

@@ -2259,12 +2259,13 @@ Creates a page.
 | `gmBody` | string | no |  |
 | `revealedToPlayers` | boolean | no |  |
 | `bannerAssetId` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date that places an `event` page on the chronicle. Omit for undated. |
 
 **Responses:** `201` Success - envelope of `CodexPageData` · errors `400` `401`
 
 ### `GET /api/v1/codex/search`
 
-Full-text page search, role-scoped. `q` is the query.
+Suite-wide full-text search across pages, journal entries, maps and markers, role-scoped. `q` is the query. Deliberately ONE search route rather than one per record type: `hits` is a single ranked list discriminated by `kind`.
 
 **Auth:** GM session · Player session (own-character limits apply)
 
@@ -2303,6 +2304,7 @@ Edits a page. `expectedRev` rejects a stale write with 409.
 | `playerBody` | string | no |  |
 | `gmBody` | string | no |  |
 | `bannerAssetId` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date. Omitted leaves the stored date alone; `null` clears it. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the page moved on. |
 
 **Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404` `409`
@@ -2335,7 +2337,7 @@ Shows/hides a page to players.
 
 ### `POST /api/v1/codex/pages/{id}/relationships`
 
-Adds a typed relationship edge from this page to another.
+Adds a typed relationship edge from this page to another. Counts as an edit of BOTH pages, so both move in "recently updated" - but neither page's `rev` changes, so an open editor is not forced into a conflict.
 
 **Auth:** GM session
 
@@ -2349,6 +2351,16 @@ Adds a typed relationship edge from this page to another.
 | `type` | string | yes |  |
 
 **Responses:** `201` Success - envelope of `CodexRelationshipData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/pages/{id}/markers`
+
+The reverse of `/codex/maps/{id}/markers`: every atlas marker that links THIS page, so an open page can point back at the map. Role-scoped by exactly the forward route's predicate - a player must be able to see the page itself (an unrevealed page 404s), and then receives only revealed pins whose MAP is also revealed, with each pin's links filtered to the revealed subset and scene/actor ids stripped.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexMarkerListData` · errors `401` `404`
 
 ### `GET /api/v1/codex/pages/{id}/revisions`
 
@@ -2369,6 +2381,14 @@ Restores a page to a prior revision.
 **Parameters:** `id` (path) - string (uuid) · `revisionId` (path) - integer (≥ 1)
 
 **Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/preview-session`
+
+Mints a short-lived PLAYER session token so the GM can preview the player Codex truthfully. Deliberately a real player principal rather than a role flag on the GM's session - every read then walks the same authorization and projection path a genuine player gets, so the preview can never show what a player could not see.
+
+**Auth:** GM session
+
+**Responses:** `201` Success - envelope of `CodexPreviewSessionData` · errors `401`
 
 ### `GET /api/v1/codex/folders`
 
@@ -2431,13 +2451,21 @@ Every relationship edge for the graph, role-scoped (a player sees only edges who
 
 ### `DELETE /api/v1/codex/relationships/{id}`
 
-Removes one relationship edge; idempotent.
+Removes one relationship edge; idempotent. Like adding one, it counts as an edit of both endpoint pages for "recently updated" without changing either page's `rev`.
 
 **Auth:** GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
 **Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `GET /api/v1/codex/links`
+
+Every `[[wiki link]]` edge between two pages - the Graph's second edge kind, beside the typed relationships. Role-scoped by both rules the existing feeds enforce: a player sees an edge only when BOTH endpoints are revealed pages (never a dangling edge to a page they cannot see) AND only when it was written in a page's PLAYER-facing body, never its GM body. Links to a title no page carries, and a page's link to itself, carry no edge.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexLinkEdgeListData` · errors `401`
 
 ### `GET /api/v1/codex/maps`
 
@@ -2457,6 +2485,7 @@ Turns an uploaded map asset into an atlas map node.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `assetId` | string (uuid) | yes |  |
 | `name` | string | yes |  |
 | `kind` | `battlemap` \| `regional` \| `world` | yes |  |
@@ -2477,6 +2506,7 @@ Renames/retypes a map.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `name` | string | no |  |
 | `kind` | `battlemap` \| `regional` \| `world` | no |  |
 
@@ -2546,6 +2576,7 @@ Drops a marker on a map.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `x` | number (0–1000000) | yes |  |
 | `y` | number (0–1000000) | yes |  |
 | `iconId` | string (pattern) | yes |  |
@@ -2571,6 +2602,7 @@ Edits a marker's icon/label/links.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `x` | number (0–1000000) | no |  |
 | `y` | number (0–1000000) | no |  |
 | `iconId` | string (pattern) | no |  |
@@ -2627,6 +2659,30 @@ Shows/hides a marker to players.
 
 **Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
 
+### `PUT /api/v1/codex/markers/{id}/party`
+
+CT-7: marks this pin as where the party is, or clears the flag from it. **Exactly one marker in the whole atlas** carries it, so setting a new one clears the old in a single step - the party is in exactly one place, and one-pin-per-map would leave "which pin is real?" unanswerable. `isParty: false` clears the flag from THIS marker only and never disturbs a different party pin. The flag is the pin's ONLY party-specific surface: it is moved, relabelled, linked, revealed and deleted through the ordinary marker routes, because the party marker is an ordinary marker with a flag rather than a marker type of its own. It is player-facing - the party pin is for the players - but it grants no visibility: a hidden party pin, or one on a hidden map, stays hidden exactly like any other pin.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `isParty` | boolean | yes | `true` makes this the party's pin and clears the flag from whichever pin held it before, anywhere in the atlas. `false` clears it from THIS pin only and never disturbs a different party pin. |
+
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/timeline`
+
+The ONE chronicle: every journal entry and every dated `event` page, interleaved in one in-world chronological order and returned in one row shape (`kind` discriminates - `entry`, `combat`, `event`). The client's "by session" lens is a regrouping of these same records, never a second fetch. Role-scoped: a player receives only revealed entries and revealed event pages, with GM-only text (`gmText`, an event's GM body), the replay linkage and the raw sort key stripped - the projection delegates to the journal and page player projections rather than restating them, so this read can never be weaker than either.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexChronicleListData` · errors `401`
+
 ### `GET /api/v1/codex/journal`
 
 The campaign timeline, or a location's mini-timeline via `markerId`/`pageId`, role-scoped (a player only for a revealed marker/page, and only revealed entries).
@@ -2647,6 +2703,7 @@ Adds a journal/timeline entry.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `playerText` | string | no |  |
 | `gmText` | string \| null | no |  |
 | `revealedToPlayers` | boolean | no |  |
@@ -2656,6 +2713,77 @@ Adds a journal/timeline entry.
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
+
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
+
+### `POST /api/v1/codex/journal/deadline`
+
+CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the campaign clock can reach. Its own text is the "what" and its own `inWorldDate` is the "when", so a deadline stores no extra payload at all; `fired` is DERIVED from that date against the clock on every read and never stored, which is why rewinding the clock correctly un-fires one. `inWorldDate` is REQUIRED and may not be null - an undated deadline can never fire, so it is a note, not a deadline. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`: there is no kind-specific reveal and no kind-based visibility rule anywhere.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | no |  |
+| `playerText` | string | no | The deadline itself, in the party's words - a deadline IS its text, which is why it stores no separate 'what'. |
+| `gmText` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `attachMarkerId` | string \| null | no |  |
+| `attachPageId` | string \| null | no |  |
+| `sessionNumber` | integer \| null | no |  |
+| `realDate` | string \| null | no |  |
+| `inWorldLabel` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate | yes | WHEN it happens - the date the campaign clock has to reach for this to fire. Required, and never null. |
+
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
+
+### `POST /api/v1/codex/journal/downtime`
+
+CT-10: records DOWNTIME - who spent how many days doing what between adventures. Creating it NEVER moves the campaign clock; it answers with `proposedDate`, the date the clock WOULD move to, so the GM's confirm affordance can state what it will do before it does it. `POST /codex/journal/{id}/apply-downtime` is the only thing that moves the clock. Dated at the GM's current campaign date when no `inWorldDate` is given, the same rule an auto-logged battle follows, so the record lands where it happened.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | no |  |
+| `playerText` | string | no |  |
+| `gmText` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `attachMarkerId` | string \| null | no |  |
+| `attachPageId` | string \| null | no |  |
+| `sessionNumber` | integer \| null | no |  |
+| `realDate` | string \| null | no |  |
+| `inWorldLabel` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no |  |
+| `downtime` | CodexDowntimeInput | yes |  |
+
+**Responses:** `201` Success - envelope of `CodexDowntimeCreatedData` · errors `400` `401`
+
+### `POST /api/v1/codex/journal/milestone`
+
+CT-8: records a MILESTONE - the party reached a level, and why. `level` is the level REACHED, not a step, so a deleted record cannot silently change what level the party is on (a delta would make the current level a sum over the whole timeline). There is no XP: progression here is milestone-based by design and the record carries no arithmetic. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal` - there is no kind-specific reveal. Dated at the GM's current campaign date when no `inWorldDate` is given, the rule an auto-logged battle and a downtime record already follow.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | no |  |
+| `playerText` | string | no |  |
+| `gmText` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `attachMarkerId` | string \| null | no |  |
+| `attachPageId` | string \| null | no |  |
+| `sessionNumber` | integer \| null | no |  |
+| `realDate` | string \| null | no |  |
+| `inWorldLabel` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no |  |
+| `milestone` | CodexMilestoneInput | yes |  |
 
 **Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
 
@@ -2671,6 +2799,7 @@ Edits a journal entry.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `playerText` | string | no |  |
 | `gmText` | string \| null | no |  |
 | `revealedToPlayers` | boolean | no |  |
@@ -2695,7 +2824,7 @@ Deletes a journal entry; idempotent.
 
 ### `POST /api/v1/codex/journal/{id}/reveal`
 
-Shows/hides a journal entry to players.
+Shows/hides a journal entry to players. Works on EVERY journal kind, deadlines and downtime included - there is deliberately no kind-specific reveal route, because a second gate is a second thing to keep in step with the first.
 
 **Auth:** GM session
 
@@ -2709,9 +2838,250 @@ Shows/hides a journal entry to players.
 
 **Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `404`
 
+### `POST /api/v1/codex/journal/{id}/apply-downtime`
+
+Confirms a downtime record's time cost and ADVANCES the campaign clock by its `days`. The GM's explicit yes - the owner asked to be asked rather than have the clock move itself. Entry and calendar move together in one transaction and are returned together, so a client cannot render a moved clock beside an unapplied record. Applying an already-applied downtime, or any entry that is not downtime, is refused and moves nothing. Advancing the clock does NOT publish it: players keep seeing the published date until `POST /codex/calendar/publish`.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDowntimeAppliedData` · errors `400` `401` `404` `409`
+
+### `GET /api/v1/codex/sessions`
+
+Every play session - the GM's prep-and-recap record of one evening at the table. Numbered sessions first in number order, then the unnumbered ones oldest-first (the same tier-separator idiom the chronicle uses for undated records). Role-scoped: a GM receives the whole record for every session plus `activeSessionId`; a player receives only REVEALED sessions, reduced to the recap layer (`id`, `sessionNumber`, `realDate`, `recap`), and `activeSessionId` is always null for a player because it can name a session they cannot see.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexSessionListData` · errors `401`
+
+### `POST /api/v1/codex/sessions`
+
+Creates a session. Every field is optional - an empty POST opens a blank `planned` session to prep into. A `sessionNumber` another session already carries is refused with 400: the journal's by-session lens resolves a number to at most one session, so numbers are unique.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `sessionNumber` | integer \| null | no | Must not already be in use by another session. |
+| `realDate` | string \| null | no |  |
+| `attendees` | string[] | no |  |
+| `prepBody` | string | no |  |
+| `recapBody` | string | no |  |
+| `status` | `planned` \| `played` | no |  |
+| `revealedToPlayers` | boolean | no |  |
+
+**Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401`
+
+### `GET /api/v1/codex/sessions/{id}`
+
+One session, projected for the caller. An unrevealed session is **404** to a player - the same 404 an absent session gets, and never 403, because a 403 would confirm the record exists and its very existence ("session 14 is being prepped") is GM information.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `401` `404`
+
+### `PATCH /api/v1/codex/sessions/{id}`
+
+Edits a session; an omitted field is left alone. `expectedRev` rejects a stale write with 409. A `sessionNumber` another session already carries is a 400, not a 409 - it is a bad value, not a lost race.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `sessionNumber` | integer \| null | no | Must not already be in use by another session; `null` clears it. |
+| `realDate` | string \| null | no |  |
+| `attendees` | string[] | no |  |
+| `prepBody` | string | no |  |
+| `recapBody` | string | no |  |
+| `status` | `planned` \| `played` | no |  |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the session moved on. |
+
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `404` `409`
+
+### `DELETE /api/v1/codex/sessions/{id}`
+
+Deletes a session; idempotent. If it was the active session the pointer is cleared in the same transaction, so `activeSessionId` can never name a record that is gone. Journal entries that carry its `sessionNumber` are NOT deleted or renumbered - the number on an entry is a label, not a foreign key.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/sessions/{id}/reveal`
+
+Publishes/retracts a session's recap to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot light the players' recap badge for text nobody changed.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/sessions/{id}/activate`
+
+Marks this session the ACTIVE one - the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, not as a flag on each session, so "two active sessions" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE, not an edit of the record, and it moves neither `rev` nor `updatedAt` - returning the row would imply otherwise.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexSessionActiveData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/quests`
+
+Every quest - what the party is chasing, and whether it is still open. Role-scoped: a GM receives the whole record for every quest; a player receives only REVEALED quests, reduced to the player layer (`id`, `title`, `status`, `body`, `objectives`, `entityIds`). `status` IS player-facing here, unlike a session's: "what is still open" is the point of the feature, and a revealed quest whose state the player cannot see is useless. `entityIds` is filtered to the revealed subset, exactly as a marker's `pageIds` is.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexQuestListData` · errors `401`
+
+### `POST /api/v1/codex/quests`
+
+Creates a quest. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `title` | string | yes |  |
+| `status` | `active` \| `completed` \| `failed` | no |  |
+| `playerBody` | string | no |  |
+| `gmBody` | string | no |  |
+| `objectives` | CodexQuestObjective[] | no |  |
+| `entityIds` | string (uuid)[] | no |  |
+| `revealedToPlayers` | boolean | no |  |
+
+**Responses:** `201` Success - envelope of `CodexQuestData` · errors `400` `401`
+
+### `GET /api/v1/codex/quests/{id}`
+
+One quest, projected for the caller. An unrevealed quest is **404** to a player - the same 404 an absent quest gets, and never 403, because a 403 would confirm the record exists and its very existence ("there is a quest about the duke") is GM information.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `401` `404`
+
+### `PATCH /api/v1/codex/quests/{id}`
+
+Edits a quest; an omitted field is left alone. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `title` | string | no |  |
+| `status` | `active` \| `completed` \| `failed` | no |  |
+| `playerBody` | string | no |  |
+| `gmBody` | string | no |  |
+| `objectives` | CodexQuestObjective[] | no |  |
+| `entityIds` | string (uuid)[] | no |  |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the quest moved on. |
+
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `404` `409`
+
+### `DELETE /api/v1/codex/quests/{id}`
+
+Deletes a quest; idempotent. The pages named by `entityIds` are untouched - the link is a reference, not ownership.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/quests/{id}/reveal`
+
+Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot make an untouched quest look freshly changed.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/standing`
+
+CT-6: where the party stands with each faction, ROLE-SCOPED. A GM receives every standing; a player receives only those that are BOTH revealed themselves AND whose faction page is itself revealed, reduced to `factionPageId` and `value`. The second gate is not belt-and-braces: a standing row carries no title of its own (the faction's live page is the one name, so a rename cannot go stale), so a reader NAMES it by resolving `factionPageId` - and a standing published for a secret faction would hand the party a page id they cannot open beside a bar they cannot label. `value` is SIGNED, -100 (hostile) to +100 (allied), because a faction can be actively against the party and an unsigned favour scale cannot say so; a reader shows the word beside the bar, never the bar alone.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexStandingListData` · errors `401`
+
+### `PUT /api/v1/codex/standing/{factionPageId}`
+
+Sets where the party stands with one faction, and appends the `standing` chronicle record for the change - in ONE transaction, so the table (where things stand) and the timeline (what happened) can never disagree. Creates the standing on first use: `faction_page_id` is unique, so there is exactly one row per faction and nothing to create separately. `value` is the RESULTING value and is clamped to -100..100; the chronicle record carries the DELTA, because the record says what happened while the table says where things stand. 404 when no page with that id exists. **400** when the page exists but is not a `faction`: standing is tracked against factions, and the store enforces the entity type that the spec asks for as a foreign key (SQLite cannot express it - a CHECK may not subquery). The GM Codex only offers faction pages, so this is reachable mainly by a direct API caller, or by a page whose type was changed to something else after it had a standing row.
+
+**Auth:** GM session
+
+**Parameters:** `factionPageId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `value` | integer (-100–100) | yes | The new standing, SIGNED. Rejected outside -100..100 here (the client's control cannot produce a 150, so one is a malformed caller) and clamped to the same range by the store, which is the router-rejects / store-enforces arrangement every bounded field in this surface uses. |
+| `reason` | string | no | Why it moved, in one line - it lands on the `standing` chronicle record. Optional and may be empty: adjusting a standing mid-session should not be blocked on typing a sentence, and the change is recorded either way. Defaults to an empty string. |
+
+**Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/standing/{factionPageId}/reveal`
+
+Shows/hides a faction's standing to players. The ordinary reveal shape every codex record uses; revealing a standing does NOT reveal the faction page, and a player sees the standing only once both are revealed.
+
+**Auth:** GM session
+
+**Parameters:** `factionPageId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/reveal-audit`
+
+CT-9: one GM view of everything the party can currently see, across every reveal surface in the Codex - pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return - a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind's EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope - that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.
+
+**Auth:** GM session
+
+**Responses:** `200` Success - envelope of `CodexRevealAuditData` · errors `401`
+
 ### `GET /api/v1/codex/calendar`
 
-The world's calendar (months, weekdays, era, current date).
+The world's calendar (months, weekdays, era, current date), ROLE-PROJECTED. The campaign has two clocks: the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. A GM receives their own clock as `currentDate` plus `publishedDate` so they can tell whether the table is behind them; a player receives `currentDate` sourced ONLY from the published date, and never `publishedDate` (for a player the two are the same value) and never the GM's clock by any path. Months, weekdays and era are the world's own and are player-facing on both.
 
 **Auth:** GM session · Player session (own-character limits apply)
 
@@ -2719,7 +3089,7 @@ The world's calendar (months, weekdays, era, current date).
 
 ### `PUT /api/v1/codex/calendar`
 
-Replaces the world calendar.
+Replaces the world calendar and reflows every dated record's sort instant and label from the raw dates. Moves the GM's clock only: advancing NEVER publishes, so the party's `currentDate` does not move until `POST /codex/calendar/publish`. `publishedDate` is deliberately not settable here - this body replaces the whole calendar, and a player-facing value inside a wholesale replacement is one careless PUT from being cleared.
 
 **Auth:** GM session
 
@@ -2734,9 +3104,53 @@ Replaces the world calendar.
 
 **Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401`
 
+### `POST /api/v1/codex/calendar/publish`
+
+Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - "publish" means exactly "the table now sees where I am", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one. The 400 is not reachable through any input today - the handler routes every failure through the shared codex error mapper, and documenting only the statuses currently reachable would make the document wrong the moment that changes.
+
+**Auth:** GM session
+
+**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401`
+
+### `GET /api/v1/codex/settings`
+
+Every codex-WIDE setting, plus what the kept revision history COSTS (`versionCount` / `versionBytes`, both server-computed and read-only). GM-only on the read as well as the write, unlike the calendar: nothing here is player-facing - these values describe how the GM's own authoring history is kept, they gate no content, and they put nothing on a player's screen. An out-of-range or unrepresentable stored value reads back as the default rather than propagating, so this route always answers with a usable setting.
+
+**Auth:** GM session
+
+**Responses:** `200` Success - envelope of `CodexSettingsData` · errors `401`
+
+### `PUT /api/v1/codex/settings`
+
+Replaces the codex-wide settings and answers with the full READ shape (usage figures included), never with what was sent - so a caller whose `windowMinutes` was clamped or truncated sees the real value rather than believing its own number took, and needs no second request to refresh the screen. The body carries the two SETTABLE fields only: `versionCount` / `versionBytes` are facts about a table the caller cannot see, so sending either is a **400** rather than a silently ignored key, and no path stores them. `windowMinutes` outside 0..10080 is likewise a **400** (the GM's control cannot produce one, so a caller that does is malformed, which is the router-rejects / store-clamps arrangement every bounded field in this surface uses); a fractional value INSIDE the range is truncated rather than rejected, because that is a slider artefact and not a mistake about what was meant. Changing these settings never deletes a revision: switching history off stops new checkpoints being written and nothing else, and the existing history stays listable and restorable.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revisionHistory` | CodexRevisionHistoryInput | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexSettingsData` · errors `400` `401`
+
+### `DELETE /api/v1/codex/page-revisions`
+
+Deletes every page revision authored more than `olderThanDays` ago, and answers with how many rows really went. The ONE destructive route in the Codex surface, and deliberately unforgiving: `olderThanDays` must be a whole number from 0 to 36500, and a negative or fractional value is a **400** rather than a clamp - the exact opposite of `windowMinutes`, because that is a slider the GM drags while this destroys data, and a malformed destructive request must not be interpreted generously. **`0` deletes EVERY revision**, which is arithmetic rather than a magic value: nothing is younger than zero days old. "Old" is measured against `authoredAt` - when the checkpointed content was authored - which is the same clock the write-side throttle uses, so age means one thing in this store. It works regardless of the `enabled` setting, because a GM who switched history off is exactly the GM reclaiming the space. It touches the revision table and NOTHING else: no page, no body and no `rev` moves, because a page as it stands now is not a version of itself.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `olderThanDays` | integer (0–36500) | yes | Delete every revision authored more than this many days ago. **`0` deletes them all** - arithmetic, not a magic value, since nothing is younger than zero days old. A negative or fractional value is a 400 rather than a clamp, because this destroys data. The 36500 ceiling (100 years) is a guard, not a policy: a larger value pushes the cutoff date out of the representable range, which would turn a silly request into a 500. |
+
+**Responses:** `200` Success - envelope of `CodexRevisionsDeletedData` · errors `400` `401`
+
 ### `GET /api/v1/codex/export`
 
-A full codex backup bundle for round-trip.
+A full codex backup bundle for round-trip. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds.
 
 **Auth:** GM session
 
@@ -2780,6 +3194,16 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | `name` | string | yes |  |
 | `days` | integer (1–400) | yes |  |
 
+### `CodexDowntimeInput`
+
+The downtime facts themselves. `applied` is deliberately not an input: confirming the clock move is a separate, explicit act (O-3), and accepting it here would let one POST both record the week off and move the campaign clock.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `who` | string | yes | Who spent the time. May be empty: downtime is often party-wide with nobody in particular to name. |
+| `activity` | string | yes | What they did. May be empty, for the same reason as `who` - the record's prose carries it when the fields do not. |
+| `days` | integer (0–3650) | yes | The time cost in in-world days. Ten years is already well past the point where a GM would set a date instead of counting days. |
+
 ### `CodexInWorldDate`
 
 | Field | Type | Required | Notes |
@@ -2787,6 +3211,33 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | `year` | integer | yes |  |
 | `month` | integer (0–23) | yes |  |
 | `day` | integer (1–400) | yes |  |
+
+### `CodexMilestoneInput`
+
+CT-8: the milestone facts themselves. Exactly two - the spec says "milestone / level history … no XP arithmetic", so there is no XP total, no threshold and no next level.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `level` | integer (1–20) | yes | The level the party REACHED. 1-20, the repo's existing character-level bound. |
+| `reason` | string | no | Why, in one line. Optional and may be empty: "we hit 5" with the why in the record's own prose is a legitimate body, and a minimum here would reject a state the composer can reach. Defaults to an empty string. |
+
+### `CodexQuestObjective`
+
+One tickable step of a quest. Deliberately exactly two keys - a shape richer than `{ text, done }` (assignees, due dates, sub-objectives) is unapproved scope. The text is PLAYER-FACING: it lives beside `playerBody`, never beside `gmBody`, so a GM-only detail belongs in the quest's GM body and never in an objective.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `text` | string | yes | What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after "Add item" — and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state, not a malformed one. The server accepts it; this says so rather than publishing a rule it does not enforce. |
+| `done` | boolean | yes |  |
+
+### `CodexRevisionHistoryInput`
+
+The two SETTABLE revision-history knobs, and the difference between them is load-bearing: `enabled: false` writes NO new revisions at all, while `windowMinutes: 0` writes one for EVERY save. `0` is therefore not "off" - it is the behaviour every codex had before this setting existed - and the two are separate fields so nothing has to guess which a zero meant. Neither setting ever DELETES a revision: switching history off stops new checkpoints and nothing else, and the existing history stays listable and restorable, because disabling a feature must not destroy the GM's only undo. Deleting is a separate, explicit act (`DELETE /codex/page-revisions`).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `enabled` | boolean | yes | Whether a page save may write a new revision at all. Default `true` - every existing codex upgrades with history on, exactly as it was. |
+| `windowMinutes` | integer (0–10080) | yes | Coalescing window. A save whose page already has a checkpoint younger than this writes no new one, so at most this much authoring can be lost. Measured against WHEN THE CHECKPOINTED CONTENT WAS AUTHORED, not when its row was written, which is what makes the guarantee hold across an idle gap as well as during continuous work. `0` keeps every save; the 10080 ceiling is one week of minutes, past which the window stops coalescing a work session and starts meaning "keep almost nothing" - which `enabled: false` already says more honestly. The owner's default is 90. |
 
 ### `HomebrewActionOnHit`
 

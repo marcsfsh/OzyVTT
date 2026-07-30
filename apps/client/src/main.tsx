@@ -16,6 +16,7 @@ import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
 import { CodexWorkspace } from "./codex/CodexWorkspace";
 import { PlayerCodex } from "./codex/PlayerCodex";
+import { useRecapBadge } from "./codex/useRecapBadge";
 import { HomebrewPanel } from "./homebrew/HomebrewPanel";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { SceneGallery } from "./scenes/SceneGallery";
@@ -26,7 +27,7 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal, Button, Input } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal, Badge, Button, Input } from "@vtt/ui";
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
@@ -66,6 +67,8 @@ function App() {
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [playerCodexOpen, setPlayerCodexOpen] = useState(false);
+  // A Codex combat entry can jump to the archived fight it came from (GM-only; archives carry GM narration).
+  const [replayArchiveId, setReplayArchiveId] = useState<number | null>(null);
   // The character builder is a FULL PAGE (decision 4), so it replaces the app body rather than
   // floating over it in a modal — the shell's tabs and roster would otherwise scroll behind it.
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -215,6 +218,9 @@ function App() {
   };
 
   const mapToken = mode === "gm" ? gmToken : localStorage.getItem(PLAYER_TOKEN_KEY);
+  // CT-3: "a recap you haven't read". Called unconditionally (hooks rules) with a null token for the GM,
+  // where it does nothing — the badge belongs to the player's Open Codex button and to nothing else.
+  const recapBadge = useRecapBadge(mode === "player" ? mapToken : null);
   // Docking is available whenever a map is loaded (a live scene), not only once combat starts, so the
   // GM can position the tracker during encounter setup too (report #9/#6). Players' projection nulls
   // mapAssetId until combat is active, so this stays GM-side and never affects the viewer.
@@ -306,7 +312,9 @@ function App() {
         onChange={(id) => setGmTab(id as GmTab)}
       />}
 
-      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => setPlayerCodexOpen(true)}>Open Codex</Button></div>}
+      {/* CT-3: the count rides INSIDE the button, so it is part of its accessible name ("Open Codex 2
+          new") rather than a coloured dot a screen reader never reaches. Opening marks them read. */}
+      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => { recapBadge.markSeen(); setPlayerCodexOpen(true); }}>Open Codex{recapBadge.unread > 0 && <> <Badge tone="info" solid>{recapBadge.unread} new</Badge></>}</Button></div>}
       {mode === "player" && playerCodexOpen && mapToken && <Modal open onClose={() => setPlayerCodexOpen(false)} size="lg" title="Codex" ariaLabel="Codex"><PlayerCodex token={mapToken} onClose={() => setPlayerCodexOpen(false)} /></Modal>}
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
@@ -376,11 +384,13 @@ function App() {
       {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
       {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
-      {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
+      {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} openArchiveId={replayArchiveId} onOpenedArchive={() => setReplayArchiveId(null)} /></div>}
       {mode === "gm" && gmToken && gmTab === "codex" && <div className="anim-view"><CodexWorkspace gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
+        actors={(state as GmView | null)?.actors?.map((actor) => ({ id: actor.id, name: actor.name })) ?? []}
         activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
-        onActivateScene={(sceneId) => { makeSceneLive(sceneId); setGmTab("table"); }} /></div>}
+        onActivateScene={(sceneId) => { makeSceneLive(sceneId); setGmTab("table"); }}
+        onOpenReplay={(archiveId) => { setReplayArchiveId(archiveId); setGmTab("replay"); }} /></div>}
 
       {mode === "gm" && gmToken && gmTab === "homebrew" && <div className="anim-view"><HomebrewPanel gmToken={gmToken} /></div>}
 

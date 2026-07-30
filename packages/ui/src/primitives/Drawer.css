@@ -1,0 +1,104 @@
+/* Non-modal side panel — see Drawer.tsx for why this is not built on <dialog>.showModal().
+   There is deliberately NO scrim and NO backdrop rule here: dimming the view behind a
+   panel you are meant to keep using is the modal treatment this component exists to avoid. */
+.nh-drawer {
+  position: fixed;
+  /* Above menu popovers (40), below toasts (80). A modal <dialog> is in the top layer and
+     always wins, which is right: a modal question outranks a console you left open. */
+  z-index: 60;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  /* Stated rather than inherited: the /styleguide entry loads only @vtt/ui/styles.css, so
+     the app's `* { box-sizing: border-box }` is not in scope there. */
+  box-sizing: border-box;
+  width: min(24rem, 100vw);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  color: var(--text);
+  visibility: hidden;
+  /* --ease-drawer is the token minted for exactly this motion (design-tokens.css).
+     `visibility` rides the transition on purpose: it flips to visible at the START of the
+     way in and holds until the END of the way out, so a closed drawer is out of the
+     accessibility tree and unfocusable without the exit slide being cut short. Never
+     `all` (§7.2). */
+  transition:
+    translate var(--dur-base) var(--ease-drawer),
+    visibility var(--dur-base) var(--ease-drawer);
+}
+.nh-drawer--right { right: 0; translate: 100% 0; border-left: 1px solid var(--line); }
+.nh-drawer--left { left: 0; translate: -100% 0; border-right: 1px solid var(--line); }
+.nh-drawer.is-open { translate: 0 0; visibility: visible; }
+
+.nh-drawer-head {
+  /* `max-width: none` for the same reason as `.nh-modal-head`: the client's styles.css
+     carries a bare `header { max-width: 40rem }` written for its landing hero, which
+     clamps EVERY <header> in the app. A primitive must not inherit whichever element
+     selectors its host happens to define. */
+  max-width: none;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line);
+}
+.nh-drawer-title {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 400 var(--fs-h2) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+}
+
+/* 44px touch floor — design-language §4 ROUTE 2 (grow the hit AREA, not the paint), taken
+   with the shared `.tap-target` utility exactly as `.nh-modal-close` does. Route 1 was
+   rejected here for the same reason: a 44px-tall ✕ turns a one-line drawer header into a
+   chrome band, and this panel is open for long stretches beside real work.
+
+   Gap budget (route 2's obligation). Paint is 2rem = 32px, so the `::after` box overhangs
+   by (44 − 32) / 2 = 6px per side. What it can reach:
+     - the title, at `gap: var(--space-2)` = 8px ≥ 6px — and a heading is not a control, so
+       its own overhang is 0 and the required clearance is 6 + 0 = 6px;
+     - the body below, at the header's `padding-block-end: var(--space-4)` = 16px ≥ 6px at
+       every width, plus the body's own top padding (20px, 16px on the phone sheet).
+   The header holds no second control, so nothing here can steal a neighbour's tap. */
+.nh-drawer-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.nh-drawer-close:hover { color: var(--text); border-color: var(--line-strong); }
+
+.nh-drawer-body { flex: 1; min-height: 0; padding: var(--space-5); overflow-y: auto; }
+
+/* Full-width sheet at the repo's phone/tablet split. `width: min(24rem, 100vw)` alone
+   still leaves a 384px panel with a dead strip beside it on a 700px tablet, so the sheet
+   is stated rather than inferred; the side border goes with it, because an edge-to-edge
+   sheet has no edge to draw. */
+@media (max-width: 760px) {
+  .nh-drawer { width: 100vw; }
+  .nh-drawer--right { border-left: 0; }
+  .nh-drawer--left { border-right: 0; }
+  .nh-drawer-head { padding: var(--space-4); }
+  .nh-drawer-body { padding: var(--space-4); padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
+}
+
+/* The global reduced-motion rule already collapses the duration; state the cut here so a
+   later edit to the transition above cannot quietly reintroduce a slide. */
+@media (prefers-reduced-motion: reduce) {
+  .nh-drawer { transition: none; }
+}

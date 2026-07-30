@@ -8,6 +8,45 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-29 — Codex Phase 4 M9–M11 (`claude/codex-phase-4-m9-54sebz`)
+
+Sessions/prep/recap (M9), quests (M10), and deadlines/downtime with a private prep clock (M11).
+1331 tests, up from 1196 at the start. Built by layer-split agents (store / server boundary / client)
+against a frozen contract per milestone, then integrated and verified by the Director.
+
+**Seven owner decisions were settled**, four in M9 and three in M11: no backfill of legacy session
+numbers; an active session; players can read a quest; a session's number is hidden until it is
+revealed; the GM gets a **private prep clock** (players keep the old date until it is published);
+deadlines and downtime are hidden-but-revealable like anything else; and downtime **proposes** a date
+the GM confirms rather than moving the clock itself.
+
+**The spec was wrong in two load-bearing places, and only checking found it.** M11 is described as
+"one additive column"; the journal table has rejected every kind but `note` and `combat` since
+migration v1, and SQLite cannot widen a CHECK in place — so M11 rebuilds the table. The same section
+calls the calendar reflow the programme's sharpest risk; the reflow reads only the calendar's *shape*,
+so moving the date rewrites every dated record with identical values. Both established by running SQL,
+not by reading it.
+
+**What testing missed, and why.** The client suite mocks the server and the server suite writes its
+own request bodies, so a request the app sends and the server rejects passes both — that seam hid a
+downtime state reachable in one click that failed with a raw 400. The API-contract test compares the
+served document to the package copy, so **both** can drift from the code they describe; one such drift
+shipped and was caught only by reading the schema beside it. And the M11 implementation contract itself
+mandated a viewer-safety leak (a player-facing "fired" flag derived from the GM's private clock) while
+forbidding it two sections later — both server agents caught that independently.
+
+**Adversarial review earned its place again.** It found a HIGH defect nothing else had: editing a
+deadline could clear its date, leaving a record that reads "Approaching" forever and can never fire —
+two clicks from the Journal, past a create-path guard that had always been there. Plus a silent
+regression where a *new* campaign's first date never reached players. Both reproduced through the real
+routes before fixing, and both fixed with the leak direction mutation-proven.
+
+Follow-ups in `known-bugs.md`: the client's date arithmetic can drift a day from the server's in one
+edge case (harmless today, still drives the timeline's Today marker); `apps/client/test/setup.ts` sits
+outside the tsconfig and is never typechecked; migration v15's failure mode is total rather than
+partial; a calendar reshape can flip a revealed deadline back to "Approaching". M12 and a three-lens
+final QA remain.
+
 ## 2026-07-27 — Homebrew content system (`claude/dndbeyond-sheet-importer-0k6u2e`)
 
 Eleven commits, ~15k lines. A GM can author, publish and play nine content types. Built by a staged

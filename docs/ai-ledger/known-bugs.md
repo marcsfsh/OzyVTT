@@ -10,6 +10,195 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex/ux] Three friction points from the final QA pass still open (2026-07-30).** Seven were raised; the
+  owner ruled on four (see `decision-log.md` 2026-07-30) and those are fixed. These three were not ruled on
+  and remain design calls rather than defects:
+  1. **The four new dashboard cards do not show reveal state** while the two older ones do (Atlas and
+     Recently updated show "Shown" / "Hidden"). A hidden deadline and a shared one render identically — on
+     the same screen as a feature premised on reveal state mattering.
+  2. **Reveal audit: Hide is one-way, and one tap can remove two rows.** Hiding a faction page also removes
+     its standing (correctly — the standing is only visible while its page is), with nothing on screen saying
+     so, and no way back from where you hid it. The file argues against a bulk un-hide on safety grounds; the
+     same argument applies to one mis-tap on a 20-row list.
+  3. **The Faction standing card is unbounded and 3 rows tall per faction**, listing every faction page
+     whether rated or not, sitting 4th of 9 sections. Deliberately unsliced (it is the only place standing is
+     adjusted), but a campaign with 25 factions buries everything below it.
+  Also still open: the session console is a full-screen takeover at ≤384px, which undercuts its "consult prep
+  while browsing" rationale on a phone.
+
+  _Fixed 2026-07-30 and removed from this list:_ the silent deadline-firing on downtime confirm; the same
+  record appearing twice on the dashboard; "Show the pin" not showing the pin; publishing giving no
+  confirmation; audit rows not naming their kind; and "GM only" meaning two different things on one row.
+
+- **[codex/export] `GET /codex/export` has no restore path (2026-07-30).** The bundle was completed on the
+  owner's decision (calendar, folders, page revisions), so it is a complete *record* of a codex — but
+  **nothing reads it back**. The Codex's "Import" button imports markdown files as pages, one per file; there
+  is no `importBundle`, no import route, and no consumer of the bundle anywhere in the repo, so restoring
+  means hand-editing the sqlite file. `CodexExportData`'s description ("round-trips via the codex import
+  surface") is aspirational.
+
+  _The size half of this entry is resolved:_ revision history is no longer unbounded — migration v17 added a
+  global switch and a coalescing window (90 minutes by default), and `DELETE /codex/page-revisions` trims
+  what already exists. A codex that keeps every save can still reach the measured 20.8 MB, and `express`
+  buffers the response, so a large bundle is still one synchronous `JSON.stringify` on the GM's backup path.
+
+- **[codex/history] Nothing coalesces or prunes a page's revisions RETROACTIVELY (2026-07-30).** The window
+  applies to new saves only, so a codex that accumulated hundreds of rows per page before v17 keeps them
+  until the GM trims from Codex settings. That is deliberate — silently deleting history on upgrade would be
+  the destructive act the whole design avoids — but it means the default 90-minute window does not shrink an
+  existing codex by itself, and a GM who never opens the settings screen will not discover the trim.
+
+- **[repo/tooling] The committed tap audit cannot see five of the surfaces this programme added.** Its
+  `MODES` loop visits the five mode tabs only, and switching mode closes the destinations — so the Sessions
+  log, Quests log, Reveal audit, session console drawer and standing dialog have never appeared in a reported
+  number. The final QA pass measured all five separately (0 sub-floor, 0 stolen taps at 375 and 320), but the
+  script should learn the ops row so the claim stays checkable without hand-written harnesses.
+
+- **[codex/ui] A closed session-console drawer inflates `document.body.scrollWidth`.** `position: fixed;
+  translate: 100%` stretches the initial containing block, so `scrollWidth` reads 1648 at a 1280 viewport and
+  `innerWidth` reads 734 on a 375px phone. **Inert for users** — `canScrollRightBy: 0`, visual viewport scale
+  1, drawer `visibility: hidden`, and the only stretched element is `.app-texture` (`z-index: -1`,
+  `pointer-events: none`). But it desynchronises `getBoundingClientRect` from synthesized input coordinates,
+  which produced two convincing false findings (a "broken" mobile pin drag, an "unreachable" drawer close)
+  before the reviewer caught it. Anyone writing automated mobile tests against this app will hit it.
+
+- **[codex/audit] A revealed unnumbered session with an empty recap renders a blank audit row.** Same defect
+  the M12 remediation fixed for journal rows with `AUDIT_JOURNAL_FALLBACK`, left in place one arm over
+  (`codex-projections.ts`, the session arm). A row with a Hide button and no label, on the screen whose job is
+  saying what the party can see.
+
+- **[codex/search] Four of the five arms of `projectPlayerSearchHit` have no test that fails when broken.**
+  Measured: making the page, journal, map or marker arm unconditionally visible leaves all 224 codex tests
+  passing; only the quest arm fails. The SQL layer IS covered, which is exactly why the projection's gate is
+  never exercised over HTTP — `PLAYER_VISIBLE_SQL` filters the ids first. M10 applied the direct-unit-test
+  discipline to the arm it added and never retrofitted the four older ones, while the file claims "Each is
+  tested at its own layer for exactly that reason." Not a live leak; a load-bearing gate with no alarm on it,
+  and the M6 lesson recurring in the mirror direction. (The journal arm now delegates to
+  `projectPlayerJournalEntry`, so it is covered — the other three are not.)
+
+- **[codex/realtime] The `codex:changed` ping tells every player which KIND of record the GM is working on.**
+  Measured on a real player socket while the GM created three entirely unrevealed records: `scope: "sessions"`,
+  then `"quests"`, then `"journal"`. No content leaks. But the homebrew notifier eight lines below refuses to
+  do this on stated principle — "telling players which kind of thing the GM is working on … is a small leak of
+  GM intent" — and M9/M10 added `sessions` and `quests` to that union. Two adjacent notifiers, opposite rules.
+
+- **[codex/store] A page that HAD standing and is re-typed away from `faction` keeps its standing row.**
+  `setStanding` now requires `entity_type = 'faction'` only to CREATE a row, not to update one, and the
+  Campaign card lists any page that already has a row whatever its type is now — otherwise the GM had a
+  player-visible number they could neither edit nor reach (verified through the real routes before the fix).
+  What remains: a standing row can sit against a character or location page if the GM re-types one. Harmless
+  and repairable (zero it, unreveal it, or delete the page), but the data model no longer guarantees what the
+  spec asks for. The stricter alternative — refusing to demote a faction that has standing — was rejected as
+  the worse trade: it blocks an ordinary edit to protect a rule nothing depends on.
+
+- **[repo/tooling] `apps/server/test/**` is not typechecked by anything.** `apps/server/tsconfig.json` is
+  `"include": ["src"]`, so `npm run check` sees no server test file. There are **41 pre-existing type errors**
+  across nine non-codex test files (`character-build` 14, `combat-rules-regression` 9,
+  `viewer-presentation` 8, …), and M12 briefly added four more to M11's downtime assertions that no command
+  in the repo would have reported. Found by an agent typechecking with a temporary config. Fixing the 41 is
+  its own job; the gap itself is worth knowing about before trusting "check is clean" for a test-only change.
+
+- **[codex/client] `clampStanding(Infinity)` returns 0, not 100.** `Math.trunc(Infinity)` is not finite, so
+  a non-finite value falls through to the `Uninvested` centre rather than the `Exalted` end. Not reachable
+  from the bounded number input; documented as intentional in the helper. Recorded because "an overflowing
+  control lands on neutral" is a surprising failure direction if it ever becomes reachable.
+
+- **[codex/audit] The published campaign date is not in the reveal audit.** It is a player-visible thing the
+  GM publishes (M11's O-1), and the audit lists seven record kinds and not that. Contract-compliant — the
+  seven kinds were frozen deliberately — but a GM asking "what can they see?" may reasonably expect the
+  party's current date to be on that list. Raised by adversarial review as a scope observation, not a defect.
+
+- **[codex] Renumbering a session orphans its entries and republishes numbers the player gate was
+  hiding — OPEN, awaiting an owner decision (2026-07-29, found by M9's correctness review).** The join
+  between a session record and its journal entries is the **number**, not the id, and `updateSession`
+  does not touch `codex_journal`. So: create session #4, leave it unrevealed, play — entries are stamped
+  4 and correctly show players nothing. Then correct the record's number to 5. No record now claims 4,
+  the gate's third rule ("no record → unchanged") applies, and **every one of those revealed entries
+  starts showing "Session 4" to players again**. The by-session lens simultaneously loses the group, and
+  the new #5 has no entries under it.
+  The **delete** case behaves the same way but is deliberate and documented in three places ("the number
+  on an entry is a label, not a foreign key"); the **renumber** case is documented nowhere and tested
+  nowhere. Options for the owner: (1) propagate a renumber to the entries carrying the old number;
+  (2) refuse to renumber a session that has entries; (3) accept and warn in the editor, as delete does.
+
+- **[codex] The Graph's sub-floor node count is data-dependent, not 3.** `known-bugs` has recorded "the
+  Graph's 3 remain by design" since Stage Six. Measured against a populated database (10 pages) the audit
+  reports **30** — the nodes are 36–40px and there is one entry per node element, so the figure scales
+  with the campaign. The design decision is unchanged; the number is not a constant and should not be
+  quoted as one.
+
+- **[tooling] `scripts/tap-audit.mjs` could not be run as committed — FIXED 2026-07-29.** It hardcoded
+  `http://localhost:5173/` and the password `testpassword123`, and navigated by `text=Codex`, which
+  matches any ancestor containing the word and timed out with "&lt;main&gt; intercepts pointer events". Every
+  run in M9 and M10 needed a hand-patched copy, which defeats the point of committing it. Now takes
+  `AUDIT_URL` / `AUDIT_PASSWORD` (defaults unchanged, so the documented `npm run dev` invocation still
+  works), selects tabs by role, forces the two navigation clicks the combat roster intercepts, and
+  **throws rather than measuring a surface it failed to reach** — a silent zero is worse than a loud
+  failure. Verified end to end against `npm run start` on :3001 with env vars only, no edits.
+
+- **[tooling] The audit's "taps stolen" column reported 7 false positives — FIXED 2026-07-29.** The
+  outward walk was capped at 30 steps, so reach could never exceed 61px; every control TALLER than 61px
+  was therefore flagged unconditionally — 5 Campaign type cards (64px) and 2 Journal composer textareas
+  (72px), on every run against a populated database. The walk is now bounded by the control's own size.
+  This is the second arithmetic defect found in that predicate; the first was fixed in Stage Six.
+
+- **[tooling] The tap audit over-reported label-wrapped controls — FIXED 2026-07-29 (M10).** A checkbox
+  painting 20×20 inside a 44×44 `&lt;label&gt;` was reported sub-floor, though a tap anywhere in the label
+  activates it — verified by walking `elementFromPoint` outward, which reached 44px in both axes. Both
+  the size calculation and the reach walk now treat a wrapping label as the control. M10's objective
+  checklist was the first label-wrapped control in the Codex, so the blind spot had never fired before.
+  **A false violation is worse than none: it sends the next session to "fix" working code.**
+
+- **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — OPEN,
+  awaiting an owner decision (2026-07-29, M9).** Reproduced live: a GM creates session 4, leaves it
+  unrevealed and activates it; any revealed journal entry written during play carries `sessionNumber: 4`
+  to the player, who sees "Session 4", while their session list shows only `[3]` and a direct fetch of
+  session 4 is 404. Content never travels — no prep, attendees or recap — only the ordinal and the fact
+  that the session exists.
+  **Not a new channel:** `sessionNumber` was already in the player journal projection before M9
+  (`7e6480d:183`, and in the pre-M9 exact-key-set assertion). What M9 changed is that the number now
+  arrives *automatically*, where a GM previously had to type it.
+  **Why it is still worth a decision:** the routes go to real trouble to return 404-not-403 on an
+  unrevealed session and to null `activeSessionId` for players, both on the stated grounds that a
+  session's existence is GM information. Auto-linking routes around that.
+  Options put to the owner: (1) accept, and soften the 404-not-403 rationale so it stops over-claiming;
+  (2) null `sessionNumber` in the player projection when a real session record exists for it and is
+  unrevealed — legacy numbers with no record behind them unaffected, so nothing that works today changes;
+  (3) do not auto-link to an unrevealed session — rejected in advance, it breaks the prep workflow the
+  feature exists for.
+
+- **[codex] `.codex-back` ("‹ All pages" / "‹ All sessions") is sub-floor** — 13px text with no
+  `min-height`. Pre-existing; M9 reuses it for the session log rather than adding a third variant.
+  Widening it also unclamps other surfaces, so it wants its own pass.
+
+- **[tooling] `apps/server/test/homebrew-http.test.ts`'s per-path mount probe is vacuous.** It asserts the
+  router's own headers prove a path is mounted; because `router.use(...)` is declared with no path and the
+  router mounts bare, those headers come back for *any* path — measured, `/completely/unrelated/path`
+  returns 404 carrying both. Its path-set assertion is sound; only the probe loop proves nothing. Left
+  alone as another milestone's file; the Codex equivalent added in M9 reads Express's route table instead.
+
+- **[codex] `GET /codex/export` documents a round-trip that does not exist.** `CodexExportData` is
+  described as "round-trips via the codex import surface", but no route ingests a bundle — the client's
+  Import reads `.md`/`.txt` files and creates pages. The export is a one-way backup. Pre-existing.
+
+- **[mobile] The encounter *replay viewer* overflows horizontally at 390px (~99px).** **Pre-existing, not
+  introduced by the Codex overhaul** — proven by measuring both paths at 390px: opening a replay via the
+  existing "▶ Watch" button on the Replays list (`ReplayPanel.tsx:221`) gives the same 99px as arriving via
+  the new Codex "Open replay" link. The Replays *list* itself is clean (0px), as are all Codex surfaces.
+  `ReplayPanel`/`ReplayViewer` is a combat-pillar surface and outside the Codex overhaul's approved scope,
+  so M2 deliberately did not fix it. Worth noting that M2 makes the screen considerably easier to reach.
+
+- **[ux] The marker inspector is dominated by the icon picker.** Measured live at 1440px: the inspector is
+  a 300px rail whose icon grid occupies roughly the first 500px, so every *functional* control — linked
+  pages, drill-into map, linked scenes, and (new in M1) linked actor at y≈1082 and the journal readback at
+  y≈1188 — sits far below the fold. Pre-existing; M1's two additions lengthen it by ~130px rather than
+  causing it. **Deliberately not fixed in M1**, whose scope is giving built capabilities an entry point, not
+  redesigning the inspector. Candidate fixes (collapse the picker, or order links above it) are a design
+  decision for the Codex overhaul's M5/design pass, not a side-effect of wiring.
+  **Status after M5:** still open. M5's scope was the 44px floor and the narrow-viewport gaps, both of
+  which the inspector now meets; re-ordering or collapsing the icon picker is a layout redesign that was
+  not part of the approved milestone. Carrying forward.
+
 - **[character-builder] Phase-2 gating items found by the requirements QA pass (2026-07-26).** The
   Phase-1 foundation is sound, but three things must land before wizard screens are built:
   1. **`fromCatalog` has no resolver.** Ten catalog slugs are authored on feature choices
@@ -220,6 +409,109 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   Found by architecture review 2026-07-18. **Mitigated 2026-07-18:** the VTT Setup credential
   form no longer offers the field, so the footgun is API-only; the contract keeps accepting it
   for now.
+
+- **[codex/ux] Switching a page's entity type silently drops the old type's field values.** Since M5 the
+  server prunes fields to the effective type (CD-2), and `PageEditor` filters the draft the instant the
+  GM picks a new type — with no confirmation. Switching to `note`, which carries no fields at all, wipes
+  every value. The data **is** recoverable: every save snapshots into `codex_page_revisions`, which is
+  never trimmed, so page History restores the old type together with its values. But a GM who doesn't
+  know to look there will read it as data loss. Raised by the M5 review; a confirmation step is a UX
+  addition beyond CD-2's approved scope, so it is recorded here rather than built.
+
+- **[ui/touch] `TagInput`'s chip ✕ violates §4's gap budget vertically when the chip row wraps — but no
+  tap theft could be demonstrated.** `.nh-taginput-tags` gaps by `--space-2` (8px) and a chip is 24px
+  tall, so wrapped rows sit **32px** apart centre-to-centre while each `.nh-chip-remove` carries a 44px
+  `::after`. Rows therefore overlap by ~12px, which `design-language.md` §4 forbids: it reasons only
+  about *horizontal* neighbours ("consecutive ✕s are a whole chip apart") and never considers the wrap
+  case. Reported by an implementation agent as a measured 34px reach on the last chip of a wrapped row.
+  **I could not reproduce that number**: my probe measured 45px on all seven ✕s across four wrapped rows,
+  and the decisive functional test — a real `touchscreen.tap` 10px *above* a second-row chip's ✕ —
+  removed that chip's own tag, not the row above's. The likely reason there is no theft in practice is
+  that chips are horizontally offset, so the ✕ boxes seldom align vertically. Pre-existing since M4
+  (`PageEditor`); CI-2 widens the exposure to four surfaces. **Deliberately not fixed**: the fix lives in
+  `packages/ui/src/primitives/TagInput.css` and would change chip-cloud density for Homebrew as well as
+  the Codex — a shared-primitive visual change, outside CI-2's approved scope and not justified by an
+  unreproduced measurement. If it is taken up, the fix is `row-gap: var(--space-5)` (20px → exactly 44
+  centre-to-centre; go one step further given the M5 sub-pixel lesson) plus a `/styleguide` case that
+  actually wraps.
+
+- **[codex/store] Migration v15 is not idempotent, and its failure mode is "the codex will not open".**
+  Re-running it (only reachable if its `codex_schema_migrations` row is lost) aborts on
+  `ALTER TABLE codex_meta ADD COLUMN published_year` → `duplicate column name`. **Verified**: deleting the
+  v15 row from a healthy database and re-initializing throws, and the file is left fully intact — no data
+  loss, no stray `codex_journal_new`, all indexes present. Every migration in the file behaves this way
+  (none use `IF NOT EXISTS`), so this is consistent rather than new; v15 is simply the first whose failure
+  is total rather than partial. The version INSERT is inside the same transaction as the migration, so a
+  crash can never record a migration that did not run. Left as-is because making one migration idempotent
+  and not the rest would be the worse inconsistency.
+
+- **[codex/chronicle] A calendar reshape can flip a revealed deadline's state from "Passed" back to
+  "Approaching".** `fired` derives from `calendar_instant`, which is recomputed from the raw date on every
+  calendar write; `normalizeCalendar` clamps a date's month into the new month count. **Verified**: a
+  deadline dated month 1, day 25 has instant 89574; shrinking the calendar to a single month clamps it to
+  44784, and a deadline the party had seen pass reads as approaching again. The raw date is preserved
+  correctly and the reflow is doing exactly what K3 specifies — the flip is inherent to deriving `fired`
+  rather than storing it (D11-C), which remains the right trade. Recorded because nothing else says so,
+  and because a GM who reshapes their calendar mid-campaign will see it.
+
+- **[codex/client] The client's `dateToInstant` does not clamp the day to its month's length; the
+  server's `calendarInstantOf` does.** `normalizeCalendar` stores a `currentDate` day above the month's
+  length verbatim (it clamps only at the bottom), so the state is reachable, and the two then disagree by
+  a day. **Measured, not theorised**: with the clock on day 31 of a 30-day month, a 5-day downtime has the
+  server landing on Alturiak 5 while unclamped client arithmetic reaches Alturiak 6. M11 is not exposed —
+  `downtimeProposedDate` hand-clamps before calling it, and the Confirm row now names the server's date
+  regardless — but `dateToInstant` still drives the timeline's Today marker and its year grouping, which
+  are unclamped. The real fix is to clamp inside `dateToInstant` itself (or to clamp `currentDate`'s day
+  in `normalizeCalendar`, which is the lossy write underneath). Both change existing behaviour beyond
+  M11's scope, so both were deliberately left.
+
+- **[repo/tooling] `apps/client/test/setup.ts` is outside the client tsconfig and is never typechecked.**
+  `tsconfig.app.json` includes `src`, and every client test lives in `src/codex/` — so test files *are*
+  checked (confirmed: widening the M11 types produced 14 errors across seven existing test files). But
+  the shared setup file is not: appending `const deliberate: number = "not a number";` to it produced no
+  error from `tsc`. Anything that moves into that file is invisible to `npm run check`.
+
+- **[RESOLVED 2026-07-29 by M11 / owner decision O-1] The campaign's current in-world date reaches
+  players, and always has.** The open product question this entry raised — "if a GM is meant to be able to
+  run the campaign clock ahead of the party while prepping, `currentDate` needs a server-side gate, and no
+  such gate exists today" — was put to the owner, who chose a private prep clock. `GET /codex/calendar` is
+  now role-projected: the GM's `currentDate` is their own clock, players receive the separately stored
+  published date, and publishing is an explicit act. Backfilled from `currentDate`, so nothing visibly
+  changed for an existing campaign. Original entry kept below for its reasoning.
+
+- **[codex/viewer] The campaign's current in-world date reaches players, and always has.** M7's Campaign
+  dashboard shows a "Now: …" chip to players as well as the GM. That is **not** a new exposure:
+  `GET /api/v1/codex/calendar` (`codex-http.ts:522`) returns `store.getCalendar()` **unprojected to any
+  authenticated role**, and it predates M7 — the dashboard only surfaces what the server already sent.
+  It is also consistent with the `inWorldLabel` every revealed journal entry already carries. Recorded
+  because there is a real product question underneath: **if a GM is meant to be able to run the campaign
+  clock ahead of the party while prepping, `currentDate` needs a server-side gate**, and no such gate
+  exists today. Raised by the M7 implementer rather than decided unilaterally. Not a leak of GM-only
+  content as the system is currently specified; revisit if prep-ahead becomes a supported workflow.
+
+- **[codex/graph] Framing orphans can, in principle, compress a dense graph enough for M5's tap cap to
+  bind — not reproduced.** CI-8 changed the auto-fit to frame every node, including unconnected ones
+  (before, an orphan sat outside the viewBox with an effective hit area of **zero**). The implementer
+  disclosed a trade-off: on a 4-node layout at 375px the tighter fit put two nodes 28.7px apart on
+  screen, so M5's nearest-neighbour cap correctly refused to give both a 44px area, and they measured
+  28.7px. **CORRECTION (Stage Six): it reproduces, and my non-reproduction was a coverage failure.**
+  I first recorded this as *not reproduced* — I had seeded only 5 nodes (3 orphans) and measured all 5 at
+  **44.7px**, inside the frame. The final QA pass, against a populated database, measured **3 of 8 nodes at
+  17.1–17.6px** at 375px, and I confirmed it independently after remediation: Pages and Atlas went to zero
+  sub-floor controls while the Graph's 3 remained. Five nodes simply do not cluster tightly enough to bind
+  the cap. This is the same lesson as the tap audit itself — the measurement was right, its coverage was not.
+  **Still deliberately not fixed**, and the reason is stronger than convenience: the cap is precisely what
+  stops two nodes ~17px apart from being handed overlapping 44px areas, which would trade a small *visible*
+  target for an invisible **wrong-node** tap. Removing it makes the graph worse, not better. The real fixes
+  — more spacing in `computeLayout`'s force simulation, or a zoom-to-fit floor — change every existing
+  layout and belong to their own change. Zoom already recovers it: 1× → 28.7px, 1.56× → 44.7px for every
+  node.
+
+- **[codex/graph] The node hover/focus ring paints on the invisible 44px hit circle.** `.codex-graph-node.is-hover circle`
+  and `:focus-visible circle` are unscoped, so they stroke *every* circle in the node group — including
+  M5's transparent hit circle, which is far larger than the painted node. Pre-existing (M5 added the hit
+  circle; these rules predate it), spotted during M7. CI-8's new `.is-focus` rule scopes itself off the
+  hit circle correctly, so the pattern to copy is already in the file.
 
 ## Gotchas that look like bugs (but aren't)
 

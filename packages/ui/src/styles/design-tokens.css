@@ -207,7 +207,14 @@
   --magenta: #C81D80;
   --magenta-hi: #E24C9C;
   --cyan: #0F7FC0;      /* blue-leaning cyan, never teal */
-  --cyan-hi: #2AA0DE;
+  /* On dark/dusk a `-hi` variant is the LIGHTER twin, because "readable" there means
+     lighter than the surface. On light it has to invert — the readable twin is the
+     DEEPER one — which is what `--violet-hi` below already does. `--cyan-hi` followed
+     the dark convention instead and shipped at #2AA0DE: 2.48:1 on --surface-3, failing
+     AA everywhere it is used as text in this theme. The most consequential instance was
+     the Codex "Shown" reveal badge — the marker that answers "can my players see this?"
+     — so this is now the deep twin, ≥5.18:1 on every light surface incl. --void. */
+  --cyan-hi: #0B6497;
   --violet: #7A3FD0;
   --violet-hi: #7A3FD0; /* keep deep for text contrast on light */
   --indigo: #3D50D6;
