@@ -209,7 +209,21 @@ export type PlayerCodexJournalEntry = Readonly<{
  * `projectPlayerQuest` shape verbatim, because a projection that reached back into the store would be a
  * second place that decides what a player may see.
  */
-export type PlayerSessionNumberContext = Readonly<{ unrevealedSessionNumbers: ReadonlySet<number> }>;
+/** The quietest possible default for an unsupplied revealed-page set: nothing is revealed, so no id travels. */
+const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
+
+/**
+ * What a player journal read needs resolved before anything can be projected. Both members are facts only
+ * the store can answer; the projection decides who may see the answer.
+ *
+ * `revealedPageIds` is optional and defaults to EMPTY, which fails CLOSED: a caller that forgets it hides
+ * standing records rather than publishing them. It became part of this context (rather than the chronicle's
+ * alone) when the standing gate moved onto `projectPlayerJournalEntry` — see `playerStandingVisible`.
+ */
+export type PlayerSessionNumberContext = Readonly<{
+  unrevealedSessionNumbers: ReadonlySet<number>;
+  revealedPageIds?: ReadonlySet<string>;
+}>;
 
 /**
  * A player's copy of an entry's `sessionNumber`: null when a session record EXISTS with that number and is
@@ -230,6 +244,30 @@ export type PlayerSessionNumberContext = Readonly<{ unrevealedSessionNumbers: Re
  *   - record exists and is NOT revealed -> null. The only case that changes.
  * The GM projection never consults this at all.
  */
+/**
+ * A `standing` record is about a faction PAGE, so it is only player-visible when that page is.
+ *
+ * This lives here, on the entry projection, rather than on the chronicle — and that placement is the whole
+ * point. M12 first put it in `projectPlayerChronicleRecord`, which gated `GET /codex/timeline` and left the
+ * other three player journal surfaces open: `GET /codex/journal`, player search, and the reveal audit (which
+ * used `/codex/journal` as its own oracle, so the audit and its test agreed while both disagreed with the
+ * chronicle). A revealed standing record for a secret faction reached the party there — its existence, its
+ * in-world date, and, once the GM added prose or a tag, its searchable text. Found by the final QA pass and
+ * reproduced through the real routes.
+ *
+ * `projectPlayerJournalEntry` is the ONE projection all four surfaces delegate to, so a gate here cannot be
+ * forgotten by a fifth. That is the same reasoning `playerSessionNumber` below is built on.
+ *
+ * Absent context means nothing is revealed, which fails closed: a caller that forgets to resolve the page
+ * set hides standing records rather than publishing them.
+ */
+function playerStandingVisible(row: CodexJournalRow, context: PlayerSessionNumberContext): boolean {
+  if (row.kind !== "standing") return true;
+  const payload = row.payload;
+  const faction = payload !== null && "delta" in payload ? payload.factionPageId : null;
+  return faction !== null && (context.revealedPageIds ?? EMPTY_PAGE_IDS).has(faction);
+}
+
 function playerSessionNumber(sessionNumber: number | null, context: PlayerSessionNumberContext): number | null {
   if (sessionNumber === null) return null;
   return context.unrevealedSessionNumbers.has(sessionNumber) ? null : sessionNumber;
@@ -238,6 +276,7 @@ function playerSessionNumber(sessionNumber: number | null, context: PlayerSessio
 export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry { return row; }
 export function projectPlayerJournalEntry(row: CodexJournalRow, context: PlayerSessionNumberContext): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
+  if (!playerStandingVisible(row, context)) return null;
   return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: playerSessionNumber(row.sessionNumber, context), realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
 }
 
@@ -509,8 +548,6 @@ function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | nul
     case "note": case "combat": case "deadline": return null;
   }
 }
-/** The quietest possible default for an unsupplied revealed-page set: nothing is revealed, so no id travels. */
-const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
 /**
  * The player half. Explicit allow-list per kind, never a spread-and-delete: a field added to any stored
  * payload must be added HERE to reach a player, so the default for anything new is secret. `applied` is the
@@ -717,11 +754,6 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
      * 'Hunted' would tell the table that something they have never been told about is hunting them"). The
      * two surfaces now agree, which is the point.
      */
-    if (record.entry.kind === "standing") {
-      const payload = record.entry.payload;
-      const faction = payload !== null && "delta" in payload ? payload.factionPageId : null;
-      if (faction === null || !(context.revealedPageIds ?? EMPTY_PAGE_IDS).has(faction)) return null;
-    }
     // O-2: NO kind filter here or anywhere. A deadline and a downtime are gated by the ordinary reveal flag
     // - the one `projectPlayerJournalEntry` just applied - and by nothing else, so a revealed deadline is
     // exactly as visible as a revealed note. `payload` still rides through the per-kind allow-list.
@@ -862,7 +894,8 @@ export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
  * null when this record is not player-visible - the audited gate. The predicate per kind is COPIED
  * from that kind's player LIST endpoint and must never be weaker, or search becomes the leak:
  *   page    -> `projectPlayerPage(Summary)`: revealed only.
- *   journal -> `projectPlayerJournalEntry`: revealed only, and the excerpt reads `playerText` ALONE.
+ *   journal -> DELEGATES to `projectPlayerJournalEntry` (reveal flag AND M12's standing/faction gate),
+ *              and the excerpt reads `playerText` ALONE.
  *   map     -> `projectPlayerMap`: revealed only.
  *   marker  -> `projectPlayerMarker` PLUS the map gate `GET /codex/maps/:id/markers` applies before
  *              projecting anything (CD-6): a revealed pin on a secret map is invisible to players.
@@ -875,12 +908,19 @@ export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
  * weakening the SQL predicate left every test passing because THIS function quietly caught it - which is
  * also true in reverse. Each is tested at its own layer for exactly that reason.
  */
-export function projectPlayerSearchHit(record: CodexSearchRecord): CodexSearchHit | null {
+export function projectPlayerSearchHit(record: CodexSearchRecord, context: PlayerSessionNumberContext): CodexSearchHit | null {
   switch (record.kind) {
     case "page":
       return record.page.revealedToPlayers ? { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null } : null;
     case "journal":
-      return record.entry.revealedToPlayers ? { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText), tags: record.entry.tags, entityType: null, mapId: null } : null;
+      // Delegates rather than restating: `projectPlayerJournalEntry` owns BOTH the reveal flag and the
+      // standing/faction gate, so this arm cannot drift from the list endpoint it is copied from. Search
+      // was one of the three surfaces that leaked a secret faction's standing record while this arm read
+      // `revealedToPlayers` alone — and a searchable row is the worst place for it, since the GM can add
+      // prose and a tag to that record through the ordinary journal PATCH.
+      return projectPlayerJournalEntry(record.entry, context) === null
+        ? null
+        : { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText), tags: record.entry.tags, entityType: null, mapId: null };
     case "map":
       return record.map.revealedToPlayers ? { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null } : null;
     case "marker":

@@ -1443,6 +1443,35 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
     // The GM still has it, so the absence above is the gate and not a missing record.
     expect(JSON.stringify(await body(await get(base, "/api/v1/codex/timeline", GM)))).toContain("Paid the toll");
 
+    /**
+     * The SAME record, on every OTHER player journal surface. This is the half that shipped broken.
+     *
+     * M12 put the standing/faction gate on `projectPlayerChronicleRecord`, so `/codex/timeline` was closed
+     * and `GET /codex/journal`, player search and the reveal audit were not. The audit even used
+     * `/codex/journal` as its own oracle, so the audit and its test agreed while both disagreed with the
+     * chronicle. Worse, the GM can add prose and a tag to a standing record through the ordinary journal
+     * PATCH, which made the secret faction's name searchable by the party.
+     *
+     * The gate now lives on `projectPlayerJournalEntry` — the one projection all four surfaces delegate to —
+     * so this asserts all four, and the PATCH-then-search path specifically.
+     */
+    const playerJournal = await body(await get(base, "/api/v1/codex/journal", PLAYER));
+    expect(JSON.stringify(playerJournal)).not.toContain("Paid the toll");
+    expect((playerJournal.data.entries as Json[]).some((row) => row.kind === "standing")).toBe(false);
+
+    // Give the record prose and a tag, exactly as a GM would, then search as a player.
+    await patch(base, `/api/v1/codex/journal/${secretRecord.id}`, GM, { playerText: "The Zhentarim have marked you.", tags: ["zhent"] });
+    for (const term of ["Zhentarim", "zhent", "marked"]) {
+      const hits = (await body(await get(base, `/api/v1/codex/search?q=${term}`, PLAYER))).data.hits as Json[];
+      expect(hits.filter((hit) => hit.kind === "journal"), `player search for "${term}"`).toEqual([]);
+    }
+    // The GM can still find it, so the empty player results above are the gate and not a tokenizer artifact.
+    expect(((await body(await get(base, "/api/v1/codex/search?q=Zhentarim", GM))).data.hits as Json[]).length).toBeGreaterThan(0);
+
+    // And the audit agrees with the chronicle rather than with the surface that used to leak.
+    const auditSections = (await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit.sections as Json[];
+    expect(JSON.stringify(auditSections.find((s) => s.kind === "journal"))).not.toContain("Zhentarim");
+
     // CT-7 / CD-6: the party pin, revealed, on a HIDDEN map.
     const secretMap = await makeMap(base, "The Under-dark", false);
     const shownMap = await makeMap(base, "Barovia", true);

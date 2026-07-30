@@ -344,7 +344,18 @@ function pageRevealedFor(store: CodexStore, pageId: string): boolean {
  * alone. A GM read never calls it - the GM projection is not gated.
  */
 function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
-  return { unrevealedSessionNumbers: store.unrevealedSessionNumbers() };
+  // `revealedPageIds` rides along because `projectPlayerJournalEntry` needs it to gate a `standing`
+  // record against its faction page. Resolved HERE, once, so every player journal read — the timeline,
+  // `GET /codex/journal`, the per-page and per-marker mini-timelines, search and the reveal audit — is
+  // gated by construction rather than by each route remembering. The gate used to live on the chronicle
+  // alone, and the three surfaces that did not go through it leaked.
+  // The candidate set is the factions standing is tracked against — one row per faction, so this is small
+  // and precise rather than "every revealed page". A standing record whose faction page was deleted has no
+  // candidate at all and is therefore hidden, which is the right answer.
+  return {
+    unrevealedSessionNumbers: store.unrevealedSessionNumbers(),
+    revealedPageIds: revealedPageIdsIn(store, store.listStanding().map((row) => row.factionPageId))
+  };
 }
 
 export function createCodexRouter(options: CodexRouterOptions) {
@@ -397,10 +408,14 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = roleOf(request);
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to search the codex.");
     const query = typeof request.query.q === "string" ? request.query.q : "";
+    // Resolved before the map so it is computed once per request, not once per hit. Built for both
+    // roles rather than conditionally: it is two cheap reads, and a `null` here would only push the
+    // branch into the projection call below, where forgetting it is a leak rather than a type error.
+    const playerContext = playerSessionNumbers(store);
     const hits = store.searchAll(role, query)
       .map((ref) => loadSearchRecord(store, ref))
       .filter((record) => record !== null)
-      .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record)))
+      .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record, playerContext)))
       .filter((hit) => hit !== null);
     return envelope(response, 200, { hits });
   });
