@@ -38,12 +38,22 @@ type MapSurfaceProps = Readonly<{
   placing: boolean;
   selectedMarkerId: string | null;
   readOnly?: boolean;
+  /**
+   * A request to bring ONE pin into view (`ux-principles.md` §9 — actions name their result). The camera
+   * lives in here, so a caller cannot move it; it asks, and this honours the ask once per request.
+   *
+   * Deliberately separate from `selectedMarkerId`: selecting a pin the GM just tapped must NOT yank the
+   * camera out from under their finger, so centring is only ever what somebody explicitly asked for.
+   */
+  centerOnMarkerId?: string | null;
+  /** Clears the request above (the same handled-latch shape the journal's `openEntryId` uses), so the same pin can be asked for again. */
+  onCentered?: () => void;
   onBackgroundClick: (point: { x: number; y: number }) => void;
   onMarkerClick: (markerId: string) => void;
   onMarkerDragEnd: (markerId: string, point: { x: number; y: number }) => void;
 }>;
 
-export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, readOnly = false, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
+export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, readOnly = false, centerOnMarkerId = null, onCentered, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
   const image = useAuthorizedMapImage(assetId, token);
   const svgRef = useRef<SVGSVGElement>(null);
   const gesture = useRef<Gesture>({ mode: "idle" });
@@ -56,6 +66,27 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
 
   // Fit the map when it loads (center, zoom 1 = whole image in view via preserveAspectRatio).
   useEffect(() => { if (image.status === "ready") setCamera({ cx: image.width / 2, cy: image.height / 2, zoom: 1 }); }, [image.status, assetId]);
+
+  /**
+   * Honour a centring request: move the camera to the pin, at the zoom the GM is already on.
+   *
+   * The zoom is deliberately untouched. At zoom 1 the whole image is in view, so centring is a no-op there
+   * and nothing is lost; the case this exists for is a GM who has zoomed and panned somewhere else, and
+   * re-scaling their map to "help" would be the surface overruling a choice they made deliberately.
+   *
+   * Waits for `image.status === "ready"`, because until then there is no camera to move and the fit effect
+   * above would overwrite it the moment there was.
+   */
+  const centeredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!centerOnMarkerId) { centeredRef.current = null; return; }
+    if (image.status !== "ready" || centeredRef.current === centerOnMarkerId) return;
+    const target = markers.find((marker) => marker.id === centerOnMarkerId);
+    if (!target) return;
+    centeredRef.current = centerOnMarkerId;
+    setCamera((prev) => ({ cx: target.x, cy: target.y, zoom: prev?.zoom ?? 1 }));
+    onCentered?.();
+  }, [centerOnMarkerId, markers, image.status, onCentered]);
 
   const viewBox = camera && width
     ? `${camera.cx - width / (2 * camera.zoom)} ${camera.cy - height / (2 * camera.zoom)} ${width / camera.zoom} ${height / camera.zoom}`

@@ -5,7 +5,7 @@ import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkK
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView } from "./JournalView";
-import { campaignDeadlines, chronicleWhenLabel, chronicleRowSummary } from "./chronicle";
+import { DASHBOARD_CARDED_KINDS, campaignDeadlines, chronicleWhenLabel, chronicleRowSummary } from "./chronicle";
 import { CommandPalette } from "./CommandPalette";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
@@ -45,6 +45,7 @@ const CONSOLE_KEY = "codex-session-console";
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 type WorkspaceActor = Readonly<{ id: string; name: string }>;
+
 export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {}, onOpenReplay }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; actors?: readonly WorkspaceActor[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void }>) {
   // CI-7: `world` is `campaign`. The mode is not persisted anywhere (no localStorage key, no URL), so
   // the rename needs no migration — but it IS the union the mode bar, the palette's goto targets and
@@ -229,10 +230,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    * blank row on the GM's own dashboard.
    */
   const campaignEntries = useMemo<readonly CampaignEntry[]>(() => [...campaign.records]
-    // CT-11: dated `event` pages share the chronicle but not this list, exactly as on the player's
-    // dashboard — the section is "Recent journal activity" and its rows open the Journal by entry id,
-    // while an event is a wiki page already counted in the entity totals above.
-    .filter((record) => record.kind !== "event")
+    // OWNER DECISION (2026-07-30): a record that has a card of its own on this dashboard does NOT appear in
+    // the feed as well — one deadline used to be two rows on one screen, badged "Approaching" in the card
+    // and "Deadline" here. Which kinds, and why each, is settled once in `DASHBOARD_CARDED_KINDS`; the
+    // player's dashboard applies the same set, because it renders the same cards.
+    .filter((record) => !DASHBOARD_CARDED_KINDS.has(record.kind))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((record) => ({ id: record.id, summary: chronicleRowSummary(record), when: chronicleWhenLabel(record), kind: record.kind })), [campaign.records]);
   /**

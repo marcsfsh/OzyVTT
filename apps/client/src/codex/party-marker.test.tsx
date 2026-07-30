@@ -127,6 +127,52 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
   });
 });
 
+/**
+ * "Show the pin" has to SHOW the pin (`ux-principles.md` §9 — actions name their result). Fixed 2026-07-30.
+ *
+ * It used to call `setSelectedMarkerId` alone: that opens the inspector and rings the pin, neither of which
+ * helps when the pin is outside the current view, and on a phone the map is usually below the fold from the
+ * row the button sits on. So the tap now does both halves — the surface centres its camera on the pin, and
+ * the map is scrolled into the page's own viewport.
+ *
+ * The camera is asserted through the `viewBox`, which is pure state → attribute with no layout in it, so it
+ * is one of the few things about this surface a jsdom test can honestly prove (`test/setup.ts` is explicit
+ * that pointer geometry is not). `scrollIntoView` is a no-op shim there, so the second half is asserted as
+ * a call rather than as a scroll position.
+ */
+describe("Show the pin shows the pin (ux-principles §9)", () => {
+  // The mocked image is 1000×800, and the surface fits it at zoom 1 with the camera at its centre —
+  // `viewBox = "cx - w/2  cy - h/2  w  h"`, so (500, 400) reads as "0 0 1000 800".
+  const FIT = "0 0 1000 800";
+  const svg = () => document.querySelector(".codex-map-svg")!;
+
+  it("centres the camera on the party pin and brings the map into view", async () => {
+    const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
+    // Deliberately NOT the centre of the map: a camera that never moved would still read as fitted.
+    await renderAtlas([MARKER({ isParty: true, x: 100, y: 200 })]);
+    const user = userEvent.setup();
+    expect(svg()).toHaveAttribute("viewBox", FIT);
+
+    await user.click(screen.getByRole("button", { name: "Show the pin" }));
+
+    // Centred on (100, 200) at the same zoom: 100 − 500 = −400, 200 − 400 = −200.
+    await waitFor(() => expect(svg()).toHaveAttribute("viewBox", "-400 -200 1000 800"));
+    expect(scrolled).toHaveBeenCalled();
+    scrolled.mockRestore();
+  });
+
+  it("does not yank the camera when the GM merely taps a pin", async () => {
+    await renderAtlas([MARKER({ isParty: true, x: 100, y: 200 })]);
+    const user = userEvent.setup();
+
+    // Selecting is not a centring request. A surface that moved the camera on selection would pull the map
+    // out from under the GM's finger every time they opened a pin's inspector.
+    await user.click(document.querySelector('[data-marker-id="k1"]')!);
+
+    expect(svg()).toHaveAttribute("viewBox", FIT);
+  });
+});
+
 describe("One party pin for the whole atlas (M12-C)", () => {
   it("marks a pin as the party through its own route, and re-reads the map's pins", async () => {
     await renderAtlas([MARKER()]);

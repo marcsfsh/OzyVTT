@@ -449,7 +449,7 @@ export function CampaignHome({
               <button key={map.id} type="button" className="codex-campaign-recentitem" onClick={() => onOpenMap(map.id)}>
                 <CodexIcon iconId="compass" className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{map.name}</span>
-                {showReveal && (map.revealedToPlayers ? <Badge tone="success">Shown</Badge> : <Badge>GM only</Badge>)}
+                {showReveal && (map.revealedToPlayers ? <Badge tone="success">Shown</Badge> : <Badge>Hidden</Badge>)}
               </button>
             ))}
           </nav>

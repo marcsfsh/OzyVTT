@@ -28,7 +28,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { RevealAudit } from "./RevealAudit";
-import type { CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "./api";
+import type { CodexJournalKind, CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "./api";
 
 /**
  * M12 / CT-9 — the reveal audit on the client.
@@ -52,8 +52,12 @@ import type { CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } 
 
 const KINDS: readonly CodexRevealAuditKind[] = ["page", "map", "marker", "journal", "session", "quest", "standing"];
 
-const section = (kind: CodexRevealAuditKind, rows: Array<{ id: string; title: string }>, total = rows.length): CodexRevealAuditSection =>
-  ({ kind, revealed: rows.length, total, rows: rows.map((row) => ({ kind, ...row })) });
+/**
+ * `journalKind` defaults to null — the value every non-journal row carries, and present rather than absent
+ * because the row is one uniform shape (see the type). A journal row that wants a kind passes one.
+ */
+const section = (kind: CodexRevealAuditKind, rows: Array<{ id: string; title: string; journalKind?: CodexJournalKind }>, total = rows.length): CodexRevealAuditSection =>
+  ({ kind, revealed: rows.length, total, rows: rows.map((row) => ({ kind, journalKind: null, ...row })) });
 
 /**
  * Wraps a section list into the whole answer, deriving the codex-wide totals the way the SERVER does.
@@ -116,6 +120,52 @@ describe("The audit lists every Codex record type (CT-9)", () => {
     await renderAudit();
     expect(screen.getByText(/Codex records only/)).toBeInTheDocument();
     expect(screen.getByText(/Tokens, fog and the shared table view/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * A chronicle row on this surface must say WHICH kind of record it is (fixed 2026-07-30).
+ *
+ * One journal table carries six kinds, so the section is headed "Chronicle records" — and until this, a
+ * revealed deadline and a revealed note read identically the moment either had prose of its own. The
+ * server's `AUDIT_JOURNAL_FALLBACK` names the kind only for a record with NO player text, which is the
+ * silent minority. "Is that deadline visible?" is the question this whole screen exists to answer.
+ *
+ * `journalKind` is a FIELD and the client badges it, never a prefix parsed out of `title`: R2 is that a kind
+ * reads by icon and label, and a title with "Deadline: " glued on could not be told from a GM who genuinely
+ * began a note with that word.
+ */
+describe("A chronicle row says which kind of record it is", () => {
+  it("badges the kind, in the chronicle's own words, beside the record's own prose", async () => {
+    await renderAudit(answer([
+      ...KINDS.filter((kind) => kind !== "journal").map((kind) => section(kind, [])),
+      section("journal", [
+        { id: "j1", title: "The duke's ultimatum expires.", journalKind: "deadline" },
+        { id: "j2", title: "The party crossed the mists.", journalKind: "note" }
+      ], 40)
+    ]));
+
+    const chronicle = within(sectionOf("Chronicle records"));
+    // "Deadline" and "Entry" — the timeline's own labels, so a row here says what the same record says
+    // there. `note` reads as "Entry": the DB's word and the chronicle's differ by exactly that one, and
+    // `CHRONICLE_KIND_META["note"]` does not exist, so crossing that gap by hand would throw on the most
+    // common kind of all.
+    expect(chronicle.getByText("Deadline")).toBeInTheDocument();
+    expect(chronicle.getByText("Entry")).toBeInTheDocument();
+    // The prose is still the row's own; the badge is beside it, not instead of it.
+    expect(chronicle.getByText("The duke's ultimatum expires.")).toBeInTheDocument();
+  });
+
+  it("badges nothing on the six kinds that are not journal records", async () => {
+    await renderAudit();
+    // `journalKind` is present-and-null on those rows, so a naive truthiness read would be fine — but a
+    // section that grew a badge would be claiming a page or a map is a kind of chronicle record.
+    for (const heading of ["Pages", "Maps", "Map pins", "Session recaps", "Quests", "Faction standing"]) {
+      const rows = within(sectionOf(heading));
+      for (const label of ["Entry", "Battle", "Deadline", "Downtime", "Milestone", "Standing"]) {
+        expect(rows.queryByText(label), `${heading} should carry no ${label} badge`).not.toBeInTheDocument();
+      }
+    }
   });
 });
 

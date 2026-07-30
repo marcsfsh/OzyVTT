@@ -198,6 +198,55 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
   });
 
   /**
+   * OWNER DECISION (2026-07-30): the confirm names what the clock move would COST, not only where it lands.
+   *
+   * Measured before this existed: a 7-day confirm moved the clock 16→23 and flipped two deadlines to
+   * "Passed" with no notice anywhere — the GM found out by going back to the dashboard. A deadline exists
+   * precisely because it happens whether or not the party acts, which makes the instant the clock jumps
+   * over it the instant the GM most needs to know.
+   *
+   * The fixture is built so a wrong implementation gives a wrong NUMBER rather than merely a wrong row:
+   * counting everything gives 4, ignoring `fired` gives 3, comparing `<` instead of `<=` gives 1.
+   */
+  it("says how many deadlines confirming would pass", async () => {
+    await renderJournal([
+      DOWNTIME,                                                                     // proposes Hammer 10
+      DEADLINE,                                                                     // Hammer 10 — exactly the landing day, counts
+      RECORD({ kind: "deadline", id: "d2", text: "The caravan leaves.", fired: false,
+        inWorldLabel: "Hammer 5, 1492 DR", calendarInstant: 1492 * 60 + 4, inWorldDate: { year: 1492, month: 0, day: 5 } }),
+      RECORD({ kind: "deadline", id: "d3", text: "The tax was due.", fired: true,    // already passed — not caused by this
+        inWorldLabel: "Hammer 2, 1492 DR", calendarInstant: 1492 * 60 + 1, inWorldDate: { year: 1492, month: 0, day: 2 } }),
+      RECORD({ kind: "deadline", id: "d4", text: "Midwinter.", fired: false,         // beyond the landing day
+        inWorldLabel: "Alturiak 20, 1492 DR", calendarInstant: 1492 * 60 + 49, inWorldDate: { year: 1492, month: 1, day: 20 } })
+    ]);
+    const row = within(rowOf("w1"));
+
+    expect(row.getByText("Advance the campaign clock to Hammer 10, 1492 DR — this passes 2 deadlines.")).toBeInTheDocument();
+  });
+
+  /** One is "1 deadline", not "1 deadlines" — the sentence is read mid-session, at speed. */
+  it("counts one deadline in the singular", async () => {
+    await renderJournal([DOWNTIME, DEADLINE]);
+    expect(within(rowOf("w1")).getByText("Advance the campaign clock to Hammer 10, 1492 DR — this passes 1 deadline.")).toBeInTheDocument();
+  });
+
+  /**
+   * Zero says NOTHING, rather than "this passes 0 deadlines".
+   *
+   * The clause is a warning. A campaign with no deadlines would otherwise carry it on every downtime it ever
+   * logs, and a warning that is always present is one the GM stops reading — which costs the real case the
+   * only notice it gets.
+   */
+  it("adds no clause when the move passes nothing", async () => {
+    await renderJournal([DOWNTIME, RECORD({ kind: "deadline", id: "d5", text: "Midwinter.", fired: false,
+      inWorldLabel: "Alturiak 20, 1492 DR", calendarInstant: 1492 * 60 + 49, inWorldDate: { year: 1492, month: 1, day: 20 } })]);
+    const row = within(rowOf("w1"));
+
+    expect(row.getByText("Advance the campaign clock to Hammer 10, 1492 DR")).toBeInTheDocument();
+    expect(row.queryByText(/deadline/)).not.toBeInTheDocument();
+  });
+
+  /**
    * The Confirm sentence names the SERVER's date, not a second local computation of it.
    *
    * The client can do this arithmetic and for the composer's live preview it must — no record exists yet

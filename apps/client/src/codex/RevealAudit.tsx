@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, codexApi, journalApi, questApi, revealAuditApi, sessionApi, standingApi, type CodexRevealAudit, type CodexRevealAuditKind, type CodexRevealAuditSection } from "./api";
-import { CHRONICLE_KIND_META } from "./chronicle";
+import { CHRONICLE_KIND_META, chronicleKindOfJournal } from "./chronicle";
 import { CodexIcon } from "./icons";
 
 /**
@@ -189,6 +189,21 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
                          `.codex-audit-row` carries `min-height`, and the button inside it is `Button` at
                          its DEFAULT size — 44px of real paint and no `::after` at all. */
                       <div key={`${kind}:${row.id}`} className="codex-audit-row">
+                        {/* WHICH kind of chronicle record this is — the fix for the one thing this screen
+                            could not say. The section heading is "Chronicle records" because one journal
+                            table carries six kinds, so a revealed deadline and a revealed note read
+                            identically here the moment either had prose of its own — on the surface whose
+                            entire job is answering "is that deadline visible?".
+
+                            Badged, never parsed out of `title`: R2 is that a kind reads by icon AND label,
+                            and `title` is the record's own prose whenever it has any. The words and the tone
+                            come from the chronicle's OWN kind vocabulary, so a row here says what the same
+                            record says on the timeline. `journalKind` is present-and-null on the other six
+                            audit kinds, so this needs no per-section branch. */}
+                        {row.journalKind && (() => {
+                          const journalMeta = CHRONICLE_KIND_META[chronicleKindOfJournal(row.journalKind)];
+                          return <Badge tone={journalMeta.tone}>{journalMeta.label}</Badge>;
+                        })()}
                         <span className="codex-list-title">{row.title}</span>
                         <Button variant="ghost" disabled={busyId === `${kind}:${row.id}`}
                           aria-label={meta.hideLabel(row.title)} onClick={() => hide(kind, row.id)}>

@@ -3127,3 +3127,87 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
     await store.initialize();
   });
 });
+
+/**
+ * The three keys `exportBundle` was missing until 2026-07-30 (owner decision), each asserted for the
+ * FACT THAT EXISTS NOWHERE ELSE - which is the whole reason each had to join the bundle:
+ *
+ *  - the calendar: without it a restore re-derives every `calendarInstant` against the default 12x30
+ *    calendar, silently re-dating a campaign that uses any other one.
+ *  - an EMPTY folder: a folder that still holds pages is re-derivable from `codex_pages.folder`; an
+ *    emptied one is remembered by `codex_folders` alone, so a restore was deleting the GM's filing.
+ *  - revision history: the codex's only undo. `codex_page_revisions` is written by every page save and
+ *    read by nothing else, so a bundle without it restores a history one revision deep.
+ *
+ * These are store-level on purpose. `GET /codex/export` returns the bundle verbatim and its contract
+ * component is `additionalProperties: true` (an opaque blob), so an HTTP test can only re-assert what is
+ * checked here - the layer that decides what is IN the bundle is this one.
+ */
+describe("CodexStore export bundle — the calendar, empty folders and revision history (2026-07-30)", () => {
+  it("carries the CALENDAR, and keeps the GM's clock distinct from the published one", () => {
+    // A deliberately non-default calendar: two 10-day months. If the bundle omits it, a restore re-derives
+    // every instant against 12x30 and every dated record lands somewhere else.
+    store.setCalendar({ yearName: "AR", months: [{ name: "Frost", days: 10 }, { name: "Thaw", days: 10 }], weekdays: ["Firstday"], currentDate: { year: 1492, month: 1, day: 4 } });
+    store.publishCampaignDate();
+    // The GM's clock then runs AHEAD, unpublished - the state O-1 exists to keep private.
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1493, month: 0, day: 9 } });
+
+    const bundle = store.exportBundle();
+    expect(bundle.calendar.yearName).toBe("AR");
+    expect(bundle.calendar.months).toEqual([{ name: "Frost", days: 10 }, { name: "Thaw", days: 10 }]);
+    // The two clocks are two separate facts, and the bundle carries both without conflating them: a
+    // restore that read the party's date off `calendar.currentDate` would jump them a year forward.
+    expect(bundle.calendar.currentDate).toEqual({ year: 1493, month: 0, day: 9 });
+    expect(bundle.publishedDate).toEqual({ year: 1492, month: 1, day: 4 });
+  });
+
+  it("carries an EMPTY folder, the one part of the GM's filing nothing else remembers", () => {
+    const page = store.createPage({ title: "Village of Barovia", folder: "Barovia/Villages" });
+    store.createFolder("Barovia/Ruins");                          // never held a page at all
+    store.updatePage(page.id, { folder: null }, undefined, "gm"); // and now this one is empty too
+
+    const bundle = store.exportBundle();
+    expect(bundle.pages.find((row) => row.id === page.id)!.folder).toBeNull();
+    // Neither path is derivable from any page's `folder` any more - `codex_folders` is the only witness.
+    expect(bundle.folders).toEqual(expect.arrayContaining(["Barovia", "Barovia/Ruins", "Barovia/Villages"]));
+  });
+
+  it("carries EVERY page's revision history, with the snapshot columns a restore needs", () => {
+    const page = store.createPage({ title: "Strahd", entityType: "character", fields: { race: "Vampire" }, gmFields: { goals: "Reclaim Tatyana" }, playerBody: "A count.", gmBody: "The darklord." });
+    store.updatePage(page.id, { title: "Strahd von Zarovich", playerBody: "A count of Barovia." }, undefined, "gm");
+    const other = store.createPage({ title: "Ireena" });
+
+    const bundle = store.exportBundle();
+    // Both pages' histories in ONE list, regroupable by `pageId` - the reason the export read is not per
+    // page the way `listRevisions` is.
+    expect(new Set(bundle.revisions.map((row) => row.pageId))).toEqual(new Set([page.id, other.id]));
+    const history = bundle.revisions.filter((row) => row.pageId === page.id);
+    expect(history.map((row) => row.rev)).toEqual([1, 2]);                 // ascending: a history, not a feed
+    expect(history[0]).toMatchObject({ title: "Strahd", playerBody: "A count.", gmBody: "The darklord." });
+    expect(history[1].title).toBe("Strahd von Zarovich");
+    /**
+     * The three snapshot columns `GET /codex/pages/{id}/revisions` does not send. `restoreRevision` reads
+     * exactly these plus the wire row, so a bundle without them holds a history that restores a page's
+     * prose and silently drops its typed fields - the same bug the gmFields export guard above exists for.
+     */
+    expect(history[0].entityType).toBe("character");
+    expect(history[0].fields).toEqual({ race: "Vampire" });
+    expect(history[0].gmFields).toEqual({ goals: "Reclaim Tatyana" });
+    // And the WIRE row is unchanged by that: `listRevisions` still serves exactly the contract's ten keys.
+    expect(Object.keys(store.listRevisions(page.id)[0]).sort())
+      .toEqual(["authorTag", "authoredAt", "bannerAssetId", "gmBody", "id", "pageId", "playerBody", "rev", "tags", "title"]);
+  });
+
+  /**
+   * The function's own three-times-stated convention: a new key is APPENDED so no existing key moves. A
+   * consumer reads this bundle by key, so this is not about JSON ordering for its own sake - it is the
+   * guard that stops a future fifth-time addition being slipped into the middle of the record.
+   */
+  it("appends the three keys LAST, leaving the previous eleven in their established order", () => {
+    expect(Object.keys(store.exportBundle())).toEqual([
+      "pages", "maps", "markers", "journal", "relationships", "sessions", "activeSessionId", "quests",
+      "publishedDate", "standing", "partyMarkerId",
+      "calendar", "folders", "revisions"
+    ]);
+  });
+});

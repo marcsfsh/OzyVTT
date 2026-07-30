@@ -50,6 +50,20 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
   const [currentMapId, setCurrentMapId] = useState<string | null>(null);
   const [markers, setMarkers] = useState<CodexMarker[]>([]);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  /**
+   * "Show the pin" must SHOW the pin (`ux-principles.md` §9). It used to call `setSelectedMarkerId` alone,
+   * which opens the inspector and rings the pin — neither of which helps if the pin is off the current view,
+   * and on a phone the map itself is usually below the fold from this row. So the tap does both halves now:
+   * this asks the surface to centre its camera (`MapSurface.centerOnMarkerId`), and the ref below brings the
+   * map into the page's own viewport.
+   */
+  const [centerOnMarkerId, setCenterOnMarkerId] = useState<string | null>(null);
+  const mapBodyRef = useRef<HTMLDivElement>(null);
+  const showPin = (markerId: string) => {
+    setSelectedMarkerId(markerId);
+    setCenterOnMarkerId(markerId);
+    mapBodyRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
   const [placing, setPlacing] = useState(false);
   const [picking, setPicking] = useState(false);
   // A new map nests under the map you're looking at by default; turning this off makes a second ROOT map,
@@ -282,15 +296,16 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
       {partyMarker && (
         <div className="codex-atlas-party">
           <span className="codex-atlas-partytext">The party is on this map{partyMarker.label ? <> — <strong>{partyMarker.label}</strong></> : null}.</span>
-          <Button variant="ghost" onClick={() => setSelectedMarkerId(partyMarker.id)}>Show the pin</Button>
+          <Button variant="ghost" onClick={() => showPin(partyMarker.id)}>Show the pin</Button>
         </div>
       )}
 
       {error && <Alert tone="danger">{error}</Alert>}
 
-      <div className="codex-atlas-body">
+      <div className="codex-atlas-body" ref={mapBodyRef}>
         {currentMap
           ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
+              centerOnMarkerId={centerOnMarkerId} onCentered={() => setCenterOnMarkerId(null)}
               onBackgroundClick={placeMarker} onMarkerClick={setSelectedMarkerId} onMarkerDragEnd={moveMarker} />
           : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}

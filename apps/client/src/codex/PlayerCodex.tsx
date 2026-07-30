@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Checklist, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
 import { formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession, type PlayerCodexStanding } from "./api";
-import { CHRONICLE_KIND_META, campaignDeadlines, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeSummaryLabel, milestoneOf, milestoneSummaryLabel, standingChangeLabel, standingOf } from "./chronicle";
+import { CHRONICLE_KIND_META, DASHBOARD_CARDED_KINDS, campaignDeadlines, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeSummaryLabel, milestoneOf, milestoneSummaryLabel, standingChangeLabel, standingOf } from "./chronicle";
 import { pickNextSession } from "./sessions";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
 import { CodexIcon } from "./icons";
@@ -212,8 +212,12 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
     // `kind === "combat" ? "combat" : "note"` — the same collapse that made a new record kind cost zero
     // compile errors on the server and render as the wrong thing; with deadlines and downtime on this
     // feed it would have drawn both as ordinary notes on the player's own dashboard.
+    // OWNER DECISION (2026-07-30): the same de-duplication the GM's dashboard applies, from the same shared
+    // set — this surface renders the SAME `CampaignHome` with the same Deadlines and Faction standing cards,
+    // so a revealed deadline was two rows on a player's screen too. Strictly narrowing, so it cannot widen
+    // what a player can see; the records themselves are still the server's revealed-only projection.
     () => timeline
-      .filter((record) => record.kind !== "event")
+      .filter((record) => !DASHBOARD_CARDED_KINDS.has(record.kind))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((record) => ({ id: record.id, summary: record.text, when: chronicleWhenLabel(record), kind: record.kind })),
     [timeline]

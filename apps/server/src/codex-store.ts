@@ -88,6 +88,17 @@ export type CodexPageRevisionRow = Readonly<{
   authorTag: string;
 }>;
 
+/**
+ * A revision as the BACKUP BUNDLE carries it: the wire row plus the three snapshot columns `restoreRevision`
+ * needs and `GET /codex/pages/{id}/revisions` does not send (see `listAllRevisions` for why the endpoint's
+ * row cannot simply grow). A superset, never a parallel shape - one mapper produces the shared part.
+ */
+export type CodexPageRevisionExportRow = CodexPageRevisionRow & Readonly<{
+  entityType: CodexEntityType;
+  fields: Readonly<Record<string, string>>;
+  gmFields: Readonly<Record<string, string>>;
+}>;
+
 export type CodexBacklinkRow = Readonly<{
   sourcePageId: string;
   sourceTitle: string;
@@ -1085,6 +1096,17 @@ function pageDateOf(row: Pick<PageRow, "in_world_year" | "in_world_month" | "in_
     : null;
 }
 type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
+/**
+ * The revision columns `CodexPageRevisionRow` is made of, named once for the same reason PAGE_COLUMNS is:
+ * two reads share them (`listRevisions` per page, `listAllRevisions` for the backup) and a column added to
+ * the row type must not be able to land in one SELECT and be forgotten in the other.
+ */
+const REVISION_COLUMNS = "id, page_id, rev, title, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag";
+type RevisionRowRaw = { id: number; page_id: string; rev: number; title: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string; authored_at: string; author_tag: string };
+/** The ONE mapping of a `codex_page_revisions` row, so the per-page read and the backup read cannot disagree. */
+function toRevision(row: RevisionRowRaw): CodexPageRevisionRow {
+  return { id: row.id, pageId: row.page_id, rev: row.rev, title: row.title, playerBody: row.player_body, gmBody: row.gm_body, bannerAssetId: row.banner_asset_id, tags: JSON.parse(row.tags_json) as string[], authoredAt: row.authored_at, authorTag: row.author_tag };
+}
 type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; tags_json: string; created_at: string; updated_at: string };
 const MAP_COLUMNS = "id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at";
 type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_ids_json: string | null; sub_map_id: string | null; scene_ids_json: string | null; actor_id: string | null; tags_json: string; is_party: number; created_at: string; updated_at: string };
@@ -1902,7 +1924,7 @@ export class CodexStore {
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
-  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[]; publishedDate: CodexInWorldDate | null; standing: CodexStandingRow[]; partyMarkerId: string | null }> {
+  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[]; publishedDate: CodexInWorldDate | null; standing: CodexStandingRow[]; partyMarkerId: string | null; calendar: CodexCalendar; folders: string[]; revisions: CodexPageRevisionExportRow[] }> {
     const pages = (this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
@@ -1920,10 +1942,10 @@ export class CodexStore {
     // jumped forward to wherever the GM's prep had reached. A downtime's `payload` needs no key of its own:
     // it rides on the journal rows this already carries, because it is a field on the entry.
     //
-    // The bundle still omits the CALENDAR ITSELF, which predates M11 and is left alone here rather than
-    // fixed opportunistically - it is a real gap (a restored codex re-derives every instant against the
-    // default 12x30 calendar), but it is not this milestone's, and widening the bundle is a change every
-    // consumer of `GET /codex/export` sees.
+    // The bundle omitted the CALENDAR ITSELF until 2026-07-30 (CLOSED below), which predated M11 and was
+    // left alone at the time rather than fixed opportunistically - it was a real gap (a restored codex
+    // re-derives every instant against the default 12x30 calendar), but it was not that milestone's, and
+    // widening the bundle is a change every consumer of `GET /codex/export` sees.
     //
     // M12, fourth time, same reason: `codex_standing` is a table of its own and exists nowhere else, so a
     // bundle without it restores a codex where every faction is silently back at Neutral - and the
@@ -1932,10 +1954,38 @@ export class CodexStore {
     // `isParty`, and it is here anyway: it is the one fact in this bundle that is an atlas-wide SINGLETON,
     // so a reader can check it directly instead of scanning every pin on every map and hoping exactly one
     // comes back. Both appended LAST so no existing key moves.
+    //
+    // 2026-07-30, fifth time and the last of the known gaps - the owner approved closing all three at once,
+    // so the paragraph above is now history rather than a standing caveat. Same reason as every entry above:
+    // each of these exists NOWHERE ELSE in the bundle, so a restore that lacks it is quietly wrong rather
+    // than obviously broken. Appended LAST, in this order, so no existing key moves.
+    //
+    //  - `calendar` is the gap the M11 paragraph named. `getCalendar()` rather than the raw `calendar_json`
+    //    column, for three reasons: every other key here is a mapped ROW and not a stored blob, so a JSON
+    //    STRING would be the one key a reader has to parse twice; the getter normalizes and falls back to
+    //    the default 12x30 calendar, which is exactly the calendar an unset column's instants were computed
+    //    against, so writing it explicitly records what the bundle's own `calendarInstant` values MEAN
+    //    rather than leaving the reader to guess; and it is the same read every other consumer of the
+    //    calendar uses, so the backup cannot drift from the app. `publishedDate` stays its own key and is
+    //    NOT duplicated in here: `calendar.currentDate` is the GM's clock and `publishedDate` is the
+    //    party's, and D11-H is that the two are separate facts (see `getPublishedDate`).
+    //  - `folders` is `codex_folders`, whose whole purpose is the EMPTY folder (v9): a folder that still
+    //    holds pages is re-derivable from `codex_pages.folder`, an empty one is derivable from nothing at
+    //    all. Without this key, restoring a backup silently deletes every folder the GM had emptied but
+    //    kept - the one part of their filing that only this table remembers.
+    //  - `revisions` is `codex_page_revisions`, the codex's only undo. Every page save snapshots the prior
+    //    state there and nothing else does, so a bundle without it restores a codex whose entire history
+    //    is one revision deep. It is the ONE key here that DOMINATES the bundle's size, and it is unbounded:
+    //    nothing prunes the table, and a revision row weighs the same as a page row (both bodies), so the
+    //    bundle grows to roughly (1 + revisions-per-page) x its old size. Measured, not estimated: a codex
+    //    of 200 pages x 15 revisions x 3KB per body exports 1.25 MB before this key and 19.73 MB after
+    //    (18.47 MB of it revisions). If that ever needs bounding, bound the TABLE (prune old revisions) -
+    //    an export that carries only some of the history would be a backup that lies about being one.
     return {
       pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
       sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests(),
-      publishedDate: this.getPublishedDate(), standing: this.listStanding(), partyMarkerId: this.partyMarker()?.id ?? null
+      publishedDate: this.getPublishedDate(), standing: this.listStanding(), partyMarkerId: this.partyMarker()?.id ?? null,
+      calendar: this.getCalendar(), folders: this.listFolders(), revisions: this.listAllRevisions()
     };
   }
 
@@ -2015,9 +2065,35 @@ export class CodexStore {
 
   listRevisions(pageId: string): CodexPageRevisionRow[] {
     return (this.requireDatabase()
-      .prepare("SELECT id, page_id, rev, title, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag FROM codex_page_revisions WHERE page_id = ? ORDER BY rev DESC")
-      .all(pageId) as Array<{ id: number; page_id: string; rev: number; title: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string; authored_at: string; author_tag: string }>)
-      .map((row) => ({ id: row.id, pageId: row.page_id, rev: row.rev, title: row.title, playerBody: row.player_body, gmBody: row.gm_body, bannerAssetId: row.banner_asset_id, tags: JSON.parse(row.tags_json) as string[], authoredAt: row.authored_at, authorTag: row.author_tag }));
+      .prepare(`SELECT ${REVISION_COLUMNS} FROM codex_page_revisions WHERE page_id = ? ORDER BY rev DESC`)
+      .all(pageId) as RevisionRowRaw[])
+      .map(toRevision);
+  }
+
+  /**
+   * EVERY page's revision history in one read, for the backup bundle. `listRevisions` is per page because
+   * that is how the editor asks; a backup has to carry the whole table, and `pageId` on each row is what
+   * regroups them.
+   *
+   * Ordered `page_id, rev` (ASC, not the editor's DESC) because a backup is read as a history rather than
+   * scanned newest-first, and a deterministic order makes two exports of an unchanged codex comparable.
+   *
+   * Carries THREE columns `listRevisions` does not - `entity_type`, `fields_json`, `gm_fields_json`, added
+   * by migrations v3/v5. That is deliberate and it is why this returns a superset type rather than
+   * `CodexPageRevisionRow`:
+   *  - `restoreRevision` reads exactly those three columns plus the ones the base row carries, so a bundle
+   *    without them holds a history that can restore a page's PROSE and silently drop its typed fields -
+   *    the same shape of bug the "preserves them through export" gmFields regression guard exists for.
+   *  - They cannot simply be added to `CodexPageRevisionRow`, because that row IS the wire shape of
+   *    `GET /codex/pages/{id}/revisions`, whose contract component is `additionalProperties: false`. The
+   *    bundle is declared opaque (`CodexExportData.codex`), so it may carry more; that endpoint may not.
+   * One row-mapper (`toRevision`) still owns every shared column, so the two shapes cannot drift.
+   */
+  listAllRevisions(): CodexPageRevisionExportRow[] {
+    return (this.requireDatabase()
+      .prepare(`SELECT ${REVISION_COLUMNS}, entity_type, fields_json, gm_fields_json FROM codex_page_revisions ORDER BY page_id, rev`)
+      .all() as Array<RevisionRowRaw & { entity_type: string; fields_json: string; gm_fields_json: string }>)
+      .map((row) => ({ ...toRevision(row), entityType: (row.entity_type as CodexEntityType) ?? "note", fields: parseFields(row.fields_json), gmFields: parseFields(row.gm_fields_json) }));
   }
 
   /**

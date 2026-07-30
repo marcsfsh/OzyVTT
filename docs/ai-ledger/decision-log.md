@@ -7,6 +7,58 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-30 — four owner decisions on the final-QA findings
+
+The final QA pass deliberately left seven UX findings and the prep-clock date leak as **owner decisions**
+rather than fixing them unilaterally. The owner ruled on four.
+
+**The prep clock keeps its dating; the reveal warns; the warning is switchable.** Records go on carrying the
+GM's own clock — that is genuinely when the thing happened, and dating them at the *published* clock would
+make the timeline lie about its own order. Instead, revealing a record dated **strictly after** the published
+date asks first. Two silences are part of the decision, not omissions: an **undated** record discloses
+nothing, and a campaign that has **never published** has no "what players have been shown" for a record to be
+ahead of, so it does not warn — a dialog that fires on every dated reveal is one the GM learns to dismiss
+unread, which costs the real case its only defence. Hiding never warns; a confirm on the way back to safety
+teaches a GM to stop hiding things. The switch is per-device `localStorage` rather than server state: it
+changes nothing a player can observe and nothing the server authorises, so a migration, a route and a
+contract change to store a preference about a dialog would be the wrong trade. It is set only from the
+affirmative button — a GM who flicks it and then cancels has abandoned the interaction, and disabling a
+warning on the way out of a dialog they backed out of is how a safety net vanishes with nobody deciding it
+should — and there is a **way back on**, because there is no settings screen in this app to undo it in.
+
+**The export bundle is complete, and left unbounded.** `calendar`, `folders` and `revisions` join it; each
+existed nowhere else, which is the same reason every earlier key was added. The measured cost is real and
+recorded rather than discovered later: 200 pages × 15 revisions takes the bundle from 1.24 MB to 20.8 MB
+(~17×), and revision history is unbounded because nothing prunes `codex_page_revisions`. **If that ever needs
+bounding, bound the table, not the export** — a bundle carrying only part of the history would be a backup
+that lies about being one.
+
+**A clock move states its cost before the button that causes it.** "…— this passes 2 deadlines." Silent at
+zero, because a warning present on every downtime in a campaign with no deadlines is noise that spends the
+GM's attention on nothing.
+
+**One record, one row per screen — and only the kinds that genuinely duplicate.** The dashboard feed drops
+`event`, `deadline` and `standing`, which have cards of their own. The QA finding also named downtime and
+milestones; **it was wrong**, and following it would have been a deletion rather than a de-duplication —
+`CampaignHome` has no card for either, so the feed is their only home. The general lesson, which is why this
+is here: a review finding names a symptom, and the fix still has to be checked against what the code actually
+does. `standing` was the genuine judgment call and the crowding argument settled it: its card is unsliced and
+lists every faction, while five standing adjustments (which carry no player prose by design) used to fill all
+five feed slots and push every real entry out.
+
+## 2026-07-30 — a projection change is not automatically a docs change
+
+`CodexRevealAuditRow` gained a field, which is a contract change, so both generated docs were regenerated per
+ADR-0016 — and **neither changed**, correctly. `reference.ts` seeds its referenced-schema set from **request
+bodies only**; a response schema is labelled, never expanded, so `CodexRevealAuditRow` appears nowhere in
+`docs/api-reference.md`. `renderAppMap()` reads `GameStateSchema.shape`, `GAME_COMMAND_SCOPES` and
+`openApiDocument.paths` + methods, so a components-only change is invisible to it.
+
+Worth recording because the M11 lesson pointed the other way (contracts must not forbid regenerating the
+docs) and the naive correction is to expect a diff every time. **Regenerate always; expect a diff only when
+the change touches a path, a method, a request body, or the game state.** No diff after regenerating is
+evidence the docs are current, not evidence the generators were skipped.
+
 ## 2026-07-29 — M12: three decisions closing the campaign-tracking programme
 
 **M12-A — the reveal audit covers Codex records only**, not tokens, fog, or the shared table viewer.

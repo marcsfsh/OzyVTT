@@ -2,7 +2,7 @@ import { Alert, Badge, Button, Field, IconButton, Input, Select, Switch, TagInpu
 import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { IconPicker, EntityIcon } from "./icons";
 import { EntityPicker } from "./EntityPicker";
-import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
+import { RevealSwitch, HiddenFromPlayers } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { socket } from "../socket";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -224,7 +224,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
                 <li key={entry.id} className="codex-page-timeline-item">
                   {entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}
                   {(entry.sessionNumber != null || entry.inWorldLabel) && <span className="codex-page-timeline-meta">{[entry.sessionNumber != null ? `S${entry.sessionNumber}` : null, entry.inWorldLabel].filter(Boolean).join(" · ")}</span>}
-                  {!entry.revealedToPlayers && <GmOnlyTag />}
+                  {!entry.revealedToPlayers && <HiddenFromPlayers />}
                   <span className="codex-page-timeline-text">{entry.playerText || entry.gmText}</span>
                   {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&
                     <button type="button" className="codex-linklike" onClick={() => onOpenReplay(entry.sourceEncounterId!)}>Open replay</button>}

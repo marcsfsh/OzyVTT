@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, Button, Input, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import { journalApi, type CodexJournalEntry } from "./api";
-import { GmOnlyTag } from "./SecretMarkers";
+import { HiddenFromPlayers } from "./SecretMarkers";
 
 /**
  * A page's pinned campaign history, shown inline in the editor: every journal entry attached to this
@@ -58,7 +58,7 @@ export function PageTimeline({ gmToken, pageId, onOpenReplay, onOpenEntry }: Rea
                 {/* CD-5: secrecy is `revealedToPlayers`, not "has no player text". Keying off empty text
                     meant the ordinary GM-only entry — one WITH player-facing prose, simply not revealed —
                     showed no cue at all, which is precisely the case the GM needs flagged. */}
-                {!entry.revealedToPlayers && <GmOnlyTag />}
+                {!entry.revealedToPlayers && <HiddenFromPlayers />}
                 <span className="codex-page-timeline-text codex-list-title">{entry.playerText || entry.gmText}</span>
               </>
             );

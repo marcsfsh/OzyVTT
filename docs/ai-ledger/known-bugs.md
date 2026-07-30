@@ -10,46 +10,37 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
-- **[codex/ux] Seven friction points from the final QA pass, left for an owner decision (2026-07-30).**
-  Each is a design call rather than a defect, so none was changed unilaterally. Ranked as the reviewer ranked
-  them, by how much they would annoy a GM mid-session:
-  1. **Confirming a downtime can fire deadlines silently.** Measured: a 7-day confirm moved the clock 16→23
-     and flipped two deadlines to "Passed" with no notice anywhere. The affordance names the date and nothing
-     else. One clause would fix it: "…this passes 2 deadlines."
-  2. **A deadline appears twice on the dashboard with two different words** — in the Deadlines card badged
-     "Approaching", and again in Recent journal activity badged "Deadline". `campaignEntries` filters only
-     `kind !== "event"`, so downtime, milestones and standing double up too. This is the "two ways to say one
-     thing" pathology the overhaul exists to remove; fix by excluding kinds that have their own card, or by
-     dropping the separate card.
-  3. **The four new dashboard cards do not show reveal state** while the two older ones do (Atlas and
-     Recently updated show "Shown" / "GM only"). A GM-only deadline and a shared one render identically — on
+- **[codex/ux] Three friction points from the final QA pass still open (2026-07-30).** Seven were raised; the
+  owner ruled on four (see `decision-log.md` 2026-07-30) and those are fixed. These three were not ruled on
+  and remain design calls rather than defects:
+  1. **The four new dashboard cards do not show reveal state** while the two older ones do (Atlas and
+     Recently updated show "Shown" / "Hidden"). A hidden deadline and a shared one render identically — on
      the same screen as a feature premised on reveal state mattering.
-  4. **Reveal audit: Hide is one-way, and one tap can remove two rows.** Hiding a faction page also removes
+  2. **Reveal audit: Hide is one-way, and one tap can remove two rows.** Hiding a faction page also removes
      its standing (correctly — the standing is only visible while its page is), with nothing on screen saying
      so, and no way back from where you hid it. The file argues against a bulk un-hide on safety grounds; the
      same argument applies to one mis-tap on a 20-row list.
-  5. **"Show the pin" does not show the pin** (`AtlasView.tsx`) — it selects the marker without scrolling or
-     re-centring, so on a phone the pin stays off-screen. Breaks `ux-principles.md` §9, "actions name their
-     result."
-  6. **Publishing the campaign date gives no confirmation** — the row simply disappears, and because it only
-     renders while the clocks disagree there is afterwards no way to ask what date the players think it is.
-  7. **The Faction standing card is unbounded and 3 rows tall per faction**, listing every faction page
+  3. **The Faction standing card is unbounded and 3 rows tall per faction**, listing every faction page
      whether rated or not, sitting 4th of 9 sections. Deliberately unsliced (it is the only place standing is
      adjusted), but a campaign with 25 factions buries everything below it.
-  Also: audit rows do not name their kind, so a revealed deadline and a revealed note look identical on the
-  surface where "is that deadline visible?" is the question; "GM only" means two different things on one row
-  (the reveal switch's off state and the GM-text tag); and the session console is a full-screen takeover at
-  ≤384px, which undercuts its "consult prep while browsing" rationale on a phone.
+  Also still open: the session console is a full-screen takeover at ≤384px, which undercuts its "consult prep
+  while browsing" rationale on a phone.
 
-- **[codex/viewer] Downtime, milestone and standing records are auto-dated from the GM's PRIVATE clock, and
-  that date ships to players on reveal.** Measured with the GM prepping 48 days ahead: a revealed milestone
-  carried `inWorldLabel: "Second, Alturiak 28, 1492 DR"` to a player whose own "now" was Hammer 10 — a date
-  they have not been shown. `createDowntime`, `createMilestone` and `setStanding` all default to
-  `getCalendar().currentDate` (the prep clock) rather than the published date. The same auto-dating predates
-  M11 for `appendCombatEntry`, so this is inherited rather than introduced — but M11 created the private clock
-  and M11/M12 then wired three new kinds to it, and nothing warns the GM that revealing such a record
-  discloses their date. Options: date them at the published clock; warn on reveal; or accept and document.
-  **Left for the owner: it is a product decision about what "when did this happen" means, not a slip.**
+  _Fixed 2026-07-30 and removed from this list:_ the silent deadline-firing on downtime confirm; the same
+  record appearing twice on the dashboard; "Show the pin" not showing the pin; publishing giving no
+  confirmation; audit rows not naming their kind; and "GM only" meaning two different things on one row.
+
+- **[codex/export] `GET /codex/export` has no restore path, and the bundle is now ~17× larger
+  (2026-07-30).** The bundle was completed on the owner's decision (calendar, folders, page revisions), so it
+  is a complete *record* of a codex — but **nothing reads it back**. The Codex's "Import" button imports
+  markdown files as pages, one per file; there is no `importBundle`, no import route, and no consumer of the
+  bundle anywhere in the repo, so restoring means hand-editing the sqlite file. `CodexExportData`'s
+  description ("round-trips via the codex import surface") is aspirational. Separately, revision history is
+  **unbounded** — nothing prunes `codex_page_revisions` — so the bundle grows to roughly
+  (1 + revisions-per-page) × its old size: measured at 1.24 MB → 20.8 MB for 200 pages × 15 revisions, and
+  `express` buffers the whole thing, so a ~20 MB `JSON.stringify` is now one synchronous call on the GM's
+  backup path. Fine on a LAN for one GM; recorded so it is a known cost rather than a surprise. If it needs
+  bounding, prune the TABLE — a partial history would be a backup that lies about being one.
 
 - **[repo/tooling] The committed tap audit cannot see five of the surfaces this programme added.** Its
   `MODES` loop visits the five mode tabs only, and switching mode closes the destinations — so the Sessions

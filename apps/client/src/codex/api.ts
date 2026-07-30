@@ -829,7 +829,23 @@ export type CodexRevealAuditKind = "page" | "map" | "marker" | "journal" | "sess
  * `id` is the address that record's own reveal route takes, which for `standing` is the FACTION PAGE's
  * id (`PUT /codex/standing/{factionPageId}/reveal`) and not the standing row's own.
  */
-export type CodexRevealAuditRow = Readonly<{ kind: CodexRevealAuditKind; id: string; title: string }>;
+export type CodexRevealAuditRow = Readonly<{
+  kind: CodexRevealAuditKind;
+  id: string;
+  title: string;
+  /**
+   * WHICH kind of journal record this is, on a `kind: "journal"` row; `null` on all six other kinds
+   * (present-and-null, so nothing here branches on key presence — the same shape `CodexSearchHit` uses for
+   * `entityType` and `mapId`). Added 2026-07-30.
+   *
+   * `title` could not carry it: it is the record's own player prose whenever the record has any, and only
+   * names the kind when the record is silent — so a revealed deadline WITH prose and a revealed note with
+   * prose read identically on the one screen whose whole job is answering "is that deadline visible?".
+   * Render it as a badge (`chronicleKindOfJournal` crosses to the chronicle's own vocabulary), never by
+   * parsing the title.
+   */
+  journalKind: CodexJournalKind | null;
+}>;
 
 /**
  * One section: what players can actually see of this record type, and how much of it exists.

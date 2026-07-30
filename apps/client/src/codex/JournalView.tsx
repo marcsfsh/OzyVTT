@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "./api";
-import { CHRONICLE_KIND_META, CHRONICLE_LENSES, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
+import { CHRONICLE_KIND_META, CHRONICLE_LENSES, chronicleWhenLabel, deadlineFired, deadlinesPassedBy, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, revealAheadOfPlayers, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
 import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 import { EntityPicker } from "./EntityPicker";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { sessionByNumber, type SessionRef } from "./sessions";
-import { useConfirm } from "../components/feedback";
+import { Notice, useConfirm, type NoticeMessage } from "../components/feedback";
 
 /**
  * The campaign chronicle (CT-11 / CT-12): **one** timeline carrying GM-written two-layer journal entries
@@ -56,6 +56,17 @@ type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionNu
 const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "", level: "", reason: "" };
 const DRAFT_KEY = "codex-journal-draft";
 const LENS_KEY = "codex-chronicle-lens";
+/**
+ * OWNER DECISION (2026-07-30): the prep-clock reveal warning is switchable off, and the switch is per
+ * DEVICE — `localStorage`, like every other GM reading preference in this app (`vtt.show-occupied`,
+ * `codex-notebook-sort`). Deliberately not server state: it changes nothing a player can observe and
+ * nothing the server authorises, so putting it in `codex_meta` would have cost a migration, a route and an
+ * API-contract change to store a preference about a dialog. Absent means ON — a warning that defaults off
+ * because storage is unavailable is not a warning.
+ */
+const REVEAL_WARN_KEY = "codex.warn-reveal-ahead";
+const readRevealWarn = (): boolean => { try { return localStorage.getItem(REVEAL_WARN_KEY) !== "off"; } catch { return true; } };
+const writeRevealWarn = (on: boolean) => { try { localStorage.setItem(REVEAL_WARN_KEY, on ? "on" : "off"); } catch { /* private mode - the preference stays in-session */ } };
 
 /**
  * CI-6 (return edge): an entry knows where it happened (`attachMarkerId`, set by the combat bridge when
@@ -109,6 +120,15 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
   // CF-2: an empty list is ambiguous until the first fetch settles — without this the journal
   // asserts "No journal entries yet." over a campaign that simply has not loaded.
   const [loading, setLoading] = useState(true);
+  /**
+   * Publishing the clock used to be silent: the prep-clock row renders only WHILE the two clocks disagree,
+   * so a successful publish made the row — and with it the only readout of what the table is on — vanish,
+   * which reads identically to a click that did nothing. This is the acknowledgement, and it names the date
+   * so the answer to "what do the players think it is?" survives the row it was asked on.
+   */
+  const [notice, setNotice] = useState<NoticeMessage>(null);
+  /** The reveal warning's own switch (see `REVEAL_WARN_KEY`). State, not a raw read, so turning it back on re-arms without a reload. */
+  const [revealWarn, setRevealWarn] = useState(readRevealWarn);
 
   // CT-12: the lens is a reading preference, so it survives leaving and returning to the mode — the same
   // sessionStorage discipline the composer draft uses, and for the same reason.
@@ -244,7 +264,16 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
   };
   /** O-1 / D11-H: hand the GM's clock to the table. The only thing on this client that publishes it. */
   const publishDate = async () => {
-    try { await calendarApi.publish(gmToken); await load(); }
+    // Read the date BEFORE the round-trip: `load()` replaces `calendar`, and after a successful publish the
+    // two clocks agree, so "the date players now see" and "the GM's clock" are the same value either way —
+    // but naming it from the pre-publish state is what makes the message true even if the GM edits the
+    // calendar between the click and the refetch.
+    const published = calendar?.currentDate ? formatWorldDate(calendar, calendar.currentDate) : null;
+    try {
+      await calendarApi.publish(gmToken);
+      await load();
+      setNotice({ tone: "success", text: published ? `Players now see ${published}.` : "The date is published to players." });
+    }
     catch (publishError) { setError(publishError instanceof Error ? publishError.message : "Could not publish the date."); }
   };
   const cancelEdit = () => { setEditingId(null); setEditingKind(null); setDraft(stashedDraft ?? EMPTY); setStashedDraft(null); };
@@ -254,6 +283,28 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
    * because there is one reveal state per record and the chronicle is a view of it, not a second copy.
    */
   const reveal = async (record: CodexChronicleRecord, revealed: boolean) => {
+    /**
+     * OWNER DECISION (2026-07-30): warn before a reveal hands players a date the GM has not published.
+     *
+     * Gated on `revealed` — HIDING a record discloses nothing, so it is never worth a dialog. The switch is
+     * controlled by `record.revealedToPlayers`, which nothing here mutates, so a cancelled warning leaves it
+     * visibly off rather than showing a reveal that did not happen.
+     *
+     * Only the chronicle warns, and only about ITS records. A page carries an in-world date solely because
+     * the GM typed one in the page editor, so revealing it discloses a date they chose deliberately; these
+     * six kinds auto-date at the prep clock without being asked, which is the whole reason this exists.
+     */
+    if (revealed && revealWarn && revealAheadOfPlayers(record, calendar)) {
+      const dated = record.inWorldLabel ?? (record.inWorldDate && calendar ? formatWorldDate(calendar, record.inWorldDate) : "a later date");
+      const seen = calendar?.publishedDate && calendar ? formatWorldDate(calendar, calendar.publishedDate) : "no date yet";
+      const proceed = await confirm({
+        title: "This is dated ahead of the players",
+        body: `This record is dated ${dated}. Players are still on ${seen}, so revealing it tells them the campaign has reached ${dated}. Publish the date first if that is not what you want.`,
+        confirmLabel: "Reveal anyway",
+        suppress: { label: "Stop warning me about this", onChange: (suppressed) => { if (suppressed) { setRevealWarn(false); writeRevealWarn(false); } } }
+      });
+      if (!proceed) return;
+    }
     if (record.kind === "event") await codexApi.revealPage(gmToken, record.id, revealed);
     else await journalApi.reveal(gmToken, record.id, revealed);
     await load();
@@ -343,6 +394,14 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
             <span className="codex-prepclock-label">Players still see</span>
             <span className="codex-now-chip">{publishedLabel ?? "no date yet"}</span>
             <Button variant="primary" onClick={publishDate}>Publish the date</Button>
+            {/* The way BACK from "Stop warning me about this". It lives here rather than in a settings screen
+                because this row is the only place both clocks are on screen, and it renders exactly when the
+                warning would have mattered — so the GM meets the switch at the moment they want it, instead
+                of having to remember which dialog they dismissed. Absent while the warning is on: nothing to
+                offer a GM who never turned it off. */}
+            {!revealWarn && (
+              <Button variant="ghost" size="sm" onClick={() => { setRevealWarn(true); writeRevealWarn(true); }}>Warn me again on reveal</Button>
+            )}
           </div>
         )}
         <Field label={COMPOSER_COPY[draft.kind].textLabel} htmlFor="j-player"><Textarea id="j-player" className="codex-composer-body" value={draft.playerText} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder} onChange={(event) => set({ playerText: event.target.value })} /></Field>
@@ -417,6 +476,9 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       </Panel>
 
       {error && <Alert tone="danger">{error}</Alert>}
+      {/* Publishing's acknowledgement (see `publishDate`). `Notice` announces politely via `role="status"`,
+          so it reaches a screen reader without interrupting; `error` above stays the assertive channel. */}
+      <Notice notice={notice} />
 
       {/* CT-12: the lens toggle. Above the timeline and outside the groups, because it governs all of
           them; `SegmentedControl` is the `@vtt/ui` primitive (R9) and carries its own 44px floor. */}
@@ -472,6 +534,11 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
               // can be authoritative. `downtimeProposedDate` stays for the composer's preview, where no
               // record exists yet for the server to answer about.
               const proposed = downtime && !downtime.applied ? record.proposedDate : null;
+              // OWNER DECISION (2026-07-30): say what the clock move would COST before the button that does
+              // it. Counted against the whole chronicle, not this group — a deadline sitting in next year's
+              // group is exactly the one the GM has forgotten about. Zero says nothing rather than "passes 0
+              // deadlines", which would be noise on every downtime in a campaign that has none.
+              const passing = proposed ? deadlinesPassedBy(records, calendar, proposed) : 0;
               return (
               <article key={`${record.kind}-${record.id}`} id={`codex-entry-${record.id}`} aria-current={record.id === focusedEntryId ? "true" : undefined}
                 className={`codex-entry${record.kind === "combat" ? " is-combat" : ""}${isEvent ? " is-event" : ""}${isDeadline ? " is-deadline" : ""}${downtime ? " is-downtime" : ""}${record.id === focusedEntryId ? " is-focused" : ""}`}>
@@ -511,7 +578,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
                       ? <p className="codex-downtime-state">The campaign clock has already been advanced for this downtime.</p>
                       : proposed && calendar
                       ? <div className="codex-downtime-apply">
-                          <span className="codex-downtime-proposal">Advance the campaign clock to {formatWorldDate(calendar, proposed)}</span>
+                          <span className="codex-downtime-proposal">Advance the campaign clock to {formatWorldDate(calendar, proposed)}{passing > 0 ? ` — this passes ${passing} ${passing === 1 ? "deadline" : "deadlines"}.` : ""}</span>
                           {/* §4 route 1: `Button` at its default size grows its own paint to 44px and
                               has no `::after`, which is what a control stacked above the row's footer
                               buttons needs — a route-2 overhang here would reach into their hit areas. */}

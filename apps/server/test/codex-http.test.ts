@@ -1635,6 +1635,40 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
     expect(shownSession.data.session.id).toBeTruthy();
   });
 
+  /**
+   * A journal row names its KIND over the wire, and the row matches its contract component (2026-07-30).
+   *
+   * The projection test proves the value is chosen correctly; this proves it SURVIVES the route and that the
+   * documented shape is the shape actually served. `CodexRevealAuditRow` has no Zod twin, so the parity gate
+   * in `@vtt/api-contract` cannot pair it automatically - the keys are compared to the component's own
+   * `required` list here instead, which is the same check by hand.
+   */
+  it("carries a journal row's kind over the wire as its own field, matching CodexRevealAuditRow exactly", async () => {
+    const { base } = await fixture();
+    // The SAME player text on both, so the only thing that can tell them apart is the new field. With
+    // different prose a title-only row would still look informative and this test would prove nothing.
+    const deadline = await body(await post(base, "/api/v1/codex/journal/deadline", GM, { playerText: "The tax is due.", inWorldDate: { year: 1492, month: 0, day: 20 } }));
+    const note = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "The tax is due." }));
+    for (const id of [deadline.data.entry.id, note.data.entry.id] as string[]) {
+      await post(base, `/api/v1/codex/journal/${id}/reveal`, GM, { revealed: true });
+    }
+    const quest = await body(await post(base, "/api/v1/codex/quests", GM, { title: "The Wyrmwood Contract" }));
+    await post(base, `/api/v1/codex/quests/${quest.data.quest.id}/reveal`, GM, { revealed: true });
+
+    const sections = (await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit.sections as Json[];
+    const rowsOf = (kind: string) => (sections.find((entry) => entry.kind === kind)!.rows as Json[]);
+    const journalRows = rowsOf("journal");
+    expect(journalRows.map((row) => row.title)).toEqual(["The tax is due.", "The tax is due."]);
+    expect(new Map(journalRows.map((row) => [row.id as string, row.journalKind as string])))
+      .toEqual(new Map([[deadline.data.entry.id as string, "deadline"], [note.data.entry.id as string, "note"]]));
+    // PRESENT-AND-NULL on every other kind - the uniform-row rule this component is built on, over the wire.
+    expect(rowsOf("quest")).toEqual([{ kind: "quest", id: quest.data.quest.id, title: "The Wyrmwood Contract", journalKind: null }]);
+
+    const component = ((openApiDocument as unknown as { components: { schemas: Record<string, { required: string[]; properties: Record<string, unknown> }> } }).components.schemas).CodexRevealAuditRow;
+    expect(component.required).toEqual(Object.keys(component.properties));   // no documented-but-optional key
+    for (const row of [...journalRows, ...rowsOf("quest")]) expect(Object.keys(row).sort()).toEqual([...component.required].sort());
+  });
+
   /** Un-revealing from the audit is the EXISTING per-kind route - M12 adds no unreveal verb and no bulk one. */
   it("drops a record from the audit when the GM un-reveals it through that kind's own reveal route", async () => {
     const { base } = await fixture();
@@ -1642,7 +1676,7 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
     const questId = quest.data.quest.id as string;
     await post(base, `/api/v1/codex/quests/${questId}/reveal`, GM, { revealed: true });
     const auditOf = async () => ((await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit.sections as Json[]).find((entry) => entry.kind === "quest")!;
-    expect((await auditOf()).rows).toEqual([{ kind: "quest", id: questId, title: "The Wyrmwood Contract" }]);
+    expect((await auditOf()).rows).toEqual([{ kind: "quest", id: questId, title: "The Wyrmwood Contract", journalKind: null }]);
 
     await post(base, `/api/v1/codex/quests/${questId}/reveal`, GM, { revealed: false });
     expect((await auditOf()).revealed).toBe(0);

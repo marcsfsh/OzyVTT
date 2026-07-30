@@ -309,7 +309,7 @@ describe("M12 reveal audit projection - CT-9, an aggregation and not a second op
     expect(section("marker").total).toBe(2);
     expect(section("marker").revealed).toBe(1);
     expect(section("marker").rows.map((row) => row.id)).toEqual([onShownMap.id]);
-    expect(section("standing").rows).toEqual([{ kind: "standing", id: FACTION_ID, title: "The Harpers" }]);
+    expect(section("standing").rows).toEqual([{ kind: "standing", id: FACTION_ID, title: "The Harpers", journalKind: null }]);
 
     // Every surface is reported, empty ones included: "nothing revealed" and "did not load" must not look
     // the same on the GM's screen, and an omitted section is exactly how they would.
@@ -317,5 +317,41 @@ describe("M12 reveal audit projection - CT-9, an aggregation and not a second op
     expect(section("page")).toEqual({ kind: "page", revealed: 0, total: 0, rows: [] });
     expect(audit.revealed).toBe(2);
     expect(audit.total).toBe(3);
+  });
+
+  /**
+   * A journal row must NAME ITS KIND (2026-07-30).
+   *
+   * `AUDIT_JOURNAL_FALLBACK` named the kind only when the record had no player prose, so a revealed
+   * DEADLINE with prose and a revealed NOTE with prose rendered as the same row - on the one surface whose
+   * entire job is answering "is that deadline visible?". The kind now travels as `journalKind`, its own
+   * field, because the client badges it: a kind reads by icon AND label here, and a prefix glued onto
+   * `title` can be neither badged nor told apart from prose that happens to start with the same word.
+   */
+  it("names a journal row's KIND in its own field, so a deadline with prose is not a note with prose", () => {
+    const deadline = entryRow({ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", kind: "deadline", revealedToPlayers: true, playerText: "The tax is due." });
+    const note = entryRow({ id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", kind: "note", revealedToPlayers: true, playerText: "The tax is due." });
+    const sessionContext = { unrevealedSessionNumbers: new Set<number>() };
+    const rows = projectRevealAudit([
+      { kind: "journal", entry: deadline, sessionContext },
+      { kind: "journal", entry: note, sessionContext }
+    ]).sections.find((entry) => entry.kind === "journal")!.rows;
+
+    // Identical prose on purpose: with different text a title-only audit would still LOOK informative, and
+    // this test would prove nothing about the kind travelling.
+    expect(rows.map((row) => row.title)).toEqual(["The tax is due.", "The tax is due."]);
+    expect(rows.map((row) => row.journalKind)).toEqual(["deadline", "note"]);
+    // A FIELD, not a prefix: the title is still the record's own prose, unornamented.
+    expect(rows[0].title).not.toContain("Deadline");
+
+    /**
+     * The fallback is untouched and still names a silent record - `setStanding` writes an EMPTY player text,
+     * which is the case it was added for. A revealed standing record additionally needs its faction page
+     * revealed to reach a player at all (the CT-6 gate above), so the context says so here.
+     */
+    const silentStanding = entryRow({ kind: "standing", revealedToPlayers: true, playerText: "", payload: { factionPageId: FACTION_ID, delta: 40, reason: "Saved the caravan." } });
+    const silent = projectRevealAudit([{ kind: "journal", entry: silentStanding, sessionContext: { ...sessionContext, revealedPageIds: new Set([FACTION_ID]) } }])
+      .sections.find((entry) => entry.kind === "journal")!.rows;
+    expect(silent).toEqual([{ kind: "journal", id: silentStanding.id, title: "Faction standing changed", journalKind: "standing" }]);
   });
 });

@@ -9,7 +9,7 @@
  */
 
 import type { BadgeTone, MeterTone } from "@vtt/ui";
-import { calendarDaysPerYear, calendarYearOf, dateToInstant, formatWorldYear, instantToDate, type CodexCalendar, type CodexChronicleKind, type CodexChronicleRecord, type CodexDowntimeSummary, type CodexInWorldDate, type CodexJournalPayload, type CodexMilestonePayload, type CodexPlayerChroniclePayload, type CodexStandingChange } from "./api";
+import { calendarDaysPerYear, calendarYearOf, dateToInstant, formatWorldYear, instantToDate, type CodexCalendar, type CodexChronicleKind, type CodexChronicleRecord, type CodexDowntimeSummary, type CodexInWorldDate, type CodexJournalKind, type CodexJournalPayload, type CodexMilestonePayload, type CodexPlayerChroniclePayload, type CodexStandingChange, type GmCodexCalendar } from "./api";
 
 /**
  * How a record says *when* it happened, in the chronicle's own order of preference.
@@ -338,6 +338,104 @@ export function downtimeProposedDate(calendar: CodexCalendar | null, days: numbe
  * Lives here beside the other reading rules so the dashboard and the timeline cannot describe one record two
  * different ways, which is the pathology this overhaul exists to remove.
  */
+/**
+ * How many deadlines a clock move to `target` would pass — OWNER DECISION (2026-07-30).
+ *
+ * Confirming a downtime moves the campaign clock, and that can push past deadlines the GM set weeks ago.
+ * Measured before this existed: a 7-day confirm moved the clock 16→23 and flipped two deadlines to "Passed"
+ * with no notice anywhere, so the GM found out by going back to the dashboard. A deadline exists precisely
+ * because it happens whether or not the party acts, which makes the moment the clock jumps over it the
+ * moment the GM most needs to know.
+ *
+ * Counts only deadlines that are NOT already passed, so the number is what this action would cause rather
+ * than a running total. Reads `fired` through `deadlineFired` like every other reader, so "has it passed"
+ * has one answer on this client.
+ */
+export type DatedDeadlineRef = DeadlineRef & Readonly<{ calendarInstant: number | null }>;
+export function deadlinesPassedBy(records: readonly DatedDeadlineRef[], calendar: CodexCalendar | null, target: CodexInWorldDate | null): number {
+  if (!calendar || !target) return 0;
+  // `target` is already a date the calendar admits (`downtimeProposedDate` builds it with `instantToDate`),
+  // so this round-trips exactly and needs no `clampToCalendar`.
+  const targetInstant = dateToInstant(calendar, target);
+  return records.filter((record) => record.kind === "deadline" && !deadlineFired(record)
+    && record.calendarInstant !== null && record.calendarInstant <= targetInstant).length;
+}
+
+/**
+ * A raw JOURNAL kind read as the CHRONICLE kind the reading rules above are keyed by.
+ *
+ * The two vocabularies differ in exactly one word: the database calls an ordinary entry `note` and the
+ * timeline calls it `entry` (the server's own `chronicleKindOf` makes the same single substitution on its
+ * side of the wire). Anywhere a surface holds a journal kind and wants the chronicle's icon, label or tone —
+ * the reveal audit's rows do — it has to cross that gap, and `CHRONICLE_KIND_META["note"]` is `undefined`,
+ * so crossing it by hand would read a tone off nothing and throw on the one kind that is most common.
+ *
+ * A `Record` rather than a ternary so all six are named: a seventh journal kind is then a compile error
+ * here, which is the same discipline `CHRONICLE_KIND_META` and `AUDIT_JOURNAL_FALLBACK` keep.
+ */
+const JOURNAL_TO_CHRONICLE_KIND: Readonly<Record<CodexJournalKind, CodexChronicleKind>> = {
+  note: "entry", combat: "combat", deadline: "deadline", downtime: "downtime", milestone: "milestone", standing: "standing"
+};
+export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKind { return JOURNAL_TO_CHRONICLE_KIND[kind]; }
+
+/**
+ * Kinds the Campaign dashboard must NOT repeat in "Recent journal activity" — OWNER DECISION (2026-07-30).
+ *
+ * The defect: a deadline appeared twice on one screen, in the Deadlines card badged "Approaching" and again
+ * in the feed badged "Deadline" — one record, two rows, two vocabularies. The owner chose to keep the cards
+ * and drop those kinds from the feed.
+ *
+ * **Which kinds, exactly, is narrower than the review claimed, and deliberately so.** The finding said
+ * downtime and milestones double up as well. They do not: the dashboard has no downtime card and no
+ * milestone card, so the feed is the ONLY place either appears, and excluding them would have deleted them
+ * from the dashboard rather than de-duplicating them. Checked against `CampaignHome`'s actual sections.
+ *
+ * So three kinds, each for its own reason:
+ *  - `event` — a dated `event` page is a wiki page, already counted in the entity totals and listed under
+ *    "Recently updated pages". Excluded since CT-11, before this decision.
+ *  - `deadline` — the true duplicate. Same records, same list, two different words for the same state.
+ *  - `standing` — a judgment call, and the crowding argument decides it. `setStanding` writes no player
+ *    prose, so five end-of-session adjustments filled all five feed slots and pushed every real entry out;
+ *    meanwhile the Faction standing card is UNSLICED and shows every faction. The feed row's one extra fact
+ *    is the change's reason, which the Journal still carries in full.
+ *
+ * Shared by BOTH dashboards (the GM's workspace and the player's Codex), because they render the same
+ * component with the same cards — two copies of this set is how they would come to disagree.
+ */
+export const DASHBOARD_CARDED_KINDS: ReadonlySet<CodexChronicleKind> = new Set<CodexChronicleKind>(["event", "deadline", "standing"]);
+
+/**
+ * Would revealing this record tell players a date they have not been shown? — OWNER DECISION (2026-07-30).
+ *
+ * O-1 gave the GM a private prep clock, and M11/M12 then wired three new kinds (downtime, milestone,
+ * standing) to auto-date at it, the way `appendCombatEntry` already did. Measured with the GM prepping 48
+ * days ahead: a revealed milestone carried `inWorldLabel: "Second, Alturiak 28, 1492 DR"` to a player whose
+ * own "now" was Hammer 10. The owner's decision was to KEEP dating records at the GM's clock — that is
+ * genuinely when the thing happened — and to warn at the moment of reveal instead.
+ *
+ * Two deliberate silences, so the warning stays worth reading:
+ *  - An UNDATED record cannot disclose a date. `calendarInstant` null, nothing to say.
+ *  - **Nothing published yet** (`publishedDate` null) is not a warning either. The leak is being AHEAD of
+ *    what players have been shown, and with no published date there is nothing to be ahead of: the first
+ *    date they ever see is one the GM typed on a record they chose to reveal. Warning on every dated reveal
+ *    in a campaign that has never published the clock would train the GM to dismiss the dialog unread,
+ *    which costs the real case its only defence.
+ *
+ * Strictly after, not on-or-after: a record dated exactly at the published date is the party's own present.
+ */
+export function revealAheadOfPlayers(record: Readonly<{ calendarInstant: number | null }>, calendar: GmCodexCalendar | null): boolean {
+  // Falsy-safe on BOTH reads, in the spirit of `deadlineFired`, and not merely defensive: the calendar
+  // arrives through `calendarApi.get` and the field is typed present-but-null, but a caller holding a
+  // narrower calendar shape gives `undefined` here — and `=== null` let that through into `clampToCalendar`,
+  // which threw inside the reveal click handler. A missed warning is a bug; a throw is a broken switch.
+  const published = calendar?.publishedDate;
+  if (!calendar || !published || typeof record.calendarInstant !== "number") return false;
+  // `clampToCalendar` for the same reason the downtime proposal needs it: `publishedDate` can be the one
+  // lossy date the calendar admits ("day 31 of a 30-day month"), and the client's `dateToInstant` clamps the
+  // day only at the bottom — so without this the comparison would sit a day later than the server's does.
+  return record.calendarInstant > dateToInstant(calendar, clampToCalendar(calendar, published));
+}
+
 export function chronicleRowSummary(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload> & Readonly<{ text: string; gmText?: string | null }>): string {
   const standing = standingOf(record);
   if (standing) return standingChangeLabel(standing, null);

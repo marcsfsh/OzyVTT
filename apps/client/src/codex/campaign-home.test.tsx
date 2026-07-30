@@ -297,6 +297,75 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
   });
 });
 
+/**
+ * OWNER DECISION (2026-07-30): one record, one row per screen.
+ *
+ * A deadline used to appear twice on the dashboard — in the Deadlines card badged "Approaching", and again in
+ * Recent journal activity badged "Deadline". Same record id, two rows, two vocabularies. Standing changes
+ * were worse in practice: `setStanding` writes no player prose, so five end-of-session adjustments filled all
+ * five feed slots and pushed every real entry out of a list that is sliced to 5 — while the Faction standing
+ * card, sitting directly above, is unsliced and lists every faction anyway.
+ *
+ * The kinds WITHOUT a card stay in the feed, and that is the half a wider fix would have broken: the final QA
+ * pass reported downtime and milestones as doubling up too, but `CampaignHome` has no downtime card and no
+ * milestone card, so excluding them would have deleted them from the dashboard rather than de-duplicating
+ * them. Both are asserted present below, on purpose.
+ */
+describe("A record with a card of its own does not also sit in the feed (owner decision, 2026-07-30)", () => {
+  const DEADLINE = RECORD({
+    kind: "deadline", id: "d1", text: "The duke's ultimatum expires.", fired: false,
+    inWorldLabel: "Hammer 10, 1492 DR", calendarInstant: 1492 * 30 + 9, inWorldDate: { year: 1492, month: 0, day: 10 }
+  });
+  const STANDING = RECORD({ kind: "standing", id: "s1", text: "", payload: { factionPageId: "p1", delta: -2, reason: "the stolen ledger" } });
+  const MILESTONE = RECORD({ kind: "milestone", id: "m1", text: "", payload: { level: 5, reason: "Barovia" } });
+  const DOWNTIME = RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging", days: 7, applied: false } });
+
+  beforeEach(() => {
+    gmDefaults();
+    chronicle.mockResolvedValue([RECORD(), DEADLINE, STANDING, MILESTONE, DOWNTIME]);
+  });
+
+  const openCampaign = async (user: ReturnType<typeof userEvent.setup>) => {
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await waitFor(() => expect(chronicle).toHaveBeenCalled());
+  };
+
+  it("keeps the deadline in its card and out of the feed", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await openCampaign(user);
+
+    const feed = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    expect(feed.queryByText("The duke's ultimatum expires.")).not.toBeInTheDocument();
+    // Still on the screen — in the card that exists to carry it, which is the half that makes this a
+    // de-duplication rather than a deletion.
+    expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByText("The duke's ultimatum expires.")).toBeInTheDocument();
+  });
+
+  it("keeps standing changes out of the feed, where five of them used to crowd out every real entry", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await openCampaign(user);
+
+    const feed = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    expect(feed.queryByText(/the stolen ledger/)).not.toBeInTheDocument();
+    expect(feed.getByText("The party crossed the mists.")).toBeInTheDocument();
+  });
+
+  it("keeps downtime and milestones IN the feed — the dashboard has no card for either", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await openCampaign(user);
+
+    const feed = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    expect(feed.getByText("A quiet tenday.")).toBeInTheDocument();
+    // A milestone carries its meaning in its PAYLOAD, not its prose, so the row reads through the shared
+    // summary rule rather than through an empty `text`.
+    expect(feed.getByText(/Reached level 5/)).toBeInTheDocument();
+  });
+});
+
 describe("The player's Campaign dashboard is the server's projection (CI-7, viewer safety)", () => {
   beforeEach(playerDefaults);
 

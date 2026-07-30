@@ -601,6 +601,69 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex Phase 4 — owner decisions on the final-QA findings (2026-07-30).** The QA pass left seven
+  friction points and the prep-clock date leak as **owner decisions**, not defects. The owner ruled on four;
+  four smaller findings were fixed alongside. Three of the seven (dashboard cards showing reveal state,
+  audit Hide being one-way, the unbounded standing card) were **not** ruled on and stay in `known-bugs.md`.
+  - **The prep clock no longer leaks silently (owner: keep the dating, warn on reveal, and let me switch
+    the warning off).** Records stay dated at the GM's own clock — that is genuinely when the thing happened
+    — and revealing one dated **strictly after** the published date now opens a confirm naming both dates
+    ("This record is dated Alturiak 28, 1492 DR. Players are still on Hammer 10, 1492 DR…"). The rule is one
+    reader, `revealAheadOfPlayers` in `chronicle.ts`, and it is deliberately **silent** in two cases: an
+    undated record discloses nothing, and a campaign that has **never published** has no "what players have
+    been shown" to be ahead of — warning there would train the GM to dismiss the dialog unread. Hiding is
+    never warned about. The switch is `localStorage` (`codex.warn-reveal-ahead`, absent = ON), set only from
+    the affirmative button, and the way back — **"Warn me again on reveal"** — lives on the prep-clock row,
+    the one place both clocks are on screen. `useConfirm` grew an optional `suppress` control for this
+    (`components/feedback.tsx`), reset per request so a switch flicked on a cancelled dialog cannot arrive
+    pre-flicked on the next one.
+  - **The export bundle is complete (owner: make it complete now).** `exportBundle` appends `calendar`,
+    `folders` and `revisions` — last, so no existing key moves. Each existed nowhere else: the calendar gap
+    was documented since M11 (a restore re-derived every instant against the default 12×30 calendar);
+    `codex_folders` is the only record of a folder the GM emptied but kept; `codex_page_revisions` is the
+    codex's only undo. Revisions travel as a **superset** row (`CodexPageRevisionExportRow`) carrying
+    `entityType`/`fields`/`gmFields`, because `restoreRevision` reads those and the per-page endpoint's
+    contract component is `additionalProperties: false` — one mapper (`toRevision`) owns the shared columns.
+    **No contract change and no docs regeneration**: `CodexExportData.codex` is declared opaque
+    (`additionalProperties: true`); verified by regenerating both docs and confirming `git status docs/`
+    empty. **Measured cost:** 200 pages × 15 revisions goes 1.24 MB → 20.8 MB (~17×), essentially all
+    revisions, which are unbounded (nothing prunes the table). Left unbounded per the owner's decision; if
+    it ever needs bounding, bound the *table*, since a partial history is a backup that lies.
+  - **Confirming a downtime says what it will cost (owner: warn me on the button).** The Confirm row now
+    reads "Advance the campaign clock to Hammer 10, 1492 DR — this passes 2 deadlines." Counts only
+    deadlines not already fired, so the number is what this action causes; singular at 1; **silent at 0**,
+    because a clause present on every downtime is one the GM stops reading.
+  - **One record, one row per screen (owner: keep the cards, drop those kinds from Recent activity), and
+    NARROWER than the review claimed.** `DASHBOARD_CARDED_KINDS` excludes `event`, `deadline` and
+    `standing` from the dashboard feed — shared by the GM's workspace and the player's Codex, which render
+    the same cards. The QA pass also reported downtime and milestones as doubling up; **they do not** —
+    `CampaignHome` has no downtime card and no milestone card, so excluding them would have deleted them
+    from the dashboard rather than de-duplicating them. Checked against the component's actual sections and
+    asserted present. `standing` was the judgment call: its card is unsliced and lists every faction, while
+    five adjustments (which carry no player prose) used to fill all five feed slots.
+  - **Four smaller findings fixed.** "Show the pin" now centres the surface's camera on the pin
+    (`MapSurface.centerOnMarkerId`, a request the surface honours once per ask — selection deliberately does
+    *not* move the camera) and scrolls the map into the page viewport. Publishing acknowledges: "Players now
+    see Alturiak 28, 1492 DR.", which survives the prep-clock row disappearing. A reveal-audit chronicle row
+    now **badges its journal kind** — a new `journalKind` field on `CodexRevealAuditRow`
+    (`CodexJournalKind | null`, present-and-null, in the contract's `required`), read off the *player*
+    projection and badged through `chronicleKindOfJournal`; the server's `AUDIT_JOURNAL_FALLBACK` only named
+    the kind for records with no prose, so a revealed deadline and a revealed note were identical on the one
+    screen that exists to answer "is that deadline visible?". And **"GM only" no longer means two things on
+    one row**: the RECORD axis reads "Hidden from players" (the switch's off state, plus a new
+    `HiddenFromPlayers` pill replacing the misused content pill on the page timeline, page markers and the
+    marker inspector, and `Hidden` on the dashboard's map badge), while the violet "GM only" pill keeps the
+    CONTENT axis alone, as R5 reserves violet for.
+  - **Verified:** `npm run check`, `npm run test` (1432 tests, 8 workspaces) and `npm run build` all green.
+    Every new test **mutation-proven** — 20 mutations, each watched fail on the specific assertion and pass
+    after restore. One test survived its mutation (the confirm dialog's per-request reset was untested) and
+    got a real assertion added. The export size was measured independently rather than taken from the
+    implementing agent's report.
+  - **Found while doing this, and worth knowing: there is no restore route.** "Import" imports markdown
+    files as pages, one per file; nothing reads the export bundle back, and there is no `importBundle`
+    anywhere. So the bundle is now a complete *record* and restoring it still means hand-editing the sqlite
+    file. `CodexExportData`'s "round-trips via the codex import surface" is aspirational.
+
 - **Codex Phase 4 M12 — standing, party marker, milestones, reveal audit (2026-07-29).** Delivers
   **CT-6, CT-7, CT-8, CT-9** and **completes the campaign-tracking programme** (M8–M12). All 12 CT
   requirements plus CP-9's session half are now built.

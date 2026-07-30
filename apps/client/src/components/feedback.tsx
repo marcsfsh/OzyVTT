@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Modal, Button, Input } from "@vtt/ui";
+import { Modal, Button, Input, Switch } from "@vtt/ui";
 
 export type NoticeTone = "success" | "error" | "info";
 export type NoticeMessage = { tone: NoticeTone; text: string } | null;
@@ -11,7 +11,18 @@ export function Notice({ notice }: { notice: NoticeMessage }) {
   return <p className={`notice notice-${notice.tone}`} role={isError ? "alert" : "status"} aria-live={isError ? "assertive" : "polite"}>{notice.text}</p>;
 }
 
-type ConfirmOptions = { title: string; body: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean };
+/**
+ * An optional "don't ask me this again" control inside a confirm.
+ *
+ * `onChange` fires **only when the GM confirms**, with the control's final state. Suppressing a warning
+ * is an affirmative choice, so it rides on the affirmative button: a GM who flicks this and then cancels
+ * has abandoned the whole interaction, and silently disabling a warning on the way out of a dialog they
+ * backed out of is how a safety net disappears without anyone deciding it should.
+ *
+ * A caller that offers this owes the GM a way BACK — there is no settings screen in this app to undo it in.
+ */
+export type ConfirmSuppress = { label: string; onChange: (suppressed: boolean) => void };
+type ConfirmOptions = { title: string; body: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; suppress?: ConfirmSuppress };
 type ConfirmRequest = ConfirmOptions & { resolve: (confirmed: boolean) => void };
 
 /**
@@ -21,8 +32,15 @@ type ConfirmRequest = ConfirmOptions & { resolve: (confirmed: boolean) => void }
  */
 export function useConfirm() {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
-  const confirm = useCallback((options: ConfirmOptions) => new Promise<boolean>((resolve) => setRequest({ ...options, resolve })), []);
-  const settle = (confirmed: boolean) => { request?.resolve(confirmed); setRequest(null); };
+  // Reset per request, not per settle: a stale `true` from a previous dialog would arrive pre-flicked on
+  // the next one, and the GM would suppress a warning by agreeing to something else entirely.
+  const [suppressed, setSuppressed] = useState(false);
+  const confirm = useCallback((options: ConfirmOptions) => new Promise<boolean>((resolve) => { setSuppressed(false); setRequest({ ...options, resolve }); }), []);
+  const settle = (confirmed: boolean) => {
+    if (confirmed && request?.suppress) request.suppress.onChange(suppressed);
+    request?.resolve(confirmed);
+    setRequest(null);
+  };
   const dialog = (
     <Modal
       open={!!request}
@@ -36,6 +54,14 @@ export function useConfirm() {
       </>}
     >
       {request && <p>{request.body}</p>}
+      {/* `Switch`, not a bare checkbox: it carries its own 44px tap floor (mobile parity is an invariant and
+          this dialog is reachable from a phone), and this app has no styled checkbox primitive to inherit
+          one from. The change does not take effect until Confirm, which is stated in the label. */}
+      {request?.suppress && (
+        <div className="confirm-suppress">
+          <Switch checked={suppressed} onChange={setSuppressed} label={request.suppress.label} />
+        </div>
+      )}
     </Modal>
   );
   return { confirm, dialog };

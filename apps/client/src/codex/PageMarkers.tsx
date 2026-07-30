@@ -3,7 +3,7 @@ import { Alert, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import { codexApi, type CodexMarker } from "./api";
 import { CodexIcon } from "./icons";
-import { GmOnlyTag } from "./SecretMarkers";
+import { HiddenFromPlayers } from "./SecretMarkers";
 
 /**
  * CI-4 (return edge): **where this page sits on the atlas.** The Atlas has always been able to say
@@ -54,7 +54,7 @@ export function PageMarkers({ gmToken, pageId, onOpenMarker }: Readonly<{
                 <span className="codex-list-title">{marker.label?.trim() || "Unlabelled pin"}</span>
                 {/* R5: the one GM-only vocabulary. A pin the party cannot see is worth knowing about
                     from here — it is exactly the pin a GM forgets to reveal. */}
-                {!marker.revealedToPlayers && <GmOnlyTag />}
+                {!marker.revealedToPlayers && <HiddenFromPlayers />}
               </button>
             </li>
           ))}

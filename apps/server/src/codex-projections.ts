@@ -1005,7 +1005,33 @@ export type CodexRevealAuditRecord =
  * un-revealing from the audit is `POST /codex/<kind>/{id}/reveal { revealed: false }` and nothing new.
  * M12 adds no unreveal route and no bulk operation: CT-9 is a view, not a writer.
  */
-export type CodexRevealAuditRow = Readonly<{ kind: CodexRevealAuditKind; id: string; title: string }>;
+export type CodexRevealAuditRow = Readonly<{
+  kind: CodexRevealAuditKind;
+  id: string;
+  title: string;
+  /**
+   * WHICH KIND of journal record this is, on a `kind: "journal"` row; `null` on every other kind.
+   *
+   * A field of its own rather than a prefix on `title`, because the client renders it as a BADGE beside
+   * the title: a kind reads by icon AND label in this app (the same rule `CodexChronicleRecord.kind`
+   * states - never by colour alone), and a string that has had "Deadline: " glued to its front cannot be
+   * badged, cannot be styled, and cannot be told apart from a GM who genuinely began a note with that word.
+   *
+   * `title` alone was not enough to name a row on THIS surface. `AUDIT_JOURNAL_FALLBACK` names the kind
+   * only when the record has NO player prose, so a revealed deadline WITH prose and a revealed note with
+   * prose rendered identically - on the one screen whose entire job is answering "is that deadline
+   * visible?". The fallback stays exactly as it was; this carries the kind on every journal row instead of
+   * only the silent ones.
+   *
+   * PRESENT-AND-NULL, not absent. This row is deliberately ONE uniform shape for all seven surfaces (see
+   * the type's comment above and `CodexSearchHit`, whose `entityType` and `mapId` are the same idea): a
+   * reader must not have to branch on which kind it got, so every key is on every row and null means "does
+   * not apply here". Making this the app's first key-presence-discriminated row would buy nothing - the
+   * client checks one value either way - and would cost the `additionalProperties: false` contract
+   * component its single-object shape.
+   */
+  journalKind: CodexJournalKind | null;
+}>;
 
 /** One reveal surface's report. Always present, `revealed: 0` and `rows: []` when the party can see none of it. */
 export type CodexRevealAuditSection = Readonly<{
@@ -1048,16 +1074,16 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
   switch (record.kind) {
     case "page": {
       const projected = projectPlayerPageSummary(record.page);
-      return projected === null ? null : { kind: "page", id: projected.id, title: projected.title };
+      return projected === null ? null : { kind: "page", id: projected.id, title: projected.title, journalKind: null };
     }
     case "map": {
       const projected = projectPlayerMap(record.map, { parentRevealed: record.parentRevealed });
-      return projected === null ? null : { kind: "map", id: projected.id, title: projected.name };
+      return projected === null ? null : { kind: "map", id: projected.id, title: projected.name, journalKind: null };
     }
     case "marker": {
       // `projectPlayerPageMarker`, not `projectPlayerMarker`: the map gate is half the answer here (CD-6).
       const projected = projectPlayerPageMarker(record);
-      return projected === null ? null : { kind: "marker", id: projected.id, title: projected.label ?? "" };
+      return projected === null ? null : { kind: "marker", id: projected.id, title: projected.label ?? "", journalKind: null };
     }
     case "journal": {
       const projected = projectPlayerJournalEntry(record.entry, record.sessionContext);
@@ -1070,25 +1096,36 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
        * kind, not an edge case. An unlabelled pin has the same problem and always has.
        *
        * So: the record's own text when it has any, else what KIND of record it is. Never an empty string.
+       *
+       * `journalKind` then carries the kind on EVERY journal row, prose or not. The fallback above solved
+       * only half of this: a revealed deadline that HAS prose and a revealed note that has prose were
+       * indistinguishable here, and "is that deadline visible?" is the question this screen exists to
+       * answer.
+       *
+       * Read off `projected.kind` - the PLAYER projection's own output, exactly as this file's rule above
+       * requires and for the same reason: if a later change stops handing players a journal entry's kind,
+       * this line becomes a compile error instead of quietly outliving it. It is the same value as
+       * `record.entry.kind`, which is what the fallback above is keyed by, so the badge and the fallback
+       * text cannot disagree about what the record is.
        */
-      return { kind: "journal", id: projected.id, title: excerpt(projected.text) || AUDIT_JOURNAL_FALLBACK[record.entry.kind] };
+      return { kind: "journal", id: projected.id, title: excerpt(projected.text) || AUDIT_JOURNAL_FALLBACK[record.entry.kind], journalKind: projected.kind };
     }
     case "session": {
       const projected = projectPlayerSession(record.session);
       if (projected === null) return null;
       // A numbered session reads by its number, which is how the party refers to it; an unnumbered one has
       // only its recap, so the row shows a bounded excerpt of that rather than an empty line.
-      return { kind: "session", id: projected.id, title: projected.sessionNumber === null ? excerpt(projected.recap) : `Session ${projected.sessionNumber}` };
+      return { kind: "session", id: projected.id, title: projected.sessionNumber === null ? excerpt(projected.recap) : `Session ${projected.sessionNumber}`, journalKind: null };
     }
     case "quest": {
       const projected = projectPlayerQuest(record.quest, { revealedEntityIds: record.revealedEntityIds });
-      return projected === null ? null : { kind: "quest", id: projected.id, title: projected.title };
+      return projected === null ? null : { kind: "quest", id: projected.id, title: projected.title, journalKind: null };
     }
     case "standing": {
       const projected = projectPlayerStanding(record.standing, { factionRevealed: record.factionRevealed });
       // The faction's title comes from its PAGE, which this projection has just established is revealed -
       // so the name on this row is one the party can already read. The standing row itself stores no title.
-      return projected === null ? null : { kind: "standing", id: projected.factionPageId, title: record.factionTitle ?? "" };
+      return projected === null ? null : { kind: "standing", id: projected.factionPageId, title: record.factionTitle ?? "", journalKind: null };
     }
   }
 }

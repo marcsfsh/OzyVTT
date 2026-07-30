@@ -274,6 +274,10 @@
 .codex-gm-block { border-left: 3px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); border-radius: var(--radius-md); }
 .codex-gm-pill { display: inline-block; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--violet-hi); background: color-mix(in srgb, var(--violet) 20%, transparent); padding: 2px 8px; border-radius: var(--radius-pill); }
 .codex-gm-pill.is-floating { position: absolute; top: var(--space-2); right: var(--space-2); pointer-events: none; }
+/* The RECORD axis (`HiddenFromPlayers`), deliberately NOT violet: R5 reserves violet for GM-only CONTENT,
+   which is the other axis and the one the pill above owns. Muted rather than a second accent, because this
+   is the ordinary resting state of a record the GM has not shared yet — not a warning about anything. */
+.codex-hidden-pill { display: inline-block; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); background: var(--surface-3); padding: 2px 8px; border-radius: var(--radius-pill); }
 .codex-fields-secret { margin-top: var(--space-3); padding: var(--space-3); }
 .codex-fields-secret-tag { grid-column: 1 / -1; justify-self: start; margin-bottom: var(--space-1); }
 .codex-tree-icon { flex-shrink: 0; }
