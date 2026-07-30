@@ -86,7 +86,14 @@ export type CodexRevisionHistorySettings = Readonly<{ enabled: boolean; windowMi
 export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistorySettings & Readonly<{ versionCount: number; versionBytes: number }> }>;
 /** What the GM WRITES. Deliberately narrower than the read: the usage figures are the server's to report. */
 export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionHistorySettings }>;
-/** Bounds the server clamps to, restated so a control can refuse a value rather than hand back a 400. */
+/**
+ * The bounds the server ENFORCES, restated so a control can refuse a value instead of earning a 400.
+ *
+ * Measured against the live route, not assumed: out of range is a **400** ("Number must be less than or equal
+ * to 10080"), and a fractional in-range value is truncated (45.7 stores 45). So the client clamps before
+ * sending — which is what keeps that 400 unreachable from the UI — and still shows whatever the server
+ * answers, because truncation means the two can legitimately differ.
+ */
 export const REVISION_WINDOW_MIN = 0;
 export const REVISION_WINDOW_MAX = 10_080;
 

@@ -99,6 +99,48 @@ export type CodexPageRevisionExportRow = CodexPageRevisionRow & Readonly<{
   gmFields: Readonly<Record<string, string>>;
 }>;
 
+/**
+ * OWNER DECISION (2026-07-30): how much version history the codex keeps.
+ *
+ * `codex_page_revisions` was UNBOUNDED - every page save wrote a row, nothing pruned, and a revision row
+ * weighs the same as a page row (both bodies). Measured while completing the export bundle: 200 pages x 15
+ * revisions exported 20.8 MB against 1.24 MB without the history. The owner's answer was two knobs, and the
+ * distinction between them is load-bearing:
+ *
+ *  - `enabled: false` writes NO new revisions at all. It never deletes what exists - disabling a feature must
+ *    not destroy the GM's only undo - so old revisions stay listable and restorable with the switch off.
+ *  - `windowMinutes` COALESCES: a save whose page already has a checkpoint younger than this writes no new
+ *    one. **`0` is not "off"** - it means "checkpoint every save", i.e. exactly today's behaviour - and
+ *    conflating the two would take the old behaviour away from a GM who asks for it by name.
+ *
+ * The owner's default is 90, chosen so "at most, 90 minutes of work could be lost".
+ */
+export type CodexRevisionSettings = Readonly<{ enabled: boolean; windowMinutes: number }>;
+/**
+ * What the kept history actually COSTS - read-only and server-computed, so the GM can answer "is my history
+ * worth trimming?" on the same screen that holds the knobs and the delete.
+ *
+ * Deliberately APPROXIMATE, and the imprecision is the point: `versionBytes` is the summed `LENGTH()` of the
+ * text this table stores, not disk usage and not the export's serialized size. A figure precise enough to
+ * invite comparison against the sqlite file's size would be a figure that disagrees with it. It is rendered as
+ * "about 8.0 MB of text".
+ */
+export type CodexRevisionHistoryUsage = Readonly<{ versionCount: number; versionBytes: number }>;
+/** The revision-history section as a READER sees it: the two settable knobs plus what the history costs. */
+export type CodexRevisionHistory = CodexRevisionSettings & CodexRevisionHistoryUsage;
+/**
+ * Every codex-wide setting, nested by area. `codex_meta` is the codex's singleton settings row, so this is
+ * the shape of that row as a caller sees it; the `revisionHistory` nesting is what gives a later codex-wide
+ * setting a home without inventing fields for it today.
+ */
+export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistory }>;
+/**
+ * The WRITABLE half, and the reason the read and write shapes are two types rather than one: `versionCount` /
+ * `versionBytes` are facts about a table the caller cannot see, so a body that could carry them would be a
+ * client asserting them. They are absent here by construction, not filtered out later.
+ */
+export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionSettings }>;
+
 export type CodexBacklinkRow = Readonly<{
   sourcePageId: string;
   sourceTitle: string;
@@ -991,6 +1033,42 @@ export const MIGRATIONS = [{
     ALTER TABLE codex_markers ADD COLUMN is_party INTEGER NOT NULL DEFAULT 0;
     CREATE UNIQUE INDEX codex_markers_party ON codex_markers (is_party) WHERE is_party = 1;
   `
+}, {
+  version: 17,
+  // OWNER DECISION (2026-07-30): revision history becomes GM-controllable, because `codex_page_revisions` was
+  // unbounded (see `CodexRevisionSettings` for the measurement that provoked this).
+  //
+  // ADDITIVE ONLY, and the loudest thing about this migration is what it does NOT do: it does not prune,
+  // trim, or touch a single existing revision row. Disabling history stops WRITING; destroying the GM's only
+  // undo as a side effect of turning a feature off would be the worst possible reading of the request, and
+  // there is deliberately no "delete my history" verb anywhere in this change.
+  //
+  // Two columns on `codex_meta` - the codex's singleton settings row (`id INTEGER PRIMARY KEY CHECK (id = 1)`),
+  // which is where v4's calendar, v13's active-session pointer and v15's published date already live, so a
+  // codex-wide setting has an established home and needs no table of its own.
+  //
+  // Both carry DEFAULTs, which is the whole of the upgrade story (K7): an existing codex reads
+  // `revision_history_enabled = 1` (exactly today's behaviour - history on) and `revision_window_minutes = 90`
+  // (the owner's default). Verified against this build rather than assumed: `ALTER TABLE ... ADD COLUMN
+  // ... NOT NULL DEFAULT` on a STRICT table backfills the EXISTING row, so there is nothing to UPDATE
+  // afterwards and no window in which the columns read NULL. On a FRESH database this runs BEFORE
+  // `initialize()` seeds `codex_meta`, so there is no row to backfill and the seed's named-column INSERT
+  // simply takes both defaults - the ordering note v13 records, and it holds here for the same reason (the
+  // ALTERs alter the table, not a row).
+  //
+  // INTEGER for the boolean because SQLite has none, the encoding `revealed` / `is_party` already use.
+  //
+  // No CHECK on either column, and that is the same decision v16 made about `codex_standing.value` rather
+  // than a lapse: 0..10080 is a PRODUCT bound (a week of minutes) on a number, not an ENUM whose legal set is
+  // structural, and baking it into the file would cost a full table rebuild - the v15 experience - to widen
+  // later. The clamp lives in `revisionWindowMinutes` on the way in, and `getSettings` re-validates on the way
+  // OUT so a hand-edited or repair-scripted value reads as the default instead of propagating. That is this
+  // file's fail-closed discipline applied to a number, and it is why the guard is on the READ: the write is
+  // not the only way in.
+  sql: `
+    ALTER TABLE codex_meta ADD COLUMN revision_history_enabled INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE codex_meta ADD COLUMN revision_window_minutes INTEGER NOT NULL DEFAULT 90;
+  `
 }];
 
 /**
@@ -1481,6 +1559,42 @@ function standingValue(value: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("A standing value must be a number from -100 to 100.");
   return Math.min(MAX_STANDING, Math.max(MIN_STANDING, Math.trunc(value)));
 }
+
+/**
+ * The revision window's bounds and default (owner decision, 2026-07-30).
+ *
+ * `0` is INSIDE the range and is meaningful: it means "checkpoint every save", which is exactly the behaviour
+ * every codex had before this change. It is emphatically NOT the same as `enabled: false`, and the two are
+ * separate columns so that no reader has to guess which a `0` meant.
+ *
+ * `10080` is one week of minutes - a ceiling rather than a recommendation. Past a week the window stops
+ * coalescing a work session and starts meaning "keep almost nothing", which is what `enabled: false` already
+ * says more honestly, so there is no reason to offer more.
+ */
+const MIN_REVISION_WINDOW_MINUTES = 0;
+const MAX_REVISION_WINDOW_MINUTES = 10_080;
+const DEFAULT_REVISION_SETTINGS: CodexRevisionSettings = { enabled: true, windowMinutes: 90 };
+/**
+ * The ceiling on `deleteRevisionsOlderThan`'s age, and it is a GUARD rather than a policy: a value large enough
+ * to push the cutoff date out of range makes `toISOString()` throw `RangeError: Invalid time value`, turning a
+ * silly request into a 500. 100 years already deletes nothing in any real codex, so nothing legitimate is
+ * refused by it. Measured against this build, not assumed.
+ */
+const MAX_PRUNE_DAYS = 36_500;
+/**
+ * The window on the way in: CLAMPED and TRUNCATED, `standingValue`'s arrangement verbatim and for the same
+ * reason - the GM is dragging a slider along a fixed scale, so a request that overshoots is asking for the end
+ * of the scale rather than making a mistake, and a fractional minute is a UI artefact rather than an intent.
+ * The HTTP router still REJECTS out-of-range values with a 400 (its control cannot produce one, so a caller
+ * that does is malformed); this clamp stands behind it for every non-HTTP writer.
+ *
+ * A non-finite value is an error, not a clamp: `Math.trunc(NaN)` is `NaN`, and clamping that would write NaN
+ * into a STRICT INTEGER column.
+ */
+function revisionWindowMinutes(value: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`A revision window must be a number of minutes from ${MIN_REVISION_WINDOW_MINUTES} to ${MAX_REVISION_WINDOW_MINUTES}.`);
+  return Math.min(MAX_REVISION_WINDOW_MINUTES, Math.max(MIN_REVISION_WINDOW_MINUTES, Math.trunc(value)));
+}
 /**
  * CT-6's payload on the way IN. `delta` is passed in already computed by `setStanding` (it is the difference
  * between two clamped values, so it is bounded by -200..200 and needs no clamp of its own).
@@ -1722,13 +1836,25 @@ export class CodexStore {
       this.rebuildLinks(pageId, row.player_body, row.gm_body);
       this.indexPage(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json, row.tags_json);
       this.registerFolderPath(row.folder, stamp);
-      this.snapshotRevision(pageId, row, "codex:create");
+      // NEVER throttled, unlike `updatePage`'s (owner decision, 2026-07-30). Two reasons, and the first is the
+      // decisive one: a page with no history at all is the one case with nothing to fall back to. And there is
+      // no PRIOR state to checkpoint here anyway - the row this snapshots is the one it just created, which
+      // makes the moment of creation a legitimate checkpoint in its own right rather than an exception.
+      // Never THROTTLED - a page with no history has nothing to fall back to - but it does honour the global
+      // switch. "Globally disable-able" has to mean off: a codex with history disabled would otherwise still
+      // accumulate one checkpoint per page, and the client says in as many words that nothing new is written.
+      if (this.revisionSettings().enabled) this.snapshotRevision(pageId, row, "codex:create");
       this.bumpRevision();
     });
     return this.getPage(pageId)!;
   }
 
-  updatePage(pageId: string, input: CodexPageUpdateInput, expectedRev: number | undefined, authorTag: string): CodexPageRow {
+  /**
+   * `forceRevision` is set by `restoreRevision` alone (see the call below). It is deliberately the LAST
+   * parameter and defaults false, so every existing caller - the PATCH route included - is unchanged and no
+   * request can ask for it.
+   */
+  updatePage(pageId: string, input: CodexPageUpdateInput, expectedRev: number | undefined, authorTag: string, forceRevision = false): CodexPageRow {
     const database = this.requireDatabase();
     const existing = this.pageRow(pageId);
     if (!existing) throw new CodexNotFoundError("That page no longer exists.");
@@ -1742,8 +1868,10 @@ export class CodexStore {
     // CD-2: also prune to the *effective* type, and do it on a bare type switch too. A switch used to
     // keep the old type's values in `fields_json`, where the editor renders only the new type's keys —
     // so the GM could neither see nor delete them, while a revealed page still shipped them to players.
-    // Pruning is recoverable: every save snapshots the prior state into `codex_page_revisions` (which
-    // is never trimmed), so `restoreRevision` restores the old type together with its values.
+    // Pruning is recoverable: a save snapshots the prior state into `codex_page_revisions` (which nothing
+    // ever prunes), so `restoreRevision` restores the old type together with its values. Since 2026-07-30
+    // that snapshot is THROTTLED (`revisionDue`), so the recoverable state may be up to `windowMinutes` old
+    // rather than the immediately preceding one - the owner's accepted trade, not a gap.
     let fieldsJson = existing.fields_json;
     let gmFieldsJson = existing.gm_fields_json;
     if (input.fields !== undefined || input.gmFields !== undefined || nextEntityType !== existing.entity_type) {
@@ -1783,7 +1911,43 @@ export class CodexStore {
       this.rebuildLinks(pageId, next.player_body, next.gm_body);
       this.indexPage(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json, next.tags_json);
       this.registerFolderPath(next.folder, next.updated_at);
-      this.snapshotRevision(pageId, next, authorTag);
+      /**
+       * Checkpoint the state as it was BEFORE this save (`existing`), not the state this save produced
+       * (`next`) - and throttle it (owner decision, 2026-07-30; see `revisionDue`).
+       *
+       * The two used to be nearly interchangeable, which is exactly why the direction never mattered before:
+       * with EVERY save snapshotted, the set of restorable states is the same either way, shifted by one. It
+       * becomes load-bearing the moment saves are skipped, and this is the change that makes skipping SAFE:
+       *
+       *   With new-state snapshots, a save at t=0 is snapshotted, saves through t=80 are skipped, the GM stops,
+       *   and then a save that ruins the page at t=3000 snapshots the RUINED state. The good t=80 work was
+       *   never captured and the GM falls back to t=0.
+       *
+       *   With prior-state snapshots, that ruinous save first checkpoints the good state it is about to
+       *   overwrite. That is what makes "at most 90 minutes of work could be lost" true across an IDLE GAP and
+       *   not only during continuous work - the gap is precisely when the naive version loses everything.
+       *
+       * A consequence, deliberate and not hidden: the newest revision is now normally BEHIND the page's current
+       * state where it used to equal it, so `restoreRevision` on the newest entry is a real undo rather than the
+       * no-op it was. That is the feature, not a side effect.
+       *
+       * `authorTag` still names the save that produced this revision ROW - which, under prior-state semantics,
+       * is the save that DISPLACED the content rather than the one that wrote it. Nothing is lost by that: the
+       * store keeps no per-save author on `codex_pages` to recover the original from, and this app has exactly
+       * one authoring principal (the GM).
+       */
+      /**
+       * `forceRevision` is the RESTORE path, and it is preserving existing behaviour rather than adding a
+       * policy. Every save checkpointed before the throttle existed, so a restore always left the state it
+       * discarded recoverable; with the throttle, a restore inside the window would silently drop it and
+       * "I restored the wrong version" would become unrecoverable. Restoring is the one save that deliberately
+       * throws the current text away, which makes it the one that most needs the state it throws away kept.
+       *
+       * `revisionExistsAt` still applies, so this cannot write a duplicate of a state already captured.
+       */
+      if (this.revisionDue(pageId, forceRevision) && !this.revisionExistsAt(pageId, existing.rev)) {
+        this.snapshotRevision(pageId, existing, authorTag);
+      }
       this.bumpRevision();
     });
     return this.getPage(pageId)!;
@@ -1973,14 +2137,19 @@ export class CodexStore {
     //    holds pages is re-derivable from `codex_pages.folder`, an empty one is derivable from nothing at
     //    all. Without this key, restoring a backup silently deletes every folder the GM had emptied but
     //    kept - the one part of their filing that only this table remembers.
-    //  - `revisions` is `codex_page_revisions`, the codex's only undo. Every page save snapshots the prior
-    //    state there and nothing else does, so a bundle without it restores a codex whose entire history
-    //    is one revision deep. It is the ONE key here that DOMINATES the bundle's size, and it is unbounded:
+    //  - `revisions` is `codex_page_revisions`, the codex's only undo. A page save snapshots the prior state
+    //    there and nothing else does, so a bundle without it restores a codex whose entire history is one
+    //    revision deep. It is the ONE key here that DOMINATES the bundle's size, and it USED to be unbounded:
     //    nothing prunes the table, and a revision row weighs the same as a page row (both bodies), so the
-    //    bundle grows to roughly (1 + revisions-per-page) x its old size. Measured, not estimated: a codex
+    //    bundle grew to roughly (1 + revisions-per-page) x its old size. Measured, not estimated: a codex
     //    of 200 pages x 15 revisions x 3KB per body exports 1.25 MB before this key and 19.73 MB after
-    //    (18.47 MB of it revisions). If that ever needs bounding, bound the TABLE (prune old revisions) -
-    //    an export that carries only some of the history would be a backup that lies about being one.
+    //    (18.47 MB of it revisions).
+    //    That measurement is what provoked the owner's 2026-07-30 decision, and the bound it chose was the one
+    //    named right here: bound the WRITES, never the export. `revisionDue` coalesces saves inside a window
+    //    and can switch history off entirely, so the table stops growing per keystroke - but nothing prunes it
+    //    and this key still carries whatever rows exist, verbatim. An export that carried only SOME of the
+    //    history would be a backup that lies about being one, and a codex whose history stopped growing is
+    //    still a codex whose whole history must round-trip.
     return {
       pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
       sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests(),
@@ -2061,6 +2230,172 @@ export class CodexStore {
     return { id: row.id, fromPageId: row.from_page_id, toPageId: row.to_page_id, type: row.type, createdAt: row.created_at };
   }
 
+  // ----- Codex-wide settings -----
+
+  /**
+   * Every codex-wide setting, plus what the kept history COSTS (owner decision, 2026-07-30).
+   *
+   * The usage figures are computed here and NOT by `revisionSettings` below, which is the split that matters
+   * for performance rather than tidiness: `revisionSettings` is read on EVERY page save and stays one indexed
+   * lookup of the singleton meta row, while this aggregate scans `codex_page_revisions` and is only ever run
+   * for the settings screen.
+   */
+  getSettings(): CodexSettings {
+    return { revisionHistory: { ...this.revisionSettings(), ...this.revisionHistoryUsage() } };
+  }
+
+  /**
+   * What the kept history costs. ONE aggregate over the WHOLE table - not one page's rows - because the
+   * question it answers ("is my history worth trimming?") is about the codex, and the delete it sits beside is
+   * table-wide too.
+   *
+   * **Which columns are summed, and why those:** every column that carries a copy of the PAGE'S CONTENT -
+   * `player_body` and `gm_body` (the dominant weight, and the reason a revision row weighs the same as a page
+   * row), `fields_json` and `gm_fields_json` (the typed entity fields a restore needs), `title`, and
+   * `tags_json`. That set is exactly "what a revision duplicates from its page", so leaving any of it out would
+   * make the figure disagree with what the row is for. Everything else on the row is fixed-size bookkeeping:
+   * `id`, `page_id`, `rev`, `entity_type`, `banner_asset_id`, `authored_at`, `author_tag`.
+   *
+   * `LENGTH()` counts CHARACTERS, not bytes - so for the mostly-ASCII prose a codex holds this equals bytes,
+   * and for accented or CJK text it under-counts. Left as-is deliberately: the figure is declared approximate,
+   * and it exists to be compared against ITSELF before and after a trim, not against the sqlite file. Every
+   * summed column is NOT NULL, so the only null to handle is `SUM` over an empty table, which `COALESCE` does.
+   */
+  private revisionHistoryUsage(): CodexRevisionHistoryUsage {
+    const row = this.requireDatabase().prepare(
+      `SELECT COUNT(*) AS version_count,
+              COALESCE(SUM(LENGTH(title) + LENGTH(player_body) + LENGTH(gm_body) + LENGTH(fields_json) + LENGTH(gm_fields_json) + LENGTH(tags_json)), 0) AS version_bytes
+       FROM codex_page_revisions`
+    ).get() as { version_count: number; version_bytes: number } | undefined;
+    return { versionCount: row?.version_count ?? 0, versionBytes: row?.version_bytes ?? 0 };
+  }
+
+  /**
+   * The two settable knobs alone (owner decision, 2026-07-30). Read on EVERY page save, so it is one indexed
+   * SELECT of the singleton meta row and nothing more - the usage aggregate deliberately does not live here.
+   *
+   * **Both values are re-validated on the way OUT, and that is not belt-and-braces.** `getPublishedDate`
+   * learned this the hard way and its comment records the incident: the write is not the only way into an
+   * INTEGER column - a repair script or a hand-edited database reaches the same place - and a stored value
+   * JavaScript cannot represent makes `node:sqlite` THROW rather than return something odd. Measured against
+   * this build, not assumed: 2^53-1 reads back fine, 2^53 throws `RangeError: Value is too large to be
+   * represented as a JavaScript number`, and it poisons the WHOLE row read, not just its own column - which is
+   * why one bad column falls back to the defaults for both rather than for itself alone.
+   *
+   * A stored NON-INTEGER is impossible rather than merely unlikely, and it is worth saying which guard is doing
+   * what: `codex_meta` is a STRICT table, so an INTEGER column REJECTS `90.5` outright ("cannot store REAL
+   * value in INTEGER column") and losslessly converts `90.0` / `'45'`. Magnitude and RANGE are the only ways a
+   * stored value can be wrong, so those are what the guards below actually catch - `Number.isSafeInteger` plus
+   * the bounds. Reading a bad value as the DEFAULT is right rather than merely safe: an out-of-range window is
+   * not a window, so the honest answer is the one the codex would have had if nobody had ever set it.
+   *
+   * `enabled` accepts EXACTLY 0 or 1 and reads anything else as the default (on). Fail-OPEN is the correct
+   * direction here and the opposite of this file's usual reveal discipline: a garbled value must not silently
+   * stop recording the GM's undo history, which is the one outcome that loses data.
+   */
+  private revisionSettings(): CodexRevisionSettings {
+    let row: { revision_history_enabled: number; revision_window_minutes: number } | undefined;
+    try {
+      row = this.requireDatabase().prepare("SELECT revision_history_enabled, revision_window_minutes FROM codex_meta WHERE id = 1")
+        .get() as { revision_history_enabled: number; revision_window_minutes: number } | undefined;
+    } catch { return DEFAULT_REVISION_SETTINGS; }
+    if (!row) return DEFAULT_REVISION_SETTINGS;
+    const stored = row.revision_window_minutes;
+    const inRange = Number.isSafeInteger(stored) && stored >= MIN_REVISION_WINDOW_MINUTES && stored <= MAX_REVISION_WINDOW_MINUTES;
+    return {
+      enabled: row.revision_history_enabled === 0 || row.revision_history_enabled === 1
+        ? row.revision_history_enabled === 1
+        : DEFAULT_REVISION_SETTINGS.enabled,
+      windowMinutes: inRange ? stored : DEFAULT_REVISION_SETTINGS.windowMinutes
+    };
+  }
+
+  /**
+   * Replace the codex-wide settings and answer with the FULL READ SHAPE, re-read from the database - so a caller
+   * that overshot the window's range sees the clamped value rather than believing its own number took, and gets
+   * the usage figures a GET would have given it without a second round trip.
+   *
+   * It takes `CodexSettingsInput`, not `CodexSettings`: the usage figures are facts about a table the caller
+   * cannot see, so there is no shape in which they could be sent.
+   *
+   * The UPDATE sits inside `this.transaction` beside `bumpRevision`, the shape `setPageRevealed` uses: one
+   * `BEGIN IMMEDIATE`, one coarse revision bump, so every client refetches. No private leaf-level helper the
+   * way `writeCalendar` / `writePublishedDate` have one - those exist because a SECOND caller needed to compose
+   * them into an outer transaction (F-2: `transaction()` is a bare `BEGIN IMMEDIATE` and does not nest), and
+   * nothing composes a settings write today. The read side is a plain SELECT and is therefore safe to call from
+   * inside `updatePage`'s transaction, which is exactly where the throttle calls it.
+   */
+  setSettings(input: CodexSettingsInput): CodexSettings {
+    const database = this.requireDatabase();
+    // Normalized OUTSIDE the transaction: both of these throw on a value they cannot make sense of, and a
+    // rejection that never opened a transaction costs nothing to roll back (`setCalendar`'s arrangement).
+    //
+    // `enabled` is REQUIRED to be a real boolean rather than coerced by truthiness. The read side above
+    // deliberately coerces a garbled stored value to "on"; a WRITE must not, because the coercion of a missing
+    // field would land on `false` and silently switch the GM's undo history off - the one outcome here that
+    // loses data. A caller that means "off" can say so.
+    const enabled = input?.revisionHistory?.enabled;
+    if (typeof enabled !== "boolean") throw new Error("Revision history must be switched on or off explicitly.");
+    const windowMinutes = revisionWindowMinutes(input?.revisionHistory?.windowMinutes);
+    this.transaction(() => {
+      database.prepare("UPDATE codex_meta SET revision_history_enabled = ?, revision_window_minutes = ? WHERE id = 1")
+        .run(enabled ? 1 : 0, windowMinutes);
+      this.bumpRevision();
+    });
+    return this.getSettings();
+  }
+
+  /**
+   * Delete every revision authored more than `olderThanDays` ago, and answer with how many rows really went
+   * (owner decision, 2026-07-30: "yes" to a way of deleting existing version history).
+   *
+   * **`0` deletes everything, and that is ARITHMETIC rather than a magic value** - the cutoff is simply "now",
+   * and nothing is younger than zero days old. Deliberately not special-cased: a branch on zero would be a
+   * second rule about the same comparison, and the day someone changed one of them they would disagree.
+   *
+   * That is what makes the comparison `<=` rather than `<`, and it is the one boundary decision here worth
+   * stating: a row authored EXACTLY at the cutoff is deleted. With a strict `<`, `olderThanDays: 0` on a codex
+   * saved a moment ago deletes nothing - measured, not reasoned about, because `authored_at` and a zero-day
+   * cutoff are then the same stamp to the millisecond. The inclusive boundary also matches `revisionDue`, which
+   * commits a checkpoint at exactly `windowMinutes` rather than one millisecond later; both treat "exactly on
+   * the boundary" as "act".
+   *
+   * REJECTS rather than clamps a bad `olderThanDays`, which is the deliberate opposite of
+   * `revisionWindowMinutes` sitting a few lines above it in this feature. The window is a slider the GM drags,
+   * where overshooting means "the end of the scale"; this is DESTRUCTIVE, so a malformed request must not be
+   * interpreted generously - "-1" or "3.5" is a caller that does not know what it is asking for, and the honest
+   * answer is a refusal. The upper bound exists for a blunter reason as well as symmetry: past a few hundred
+   * thousand years the cutoff date is not representable and `toISOString()` throws `RangeError: Invalid time
+   * value`, so an unbounded input would turn a silly request into a 500. Measured, not assumed.
+   *
+   * **The clock and column are the throttle's, exactly**: `authored_at` compared against `this.now()`, so "old"
+   * means ONE thing in this store - when the checkpointed content was authored. A row whose stamp will not parse
+   * counts as OLD and is deleted, which is the same way `revisionDue` treats one (it checkpoints rather than
+   * trusting it); an empty stamp sorts below every real one, so the ordinary comparison already says so.
+   *
+   * The comparison is done in SQL on the TEXT stamps rather than in JavaScript, so ONE statement does the whole
+   * job inside one `BEGIN IMMEDIATE` and `changes` is the authoritative row count. That is safe here because
+   * every stamp is `new Date(...).toISOString()`, which is fixed-width and therefore sorts chronologically.
+   *
+   * It touches `codex_page_revisions` and NOTHING else. A page as it stands now is not a version of itself, so
+   * no page, body or `rev` moves - and there is no cascade in either direction to worry about, because nothing
+   * references this table. It also ignores the `enabled` setting completely: a GM who turned history off is
+   * exactly the GM who wants the space back.
+   */
+  deleteRevisionsOlderThan(olderThanDays: number): number {
+    const database = this.requireDatabase();
+    if (!Number.isInteger(olderThanDays) || olderThanDays < 0 || olderThanDays > MAX_PRUNE_DAYS) {
+      throw new Error(`Choose a whole number of days from 0 to ${MAX_PRUNE_DAYS}.`);
+    }
+    const cutoff = new Date(this.now() - olderThanDays * 86_400_000).toISOString();
+    let deleted = 0;
+    this.transaction(() => {
+      deleted = database.prepare("DELETE FROM codex_page_revisions WHERE authored_at <= ?").run(cutoff).changes as number;
+      this.bumpRevision();
+    });
+    return deleted;
+  }
+
   // ----- Revisions -----
 
   listRevisions(pageId: string): CodexPageRevisionRow[] {
@@ -2103,11 +2438,25 @@ export class CodexStore {
    * restore keeps the page's CURRENT chronicle placement. Restoring older prose is a content edit, not a
    * statement about when the event happened - and the alternative (snapshotting it) would silently move an
    * event years across the timeline as a side effect of undoing a typo.
+   *
+   * **Unchanged by the 2026-07-30 revision throttle, and checked rather than assumed.** It still restores by
+   * ID, so it reaches every row in the table however sparse the history is, and it still works with
+   * `enabled: false` - disabling history stops new writes, it does not lock the GM out of what exists.
+   * What DID change is that restoring the NEWEST revision is now a meaningful undo: under prior-state
+   * snapshots the newest checkpoint normally sits behind the page's current state, where before this it
+   * equalled it and restoring it was a no-op that only bumped `rev`.
+   *
+   * It goes through `updatePage`, so the restore is itself a save and is itself throttled: the state it
+   * overwrites is checkpointed only if the window allows. That is the same trade every save now makes, and
+   * treating a restore as special would be a second policy about the same table.
    */
   restoreRevision(pageId: string, revisionId: number, authorTag: string): CodexPageRow {
     const snap = this.requireDatabase().prepare("SELECT title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json FROM codex_page_revisions WHERE id = ? AND page_id = ?").get(revisionId, pageId) as { title: string; entity_type: string; fields_json: string; gm_fields_json: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string } | undefined;
     if (!snap) throw new CodexNotFoundError("That revision no longer exists.");
-    return this.updatePage(pageId, { title: snap.title, entityType: snap.entity_type as CodexEntityType, fields: parseFields(snap.fields_json), gmFields: parseFields(snap.gm_fields_json), playerBody: snap.player_body, gmBody: snap.gm_body, bannerAssetId: snap.banner_asset_id, tags: JSON.parse(snap.tags_json) as string[] }, undefined, authorTag);
+    // `forceRevision`: checkpoint the state this restore is about to discard, whatever the window says. Before
+    // the throttle every save checkpointed, so a restore was always undoable; without this, restoring twice
+    // inside the window would lose the text the GM restored away from and there would be no way back.
+    return this.updatePage(pageId, { title: snap.title, entityType: snap.entity_type as CodexEntityType, fields: parseFields(snap.fields_json), gmFields: parseFields(snap.gm_fields_json), playerBody: snap.player_body, gmBody: snap.gm_body, bannerAssetId: snap.banner_asset_id, tags: JSON.parse(snap.tags_json) as string[] }, undefined, authorTag, true);
   }
 
   // ----- Links / backlinks -----
@@ -3674,9 +4023,85 @@ export class CodexStore {
       { title: "", body: `${playerText}\n${gmText ?? ""}\n${tagText}` });
   }
 
+  /**
+   * Write one checkpoint of `row` into `codex_page_revisions`. `authored_at` is the SNAPSHOTTED ROW's
+   * `updated_at`, never the moment the snapshot was taken - so the column means "when the checkpointed content
+   * was last authored", which is the clock `revisionDue` compares against. See `revisionDue` for why that is
+   * the right clock and not merely a convenient one.
+   */
   private snapshotRevision(pageId: string, row: PageRow, authorTag: string) {
     this.requireDatabase().prepare("INSERT INTO codex_page_revisions (page_id, rev, title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(pageId, row.rev, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.player_body, row.gm_body, row.banner_asset_id, row.tags_json, row.updated_at, authorTag);
+  }
+
+  /**
+   * Is this page due a new checkpoint? The owner's throttle (2026-07-30), in three lines and one comparison.
+   *
+   * "if a previous version exists and is less than 90 minutes old, it does not commit a versioned history,
+   * this means that at most, 90 minutes of work could be lost."
+   *
+   * **Which clock "age" is measured against, and why it is `authored_at` rather than a new column.** Since
+   * `updatePage` snapshots the PRIOR state, `authored_at` is when the checkpointed CONTENT was last authored -
+   * not when the snapshot row was written. That is exactly the quantity the owner's sentence is about: if the
+   * page is ruined now and the GM falls back to this checkpoint, what they lose is everything authored after
+   * `authored_at`. Measuring instead from "when the snapshot was taken" would break the guarantee outright, and
+   * the arithmetic is worth spelling out because it is not obvious: a checkpoint written at t=95 holds content
+   * authored at t=80, so at t=180 a capture-time clock reads an age of 85 and skips - while the work actually
+   * at risk runs from t=80, which is 100 minutes. The existing column is not just sufficient, it is the correct
+   * one, so NO new column was added.
+   *
+   * `MAX(authored_at)` rather than "the newest row by `rev` or `id`": it says what it means, and it does not
+   * depend on rev/id order tracking authoring order (which holds today, but only because every writer appends).
+   * TEXT comparison is chronological here because every stamp is `new Date(...).toISOString()`, which is
+   * fixed-width - and legacy rows carrying `''` sort below every real stamp, which is the harmless direction.
+   *
+   * The clock is `this.now()`, the injected one, never a bare `Date.now()` - that is what lets a test drive the
+   * window deterministically instead of sleeping.
+   *
+   * Called from `updatePage` ONLY. `createPage` is never throttled by the WINDOW - a page with no history at
+   * all is the one case with nothing to fall back to - but it does honour the `enabled` switch, because "off"
+   * that still leaves a row per page is not off.
+   */
+  private revisionDue(pageId: string, force = false): boolean {
+    // `revisionSettings`, NOT `getSettings`: this runs on every page save, and `getSettings` also computes the
+    // usage aggregate over the whole revision table, which belongs to the settings screen and not to a save.
+    const settings = this.revisionSettings();
+    // `enabled: false` writes nothing NEW. It deletes nothing, and `listRevisions` / `restoreRevision` keep
+    // working on what is already there - disabling a feature must not destroy the GM's only undo.
+    if (!settings.enabled) return false;
+    // `force` (the restore path) bypasses the WINDOW and never the SWITCH. Ordering matters here and it was
+    // wrong first: forcing above this line let a restore write a checkpoint into a codex whose history the GM
+    // had switched off, which is precisely the "off means off" the switch promises. The window is a policy
+    // about frequency; the switch is a policy about whether to keep history at all, and only one of them has
+    // an exception.
+    if (force) return true;
+    const newest = (this.requireDatabase().prepare("SELECT MAX(authored_at) AS newest FROM codex_page_revisions WHERE page_id = ?")
+      .get(pageId) as { newest: string | null } | undefined)?.newest ?? null;
+    if (newest === null) return true; // no checkpoint at all: there is no "previous version" to coalesce into
+    const age = this.now() - Date.parse(newest);
+    // Write UNLESS the newest checkpoint can be positively shown to be recent. A `windowMinutes` of 0 therefore
+    // snapshots every save (no age is less than 0), which is the pre-2026-07-30 behaviour and is deliberately
+    // NOT what `enabled: false` means. An unparseable stamp (NaN) or one in the future both fail this test and
+    // snapshot, which is the safe direction: an extra revision costs a row, a missing one costs the GM's work.
+    return !(age >= 0 && age < settings.windowMinutes * 60_000);
+  }
+
+  /**
+   * Does a checkpoint for this page's CURRENT `rev` already exist? Three callers need it, for three reasons.
+   *
+   * It exists because `createPage` checkpoints the row it just made at rev 1, and the first `updatePage` then
+   * checkpoints the state it is overwriting - still rev 1, byte-identical. Two identical entries in the GM's
+   * history list, always present at `windowMinutes: 0` and whenever a page is stubbed and first edited after
+   * the window has elapsed. Skipping it does NOT weaken "0 checkpoints every save": a duplicate of a state
+   * already captured loses nothing, so the set of states the GM can return to is unchanged. What `0` promises
+   * is that no state is lost, not that a row is written per save regardless of whether it says anything new.
+   *
+   * `(page_id, rev)` identifies a state exactly, because `rev` increments on every write that changes the page
+   * - including a restore, which goes through `updatePage` like any other save.
+   */
+  private revisionExistsAt(pageId: string, rev: number): boolean {
+    return (this.requireDatabase().prepare("SELECT 1 FROM codex_page_revisions WHERE page_id = ? AND rev = ? LIMIT 1")
+      .get(pageId, rev) as { 1: number } | undefined) !== undefined;
   }
 
   private bumpRevision() {

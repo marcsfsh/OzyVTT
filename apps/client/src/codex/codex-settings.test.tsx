@@ -104,9 +104,12 @@ describe("How often a version is kept is configurable", () => {
 
   /**
    * The number the SERVER stored is what the field shows. The two must DISAGREE for this to prove anything —
-   * typing an over-range value is no good, because the field clamps it client-side to the same number the
-   * server would, and the assertion then passes with the server's answer thrown away. So: type an in-range 45
-   * and have the server answer 60, which the client would never compute on its own.
+   * typing an over-range value is no good, because the field bounds it client-side to the same number the
+   * server enforces, and the assertion then passes with the server's answer thrown away. So: type an in-range
+   * 45 and have the server answer 60, which the client would never compute on its own.
+   *
+   * They can differ for real: measured against the live route, the server TRUNCATES a fractional value
+   * (45.7 stores 45) and REJECTS an out-of-range one with a 400 — which is why the client bounds first.
    */
   it("shows the server's answer rather than what was typed", async () => {
     const user = await open(SETTINGS({ windowMinutes: 90 }));
@@ -120,7 +123,7 @@ describe("How often a version is kept is configurable", () => {
   });
 
   /** And the client still refuses out-of-range input up front rather than posting it for a 400. */
-  it("clamps an out-of-range window before asking the server for it", async () => {
+  it("bounds an out-of-range window before asking the server for it — the server 400s on it", async () => {
     const user = await open(SETTINGS({ windowMinutes: 90 }));
     const field = await screen.findByLabelText(/Save a version at most once every/);
 

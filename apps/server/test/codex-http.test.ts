@@ -1730,3 +1730,126 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
     expect((await put(base, `/api/v1/codex/standing/${randomUUID()}`, GM, { value: 10 })).status).toBe(404);
   });
 });
+
+/**
+ * OWNER DECISION (2026-07-30): revision history becomes GM-controllable, reports what it costs, and can be
+ * deleted. At the HTTP boundary, which is a different question from the store's - these assert on the
+ * SERIALIZED RESPONSE BODY, because the M6 lesson is that a gate at one layer can be masked by a gate at
+ * another and the end-to-end behaviour has to be checked where the bytes actually leave the process. The store
+ * half (the throttle arithmetic, the read guard, the migration path, the delete's row selection) lives in
+ * `codex-store.test.ts`; both are needed.
+ *
+ * The HTTP fixture's clock is FROZEN, which matters for reading these: every save in one test happens at the
+ * same instant, so under the 90-minute default nothing after the creation checkpoint is ever committed. The
+ * window's own arithmetic is therefore driven from the store tests, and these cover the wire shape, the GM
+ * gate, and which bodies are accepted.
+ */
+describe("codex settings and the revision delete, HTTP boundary (owner decision, 2026-07-30)", () => {
+  const settings = async (base: string, headers: Record<string, string>) =>
+    (await body(await get(base, "/api/v1/codex/settings", headers))).data.settings as Json;
+  const del = (base: string, path: string, headers: Record<string, string>, payload: unknown) =>
+    fetch(`${base}${path}`, { method: "DELETE", headers, body: JSON.stringify(payload) });
+
+  it("serves the owner's defaults, with the usage figures, in exactly the shape the client reads", async () => {
+    const { base } = await fixture();
+    const payload = await settings(base, GM);
+    // The whole shape, asserted by key set as well as by value: an extra or renamed key here is a client break.
+    expect(Object.keys(payload)).toEqual(["revisionHistory"]);
+    expect(Object.keys(payload.revisionHistory).sort()).toEqual(["enabled", "versionBytes", "versionCount", "windowMinutes"]);
+    expect(payload.revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 });
+  });
+
+  it("is GM-only on BOTH sides, and on the delete — a player gets 401 and changes nothing", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Barovia", playerBody: "a valley" });
+
+    expect((await get(base, "/api/v1/codex/settings", PLAYER)).status).toBe(401);
+    expect((await put(base, "/api/v1/codex/settings", PLAYER, { revisionHistory: { enabled: false, windowMinutes: 0 } })).status).toBe(401);
+    expect((await del(base, "/api/v1/codex/page-revisions", PLAYER, { olderThanDays: 0 })).status).toBe(401);
+    // ...and the refusals really refused: the settings are untouched and the history is intact.
+    expect((await settings(base, GM)).revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 1, versionBytes: expect.any(Number) });
+  });
+
+  it("stores the two knobs, answers with the full read shape, and reports them back on the next GET", async () => {
+    const { base } = await fixture();
+    const written = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: false, windowMinutes: 240 } }))).data.settings as Json;
+    // The PUT's response IS the read shape, usage figures included - the client puts it straight into state.
+    expect(written.revisionHistory).toEqual({ enabled: false, windowMinutes: 240, versionCount: 0, versionBytes: 0 });
+    expect((await settings(base, GM)).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 240 });
+  });
+
+  it("truncates a fractional window but REJECTS one out of range", async () => {
+    const { base } = await fixture();
+    // In range but unrounded: accepted and truncated, because that is a slider artefact rather than a mistake.
+    const truncated = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45.7 } }))).data.settings as Json;
+    expect(truncated.revisionHistory.windowMinutes).toBe(45);
+    // Out of range either way: a 400, because the GM's control cannot produce one, so a caller that does is malformed.
+    for (const windowMinutes of [-1, 10_081]) {
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes } });
+      expect(rejected.status, `windowMinutes ${windowMinutes}`).toBe(400);
+      expect((await body(rejected)).error.code).toBe("validation_failed");
+    }
+    // ...and nothing was stored by the refusals.
+    expect((await settings(base, GM)).revisionHistory.windowMinutes).toBe(45);
+  });
+
+  /**
+   * The usage figures are READ-ONLY. Sending either is a 400 rather than a silently ignored key (every schema in
+   * `codex-http.ts` is `.strict()`), which is the right answer rather than the convenient one: they are facts
+   * about a table the caller cannot see, so a body carrying them is a caller asserting something it does not
+   * know, and hearing so beats being quietly overruled.
+   */
+  it("refuses a body that tries to assert the usage figures, and stores nothing", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Vallaki", playerBody: "a walled town" });
+    const before = await settings(base, GM);
+
+    for (const extra of [{ versionCount: 0 }, { versionBytes: 0 }, { versionCount: 9, versionBytes: 9 }]) {
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90, ...extra } });
+      expect(rejected.status, JSON.stringify(extra)).toBe(400);
+    }
+    // A missing knob is a 400 too - the PUT replaces the settings wholesale, so a half-body is not a partial edit.
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { windowMinutes: 90 } })).status).toBe(400);
+    expect((await put(base, "/api/v1/codex/settings", GM, {})).status).toBe(400);
+    // The real figures are unchanged and still the server's own.
+    expect(await settings(base, GM)).toEqual(before);
+    expect(before.revisionHistory.versionCount).toBe(1);
+  });
+
+  it("deletes every revision at olderThanDays 0 and answers with the real count", async () => {
+    const { base, store } = await fixture();
+    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } }); // keep every save, frozen clock
+    const page = store.createPage({ title: "Krezk", playerBody: "v0" });
+    // Two edits: the first one's prior state is rev 1, which the creation already checkpointed, so the
+    // byte-identical duplicate is suppressed. Two pages plus one distinct edit = three rows.
+    store.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
+    store.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
+    store.createPage({ title: "Berez", playerBody: "swamp" });
+    expect((await settings(base, GM)).revisionHistory.versionCount).toBe(3);
+
+    const deleted = await del(base, "/api/v1/codex/page-revisions", GM, { olderThanDays: 0 });
+    expect(deleted.status).toBe(200);
+    expect((await body(deleted)).data).toEqual({ deleted: 3 });
+    // The usage figures move with it, and a second call reports 0 rather than repeating the first answer.
+    expect((await settings(base, GM)).revisionHistory).toMatchObject({ versionCount: 0, versionBytes: 0 });
+    expect((await body(await del(base, "/api/v1/codex/page-revisions", GM, { olderThanDays: 0 }))).data).toEqual({ deleted: 0 });
+
+    // ...and the PAGES are all still there, with their bodies: a page as it stands now is not a version of itself.
+    const pages = (await body(await get(base, "/api/v1/codex/pages", GM))).data.pages as Json[];
+    expect(pages.map((row) => row.title).sort()).toEqual(["Berez", "Krezk"]);
+    expect((await body(await get(base, `/api/v1/codex/pages/${page.id}`, GM))).data.page).toMatchObject({ playerBody: "v2", rev: 3 });
+  });
+
+  it("400s a negative, fractional or absurd age, and deletes nothing when it does", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Yester Hill", playerBody: "standing stones" });
+    for (const olderThanDays of [-1, 3.5, 36_501, "7", null]) {
+      const rejected = await del(base, "/api/v1/codex/page-revisions", GM, { olderThanDays });
+      expect(rejected.status, `olderThanDays ${JSON.stringify(olderThanDays)}`).toBe(400);
+      expect((await body(rejected)).error.code).toBe("validation_failed");
+    }
+    // A silent body is a 400 too: the destructive route must not have a meaning when nothing was asked for.
+    expect((await del(base, "/api/v1/codex/page-revisions", GM, {})).status).toBe(400);
+    expect((await settings(base, GM)).revisionHistory.versionCount).toBe(1);
+  });
+});

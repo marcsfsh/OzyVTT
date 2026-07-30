@@ -7,6 +7,38 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-30 — version history: a checkpoint is of the state you are about to LOSE
+
+Throttling `codex_page_revisions` is only safe because the snapshot direction changed with it. `updatePage`
+used to record the state it had just written; it now records the state it is about to overwrite. With
+new-state snapshots, a save at t=0 is checkpointed, saves through t=80 are skipped, the GM stops, and a save
+that ruins the page at t=3000 checkpoints the **ruined** state — the good work was never captured. Prior-state
+means the ruinous save first preserves what it is destroying, which is the only reading under which "at most
+90 minutes of work could be lost" survives an idle gap.
+
+Everything else follows from that one idea:
+
+- **Age is `authored_at`, and no new column was needed.** Under prior-state semantics that column means "when
+  the checkpointed content was last authored", which is exactly the quantity the guarantee measures. A
+  capture-time clock breaks it: a checkpoint *written* at t=95 holds content authored at t=80, so at t=180 it
+  reads an age of 85 and skips while the work actually at risk is 100 minutes old.
+- **A restore always checkpoints.** Every save checkpointed before the throttle existed, so a restore was
+  always undoable; leaving it throttled would make "I restored the wrong version" unrecoverable inside the
+  window. This is *preserving* behaviour, not adding policy — which is why the exception exists at all.
+- **The window has an exception; the switch does not.** The restore's bypass was first ordered above the
+  `enabled` check, which let a restore write history into a codex whose history the GM had switched off. The
+  window is a policy about frequency, the switch is a policy about whether to keep history at all, and only
+  one of those is negotiable.
+- **`0` is not `off`.** Zero minutes means "keep every save" — the pre-decision behaviour, which a GM may ask
+  for by name. Conflating the two would take it away and silently restore the unbounded table.
+- **Off means off, creation included.** `createPage` is never throttled by the window (a page with no history
+  has nothing to fall back to) but it does honour the switch: "globally disable-able" that still leaves one
+  row per page is not that.
+- **Deleting is bounded by arithmetic, not by a special case.** `olderThanDays: 0` removes everything because
+  nothing is younger than zero days old. The day field nonetheless floors at 1 and delete-all has its own
+  button and confirm: they are different decisions, and one is unrecoverable. And **if history ever needs
+  bounding further, bound the TABLE** — an export carrying part of the history would be a backup that lies.
+
 ## 2026-07-30 — four owner decisions on the final-QA findings
 
 The final QA pass deliberately left seven UX findings and the prep-clock date leak as **owner decisions**

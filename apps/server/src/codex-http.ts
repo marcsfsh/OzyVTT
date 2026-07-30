@@ -238,6 +238,35 @@ const StandingSetSchema = z.object({
   value: z.number().int().min(-100).max(100),
   reason: z.string().trim().max(120).default("")
 }).strict();
+/**
+ * OWNER DECISION (2026-07-30): the codex-wide settings body. Nested under `revisionHistory` deliberately -
+ * `codex_meta` is the codex's settings row, and a nested object gives a later codex-wide setting a home
+ * without inventing fields for it today.
+ *
+ * `windowMinutes` is `z.number()` and NOT `.int()`, which is the one deliberate looseness here. The bounds are
+ * REJECTED (0..10080, this file's usual router-rejects / store-enforces arrangement - see `StandingSetSchema`),
+ * because a control that produced 99999 would be a malformed caller and deserves to hear so. A FRACTIONAL
+ * value inside the range is a different thing: it is a slider artefact, not a mistake about what was meant, so
+ * the store TRUNCATES it (`revisionWindowMinutes`) and the response carries the stored value back. Rejecting
+ * 45.5 would make a legitimate drag fail for no reader-visible reason.
+ */
+const CodexSettingsSchema = z.object({
+  revisionHistory: z.object({
+    enabled: z.boolean(),
+    windowMinutes: z.number().min(0).max(10_080)
+  }).strict()
+}).strict();
+/**
+ * The delete (owner decision, 2026-07-30). `olderThanDays: 0` deletes EVERY revision, and it is arithmetic
+ * rather than a magic value - nothing is younger than zero days old - so `min(0)` admits it without a branch.
+ *
+ * `.int()` and `.nonnegative()` REJECT rather than clamp, the deliberate opposite of `windowMinutes` directly
+ * above: this is the one destructive route in the Codex, and a malformed request must not be interpreted
+ * generously. "3.5 days" or "-1" is a caller that does not know what it is asking, and the honest answer is a
+ * 400. The store rejects the same values behind this, and also caps the age (`MAX_PRUNE_DAYS`) - which this
+ * mirrors, because a cutoff date past the representable range would otherwise 500 rather than 400.
+ */
+const RevisionsDeleteSchema = z.object({ olderThanDays: z.number().int().min(0).max(36_500) }).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
   months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
@@ -1137,6 +1166,65 @@ export function createCodexRouter(options: CodexRouterOptions) {
       options.notifyChanged("journal");
       return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) });
     } catch (error) { return codexError(response, error); }
+  });
+
+  // ----- Codex-wide settings (GM-only: how much version history the codex keeps) -----
+
+  /**
+   * OWNER DECISION (2026-07-30). Two GM-only routes over `codex_meta`'s two new columns.
+   *
+   * **GM-only on BOTH sides, including the read**, unlike the calendar pair immediately above. There is no
+   * player projection to write because there is nothing here a player has any use for: these settings describe
+   * how the GM's own authoring history is kept, they gate no content, and they place nothing on a player's
+   * screen. A read a player could make would only be a fact about the GM's tooling leaking sideways.
+   *
+   * **NOTHING IS BROADCAST from either of these routes, or from the revision delete below** - the one place in
+   * this file that departs from "every write calls `notifyChanged`", so it is worth saying why rather than
+   * looking like an omission. `notifyCodexChanged` emits `codex:changed` with a `scope` to EVERY socket,
+   * players included, and the scope union names content kinds (`pages`, `maps`, `markers`, `journal`,
+   * `sessions`, `quests`). None of them is true here: no page, marker or entry changed, so pinging `"pages"`
+   * would make every client refetch a list that did not move, on the strength of a false statement. Adding a
+   * seventh scope would broadcast a GM-only tooling fact to every player socket for no reader's benefit -
+   * there is exactly one GM, and they get the new state in this response.
+   *
+   * The store still bumps the coarse codex revision inside each write's transaction (every write does), so an
+   * ETag-driven reader is not left holding a stale token; there is simply no content to push.
+   */
+  router.get(`${CODEX_BASE}/settings`, requireGm, (_request, response) => envelope(response, 200, { settings: store.getSettings() }));
+
+  /**
+   * Replaces the settings wholesale and answers with the full READ shape, never with what was sent - so a caller
+   * whose `windowMinutes` was clamped or truncated sees the real value rather than believing its own number
+   * took, and gets the usage figures without a second round trip. Same contract as `PUT /codex/calendar`: a
+   * malformed body is a 400 through `malformed`, and the store is the enforcer behind it.
+   *
+   * `versionCount` / `versionBytes` are NOT accepted here, and the schema is `.strict()` (as every schema in
+   * this file is), so sending either is a **400** rather than a silently ignored key. That is the right answer
+   * rather than merely the convenient one: they are facts about a table the caller cannot see, so a body
+   * carrying them is a caller asserting something it does not know, and hearing so is better than being
+   * quietly overruled. `CodexSettingsInput` has no shape for them either, so there is no path that stores them.
+   */
+  router.put(`${CODEX_BASE}/settings`, requireGm, (request, response) => {
+    try { return envelope(response, 200, { settings: store.setSettings(CodexSettingsSchema.parse(request.body)) }); }
+    catch (error) { return malformed(response, error); }
+  });
+
+  /**
+   * OWNER DECISION (2026-07-30): "yes" to a way of deleting existing version history. The ONE destructive route
+   * in the Codex surface, and everything about it is deliberately unforgiving.
+   *
+   * Addressed at `/codex/page-revisions` - the whole `codex_page_revisions` table - rather than under
+   * `/codex/pages/{id}/revisions`, because the question it answers ("reclaim the space my history is using") is
+   * about the codex, not about one page. `GET /codex/pages/{id}/revisions` remains the per-page read; the two
+   * paths do not overlap and neither can be mis-matched by the router.
+   *
+   * A bad `olderThanDays` is a 400, never a clamp (see `RevisionsDeleteSchema`). It works with history switched
+   * OFF - a GM who disabled it is exactly the GM reclaiming space - and it never touches `codex_pages`: a page
+   * as it stands now is not a version of itself.
+   */
+  router.delete(`${CODEX_BASE}/page-revisions`, requireGm, (request, response) => {
+    try { return envelope(response, 200, { deleted: store.deleteRevisionsOlderThan(RevisionsDeleteSchema.parse(request.body).olderThanDays) }); }
+    catch (error) { return malformed(response, error); }
   });
 
   // ----- Export (GM backup / round-trip) -----

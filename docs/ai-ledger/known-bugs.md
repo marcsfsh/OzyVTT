@@ -30,17 +30,23 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   record appearing twice on the dashboard; "Show the pin" not showing the pin; publishing giving no
   confirmation; audit rows not naming their kind; and "GM only" meaning two different things on one row.
 
-- **[codex/export] `GET /codex/export` has no restore path, and the bundle is now ~17× larger
-  (2026-07-30).** The bundle was completed on the owner's decision (calendar, folders, page revisions), so it
-  is a complete *record* of a codex — but **nothing reads it back**. The Codex's "Import" button imports
-  markdown files as pages, one per file; there is no `importBundle`, no import route, and no consumer of the
-  bundle anywhere in the repo, so restoring means hand-editing the sqlite file. `CodexExportData`'s
-  description ("round-trips via the codex import surface") is aspirational. Separately, revision history is
-  **unbounded** — nothing prunes `codex_page_revisions` — so the bundle grows to roughly
-  (1 + revisions-per-page) × its old size: measured at 1.24 MB → 20.8 MB for 200 pages × 15 revisions, and
-  `express` buffers the whole thing, so a ~20 MB `JSON.stringify` is now one synchronous call on the GM's
-  backup path. Fine on a LAN for one GM; recorded so it is a known cost rather than a surprise. If it needs
-  bounding, prune the TABLE — a partial history would be a backup that lies about being one.
+- **[codex/export] `GET /codex/export` has no restore path (2026-07-30).** The bundle was completed on the
+  owner's decision (calendar, folders, page revisions), so it is a complete *record* of a codex — but
+  **nothing reads it back**. The Codex's "Import" button imports markdown files as pages, one per file; there
+  is no `importBundle`, no import route, and no consumer of the bundle anywhere in the repo, so restoring
+  means hand-editing the sqlite file. `CodexExportData`'s description ("round-trips via the codex import
+  surface") is aspirational.
+
+  _The size half of this entry is resolved:_ revision history is no longer unbounded — migration v17 added a
+  global switch and a coalescing window (90 minutes by default), and `DELETE /codex/page-revisions` trims
+  what already exists. A codex that keeps every save can still reach the measured 20.8 MB, and `express`
+  buffers the response, so a large bundle is still one synchronous `JSON.stringify` on the GM's backup path.
+
+- **[codex/history] Nothing coalesces or prunes a page's revisions RETROACTIVELY (2026-07-30).** The window
+  applies to new saves only, so a codex that accumulated hundreds of rows per page before v17 keeps them
+  until the GM trims from Codex settings. That is deliberate — silently deleting history on upgrade would be
+  the destructive act the whole design avoids — but it means the default 90-minute window does not shrink an
+  existing codex by itself, and a GM who never opens the settings screen will not discover the trim.
 
 - **[repo/tooling] The committed tap audit cannot see five of the surfaces this programme added.** Its
   `MODES` loop visits the five mode tabs only, and switching mode closes the destinations — so the Sessions

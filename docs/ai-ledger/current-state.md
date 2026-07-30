@@ -601,6 +601,50 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex version history is bounded, switchable and trimmable — owner decisions (2026-07-30).** Completing
+  the export bundle exposed `codex_page_revisions` as **unbounded**: every page save wrote a row, nothing
+  pruned, and a revision row weighs the same as a page row (both bodies). Worse than "per save" implies — the
+  page editor autosaves on an **800ms debounce**, so a version was written on every pause in typing and an
+  hour of writing produced hundreds of rows for one page. The owner asked for three things.
+  - **A global switch, a configurable frequency, and a 90-minute default.** Migration **v17** adds
+    `revision_history_enabled` and `revision_window_minutes` to `codex_meta`, additive with defaults so an
+    existing codex upgrades to today's behaviour plus the new window. `enabled: false` writes nothing at all;
+    `windowMinutes` coalesces, and **`0` means "keep every save"** — the pre-decision behaviour, deliberately
+    NOT the same as off, which is the one conflation that would quietly bring the 20 MB export back.
+  - **The snapshot now captures the PRIOR state, and that is what makes throttling safe.** `updatePage` used
+    to snapshot the new row. With that, a save at t=0 is checkpointed, saves through t=80 are skipped, the GM
+    stops, and a save that ruins the page at t=3000 checkpoints the *ruined* state — the good work was never
+    captured and the GM falls back to t=0. Prior-state means the ruinous save first checkpoints the state it
+    is about to overwrite, which is what makes "at most 90 minutes of work could be lost" true across idle
+    gaps and not only during continuous typing. Age is measured on `authored_at` (no new column), which under
+    prior-state semantics is exactly the quantity the guarantee is about.
+  - **Deleting existing history.** `DELETE /codex/page-revisions { olderThanDays }`, GM-only, one
+    transaction, never touching `codex_pages`. **`olderThanDays: 0` deletes everything** by ordinary
+    arithmetic rather than a special case. Two separate controls with separate confirms, and the day field
+    **floors at 1** so winding it down is not a route to deleting everything. The confirm names the real
+    count, because "this cannot be undone" over an unknown number is a warning a GM learns to click through.
+  - **A Codex settings screen** (owner's placement choice) — the FOURTH destination off the ops row, on the
+    same terms as the session log, quest log and reveal audit; every opener now closes the other three. It
+    reports what the history costs (`versionCount` / `versionBytes`, server-computed and absent from the
+    write shape). The page editor's Revision history panel keeps a read-only sentence naming the setting in
+    force, which preserves the one real advantage of the placement it lost: a short list explains itself.
+  - **Four corrections I made to the implementing agent's work**, each mutation-proven: the rev-1 **duplicate**
+    (creation checkpoints rev 1, then the first edit checkpoints rev 1 again, byte-identical) is now
+    suppressed by `revisionExistsAt`; `createPage` honours the `enabled` switch, because "globally
+    disable-able" cannot leave one row per page behind; **a restore always checkpoints the state it
+    discards**, which is *preserving* pre-throttle behaviour rather than adding policy (without it, restoring
+    the wrong version inside the window is unrecoverable); and `force` was initially ordered above the
+    `enabled` check, so a restore wrote history into a codex whose history was switched off — the window has
+    an exception, the switch does not.
+  - **Verified:** `npm run check` and `npm run test` (1479 tests, 8 workspaces) green; both generated docs
+    regenerated, changed, and idempotent (a new path with a request body, so a diff was expected here where
+    a components-only change correctly produces none). **End-to-end against the live server** with a real GM
+    token: 6 writes → 1 checkpoint at a 90-minute window; 4 writes → 3 at `0`; nothing at all with the switch
+    off, creation included; the delete removing 4 rows and leaving all 3 pages intact; out-of-range windows
+    **400** and fractional ones truncate (measured, and the client comment was corrected to say so rather
+    than "clamps"); and all three routes **401** against a real player token. **Chromium at 375px and 320px**
+    — 31 checks each, driven against the live server, in `scripts/codex-settings-ux-check.mjs`.
+
 - **Codex Phase 4 — owner decisions on the final-QA findings (2026-07-30).** The QA pass left seven
   friction points and the prep-clock date leak as **owner decisions**, not defects. The owner ruled on four;
   four smaller findings were fixed alongside. Three of the seven (dashboard cards showing reveal state,

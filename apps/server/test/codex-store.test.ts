@@ -381,8 +381,16 @@ describe("CodexStore pages", () => {
     const revealed = store.setPageRevealed(page.id, true);
     expect(revealed.revealedToPlayers).toBe(true);
 
+    /**
+     * ONE checkpoint, from the creation, and that single number now proves two separate things (owner
+     * decision, 2026-07-30):
+     *  - the update was COALESCED into it. Under the 90-minute default a save this soon after the page's
+     *    last checkpoint writes no new revision, which is the whole point of the throttle.
+     *  - the reveal still snapshots NOTHING. It never did, and if it started to, this would read 2 - the
+     *    assertion the line originally existed for, unchanged in force.
+     */
     const revisionCount = store.listRevisions(page.id).length;
-    expect(revisionCount).toBe(2); // create + one update (reveal does not snapshot)
+    expect(revisionCount).toBe(1);
 
     store.close();
     store = new CodexStore(join(directory, "vtt.sqlite"));
@@ -3173,8 +3181,16 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
   });
 
   it("carries EVERY page's revision history, with the snapshot columns a restore needs", () => {
+    /**
+     * `windowMinutes: 0` = checkpoint every save, which is exactly the behaviour this test was written
+     * against before the 2026-07-30 throttle existed. It is set explicitly because this test is about what
+     * the BUNDLE carries and therefore needs a history deeper than one entry; the throttle's own behaviour is
+     * tested in "CodexStore revision history" below, not here.
+     */
+    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
     const page = store.createPage({ title: "Strahd", entityType: "character", fields: { race: "Vampire" }, gmFields: { goals: "Reclaim Tatyana" }, playerBody: "A count.", gmBody: "The darklord." });
     store.updatePage(page.id, { title: "Strahd von Zarovich", playerBody: "A count of Barovia." }, undefined, "gm");
+    store.updatePage(page.id, { title: "Strahd, Lord of Barovia" }, undefined, "gm");
     const other = store.createPage({ title: "Ireena" });
 
     const bundle = store.exportBundle();
@@ -3182,7 +3198,14 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
     // page the way `listRevisions` is.
     expect(new Set(bundle.revisions.map((row) => row.pageId))).toEqual(new Set([page.id, other.id]));
     const history = bundle.revisions.filter((row) => row.pageId === page.id);
-    expect(history.map((row) => row.rev)).toEqual([1, 2]);                 // ascending: a history, not a feed
+    /**
+     * Ascending: a history, not a feed. **One row per `rev`, never two.** Prior-state snapshots would otherwise
+     * duplicate rev 1 - the creation checkpoints the page it just made, and the first edit checkpoints the
+     * state it overwrites, which is still rev 1 and byte-identical - so `revisionExistsAt` suppresses the
+     * second. That does not weaken "windowMinutes 0 keeps every save": a duplicate of a state already captured
+     * loses nothing, and the set of states the GM can return to is the same either way.
+     */
+    expect(history.map((row) => row.rev)).toEqual([1, 2]);
     expect(history[0]).toMatchObject({ title: "Strahd", playerBody: "A count.", gmBody: "The darklord." });
     expect(history[1].title).toBe("Strahd von Zarovich");
     /**
@@ -3209,5 +3232,550 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
       "publishedDate", "standing", "partyMarkerId",
       "calendar", "folders", "revisions"
     ]);
+  });
+});
+
+/**
+ * OWNER DECISION (2026-07-30): revision history is globally disable-able and its frequency configurable.
+ *
+ * "revision history should be globally disable-able for the GM; and the frequency of revision history should
+ * be configurable. Default is: if a previous version exists and is less than 90 minutes old, it does not
+ * commit a versioned history, this means that at most, 90 minutes of work could be lost."
+ *
+ * Every test here drives the store's INJECTED clock (`new CodexStore(path, () => now)`) rather than sleeping,
+ * which is why the constructor takes one. A test that slept could only ever exercise `windowMinutes: 0`.
+ *
+ * The other half of the decision is what the change deliberately does NOT do: nothing here prunes, trims or
+ * deletes a revision row, and the disabled case asserts that explicitly rather than implying it.
+ */
+describe("CodexStore revision history — the GM's two knobs (owner decision, 2026-07-30)", () => {
+  const EPOCH = Date.parse("2026-07-30T09:00:00.000Z");
+  let clockDirectory: string;
+  let clock: CodexStore;
+  let now = EPOCH;
+  /** Move the injected clock to `minutes` after the fixture's epoch. */
+  const at = (minutes: number) => { now = EPOCH + minutes * 60_000; };
+
+  beforeEach(async () => {
+    clockDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-revisions-"));
+    now = EPOCH;
+    clock = new CodexStore(join(clockDirectory, "vtt.sqlite"), () => now);
+    await clock.initialize();
+  });
+  afterEach(async () => {
+    clock.close();
+    await rm(clockDirectory, { recursive: true, force: true });
+  });
+
+  it("starts every codex on the owner's defaults: history on, a 90-minute window, nothing stored yet", () => {
+    expect(clock.getSettings()).toEqual({ revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 } });
+  });
+
+  it("coalesces a save INSIDE the window and checkpoints one OUTSIDE it", () => {
+    at(0);
+    const page = clock.createPage({ title: "Barovia", playerBody: "v0" });
+    expect(clock.listRevisions(page.id)).toHaveLength(1);   // the creation checkpoint, never throttled
+
+    at(89);                                                 // 89 < 90: coalesced into the existing checkpoint
+    clock.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
+    expect(clock.listRevisions(page.id)).toHaveLength(1);
+
+    at(90);                                                 // exactly 90 is NOT "less than 90", so this commits
+    clock.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
+    const revisions = clock.listRevisions(page.id);
+    expect(revisions).toHaveLength(2);
+    // ...and what it captured is the state this save OVERWROTE (v1, authored at t=89), not the v2 it wrote.
+    expect(revisions[0]).toMatchObject({ playerBody: "v1", authoredAt: new Date(EPOCH + 89 * 60_000).toISOString() });
+  });
+
+  /**
+   * The easy inversion to ship by accident is `0 => never`. It is exactly backwards: `0` is the pre-decision
+   * behaviour ("keep every save") and `enabled: false` is the "never". The clock deliberately does NOT move
+   * between these saves, so nothing here can pass by accident of elapsed time.
+   */
+  it("checkpoints EVERY save at windowMinutes 0 — the OLD behaviour, not 'never'", () => {
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+    at(0);
+    const page = clock.createPage({ title: "Vallaki", playerBody: "v0" });
+    clock.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
+    clock.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
+    clock.updatePage(page.id, { playerBody: "v3" }, undefined, "gm");
+    // Four writes, THREE checkpoints, with the clock frozen the whole time — one per distinct state.
+    const revisions = clock.listRevisions(page.id);
+    expect(revisions).toHaveLength(3);
+    // Newest first. `v0` appears ONCE: the creation checkpoint already captured rev 1, so the first edit's
+    // prior-state snapshot would have been a byte-identical duplicate and is suppressed. `v3` is absent
+    // because it is the CURRENT state, which is the whole point of checkpointing the prior one.
+    expect(revisions.map((row) => row.playerBody)).toEqual(["v2", "v1", "v0"]);
+  });
+
+  it("writes NOTHING with history disabled, and still lists and restores what already exists", () => {
+    at(0);
+    const page = clock.createPage({ title: "Krezk", playerBody: "the good version" });
+    at(200); clock.updatePage(page.id, { playerBody: "second" }, undefined, "gm");
+    at(400); clock.updatePage(page.id, { playerBody: "third" }, undefined, "gm");
+    const before = clock.listRevisions(page.id);
+    expect(before.map((row) => row.playerBody)).toEqual(["second", "the good version"]);
+
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    at(1000); clock.updatePage(page.id, { playerBody: "fourth" }, undefined, "gm");
+    at(2000); clock.updatePage(page.id, { playerBody: "fifth" }, undefined, "gm");
+    // Not one new row - and, just as important, not one row DESTROYED. Disabling a feature must not delete the
+    // GM's only undo, so this asserts the exact same row ids are still there rather than merely a count.
+    expect(clock.listRevisions(page.id).map((row) => row.id)).toEqual(before.map((row) => row.id));
+
+    // ...and the history is still RESTORABLE with the switch off, which is the half a "stop writing" change
+    // most easily breaks by routing restore through the same gate.
+    const oldest = before[before.length - 1];
+    expect(clock.restoreRevision(page.id, oldest.id, "gm").playerBody).toBe("the good version");
+    // The restore is itself a save, and it wrote no revision either - nothing crept in through that path.
+    // This is the one that catches a `force`-style exception ordered ABOVE the enabled switch: a restore always
+    // checkpoints the text it discards (see the test below), and that exception must bypass the WINDOW only.
+    expect(clock.listRevisions(page.id).map((row) => row.id)).toEqual(before.map((row) => row.id));
+  });
+
+  /**
+   * **Off means off, on the create path too.** `enabled: false` writes no checkpoint at all, not even a page's
+   * creation - the two gates are deliberately different: the WINDOW never throttles a creation (a page with no
+   * history has nothing to fall back to), but the SWITCH does.
+   *
+   * It was the other way round first, on the reasoning that the whole throttle belongs to `updatePage`. That
+   * reasoning holds while history is ON and fails once the GM has turned it off: they have said they do not
+   * want fallbacks, and a codex with history disabled would still have accumulated one checkpoint per page -
+   * roughly 2x the page table - while the client told them in as many words that nothing new was being written.
+   * "Globally disable-able" was the owner's phrase, and a switch that leaves a per-page row behind is not that.
+   */
+  it("writes NO checkpoint at all with history disabled, not even a page's creation", () => {
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    at(0);
+    const page = clock.createPage({ title: "Berez", playerBody: "as created" });
+    expect(clock.listRevisions(page.id)).toEqual([]);
+    // And no later save sneaks one in either, however far outside the window it falls.
+    at(5000); clock.updatePage(page.id, { playerBody: "edited" }, undefined, "gm");
+    expect(clock.listRevisions(page.id)).toEqual([]);
+    // The page itself is untouched by any of this — only its history is.
+    expect(clock.getPage(page.id)!.playerBody).toBe("edited");
+  });
+
+  /**
+   * Restoring ALWAYS checkpoints the state it discards, whatever the window says — preserving the behaviour
+   * every save had before the throttle existed, not adding a policy.
+   *
+   * A restore is the one save that deliberately throws the current text away, which makes it the one that most
+   * needs that text kept. Without this, restoring twice inside the window would lose the version the GM
+   * restored away from and "I picked the wrong one" would be unrecoverable.
+   */
+  it("checkpoints the state a RESTORE discards, even well inside the window", () => {
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 } });
+    /**
+     * THE TIMING IS THE TEST, and it is fiddly enough to spell out — a first attempt spaced these saves so far
+     * apart that the ordinary window fired anyway, and the assertion passed with `force` doing nothing at all
+     * (proved by mutation: throttling the restore changed no result).
+     *
+     * The subtlety is that a checkpoint's `authored_at` is when its CONTENT was authored, not when the row was
+     * written, so it always lags. To reach a state where an ordinary save would be suppressed, the newest
+     * checkpoint's own `authored_at` has to be inside the window:
+     *
+     *   t=0    create "the original"       -> checkpoint rev 1, authored_at t=0
+     *   t=200  save "a draft"              -> prior state is rev 1, already checkpointed: suppressed
+     *   t=250  save "the good draft"       -> prior state is rev 2 ("a draft", authored t=200); newest
+     *                                         checkpoint is authored t=0, age 250 > 90, so this WRITES,
+     *                                         and the newest authored_at becomes t=200
+     *   t=260  restore                     -> age is now 260-200 = 60 < 90, so an ordinary save writes
+     *                                         NOTHING here. Only `force` checkpoints.
+     */
+    at(0);
+    const page = clock.createPage({ title: "Argynvostholt", playerBody: "the original" });
+    at(200); clock.updatePage(page.id, { playerBody: "a draft" }, undefined, "gm");
+    at(250); clock.updatePage(page.id, { playerBody: "the good draft" }, undefined, "gm");
+    const original = clock.listRevisions(page.id).find((row) => row.playerBody === "the original")!;
+
+    at(260);
+    clock.restoreRevision(page.id, original.id, "gm");
+    expect(clock.getPage(page.id)!.playerBody).toBe("the original");
+
+    // The draft the restore discarded is recoverable, which is the whole point: without this, restoring the
+    // wrong version inside the window would lose the text you restored away from with no way back.
+    const draft = clock.listRevisions(page.id).find((row) => row.playerBody === "the good draft");
+    expect(draft, "restoring must checkpoint the text it overwrites").toBeDefined();
+    expect(clock.restoreRevision(page.id, draft!.id, "gm").playerBody).toBe("the good draft");
+  });
+
+  it("never throttles createPage — even with a window nothing could fall outside", () => {
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 10_080 } }); // a week
+    at(0);
+    const first = clock.createPage({ title: "One" });
+    at(1);
+    const second = clock.createPage({ title: "Two" });
+    expect(clock.listRevisions(first.id)).toHaveLength(1);
+    expect(clock.listRevisions(second.id)).toHaveLength(1);
+    // ...and the week-long window really is suppressing UPDATES at this setting, so the two assertions above
+    // are the create path being exempt rather than the window failing to apply at all.
+    at(5_000); // well over three days, still inside a week
+    clock.updatePage(first.id, { playerBody: "edited" }, undefined, "gm");
+    expect(clock.listRevisions(first.id)).toHaveLength(1);
+  });
+
+  /**
+   * THE OWNER'S GUARANTEE, and the test that proves the snapshot must capture the PRIOR state.
+   *
+   * With NEW-state snapshots the sequence below loses the work outright: the save at t=0 is checkpointed, the
+   * save at t=80 is coalesced away, the GM stops for two days, and then a save that ruins the page at t=3000 is
+   * outside the window and checkpoints the RUIN. The good t=80 work was never captured and the GM falls all the
+   * way back to t=0. Every assertion below fails in that world, which is what makes this the 2a proof.
+   */
+  it("checkpoints the GOOD prior state across an idle gap, so the ruinous save recovers the work", () => {
+    at(0);
+    const page = clock.createPage({ title: "Ravenloft", playerBody: "opening" });
+    at(80);
+    clock.updatePage(page.id, { playerBody: "the good work" }, undefined, "gm");
+    expect(clock.listRevisions(page.id)).toHaveLength(1);      // 80 < 90: coalesced, nothing new yet
+
+    at(3000);                                                  // two days idle, then one save ruins the page
+    clock.updatePage(page.id, { playerBody: "" }, undefined, "gm");
+
+    const revisions = clock.listRevisions(page.id);
+    expect(revisions).toHaveLength(2);
+    // The checkpoint that save took is the state it was ABOUT TO OVERWRITE, not the ruin it wrote.
+    expect(revisions[0].playerBody).toBe("the good work");
+    expect(revisions.map((row) => row.playerBody)).not.toContain("");
+    // ...so restoring it recovers the work, rather than dropping the GM back to the opening draft.
+    expect(clock.restoreRevision(page.id, revisions[0].id, "gm").playerBody).toBe("the good work");
+  });
+
+  /**
+   * The consequence the throttle creates on purpose: the newest checkpoint now normally sits BEHIND the page's
+   * current state, where before this change it equalled it and restoring it only bumped `rev`. Restoring the
+   * newest entry is therefore a real undo, and this is the assertion that says so.
+   */
+  it("makes restoring the NEWEST revision a real undo, where it used to be a no-op", () => {
+    at(0);
+    const page = clock.createPage({ title: "Tser Pool", playerBody: "keep this" });
+    at(500);
+    clock.updatePage(page.id, { playerBody: "regret this" }, undefined, "gm");
+    const newest = clock.listRevisions(page.id)[0];
+    expect(newest.playerBody).toBe("keep this");
+    expect(clock.getPage(page.id)!.playerBody).toBe("regret this");   // the two really differ
+    expect(clock.restoreRevision(page.id, newest.id, "gm").playerBody).toBe("keep this");
+  });
+
+  it("clamps and truncates the window on the way in, and answers with what was STORED", () => {
+    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 999_999 } }).revisionHistory.windowMinutes).toBe(10_080);
+    expect(clock.getSettings().revisionHistory.windowMinutes).toBe(10_080);
+    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: -12 } }).revisionHistory.windowMinutes).toBe(0);
+    expect(clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 45.7 } }).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
+    expect(clock.getSettings().revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
+    // A non-finite window is an ERROR, not a clamp: `Math.trunc(NaN)` is NaN, and clamping that would write
+    // NaN into a STRICT INTEGER column. `standingValue`'s rule, for the same reason.
+    expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: Number.NaN } })).toThrow(/minutes/i);
+    // ...and `enabled` must be stated rather than coerced from a missing field, because the coercion would land
+    // on `false` and silently switch the GM's undo history off.
+    expect(() => clock.setSettings({ revisionHistory: { windowMinutes: 90 } } as never)).toThrow(/on or off/i);
+    expect(clock.getSettings().revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 }); // neither throw wrote
+  });
+
+  /**
+   * The READ guard, which exists for the reason `getPublishedDate`'s does: the write is not the only way into an
+   * INTEGER column. A repair script or a hand-edited database reaches the same place, and a value JavaScript
+   * cannot represent makes `node:sqlite` THROW on the read rather than return something odd - which, for
+   * `getPublishedDate`, meant a codex that opened fine and could not be backed up.
+   *
+   * Edited with the store CLOSED and reopened, so this is genuinely a stored value arriving at a fresh read
+   * rather than a value smuggled past the setter.
+   */
+  it("reads an out-of-range, unrepresentable or garbled stored setting as the default", async () => {
+    const path = join(clockDirectory, "vtt.sqlite");
+    const page = clock.createPage({ title: "Argynvostholt", playerBody: "v0" });
+    clock.close();
+
+    const write = (sql: string, ...values: Array<number | bigint>) => {
+      const database = new DatabaseSync(path);
+      database.prepare(sql).run(...values);
+      database.close();
+    };
+    const reopen = async () => { const reopened = new CodexStore(path, () => now); await reopened.initialize(); return reopened; };
+
+    // First the NON-VACUITY half: an in-range value really does survive the round trip, so the assertions
+    // below are the guard firing rather than the getter ignoring the column.
+    write("UPDATE codex_meta SET revision_window_minutes = ? WHERE id = 1", 45);
+    let store45 = await reopen();
+    expect(store45.getSettings().revisionHistory.windowMinutes).toBe(45);
+    store45.close();
+
+    for (const stored of [-5, 10_081, 2n ** 53n]) {
+      write("UPDATE codex_meta SET revision_window_minutes = ? WHERE id = 1", stored);
+      const reopened = await reopen();
+      // Never throws (the 2^53 case is the one that would), and reads as the owner's default.
+      expect(reopened.getSettings().revisionHistory.windowMinutes, `stored ${stored}`).toBe(90);
+      // Behavioural, not just the getter: the throttle really runs at 90 minutes, so a save at t=200 commits.
+      at(0); reopened.updatePage(page.id, { playerBody: "inside" }, undefined, "gm");
+      expect(reopened.listRevisions(page.id), `stored ${stored}`).toHaveLength(1);
+      at(200); reopened.updatePage(page.id, { playerBody: "outside" }, undefined, "gm");
+      expect(reopened.listRevisions(page.id), `stored ${stored}`).toHaveLength(2);
+      reopened.close();
+      // Put the page back to a one-checkpoint state for the next iteration.
+      write("DELETE FROM codex_page_revisions WHERE rev > 1 OR id NOT IN (SELECT MIN(id) FROM codex_page_revisions)");
+    }
+
+    // `enabled` accepts EXACTLY 0 or 1; anything else reads as ON. Fail-OPEN here, deliberately the opposite of
+    // this file's reveal discipline: a garbled value must not silently stop recording the GM's undo history.
+    write("UPDATE codex_meta SET revision_history_enabled = 7, revision_window_minutes = 90 WHERE id = 1");
+    const garbled = await reopen();
+    expect(garbled.getSettings().revisionHistory).toMatchObject({ enabled: true, windowMinutes: 90 });
+    garbled.close();
+    // ...and 0 is still honoured, so "reads as on" is the fallback and not the only answer it can give.
+    write("UPDATE codex_meta SET revision_history_enabled = 0 WHERE id = 1");
+    const off = await reopen();
+    expect(off.getSettings().revisionHistory.enabled).toBe(false);
+    off.close();
+
+    // Reopened at the end so the fixture's `afterEach` has a live store to close.
+    clock = await reopen();
+  });
+
+  /**
+   * THE MIGRATION PATH, against a REAL v16 database rather than a fresh one - the discipline the v11 backfill
+   * test established and the v14->v15 and v12->v16 paths were checked with. A fresh-database test can never
+   * catch a bad upgrade, because every table is empty and every default is trivially satisfied.
+   *
+   * Built out of the SHIPPED migration SQL up to v16, filled with a page and two revision rows exactly as the
+   * old code wrote them (new-state snapshots, `authored_at` from the page's `updated_at`), then opened with a
+   * CodexStore - which is precisely the upgrade a GM's existing `vtt.sqlite` performs on next boot.
+   */
+  it("upgrades a REAL v16 database: the defaults land, and every existing revision survives", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v16-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+      database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 16)) {
+        database.exec(migration.sql);
+        database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+      }
+      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 4)").run();
+      const pageId = crypto.randomUUID();
+      const legacyStamp = new Date(EPOCH - 30 * 60_000).toISOString(); // authored half an hour before "now"
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Vistani camp', 'location', '{}', '{}', NULL, '[]', 'v2', 'the secret', 0, NULL, 2, ?, ?)")
+        .run(pageId, legacyStamp, legacyStamp);
+      const insertRevision = database.prepare("INSERT INTO codex_page_revisions (page_id, rev, title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, 'Vistani camp', 'location', '{}', '{}', ?, 'the secret', NULL, '[]', ?, 'gm')");
+      insertRevision.run(pageId, 1, "v1", new Date(EPOCH - 120 * 60_000).toISOString());
+      insertRevision.run(pageId, 2, "v2", legacyStamp);
+      // No `revision_history_enabled` / `revision_window_minutes` yet - that is the point of the fixture.
+      expect((database.prepare("PRAGMA table_info(codex_meta)").all() as Array<{ name: string }>).map((row) => row.name))
+        .not.toContain("revision_window_minutes");
+      database.close();
+
+      at(0);
+      upgraded = new CodexStore(path, () => now);
+      await upgraded.initialize();
+
+      // v17 applied, and the DEFAULTS landed on the pre-existing meta row - which is the whole upgrade story:
+      // an existing codex keeps today's behaviour (history on) and gains the owner's 90-minute window.
+      const applied = new DatabaseSync(path);
+      expect((applied.prepare("SELECT version FROM codex_schema_migrations ORDER BY version").all() as Array<{ version: number }>).map((row) => row.version))
+        .toEqual(MIGRATIONS.map((migration) => migration.version));
+      expect(applied.prepare("SELECT revision_history_enabled AS enabled, revision_window_minutes AS window FROM codex_meta WHERE id = 1").get())
+        .toMatchObject({ enabled: 1, window: 90 });
+      applied.close();
+      expect(upgraded.getSettings().revisionHistory).toMatchObject({ enabled: true, windowMinutes: 90 });
+      // ...and the usage figures see the LEGACY rows, so the settings screen reports a pre-existing history
+      // rather than an empty one on the first boot after the upgrade.
+      expect(upgraded.getSettings().revisionHistory.versionCount).toBe(2);
+      expect(upgraded.getSettings().revisionHistory.versionBytes).toBeGreaterThan(0);
+
+      // EVERY pre-existing revision survives, untouched, in order - nothing about this change prunes.
+      expect(upgraded.listRevisions(pageId).map((row) => ({ rev: row.rev, playerBody: row.playerBody })))
+        .toEqual([{ rev: 2, playerBody: "v2" }, { rev: 1, playerBody: "v1" }]);
+      // ...and they are still restorable on the upgraded codex.
+      const oldest = upgraded.listRevisions(pageId)[1];
+      expect(upgraded.restoreRevision(pageId, oldest.id, "gm").playerBody).toBe("v1");
+
+      // The new window applies IMMEDIATELY, measured against the legacy rows' own `authored_at`: the newest
+      // legacy checkpoint was authored 30 minutes ago, so the restore above (a save) coalesced into it...
+      expect(upgraded.listRevisions(pageId)).toHaveLength(2);
+      // ...and a save two hours later commits.
+      at(120);
+      upgraded.updatePage(pageId, { playerBody: "v4" }, undefined, "gm");
+      expect(upgraded.listRevisions(pageId)).toHaveLength(3);
+      expect(upgraded.listRevisions(pageId)[0].playerBody).toBe("v1"); // the state the restore left behind
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+});
+
+/**
+ * OWNER DECISION (2026-07-30), the second half: the GM asked for a way to DELETE existing version history, and
+ * for the settings screen to report what that history costs.
+ *
+ * The usage figures and the delete are tested together because they are one loop in use - read the cost, decide,
+ * trim, read it again - and a test that only ever read the figures could not tell a real count from a constant.
+ */
+describe("CodexStore revision history — usage figures and the delete (owner decision, 2026-07-30)", () => {
+  const EPOCH = Date.parse("2026-07-30T09:00:00.000Z");
+  let pruneDirectory: string;
+  let pruner: CodexStore;
+  let now = EPOCH;
+  /** Move the injected clock `days` before/after the fixture's epoch. */
+  const atDays = (days: number) => { now = EPOCH + days * 86_400_000; };
+
+  beforeEach(async () => {
+    pruneDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-prune-"));
+    now = EPOCH;
+    pruner = new CodexStore(join(pruneDirectory, "vtt.sqlite"), () => now);
+    await pruner.initialize();
+    // Every save checkpointed, so a test can build a history of a known depth without moving the clock for it.
+    pruner.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+  });
+  afterEach(async () => {
+    pruner.close();
+    await rm(pruneDirectory, { recursive: true, force: true });
+  });
+
+  it("counts the WHOLE table, not one page's rows, and moves with what is stored", () => {
+    expect(pruner.getSettings().revisionHistory).toMatchObject({ versionCount: 0, versionBytes: 0 });
+
+    const first = pruner.createPage({ title: "Barovia", playerBody: "abcde", gmBody: "fgh" });   // 1 revision
+    const second = pruner.createPage({ title: "Vallaki", playerBody: "ij" });                    // 1 revision
+    // The first EDIT adds nothing: its prior state is rev 1, which the creation already checkpointed, so
+    // `revisionExistsAt` suppresses the byte-identical duplicate. A second edit is what adds a row.
+    pruner.updatePage(first.id, { playerBody: "klmno" }, undefined, "gm");
+    pruner.updatePage(first.id, { playerBody: "pqrst" }, undefined, "gm");                        // 1 more
+    // Three rows across TWO pages: a per-page count would read 2 here, and a count of the page table would read 2.
+    expect(pruner.getSettings().revisionHistory.versionCount).toBe(3);
+    expect(pruner.listRevisions(first.id)).toHaveLength(2);
+    expect(pruner.listRevisions(second.id)).toHaveLength(1);
+
+    /**
+     * `versionBytes` sums the content columns a revision duplicates from its page: title + both bodies + both
+     * field maps + tags. Computed here from the known inputs rather than asserted as a magic number, so the
+     * assertion says WHICH columns are summed instead of merely pinning today's total.
+     */
+    const weight = (title: string, playerBody: string, gmBody: string) =>
+      title.length + playerBody.length + gmBody.length + "{}".length * 2 + "[]".length;
+    expect(pruner.getSettings().revisionHistory.versionBytes).toBe(
+      weight("Barovia", "abcde", "fgh") + weight("Barovia", "abcde", "fgh") + weight("Vallaki", "ij", "")
+    );
+  });
+
+  it("reports a smaller history after a delete — the read/trim/read loop the screen is for", () => {
+    pruner.createPage({ title: "Krezk", playerBody: "a long-ish body" });
+    pruner.createPage({ title: "Berez", playerBody: "another body" });
+    const before = pruner.getSettings().revisionHistory;
+    expect(before.versionCount).toBe(2);
+    expect(before.versionBytes).toBeGreaterThan(0);
+
+    expect(pruner.deleteRevisionsOlderThan(0)).toBe(2);
+    const after = pruner.getSettings().revisionHistory;
+    expect(after).toMatchObject({ versionCount: 0, versionBytes: 0 });
+    // The knobs are untouched by a delete - trimming is not a settings change.
+    expect(after).toMatchObject({ enabled: true, windowMinutes: 0 });
+  });
+
+  /**
+   * `olderThanDays: 0` deletes everything, and it must be ARITHMETIC rather than a special case - nothing is
+   * younger than zero days old. A test asserting only the 0 case could pass against a `if (days === 0) delete
+   * everything` branch, so this asserts the boundary either side of it too.
+   */
+  it("deletes EVERY revision at olderThanDays 0, by ordinary arithmetic", () => {
+    const page = pruner.createPage({ title: "Argynvostholt", playerBody: "v0" });
+    // Three edits, not two: the first one's prior state duplicates the creation checkpoint and is suppressed.
+    pruner.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
+    pruner.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
+    pruner.updatePage(page.id, { playerBody: "v3" }, undefined, "gm");
+    expect(pruner.getSettings().revisionHistory.versionCount).toBe(3);
+
+    expect(pruner.deleteRevisionsOlderThan(0)).toBe(3);
+    expect(pruner.listRevisions(page.id)).toEqual([]);
+    // A second call finds nothing left and says 0 rather than repeating the first answer - idempotent, and
+    // `deleted` is a real count rather than a restatement of the request.
+    expect(pruner.deleteRevisionsOlderThan(0)).toBe(0);
+  });
+
+  it("leaves the NEWER rows alone, and reports the real number it removed", () => {
+    // Four checkpoints authored on four different days: the page is saved once a day for four days.
+    const page = pruner.createPage({ title: "Tser Pool", playerBody: "day-0" });
+    // A second day-0 save, so day 0 genuinely holds TWO checkpoints: the creation, plus the state this edit
+    // displaces. Without it the first dated edit would only duplicate rev 1 and be suppressed, and the
+    // inclusive-boundary assertion below would have just one row to delete rather than two.
+    pruner.updatePage(page.id, { playerBody: "day-0 again" }, undefined, "gm");
+    for (const day of [1, 2, 3]) { atDays(day); pruner.updatePage(page.id, { playerBody: `day-${day}` }, undefined, "gm"); }
+    atDays(3);
+    expect(pruner.listRevisions(page.id).map((row) => row.playerBody)).toEqual(["day-2", "day-1", "day-0 again", "day-0"]);
+
+    /**
+     * From t=day-3, "older than 3 days" is a cutoff of exactly day 0 - and the boundary is INCLUSIVE, the same
+     * arithmetic that makes `olderThanDays: 0` delete everything. So the two day-0 checkpoints go and the
+     * day-1 and day-2 ones stay.
+     *
+     * The SURVIVORS are asserted, not just the count: a delete that took the wrong two rows would satisfy a
+     * count-only assertion exactly.
+     */
+    expect(pruner.deleteRevisionsOlderThan(3)).toBe(2);
+    expect(pruner.listRevisions(page.id).map((row) => row.playerBody)).toEqual(["day-2", "day-1"]);
+    expect(pruner.getSettings().revisionHistory.versionCount).toBe(2);
+
+    // A second, narrower cut takes exactly one more row - so the age really is per-row rather than all-or-nothing.
+    expect(pruner.deleteRevisionsOlderThan(2)).toBe(1);
+    expect(pruner.listRevisions(page.id).map((row) => row.playerBody)).toEqual(["day-2"]);
+
+    // A window wide enough to cover nothing removes nothing, and says so.
+    expect(pruner.deleteRevisionsOlderThan(365)).toBe(0);
+    expect(pruner.listRevisions(page.id)).toHaveLength(1);
+  });
+
+  /**
+   * A page as it stands now is not a version of itself. This is the assertion that a delete-everything cannot
+   * quietly become a data-loss bug: pages, both their bodies, their typed fields and their `rev` all survive.
+   */
+  it("never touches codex_pages — bodies, fields and rev all survive a delete-everything", () => {
+    // A `character`, because that is the type `goals` is a (secret) field of - the pruning rule CD-2 applies on
+    // the way in, so a `location` would arrive with `gmFields` already empty and prove nothing about the delete.
+    const page = pruner.createPage({ title: "Madam Eva", entityType: "character", fields: { race: "Vistani" }, gmFields: { goals: "watch the road" }, playerBody: "wagons", gmBody: "they know Strahd" });
+    pruner.updatePage(page.id, { playerBody: "wagons and horses" }, undefined, "gm");
+    const beforePage = pruner.getPage(page.id)!;
+    const beforeCount = pruner.listPages().length;
+
+    // ONE revision: the creation checkpoint. The edit's prior state is rev 1, already captured.
+    expect(pruner.deleteRevisionsOlderThan(0)).toBe(1);
+
+    expect(pruner.getPage(page.id)).toEqual(beforePage);   // every column, including `rev` and `updatedAt`
+    expect(pruner.getPage(page.id)!.playerBody).toBe("wagons and horses");
+    expect(pruner.getPage(page.id)!.gmBody).toBe("they know Strahd");
+    expect(pruner.getPage(page.id)!.gmFields).toEqual({ goals: "watch the road" });
+    expect(pruner.getPage(page.id)!.rev).toBe(2);
+    expect(pruner.listPages()).toHaveLength(beforeCount);
+    // ...and the page is still editable afterwards, which a broken cascade would have taken away.
+    expect(pruner.updatePage(page.id, { playerBody: "wagons, horses and a bear" }, undefined, "gm").rev).toBe(3);
+  });
+
+  it("deletes regardless of the enabled setting — the GM who turned history off is the one reclaiming space", () => {
+    const page = pruner.createPage({ title: "Berez", playerBody: "v0" });
+    pruner.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
+    pruner.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
+    expect(pruner.getSettings().revisionHistory.versionCount).toBe(2);
+
+    pruner.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    expect(pruner.deleteRevisionsOlderThan(0)).toBe(2);
+    expect(pruner.getSettings().revisionHistory.versionCount).toBe(0);
+  });
+
+  /**
+   * REJECTED, not clamped - the deliberate opposite of `windowMinutes`, because this is the one destructive
+   * route in the Codex and a malformed destructive request must not be interpreted generously.
+   */
+  it("rejects a negative, fractional or absurd age rather than clamping it, and deletes nothing when it does", () => {
+    const page = pruner.createPage({ title: "Yester Hill", playerBody: "v0" });
+    for (const bad of [-1, 3.5, Number.NaN, Number.POSITIVE_INFINITY, 36_501]) {
+      expect(() => pruner.deleteRevisionsOlderThan(bad), `olderThanDays ${bad}`).toThrow(/whole number of days/i);
+    }
+    // Not one row went while all five were refused.
+    expect(pruner.listRevisions(page.id)).toHaveLength(1);
+    // The upper bound is a GUARD, not a policy: 36500 is accepted and simply matches nothing, where an
+    // unbounded value would push the cutoff date out of range and throw `RangeError: Invalid time value`.
+    expect(pruner.deleteRevisionsOlderThan(36_500)).toBe(0);
+    expect(pruner.listRevisions(page.id)).toHaveLength(1);
   });
 });
