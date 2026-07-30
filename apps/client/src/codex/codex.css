@@ -589,6 +589,13 @@
 .codex-graph-nodelabel { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--void); stroke-width: 3px; }
 .codex-editor-foot { display: flex; }
 
+/* The two history knobs, above the list they govern. A COLUMN, not a row: §4 route 1 is required of a
+   vertical stack of controls, and the `Switch` and the minutes `Field` both grow their own paint — a row
+   would put them side by side at 320px and force the field to shrink below the floor. The rule below
+   separates them from the list so they read as settings rather than as a version. */
+.codex-revsettings { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
+/* Bounded so the minutes field does not stretch across a laptop-width modal, and free to shrink on a phone. */
+.codex-revsettings .nh-field { max-width: 22rem; }
 .codex-revisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-revision { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); }
 .codex-revision-title { grid-column: 1; color: var(--text-dim); font-size: var(--fs-sm); }

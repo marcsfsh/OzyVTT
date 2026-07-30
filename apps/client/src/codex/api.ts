@@ -57,6 +57,27 @@ export type CodexPageRevision = Readonly<{
   authorTag: string;
 }>;
 
+/**
+ * OWNER DECISION (2026-07-30) — how much version history the codex keeps.
+ *
+ * Every page save used to write a revision row, nothing ever pruned the table, and a revision row weighs
+ * the same as a page row (both bodies). Measured while completing the export bundle: 200 pages × 15
+ * revisions exported 20.8 MB against 1.24 MB without the history. So the GM gets two knobs.
+ *
+ *  - `enabled: false` writes no new revisions at all. It does **not** delete what exists — disabling a
+ *    feature must not destroy the GM's only undo — so old revisions stay listable and restorable.
+ *  - `windowMinutes` coalesces: a save within this long of the last checkpoint does not write one. **`0`
+ *    means every save is kept** (the old behaviour) and is deliberately NOT the same as `enabled: false`.
+ *    The owner's default is 90, chosen so at most 90 minutes of work can be lost.
+ *
+ * Nested under `revisionHistory` on purpose: `codex_meta` is the codex's settings row, so this gives later
+ * codex-wide settings a home without inventing fields for them today.
+ */
+export type CodexSettings = Readonly<{ revisionHistory: Readonly<{ enabled: boolean; windowMinutes: number }> }>;
+/** Bounds the server clamps to, restated so a control can refuse a value rather than hand back a 400. */
+export const REVISION_WINDOW_MIN = 0;
+export const REVISION_WINDOW_MAX = 10_080;
+
 // ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----
 
 /** The five things the codex indexes. Mirrors the server's `CodexRecordKind` (`codex-store.ts`). */
@@ -148,6 +169,13 @@ export const codexApi = {
   deleteFolder: (token: string, path: string) => request<{ deleted: boolean }>(token, "/folders/delete", { method: "POST", body: JSON.stringify({ path }) }),
   listRevisions: (token: string, id: string) => request<{ revisions: CodexPageRevision[] }>(token, `/pages/${id}/revisions`).then((data) => data.revisions),
   restoreRevision: (token: string, id: string, revisionId: number) => request<{ page: CodexPage }>(token, `/pages/${id}/revisions/${revisionId}/restore`, { method: "POST" }).then((data) => data.page),
+  /**
+   * OWNER DECISION (2026-07-30): codex-wide settings, GM-only. Server state rather than a device
+   * preference, and it has to be: these govern what the SERVER writes, so a per-device copy would let two
+   * GM devices disagree about a codex they share.
+   */
+  getSettings: (token: string) => request<{ settings: CodexSettings }>(token, "/settings").then((data) => data.settings),
+  setSettings: (token: string, input: CodexSettings) => request<{ settings: CodexSettings }>(token, "/settings", { method: "PUT", body: JSON.stringify(input) }).then((data) => data.settings),
   /** Mints a short-lived PLAYER token so the GM can preview the player Codex through the real player projection. */
   createPreviewSession: (token: string) => request<{ token: string }>(token, "/preview-session", { method: "POST" }).then((data) => data.token),
   exportBundle: (token: string) => request<{ codex: unknown; exportedAt: string }>(token, "/export")
