@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -52,7 +53,7 @@ async function fixture(pings?: unknown[][]) {
   const server = createServer(app); await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); if (!address || typeof address === "string") throw new Error("Codex test server did not bind.");
   cleanups.push(async () => { await new Promise<void>((resolve) => server.close(() => resolve())); store.close(); await rm(directory, { recursive: true, force: true }); });
-  return { base: `http://127.0.0.1:${address.port}`, store, assets };
+  return { base: `http://127.0.0.1:${address.port}`, store, assets, directory };
 }
 
 const PREVIEW_TOKEN = "preview-player-token";
@@ -2321,6 +2322,80 @@ describe("codex export/import, HTTP boundary (D16, R1)", () => {
     expect((await post(base, "/api/v1/codex/import", GM, { codex: {}, surprise: 1 })).status, "`.strict()`, like every other codex body").toBe(400);
     expect((await post(base, "/api/v1/codex/import", GM, { codex: { pages: [{ id: "nope" }] } })).status).toBe(400);
     expect(JSON.stringify(store.exportBundle()), "every refusal left the codex exactly as it was").toBe(before);
+  });
+
+  /**
+   * THE FILE THAT WIPED A REAL CODEX. A bundle that parses as an object but carries no section the codex
+   * recognises used to be indistinguishable from "this campaign is empty": it deleted every page, map, pin,
+   * session, quest and journal entry and answered **200** with `counts.pages: 0`. QA destroyed 22 pages
+   * through the Backup screen doing exactly that.
+   *
+   * The refusal must not cost R1, which is why the last two cases are here: a pre-versioning bundle (no
+   * `bundleVersion` key) still restores, and an explicitly EMPTY campaign - the shape an export of an empty
+   * codex really has - still restores. "Refuse anything that produces zero records" would have broken both.
+   */
+  it("refuses a bundle with no recognised sections instead of wiping the codex, and still honours R1", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Barovia" });
+    store.createSession({ sessionNumber: 1 });
+    const before = JSON.stringify(store.exportBundle());
+
+    for (const codex of [{}, { notes: [] }, { pagez: [{ id: randomUUID() }] }]) {
+      const refused = await post(base, "/api/v1/codex/import", GM, { codex });
+      expect(refused.status, JSON.stringify(codex)).toBe(400);
+      expect((await body(refused)).error.message).toMatch(/no codex sections|does not recognise/i);
+      expect(JSON.stringify(store.exportBundle()), "the codex is untouched").toBe(before);
+    }
+    // The mistyped section is NAMED, so a GM can go and fix the file.
+    expect((await body(await post(base, "/api/v1/codex/import", GM, { codex: { pagez: [] } }))).error.message).toContain('"pagez"');
+
+    // R1 is intact: a pre-versioning bundle (no `bundleVersion`) still restores...
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    expect((await post(base, "/api/v1/codex/import", GM, { codex: exported.codex })).status).toBe(200);
+    // ...and so does a campaign that genuinely holds nothing, which is what makes this a distinction and
+    // not just a refusal.
+    const emptied = await post(base, "/api/v1/codex/import", GM, { codex: { pages: [], journal: [], sessions: [] } });
+    expect(emptied.status).toBe(200);
+    expect((await body(emptied)).data.counts).toMatchObject({ pages: 0, sessions: 0 });
+    expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(0);
+  });
+
+  /**
+   * NO DRIVER TEXT REACHES A CALLER, and an internal failure is not reported as the caller's mistake.
+   *
+   * `malformed()` used to forward `(error as Error).message` for every non-Zod error, so a `codex:write`
+   * integration POSTing a bundle with a duplicate page id got `400 validation_failed` /
+   * "UNIQUE constraint failed: codex_pages.id" - internal table and column names, and a 4xx for a 5xx.
+   *
+   * Most of those cases are now caught before `BEGIN` with copy a GM can read (see the store suite), so the
+   * failure here is forced with a PROBE constraint the real schema does not have - a UNIQUE index over
+   * `codex_pages(title)`, installed from a second connection. That keeps the test pointed at the boundary
+   * behaviour ("what does a caller receive when something unrecognised escapes the store?") rather than at
+   * whichever validation happens to be in place today.
+   */
+  it("answers a sanitized 500 when something unrecognised escapes the store, never the driver's text", async () => {
+    const { base, store, directory } = await fixture();
+    store.createPage({ title: "Barovia" });
+    store.createPage({ title: "Vallaki" });
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    const before = JSON.stringify(store.exportBundle());
+
+    const probe = new DatabaseSync(join(directory, "vtt.sqlite"));
+    probe.exec("CREATE UNIQUE INDEX probe_page_title ON codex_pages (title);");
+    probe.close();
+
+    const pages = (exported.codex as Json).pages as Json[];
+    const collide = { ...(exported.codex as Json), pages: [...pages, { ...pages[0], id: randomUUID() }] };
+    const failed = await post(base, "/api/v1/codex/import", GM, { codex: collide });
+
+    expect(failed.status, "a driver failure is this process failing, not the caller's bad request").toBe(500);
+    const envelope = await body(failed);
+    expect(envelope.error.code).toBe("internal_error");
+    expect(envelope.error.message).toBe("The codex request failed.");
+    expect(JSON.stringify(envelope), "no table, no column, no path").not.toMatch(/constraint failed|codex_pages|sqlite/i);
+    expect(envelope.error.requestId, "the sanitized answer still carries the id the caller correlates on").toEqual(expect.any(String));
+    // ...and the transaction still protected the codex, which is the half a 500 must never mean it skipped.
+    expect(JSON.stringify(store.exportBundle())).toBe(before);
   });
 });
 

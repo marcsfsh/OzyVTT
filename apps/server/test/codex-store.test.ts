@@ -4691,8 +4691,10 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
     const before = store.exportBundle();
     const beforeJson = JSON.stringify(before);
 
-    // Wipe by importing an EMPTY bundle first, so the restore below is provably doing the work.
-    store.importBundle({});
+    // Wipe by importing an EXPLICITLY empty bundle first, so the restore below is provably doing the work.
+    // Explicitly: `{ pages: [] }` is a campaign that has nothing in it, which is a legitimate thing to
+    // restore. `{}` is a file with no codex sections at all, which is refused - see the test below.
+    store.importBundle({ pages: [] });
     expect(store.listPages()).toEqual([]);
     expect(store.listSessions()).toEqual([]);
 
@@ -4734,6 +4736,106 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
     // surfacing as a mid-transaction constraint failure.
     expect(() => store.importBundle({ ...bundle, sessions: [{ ...bundle.sessions[0], id: crypto.randomUUID() }, { ...bundle.sessions[0], id: crypto.randomUUID() }] })).toThrow(/same number/i);
     expect(JSON.stringify(store.exportBundle())).toBe(before);
+  });
+
+  /**
+   * D16's atomicity, tested where it is actually load-bearing: a failure AFTER the 13-table wipe.
+   *
+   * The test above it does NOT do this, and said it did. Its corrupt id throws inside `normalizeBundle`,
+   * which runs BEFORE `BEGIN` - so no table is ever emptied, no page is ever inserted, and deleting
+   * `this.transaction(...)` from `importBundle` leaves it green. Every other import test is a success or
+   * another pre-BEGIN refusal, so nothing in the repo exercised the ROLLBACK on the one route that empties
+   * the codex before it refills it. That is the single worst place to have a coverage hole: if the rollback
+   * ever breaks, the symptom is a GM's whole campaign gone.
+   *
+   * The failure is forced with a PROBE constraint installed from a second connection on the same file - a
+   * UNIQUE index over `codex_pages(title)`, which the real schema does not have. That is deliberate rather
+   * than convenient: it is a failure the bundle validators cannot pre-empt, so this test keeps proving the
+   * transaction no matter how much validation moves earlier. The assertion on the driver's own message is
+   * what pins that the throw came from an INSERT inside the transaction rather than from a validator
+   * outside it.
+   */
+  it("rolls back a failure that happens AFTER the wipe, not merely one that happens before it", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const revisionBefore = store.revision;
+    const bundle = JSON.parse(before) as { pages: Array<Record<string, unknown>> };
+    expect(bundle.pages.length, "the wipe must have something to destroy for this to mean anything").toBeGreaterThan(1);
+
+    const probe = new DatabaseSync(join(directory, "vtt.sqlite"));
+    probe.exec("CREATE UNIQUE INDEX probe_page_title ON codex_pages (title);");
+    probe.close();
+
+    // Valid to every validator - distinct uuid, closed references - and fatal to the probe index on the
+    // THIRD page insert, by which point `DELETE FROM` has already emptied all thirteen tables.
+    const collide = { ...bundle, pages: [...bundle.pages, { ...bundle.pages[0], id: crypto.randomUUID() }] };
+    expect(() => store.importBundle(collide)).toThrow(/UNIQUE constraint failed: codex_pages\.title/);
+
+    expect(JSON.stringify(store.exportBundle()), "row for row, the codex survived a failure mid-restore").toBe(before);
+    expect(store.revision, "...and nothing bumped the revision, so no client was told to refetch").toBe(revisionBefore);
+  });
+
+  /**
+   * THE DIFFERENCE BETWEEN "NO RECORDS IN THIS FILE" AND "NO RECORDS IN THIS CAMPAIGN".
+   *
+   * A restore REPLACES the codex, so those two must not take the same branch - and they used to. A file
+   * that parsed as an object but carried no key the codex recognises wiped everything and reported success:
+   * QA destroyed 22 real pages through the Backup screen with a hand-edited file, and the counts in the
+   * response said `pages: 0` as though that were the answer.
+   *
+   * They are distinguishable on the wire and always were, because `exportBundle` writes every key
+   * unconditionally. An empty campaign carries `"pages": []`; a truncated or mistyped file carries nothing
+   * the codex knows. Every negative below is followed by a byte-comparison of the export, so "refused"
+   * means "wrote nothing", not merely "returned an error".
+   */
+  it("refuses a bundle with no recognised sections, and still restores a genuinely empty campaign", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const revisionBefore = store.revision;
+
+    for (const bad of [{}, { notes: [] }, { Pages: [] }, { pagez: [{ id: crypto.randomUUID() }] }]) {
+      expect(() => store.importBundle(bad), JSON.stringify(bad)).toThrow(/no codex sections|does not recognise/i);
+      expect(JSON.stringify(store.exportBundle()), `${JSON.stringify(bad)} must write nothing`).toBe(before);
+      expect(store.revision).toBe(revisionBefore);
+    }
+    // A mistyped section is named, so the GM can go and fix it rather than guess.
+    expect(() => store.importBundle({ pagez: [] })).toThrow(/"pagez"/);
+    // A recognised section that is not a LIST is refused by name too, rather than silently counting as zero
+    // records - which is the same wipe wearing a different hat.
+    expect(() => store.importBundle({ pages: { id: "x" } })).toThrow(/"pages" section is not a list/);
+    expect(JSON.stringify(store.exportBundle())).toBe(before);
+
+    // ...and the legitimate empty campaign still restores, which is the whole reason this is not just
+    // "refuse a bundle that produces zero records".
+    expect(store.importBundle({ pages: [] })).toMatchObject({ pages: 0, journal: 0, sessions: 0 });
+    expect(store.listPages()).toEqual([]);
+  });
+
+  /**
+   * Cross-record refusals speak English and name the section. Each of these is a constraint the insert loop
+   * would otherwise hit AFTER the wipe, where the only text available is the driver's - "UNIQUE constraint
+   * failed: codex_pages.id" to whoever asked, which names internal tables and tells a GM nothing.
+   */
+  it("names the section and the value when a bundle breaks a database constraint", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const bundle = JSON.parse(before) as Record<string, Array<Record<string, unknown>>>;
+    const cases: ReadonlyArray<readonly [Record<string, unknown>, RegExp]> = [
+      [{ ...bundle, pages: [...bundle.pages, { ...bundle.pages[0] }] }, /two "pages" records with the same id/],
+      [{ ...bundle, markers: [{ ...bundle.markers[0], mapId: crypto.randomUUID() }] }, /"markers" section names a map the file does not contain/],
+      [{ ...bundle, relationships: [{ ...bundle.relationships[0], toPageId: crypto.randomUUID() }] }, /"relationships" section names a page the file does not contain/],
+      [{ ...bundle, standing: [{ ...bundle.standing[0], factionPageId: crypto.randomUUID() }] }, /"standing" section names a faction page the file does not contain/],
+      [{ ...bundle, revisions: [{ ...bundle.revisions[0], pageId: crypto.randomUUID() }] }, /"revisions" section names a page the file does not contain/],
+      [{ ...bundle, pages: [{ ...bundle.pages[0], id: "not-a-uuid" }] }, /"pages" entry 1 is not valid: Codex id is malformed/]
+    ];
+    for (const [bad, message] of cases) {
+      expect(() => store.importBundle(bad), message.source).toThrow(message);
+      expect(JSON.stringify(store.exportBundle()), `${message.source} must write nothing`).toBe(before);
+    }
+    // Not one of them mentions a table, a column or the driver.
+    for (const [bad] of cases) {
+      try { store.importBundle(bad); } catch (error) { expect((error as Error).message).not.toMatch(/constraint failed|codex_[a-z_]+\./i); }
+    }
   });
 
   it("restores a PRE-VERSIONING bundle — the backups a GM already has (director ruling R1)", () => {

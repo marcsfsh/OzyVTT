@@ -663,6 +663,23 @@ export const CODEX_BUNDLE_VERSION = 1;
 export class CodexRevisionConflictError extends Error {}
 /** Thrown when a referenced page/map/marker does not exist. */
 export class CodexNotFoundError extends Error {}
+/**
+ * Thrown when the CALLER's input is refused - every validator in this file, and every cross-record check
+ * `normalizeBundle` makes. Its `message` is written for a GM to read and is the one thing in this file that
+ * is deliberately forwarded to an API caller verbatim (`malformed` in `codex-http.ts`).
+ *
+ * **It exists so that forwarding is an ALLOW-LIST rather than a default.** These refusals used to be bare
+ * `Error`s, indistinguishable at the HTTP boundary from anything else that can escape a store call - and
+ * what actually escaped was the SQLite driver: an import with a duplicate page id answered
+ * `400 validation_failed` with "UNIQUE constraint failed: codex_pages.id", handing an integration credential
+ * internal table and column names, and reporting an internal failure as the caller's mistake. A denylist of
+ * driver errors would have to be extended for every new error type; this way the default for anything
+ * unrecognised is the sanitized 500, which is the right default.
+ *
+ * `CodexStore has not been initialized.` is deliberately NOT one of these: it is a programming error, not a
+ * caller's, and it must reach the 500 arm.
+ */
+export class CodexValidationError extends Error {}
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONTROL_CHARS = /\p{Cc}/u;
@@ -1669,7 +1686,7 @@ function parseTags(raw: string | null | undefined): readonly string[] {
   } catch { return []; }
 }
 function id(value: string): string {
-  if (!ID.test(value)) throw new Error("Codex id is malformed.");
+  if (!ID.test(value)) throw new CodexValidationError("Codex id is malformed.");
   return value;
 }
 /**
@@ -1678,7 +1695,7 @@ function id(value: string): string {
  */
 function title(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 160 || CONTROL_CHARS.test(trimmed)) throw new Error("A title must be 1 to 160 printable characters.");
+  if (!trimmed || trimmed.length > 160 || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError("A title must be 1 to 160 printable characters.");
   return trimmed;
 }
 /** A nested notebook folder PATH ("NPCs/Villains"): "/"-separated segments, normalized and bounded. */
@@ -1686,41 +1703,41 @@ function folder(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const segments = value.split("/").map((segment) => segment.trim()).filter(Boolean);
   if (segments.length === 0) return null;
-  if (segments.length > 6) throw new Error("A folder path can be at most 6 levels deep.");
-  for (const segment of segments) if (segment.length > 40 || CONTROL_CHARS.test(segment)) throw new Error("Each folder name is up to 40 printable characters.");
+  if (segments.length > 6) throw new CodexValidationError("A folder path can be at most 6 levels deep.");
+  for (const segment of segments) if (segment.length > 40 || CONTROL_CHARS.test(segment)) throw new CodexValidationError("Each folder name is up to 40 printable characters.");
   const path = segments.join("/");
-  if (path.length > 160) throw new Error("That folder path is too long.");
+  if (path.length > 160) throw new CodexValidationError("That folder path is too long.");
   return path;
 }
 function tags(value: readonly string[] | undefined): string[] {
   if (!value) return [];
   const cleaned = [...new Set(value.map((tag) => tag.trim().toLowerCase()).filter(Boolean))];
-  if (cleaned.length > MAX_TAGS) throw new Error(`A record may carry at most ${MAX_TAGS} tags.`);
-  for (const tag of cleaned) if (tag.length > 40 || !/^[a-z0-9][a-z0-9-]*$/.test(tag)) throw new Error("Tags use lowercase letters, numbers, and hyphens.");
+  if (cleaned.length > MAX_TAGS) throw new CodexValidationError(`A record may carry at most ${MAX_TAGS} tags.`);
+  for (const tag of cleaned) if (tag.length > 40 || !/^[a-z0-9][a-z0-9-]*$/.test(tag)) throw new CodexValidationError("Tags use lowercase letters, numbers, and hyphens.");
   return cleaned;
 }
 function body(value: string | undefined): string {
   const text = value ?? "";
-  if (text.length > MAX_BODY) throw new Error("A page body is limited to 100000 characters.");
+  if (text.length > MAX_BODY) throw new CodexValidationError("A page body is limited to 100000 characters.");
   return text;
 }
 function entityType(value: string | undefined): CodexEntityType {
   if (value === undefined) return "note";
-  if (!ENTITY_TYPES.includes(value as CodexEntityType)) throw new Error("Unknown entity type.");
+  if (!ENTITY_TYPES.includes(value as CodexEntityType)) throw new CodexValidationError("Unknown entity type.");
   return value as CodexEntityType;
 }
 /** Structured entity attributes: a flat {slug: string} map, empties dropped, bounded in size. */
 function entityFields(value: Readonly<Record<string, string>> | undefined): Record<string, string> {
   if (value === undefined) return {};
   const entries = Object.entries(value);
-  if (entries.length > 40) throw new Error("An entity may carry at most 40 fields.");
+  if (entries.length > 40) throw new CodexValidationError("An entity may carry at most 40 fields.");
   const out: Record<string, string> = {};
   for (const [key, raw] of entries) {
-    if (!/^[a-z0-9][a-z0-9-]*$/.test(key) || key.length > 40) throw new Error("A field key must be a lowercase slug.");
-    if (typeof raw !== "string" || raw.length > 2000 || CONTROL_CHARS.test(raw.replace(/[\n\r\t]/g, ""))) throw new Error("A field value is up to 2000 printable characters.");
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(key) || key.length > 40) throw new CodexValidationError("A field key must be a lowercase slug.");
+    if (typeof raw !== "string" || raw.length > 2000 || CONTROL_CHARS.test(raw.replace(/[\n\r\t]/g, ""))) throw new CodexValidationError("A field value is up to 2000 printable characters.");
     if (raw.trim() !== "") out[key] = raw;
   }
-  if (JSON.stringify(out).length > 10_000) throw new Error("Entity fields are too large.");
+  if (JSON.stringify(out).length > 10_000) throw new CodexValidationError("Entity fields are too large.");
   return out;
 }
 /**
@@ -1772,13 +1789,13 @@ function connectionLabel(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
   const trimmed = value.trim();
   if (!trimmed) return "";
-  if (trimmed.length > MAX_CONNECTION_LABEL || CONTROL_CHARS.test(trimmed)) throw new Error(`A connection label is up to ${MAX_CONNECTION_LABEL} printable characters.`);
+  if (trimmed.length > MAX_CONNECTION_LABEL || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError(`A connection label is up to ${MAX_CONNECTION_LABEL} printable characters.`);
   return trimmed;
 }
 /** Which layer a DECLARED connection sits on. Defaults to `player`, which is what every migrated edge is. */
 function connectionLayer(value: string | null | undefined): "player" | "gm" {
   if (value === null || value === undefined) return "player";
-  if (value !== "player" && value !== "gm") throw new Error("A connection sits on the player layer or the GM layer.");
+  if (value !== "player" && value !== "gm") throw new CodexValidationError("A connection sits on the player layer or the GM layer.");
   return value;
 }
 function parseFields(json: string | null | undefined): Record<string, string> {
@@ -1788,7 +1805,7 @@ function parseFields(json: string | null | undefined): Record<string, string> {
 }
 function normalizeCalendar(input: CodexCalendar): CodexCalendar {
   const months = (input.months ?? []).map((month) => ({ name: shortLabel(month.name, 40, "month name") ?? "Month", days: Number.isFinite(month.days) ? Math.max(1, Math.min(Math.trunc(month.days), 400)) : 30 }));
-  if (months.length < 1 || months.length > 24) throw new Error("A calendar needs 1 to 24 months.");
+  if (months.length < 1 || months.length > 24) throw new CodexValidationError("A calendar needs 1 to 24 months.");
   const weekdays = (input.weekdays ?? []).slice(0, 20).map((day) => shortLabel(day, 40, "weekday") ?? "Day");
   const current = input.currentDate;
   const currentDate = current && Number.isFinite(current.year) && Number.isFinite(current.month) && Number.isFinite(current.day)
@@ -1851,30 +1868,30 @@ function formatInWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): str
 const MAP_KINDS = new Set<CodexMapKind>(["battlemap", "regional", "world"]);
 function mapName(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new Error("A map name must be 1 to 120 printable characters.");
+  if (!trimmed || trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError("A map name must be 1 to 120 printable characters.");
   return trimmed;
 }
 function mapKind(value: string): CodexMapKind {
-  if (!MAP_KINDS.has(value as CodexMapKind)) throw new Error("Map kind must be battlemap, regional, or world.");
+  if (!MAP_KINDS.has(value as CodexMapKind)) throw new CodexValidationError("Map kind must be battlemap, regional, or world.");
   return value as CodexMapKind;
 }
 function iconId(value: string): string {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(value) || value.length > 60) throw new Error("An icon id must be a lowercase slug.");
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(value) || value.length > 60) throw new CodexValidationError("An icon id must be a lowercase slug.");
   return value;
 }
 function hexColor(value: string): string {
-  if (!/^#[0-9a-fA-F]{6}$/.test(value)) throw new Error("A color must be a #rrggbb hex value.");
+  if (!/^#[0-9a-fA-F]{6}$/.test(value)) throw new CodexValidationError("A color must be a #rrggbb hex value.");
   return value;
 }
 function coord(value: number): number {
-  if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error("A marker position must sit within the map.");
+  if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new CodexValidationError("A marker position must sit within the map.");
   return value;
 }
 function markerLabel(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   if (trimmed === "") return null;
-  if (trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new Error("A marker label is up to 120 printable characters.");
+  if (trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError("A marker label is up to 120 printable characters.");
   return trimmed;
 }
 function optionalId(value: string | null | undefined): string | null {
@@ -1895,24 +1912,24 @@ function parseIdArray(json: string | null | undefined): string[] {
 const MAX_ENTRY = 20_000;
 function entryText(value: string | undefined): string {
   const text = value ?? "";
-  if (text.length > MAX_ENTRY) throw new Error("A journal entry is limited to 20000 characters.");
+  if (text.length > MAX_ENTRY) throw new CodexValidationError("A journal entry is limited to 20000 characters.");
   return text;
 }
 function entryGmText(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
-  if (value.length > MAX_ENTRY) throw new Error("A journal entry is limited to 20000 characters.");
+  if (value.length > MAX_ENTRY) throw new CodexValidationError("A journal entry is limited to 20000 characters.");
   return value === "" ? null : value;
 }
 function shortLabel(value: string | null | undefined, max: number, what: string): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   if (trimmed === "") return null;
-  if (trimmed.length > max || CONTROL_CHARS.test(trimmed)) throw new Error(`A ${what} is up to ${max} printable characters.`);
+  if (trimmed.length > max || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError(`A ${what} is up to ${max} printable characters.`);
   return trimmed;
 }
 function sessionNo(value: number | null | undefined): number | null {
   if (value === null || value === undefined) return null;
-  if (!Number.isInteger(value) || value < 0 || value > 100_000) throw new Error("A session number must be a non-negative integer.");
+  if (!Number.isInteger(value) || value < 0 || value > 100_000) throw new CodexValidationError("A session number must be a non-negative integer.");
   return value;
 }
 const MAX_ATTENDEES = 24;
@@ -1929,7 +1946,7 @@ function attendees(value: readonly string[] | undefined): string[] {
     const name = shortLabel(raw, 40, "attendee name");
     if (name && !out.includes(name)) out.push(name);
   }
-  if (out.length > MAX_ATTENDEES) throw new Error(`A session may list at most ${MAX_ATTENDEES} attendees.`);
+  if (out.length > MAX_ATTENDEES) throw new CodexValidationError(`A session may list at most ${MAX_ATTENDEES} attendees.`);
   return out;
 }
 const SESSION_STATUSES = new Set<CodexSessionStatus>(["planned", "played"]);
@@ -1940,7 +1957,7 @@ const SESSION_STATUSES = new Set<CodexSessionStatus>(["planned", "played"]);
  */
 function sessionStatus(value: string | undefined): CodexSessionStatus {
   if (value === undefined) return "planned";
-  if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new Error("A session is either planned or played.");
+  if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new CodexValidationError("A session is either planned or played.");
   return value as CodexSessionStatus;
 }
 const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"]);
@@ -1977,7 +1994,7 @@ const MAX_DOWNTIME_DAYS = 3650;
  */
 function downtimePayload(input: Readonly<{ who: string; activity: string; days: number; characterPageId?: string | null }>): CodexDowntimePayload {
   const days = input?.days;
-  if (!Number.isInteger(days) || days < 0 || days > MAX_DOWNTIME_DAYS) throw new Error(`Downtime days must be a whole number from 0 to ${MAX_DOWNTIME_DAYS}.`);
+  if (!Number.isInteger(days) || days < 0 || days > MAX_DOWNTIME_DAYS) throw new CodexValidationError(`Downtime days must be a whole number from 0 to ${MAX_DOWNTIME_DAYS}.`);
   return {
     who: shortLabel(input.who, 120, "downtime participant") ?? "",
     activity: shortLabel(input.activity, 120, "downtime activity") ?? "",
@@ -2023,7 +2040,7 @@ const MAX_LEVEL = 20;
  */
 function milestonePayload(input: Readonly<{ level: number; reason: string }>): CodexMilestonePayload {
   const level = input?.level;
-  if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL) throw new Error(`A milestone's level must be a whole number from 1 to ${MAX_LEVEL}.`);
+  if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL) throw new CodexValidationError(`A milestone's level must be a whole number from 1 to ${MAX_LEVEL}.`);
   return { level, reason: shortLabel(input.reason, 120, "milestone reason") ?? "" };
 }
 /** Read a stored milestone payload defensively - malformed JSON degrades to `null` (`parseDowntimePayload`'s rule). */
@@ -2055,7 +2072,7 @@ const MAX_STANDING = 100;
  * clamping that would write NaN into a STRICT INTEGER column.
  */
 function standingValue(value: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("A standing value must be a number from -100 to 100.");
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new CodexValidationError("A standing value must be a number from -100 to 100.");
   return Math.min(MAX_STANDING, Math.max(MIN_STANDING, Math.trunc(value)));
 }
 
@@ -2091,7 +2108,7 @@ const MAX_PRUNE_DAYS = 36_500;
  * into a STRICT INTEGER column.
  */
 function revisionWindowMinutes(value: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`A revision window must be a number of minutes from ${MIN_REVISION_WINDOW_MINUTES} to ${MAX_REVISION_WINDOW_MINUTES}.`);
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new CodexValidationError(`A revision window must be a number of minutes from ${MIN_REVISION_WINDOW_MINUTES} to ${MAX_REVISION_WINDOW_MINUTES}.`);
   return Math.min(MAX_REVISION_WINDOW_MINUTES, Math.max(MIN_REVISION_WINDOW_MINUTES, Math.trunc(value)));
 }
 /**
@@ -2116,7 +2133,7 @@ const DEFAULT_AUTOSAVE_SETTINGS: CodexAutosaveSettings = { enabled: true, interv
  * a 400; this clamp stands behind it for every non-HTTP writer (import, tests, a repair script).
  */
 function autosaveIntervalSeconds(value: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`An autosave interval must be a number of seconds from ${MIN_AUTOSAVE_INTERVAL_SECONDS} to ${MAX_AUTOSAVE_INTERVAL_SECONDS}.`);
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new CodexValidationError(`An autosave interval must be a number of seconds from ${MIN_AUTOSAVE_INTERVAL_SECONDS} to ${MAX_AUTOSAVE_INTERVAL_SECONDS}.`);
   return Math.min(MAX_AUTOSAVE_INTERVAL_SECONDS, Math.max(MIN_AUTOSAVE_INTERVAL_SECONDS, Math.trunc(value)));
 }
 /**
@@ -2234,7 +2251,7 @@ const QUEST_STATUSES = new Set<CodexQuestStatus>(["active", "completed", "failed
 /** The TS half of the quest status gate; migration v14's CHECK is the other half (see `sessionStatus`). */
 function questStatus(value: string | undefined): CodexQuestStatus {
   if (value === undefined) return "active";
-  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new Error("A quest is active, completed, or failed.");
+  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new CodexValidationError("A quest is active, completed, or failed.");
   return value as CodexQuestStatus;
 }
 const MAX_OBJECTIVES = 24;
@@ -2267,11 +2284,11 @@ const MAX_OBJECTIVE_TEXT = 120;
  */
 function questObjectives(value: readonly CodexQuestObjective[] | undefined): CodexQuestObjective[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new Error("Objectives must be a list.");
-  if (value.length > MAX_OBJECTIVES) throw new Error(`A quest may carry at most ${MAX_OBJECTIVES} objectives.`);
+  if (!Array.isArray(value)) throw new CodexValidationError("Objectives must be a list.");
+  if (value.length > MAX_OBJECTIVES) throw new CodexValidationError(`A quest may carry at most ${MAX_OBJECTIVES} objectives.`);
   return value.map((objective) => {
     const text = typeof objective?.text === "string" ? objective.text.trim() : "";
-    if (text.length > MAX_OBJECTIVE_TEXT || CONTROL_CHARS.test(text)) throw new Error(`An objective is up to ${MAX_OBJECTIVE_TEXT} printable characters.`);
+    if (text.length > MAX_OBJECTIVE_TEXT || CONTROL_CHARS.test(text)) throw new CodexValidationError(`An objective is up to ${MAX_OBJECTIVE_TEXT} printable characters.`);
     return { text, done: objective?.done === true };
   });
 }
@@ -2323,6 +2340,16 @@ export function parseWikiLinks(text: string, layer: "player" | "gm"): CodexLinkR
 }
 
 /**
+ * Every top-level key a codex bundle may carry, list-valued and single-valued. It is the UNION over every
+ * shape `exportBundle` has ever produced (checked against the file's own history), which is what lets an
+ * unrecognised key be refused without breaking director ruling R1: a pre-versioning backup is a strict
+ * SUBSET of these, never a superset.
+ */
+const BUNDLE_LIST_KEYS = ["pages", "maps", "markers", "journal", "relationships", "sessions", "quests", "standing", "revisions", "folders"] as const;
+const BUNDLE_VALUE_KEYS = ["activeSessionId", "publishedDate", "partyMarkerId", "calendar", "settings"] as const;
+const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, ...BUNDLE_VALUE_KEYS]);
+
+/**
  * D16: turn an untrusted bundle into a validated one, or throw - BEFORE any transaction opens.
  *
  * Every value goes through the SAME validator an ordinary write uses (`title`, `tags`, `body`,
@@ -2333,19 +2360,57 @@ export function parseWikiLinks(text: string, layer: "player" | "gm"): CodexLinkR
  * rows of it, and refusing such a bundle would break the one promise D16 makes - that the backups a GM
  * already has restore cleanly (director ruling R1).
  *
- * Two CROSS-record checks that the per-row validators cannot see, both of which would otherwise surface
- * as a mid-transaction constraint failure with a message no GM can act on:
+ * **A bundle carrying NO recognised key at all is refused, and that is a different thing from an empty
+ * campaign.** This route REPLACES the codex, so "I could not find any records in this file" and "this
+ * campaign genuinely has no records" must not take the same branch. They are distinguishable on the wire
+ * and always have been: an export writes every key unconditionally, so an empty campaign posts
+ * `{"pages": [], "maps": [], …}` and a truncated or hand-edited file posts `{}` or a bag of keys the codex
+ * does not know. The second used to wipe the whole codex and answer 200 - QA destroyed 22 real pages
+ * through the UI doing exactly that. An unrecognised key is refused BY NAME for the same reason: a bundle
+ * whose `pages` key is mistyped is a bundle whose pages would be silently deleted, and the GM needs to be
+ * told which key is wrong rather than told nothing.
+ *
+ * CROSS-RECORD checks the per-row validators cannot see. Each one MIRRORS a database constraint the insert
+ * loop would otherwise hit mid-transaction, where the only text available is the driver's ("UNIQUE
+ * constraint failed: codex_pages.id", "FOREIGN KEY constraint failed") - which names internal tables to
+ * whoever asked and tells a GM nothing they can act on. They add no refusal the database was not already
+ * going to make; they move it earlier and give it words:
  *   - at most one `isParty` marker (v16's partial unique index),
- *   - no duplicate session numbers (v13's partial unique index).
+ *   - no duplicate session numbers (v13's partial unique index),
+ *   - one standing row per faction (v16's `codex_standing_faction`),
+ *   - unique ids within each collection (every table's PRIMARY KEY),
+ *   - referential closure for every FK the schema declares: a marker's map, a map's parent, both ends of a
+ *     declared connection, a standing row's faction page, a revision's page.
  */
 function normalizeBundle(raw: unknown): CodexBundle {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("That backup file is not a codex bundle.");
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new CodexValidationError("That backup file is not a codex bundle.");
   const bundle = raw as Record<string, unknown>;
-  const list = (key: string): unknown[] => { const value = bundle[key]; return Array.isArray(value) ? value : []; };
-  const obj = (value: unknown): Record<string, unknown> => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("That backup contains a record that is not a record.");
-    return value as Record<string, unknown>;
+  const unrecognised = Object.keys(bundle).find((key) => !BUNDLE_KEYS.has(key));
+  if (unrecognised !== undefined) {
+    throw new CodexValidationError(`That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export - a mistyped section name means those records would be dropped rather than restored.`);
+  }
+  if (!Object.keys(bundle).some((key) => BUNDLE_KEYS.has(key))) {
+    throw new CodexValidationError("That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section (\"pages\": [], and so on) - restoring this would erase the codex rather than replace it.");
+  }
+  const list = (key: string): unknown[] => {
+    const value = bundle[key];
+    if (value === undefined || value === null) return [];   // R1: a bundle from before this record type existed
+    if (!Array.isArray(value)) throw new CodexValidationError(`That backup's "${key}" section is not a list of records.`);
+    return value;
   };
+  /**
+   * One collection, row by row, with the collection NAME and the row's position carried into every message
+   * a per-field validator raises. "Codex id is malformed." is unactionable in a 4 MB file; "That backup's
+   * "pages" entry 37 is not valid: Codex id is malformed." is a line a GM can go and look at.
+   */
+  const rows = <T>(key: string, map: (row: Record<string, unknown>) => T): T[] => list(key).map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new CodexValidationError(`That backup's "${key}" entry ${index + 1} is not a record.`);
+    try { return map(value as Record<string, unknown>); }
+    catch (error) {
+      if (error instanceof CodexValidationError) throw new CodexValidationError(`That backup's "${key}" entry ${index + 1} is not valid: ${error.message}`);
+      throw error;
+    }
+  });
   const text = (value: unknown): string => (typeof value === "string" ? value : "");
   const nullableText = (value: unknown): string | null => (typeof value === "string" ? value : null);
   const flag = (value: unknown): boolean => value === true;
@@ -2361,8 +2426,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     return { year: Math.trunc(parts.year), month: Math.trunc(parts.month), day: Math.trunc(parts.day) };
   };
 
-  const pages = list("pages").map((value) => {
-    const row = obj(value);
+  const pages = rows("pages", (row) => {
     return {
       id: id(text(row.id)), title: title(text(row.title)), entityType: entityType(typeof row.entityType === "string" ? row.entityType : undefined),
       fields: entityFields(row.fields as Record<string, string> | undefined), gmFields: entityFields(row.gmFields as Record<string, string> | undefined),
@@ -2372,8 +2436,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
       rev: Math.max(1, count(row.rev, 1)), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexPageRow;
   });
-  const maps = list("maps").map((value) => {
-    const row = obj(value);
+  const maps = rows("maps", (row) => {
     return {
       id: id(text(row.id)), assetId: id(text(row.assetId)), name: mapName(text(row.name)), kind: mapKind(text(row.kind)),
       parentMapId: optionalId(nullableText(row.parentMapId)), revealedToPlayers: flag(row.revealedToPlayers),
@@ -2381,8 +2444,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
       createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexMapRow;
   });
-  const markers = list("markers").map((value) => {
-    const row = obj(value);
+  const markers = rows("markers", (row) => {
     return {
       id: id(text(row.id)), mapId: id(text(row.mapId)), x: coord(real(row.x)), y: coord(real(row.y)),
       iconId: iconId(text(row.iconId)), iconColor: hexColor(text(row.iconColor)), label: markerLabel(nullableText(row.label)),
@@ -2392,10 +2454,8 @@ function normalizeBundle(raw: unknown): CodexBundle {
       isParty: flag(row.isParty), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexMarkerRow;
   });
-  if (markers.filter((marker) => marker.isParty).length > 1) throw new Error("That backup marks more than one pin as the party's - only one pin can be.");
 
-  const sessions = list("sessions").map((value) => {
-    const row = obj(value);
+  const sessions = rows("sessions", (row) => {
     return {
       id: id(text(row.id)), sessionNumber: sessionNo(typeof row.sessionNumber === "number" ? row.sessionNumber : null),
       realDate: shortLabel(nullableText(row.realDate), 40, "date"), attendees: attendees(Array.isArray(row.attendees) ? (row.attendees as string[]) : []),
@@ -2404,11 +2464,8 @@ function normalizeBundle(raw: unknown): CodexBundle {
       rev: Math.max(1, count(row.rev, 1)), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexSessionRow;
   });
-  const numbers = sessions.map((session) => session.sessionNumber).filter((value): value is number => value !== null);
-  if (new Set(numbers).size !== numbers.length) throw new Error("That backup has two sessions with the same number.");
 
-  const journal = list("journal").map((value) => {
-    const row = obj(value);
+  const journal = rows("journal", (row) => {
     const kind = journalKind(text(row.kind));
     return {
       id: id(text(row.id)), playerText: entryText(text(row.playerText)), gmText: entryGmText(nullableText(row.gmText)),
@@ -2425,8 +2482,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
       createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexJournalRow;
   });
-  const quests = list("quests").map((value) => {
-    const row = obj(value);
+  const quests = rows("quests", (row) => {
     return {
       id: id(text(row.id)), title: title(text(row.title)), status: questStatus(typeof row.status === "string" ? row.status : undefined),
       playerBody: body(text(row.playerBody)), gmBody: body(text(row.gmBody)),
@@ -2436,15 +2492,13 @@ function normalizeBundle(raw: unknown): CodexBundle {
       rev: Math.max(1, count(row.rev, 1)), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexQuestRow;
   });
-  const standing = list("standing").map((value) => {
-    const row = obj(value);
+  const standing = rows("standing", (row) => {
     return {
       id: id(text(row.id)), factionPageId: id(text(row.factionPageId)), value: standingValue(count(row.value)),
       revealedToPlayers: flag(row.revealedToPlayers), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexStandingRow;
   });
-  const relationships = list("relationships").map((value) => {
-    const row = obj(value);
+  const relationships = rows("relationships", (row) => {
     return {
       id: id(text(row.id)), fromPageId: id(text(row.fromPageId)), toPageId: id(text(row.toPageId)),
       // An OLD bundle carries a slug `type` where a new one carries a `label`; both land as the label,
@@ -2453,8 +2507,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
       layer: connectionLayer(typeof row.layer === "string" ? row.layer : null), createdAt: stamp(row.createdAt)
     } satisfies CodexRelationshipRow;
   });
-  const revisions = list("revisions").map((value) => {
-    const row = obj(value);
+  const revisions = rows("revisions", (row) => {
     return {
       id: count(row.id), pageId: id(text(row.pageId)), rev: count(row.rev, 1), title: title(text(row.title)),
       entityType: entityType(typeof row.entityType === "string" ? row.entityType : undefined),
@@ -2463,6 +2516,43 @@ function normalizeBundle(raw: unknown): CodexBundle {
       tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []), authoredAt: stamp(row.authoredAt), authorTag: text(row.authorTag)
     } satisfies CodexPageRevisionExportRow;
   });
+
+  // ---- CROSS-RECORD checks. See the header: each one mirrors a constraint the insert loop would hit
+  // mid-transaction, so none of them refuses a bundle the database would have accepted - they only replace
+  // the driver's text with a sentence naming the section and the offending value.
+  const unique = (key: string, ids: readonly (string | number)[]) => {
+    const seen = new Set<string | number>();
+    for (const value of ids) {
+      if (seen.has(value)) throw new CodexValidationError(`That backup lists two "${key}" records with the same id (${value}).`);
+      seen.add(value);
+    }
+  };
+  const closed = (key: string, what: string, refs: readonly (string | null)[], known: ReadonlySet<string>) => {
+    for (const ref of refs) {
+      if (ref !== null && !known.has(ref)) throw new CodexValidationError(`That backup's "${key}" section names a ${what} the file does not contain (${ref}).`);
+    }
+  };
+  unique("pages", pages.map((row) => row.id));
+  unique("maps", maps.map((row) => row.id));
+  unique("markers", markers.map((row) => row.id));
+  unique("journal", journal.map((row) => row.id));
+  unique("sessions", sessions.map((row) => row.id));
+  unique("quests", quests.map((row) => row.id));
+  unique("standing", standing.map((row) => row.id));
+  unique("relationships", relationships.map((row) => row.id));
+  unique("revisions", revisions.map((row) => row.id));
+  const pageIds = new Set(pages.map((row) => row.id));
+  const mapIds = new Set(maps.map((row) => row.id));
+  closed("maps", "parent map", maps.map((row) => row.parentMapId), mapIds);
+  closed("markers", "map", markers.map((row) => row.mapId), mapIds);
+  closed("relationships", "page", relationships.flatMap((row) => [row.fromPageId, row.toPageId]), pageIds);
+  closed("standing", "faction page", standing.map((row) => row.factionPageId), pageIds);
+  closed("revisions", "page", revisions.map((row) => row.pageId), pageIds);
+  const factions = standing.map((row) => row.factionPageId);
+  if (new Set(factions).size !== factions.length) throw new CodexValidationError("That backup has two standing rows for the same faction - a faction holds one standing.");
+  if (markers.filter((marker) => marker.isParty).length > 1) throw new CodexValidationError("That backup marks more than one pin as the party's - only one pin can be.");
+  const numbers = sessions.map((session) => session.sessionNumber).filter((value): value is number => value !== null);
+  if (new Set(numbers).size !== numbers.length) throw new CodexValidationError("That backup has two sessions with the same number.");
 
   const settingsRaw = bundle.settings as { revisionHistory?: { enabled?: unknown; windowMinutes?: unknown }; autosave?: { enabled?: unknown; intervalSeconds?: unknown } } | undefined;
   const settings: CodexSettingsInput | undefined = settingsRaw
@@ -2478,7 +2568,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
     publishedDate: date(bundle.publishedDate),
     partyMarkerId: typeof bundle.partyMarkerId === "string" ? optionalId(bundle.partyMarkerId) : null,
     calendar: normalizeCalendar((bundle.calendar ?? DEFAULT_CALENDAR) as CodexCalendar),
-    folders: (Array.isArray(bundle.folders) ? (bundle.folders as unknown[]) : []).map((path) => folder(text(path))).filter((path): path is string => path !== null)
+    folders: list("folders").map((path) => folder(text(path))).filter((path): path is string => path !== null)
   };
 }
 
@@ -2770,9 +2860,9 @@ export class CodexStore {
   moveFolder(fromPath: string, toPath: string): number {
     const database = this.requireDatabase();
     const from = folder(fromPath);
-    if (!from) throw new Error("Choose a folder to move.");
+    if (!from) throw new CodexValidationError("Choose a folder to move.");
     const to = folder(toPath); // null => top level
-    if (to !== null && (to === from || to.startsWith(`${from}/`))) throw new Error("Can't move a folder into itself.");
+    if (to !== null && (to === from || to.startsWith(`${from}/`))) throw new CodexValidationError("Can't move a folder into itself.");
     // Re-path a folder value under `from` onto `to` (used for both pages and folder records).
     const repath = (value: string): string | null => folder(value === from ? (to ?? "") : to === null ? value.slice(from.length + 1) : to + value.slice(from.length));
     let moved = 0;
@@ -2799,7 +2889,7 @@ export class CodexStore {
   createFolder(path: string): string {
     const database = this.requireDatabase();
     const clean = folder(path);
-    if (!clean) throw new Error("Name the folder.");
+    if (!clean) throw new CodexValidationError("Name the folder.");
     this.transaction(() => {
       database.prepare("INSERT OR IGNORE INTO codex_folders (path, created_at) VALUES (?, ?)").run(clean, this.stamp());
       this.bumpRevision();
@@ -3125,7 +3215,7 @@ export class CodexStore {
     const database = this.requireDatabase();
     const from = id(fromPageId);
     const to = id(input.toPageId);
-    if (from === to) throw new Error("A page can't connect to itself.");
+    if (from === to) throw new CodexValidationError("A page can't connect to itself.");
     if (!this.pageRow(from) || !this.pageRow(to)) throw new CodexNotFoundError("One of those pages no longer exists.");
     const label = connectionLabel(input.label);
     const layer = connectionLayer(input.layer);
@@ -3474,12 +3564,12 @@ export class CodexStore {
     // field would land on `false` and silently switch the GM's undo history off - the one outcome here that
     // loses data. A caller that means "off" can say so.
     const enabled = input?.revisionHistory?.enabled;
-    if (typeof enabled !== "boolean") throw new Error("Revision history must be switched on or off explicitly.");
+    if (typeof enabled !== "boolean") throw new CodexValidationError("Revision history must be switched on or off explicitly.");
     const windowMinutes = revisionWindowMinutes(input?.revisionHistory?.windowMinutes);
     // D6: the same explicit-boolean rule, for the same reason one step further along - a coerced missing
     // field would land on `false` and switch AUTOSAVE off, which is the outcome that loses the GM's work.
     const autosaveEnabled = input?.autosave?.enabled;
-    if (typeof autosaveEnabled !== "boolean") throw new Error("Autosave must be switched on or off explicitly.");
+    if (typeof autosaveEnabled !== "boolean") throw new CodexValidationError("Autosave must be switched on or off explicitly.");
     const intervalSeconds = autosaveIntervalSeconds(input?.autosave?.intervalSeconds);
     this.transaction(() => {
       database.prepare("UPDATE codex_meta SET revision_history_enabled = ?, revision_window_minutes = ?, autosave_enabled = ?, autosave_interval_seconds = ? WHERE id = 1")
@@ -3529,7 +3619,7 @@ export class CodexStore {
   deleteRevisionsOlderThan(olderThanDays: number): number {
     const database = this.requireDatabase();
     if (!Number.isInteger(olderThanDays) || olderThanDays < 0 || olderThanDays > MAX_PRUNE_DAYS) {
-      throw new Error(`Choose a whole number of days from 0 to ${MAX_PRUNE_DAYS}.`);
+      throw new CodexValidationError(`Choose a whole number of days from 0 to ${MAX_PRUNE_DAYS}.`);
     }
     const cutoff = new Date(this.now() - olderThanDays * 86_400_000).toISOString();
     let deleted = 0;
@@ -3702,11 +3792,11 @@ export class CodexStore {
     if (!this.mapRowRaw(mapId)) throw new CodexNotFoundError("That map no longer exists.");
     const parent = optionalId(parentMapId);
     if (parent !== null) {
-      if (parent === mapId) throw new Error("A map cannot be its own parent.");
+      if (parent === mapId) throw new CodexValidationError("A map cannot be its own parent.");
       let cursor: string | null = parent;
       const seen = new Set<string>([mapId]);
       while (cursor !== null) {
-        if (seen.has(cursor)) throw new Error("That would create a loop in the map tree.");
+        if (seen.has(cursor)) throw new CodexValidationError("That would create a loop in the map tree.");
         seen.add(cursor);
         const row: MapRowRaw | undefined = this.mapRowRaw(cursor);
         if (!row) throw new CodexNotFoundError("The parent map no longer exists.");
@@ -4182,7 +4272,7 @@ export class CodexStore {
    */
   createDeadline(input: CodexJournalCreateInput): CodexJournalRow {
     const dated = this.resolveDate(input.inWorldDate, input.inWorldLabel);
-    if (!dated.date) throw new Error("A deadline needs an in-world date - the date is when it fires.");
+    if (!dated.date) throw new CodexValidationError("A deadline needs an in-world date - the date is when it fires.");
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "deadline",
@@ -4294,12 +4384,12 @@ export class CodexStore {
     const database = this.requireDatabase();
     const existing = this.getEntry(entryId);
     if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
-    if (existing.kind !== "downtime") throw new Error("Only a downtime record can pass time.");
+    if (existing.kind !== "downtime") throw new CodexValidationError("Only a downtime record can pass time.");
     const payload = downtimePayloadOf(existing);
-    if (!payload) throw new Error("That downtime record has no activity to apply.");
+    if (!payload) throw new CodexValidationError("That downtime record has no activity to apply.");
     if (payload.applied) throw new CodexRevisionConflictError("That downtime has already passed - the clock has already moved.");
     const target = this.proposedDateFor(existing);
-    if (!target) throw new Error("Set the campaign's current date before passing time.");
+    if (!target) throw new CodexValidationError("Set the campaign's current date before passing time.");
     const calendar = this.getCalendar();
     const applied: CodexDowntimePayload = { ...payload, applied: true };
     this.transaction(() => {
@@ -4330,7 +4420,7 @@ export class CodexStore {
      * optional. The composer disables Save and says so, so this is the second line, not the first.
      */
     if (existing.kind === "deadline" && dated && dated.instant === null) {
-      throw new Error("A deadline needs an in-world date - that is what makes it a deadline. Change its date, or delete it and write a note instead.");
+      throw new CodexValidationError("A deadline needs an in-world date - that is what makes it a deadline. Change its date, or delete it and write a note instead.");
     }
     const next = {
       player_text: input.playerText === undefined ? existing.player_text : entryText(input.playerText),
@@ -4373,7 +4463,7 @@ export class CodexStore {
    */
   private editedDowntimePayload(existing: JournalRowRaw, edit: CodexJournalUpdateInput["downtime"]): string | null {
     if (edit === undefined) return existing.payload_json;
-    if (existing.kind !== "downtime") throw new Error("Only downtime entries carry downtime details.");
+    if (existing.kind !== "downtime") throw new CodexValidationError("Only downtime entries carry downtime details.");
     const current = parseDowntimePayload(existing.payload_json) ?? { who: "", activity: "", days: 0, applied: false, characterPageId: null };
     const characterPageId = edit.characterPageId === undefined ? current.characterPageId : optionalId(edit.characterPageId);
     if (characterPageId !== null && !this.pageRow(characterPageId)) throw new CodexNotFoundError("That page no longer exists.");
@@ -4779,7 +4869,7 @@ export class CodexStore {
     try { work(); }
     catch (error) {
       if (sessionNumber !== null && error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
-        throw new Error(`Session ${sessionNumber} already exists. Give this one a different number.`);
+        throw new CodexValidationError(`Session ${sessionNumber} already exists. Give this one a different number.`);
       }
       throw error;
     }
@@ -5069,7 +5159,7 @@ export class CodexStore {
      * tidily: the GM can always zero it, unreveal it, or delete the page. Creating a new row still requires
      * a faction, so the rule holds where it is actually doing work.
      */
-    if (!existing && page.entity_type !== "faction") throw new Error("Standing is tracked against a faction - pick a faction page.");
+    if (!existing && page.entity_type !== "faction") throw new CodexValidationError("Standing is tracked against a faction - pick a faction page.");
     const next = standingValue(value);
     // Measured against the CLAMPED previous value (`toStanding`'s), not the raw column, so the deltas on the
     // timeline always sum to the number the bar shows. A hand-edited row holding 500 reads as 100

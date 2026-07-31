@@ -3,7 +3,7 @@ import express, { Router, type NextFunction, type Request, type Response } from 
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
-import { CODEX_BUNDLE_VERSION, CodexNotFoundError, CodexRevisionConflictError, downtimePayloadOf, type CodexSearchRef, type CodexStore } from "./codex-store.js";
+import { CODEX_BUNDLE_VERSION, CodexNotFoundError, CodexRevisionConflictError, CodexValidationError, downtimePayloadOf, type CodexSearchRef, type CodexStore } from "./codex-store.js";
 import { projectGmCalendar, projectGmChronicleRecord, projectGmConnections, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageConnections, projectGmPageSummary, projectGmQuest, projectGmSearchHit, projectGmSession, projectGmStanding, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerConnections, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageConnections, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerSearchHit, projectPlayerSession, projectPlayerStanding, projectRevealAudit, type CodexRevealAuditRecord, type CodexSearchRecord, type PlayerConnectionContext, type PlayerSessionNumberContext } from "./codex-projections.js";
 
 /**
@@ -474,6 +474,17 @@ function failure(response: Response, status: number, code: string, message: stri
  * `details.issues` carries every issue with its machine-addressable `path`, which is what an integration
  * needs and what the published conventions have always promised. Reporting only the first issue meant a
  * caller with three bad fields learned about them one round-trip at a time.
+ *
+ * **What may be forwarded is an ALLOW-LIST**, and that is the whole point of the last arm. Two error kinds
+ * are the caller's own mistake and carry copy written for them: a `ZodError` from a request schema, and a
+ * `CodexValidationError` from one of the store's validators. ANYTHING ELSE is not a 400 at all - it is this
+ * process failing - so it takes the same sanitized 500 the router's catch-all produces, with the real error
+ * on the server log.
+ *
+ * It used to forward `(error as Error).message` for every non-Zod error, which defeated the sanitization
+ * this file documents for itself two hundred lines down: an import with a duplicate page id answered
+ * `400 validation_failed` / "UNIQUE constraint failed: codex_pages.id" - internal table and column names to
+ * whoever asked - and a genuine internal failure was reported to the caller as their own bad request.
  */
 function malformed(response: Response, error: unknown) {
   if (error instanceof z.ZodError) {
@@ -481,7 +492,9 @@ function malformed(response: Response, error: unknown) {
       issues: error.issues.map((issue) => ({ path: [...issue.path], message: issue.message }))
     });
   }
-  return failure(response, 400, "validation_failed", (error as Error).message);
+  if (error instanceof CodexValidationError) return failure(response, 400, "validation_failed", error.message);
+  console.error("codex request failed:", error);
+  return failure(response, 500, "internal_error", "The codex request failed.");
 }
 /**
  * Map a store/validation error to its HTTP envelope: 404 not-found, 409 conflict, else 400 malformed.
