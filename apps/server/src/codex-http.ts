@@ -585,16 +585,30 @@ function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
  * `revealedPageIdsIn` and `playerSessionNumbers`, with the same division of labour - it ANSWERS which
  * records a player may see; the projection decides whether that lets an edge travel.
  *
- * `revealedSourceIds` covers the three NON-page source kinds D13 added. Each is checked by its own
- * record's rule (a session, quest or entry's own reveal flag), which is exactly what the corresponding
- * list endpoint applies - so a connection can never be a way around a record's own gate.
+ * `revealedSourceIds` covers the three NON-page source kinds D13 added, and each is resolved by running the
+ * record through ITS OWN PLAYER PROJECTION rather than by reading a flag - so a connection can never be a
+ * way around the gate the record's own list endpoint applies.
+ *
+ * The journal arm is why that distinction is spelled out rather than assumed. It used to read
+ * `entry.revealedToPlayers`, which is weaker than `projectPlayerJournalEntry` for two kinds: a `standing`
+ * record is additionally gated on its faction page and a `quest` history row on its quest. A GM who set
+ * standing on a hidden faction, typed `[[Vallaki]]` into the record's player text and revealed the row
+ * published that row's existence and its text on Vallaki's Connections panel and in the graph feed - while
+ * `/codex/journal`, `/codex/timeline`, `/codex/search` and the reveal audit all correctly hid it. The audit,
+ * the one screen whose job is answering "what can the party see?", disagreed with what the party could see.
+ *
+ * Sessions and quests keep their flag test because for those two kinds the flag IS the whole projection
+ * (`projectPlayerSession` / `projectPlayerQuest` gate on nothing else); writing them as flag tests beside a
+ * projection call would imply a difference that does not exist. If either ever grows a second condition,
+ * it grows it in its projection and this must follow - which is what the journal arm is here to remember.
  */
 function playerConnectionContext(store: CodexStore): PlayerConnectionContext {
   const revealedPageIds = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
   const revealedSourceIds = new Set<string>();
   for (const session of store.listSessions()) if (session.revealedToPlayers) revealedSourceIds.add(session.id);
   for (const quest of store.listQuests()) if (quest.revealedToPlayers) revealedSourceIds.add(quest.id);
-  for (const entry of store.listTimeline()) if (entry.revealedToPlayers) revealedSourceIds.add(entry.id);
+  const journalContext = playerSessionNumbers(store);
+  for (const entry of store.listTimeline()) if (projectPlayerJournalEntry(entry, journalContext) !== null) revealedSourceIds.add(entry.id);
   return { revealedPageIds, revealedSourceIds };
 }
 
@@ -806,7 +820,10 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (role === "gm") return readEnvelope(request, response, role, { page: projectGmPage(page), connections: projectGmPageConnections(store.connectionsForPage(page.id)) });
     const projected = projectPlayerPage(page);
     if (!projected) return failure(response, 404, "not_found", "That page was not found.");
-    return readEnvelope(request, response, role, { page: projected, connections: projectPlayerPageConnections(store.connectionsForPage(page.id)) });
+    // The SAME context the graph feed resolves, and for the same reason: the panel and the graph are two
+    // renderings of one edge list, so they must be gated by one predicate. Passing it in (rather than
+    // letting the projection read the store's `otherRevealed`) is what makes that literally true.
+    return readEnvelope(request, response, role, { page: projected, connections: projectPlayerPageConnections(store.connectionsForPage(page.id), playerConnectionContext(store)) });
   });
 
   // ----- Pages: authoring (GM only) -----

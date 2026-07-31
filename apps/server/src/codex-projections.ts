@@ -67,9 +67,13 @@ export function projectPlayerPageSummary(row: CodexPageSummaryRow): PlayerCodexP
  *
  *   1. **The target page is revealed.** An edge to a page a player cannot open tells them that page
  *      EXISTS and draws them a line to it - the leak `projectPlayerQuest` filters `entityIds` for.
- *   2. **The SOURCE record is revealed, per its own kind's rule.** A page, session or quest by its own
- *      flag; a journal entry by its own. Resolved by the caller and handed in, because a projection that
- *      reached back into the store would be a second place that decides what a player may see.
+ *   2. **The SOURCE record is player-visible, per its own kind's PROJECTION.** A page, session or quest by
+ *      its own reveal flag; a journal entry by `projectPlayerJournalEntry`, which is strictly stronger than
+ *      the raw flag (a `standing` record is also gated on its faction page, a `quest` record on its quest).
+ *      "Its own flag" is what this used to say, and it was wrong for exactly one kind - which is how a
+ *      revealed standing record about a secret faction reached a player here while every other journal
+ *      surface hid it. Resolved by the caller and handed in, because a projection that reached back into
+ *      the store would be a second place that decides what a player may see.
  *   3. **`layer === "player"`.** D13's rule, and it now applies to DECLARED edges too, which is stronger
  *      than the old relationship gate: a connection the GM declared on the GM layer never travels, even
  *      between two revealed pages. A link written in a GM body is a GM note ABOUT a connection, not a
@@ -82,7 +86,11 @@ export function projectPlayerPageSummary(row: CodexPageSummaryRow): PlayerCodexP
 export type PlayerConnectionContext = Readonly<{
   /** Page ids the player may see. Both a connection's target and a page-kind source are checked against it. */
   revealedPageIds: ReadonlySet<string>;
-  /** Non-page source records the player may see, by kind. Absent sets fail CLOSED: nothing travels. */
+  /**
+   * Non-page source records the player may see. The caller builds it by running each record through that
+   * kind's own player projection - NOT by reading its reveal flag - so this set can never be weaker than
+   * the list endpoint for the same kind. Absent ids fail CLOSED: nothing travels.
+   */
   revealedSourceIds: ReadonlySet<string>;
 }>;
 
@@ -130,13 +138,25 @@ export function projectGmPageConnections(rows: readonly CodexPageConnectionRow[]
 /**
  * One page's Connections panel as a PLAYER receives it.
  *
- * The gate is the SAME three conditions as the graph feed, stated once and applied here through
- * `otherRevealed` - which the store already resolved per kind. `otherRevealed` itself then DROPS from the
- * row: a player only ever receives connections to records they can see, so the key could only be the
- * constant `true`, and shipping a constant that names a predicate is how a reader learns the predicate
- * exists. `id` and `layer` drop for the reasons `PlayerCodexConnection` states.
+ * The gate is the SAME predicate the graph feed applies, and it is now literally the same expression:
+ * `connectionSourceVisible` against the caller-resolved `PlayerConnectionContext`. It used to read the
+ * store's own `row.otherRevealed`, and that was the leak: for a JOURNAL source `otherRevealed` is the
+ * entry's raw `revealedToPlayers` flag, which is WEAKER than `projectPlayerJournalEntry` - the projection
+ * every other player journal surface delegates to. A revealed `standing` record about a hidden faction, or
+ * a revealed `quest` history row about a hidden quest, is hidden by the journal, the timeline, search and
+ * the reveal audit, and was published here, excerpt text and all, the moment the GM wrote a `[[link]]` in
+ * its player text. Resolving visibility in ONE place - the caller, through the projections - is what stops
+ * a sixth surface from forgetting again.
  *
- * The page the panel belongs to is assumed already visible - the route 404s a player before it gets here.
+ * `otherRevealed` therefore DROPS from the row rather than being consulted: a player only ever receives
+ * connections to records they can see, so the key could only be the constant `true`, and shipping a
+ * constant that names a predicate is how a reader learns the predicate exists. `id` and `layer` drop for
+ * the reasons `PlayerCodexConnection` states.
+ *
+ * Both directions go through the one predicate, and the asymmetry is deliberate rather than an oversight:
+ * an OUTgoing row's other end is the connection's TARGET (always a page, checked against `revealedPageIds`,
+ * which is condition 1) and an INcoming row's other end is its SOURCE (checked per kind, condition 2). The
+ * page the panel belongs to is assumed already visible - the route 404s a player before it gets here.
  */
 export type PlayerCodexPageConnection = Readonly<{
   direction: "out" | "in";
@@ -149,9 +169,9 @@ export type PlayerCodexPageConnection = Readonly<{
   section: string | null;
 }>;
 
-export function projectPlayerPageConnections(rows: readonly CodexPageConnectionRow[]): PlayerCodexPageConnection[] {
+export function projectPlayerPageConnections(rows: readonly CodexPageConnectionRow[], context: PlayerConnectionContext): PlayerCodexPageConnection[] {
   return rows
-    .filter((row) => row.layer === "player" && row.otherRevealed)
+    .filter((row) => row.layer === "player" && connectionSourceVisible(row.otherKind, row.otherId, context))
     .map((row) => ({ direction: row.direction, otherKind: row.otherKind, otherId: row.otherId, otherTitle: row.otherTitle, otherEntityType: row.otherEntityType, label: row.label, origin: row.origin, section: row.section }));
 }
 

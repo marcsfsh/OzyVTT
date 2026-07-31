@@ -29,6 +29,20 @@ afterEach(async () => {
  */
 const playerSessionNumbers = (from: CodexStore = store) => ({ unrevealedSessionIds: from.unrevealedSessionIds() });
 
+/**
+ * The `PlayerConnectionContext` `codex-http.ts` resolves once per request, in the shape the router builds
+ * it. Every connection fixture in this file has PAGE sources, so `revealedSourceIds` is empty by
+ * construction and says so; the session/quest/journal arms - and specifically the journal arm's gate on
+ * `projectPlayerJournalEntry` rather than on a raw reveal flag - are proven at the HTTP boundary, where the
+ * router's own resolution is the thing under test rather than a copy of it.
+ *
+ * A CALL, not a constant, for the reason `playerSessionNumbers` is: reveal state changes mid-test.
+ */
+const playerConnectionContext = (from: CodexStore = store) => ({
+  revealedPageIds: new Set(from.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id)),
+  revealedSourceIds: new Set<string>()
+});
+
 describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", () => {
   /**
    * Why these exist. Player visibility is gated TWICE on purpose: `PLAYER_VISIBLE_SQL` in the query, and
@@ -522,7 +536,7 @@ describe("CodexStore viewer safety (the leak matrix)", () => {
     store.createPage({ title: "Road", playerBody: "to [[Bree]]", revealedToPlayers: true });   // visible
     store.createPage({ title: "Cult", gmBody: "near [[Bree]]" });                                // gm-layer secret
     store.createPage({ title: "Draft", playerBody: "mentions [[Bree]]", revealedToPlayers: false }); // player-layer but unrevealed
-    const player = projectPlayerPageConnections(store.connectionsForPage(bree.id));
+    const player = projectPlayerPageConnections(store.connectionsForPage(bree.id), playerConnectionContext());
     expect(player.map((row) => row.otherTitle)).toEqual(["Road"]);
   });
 });
@@ -824,7 +838,7 @@ describe("CodexStore entities + relationships", () => {
     store.createConnection(hub.id, { toPageId: shown.id, label: "contains" });
     store.createConnection(hub.id, { toPageId: secret.id, label: "watched by" });
 
-    const player = projectPlayerPageConnections(store.connectionsForPage(hub.id));
+    const player = projectPlayerPageConnections(store.connectionsForPage(hub.id), playerConnectionContext());
     expect(player.map((row) => row.label)).toEqual(["contains"]);
     // The GM's own panel carries all three, so the filtering above is the gate and not an empty fixture.
     expect(projectGmPageConnections(store.connectionsForPage(hub.id))).toHaveLength(3);
@@ -832,10 +846,10 @@ describe("CodexStore entities + relationships", () => {
     // in D8, and the one a "both endpoints revealed" gate alone would miss.
     expect(player.some((row) => row.otherId === shown.id && row.label === "hides")).toBe(false);
     store.updateConnection(gmLayer.id, { layer: "player" });
-    expect(projectPlayerPageConnections(store.connectionsForPage(hub.id)).map((row) => row.label).sort()).toEqual(["contains", "hides"]);
+    expect(projectPlayerPageConnections(store.connectionsForPage(hub.id), playerConnectionContext()).map((row) => row.label).sort()).toEqual(["contains", "hides"]);
 
     // The player row's EXACT key set: no `id`, no `layer`, no `otherRevealed`.
-    expect(Object.keys(projectPlayerPageConnections(store.connectionsForPage(hub.id))[0]!).sort())
+    expect(Object.keys(projectPlayerPageConnections(store.connectionsForPage(hub.id), playerConnectionContext())[0]!).sort())
       .toEqual(["direction", "label", "origin", "otherEntityType", "otherId", "otherKind", "otherTitle", "section"]);
   });
 });
@@ -1199,10 +1213,8 @@ describe("Codex page→marker reverse lookup — the store and projection layers
  * mention arm's three rules are unchanged, because D8 folded the concepts rather than loosening a gate.
  */
 describe("Codex whole-graph connections — the store and projection layers, on their own (D8)", () => {
-  const context = () => ({
-    revealedPageIds: new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id)),
-    revealedSourceIds: new Set<string>()
-  });
+  // The shared `playerConnectionContext` above, in the shape the router resolves it.
+  const context = () => playerConnectionContext();
   const mentions = () => store.listAllConnections().filter((edge) => edge.origin === "mention");
   const pair = (edge: { fromId: string; toPageId: string }) => ({ fromPageId: edge.fromId, toPageId: edge.toPageId });
 

@@ -3192,6 +3192,11 @@ export class CodexStore {
    * `projectPlayerPageConnections` is the single visibility gate, and a second predicate down here would
    * be a lower layer no HTTP test can distinguish from the projection.
    *
+   * `otherRevealed` on each row is therefore a GM-FACING FACT - "is the record at the other end revealed" -
+   * and NOT the player gate. It reads a record's own flag, which for a journal entry is weaker than
+   * `projectPlayerJournalEntry`; the player projection resolves visibility from caller-supplied context
+   * instead and never consults this field. Do not reintroduce it as a filter.
+   *
    * The DEDUPE at the end is the one piece of judgement in this method. A GM who both writes
    * "[[Barovia]]" in a page's body AND declares an unlabelled connection to Barovia has made one
    * connection twice, and a panel showing it twice reads as a bug. The DECLARED row wins, because it is

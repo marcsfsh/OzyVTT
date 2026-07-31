@@ -454,6 +454,84 @@ describe("codex HTTP viewer-safety boundary", () => {
   });
 
   /**
+   * THE CONNECTION SURFACES OBEY `projectPlayerJournalEntry`, NOT THE RAW REVEAL FLAG.
+   *
+   * The leak this pins, found by QA and reproduced here through the real routes. `standing` and `quest`
+   * journal records are hidden-by-subject: `projectPlayerJournalEntry` gates a standing record on its
+   * FACTION PAGE and a quest-history row on its QUEST, over and above the record's own reveal flag. Both
+   * connection surfaces used to consult only that flag - `playerConnectionContext` built `revealedSourceIds`
+   * from `entry.revealedToPlayers`, and `projectPlayerPageConnections` filtered on the store's
+   * `row.otherRevealed`, which is the same flag one layer down.
+   *
+   * So: set standing on a HIDDEN faction, type a `[[link]]` into the record's player text (the ordinary
+   * journal PATCH accepts one on any kind), reveal the row, and the record's existence AND its player text
+   * were published to the party on the linked page's Connections panel and in the whole-graph feed - while
+   * `/codex/journal`, `/codex/timeline`, `/codex/search` and `GET /codex/reveal-audit` all correctly called
+   * it hidden. The audit is the one screen whose job is answering "what can the party see?", so the two
+   * surfaces that disagreed with it were the two that were wrong.
+   *
+   * Both halves are asserted on the SERIALIZED body as well as by shape, because the excerpt text is the
+   * part a key-set assertion would miss. Each case then REVEALS the subject and re-reads, so every empty
+   * expectation above is proven to be the gate rather than an empty fixture.
+   */
+  it("gates a journal-sourced connection on the journal PROJECTION, not the entry's reveal flag", async () => {
+    const { base, store } = await fixture();
+    const vallaki = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const faction = store.createPage({ title: "The Zhentarim", entityType: "faction" });   // HIDDEN
+
+    // --- CT-6 standing: a hidden faction's standing record, revealed, carrying a [[link]] in player text.
+    await put(base, `/api/v1/codex/standing/${faction.id}`, GM, { value: 70, reason: "Paid the toll" });
+    const standingRecord = ((await body(await get(base, "/api/v1/codex/journal", GM))).data.entries as Json[])
+      .find((row) => row.kind === "standing")!;
+    expect(standingRecord, "PUT /codex/standing writes the hidden journal record this is about").toBeDefined();
+    await patch(base, `/api/v1/codex/journal/${standingRecord.id}`, GM, { playerText: "They turned on us at [[Vallaki]]." });
+    await post(base, `/api/v1/codex/journal/${standingRecord.id}/reveal`, GM, { revealed: true });
+
+    // The GM's own page panel HAS the edge, so the player's empty list below is the gate, not a missing row.
+    const gmPanel = (await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, GM))).data.connections as Json[];
+    expect(gmPanel.some((row) => row.otherKind === "journal" && row.otherId === standingRecord.id)).toBe(true);
+
+    const playerPage = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((playerPage.data.connections as Json[]).filter((row) => row.otherKind === "journal")).toEqual([]);
+    expect(JSON.stringify(playerPage), "the excerpt is the leak, not just the id").not.toContain("turned on us");
+    expect(JSON.stringify(playerPage)).not.toContain(standingRecord.id);
+
+    const playerGraph = await body(await get(base, "/api/v1/codex/connections", PLAYER));
+    expect((playerGraph.data.connections as Json[]).filter((edge) => edge.fromKind === "journal")).toEqual([]);
+    expect(JSON.stringify(playerGraph)).not.toContain(standingRecord.id);
+
+    // ...and the reveal audit agrees with the two surfaces above rather than with the one that used to leak.
+    const audit = (await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit.sections as Json[];
+    // The audit lists only what the party CAN see, so the record's absence from `rows` is the audit saying
+    // "hidden" - which is what the two surfaces above were contradicting.
+    const journalSection = audit.find((section) => section.kind === "journal")!;
+    expect((journalSection.rows as Json[]).some((row) => row.id === standingRecord.id)).toBe(false);
+
+    // Reveal the FACTION and the very same edge travels - so every emptiness above is the projection.
+    await post(base, `/api/v1/codex/pages/${faction.id}/reveal`, GM, { revealed: true });
+    const opened = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((opened.data.connections as Json[]).some((row) => row.otherKind === "journal" && row.otherId === standingRecord.id)).toBe(true);
+    expect(((await body(await get(base, "/api/v1/codex/connections", PLAYER))).data.connections as Json[])
+      .some((edge) => edge.fromKind === "journal" && edge.fromId === standingRecord.id)).toBe(true);
+
+    // --- D11 quest history: the same hole, one record kind over. R5 writes a hidden `quest` record on create.
+    const quest = store.createQuest({ title: "The Coffin Run" });                            // HIDDEN
+    const questRecord = ((await body(await get(base, "/api/v1/codex/journal", GM))).data.entries as Json[])
+      .find((row) => row.kind === "quest")!;
+    expect(questRecord, "R5 writes a quest-history record on create").toBeDefined();
+    await patch(base, `/api/v1/codex/journal/${questRecord.id}`, GM, { playerText: "It began at [[Vallaki]]." });
+    await post(base, `/api/v1/codex/journal/${questRecord.id}/reveal`, GM, { revealed: true });
+
+    const stillSecret = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((stillSecret.data.connections as Json[]).some((row) => row.otherId === questRecord.id)).toBe(false);
+    expect(JSON.stringify(stillSecret)).not.toContain("It began at");
+
+    await post(base, `/api/v1/codex/quests/${quest.id}/reveal`, GM, { revealed: true });
+    const questOpen = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((questOpen.data.connections as Json[]).some((row) => row.otherId === questRecord.id)).toBe(true);
+  });
+
+  /**
    * D8's create/patch/delete cycle at the boundary, plus the one thing a client most needs to know: a
    * MENTION has no id, so it cannot be patched or deleted through the API. Editing the sentence is the
    * only way, which is what keeps one sentence and one edge from being two things to keep in step.
