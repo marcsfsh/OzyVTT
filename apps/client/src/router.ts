@@ -88,6 +88,25 @@ export function popTransient(key: string): void {
   window.history.back();
 }
 
+/**
+ * Forget a transient entry WITHOUT going back — for the case where the caller is about to navigate.
+ *
+ * `popTransient` cannot serve that case, and the bug it caused is worth recording. Choosing a
+ * destination from the phone nav drawer ran `closeDrawer()` (→ `history.back()`) and then `navigate()`.
+ * `back()` is queued as a task while `navigate`'s guard check resolves on a MICROTASK, so the order was
+ * always: push the destination, then go back off it. **Every tap in the phone nav drawer navigated
+ * nowhere** — the drawer closed, the address never moved, and on a laptop (no transient registered,
+ * `popTransient` a no-op) it worked perfectly, which is why it survived to a browser pass.
+ *
+ * Returns whether an entry is now stranded, so the caller can `navigate(path, { replace: true })` and
+ * overwrite it rather than leaving a duplicate the GM has to press back through twice.
+ */
+export function discardTransient(key: string): boolean {
+  if (!transients.has(key)) return false;
+  transients.delete(key);
+  return true;
+}
+
 window.addEventListener("popstate", (event) => {
   const key = (event.state as { transient?: string } | null)?.transient;
   // Popping FORWARD onto a transient entry is not a thing we ever want to honour; only the disappearance

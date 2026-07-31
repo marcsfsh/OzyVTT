@@ -8,7 +8,7 @@ import {
   type CodexPageSummary, type CodexQuest, type CodexSession, type CodexSettings, type CodexStanding,
   type GmCodexCalendar
 } from "./api";
-import { navigate, replaceQuery, pushTransient, popTransient, useRoute } from "../router";
+import { navigate, replaceQuery, pushTransient, popTransient, discardTransient, useRoute } from "../router";
 import {
   CODEX_ROOT, GM_SIDEBAR, SECTION_TITLE, atlasPath, codexSectionOf, journalEntryPath, pagePath,
   pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath, graphPath, type CodexSection
@@ -208,7 +208,17 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
     catch (previewFailure) { setPreviewError(previewFailure instanceof Error ? previewFailure.message : "Couldn't open the player preview."); }
   }, [gmToken]);
 
-  const goto = useCallback((path: string) => { closeDrawer(); navigate(path); }, [closeDrawer]);
+  /**
+   * Navigating FROM the drawer cannot use `closeDrawer`: that calls `history.back()`, which is a task,
+   * while `navigate` pushes on a microtask — so the destination was pushed and then immediately gone
+   * back off, and every tap in the phone nav drawer went nowhere. Discard the transient entry instead
+   * and `replace` it with the destination, so back from there returns to where the drawer was opened.
+   */
+  const goto = useCallback((path: string) => {
+    const stranded = discardTransient(DRAWER_TRANSIENT);
+    setDrawerOpen(false);
+    navigate(path, { replace: stranded });
+  }, []);
 
   const standingRows = useMemo(() => {
     const byFaction = new Map(standing.map((row) => [row.factionPageId, row.value]));

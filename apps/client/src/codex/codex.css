@@ -391,7 +391,17 @@
    fight. A basis keeps the title in the negotiation rather than making it the sole loser; the date and badge
    still hold their ground, and the title ellipses like every other list row. Found by the final QA pass,
    measured at both widths. The Deadlines card was the ONLY card with this fault. */
-.codex-campaign-recentitem .codex-list-title { flex: 1 1 140px; min-width: 0; }
+/* MEASURED at 1280px against a populated codex: with a progress readout AND a visibility badge beside
+   it, a quest title rendered as "Esc…" — three characters and an ellipsis. `min-width: 0` let the title
+   shrink to nothing while the trailing chips, which are `white-space: nowrap`, kept every pixel they
+   asked for. The row was technically not overflowing, so nothing caught it; it was simply unreadable.
+
+   The rule is that the TITLE is the row's subject and the chips are its annotations, so the chips give
+   way first: the title keeps a readable floor, and the chassis wraps so anything that still does not fit
+   drops to a second line inside the row rather than crushing the name. Wrapping is on at every width —
+   when the row fits, it does nothing at all. */
+.codex-campaign-recentitem { flex-wrap: wrap; row-gap: var(--space-1); }
+.codex-campaign-recentitem .codex-list-title { flex: 1 1 auto; min-width: 8rem; }
 .codex-campaign-questprogress, .codex-campaign-deadlinewhen { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
 /* Indented under its quest so the list reads as belonging to the row above it rather than as a sibling.
    The `Checklist` primitive owns everything else about it, including its own 44px story — which does not
@@ -936,7 +946,8 @@
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1);
 }
-.codex-audit-row .codex-list-title { flex: 1 1 160px; min-width: 0; }
+.codex-audit-row { flex-wrap: wrap; row-gap: var(--space-1); }
+.codex-audit-row .codex-list-title { flex: 1 1 auto; min-width: 8rem; }
 
 /* ============================================================================
    D1 — THE SIDEBAR SHELL. One navigation surface, at every width.
@@ -1170,4 +1181,20 @@
   .codex-calendar-grid { grid-template-columns: repeat(min(var(--codex-week, 7), 4), minmax(0, 1fr)); }
   .codex-downtime-pendingrow, .codex-downtime-historyrow { align-items: stretch; flex-direction: column; }
   .codex-dashgrid { gap: var(--space-3); }
+  /* MEASURED at 375px in Chromium: the Downtime history row pushed the DOCUMENT 117px sideways — the one
+     thing mobile parity forbids outright. The row chassis is a single non-wrapping flex line, and a
+     downtime row is the most loaded instance of it: glyph + title + a character-page badge + a state
+     badge + a full in-world date ("Sunday, Coldmourn 11, 735 BC"). The title already shrinks to nothing
+     (`min-width: 0`), but the two badges and the date are all `white-space: nowrap`, so the row's
+     MIN-CONTENT width was 463px and no amount of shrinking the title could help.
+
+     Fixed on the chassis rather than on the downtime row, because the same row shape carries a badge on
+     the reveal audit and a date on the dashboard and would have hit this the moment either grew: below
+     the ladder's narrow step the row wraps, so the trailing chips drop to a second line inside the row
+     instead of widening the page. `--fs-2xs` mono stays nowrap per-token but may now wrap between
+     tokens, which is the correct trade at this width. */
+  /* The chassis already wraps (see the rule above). At this width the in-world date is itself longer
+     than the column — "Sunday, Coldmourn 11, 735 BC" — so it is allowed to wrap between its own tokens
+     too, which is what closed a MEASURED 117px sideways scroll of the document on the Downtime history. */
+  .codex-campaign-recentwhen { white-space: normal; }
 }

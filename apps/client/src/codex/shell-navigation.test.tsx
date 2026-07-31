@@ -222,6 +222,53 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     await waitFor(() => expect(drawerNav()).toHaveLength(1));
   });
 
+  /**
+   * FOUND IN CHROMIUM, and **these two tests do not reproduce it** — stated plainly because a test whose
+   * comment claims a guard it does not provide is worse than no test.
+   *
+   * The bug: choosing a destination from the drawer ran `closeDrawer()` (→ `history.back()`) and then
+   * `navigate()`. In a real browser `back()` is a task while `navigate` pushes on a microtask, so the
+   * order was always push-then-go-back-off it, and **every tap in the phone nav drawer navigated
+   * nowhere**. On a laptop no transient entry is registered, `popTransient` is a no-op, and the same
+   * code path is correct — which is how it survived to a browser pass.
+   *
+   * jsdom sequences `history.back()` differently, so both of these passed against the broken code (I
+   * checked, by reverting the fix and re-running). They are kept anyway: they pin the BEHAVIOUR the fix
+   * establishes, so a future refactor that reintroduces a `closeDrawer()`-then-navigate shape has
+   * something to answer to on the "back is one press" half. The race itself is browser-only, and
+   * `scripts/browser-verify.mjs` is what actually catches it.
+   */
+  it("navigating from the drawer lands on the destination", async () => {
+    const user = userEvent.setup();
+    renderShell("/codex");
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: "Codex sections" }));
+    await waitFor(() => expect(drawerNav()).toHaveLength(2));
+    await user.click(within(drawerNav()[1]).getByRole("button", { name: "Quests" }));
+
+    // The whole point: the address moved, and stayed moved.
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/quests"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(window.location.pathname).toBe("/codex/quests");
+  });
+
+  it("replaces the drawer's own history entry, so back from the destination is one press", async () => {
+    const user = userEvent.setup();
+    renderShell("/codex");
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: "Codex sections" }));
+    await waitFor(() => expect(drawerNav()).toHaveLength(2));
+    await user.click(within(drawerNav()[1]).getByRole("button", { name: "Journal" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
+
+    // The transient entry was REPLACED rather than left stranded: one back returns to where the drawer
+    // was opened. Leaving it would make the GM press back twice to undo one tap.
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/codex"));
+  });
+
   it("closes on the back gesture instead of leaving the section", async () => {
     const user = userEvent.setup();
     renderShell("/codex/quests");

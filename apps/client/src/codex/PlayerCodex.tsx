@@ -27,7 +27,7 @@ import { TagView } from "./TagView";
 import { NotFoundView } from "../components/NotFoundView";
 import { playerCampaignFeedProps } from "./dashboard";
 import { PLAYER_SIDEBAR, SECTION_TITLE, atlasPath, codexSectionOf, journalEntryPath, pagePath, pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath } from "./routes";
-import { navigate, popTransient, pushTransient, replaceQuery, useRoute } from "../router";
+import { discardTransient, navigate, popTransient, pushTransient, replaceQuery, useRoute } from "../router";
 import { entityDef, type EntityType } from "./entities";
 import "./codex.css";
 
@@ -178,7 +178,16 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 
   const openDrawer = () => { setDrawerOpen(true); if (!embedded) pushTransient("player-codex-nav", () => setDrawerOpen(false)); };
   const closeDrawer = () => { setDrawerOpen(false); if (!embedded) popTransient("player-codex-nav"); };
-  const goto = (next: string) => { closeDrawer(); go(next); };
+  /**
+   * Same fix as the GM shell: `closeDrawer` goes BACK, which raced the push and lost the destination on
+   * every phone-drawer tap. Discard the entry and replace it with where we are going.
+   */
+  const goto = (next: string) => {
+    const stranded = !embedded && discardTransient("player-codex-nav");
+    setDrawerOpen(false);
+    if (embedded) setLocalPath(next);
+    else navigate(next, { replace: stranded });
+  };
 
   useEffect(() => {
     if (embedded) return;

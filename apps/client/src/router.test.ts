@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  currentHref, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, navigate, pathForGmTab,
+  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, navigate, pathForGmTab,
   popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, withQuery
 } from "./router";
 import { goTo } from "../test/route";
@@ -190,6 +190,33 @@ describe("Transient history (the phone nav drawer)", () => {
   it("ignores popTransient for a key that was never pushed", () => {
     goTo("/codex/pages");
     expect(() => popTransient("never-opened")).not.toThrow();
+  });
+
+  /**
+   * `discardTransient` exists because `popTransient` cannot serve a caller that is about to navigate.
+   * In a real browser `history.back()` is a task and `navigate`'s push lands on a microtask, so
+   * closing-then-navigating pushed the destination and immediately went back off it — every tap in the
+   * phone nav drawer went nowhere. This pins the contract that fixed it.
+   */
+  it("discardTransient forgets the entry WITHOUT going back, and says one was stranded", () => {
+    goTo("/codex/pages");
+    const onPop = vi.fn();
+    pushTransient("nav-drawer", onPop);
+    const at = window.location.pathname;
+
+    expect(discardTransient("nav-drawer")).toBe(true);
+    // No history movement: the caller is going to overwrite the entry itself.
+    expect(window.location.pathname).toBe(at);
+    // And the handler is gone, so a later pop is a real navigation rather than a phantom drawer close.
+    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+    expect(onPop).not.toHaveBeenCalled();
+  });
+
+  it("discardTransient reports false when nothing was open, so the caller does not replace by mistake", () => {
+    // The laptop case: no drawer, so the navigation must PUSH. Replacing here would silently eat the
+    // entry the GM came from, which is the same class of bug in the other direction.
+    goTo("/codex/pages");
+    expect(discardTransient("nav-drawer")).toBe(false);
   });
 });
 
