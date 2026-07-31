@@ -103,13 +103,28 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   from the bounded number input; documented as intentional in the helper. Recorded because "an overflowing
   control lands on neutral" is a surprising failure direction if it ever becomes reachable.
 
+- **[codex/audit] A session with no number and no recap rendered a BLANK audit row — FIXED 2026-07-31.**
+  The audit's session arm fell back to `excerpt(recap)`, which is `""` for an empty recap, so the row was
+  unreadable and unclickable. It now uses `sessionDisplayTitle` — number, else recap excerpt, else
+  **"Untitled session"** — the `AUDIT_JOURNAL_FALLBACK` rule applied one arm over, and shared verbatim
+  with the new session search hit so the two surfaces call one thing one name.
+
 - **[codex/audit] The published campaign date is not in the reveal audit.** It is a player-visible thing the
   GM publishes (M11's O-1), and the audit lists seven record kinds and not that. Contract-compliant — the
   seven kinds were frozen deliberately — but a GM asking "what can they see?" may reasonably expect the
   party's current date to be on that list. Raised by adversarial review as a scope observation, not a defect.
 
 - **[codex] Renumbering a session orphans its entries and republishes numbers the player gate was
-  hiding — OPEN, awaiting an owner decision (2026-07-29, found by M9's correctness review).** The join
+  hiding — FIXED 2026-07-31 (Codex overhaul, D9, migration v19).** Resolved by an option beyond the three
+  listed below: journal entries now join their session **by id**, so the display number is resolved live
+  from the linked record. Renumbering moves every one of its entries in one `updateSession` with no
+  journal write at all, the by-session lens never loses the group, and the player gate keys on the
+  session's reveal state by identity rather than on a list of numbers — so an unnumbered hidden session
+  is gated too, which the number list structurally could not do. Session **delete** keeps the documented
+  behaviour under director ruling R2: SET NULL on the join, with the number stamped back as a bare label
+  only when the deleted session was revealed (a hidden one leaves no label, because a bare label passes
+  through to players). Original report and the three options considered follow.
+  The join
   between a session record and its journal entries is the **number**, not the id, and `updateSession`
   does not touch `codex_journal`. So: create session #4, leave it unrevealed, play — entries are stamped
   4 and correctly show players nothing. Then correct the record's number to 5. No record now claims 4,
@@ -150,12 +165,15 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   **A false violation is worse than none: it sends the next session to "fix" working code.**
 
 - **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — FIXED IN
-  CODE; entry kept for the reasoning.** Option (2) below shipped: `playerSessionNumbers` resolves
-  `store.unrevealedSessionNumbers()` once per request and `projectPlayerJournalEntry` nulls
-  `sessionNumber` when a session record carries that number and is not revealed. Legacy numbers with no
-  record behind them are unaffected, exactly as the option promised. **Do not re-solve this.** The
-  Codex-overhaul D9 work (journal entries joining sessions by *id*) removes the number-list mechanism
-  entirely and gates on session reveal by construction; until then, this is the gate.
+  CODE (twice over); entry kept for the reasoning. Do not re-solve this.** Option (2) shipped first:
+  `playerSessionNumbers` resolved `store.unrevealedSessionNumbers()` once per request and
+  `projectPlayerJournalEntry` nulled the number when a session record carried it and was not revealed.
+  **Superseded 2026-07-31 by D9** (migration v19): entries join their session by **id**, the context is
+  now `unrevealedSessionIds()`, and `projectPlayerJournalEntry` nulls **both** `sessionId` and
+  `sessionNumber` together for an unrevealed session. That is strictly stronger — the number list could
+  not gate an entry filed under an *unnumbered* hidden session, because such a session has no number to
+  put in the set. Bare labels with no record behind them still travel, and after v19 the only ones that
+  exist are those `deleteSession` stamps back for a session that was already revealed (ruling R2).
   Original report (2026-07-29, M9): a GM creates session 4, leaves it
   unrevealed and activates it; any revealed journal entry written during play carries `sessionNumber: 4`
   to the player, who sees "Session 4", while their session list shows only `[3]` and a direct fetch of

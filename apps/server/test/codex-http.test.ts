@@ -67,6 +67,7 @@ const get = (base: string, path: string, headers: Record<string, string>) => fet
 const post = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(payload) });
 const patch = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
 const put = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PUT", headers, body: JSON.stringify(payload) });
+const del = (base: string, path: string, headers: Record<string, string>, payload?: unknown) => fetch(`${base}${path}`, { method: "DELETE", headers, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
 
 /**
  * D22: the `codex:changed` ping is CONTENT-FREE. It used to carry a `scope` word - "pages", "journal" - to
@@ -120,7 +121,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     // has always been player-visible on PAGES, and here it rides the same allow-list, so it is only ever
     // emitted for an entry the player may already see. Any OTHER new key failing this line is a leak.
     expect(Object.keys(playerTimeline.data.entries[0]).sort())
-      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text"]);
+      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionId", "sessionNumber", "tags", "text"]);
   });
 
 
@@ -745,7 +746,7 @@ describe("codex chronicle HTTP boundary (CT-11, A-8)", () => {
     //               allow-listed away, which the projection test asserts at its own layer.
     // `proposedDate` deliberately did NOT join them: a clock move the GM has not confirmed is prep.
     expect(Object.keys(playerRows[0]).sort())
-      .toEqual(["createdAt", "fired", "id", "inWorldLabel", "kind", "payload", "realDate", "sessionNumber", "tags", "text", "title"]);
+      .toEqual(["calendarInstant", "createdAt", "fired", "id", "inWorldDate", "inWorldLabel", "kind", "payload", "realDate", "sessionId", "sessionNumber", "tags", "text", "title"]);
   });
 
   it("interleaves a dated event with journal entries in one in-world order, for both roles", async () => {
@@ -847,7 +848,7 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     expect(rows).toHaveLength(1);                                   // the still-secret session 7 is absent
     // The EXACT projected key set, as the journal and chronicle tests above assert for their records:
     // this fails if any new field ever enters the player session projection, not only if this one leaks.
-    expect(Object.keys(rows[0]).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(Object.keys(rows[0]).sort()).toEqual(["id", "realDate", "recap", "sessionNumber", "tags"]);
     expect(rows[0].recap).toBe(RECAP);
 
     const payload = JSON.stringify(playerList);
@@ -859,7 +860,7 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
 
     // The single read is gated identically, and carries the same key set.
     const single = await body(await get(base, `/api/v1/codex/sessions/${shownId}`, PLAYER));
-    expect(Object.keys(single.data.session).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(Object.keys(single.data.session).sort()).toEqual(["id", "realDate", "recap", "sessionNumber", "tags"]);
     expect(JSON.stringify(single)).not.toContain(PREP);
     expect((await get(base, `/api/v1/codex/sessions/${secretId}`, PLAYER)).status).toBe(404);
     expect((await get(base, `/api/v1/codex/sessions/${secretId}`, GM)).status).toBe(200);
@@ -941,9 +942,25 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     await post(base, `/api/v1/codex/sessions/${created.data.session.id}/activate`, GM, {});
     const during = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "We reached Vallaki." }));
     expect(during.data.entry.sessionNumber).toBe(12);
-    // An explicit value still wins over the active session.
-    const pinned = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "A retcon.", sessionNumber: 4 }));
+    // An explicit ID still wins over the active session.
+    const other = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 4 }));
+    const pinned = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "A retcon.", sessionId: other.data.session.id }));
     expect(pinned.data.entry.sessionNumber).toBe(4);
+    expect(pinned.data.entry.sessionId).toBe(other.data.session.id);
+
+    // D9 / register #4: a bare `sessionNumber` on a WRITE is a 400 with the key named in `details.issues`.
+    // The number is a display value the server resolves; a client asserting one would be asserting
+    // something it does not own, and `.strict()` says so rather than ignoring the key.
+    const refused = await post(base, "/api/v1/codex/journal", GM, { playerText: "By number.", sessionNumber: 12 });
+    expect(refused.status).toBe(400);
+    const refusal = await body(refused);
+    expect(refusal.error.code).toBe("validation_failed");
+    // The key is NAMED, not merely rejected - a caller migrating off `sessionNumber` has to be able to
+    // tell this apart from a generic bad body.
+    expect(JSON.stringify(refusal.error)).toContain("sessionNumber");
+    expect((refusal.error.details.issues as unknown[]).length).toBeGreaterThan(0);
+    // ...and an id naming no session is a 404, not a silently unfiled entry.
+    expect((await post(base, "/api/v1/codex/journal", GM, { playerText: "Nowhere.", sessionId: randomUUID() })).status).toBe(404);
   });
 
   it("never lets an UNREVEALED session's number ride out on a revealed journal entry", async () => {
@@ -959,10 +976,15 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     const auto = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "We reached Vallaki." }));
     const autoId = auto.data.entry.id as string;
     expect(auto.data.entry.sessionNumber).toBe(4);                        // auto-linked, exactly as M9 intends
-    // A LEGACY-shaped entry beside it: a number no session record claims, which must be unaffected. Without
-    // it a router that simply blanked every number for players would pass this whole test.
-    const legacy = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Undated lore.", sessionNumber: 9 }));
+    // A STAMP-BACK-shaped entry beside it (director ruling R2): an entry carrying a bare number label with
+    // no session behind it, which must be unaffected. Without it a router that simply blanked every number
+    // for players would pass this whole test. It is produced the only way that state can now arise -
+    // by deleting a REVEALED numbered session.
+    const doomed = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 9 }));
+    await post(base, `/api/v1/codex/sessions/${doomed.data.session.id}/reveal`, GM, { revealed: true });
+    const legacy = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Undated lore.", sessionId: doomed.data.session.id }));
     const legacyId = legacy.data.entry.id as string;
+    await del(base, `/api/v1/codex/sessions/${doomed.data.session.id}`, GM, {});
     for (const id of [autoId, legacyId]) await post(base, `/api/v1/codex/journal/${id}/reveal`, GM, { revealed: true });
 
     // The session itself is still hidden - the list omits it, the direct read 404s. That is the fact a
@@ -982,8 +1004,11 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     expect(pJournal.text).toBe("We reached Vallaki.");                    // the entry itself is readable...
     expect(pJournal.sessionNumber).toBeNull();                            // ...without naming the session
     expect(pTimeline.sessionNumber).toBeNull();
-    expect(pLegacyJournal.sessionNumber).toBe(9);                         // nothing legacy changed
+    expect(pJournal.sessionId).toBeNull();                                // ...and neither half of the link travels
+    expect(pTimeline.sessionId).toBeNull();
+    expect(pLegacyJournal.sessionNumber).toBe(9);                         // R2's stamped-back label still reads
     expect(pLegacyTimeline.sessionNumber).toBe(9);
+    expect(pLegacyJournal.sessionId).toBeNull();                          // ...with no record left to link to
 
     // The GM's copy of both reads still carries 4, so the nulls above are the gate and not a lost field.
     const [gJournal, gTimeline] = await rowsFor(GM);
@@ -1048,7 +1073,7 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
     expect(rows).toHaveLength(1);                                   // the still-secret quest is absent
     // The EXACT projected key set: this fails if any new field ever enters the player quest projection,
     // not only if this one leaks. `status` is deliberately PRESENT — "what is still open" is the feature.
-    expect(Object.keys(rows[0]).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(Object.keys(rows[0]).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "tags", "title"]);
     expect(rows[0].body).toBe(PLAYER_BODY);
     expect(rows[0].status).toBe("active");
     expect(rows[0].objectives).toEqual(OBJECTIVES);                 // order and tick state survive the wire
@@ -1061,7 +1086,7 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
 
     // The single read is gated identically, and carries the same key set.
     const single = await body(await get(base, `/api/v1/codex/quests/${shownId}`, PLAYER));
-    expect(Object.keys(single.data.quest).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(Object.keys(single.data.quest).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "tags", "title"]);
     expect(JSON.stringify(single)).not.toContain("forgery");
     expect((await get(base, `/api/v1/codex/quests/${secretId}`, PLAYER)).status).toBe(404);
     expect((await get(base, `/api/v1/codex/quests/${secretId}`, GM)).status).toBe(200);
@@ -1806,9 +1831,6 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
 describe("codex settings and the revision delete, HTTP boundary (owner decision, 2026-07-30)", () => {
   const settings = async (base: string, headers: Record<string, string>) =>
     (await body(await get(base, "/api/v1/codex/settings", headers))).data.settings as Json;
-  const del = (base: string, path: string, headers: Record<string, string>, payload: unknown) =>
-    fetch(`${base}${path}`, { method: "DELETE", headers, body: JSON.stringify(payload) });
-
   it("serves the owner's defaults, with the usage figures, in exactly the shape the client reads", async () => {
     const { base } = await fixture();
     const payload = await settings(base, GM);

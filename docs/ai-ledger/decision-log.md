@@ -7,6 +7,47 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-31 — journal entries join their session by identity, and the Codex learns to autosave
+
+Codex overhaul, Lane B (Phases 1-2). Five durable decisions; one of them consciously supersedes a
+recorded owner decision, which is the reason this entry exists at all.
+
+- **Journal entries link to a session by ID, not by number (D9, migration v19).** `session_number` on a
+  journal row was a copy, so renumbering a session made every one of its entries lie
+  (`known-bugs.md`, OPEN since 2026-07-29). The number is now a DISPLAY value resolved live from the
+  linked record: renumbering relabels every entry with no journal write, and the by-session lens can
+  never lose a group. Writes accept `sessionId` only; a bare `sessionNumber` in a write body is a 400
+  with the key named in `details.issues`, because a client asserting a display value would be asserting
+  something the server owns. Omitted on a create auto-files under the ACTIVE session — which now works
+  for an *unnumbered* active session, where the old number-stamping could not link at all.
+- **v13's "sessions arrive with NO backfill" is consciously superseded (client decision D9).** v13
+  refused to synthesize session records for the numbers legacy entries carried, on the stated grounds
+  that inventing prep, recap and attendance would fabricate facts. That objection is honoured rather
+  than overridden: migration v19 synthesizes exactly one record per orphan NUMBER, with **empty** prep,
+  recap and attendees, `status: played` and `revealed: 0`. Nothing is invented, nothing becomes visible
+  to a player, and the only screen that changes is the GM's session list — where a number that already
+  existed now has a record behind it. The alternative was orphaning those numbers, which is data loss.
+  The v13 comment in `codex-store.ts` stands as the history; this is the decision that supersedes it.
+- **Session delete stamps the number back CONDITIONALLY (director ruling R2).** A revealed session's
+  number is written onto its entries as a bare label when the record goes — behaviour-preserving, since
+  the players were already reading it. A hidden session's entries get nothing: a bare label has no
+  record left to gate on, so it would pass through to players and announce that a session they were
+  never shown existed. Secret-by-default wins over label continuity.
+- **Autosave is a stored preference, in SECONDS, defaulting to `{enabled: true, intervalSeconds: 1}`
+  (D6, ruling R4, migration v18).** One unit from the wire to the column, so nothing converts at a
+  boundary and nothing can convert twice. The default is what the shipping editors already did (an
+  800 ms debounce) expressed on that scale, so an upgraded codex saves exactly as often as it used to.
+  The server stores a preference only — there is no server-side draft, so enforcement is editor
+  behaviour.
+- **The `codex:changed` ping is content-free (D22).** It carried a `scope` word to every socket,
+  players included, which told the table which part of the codex the GM was working in. No listener
+  ever read it, and the homebrew notifier eight lines away already refused the same thing on principle.
+  Two notifiers, one rule.
+- **A type-changing page save forces its revision snapshot (D7, ruling R7).** The pruning such a save
+  performs is exactly the content the coalescing window would otherwise swallow, and the client's
+  confirm dialog promises it is recoverable from History. The switch still wins: `enabled: false`
+  writes nothing, and a type change is not an exception to it.
+
 ## 2026-07-31 — the Codex joins the public API, and the API stops overstating itself
 
 Codex overhaul, Lane A (`c7fc8aa`, `5f78d87`). Six durable decisions, three of which consciously

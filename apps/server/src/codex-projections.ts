@@ -200,7 +200,17 @@ export type GmCodexJournalEntry = CodexJournalRow;
  * player-facing field the player Codex does not read is a field with no reason to have been widened.
  */
 export type PlayerCodexJournalEntry = Readonly<{
-  id: string; text: string; kind: CodexJournalRow["kind"]; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
+  id: string; text: string; kind: CodexJournalRow["kind"];
+  /**
+   * D9 / D14. VIEWER-SAFETY JUSTIFICATION, individually: this is emitted only when the linked session is
+   * REVEALED, in which case the player can already list that session (`GET /codex/sessions`) and open it by
+   * id (`GET /codex/sessions/{id}`). It therefore adds zero information and buys entry -> session
+   * navigation, which is the reading parity D14 asks for. When the linked session is unrevealed it is null
+   * TOGETHER with `sessionNumber` - both halves of the link, because either half announces that a session
+   * they have not been shown exists.
+   */
+  sessionId: string | null;
+  sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
 }>;
 
 /**
@@ -221,7 +231,12 @@ const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
  * alone) when the standing gate moved onto `projectPlayerJournalEntry` — see `playerStandingVisible`.
  */
 export type PlayerSessionNumberContext = Readonly<{
-  unrevealedSessionNumbers: ReadonlySet<number>;
+  /**
+   * D9: keyed by session ID, not by number. That is what closes the gap the number version could not - an
+   * UNNUMBERED hidden session could never appear in a set of numbers, so an entry filed under one had
+   * nothing to gate on. The join is now the gate, and every filed entry has one.
+   */
+  unrevealedSessionIds: ReadonlySet<string>;
   revealedPageIds?: ReadonlySet<string>;
 }>;
 
@@ -268,16 +283,31 @@ function playerStandingVisible(row: CodexJournalRow, context: PlayerSessionNumbe
   return faction !== null && (context.revealedPageIds ?? EMPTY_PAGE_IDS).has(faction);
 }
 
-function playerSessionNumber(sessionNumber: number | null, context: PlayerSessionNumberContext): number | null {
-  if (sessionNumber === null) return null;
-  return context.unrevealedSessionNumbers.has(sessionNumber) ? null : sessionNumber;
+/**
+ * A player's copy of an entry's session LINK - both halves, resolved together, because they are one fact.
+ *
+ * Three arms, and the middle one is the whole rule:
+ *   - joined to a session the players have NOT been shown -> both null. A session's very existence is GM
+ *     information (`GET /codex/sessions/{id}` 404s a player on an unrevealed one rather than 403ing, the
+ *     list omits it, `activeSessionId` is nulled), so either half of the link announces it.
+ *   - joined to a REVEALED session -> both pass. The player can already open that session by id.
+ *   - not joined, but carrying a bare LABEL -> `sessionId: null`, label passes. After migration v19 the
+ *     only bare labels in the database are those `deleteSession` stamped back for a REVEALED session
+ *     (director ruling R2), so the number was already player-visible and there is no record left whose
+ *     existence it could give away. A hidden session's delete stamps nothing at all.
+ */
+function playerSessionLink(row: CodexJournalRow, context: PlayerSessionNumberContext): { sessionId: string | null; sessionNumber: number | null } {
+  if (row.sessionId === null) return { sessionId: null, sessionNumber: row.sessionNumber };
+  if (context.unrevealedSessionIds.has(row.sessionId)) return { sessionId: null, sessionNumber: null };
+  return { sessionId: row.sessionId, sessionNumber: row.sessionNumber };
 }
 
 export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry { return row; }
 export function projectPlayerJournalEntry(row: CodexJournalRow, context: PlayerSessionNumberContext): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
   if (!playerStandingVisible(row, context)) return null;
-  return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: playerSessionNumber(row.sessionNumber, context), realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
+  const session = playerSessionLink(row, context);
+  return { id: row.id, text: row.playerText, kind: row.kind, sessionId: session.sessionId, sessionNumber: session.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
 }
 
 // ----- Sessions (M9: prep is the GM half, recap is the player half) -----
@@ -305,6 +335,15 @@ export type PlayerCodexSession = Readonly<{
   sessionNumber: number | null;
   realDate: string | null;
   recap: string;
+  /**
+   * D10. VIEWER-SAFETY JUSTIFICATION, individually: tags are SINGLE-LAYER by CI-2 - there is no GM-only
+   * tag anywhere in the codex - and every other record kind already ships its tags to players (pages
+   * always; maps, markers and journal entries since v10). A revealed session's tags are its player-facing
+   * categorization, and they are already in the player search index by the same rule, so withholding them
+   * here would make one kind behave differently for no reason a reader could name. Symmetry is the safer
+   * answer: the asymmetric version is the one whose exception someone eventually forgets.
+   */
+  tags: readonly string[];
 }>;
 
 export function projectGmSession(row: CodexSessionRow): GmCodexSession { return row; }
@@ -314,7 +353,7 @@ export function projectPlayerSession(row: CodexSessionRow): PlayerCodexSession |
   if (!row.revealedToPlayers) return null;
   // Explicit allow-list, never a spread-and-delete: a field added to `CodexSessionRow` must be added HERE
   // to reach a player, so the default for anything new is secret.
-  return { id: row.id, sessionNumber: row.sessionNumber, realDate: row.realDate, recap: row.recapBody };
+  return { id: row.id, sessionNumber: row.sessionNumber, realDate: row.realDate, recap: row.recapBody, tags: row.tags };
 }
 
 // ----- Quests (M10: playerBody is what the party was told, gmBody is where it is really going) -----
@@ -344,6 +383,12 @@ export type PlayerCodexQuest = Readonly<{
   body: string;
   objectives: readonly CodexQuestObjective[];
   entityIds: readonly string[];
+  /**
+   * D10. VIEWER-SAFETY JUSTIFICATION, individually: the `PlayerCodexSession.tags` argument verbatim - tags
+   * are single-layer by CI-2, every other kind already ships them, and a revealed quest's tags are its
+   * player-facing categorization. The quest's own reveal flag remains the whole predicate.
+   */
+  tags: readonly string[];
 }>;
 
 export function projectGmQuest(row: CodexQuestRow): GmCodexQuest { return row; }
@@ -366,7 +411,8 @@ export function projectPlayerQuest(row: CodexQuestRow, context: Readonly<{ revea
   return {
     id: row.id, title: row.title, status: row.status, body: row.playerBody,
     objectives: row.objectives,
-    entityIds: row.entityIds.filter((entityId) => context.revealedEntityIds.has(entityId))
+    entityIds: row.entityIds.filter((entityId) => context.revealedEntityIds.has(entityId)),
+    tags: row.tags
   };
 }
 
@@ -624,6 +670,8 @@ export type GmCodexChronicleRecord = Readonly<{
   text: string;
   gmText: string | null;
   revealedToPlayers: boolean;
+  /** D9: the session record this row belongs to, by identity. `null` for an `event` page and for an unfiled entry. */
+  sessionId: string | null;
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
@@ -677,9 +725,31 @@ export type PlayerCodexChronicleRecord = Readonly<{
   id: string;
   title: string | null;
   text: string;
+  /** D9: inherited from `projectPlayerJournalEntry`'s session gate rather than restated - see there. */
+  sessionId: string | null;
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
+  /**
+   * D17 / director ruling R3, and this is a documented REVERSAL of the "machine-readable dates are GM-only"
+   * line this type used to carry.
+   *
+   * VIEWER-SAFETY JUSTIFICATION, individually: `inWorldDate` is strictly derived from the record's own raw
+   * date, which the GM published by revealing the record, and the `inWorldLabel` one line above already
+   * encodes the identical information as prose ("Third, Melting 12, 1492" - the server's label carries
+   * weekday, day, month and year). The structured parts add ZERO bits; they remove a client re-parse. The
+   * GM's own clock is untouched by this field - a record's date is not the campaign's "now".
+   */
+  inWorldDate: CodexInWorldDate | null;
+  /**
+   * D17 / R3. VIEWER-SAFETY JUSTIFICATION, individually: a pure function of `inWorldDate` above and the
+   * calendar structure the player already holds (`GET /codex/calendar`), so it is derivable client-side and
+   * carries no new information at all. Shipping the SERVER's value is what stops the client re-deriving it
+   * with arithmetic that disagrees - the day-clamp divergence on a day-31-of-a-30-day-month date is a
+   * measured, ledgered bug, and one authority for one number is the fix. Null exactly when `inWorldDate`
+   * is null.
+   */
+  calendarInstant: number | null;
   tags: readonly string[];
   fired: boolean;
   payload: PlayerCodexChroniclePayload | null;
@@ -692,7 +762,7 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord, context: 
     return {
       kind: chronicleKindOf(entry.kind), id: entry.id, title: null,
       text: entry.playerText, gmText: entry.gmText, revealedToPlayers: entry.revealedToPlayers,
-      sessionNumber: entry.sessionNumber, realDate: entry.realDate, inWorldLabel: entry.inWorldLabel,
+      sessionId: entry.sessionId, sessionNumber: entry.sessionNumber, realDate: entry.realDate, inWorldLabel: entry.inWorldLabel,
       calendarInstant: entry.calendarInstant, inWorldDate: entry.inWorldDate, tags: entry.tags,
       attachPageId: entry.attachPageId, attachMarkerId: entry.attachMarkerId, sourceEncounterId: entry.sourceEncounterId,
       // `fired` is asked of every entry, not only a deadline: `deadlineFired` answers `false` for a
@@ -707,7 +777,7 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord, context: 
     kind: "event", id: page.id, title: page.title,
     text: excerpt(page.playerBody), gmText: page.gmBody.trim() ? excerpt(page.gmBody) : null,
     revealedToPlayers: page.revealedToPlayers,
-    sessionNumber: null, realDate: null, inWorldLabel: page.inWorldLabel,
+    sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: page.inWorldLabel,
     calendarInstant: page.calendarInstant, inWorldDate: page.inWorldDate, tags: page.tags,
     attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
     // An `event` PAGE is not a deadline and carries no payload: a page has no `kind` in the journal's
@@ -759,7 +829,12 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
     // exactly as visible as a revealed note. `payload` still rides through the per-kind allow-list.
     return {
       kind: chronicleKindOf(projected.kind), id: projected.id, title: null, text: projected.text,
-      sessionNumber: projected.sessionNumber, realDate: projected.realDate, inWorldLabel: projected.inWorldLabel,
+      sessionId: projected.sessionId, sessionNumber: projected.sessionNumber, realDate: projected.realDate,
+      inWorldLabel: projected.inWorldLabel,
+      // R3: both date forms, taken from the raw row rather than recomputed here - the store already
+      // resolved them against the live calendar (K3's one-reflow rule), and a second derivation in this
+      // file would be the second authority the ruling exists to remove.
+      inWorldDate: record.entry.inWorldDate, calendarInstant: record.entry.calendarInstant,
       tags: projected.tags,
       fired: deadlineFired(record.entry, context.publishedInstant ?? null),
       payload: projectPlayerPayload(record.entry, context.revealedPageIds ?? EMPTY_PAGE_IDS),
@@ -770,7 +845,10 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
   if (!projected) return null;
   return {
     kind: "event", id: projected.id, title: projected.title, text: excerpt(projected.body),
-    sessionNumber: null, realDate: null, inWorldLabel: record.page.inWorldLabel,
+    sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: record.page.inWorldLabel,
+    // R3, on the event arm too: a revealed `event` page's date is exactly as published as its label, and a
+    // calendar view that could place entries but not events would be a calendar with a hole in it.
+    inWorldDate: record.page.inWorldDate, calendarInstant: record.page.calendarInstant,
     tags: projected.tags, fired: false, payload: null, createdAt: record.page.createdAt
   };
 }
@@ -842,7 +920,27 @@ export type CodexSearchRecord =
   | Readonly<{ kind: "marker"; marker: CodexMarkerRow; mapRevealed: boolean }>
   // A quest needs NO extra context: its own `revealedToPlayers` is the whole predicate (see
   // `PLAYER_VISIBLE_SQL`), and a hit carries no entity linkage that would need resolving.
-  | Readonly<{ kind: "quest"; quest: CodexQuestRow }>;
+  | Readonly<{ kind: "quest"; quest: CodexQuestRow }>
+  // D10: a session needs NO extra context either - its own `revealedToPlayers` is the whole predicate
+  // (see `PLAYER_VISIBLE_SQL`), exactly as a quest's is. Gate 1 (`indexSession`) is what keeps prep and
+  // attendees out of the player index in the first place.
+  | Readonly<{ kind: "session"; session: CodexSessionRow }>;
+
+/**
+ * D10 / D23: what a session's result row is CALLED, on both the search surface and the reveal audit.
+ *
+ * `"Session {n}"` when it is numbered; a recap excerpt when it is not; `"Untitled session"` when it has
+ * neither. Never an empty string - a blank row is unclickable and unreadable, which is the audit bug
+ * `known-bugs.md:65-68` records. The fallback string is the repo's "Untitled page" / "Untitled quest"
+ * copy family, so the two surfaces speak one language rather than two.
+ *
+ * The number is player-safe on a REVEALED session (`projectPlayerSession` emits it), and this helper is
+ * only ever called with a session the caller has already decided the reader may see.
+ */
+export function sessionDisplayTitle(session: Readonly<{ sessionNumber: number | null; recap: string }>): string {
+  if (session.sessionNumber !== null) return `Session ${session.sessionNumber}`;
+  return excerpt(session.recap) || "Untitled session";
+}
 
 /**
  * One row in the single result list. Uniform on purpose - `kind` tells the client where to navigate,
@@ -862,11 +960,13 @@ export type CodexSearchRecord =
  * Nothing else is added without re-running this check. No bodies, no reveal flags, no parent links,
  * no scene/actor ids, no `rev`.
  *
- * A QUEST (M10) fits without widening the shape: `title` is the quest's title, and `tags` is `[]` because
- * quests carry no tags at all (not in the spec's column list). The empty array rather than a `null` or a
- * missing key is the point of "every key present on every kind" - a row renderer must not branch on which
- * kind it got. Its `status` and `objectives` are deliberately NOT here: they are read on the record, and a
- * result row exists to navigate, not to summarise.
+ * A QUEST (M10) fits without widening the shape: `title` is the quest's title, and since D10 gave quests
+ * tags, `tags` is theirs. Its `status` and `objectives` are deliberately NOT here: they are read on the
+ * record, and a result row exists to navigate, not to summarise.
+ *
+ * A SESSION (D10) fits the same way. `title` is `sessionDisplayTitle` - "Session 4", else a recap excerpt,
+ * else "Untitled session" - and `tags` is the session's own. Nothing else: a hit exists to navigate, and
+ * `prepBody`, `attendees` and `status` are not in the player session projection at all.
  */
 export type CodexSearchHit = Readonly<{
   kind: CodexRecordKind;
@@ -886,7 +986,10 @@ export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
     case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
     case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
     case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
-    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: [], entityType: null, mapId: null };
+    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null };
+    // The GM sees a session hit whatever its reveal state - reveal is the PLAYER predicate. The title rule
+    // is shared with the player arm and the reveal audit, so one concept has one name everywhere.
+    case "session": return { kind: "session", id: record.session.id, title: sessionDisplayTitle({ sessionNumber: record.session.sessionNumber, recap: record.session.recapBody }), tags: record.session.tags, entityType: null, mapId: null };
   }
 }
 
@@ -927,9 +1030,20 @@ export function projectPlayerSearchHit(record: CodexSearchRecord, context: Playe
       return record.marker.revealedToPlayers && record.mapRevealed
         ? { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId }
         : null;
+    case "session": {
+      // DELEGATES, like the journal arm above and for the same reason: `projectPlayerSession` owns what a
+      // player may see of a session, so this arm cannot drift from `GET /codex/sessions`. Everything the
+      // hit carries - the id, the number-derived title, the recap excerpt, the tags - comes back out of
+      // that projection; nothing is read off the raw row. `prepBody` and `attendees` are not merely
+      // omitted here, they never entered the player search index at all (gate 1, `indexSession`).
+      const projected = projectPlayerSession(record.session);
+      return projected === null
+        ? null
+        : { kind: "session", id: projected.id, title: sessionDisplayTitle(projected), tags: projected.tags, entityType: null, mapId: null };
+    }
     case "quest":
       return record.quest.revealedToPlayers
-        ? { kind: "quest", id: record.quest.id, title: record.quest.title, tags: [], entityType: null, mapId: null }
+        ? { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null }
         : null;
   }
 }
@@ -1113,9 +1227,14 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
     case "session": {
       const projected = projectPlayerSession(record.session);
       if (projected === null) return null;
-      // A numbered session reads by its number, which is how the party refers to it; an unnumbered one has
-      // only its recap, so the row shows a bounded excerpt of that rather than an empty line.
-      return { kind: "session", id: projected.id, title: projected.sessionNumber === null ? excerpt(projected.recap) : `Session ${projected.sessionNumber}`, journalKind: null };
+      // A numbered session reads by its number, which is how the party refers to it; an unnumbered one
+      // shows a bounded recap excerpt, and one with NEITHER shows "Untitled session".
+      //
+      // That last arm is the fix for `known-bugs.md:65-68`: an unnumbered session with an empty recap
+      // rendered a blank, unreadable, unclickable audit row. It uses `sessionDisplayTitle`, the same helper
+      // the search hit uses, so the two surfaces cannot end up calling one thing two names - the
+      // `AUDIT_JOURNAL_FALLBACK` rule applied one arm over.
+      return { kind: "session", id: projected.id, title: sessionDisplayTitle(projected), journalKind: null };
     }
     case "quest": {
       const projected = projectPlayerQuest(record.quest, { revealedEntityIds: record.revealedEntityIds });

@@ -101,7 +101,14 @@ const JournalWriteSchema = z.object({
   revealedToPlayers: z.boolean().optional(),
   attachMarkerId: z.string().uuid().nullable().optional(),
   attachPageId: z.string().uuid().nullable().optional(),
-  sessionNumber: z.number().int().min(0).max(100_000).nullable().optional(),
+  /**
+   * D9: a journal write names its session by ID, never by number. `sessionNumber` is gone from every write
+   * body and `.strict()` 400s it with the key named in `details.issues` - the number is a DISPLAY value the
+   * server resolves from the joined record, so a client asserting one would be asserting something it does
+   * not own. Omitted on a create auto-files under the active session; explicit `null` files under none; an
+   * id that names no session is a 404.
+   */
+  sessionId: z.string().uuid().nullable().optional(),
   realDate: z.string().max(40).nullable().optional(),
   inWorldLabel: z.string().max(120).nullable().optional(),
   inWorldDate: InWorldDateSchema.optional()
@@ -174,7 +181,9 @@ const SessionCreateSchema = z.object({
   prepBody: z.string().max(100_000).optional(),
   recapBody: z.string().max(100_000).optional(),
   revealedToPlayers: z.boolean().optional(),
-  status: SessionStatusSchema.optional()
+  status: SessionStatusSchema.optional(),
+  /** D10: the codex-wide tag vocabulary, `TagsSchema` verbatim - one bound for every taggable record. */
+  tags: TagsSchema.optional()
 }).strict();
 /** No `revealedToPlayers`: reveal is its own route, so a PATCH cannot publish a recap as a side effect of an edit. */
 const SessionUpdateSchema = z.object({
@@ -184,6 +193,7 @@ const SessionUpdateSchema = z.object({
   prepBody: z.string().max(100_000).optional(),
   recapBody: z.string().max(100_000).optional(),
   status: SessionStatusSchema.optional(),
+  tags: TagsSchema.optional(),
   expectedRev: z.number().int().nonnegative().optional()
 }).strict();
 /**
@@ -209,7 +219,9 @@ const QuestCreateSchema = z.object({
   gmBody: z.string().max(100_000).optional(),
   objectives: ObjectivesSchema.optional(),
   entityIds: QuestEntityIdsSchema.optional(),
-  revealedToPlayers: z.boolean().optional()
+  revealedToPlayers: z.boolean().optional(),
+  /** D10: the codex-wide tag vocabulary, `TagsSchema` verbatim - one bound for every taggable record. */
+  tags: TagsSchema.optional()
 }).strict();
 /** No `revealedToPlayers`: reveal is its own route, so a PATCH cannot publish a quest as a side effect of an edit. */
 const QuestUpdateSchema = z.object({
@@ -219,6 +231,7 @@ const QuestUpdateSchema = z.object({
   gmBody: z.string().max(100_000).optional(),
   objectives: ObjectivesSchema.optional(),
   entityIds: QuestEntityIdsSchema.optional(),
+  tags: TagsSchema.optional(),
   expectedRev: z.number().int().nonnegative().optional()
 }).strict();
 /**
@@ -413,6 +426,8 @@ function loadSearchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearchRe
     // No context to resolve: a quest's own reveal flag is the whole player predicate, and a hit carries
     // no entity linkage (unlike the quest RECORD, whose `entityIds` the list route filters).
     case "quest": { const quest = store.getQuest(ref.id); return quest ? { kind: "quest", quest } : null; }
+    // Nor does a session: its own reveal flag is the whole player predicate, exactly as a quest's is.
+    case "session": { const session = store.getSession(ref.id); return session ? { kind: "session", session } : null; }
   }
 }
 
@@ -459,7 +474,7 @@ function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
   // and precise rather than "every revealed page". A standing record whose faction page was deleted has no
   // candidate at all and is therefore hidden, which is the right answer.
   return {
-    unrevealedSessionNumbers: store.unrevealedSessionNumbers(),
+    unrevealedSessionIds: store.unrevealedSessionIds(),
     revealedPageIds: revealedPageIdsIn(store, store.listStanding().map((row) => row.factionPageId))
   };
 }
@@ -602,12 +617,17 @@ export function createCodexRouter(options: CodexRouterOptions) {
     // roles rather than conditionally: it is two cheap reads, and a `null` here would only push the
     // branch into the projection call below, where forgetting it is a leak rather than a type error.
     const playerContext = playerSessionNumbers(store);
-    const hits = store.searchAll(role, query)
+    const found = store.searchAll(role, query);
+    const hits = found.hits
       .map((ref) => loadSearchRecord(store, ref))
       .filter((record) => record !== null)
       .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record, playerContext)))
       .filter((hit) => hit !== null);
-    return readEnvelope(request, response, role, { hits });
+    // D19: the cap is SIGNALLED, not hidden. `truncated` comes from the store's own 51st-row probe, before
+    // the projections above drop anything a player may not see - so it answers "was the SEARCH cut off",
+    // which is the question a reader typing a narrower query is asking. A player whose 50 rows shrink to 12
+    // after gating still sees "narrow your search", which is honest: there really was more to find.
+    return readEnvelope(request, response, role, { hits, truncated: found.truncated });
   });
 
   router.get(`${CODEX_BASE}/pages/:id`, (request, response) => {

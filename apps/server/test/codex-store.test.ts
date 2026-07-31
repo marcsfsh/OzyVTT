@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
+import { projectRevealAudit, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
 /** D6/R4's shipped default, spelled once so the settings tests below say what they are actually about. */
 const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
@@ -27,7 +27,7 @@ afterEach(async () => {
  * store exactly as `codex-http.ts` resolves it per request. A CALL, not a constant: a session's reveal
  * state changes mid-test, and a context captured once would go stale and quietly make the gate look broken.
  */
-const playerSessionNumbers = (from: CodexStore = store) => ({ unrevealedSessionNumbers: from.unrevealedSessionNumbers() });
+const playerSessionNumbers = (from: CodexStore = store) => ({ unrevealedSessionIds: from.unrevealedSessionIds() });
 
 describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", () => {
   /**
@@ -40,14 +40,14 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
    */
   it("does not return an unrevealed MAP to a player", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Castle Ravenloft", kind: "regional" });
-    expect(store.searchAll("gm", "Ravenloft").some((hit) => hit.kind === "map" && hit.id === map.id)).toBe(true);
-    expect(store.searchAll("player", "Ravenloft").some((hit) => hit.id === map.id)).toBe(false);
+    expect(store.searchAll("gm", "Ravenloft").hits.some((hit) => hit.kind === "map" && hit.id === map.id)).toBe(true);
+    expect(store.searchAll("player", "Ravenloft").hits.some((hit) => hit.id === map.id)).toBe(false);
   });
 
   it("does not return an unrevealed JOURNAL entry to a player", () => {
     const entry = store.createEntry({ playerText: "The vistani warned us" });
-    expect(store.searchAll("gm", "vistani").some((hit) => hit.kind === "journal" && hit.id === entry.id)).toBe(true);
-    expect(store.searchAll("player", "vistani").some((hit) => hit.id === entry.id)).toBe(false);
+    expect(store.searchAll("gm", "vistani").hits.some((hit) => hit.kind === "journal" && hit.id === entry.id)).toBe(true);
+    expect(store.searchAll("player", "vistani").hits.some((hit) => hit.id === entry.id)).toBe(false);
   });
 
   /**
@@ -64,12 +64,12 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
     const quest = store.createQuest({ title: "The Wyrmwood Contract", playerBody: "Recover the ledger." });
     expect(quest.revealedToPlayers).toBe(false);
     // The GM finds it, so the player's miss below is the visibility arm and not a quest that never indexed.
-    expect(store.searchAll("gm", "ledger").some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
-    expect(store.searchAll("player", "ledger").some((hit) => hit.id === quest.id)).toBe(false);
+    expect(store.searchAll("gm", "ledger").hits.some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
+    expect(store.searchAll("player", "ledger").hits.some((hit) => hit.id === quest.id)).toBe(false);
 
     // ...and revealing it makes it findable, so the miss above is the reveal gate and not a missing arm.
     store.setQuestRevealed(quest.id, true);
-    expect(store.searchAll("player", "ledger").some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
+    expect(store.searchAll("player", "ledger").hits.some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
   });
 
   it("does not return a REVEALED marker sitting on a SECRET map to a player (CD-6, at the SQL layer)", () => {
@@ -79,12 +79,12 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
     const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Crypt of Strahd" });
     store.setMarkerRevealed(marker.id, true);                    // pin shown...
     expect(store.getMap(map.id)!.revealedToPlayers).toBe(false);  // ...map still secret
-    expect(store.searchAll("gm", "Crypt").some((hit) => hit.kind === "marker" && hit.id === marker.id)).toBe(true);
-    expect(store.searchAll("player", "Crypt").some((hit) => hit.id === marker.id)).toBe(false);
+    expect(store.searchAll("gm", "Crypt").hits.some((hit) => hit.kind === "marker" && hit.id === marker.id)).toBe(true);
+    expect(store.searchAll("player", "Crypt").hits.some((hit) => hit.id === marker.id)).toBe(false);
 
     // ...and revealing the map makes it findable, so the miss above is the map gate and not a bad query.
     store.setMapRevealed(map.id, true);
-    expect(store.searchAll("player", "Crypt").some((hit) => hit.id === marker.id)).toBe(true);
+    expect(store.searchAll("player", "Crypt").hits.some((hit) => hit.id === marker.id)).toBe(true);
   });
 });
 
@@ -94,23 +94,23 @@ describe("CodexStore search matches tags on every kind (CI-1 + CI-2)", () => {
     // box answered a tag query differently depending on which record happened to carry the tag.
     const page = store.createPage({ title: "Strahd", tags: ["villain"] });
     store.setPageRevealed(page.id, true);
-    const gmHits = store.searchAll("gm", "villain");
+    const gmHits = store.searchAll("gm", "villain").hits;
     expect(gmHits.some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
     // ...and a player can find it too, because a revealed page's tags are already player-visible.
-    expect(store.searchAll("player", "villain").some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
+    expect(store.searchAll("player", "villain").hits.some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
   });
 
   it("does not surface an UNREVEALED page by its tag to a player", () => {
     const page = store.createPage({ title: "Secret", tags: ["villain"] });
-    expect(store.searchAll("gm", "villain").some((hit) => hit.id === page.id)).toBe(true);
-    expect(store.searchAll("player", "villain").some((hit) => hit.id === page.id)).toBe(false);
+    expect(store.searchAll("gm", "villain").hits.some((hit) => hit.id === page.id)).toBe(true);
+    expect(store.searchAll("player", "villain").hits.some((hit) => hit.id === page.id)).toBe(false);
   });
 
   it("keeps a page's indexed tags in step when they change", () => {
     const page = store.createPage({ title: "Rictavio", tags: ["ally"] });
     store.updatePage(page.id, { tags: ["villain"] }, undefined, "gm");
-    expect(store.searchAll("gm", "ally").some((hit) => hit.id === page.id)).toBe(false);
-    expect(store.searchAll("gm", "villain").some((hit) => hit.id === page.id)).toBe(true);
+    expect(store.searchAll("gm", "ally").hits.some((hit) => hit.id === page.id)).toBe(false);
+    expect(store.searchAll("gm", "villain").hits.some((hit) => hit.id === page.id)).toBe(true);
   });
 });
 
@@ -136,7 +136,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
 
   it("puts the page NAMED Strahd first for a GM, keeping the pages that only mention it", () => {
     const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
-    const hits = store.searchAll("gm", "Strahd");
+    const hits = store.searchAll("gm", "Strahd").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named });
     // Recall is unchanged - the mentions are still found, just below the record named for the query.
     expect(hits.map((hit) => hit.id).sort()).toEqual([named, mentionsA, mentionsB].sort());
@@ -146,7 +146,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     // Both audiences have their own FTS table; weighting one and not the other would give the GM and the
     // player who type the same name different answers.
     const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
-    const hits = store.searchAll("player", "Strahd");
+    const hits = store.searchAll("player", "Strahd").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named });
     expect(hits.map((hit) => hit.id).sort()).toEqual([named, mentionsA, mentionsB].sort());
   });
@@ -167,7 +167,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const named = store.createPage({ title: "Strahd", playerBody: "A vampire lord.", revealedToPlayers: true });
     const spam = store.createPage({ title: "QA Keep 111", playerBody: Array.from({ length: 120 }, () => "Strahd").join(" "), revealedToPlayers: true });
     for (const audience of ["gm", "player"] as const) {
-      const hits = store.searchAll(audience, "Strahd");
+      const hits = store.searchAll(audience, "Strahd").hits;
       expect(hits[0]).toEqual({ kind: "page", id: named.id });
       expect(hits).toContainEqual({ kind: "page", id: spam.id });
     }
@@ -181,7 +181,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const titled = store.createPage({ title: "Castle Ravenloft", playerBody: "the seat of the land", revealedToPlayers: true });
     const bodied = store.createPage({ title: "QA Keep 222", playerBody: "We rode to Ravenloft. Ravenloft loomed. Ravenloft again.", revealedToPlayers: true });
     for (const audience of ["gm", "player"] as const) {
-      const hits = store.searchAll(audience, "Ravenloft");
+      const hits = store.searchAll(audience, "Ravenloft").hits;
       expect(hits[0]).toEqual({ kind: "page", id: titled.id });
       expect(hits).toContainEqual({ kind: "page", id: bodied.id });
     }
@@ -199,7 +199,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const entry = store.createEntry({ playerText: Array.from({ length: 8 }, () => "Vallaki").join(" ") });
     store.setEntryRevealed(entry.id, true);
     for (const audience of ["gm", "player"] as const) {
-      const hits = store.searchAll(audience, "Vallaki");
+      const hits = store.searchAll(audience, "Vallaki").hits;
       expect(hits[0]).toEqual({ kind: "map", id: map.id });
       expect(hits).toContainEqual({ kind: "journal", id: entry.id });
     }
@@ -211,7 +211,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const named = store.createPage({ title: "Villain", playerBody: "the archetype", revealedToPlayers: true });
     const tagged = store.createPage({ title: "Rictavio", tags: ["villain"], revealedToPlayers: true });
     const bodied = store.createPage({ title: "Rumours", playerBody: "a villain walks abroad", revealedToPlayers: true });
-    const hits = store.searchAll("player", "Villain");
+    const hits = store.searchAll("player", "Villain").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named.id });
     expect(hits.map((hit) => hit.id).sort()).toEqual([named.id, tagged.id, bodied.id].sort());
   });
@@ -284,20 +284,20 @@ describe("CodexStore suite-wide search (CI-1)", () => {
       await upgraded.initialize();
 
       // Every pre-existing record is now findable, by every kind, in the ONE index.
-      expect(upgraded.searchAll("gm", "Ravenloft")).toEqual([{ kind: "page", id: pageId }]);
-      expect(upgraded.searchAll("player", "Barovia")).toEqual([{ kind: "map", id: mapId }]);
-      expect(upgraded.searchAll("player", "Svalich")).toEqual([{ kind: "marker", id: markerId }]);
-      expect(upgraded.searchAll("player", "mists")).toEqual([{ kind: "journal", id: entryId }]);
+      expect(upgraded.searchAll("gm", "Ravenloft").hits).toEqual([{ kind: "page", id: pageId }]);
+      expect(upgraded.searchAll("player", "Barovia").hits).toEqual([{ kind: "map", id: mapId }]);
+      expect(upgraded.searchAll("player", "Svalich").hits).toEqual([{ kind: "marker", id: markerId }]);
+      expect(upgraded.searchAll("player", "mists").hits).toEqual([{ kind: "journal", id: entryId }]);
       // ...including the tags v10 added to those three kinds.
-      expect(upgraded.searchAll("player", "gloomy")).toEqual([{ kind: "map", id: mapId }]);
-      expect(upgraded.searchAll("player", "waypoint")).toEqual([{ kind: "marker", id: markerId }]);
-      expect(upgraded.searchAll("player", "arrival")).toEqual([{ kind: "journal", id: entryId }]);
+      expect(upgraded.searchAll("player", "gloomy").hits).toEqual([{ kind: "map", id: mapId }]);
+      expect(upgraded.searchAll("player", "waypoint").hits).toEqual([{ kind: "marker", id: markerId }]);
+      expect(upgraded.searchAll("player", "arrival").hits).toEqual([{ kind: "journal", id: entryId }]);
 
       // The backfill kept the layers apart: GM-only text landed in the GM index ONLY.
-      expect(upgraded.searchAll("player", "crypt")).toEqual([]);
-      expect(upgraded.searchAll("gm", "crypt")).toEqual([{ kind: "page", id: pageId }]);
-      expect(upgraded.searchAll("player", "watching")).toEqual([]);
-      expect(upgraded.searchAll("gm", "watching")).toEqual([{ kind: "journal", id: entryId }]);
+      expect(upgraded.searchAll("player", "crypt").hits).toEqual([]);
+      expect(upgraded.searchAll("gm", "crypt").hits).toEqual([{ kind: "page", id: pageId }]);
+      expect(upgraded.searchAll("player", "watching").hits).toEqual([]);
+      expect(upgraded.searchAll("gm", "watching").hits).toEqual([{ kind: "journal", id: entryId }]);
 
       // ...and the superseded pages-only tables are gone, so there is one index and one sync path.
       const reopened = new DatabaseSync(path);
@@ -315,23 +315,23 @@ describe("CodexStore suite-wide search (CI-1)", () => {
   it("keeps the index in step with writes, including markers swept away by a map delete", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Vallaki", kind: "regional", revealedToPlayers: true });
     const marker = store.createMarker(map.id, { x: 0.1, y: 0.1, iconId: "pin", iconColor: "#FF2E9A", label: "Blinsky toys", revealedToPlayers: true });
-    expect(store.searchAll("player", "Blinsky")).toEqual([{ kind: "marker", id: marker.id }]);
+    expect(store.searchAll("player", "Blinsky").hits).toEqual([{ kind: "marker", id: marker.id }]);
 
     // Renaming reindexes: the old text stops matching, the new text starts.
     store.updateMarker(marker.id, { label: "Burgomaster mansion" });
-    expect(store.searchAll("gm", "Blinsky")).toEqual([]);
-    expect(store.searchAll("gm", "Burgomaster")).toEqual([{ kind: "marker", id: marker.id }]);
+    expect(store.searchAll("gm", "Blinsky").hits).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster").hits).toEqual([{ kind: "marker", id: marker.id }]);
 
     // A reveal toggle needs no reindex - visibility is resolved against the live row at read time.
     store.setMarkerRevealed(marker.id, false);
-    expect(store.searchAll("player", "Burgomaster")).toEqual([]);
-    expect(store.searchAll("gm", "Burgomaster")).toEqual([{ kind: "marker", id: marker.id }]);
+    expect(store.searchAll("player", "Burgomaster").hits).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster").hits).toEqual([{ kind: "marker", id: marker.id }]);
 
     // Deleting the MAP cascades its markers away in SQL; their index rows must go with them, or they
     // would keep matching forever with no live row left to gate them.
     store.deleteMap(map.id);
-    expect(store.searchAll("gm", "Burgomaster")).toEqual([]);
-    expect(store.searchAll("gm", "Vallaki")).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster").hits).toEqual([]);
+    expect(store.searchAll("gm", "Vallaki").hits).toEqual([]);
   });
 });
 
@@ -779,9 +779,11 @@ describe("CodexStore entities + relationships", () => {
 describe("CodexStore journal", () => {
   it("creates, updates, reveals, and orders a timeline; combat entries auto-tag their kind", () => {
     const page = store.createPage({ title: "Bree" });
-    const first = store.createEntry({ playerText: "We arrived in Bree.", gmText: "The spy watched them.", sessionNumber: 1, attachPageId: page.id });
-    expect(first).toMatchObject({ kind: "note", revealedToPlayers: false, sessionNumber: 1 });
-    store.createEntry({ playerText: "We left at dawn.", sessionNumber: 2 });
+    const one = store.createSession({ sessionNumber: 1 });
+    const two = store.createSession({ sessionNumber: 2 });
+    const first = store.createEntry({ playerText: "We arrived in Bree.", gmText: "The spy watched them.", sessionId: one.id, attachPageId: page.id });
+    expect(first).toMatchObject({ kind: "note", revealedToPlayers: false, sessionId: one.id, sessionNumber: 1 });
+    store.createEntry({ playerText: "We left at dawn.", sessionId: two.id });
     const combat = store.appendCombatEntry({ sourceEncounterId: 7, playerText: "A brawl broke out.", attachPageId: page.id });
     expect(combat.kind).toBe("combat");
 
@@ -1022,7 +1024,7 @@ describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", ()
     // has already reached must READ as passed) and `payload` (a downtime's who/activity/days, and NEVER
     // `applied`, which is GM workflow state). This list is the gate on that pair staying a pair - the next
     // key to appear here has to be argued for, not merely compiled.
-    expect(Object.keys(projected).sort()).toEqual(["createdAt", "fired", "id", "inWorldLabel", "kind", "payload", "realDate", "sessionNumber", "tags", "text", "title"]);
+    expect(Object.keys(projected).sort()).toEqual(["calendarInstant", "createdAt", "fired", "id", "inWorldDate", "inWorldLabel", "kind", "payload", "realDate", "sessionId", "sessionNumber", "tags", "text", "title"]);
     expect(projected.text).toBe("The sky tore open.");
     expect(JSON.stringify(projected)).not.toContain("Strahd engineered it.");
     expect(JSON.stringify(projected)).not.toContain("conceal the cause");
@@ -1376,24 +1378,23 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.createSession({ sessionNumber: 7 }).sessionNumber).toBe(7);
   });
 
-  it("names exactly the session numbers whose RECORD is still hidden from players", () => {
-    // The resolution the player journal reads gate `sessionNumber` on. It must be the UNREVEALED set, not
-    // the complement of the revealed one: a number with no session record at all is in neither, which is
-    // what keeps every pre-M9 entry's label working.
+  it("names exactly the session IDS still hidden from players, numbered or not", () => {
+    // The resolution every player journal read gates the session link on. D9 keys it by ID, which is what
+    // closes the gap the number version could not: an UNNUMBERED hidden session could never appear in a
+    // set of numbers, so an entry filed under one had nothing to gate on.
     const hidden = sessions.createSession({ sessionNumber: 4 });
     const shown = sessions.createSession({ sessionNumber: 5 });
     sessions.setSessionRevealed(shown.id, true);
-    // Unrevealed, but it names no number — a set that let a null through would be a value every caller has
-    // to remember not to look up, and this is what catches one arriving.
-    sessions.createSession({});
-    expect([...sessions.unrevealedSessionNumbers()]).toEqual([4]);
+    const unnumbered = sessions.createSession({});
+    expect([...sessions.unrevealedSessionIds()].sort()).toEqual([hidden.id, unnumbered.id].sort());
 
-    // Revealing 4 empties the set, so the 4 above is the reveal flag being read and not "every session".
+    // Revealing them empties the set, so the ids above are the reveal flag being read and not "every session".
     sessions.setSessionRevealed(hidden.id, true);
-    expect([...sessions.unrevealedSessionNumbers()]).toEqual([]);
-    // ...and hiding 5 again puts a DIFFERENT number in, so this is a per-row read rather than a constant.
+    sessions.setSessionRevealed(unnumbered.id, true);
+    expect([...sessions.unrevealedSessionIds()]).toEqual([]);
+    // ...and hiding 5 again puts a DIFFERENT id in, so this is a per-row read rather than a constant.
     sessions.setSessionRevealed(shown.id, false);
-    expect([...sessions.unrevealedSessionNumbers()]).toEqual([5]);
+    expect([...sessions.unrevealedSessionIds()]).toEqual([shown.id]);
   });
 
   it("orders numbered sessions by number, with the unnumbered ones below them", () => {
@@ -1437,14 +1438,14 @@ describe("CodexStore sessions (M9)", () => {
   it("treats session number 0 as a real number, not as absent", () => {
     const zero = sessions.createSession({ sessionNumber: 0 });
     expect(zero.sessionNumber).toBe(0);
-    const entry = sessions.createEntry({ playerText: "The session before the first.", sessionNumber: 0, revealedToPlayers: true });
+    const entry = sessions.createEntry({ playerText: "The session before the first.", sessionId: zero.id, revealedToPlayers: true });
     expect(entry.sessionNumber).toBe(0);
 
-    // Unrevealed record -> gated to null, exactly as any other number.
-    expect(projectPlayerJournalEntry(entry, { unrevealedSessionNumbers: sessions.unrevealedSessionNumbers() })!.sessionNumber).toBeNull();
+    // Unrevealed record -> gated to null, exactly as any other session.
+    expect(projectPlayerJournalEntry(entry, { unrevealedSessionIds: sessions.unrevealedSessionIds() })!.sessionNumber).toBeNull();
     // Revealed -> the number survives, and 0 is not mistaken for "no session".
     sessions.setSessionRevealed(zero.id, true);
-    expect(projectPlayerJournalEntry(entry, { unrevealedSessionNumbers: sessions.unrevealedSessionNumbers() })!.sessionNumber).toBe(0);
+    expect(projectPlayerJournalEntry(entry, { unrevealedSessionIds: sessions.unrevealedSessionIds() })!.sessionNumber).toBe(0);
   });
 
   /**
@@ -1455,13 +1456,17 @@ describe("CodexStore sessions (M9)", () => {
   it("editing an entry never re-files it under the ACTIVE session", () => {
     const older = sessions.createSession({ sessionNumber: 2 });
     const running = sessions.createSession({ sessionNumber: 9 });
-    void older;
     sessions.setActiveSession(running.id);
 
-    const entry = sessions.createEntry({ playerText: "Filed under two.", sessionNumber: 2 });
+    const entry = sessions.createEntry({ playerText: "Filed under two.", sessionId: older.id });
     expect(entry.sessionNumber).toBe(2);
     const edited = sessions.updateEntry(entry.id, { playerText: "Filed under two, with a typo fixed." });
     expect(edited.sessionNumber).toBe(2);          // NOT 9
+    expect(edited.sessionId).toBe(older.id);
+    // ...and an EXPLICIT re-file still works, so the line above is the omitted-means-unchanged rule and
+    // not a PATCH that cannot move an entry at all.
+    expect(sessions.updateEntry(entry.id, { sessionId: running.id }).sessionNumber).toBe(9);
+    expect(sessions.updateEntry(entry.id, { sessionId: null })).toMatchObject({ sessionId: null, sessionNumber: null });
   });
 
   it("sets and clears the active session without touching the session record at all", () => {
@@ -1494,8 +1499,9 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.appendCombatEntry({ sourceEncounterId: 3, playerText: "A brawl." }).sessionNumber).toBe(12);
 
     // An EXPLICIT value always wins, including an explicit null — that is a caller saying "no session".
-    expect(sessions.createEntry({ playerText: "A retcon.", sessionNumber: 4 }).sessionNumber).toBe(4);
-    expect(sessions.createEntry({ playerText: "Timeless lore.", sessionNumber: null }).sessionNumber).toBeNull();
+    const other = sessions.createSession({ sessionNumber: 4 });
+    expect(sessions.createEntry({ playerText: "A retcon.", sessionId: other.id }).sessionNumber).toBe(4);
+    expect(sessions.createEntry({ playerText: "Timeless lore.", sessionId: null }).sessionNumber).toBeNull();
   });
 
   it("degrades to today's exact behaviour when there is no active session — and in every gap", () => {
@@ -1509,16 +1515,19 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.createEntry({ playerText: "Between sessions." }).sessionNumber).toBeNull();
     expect(sessions.appendCombatEntry({ sourceEncounterId: 1, playerText: "A brawl." }).sessionNumber).toBeNull();
 
-    // An active session that has NO NUMBER yet is the same gap — there is nothing to file under, and
-    // session 9 sitting right there must not be borrowed.
+    // An active session that has NO NUMBER yet is where D9 is strictly BETTER than the number-stamping it
+    // replaced: the entry joins the RECORD, so it is filed correctly and simply has no number to display
+    // yet. Under M9 it could not link at all. Session 9 sitting right there must still not be borrowed.
     const draft = sessions.createSession({});
     sessions.setActiveSession(draft.id);
-    expect(sessions.createEntry({ playerText: "Mid-draft." }).sessionNumber).toBeNull();
-    expect(sessions.appendCombatEntry({ sourceEncounterId: 2, playerText: "A brawl." }).sessionNumber).toBeNull();
+    const midDraft = sessions.createEntry({ playerText: "Mid-draft." });
+    expect(midDraft).toMatchObject({ sessionId: draft.id, sessionNumber: null });
+    expect(sessions.appendCombatEntry({ sourceEncounterId: 2, playerText: "A brawl." })).toMatchObject({ sessionId: draft.id, sessionNumber: null });
 
-    // ...and numbering that same session starts the linking, so the nulls above are the gap and not a
-    // broken lookup. It resolves to the ACTIVE session's number, not the bystander's.
+    // ...and numbering that same session gives every already-filed entry its label, retroactively - which
+    // is the whole point of joining by identity.
     sessions.updateSession(draft.id, { sessionNumber: 1 }, draft.rev, "gm");
+    expect(sessions.getEntry(midDraft.id)!.sessionNumber).toBe(1);
     expect(sessions.createEntry({ playerText: "Numbered now." }).sessionNumber).toBe(1);
     expect(bystander.sessionNumber).toBe(9);
   });
@@ -1672,7 +1681,7 @@ describe("CodexStore quests (M10)", () => {
     expect(() => quests.deleteQuest("not-a-uuid")).not.toThrow(); // malformed id: early return
     // The index row goes with the record: an orphan would keep matching forever with no live row for
     // `PLAYER_VISIBLE_SQL` to gate it on.
-    expect(quests.searchAll("gm", "First")).toEqual([]);
+    expect(quests.searchAll("gm", "First").hits).toEqual([]);
   });
 
   /**
@@ -1717,23 +1726,23 @@ describe("CodexStore quest search index text — gate 1, with no second line of 
   it("gives a player ZERO hits on a phrase that exists only in `gmBody`", () => {
     const quest = seedRevealed();
     expect(quest.revealedToPlayers).toBe(true);                            // gate 2 would pass this quest
-    expect(store.searchAll("player", "forgery")).toEqual([]);              // ...and yet the phrase is unreachable
-    expect(store.searchAll("player", GM_PHRASE)).toEqual([]);
+    expect(store.searchAll("player", "forgery").hits).toEqual([]);              // ...and yet the phrase is unreachable
+    expect(store.searchAll("player", GM_PHRASE).hits).toEqual([]);
 
     // The GM DOES find it, so the miss above is the two indexes being kept apart, not a quest that never
     // indexed at all.
-    expect(store.searchAll("gm", "forgery")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("gm", "forgery").hits).toEqual([{ kind: "quest", id: quest.id }]);
   });
 
   it("still lets a player find that same quest by its player body and by an objective", () => {
     // This is what makes the assertions above meaningful: the quest IS in the player's index and IS
     // player-visible, so the GM phrase missing is about the TEXT written, not about the record.
     const quest = seedRevealed();
-    expect(store.searchAll("player", "counting")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "counting").hits).toEqual([{ kind: "quest", id: quest.id }]);
     // An objective's text is player-facing — it lives beside `playerBody`, not `gmBody`.
-    expect(store.searchAll("player", "Search")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "Search").hits).toEqual([{ kind: "quest", id: quest.id }]);
     // ...and the title, which is the same string in both indexes.
-    expect(store.searchAll("player", "Wyrmwood")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "Wyrmwood").hits).toEqual([{ kind: "quest", id: quest.id }]);
   });
 
   it("keeps the index in step with an edit and re-splits the layers on the way", () => {
@@ -1743,14 +1752,14 @@ describe("CodexStore quest search index text — gate 1, with no second line of 
       objectives: [{ text: "Reach the gates", done: false }]
     }, undefined);
     // The old player text stops matching — body AND objective, since both feed the same index row.
-    expect(store.searchAll("player", "counting")).toEqual([]);
-    expect(store.searchAll("gm", "counting")).toEqual([]);
-    expect(store.searchAll("player", "Vallaki")).toEqual([{ kind: "quest", id: quest.id }]);
-    expect(store.searchAll("player", "gates")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "counting").hits).toEqual([]);
+    expect(store.searchAll("gm", "counting").hits).toEqual([]);
+    expect(store.searchAll("player", "Vallaki").hits).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "gates").hits).toEqual([{ kind: "quest", id: quest.id }]);
     // ...and the NEW GM half is in the GM index only, so an update cannot be the way a secret phrase
     // sneaks into the player table.
-    expect(store.searchAll("player", "target")).toEqual([]);
-    expect(store.searchAll("gm", "target")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "target").hits).toEqual([]);
+    expect(store.searchAll("gm", "target").hits).toEqual([{ kind: "quest", id: quest.id }]);
   });
 });
 
@@ -1786,7 +1795,7 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
     // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
     // ever added to the player projection, not merely if this one leaks. `gmBody` and `rev` are absent;
     // `status` is deliberately PRESENT, unlike a session's, because "what is still open" is the feature.
-    expect(Object.keys(projected).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(Object.keys(projected).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "tags", "title"]);
     expect(projected.body).toBe("Recover the ledger from the counting house.");
     expect(projected.status).toBe("active");
     // Objective order and tick state are the player's copy of the checklist, unchanged.
@@ -1840,65 +1849,111 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
 });
 
 /**
- * The K7 discipline v11/v12 follow: a fresh-database test can never catch a bad upgrade, because every
- * table is empty. This builds a genuine v12 database out of the shipped migration SQL, fills it with the
- * legacy rows that actually matter here (journal entries that already carry a `session_number`), and then
- * opens a `CodexStore` on it — which is exactly the upgrade a GM's existing vtt.sqlite performs.
+ * Migration v19 (D9), on a REAL legacy database rather than a fresh one - the K7 discipline v11/v12/v15
+ * established, because a fresh-database test can never catch a bad upgrade: every table is empty and
+ * every default is trivially satisfied.
+ *
+ * **This describe block used to be called "sessions arrive with NO backfill (M9)", and it asserted the
+ * opposite of what it asserts now.** v13 deliberately refused to synthesize session records for the
+ * numbers legacy journal rows carried, on the grounds that inventing prep, recap and attendance would
+ * fabricate facts. The client's D9 consciously supersedes that decision (see `decision-log.md`), and the
+ * objection is honoured rather than overridden: the synthesized rows carry EMPTY prep, recap and
+ * attendees - nothing is invented - and are `played` + hidden, so they are invisible to players and
+ * change nothing on any screen but the GM's session list, where a number that already existed now has a
+ * record behind it. The alternative was orphaning those numbers, which is data loss.
  */
-describe("CodexStore migration v13 — sessions arrive with NO backfill (M9)", () => {
-  it("fabricates no session records for existing numbered entries, and leaves those entries untouched", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v12-"));
+describe("CodexStore migration v19 — journal entries join their session by identity (D9)", () => {
+  it("synthesizes a hidden played session per orphan number, joins every entry to it, and keeps the display numbers identical", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v18-"));
     const path = join(legacyDirectory, "vtt.sqlite");
     let upgraded: CodexStore | undefined;
     try {
+      // A genuine v18 database, built from the SHIPPED migration SQL, populated with the legacy row
+      // shapes that actually matter: entries whose number matches an existing session record, entries
+      // whose number matches nothing, an unnumbered entry, and both a numbered and an unnumbered session.
       const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
       database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
-      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 12)) {
+      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 18)) {
         database.exec(migration.sql);
         database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
       }
       database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
-      const one = crypto.randomUUID(), two = crypto.randomUUID(), loose = crypto.randomUUID();
-      const insert = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, session_number, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, NULL, 1, 'note', ?, ?, '[]', '', '')");
-      insert.run(one, "We arrived in Barovia.", 1, 1);
-      insert.run(two, "The wolves came.", 2, 2);
-      insert.run(loose, "Undated lore.", null, 3);
+
+      const existingSession = crypto.randomUUID();
+      const unnumberedSession = crypto.randomUUID();
+      database.prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, 1, '2026-01-01', '[\"Ana\"]', 'Ambush at the bridge.', 'They crossed.', 1, 'played', 1, '', '')").run(existingSession);
+      database.prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', 'Nothing yet.', '', 0, 'planned', 1, '', '')").run(unnumberedSession);
+
+      const matched = crypto.randomUUID(), orphanA = crypto.randomUUID(), orphanB = crypto.randomUUID(), loose = crypto.randomUUID();
+      const insert = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, session_number, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, NULL, ?, 'note', ?, ?, '[]', '', '')");
+      insert.run(matched, "We arrived in Barovia.", 1, 1, 1);
+      insert.run(orphanA, "The wolves came.", 1, 7, 2);      // number 7 names no session record
+      insert.run(orphanB, "And came again.", 0, 7, 3);       // ...twice, so synthesis must not duplicate
+      insert.run(loose, "Undated lore.", 1, null, 4);
       database.close();
 
       upgraded = new CodexStore(path);
       await upgraded.initialize();
 
-      // THE point of "no backfill": three legacy entries carrying numbers 1 and 2 produce ZERO session
-      // records. Inventing one per distinct number would fabricate prep, recap and attendance nobody
-      // wrote, and would guess which numbers were ever real sessions.
-      expect(upgraded.listSessions()).toEqual([]);
-      expect(upgraded.activeSessionId).toBeNull();
+      // ONE synthesized record for the one orphan number - not two, and not one per entry.
+      const sessions = upgraded.listSessions();
+      expect(sessions).toHaveLength(3);
+      const synthesized = sessions.find((session) => session.sessionNumber === 7)!;
+      expect(synthesized, "an orphan number gets a record rather than being dropped").toBeDefined();
+      expect(synthesized.status, "the master plan's ruling: played").toBe("played");
+      expect(synthesized.revealedToPlayers, "...and unrevealed, so nothing changes for players").toBe(false);
+      // Nothing is INVENTED: v13's objection, honoured.
+      expect(synthesized.prepBody).toBe("");
+      expect(synthesized.recapBody).toBe("");
+      expect(synthesized.attendees).toEqual([]);
+      // The id passes the store's own id regex, so it round-trips through every route that validates one.
+      expect(synthesized.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      expect(upgraded.getSession(synthesized.id)).not.toBeNull();
+      // The pre-existing record is untouched, not replaced by a synthesized twin.
+      expect(upgraded.getSession(existingSession)).toMatchObject({ sessionNumber: 1, prepBody: "Ambush at the bridge.", recapBody: "They crossed." });
 
-      // ...and the legacy entries read exactly as they did before the upgrade, so the by-session lens
-      // renders those groups today the way it rendered them yesterday.
-      expect(upgraded.listTimeline().map((entry) => entry.sessionNumber)).toEqual([1, 2, null]);
-      expect(upgraded.getEntry(one)!.playerText).toBe("We arrived in Barovia.");
+      // Every previously-numbered entry now JOINS the right record, and reads back the SAME display
+      // number it carried yesterday - which is the whole "nothing visibly changes" claim.
+      expect(upgraded.getEntry(matched)).toMatchObject({ sessionId: existingSession, sessionNumber: 1 });
+      expect(upgraded.getEntry(orphanA)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
+      expect(upgraded.getEntry(orphanB)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
+      expect(upgraded.getEntry(loose)).toMatchObject({ sessionId: null, sessionNumber: null });
 
-      // Auto-linking on a REAL upgraded database with real rows: nothing is active, so a new entry is
-      // filed exactly as it was pre-M9 — the legacy numbers do not leak into it.
-      expect(upgraded.createEntry({ playerText: "Written after the upgrade." }).sessionNumber).toBeNull();
-      expect(upgraded.appendCombatEntry({ sourceEncounterId: 9, playerText: "A brawl." }).sessionNumber).toBeNull();
+      // The post-migration invariant, probed in raw SQL below the store: NO row keeps a bare number.
+      const raw = new DatabaseSync(path);
+      const bare = raw.prepare("SELECT COUNT(*) AS n FROM codex_journal WHERE session_number IS NOT NULL").get() as { n: number };
+      expect(bare.n, "the bare-number column is empty after v19 - it is now the LABEL store").toBe(0);
+      // The rebuilt CHECK admits D11's seventh kind and still rejects an eighth.
+      const probe = (kind: string) => raw.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, sort_key, tags_json, created_at, updated_at) VALUES (?, '', NULL, 0, ?, 99, '[]', '', '')").run(crypto.randomUUID(), kind);
+      expect(() => probe("quest"), "v19 widened the CHECK for D11's quest history").not.toThrow();
+      expect(() => probe("bogus"), "...and the CHECK still discriminates").toThrow();
+      // Every index survived the rebuild, plus the new join index. DROP TABLE takes its indexes with it,
+      // so a forgotten CREATE INDEX silently turns the timeline's ORDER BY into a full scan.
+      const indexes = (raw.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_journal'").all() as Array<{ name: string }>).map((row) => row.name);
+      for (const name of ["codex_journal_order", "codex_journal_marker", "codex_journal_page", "codex_journal_session"]) {
+        expect(indexes, `index ${name}`).toContain(name);
+      }
+      // v20's tags default, on real legacy rows rather than fresh ones.
+      const sessionTags = raw.prepare("SELECT tags_json FROM codex_sessions").all() as Array<{ tags_json: string }>;
+      for (const row of sessionTags) expect(row.tags_json).toBe("[]");
+      raw.close();
+      expect(upgraded.listSessions().every((session) => session.tags.length === 0)).toBe(true);
 
-      // Making a session record for a number the legacy entries ALREADY use is allowed (the constraint is
-      // over SESSIONS, not entries). Number 1 on purpose: the entries above carry 1 and 2, so this is the
-      // stated case rather than an adjacent one — the comment used to claim this while creating 3, which
-      // no legacy row used. It matters more since the player gate landed: an UNREVEALED record for a
-      // number legacy entries carry is exactly what blanks those long-correct labels for players.
-      const legacyNumbered = upgraded.createSession({ sessionNumber: 1 });
-      expect(upgraded.unrevealedSessionNumbers().has(1)).toBe(true);
-      expect(projectPlayerJournalEntry(upgraded.setEntryRevealed(one, true), { unrevealedSessionNumbers: upgraded.unrevealedSessionNumbers() })!.sessionNumber).toBeNull();
-      upgraded.setSessionRevealed(legacyNumbered.id, true);
-      expect(projectPlayerJournalEntry(upgraded.getEntry(one)!, { unrevealedSessionNumbers: upgraded.unrevealedSessionNumbers() })!.sessionNumber).toBe(1);
+      // v21's search backfill, with GATE 1 held at the migration layer: the GM finds a legacy session by
+      // its PREP text, and a player never can - even for a session that is revealed.
+      expect(upgraded.searchAll("gm", "ambush").hits.some((hit) => hit.kind === "session" && hit.id === existingSession)).toBe(true);
+      expect(upgraded.searchAll("player", "ambush").hits.some((hit) => hit.id === existingSession)).toBe(false);
+      expect(upgraded.searchAll("player", "crossed").hits.some((hit) => hit.kind === "session" && hit.id === existingSession), "a revealed session's RECAP is findable").toBe(true);
+      expect(upgraded.searchAll("player", "crossed").hits.some((hit) => hit.id === synthesized.id), "...and a hidden one is not").toBe(false);
 
-      const third = upgraded.createSession({ sessionNumber: 3 });
-      upgraded.setActiveSession(third.id);
-      expect(upgraded.createEntry({ playerText: "Session three." }).sessionNumber).toBe(3);
-      expect(upgraded.getEntry(one)!.sessionNumber).toBe(1);   // the legacy row is still untouched
+      // D9's payoff, on the upgraded database: renumbering the session moves every joined entry's
+      // display number in one write, with no journal work at all.
+      upgraded.updateSession(existingSession, { sessionNumber: 42 }, undefined, "gm");
+      expect(upgraded.getEntry(matched)!.sessionNumber).toBe(42);
+
+      // Auto-linking on a REAL upgraded database: nothing is active, so a new entry is filed under none.
+      expect(upgraded.createEntry({ playerText: "Written after the upgrade." }).sessionId).toBeNull();
+      expect(upgraded.appendCombatEntry({ sourceEncounterId: 9, playerText: "A brawl." }).sessionId).toBeNull();
     } finally {
       upgraded?.close();
       await rm(legacyDirectory, { recursive: true, force: true });
@@ -2027,7 +2082,7 @@ describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
     // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
     // ever added to the player projection, not merely if this one leaks. `attendees` and `status` are
     // deliberately absent (P2, secret by default) as well as `prepBody` and `rev`.
-    expect(Object.keys(projected).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(Object.keys(projected).sort()).toEqual(["id", "realDate", "recap", "sessionNumber", "tags"]);
     expect(projected.recap).toBe("The party crossed the bridge.");
     const payload = JSON.stringify(projected);
     expect(payload).not.toContain("Ireena is the real target");   // the GM's prep
@@ -2058,49 +2113,63 @@ describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
  * the last being every entry from before M9, which shipped with no backfill.
  */
 describe("Codex journal — the unrevealed-session number gate, on its own (M9 follow-up, A-8)", () => {
-  /** An entry a player may read, carrying a number the GM never has to retype — the shape M9 auto-linking produces. */
-  const revealedEntry = (sessionNumber: number) => store.createEntry({ playerText: "We reached Vallaki.", sessionNumber, revealedToPlayers: true });
+  /** An entry a player may read, filed under a session by ID - the shape D9 auto-linking produces. */
+  const revealedEntry = (sessionId: string | null) => store.createEntry({ playerText: "We reached Vallaki.", sessionId, revealedToPlayers: true });
 
-  it("blanks the number of an UNREVEALED session, and hands it back the moment that session is revealed", () => {
+  it("blanks BOTH halves of the link for an UNREVEALED session, and hands them back the moment it is revealed", () => {
     const session = store.createSession({ sessionNumber: 4, recapBody: "The party crossed." });
     expect(session.revealedToPlayers).toBe(false);
-    const entry = revealedEntry(4);
-    expect(entry.sessionNumber).toBe(4);                                            // the row really carries it...
+    const entry = revealedEntry(session.id);
+    expect(entry).toMatchObject({ sessionId: session.id, sessionNumber: 4 });        // the row really carries both...
 
-    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())!.sessionNumber).toBeNull();
-    // ...and the GM's own row is untouched, so the null above is the gate and not a number that never arrived.
-    expect(projectGmJournalEntry(entry).sessionNumber).toBe(4);
+    const gated = projectPlayerJournalEntry(entry, playerSessionNumbers())!;
+    // BOTH, together. Either half alone announces that a session they have not been shown exists - the id
+    // is the stronger leak, because it is a handle they could try to fetch.
+    expect(gated.sessionNumber).toBeNull();
+    expect(gated.sessionId).toBeNull();
+    // ...and the GM's own row is untouched, so the nulls above are the gate and not a link that never arrived.
+    expect(projectGmJournalEntry(entry)).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
 
-    // Revealing the SESSION — the entry row is not rewritten, only the context changes — hands the number
-    // straight back, so the null is provably the reveal gate rather than a projection that drops the field.
+    // Revealing the SESSION - the entry row is not rewritten, only the context changes - hands both back,
+    // so the nulls are provably the reveal gate rather than a projection that drops the fields.
     store.setSessionRevealed(session.id, true);
-    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())!.sessionNumber).toBe(4);
+    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
   });
 
-  it("leaves a number with NO session record alone — every entry written before M9, which shipped no backfill", () => {
-    // The case most likely to regress: asking "is 4 revealed?" instead of "is 4 hidden?" would blank this
-    // one too, and nothing about it can leak — there is no record whose existence the number names.
-    const legacy = revealedEntry(4);
-    expect(store.listSessions()).toEqual([]);
-    expect(projectPlayerJournalEntry(legacy, playerSessionNumbers())!.sessionNumber).toBe(4);
+  it("lets a bare LABEL with no session through - director ruling R2's stamp-back, and nothing else reaches this arm", () => {
+    // The only bare labels that exist after migration v19: `deleteSession` stamped a REVEALED session's
+    // number onto its entries when the record went. The number was already player-visible, and there is no
+    // record left whose existence it could name, so it travels.
+    const revealed = store.createSession({ sessionNumber: 4 });
+    store.setSessionRevealed(revealed.id, true);
+    const entry = revealedEntry(revealed.id);
+    store.deleteSession(revealed.id);
 
-    // ...and the gate is live in the same breath: an unrevealed session 5 blanks 5 and still not 4, so the
-    // 4 above is this rule holding rather than the gate being switched off in this fixture.
-    store.createSession({ sessionNumber: 5 });
-    expect(projectPlayerJournalEntry(revealedEntry(5), playerSessionNumbers())!.sessionNumber).toBeNull();
-    expect(projectPlayerJournalEntry(legacy, playerSessionNumbers())!.sessionNumber).toBe(4);
+    const orphan = store.getEntry(entry.id)!;
+    expect(orphan, "SET NULL on the join, number stamped back as a bare label").toMatchObject({ sessionId: null, sessionNumber: 4 });
+    expect(projectPlayerJournalEntry(orphan, playerSessionNumbers())).toMatchObject({ sessionId: null, sessionNumber: 4 });
+
+    // The mirror case is the one that matters: a HIDDEN session's delete stamps NOTHING, so a player can
+    // never learn a hidden session existed by reading a label it left behind.
+    const hidden = store.createSession({ sessionNumber: 5 });
+    const secretEntry = revealedEntry(hidden.id);
+    store.deleteSession(hidden.id);
+    const scrubbed = store.getEntry(secretEntry.id)!;
+    expect(scrubbed).toMatchObject({ sessionId: null, sessionNumber: null });
+    expect(projectPlayerJournalEntry(scrubbed, playerSessionNumbers())).toMatchObject({ sessionId: null, sessionNumber: null });
   });
 
-  it("gates ONLY the number — the rest of a revealed entry travels exactly as it did", () => {
-    store.createSession({ sessionNumber: 4 });
+  it("gates ONLY the link — the rest of a revealed entry travels exactly as it did", () => {
+    const session = store.createSession({ sessionNumber: 4 });
     const entry = store.createEntry({
       playerText: "We reached Vallaki.", gmText: "The burgomaster lied about the wolves.",
-      sessionNumber: 4, realDate: "2026-07-26", tags: ["travel"], revealedToPlayers: true
+      sessionId: session.id, realDate: "2026-07-26", tags: ["travel"], revealedToPlayers: true
     });
     const projected = projectPlayerJournalEntry(entry, playerSessionNumbers())!;
-    // The EXACT key set: the field is NULLED, never dropped, so one response shape still serves both roles.
-    expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text"]);
+    // The EXACT key set: the fields are NULLED, never dropped, so one response shape still serves both roles.
+    expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionId", "sessionNumber", "tags", "text"]);
     expect(projected.sessionNumber).toBeNull();
+    expect(projected.sessionId).toBeNull();
     expect(projected.text).toBe("We reached Vallaki.");                             // the entry is still readable...
     expect(projected.realDate).toBe("2026-07-26");                                  // ...and its neighbours untouched
     expect(projected.tags).toEqual(["travel"]);
@@ -2109,14 +2178,62 @@ describe("Codex journal — the unrevealed-session number gate, on its own (M9 f
 
   it("carries the same gate onto the chronicle by DELEGATION, not a second copy", () => {
     const session = store.createSession({ sessionNumber: 4 });
-    const entry = store.createEntry({ playerText: "We reached Vallaki.", sessionNumber: 4, revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 1 } });
+    const entry = store.createEntry({ playerText: "We reached Vallaki.", sessionId: session.id, revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 1 } });
     const playerRow = () => projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }, playerSessionNumbers())!;
     expect(playerRow().sessionNumber).toBeNull();
+    expect(playerRow().sessionId).toBeNull();
     // The GM's chronicle row still carries it, and revealing the session gives the player's row it back —
     // the same two controls the journal test above uses, at the surface that merely delegates.
-    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }).sessionNumber).toBe(4);
+    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
     store.setSessionRevealed(session.id, true);
-    expect(playerRow().sessionNumber).toBe(4);
+    expect(playerRow()).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
+  });
+
+  /**
+   * D9's payoff, and the reproduction of `known-bugs.md:111-122` INVERTED: renumbering a session used to
+   * leave every one of its entries carrying the old number, because the number was copied onto the row.
+   * The join makes the display number live, so one `updateSession` moves all of them and no journal row
+   * is written at all.
+   */
+  it("renumbering a session updates every linked entry's display number, with no journal write", () => {
+    const session = store.createSession({ sessionNumber: 4 });
+    const first = store.createEntry({ playerText: "We arrived.", sessionId: session.id });
+    const second = store.createEntry({ playerText: "We left.", sessionId: session.id });
+    const untouchedStamp = store.getEntry(first.id)!.updatedAt;
+    expect([first, second].map((entry) => entry.sessionNumber)).toEqual([4, 4]);
+
+    store.updateSession(session.id, { sessionNumber: 9 }, undefined, "gm");
+
+    expect(store.getEntry(first.id)!.sessionNumber).toBe(9);
+    expect(store.getEntry(second.id)!.sessionNumber).toBe(9);
+    // ...and the entries were not rewritten to do it, which is what makes this cost nothing.
+    expect(store.getEntry(first.id)!.updatedAt).toBe(untouchedStamp);
+    // Clearing the number leaves the JOIN intact - the entry is still filed under that session.
+    store.updateSession(session.id, { sessionNumber: null }, undefined, "gm");
+    expect(store.getEntry(first.id)).toMatchObject({ sessionId: session.id, sessionNumber: null });
+  });
+
+  /** The write-resolution rule, all four arms, in one place. */
+  it("resolves a write's session by id: omitted auto-files, null unfiles, an unknown id is not-found", () => {
+    const session = store.createSession({ sessionNumber: 1 });
+    expect(store.createEntry({ playerText: "nothing active yet" }).sessionId, "no active session -> unfiled").toBeNull();
+
+    store.setActiveSession(session.id);
+    expect(store.createEntry({ playerText: "during play" }).sessionId, "omitted -> the active session").toBe(session.id);
+    expect(store.createEntry({ playerText: "deliberately unfiled", sessionId: null }).sessionId, "explicit null -> none").toBeNull();
+
+    const other = store.createSession({ sessionNumber: 2 });
+    expect(store.createEntry({ playerText: "filed by hand", sessionId: other.id }).sessionId).toBe(other.id);
+    expect(() => store.createEntry({ playerText: "nowhere", sessionId: crypto.randomUUID() })).toThrow(/no longer exists/i);
+
+    // An UNNUMBERED active session auto-links too - strictly better than the number-stamping it replaces,
+    // which could not link at all until the GM had numbered the session.
+    const unnumbered = store.createSession({});
+    store.setActiveSession(unnumbered.id);
+    const filed = store.createEntry({ playerText: "before it was numbered" });
+    expect(filed).toMatchObject({ sessionId: unnumbered.id, sessionNumber: null });
+    store.updateSession(unnumbered.id, { sessionNumber: 12 }, undefined, "gm");
+    expect(store.getEntry(filed.id)!.sessionNumber, "...and the number appears the moment the GM sets one").toBe(12);
   });
 });
 
@@ -2179,10 +2296,10 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     // §3.1 says search indexing "should be free" and to VERIFY it rather than assume. It is: `indexEntry`
     // runs from `insertEntry`, so both kinds are findable on their own text on exactly a note's terms —
     // and the unrevealed downtime is hidden from the player index by the reveal gate, not by its kind.
-    expect(store.searchAll("gm", "ultimatum").some((hit) => hit.kind === "journal" && hit.id === deadline.id)).toBe(true);
-    expect(store.searchAll("gm", "poison").some((hit) => hit.kind === "journal" && hit.id === downtime.id)).toBe(true);
-    expect(store.searchAll("player", "ultimatum").some((hit) => hit.id === deadline.id)).toBe(true);   // revealed above
-    expect(store.searchAll("player", "poison").some((hit) => hit.id === downtime.id)).toBe(false);     // still hidden
+    expect(store.searchAll("gm", "ultimatum").hits.some((hit) => hit.kind === "journal" && hit.id === deadline.id)).toBe(true);
+    expect(store.searchAll("gm", "poison").hits.some((hit) => hit.kind === "journal" && hit.id === downtime.id)).toBe(true);
+    expect(store.searchAll("player", "ultimatum").hits.some((hit) => hit.id === deadline.id)).toBe(true);   // revealed above
+    expect(store.searchAll("player", "poison").hits.some((hit) => hit.id === downtime.id)).toBe(false);     // still hidden
 
     // The ordinary journal editor must not eat the payload: `updateEntry` names its columns and
     // `payload_json` is not among them, so an unrelated text edit leaves it intact.
@@ -2239,15 +2356,22 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
       expect(after).toHaveLength(before.length);                    // nothing dropped, nothing duplicated
       for (const [index, original] of before.entries()) {
-        const { payload_json: payload, ...carried } = after[index];
-        expect(carried).toEqual(original);                          // EVERY pre-existing column, value for value
-        expect(payload).toBeNull();                                 // ...and the new one starts empty
+        const { payload_json: payload, session_id: sessionId, session_number: sessionNumber, ...carried } = after[index];
+        // EVERY pre-existing column, value for value - except the two v15/v19 touched, checked below.
+        const { session_number: originalNumber, ...originalCarried } = original as Record<string, unknown>;
+        expect(carried).toEqual(originalCarried);
+        expect(payload).toBeNull();                                 // v15's new column starts empty
+        // v19 (D9): a numbered row's number moved into the JOIN and the bare column was emptied; an
+        // unnumbered row is untouched on both.
+        if (originalNumber === null) { expect(sessionId).toBeNull(); expect(sessionNumber).toBeNull(); }
+        else { expect(sessionId, "a legacy number resolved to a session record").not.toBeNull(); expect(sessionNumber, "and the bare column is now the LABEL store, empty").toBeNull(); }
       }
-      // The rebuilt table IS the old table plus one column, in the same order with the same types,
-      // NOT-NULLs and defaults — including `tags_json`'s DEFAULT '[]', which v10 added and a
+      // The rebuilt table IS the old table plus v15's and v19's columns, in the same order with the same
+      // types, NOT-NULLs and defaults — including `tags_json`'s DEFAULT '[]', which v10 added and a
       // reconstructed-from-memory DDL would silently drop.
-      expect(afterColumns.slice(0, -1)).toEqual(beforeColumns);
-      expect(afterColumns.at(-1)).toEqual(["payload_json", "TEXT", 0, null]);
+      expect(afterColumns.slice(0, -2)).toEqual(beforeColumns);
+      expect(afterColumns.at(-2)).toEqual(["payload_json", "TEXT", 0, null]);
+      expect(afterColumns.at(-1)).toEqual(["session_id", "TEXT", 0, null]);
 
       // The rows are not merely present, they still READ correctly through the store's own path.
       expect(upgraded.getEntry(fight)!.kind).toBe("combat");
@@ -2799,9 +2923,20 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
         expect(carried).toEqual(original);                          // EVERY pre-existing column, value for value
         expect(isParty).toBe(0);                                    // ...and the new one defaults to "not the party"
       }
-      // `codex_journal` is byte-identical, rows AND schema: v16 must not touch it (v15 already did the work).
-      expect(journalAfter).toEqual(journalBefore);
-      expect(journalColumnsAfter).toEqual(journalColumnsBefore);
+      // v16 itself must not touch `codex_journal` (v15 already did the work). What DOES touch it on this
+      // upgrade path is v19 (D9), so the comparison is "old columns and old values, except the two D9
+      // owns" rather than byte-identity - and asserting that explicitly is what would catch v16 quietly
+      // growing a journal write.
+      expect(journalColumnsAfter.slice(0, -1)).toEqual(journalColumnsBefore);
+      expect(journalColumnsAfter.at(-1)).toEqual(["session_id", "TEXT", 0, null]);
+      expect(journalAfter).toHaveLength(journalBefore.length);
+      for (const [index, original] of (journalBefore as Array<Record<string, unknown>>).entries()) {
+        const { session_id: sessionId, session_number: sessionNumber, ...carried } = journalAfter[index] as Record<string, unknown>;
+        const { session_number: originalNumber, ...originalCarried } = original;
+        expect(carried).toEqual(originalCarried);
+        if (originalNumber === null) { expect(sessionId).toBeNull(); expect(sessionNumber).toBeNull(); }
+        else { expect(sessionId).not.toBeNull(); expect(sessionNumber).toBeNull(); }
+      }
 
       // The new column is the LAST one and carries the declared type/NOT NULL/DEFAULT, so an existing
       // codex needs no backfill pass to be correct.
@@ -3043,14 +3178,14 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
     expect(store.setEntryRevealed(milestone.id, true).revealedToPlayers).toBe(true);
 
     // Indexed for search exactly as a note is — VERIFIED, not assumed (`writeEntry` calls `indexEntry`).
-    expect(store.searchAll("gm", "crypt").some((hit) => hit.kind === "journal" && hit.id === milestone.id)).toBe(true);
-    expect(store.searchAll("player", "crypt").some((hit) => hit.id === milestone.id)).toBe(true);     // revealed above
+    expect(store.searchAll("gm", "crypt").hits.some((hit) => hit.kind === "journal" && hit.id === milestone.id)).toBe(true);
+    expect(store.searchAll("player", "crypt").hits.some((hit) => hit.id === milestone.id)).toBe(true);     // revealed above
     // ...and PAYLOAD text is NOT indexed, for any kind. A milestone's `reason` and a standing's `reason`
     // are GM-authored prose with no reveal gate of their own; indexing them would put them in the PLAYER
     // index with only the entry's reveal flag between them and a reader. "ossuary" and "caravan" appear
     // only inside a reason and never in a `playerText`, so a hit on either would BE the leak.
-    expect(store.searchAll("gm", "ossuary").some((hit) => hit.id === milestone.id)).toBe(false);
-    expect(store.searchAll("gm", "caravan").some((hit) => hit.id === standing.id)).toBe(false);
+    expect(store.searchAll("gm", "ossuary").hits.some((hit) => hit.id === milestone.id)).toBe(false);
+    expect(store.searchAll("gm", "caravan").hits.some((hit) => hit.id === standing.id)).toBe(false);
 
     // A standing record's prose lives in its payload and NOWHERE else — one sentence, one home, one gate.
     expect(store.getEntry(standing.id)!.playerText).toBe("");
@@ -3996,5 +4131,147 @@ describe("every codex write bumps the coarse revision (the ETag's invariant)", (
 
     // Non-vacuity: the walk really covered the surface rather than short-circuiting after two calls.
     expect(seen.length).toBeGreaterThanOrEqual(40);
+  });
+});
+
+/**
+ * D10: sessions join the ONE suite-wide search index. A new kind in that index is a THREE-gate
+ * viewer-safety change (`CodexRecordKind`'s comment enumerates them), and gate 1 is the one with no
+ * second line of defence - so each gate is asserted at ITS OWN layer here, the CI-1 discipline this file
+ * established after a weakened SQL predicate left every test passing because a projection caught it.
+ */
+describe("CodexStore search — sessions join the one index (D10, three gates)", () => {
+  const seed = () => store.createSession({
+    sessionNumber: 4, realDate: "2026-07-30", tags: ["ravenloft"],
+    prepBody: "The ambush is at the bridge; Ireena is the real target.",
+    recapBody: "The party crossed the bridge.",
+    attendees: ["Ozy", "Mara"]
+  });
+
+  it("GATE 1 — prep and attendees never enter the PLAYER index, even for a revealed session", () => {
+    const session = store.setSessionRevealed(seed().id, true);
+    // The GM can find it by its prep and by who was there.
+    expect(store.searchAll("gm", "ambush").hits.some((hit) => hit.id === session.id)).toBe(true);
+    expect(store.searchAll("gm", "Mara").hits.some((hit) => hit.id === session.id)).toBe(true);
+    // The player cannot, and the session is REVEALED - so gates 2 and 3 both pass it. The hit's very
+    // existence would be the leak, even though no body is ever returned.
+    expect(store.searchAll("player", "ambush").hits).toEqual([]);
+    expect(store.searchAll("player", "Mara").hits).toEqual([]);
+    // Non-vacuity: the player index really does hold this session, by its recap, date and tags.
+    for (const query of ["crossed", "2026-07-30", "ravenloft"]) {
+      expect(store.searchAll("player", query).hits.some((hit) => hit.kind === "session" && hit.id === session.id), query).toBe(true);
+    }
+  });
+
+  it("GATE 2 — the SQL predicate hides an UNREVEALED session from a player, below any projection", () => {
+    const session = seed();
+    // Called directly, with no projection in front of it: this is the layer an HTTP test cannot see.
+    expect(store.searchAll("player", "crossed").hits).toEqual([]);
+    expect(store.searchAll("gm", "crossed").hits.some((hit) => hit.id === session.id)).toBe(true);
+    store.setSessionRevealed(session.id, true);
+    // Revealing needs NO reindex - reveal is resolved at read time, the `setQuestRevealed` rule.
+    expect(store.searchAll("player", "crossed").hits.some((hit) => hit.id === session.id)).toBe(true);
+  });
+
+  it("GATE 3 — the projection arm refuses an unrevealed session even when the SQL layer passes it", () => {
+    const session = seed();
+    // Constructed by hand, exactly as the SQL layer would have handed it over if gate 2 were weakened.
+    expect(projectPlayerSearchHit({ kind: "session", session }, playerSessionNumbers())).toBeNull();
+    // The GM's hit exists for the same record, so the null is the reveal gate and not a missing arm.
+    expect(projectGmSearchHit({ kind: "session", session })).toMatchObject({ kind: "session", id: session.id, title: "Session 4" });
+    const revealed = store.setSessionRevealed(session.id, true);
+    const hit = projectPlayerSearchHit({ kind: "session", session: revealed }, playerSessionNumbers())!;
+    // The same uniform key set every other kind emits - a row renderer must never branch on which kind it got.
+    expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(hit.tags).toEqual(["ravenloft"]);
+    // Nothing from the GM layer rides along on the hit, whatever the title rule does.
+    expect(JSON.stringify(hit)).not.toContain("Ireena");
+    expect(JSON.stringify(hit)).not.toContain("Mara");
+  });
+
+  it("never emits a blank session title: number, else recap excerpt, else \"Untitled session\"", () => {
+    const numbered = store.setSessionRevealed(store.createSession({ sessionNumber: 4 }).id, true);
+    const recapOnly = store.setSessionRevealed(store.createSession({ recapBody: "The party crossed the bridge." }).id, true);
+    const empty = store.setSessionRevealed(store.createSession({}).id, true);
+    const title = (session: typeof numbered) => projectPlayerSearchHit({ kind: "session", session }, playerSessionNumbers())!.title;
+    expect(title(numbered)).toBe("Session 4");
+    expect(title(recapOnly)).toBe("The party crossed the bridge.");
+    // `known-bugs.md:65-68`: this used to be "" on the reveal audit, which renders an unclickable blank row.
+    expect(title(empty)).toBe("Untitled session");
+    // The audit says the same words about the same records - one concept, one name, on both surfaces.
+    const auditTitles = projectRevealAudit([numbered, recapOnly, empty].map((session) => ({ kind: "session" as const, session })))
+      .sections.find((section) => section.kind === "session")!.rows.map((row) => row.title);
+    expect(auditTitles.sort()).toEqual(["Session 4", "The party crossed the bridge.", "Untitled session"]);
+  });
+
+  it("round-trips tags on sessions and quests, and finds both by tag in both audiences", () => {
+    const session = store.setSessionRevealed(store.createSession({ sessionNumber: 1, recapBody: "We began.", tags: ["Ravenloft", " ravenloft ", "arc-one"] }).id, true);
+    // `tags()` slugs, trims and dedupes on the way in, exactly as it does for every other record.
+    expect(session.tags).toEqual(["ravenloft", "arc-one"]);
+    const quest = store.setQuestRevealed(store.createQuest({ title: "Find the Sunsword", tags: ["arc-one"] }).id, true);
+    expect(quest.tags).toEqual(["arc-one"]);
+
+    for (const audience of ["gm", "player"] as const) {
+      const ids = store.searchAll(audience, "arc-one").hits.map((hit) => hit.id);
+      expect(ids, audience).toContain(session.id);
+      expect(ids, audience).toContain(quest.id);
+    }
+    // Editing the tags keeps the index in step - the reindex rides in the same transaction as the write.
+    store.updateSession(session.id, { tags: ["arc-two"] }, undefined, "gm");
+    expect(store.searchAll("gm", "arc-one").hits.map((hit) => hit.id)).not.toContain(session.id);
+    expect(store.searchAll("gm", "arc-two").hits.map((hit) => hit.id)).toContain(session.id);
+    // ...and deleting a session takes its index row with it, or the row matches forever with nothing to gate on.
+    store.deleteSession(session.id);
+    expect(store.searchAll("gm", "arc-two").hits.map((hit) => hit.id)).not.toContain(session.id);
+  });
+
+  /** D19: the cap is SIGNALLED. 51 matches means 50 hits and `truncated: true`; 50 means no flag. */
+  it("reports truncation rather than silently clipping the result list", () => {
+    for (let index = 0; index < 50; index += 1) store.createPage({ title: `Barovia hamlet ${index}`, playerBody: "barovia" });
+    const exact = store.searchAll("gm", "barovia");
+    expect(exact.hits).toHaveLength(50);
+    expect(exact.truncated, "exactly at the cap is NOT truncated - the probe row is what distinguishes them").toBe(false);
+    store.createPage({ title: "Barovia hamlet 50", playerBody: "barovia" });
+    const over = store.searchAll("gm", "barovia");
+    expect(over.hits).toHaveLength(50);
+    expect(over.truncated).toBe(true);
+  });
+});
+
+/**
+ * D17 / director ruling R3: a player chronicle row carries BOTH `inWorldDate` and `calendarInstant`.
+ *
+ * The instant is a pure function of the raw date and the calendar the player already holds, so it adds no
+ * information - but shipping the SERVER's value is what stops the client re-deriving it. The two
+ * derivations disagreed on a day that overflows its month (`known-bugs.md:457-466`), which is the case
+ * seeded below deliberately.
+ */
+describe("Codex chronicle — a player's machine-readable dates (D17, R3)", () => {
+  it("carries both date forms on a revealed dated row, and the instant is the server's own clamped one", () => {
+    // A 30-day month, and a date on day 31 of it - the measured day-clamp divergence.
+    store.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["First", "Second"], currentDate: { year: 1492, month: 1, day: 1 } });
+    const entry = store.createEntry({ playerText: "The siege begins.", revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 31 } });
+    const record = { kind: "entry" as const, entry: store.getEntry(entry.id)! };
+
+    const player = projectPlayerChronicleRecord(record, playerSessionNumbers())!;
+    const gm = projectGmChronicleRecord(record);
+    expect(player.inWorldDate, "the RAW date the GM typed, unclamped - it is the source of truth (K3)").toEqual({ year: 1492, month: 0, day: 31 });
+    // The instant is the SERVER's, identical to the GM's, so the two audiences place the row on the same
+    // day - which is the whole reason the field travels rather than being recomputed client-side.
+    expect(player.calendarInstant).toBe(gm.calendarInstant);
+    expect(typeof player.calendarInstant).toBe("number");
+    // ...and it is information-equivalent to the label the player already had.
+    expect(player.inWorldLabel).toBe(gm.inWorldLabel);
+
+    // Undated rows carry null for both, never an absent key - no reader branches on presence.
+    const undated = store.createEntry({ playerText: "Timeless.", revealedToPlayers: true });
+    const undatedRow = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(undated.id)! }, playerSessionNumbers())!;
+    expect(undatedRow.inWorldDate).toBeNull();
+    expect(undatedRow.calendarInstant).toBeNull();
+
+    // The GM's CLOCK is still not on the player row by any path: the fields describe the RECORD's date,
+    // and `fired` is still measured against the published date. Nothing here names `currentDate`.
+    expect(Object.keys(undatedRow)).not.toContain("proposedDate");
+    expect(Object.keys(undatedRow)).not.toContain("campaignInstant");
   });
 });

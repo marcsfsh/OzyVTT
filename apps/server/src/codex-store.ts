@@ -183,10 +183,19 @@ export type CodexBacklinkRow = Readonly<{
  * is why each needs a test at ITS OWN layer - see the CI-1 describe blocks in `codex-store.test.ts`.
  * Gate 1 has no second line of defence at all.
  */
-export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest";
-export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest"];
+export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest" | "session";
+export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest", "session"];
 /** One search hit as the store returns it: what kind of record matched, and which one. */
 export type CodexSearchRef = Readonly<{ kind: CodexRecordKind; id: string }>;
+/**
+ * D19: a bounded search answer that SAYS it is bounded. The codex is unpaginated by design at LAN scale,
+ * which is honest only while the caller can tell a complete list from a truncated one - `truncated` is that
+ * difference, and it is measured by asking the database for one row more than the cap rather than by
+ * comparing the returned length against it (which can never distinguish "exactly 50" from "50 and more").
+ */
+export type CodexSearchResult = Readonly<{ hits: readonly CodexSearchRef[]; truncated: boolean }>;
+/** The one shared cap for every kind on the ONE search index. See `searchOrderBySql` for what it costs. */
+const SEARCH_LIMIT = 50;
 
 export type CodexMapKind = "battlemap" | "regional" | "world";
 export type CodexMapRow = Readonly<{
@@ -324,6 +333,20 @@ export type CodexJournalRow = Readonly<{
   attachPageId: string | null;
   kind: CodexJournalKind;
   sourceEncounterId: number | null;
+  /**
+   * D9: the session this entry belongs to, BY IDENTITY. Null when the entry is filed under no session.
+   * This is what a writer sets; `sessionNumber` below is what a reader displays.
+   */
+  sessionId: string | null;
+  /**
+   * The session's number as a DISPLAY value, resolved live from the joined session - so renumbering a
+   * session updates every one of its entries with no journal write at all (the whole point of D9).
+   *
+   * It falls back to the bare label stored on the row, which after migration v19 exists in exactly one
+   * circumstance: `deleteSession` stamped a REVEALED session's number back onto its entries when the record
+   * went (director ruling R2). A hidden session's delete stamps nothing, so no label a player can see ever
+   * names a record they have not been shown.
+   */
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
@@ -338,7 +361,12 @@ export type CodexJournalRow = Readonly<{
   createdAt: string;
   updatedAt: string;
 }>;
-export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null; tags?: readonly string[] }>;
+/**
+ * D9: writers name a session by ID, never by number. `sessionId` OMITTED on a create auto-files the entry
+ * under the active session; an explicit `null` files it under none; an id that names no session is a
+ * not-found. There is no bare-number write arm at all - the number is a display value the server resolves.
+ */
+export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionId?: string | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null; tags?: readonly string[] }>;
 export type CodexJournalUpdateInput = CodexJournalCreateInput;
 /** CT-10: what `createDowntime` needs beyond an ordinary entry. `applied` is not an input - it starts false. */
 export type CodexDowntimeCreateInput = CodexJournalCreateInput & Readonly<{ downtime: Readonly<{ who: string; activity: string; days: number }> }>;
@@ -409,6 +437,8 @@ export type CodexSessionRow = Readonly<{
   recapBody: string;
   revealedToPlayers: boolean;
   status: CodexSessionStatus;
+  /** D10 / CI-2: the same single-layer tag vocabulary every other codex record carries. */
+  tags: readonly string[];
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -422,6 +452,7 @@ export type CodexSessionCreateInput = Readonly<{
   recapBody?: string;
   revealedToPlayers?: boolean;
   status?: CodexSessionStatus;
+  tags?: readonly string[];
 }>;
 /** No `revealedToPlayers`: reveal has its own endpoint and its own recency rule, exactly as `CodexPageUpdateInput` omits it. */
 export type CodexSessionUpdateInput = Readonly<{
@@ -431,6 +462,7 @@ export type CodexSessionUpdateInput = Readonly<{
   prepBody?: string;
   recapBody?: string;
   status?: CodexSessionStatus;
+  tags?: readonly string[];
 }>;
 
 /**
@@ -467,6 +499,8 @@ export type CodexQuestRow = Readonly<{
   /** Codex PAGE ids this quest concerns (via the client's `EntityPicker`), filtered on the way to a player. */
   entityIds: readonly string[];
   revealedToPlayers: boolean;
+  /** D10 / CI-2: the same single-layer tag vocabulary every other codex record carries. */
+  tags: readonly string[];
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -480,6 +514,7 @@ export type CodexQuestCreateInput = Readonly<{
   objectives?: readonly CodexQuestObjective[];
   entityIds?: readonly string[];
   revealedToPlayers?: boolean;
+  tags?: readonly string[];
 }>;
 /** No `revealedToPlayers`: reveal has its own endpoint and its own recency rule, exactly as `CodexSessionUpdateInput` omits it. */
 export type CodexQuestUpdateInput = Readonly<{
@@ -489,6 +524,7 @@ export type CodexQuestUpdateInput = Readonly<{
   gmBody?: string;
   objectives?: readonly CodexQuestObjective[];
   entityIds?: readonly string[];
+  tags?: readonly string[];
 }>;
 
 export type CodexPageCreateInput = Readonly<{
@@ -1112,6 +1148,166 @@ export const MIGRATIONS = [{
     ALTER TABLE codex_meta ADD COLUMN autosave_enabled INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE codex_meta ADD COLUMN autosave_interval_seconds INTEGER NOT NULL DEFAULT 1;
   `
+}, {
+  version: 19,
+  // D9 (client decision, 2026-07-31): journal entries join their session BY IDENTITY, and D11's `quest`
+  // kind rides along. The second table rebuild in this file's history, and v15's discipline is copied
+  // point for point rather than remembered.
+  //
+  // WHY A REBUILD. Two reasons, and each alone would be enough:
+  //  - `kind` carries `CHECK (kind IN (...six...))` and SQLite cannot widen a CHECK in place. D11's quest
+  //    history is a seventh kind. v15 already paid this cost once and said in as many words that paying it
+  //    "twice four weeks apart for one word each would be silly" - so `quest` is admitted HERE, in Phase 2,
+  //    even though the history flow itself ships in Phase 3. The DB being more permissive than
+  //    `CodexJournalKind` is the established safe direction (`journalKind` fails closed to `note`).
+  //  - `session_id` needs to be a real column, and appending it is the cheap half; the CHECK is the
+  //    expensive half, so they land together.
+  //
+  // WHY THE JOIN AT ALL. `session_number` was a bare INTEGER copied onto the entry, which made renumbering a
+  // session a lie: the entries kept the old number (`known-bugs.md:111-122`, OPEN). Joining by id makes the
+  // display number LIVE - renumber the session and every entry follows, with no journal write at all.
+  //
+  // NO FOREIGN KEY on `session_id`, deliberately, and it is the same call v13 made for `active_session_id`:
+  // `deleteSession` scrubs the column itself (with director ruling R2's conditional stamp-back), which a
+  // cascade could not express - a revealed session's number must survive its record as a bare label, and a
+  // hidden one's must not.
+  //
+  // Rebuild discipline, verbatim from v15:
+  //  - The new table is the CURRENT table in the SAME physical column order, read from live `sqlite_master`,
+  //    with `session_id` appended LAST so no existing column moves. STRICT kept.
+  //  - The INSERT names its columns on BOTH sides.
+  //  - All three indexes recreated verbatim, plus `codex_journal_session` for the new join.
+  //  - FK situation re-verified at head: nothing references `codex_journal` and it references nothing.
+  //
+  // THE BACKFILL, in two steps and in this order:
+  //
+  //  1. SYNTHESIZE a session record for every number that names none. v13 deliberately did NOT backfill,
+  //     on the grounds that fabricating session records would invent facts. The client's D9 consciously
+  //     supersedes that decision (recorded in `decision-log.md` with this migration), and the objection is
+  //     honoured rather than overridden: the synthesized rows carry EMPTY prep, recap and attendees - nothing
+  //     is invented - and are `played` + `revealed = 0`, so they are invisible to players and nothing
+  //     changes on any screen but the GM's session list, where a number that already existed now has a
+  //     record to hang on. The alternative was orphaning those entries' numbers, which is data loss.
+  //
+  //     The UUID recipe emits a lowercase v4-shaped id: version nibble forced to `4`, variant to one of
+  //     `[89ab]`, so it satisfies the store's `ID` regex and round-trips through every route that validates
+  //     an id. `strftime('%Y-%m-%dT%H:%M:%fZ','now')` is fixed-width and compatible with the store's own
+  //     `toISOString()` stamps.
+  //
+  //  2. RESOLVE the numbers into ids and NULL the column. After step 1 every number resolves, so the
+  //     post-migration invariant is exact and testable: no journal row keeps a bare `session_number`. The
+  //     column is RETAINED physically - it becomes the bare-LABEL store, written again by exactly one
+  //     writer (`deleteSession`'s R2 stamp-back) and read by `toEntry` only as the no-join fallback.
+  sql: `
+    CREATE TABLE codex_journal_new (
+      id TEXT PRIMARY KEY,
+      player_text TEXT NOT NULL,
+      gm_text TEXT,
+      revealed INTEGER NOT NULL,
+      attach_marker_id TEXT,
+      attach_page_id TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('note', 'combat', 'deadline', 'downtime', 'milestone', 'standing', 'quest')),
+      source_encounter_id INTEGER,
+      session_number INTEGER,
+      real_date TEXT,
+      in_world_label TEXT,
+      calendar_instant INTEGER,
+      sort_key INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      in_world_year INTEGER,
+      in_world_month INTEGER,
+      in_world_day INTEGER,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      payload_json TEXT,
+      session_id TEXT
+    ) STRICT;
+    INSERT INTO codex_journal_new
+      (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at, in_world_year, in_world_month, in_world_day, tags_json, payload_json)
+      SELECT
+       id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at, in_world_year, in_world_month, in_world_day, tags_json, payload_json
+      FROM codex_journal;
+    DROP TABLE codex_journal;
+    ALTER TABLE codex_journal_new RENAME TO codex_journal;
+    CREATE INDEX codex_journal_order ON codex_journal (calendar_instant, session_number, created_at);
+    CREATE INDEX codex_journal_marker ON codex_journal (attach_marker_id);
+    CREATE INDEX codex_journal_page ON codex_journal (attach_page_id);
+    CREATE INDEX codex_journal_session ON codex_journal (session_id);
+
+    INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at)
+      SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' ||
+                   substr(hex(randomblob(2)), 2) || '-' ||
+                   substr('89ab', (abs(random()) % 4) + 1, 1) || substr(hex(randomblob(2)), 2) ||
+                   '-' || hex(randomblob(6))),
+             j.session_number, NULL, '[]', '', '', 0, 'played', 1,
+             strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      FROM (SELECT DISTINCT session_number FROM codex_journal
+            WHERE session_number IS NOT NULL
+              AND session_number NOT IN (SELECT session_number FROM codex_sessions WHERE session_number IS NOT NULL)) j;
+
+    UPDATE codex_journal SET
+      session_id = (SELECT s.id FROM codex_sessions s WHERE s.session_number = codex_journal.session_number),
+      session_number = NULL
+    WHERE session_number IS NOT NULL;
+  `
+}, {
+  version: 20,
+  // D10 (client decision, 2026-07-31): sessions and quests become taggable, so every list in the Codex can
+  // be filtered the same way and a tag click can open one cross-type view.
+  //
+  // v10's shape VERBATIM (`tags_json TEXT NOT NULL DEFAULT '[]'`), which is the whole upgrade story: an
+  // existing row reads `[]` without a backfill pass, and `parseTags` already degrades a malformed blob to
+  // an empty list rather than throwing. Tags are SINGLE-LAYER by CI-2 - there is no GM-only tag - so they
+  // are indexed into both audience tables and need no reveal reasoning of their own.
+  sql: `
+    ALTER TABLE codex_sessions ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE codex_quests ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+  `
+}, {
+  version: 21,
+  // D10: sessions join the ONE suite-wide search index. This is a three-gate viewer-safety change
+  // (`CodexRecordKind`'s comment enumerates them); this migration is GATE 1 for every EXISTING session, and
+  // gate 1 is the one with no second line of defence.
+  //
+  // The two audience rows are built by DIFFERENT expressions, and the difference is the gate:
+  //  - PLAYER: recap, real date and tags. Every one of those is already in `projectPlayerSession`, so a
+  //    player's query can only match text they could already read on a revealed session.
+  //  - GM: the same plus `prep_body` and the attendee names. Prep is "the single most important secret on
+  //    this record" and attendees are real-world personal data; a `prep_body` in the player table would make
+  //    a player's query on a GM-only phrase MATCH, and the hit's existence is the leak even though the body
+  //    is never returned.
+  //
+  // Reveal is NOT part of this: gates 2 (`PLAYER_VISIBLE_SQL`) and 3 (`projectPlayerSearchHit`) resolve it at
+  // READ time, which is why `setSessionRevealed` needs no reindex - the `setQuestRevealed` rule verbatim.
+  //
+  // The title is `Session N` for a numbered session and empty for an unnumbered one; the number is already
+  // player-visible on a revealed session, so it may sit in the player table. A hit with an empty title falls
+  // back to a recap excerpt at projection time, never to a blank row.
+  //
+  // JSON1 guards match v11's and v15's: `json_valid` FIRST as a nested CASE (SQLite's AND short-circuits only
+  // sometimes; CASE is documented as evaluating in order), so one hand-edited `tags_json` cannot abort the
+  // migration and leave a codex unopenable.
+  sql: `
+    INSERT INTO codex_search_player (kind, record_id, title, body)
+      SELECT 'session', id,
+             CASE WHEN session_number IS NULL THEN '' ELSE 'Session ' || session_number END,
+             recap_body || char(10) || COALESCE(real_date, '') || char(10) ||
+             CASE WHEN json_valid(tags_json)
+               THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_sessions.tags_json)), '')
+               ELSE '' END
+      FROM codex_sessions;
+    INSERT INTO codex_search_gm (kind, record_id, title, body)
+      SELECT 'session', id,
+             CASE WHEN session_number IS NULL THEN '' ELSE 'Session ' || session_number END,
+             prep_body || char(10) || recap_body || char(10) || COALESCE(real_date, '') || char(10) ||
+             CASE WHEN json_valid(attendees_json)
+               THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_sessions.attendees_json)), '')
+               ELSE '' END || char(10) ||
+             CASE WHEN json_valid(tags_json)
+               THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_sessions.tags_json)), '')
+               ELSE '' END
+      FROM codex_sessions;
+  `
 }];
 
 /**
@@ -1129,6 +1325,10 @@ export const MIGRATIONS = [{
  *   marker  - `revealed = 1` AND ITS MAP'S `revealed = 1`. The marker's own flag is NOT sufficient:
  *             `GET /codex/maps/:id/markers` 404s a player on an unrevealed map before projecting a
  *             single pin (CD-6), so a revealed pin on a secret map is invisible and search must agree.
+ *   session - `revealed = 1`. Same as `projectPlayerSession` / `GET /codex/sessions`. A session's own flag
+ *             is the WHOLE predicate, exactly as the player list route computes it. Gate 1 does the heavy
+ *             lifting for this kind: `prep_body` and the attendee names never enter the player index at
+ *             all, so even a revealed session cannot be found by its secrets.
  *   quest   - `revealed = 1`. Same as `projectPlayerQuest` / `GET /codex/quests`. A quest's own flag is
  *             the WHOLE predicate: its `entityIds` are a LINK to pages, not a gate on the quest, and the
  *             player list already drops the unrevealed ones from that array (the `projectPlayerMarker`
@@ -1145,6 +1345,7 @@ const PLAYER_VISIBLE_SQL = `(CASE codex_search_player.kind
   WHEN 'marker' THEN EXISTS (SELECT 1 FROM codex_markers JOIN codex_maps ON codex_maps.id = codex_markers.map_id
     WHERE codex_markers.id = codex_search_player.record_id AND codex_markers.revealed = 1 AND codex_maps.revealed = 1)
   WHEN 'quest' THEN EXISTS (SELECT 1 FROM codex_quests WHERE codex_quests.id = codex_search_player.record_id AND codex_quests.revealed = 1)
+  WHEN 'session' THEN EXISTS (SELECT 1 FROM codex_sessions WHERE codex_sessions.id = codex_search_player.record_id AND codex_sessions.revealed = 1)
   ELSE 0 END)`;
 
 /**
@@ -1234,14 +1435,26 @@ type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id:
 const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, is_party, created_at, updated_at";
 type StandingRowRaw = { id: string; faction_page_id: string; value: number; revealed: number; created_at: string; updated_at: string };
 const STANDING_COLUMNS = "id, faction_page_id, value, revealed, created_at, updated_at";
-type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string };
+type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string; tags_json: string };
 /** One column list per session read, the same discipline PAGE_COLUMNS / JOURNAL_COLUMNS follow. */
-const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at";
-type QuestRowRaw = { id: string; title: string; status: string; player_body: string; gm_body: string; objectives_json: string; entity_ids_json: string; revealed: number; rev: number; created_at: string; updated_at: string };
+const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at, tags_json";
+type QuestRowRaw = { id: string; title: string; status: string; player_body: string; gm_body: string; objectives_json: string; entity_ids_json: string; revealed: number; rev: number; created_at: string; updated_at: string; tags_json: string };
 /** One column list per quest read, and the INSERT's value order is bound to it - the SESSION_COLUMNS discipline. */
-const QUEST_COLUMNS = "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at";
-type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; payload_json: string | null; created_at: string; updated_at: string };
-const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at";
+const QUEST_COLUMNS = "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json";
+type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; session_id: string | null; live_session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; payload_json: string | null; created_at: string; updated_at: string };
+/**
+ * D9: every journal read is now a LEFT JOIN onto `codex_sessions`, because the display number is LIVE.
+ *
+ * The column list is prefixed `j.` and paired with `JOURNAL_FROM` below so the two cannot be used apart -
+ * a SELECT that took the columns without the join would read `live_session_number` as undefined and quietly
+ * fall back to the bare label on every row, which is the exact bug D9 exists to remove.
+ *
+ * `session_number` is still SELECTed beside `live_session_number`: after v19 it is the bare-LABEL store,
+ * NULL on every row, written again only by `deleteSession`'s conditional stamp-back (director ruling R2)
+ * and read by `toEntry` only when there is no join to resolve.
+ */
+const JOURNAL_COLUMNS = "j.id, j.player_text, j.gm_text, j.revealed, j.attach_marker_id, j.attach_page_id, j.kind, j.source_encounter_id, j.session_number, j.session_id, s.session_number AS live_session_number, j.real_date, j.in_world_label, j.calendar_instant, j.in_world_year, j.in_world_month, j.in_world_day, j.sort_key, j.tags_json, j.payload_json, j.created_at, j.updated_at";
+const JOURNAL_FROM = "codex_journal j LEFT JOIN codex_sessions s ON s.id = j.session_id";
 
 /** Read a stored tag array defensively — a malformed value degrades to no tags rather than throwing. */
 function parseTags(raw: string | null | undefined): readonly string[] {
@@ -1726,7 +1939,7 @@ function payloadOf(kind: CodexJournalKind, raw: string | null): CodexEntryPayloa
  * to say what it carries. Three of the six say `null`, and that is the point: an optional field would let a
  * seventh kind be added that silently stores nothing.
  */
-type EntryFields = Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[]; payload: CodexEntryPayload | null }>;
+type EntryFields = Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionId: string | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[]; payload: CodexEntryPayload | null }>;
 /**
  * CT-5's "fires when the campaign date passes it", and **the only place that comparison is written**
  * (D11-C). Every reader - the store, the projections, any dashboard count - goes through this one function,
@@ -2639,9 +2852,9 @@ export class CodexStore {
    * It is ORDER BY only: nothing about WHICH records match changed, so the reveal gates above and the
    * recall of every existing query are untouched.
    */
-  searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRef[] {
+  searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchResult {
     const match = ftsQuery(query);
-    if (!match) return [];
+    if (!match) return { hits: [], truncated: false };
     // Tier 1's comparison value. `ftsQuery` already returned non-null, so the query holds at least one
     // letter or digit and this is never "" - which is what keeps journal entries and unlabelled markers
     // (both indexed with an EMPTY title) from sweeping into tier 1 on some punctuation-only query.
@@ -2649,19 +2862,25 @@ export class CodexStore {
     const table = audience === "gm" ? "codex_search_gm" : "codex_search_player";
     const kindFilter = kinds && kinds.length > 0 ? ` AND ${table}.kind IN (${kinds.map(() => "?").join(", ")})` : "";
     const visibility = audience === "gm" ? "" : ` AND ${PLAYER_VISIBLE_SQL}`;
-    const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility} ORDER BY ${searchOrderBySql(table)} LIMIT 50`;
+    // `LIMIT 51` for a cap of 50: the 51st row is not returned, it is the SIGNAL. Asking for exactly the
+    // cap can never distinguish "50 results" from "50 results and more you cannot see", and D19 requires
+    // the truncation to be visible rather than silently swallowed - a search that quietly hides matches is
+    // a search that reads as broken.
+    const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility} ORDER BY ${searchOrderBySql(table)} LIMIT ${SEARCH_LIMIT + 1}`;
     try {
       // Bind order follows the ?s in SQL TEXT order: MATCH, then the kind filter, then tier 1's title
       // in the ORDER BY. Any new parameterised clause must be inserted at its textual position here.
-      return (this.requireDatabase().prepare(sql).all(match, ...(kinds ?? []), exactTitle) as Array<{ kind: string; record_id: string }>)
-        .filter((row): row is { kind: CodexRecordKind; record_id: string } => (CODEX_RECORD_KINDS as readonly string[]).includes(row.kind))
-        .map((row) => ({ kind: row.kind, id: row.record_id }));
-    } catch { return []; }
+      const rows = (this.requireDatabase().prepare(sql).all(match, ...(kinds ?? []), exactTitle) as Array<{ kind: string; record_id: string }>)
+        .filter((row): row is { kind: CodexRecordKind; record_id: string } => (CODEX_RECORD_KINDS as readonly string[]).includes(row.kind));
+      // The flag is measured BEFORE the slice and against the unfiltered row count, so a probe row dropped
+      // by the unknown-kind filter above still counts as "there was more".
+      return { hits: rows.slice(0, SEARCH_LIMIT).map((row) => ({ kind: row.kind, id: row.record_id })), truncated: rows.length > SEARCH_LIMIT };
+    } catch { return { hits: [], truncated: false } }
   }
 
   /** The pages-only view of the same one index - kept so the page-search contract is provably unchanged. */
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
-    return this.searchAll(audience, query, ["page"]).map((hit) => ({ pageId: hit.id }));
+    return this.searchAll(audience, query, ["page"]).hits.map((hit) => ({ pageId: hit.id }));
   }
 
   // ----- Maps (the atlas tree) -----
@@ -3137,7 +3356,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId), realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload: null
     });
   }
@@ -3159,7 +3378,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
-      sourceEncounterId: input.sourceEncounterId, sessionNumber: this.activeSessionNumber(), realDate: null,
+      sourceEncounterId: input.sourceEncounterId, sessionId: this.activeSessionId, realDate: null,
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, payload: null
     });
   }
@@ -3189,7 +3408,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "deadline",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId),
       realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload: null
     });
@@ -3218,7 +3437,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "downtime",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId),
       realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload
     });
@@ -3248,7 +3467,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "milestone",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId),
       realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload
     });
@@ -3335,7 +3554,11 @@ export class CodexStore {
       gm_text: input.gmText === undefined ? existing.gm_text : entryGmText(input.gmText),
       attach_marker_id: input.attachMarkerId === undefined ? existing.attach_marker_id : optionalId(input.attachMarkerId),
       attach_page_id: input.attachPageId === undefined ? existing.attach_page_id : optionalId(input.attachPageId),
-      session_number: input.sessionNumber === undefined ? existing.session_number : sessionNo(input.sessionNumber),
+      // D9: an OMITTED `sessionId` leaves the filing alone (the journal's existing update contract); an
+      // explicit `null` files the entry under no session; an id must name a live session. Unlike a CREATE,
+      // an omitted value does NOT auto-file - editing an entry's text must not silently move it into
+      // whatever session happens to be active now.
+      session_id: input.sessionId === undefined ? existing.session_id : (input.sessionId === null ? null : this.requireSession(input.sessionId)),
       real_date: input.realDate === undefined ? existing.real_date : shortLabel(input.realDate, 40, "date"),
       in_world_label: dated ? dated.label : existing.in_world_label,
       calendar_instant: dated ? dated.instant : existing.calendar_instant,
@@ -3345,8 +3568,8 @@ export class CodexStore {
       tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags))
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, tags_json = ?, updated_at = ? WHERE id = ?")
-        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.tags_json, this.stamp(), entryId);
+      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_id = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, tags_json = ?, updated_at = ? WHERE id = ?")
+        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_id, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.tags_json, this.stamp(), entryId);
       this.indexEntry(entryId, next.player_text, next.gm_text, next.tags_json);
       this.bumpRevision();
     });
@@ -3380,7 +3603,7 @@ export class CodexStore {
   /** The global campaign timeline, ordered by in-world instant (later), then session number, then time. */
   listTimeline(): CodexJournalRow[] {
     return (this.requireDatabase().prepare(
-      `SELECT ${JOURNAL_COLUMNS} FROM codex_journal ORDER BY (calendar_instant IS NULL), calendar_instant, (session_number IS NULL), session_number, created_at`
+      `SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} ORDER BY (j.calendar_instant IS NULL), j.calendar_instant, (live_session_number IS NULL), live_session_number, j.created_at`
     ).all() as JournalRowRaw[]).map((row) => this.toEntry(row));
   }
 
@@ -3419,8 +3642,8 @@ export class CodexStore {
   /** Entries pinned to a specific marker or page (the per-entity mini-timeline). */
   listEntriesFor(attach: Readonly<{ markerId?: string; pageId?: string }>): CodexJournalRow[] {
     const database = this.requireDatabase();
-    if (attach.markerId && ID.test(attach.markerId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE attach_marker_id = ? ORDER BY created_at`).all(attach.markerId) as JournalRowRaw[]).map((row) => this.toEntry(row));
-    if (attach.pageId && ID.test(attach.pageId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE attach_page_id = ? ORDER BY created_at`).all(attach.pageId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    if (attach.markerId && ID.test(attach.markerId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} WHERE j.attach_marker_id = ? ORDER BY j.created_at`).all(attach.markerId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    if (attach.pageId && ID.test(attach.pageId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} WHERE j.attach_page_id = ? ORDER BY j.created_at`).all(attach.pageId) as JournalRowRaw[]).map((row) => this.toEntry(row));
     return [];
   }
 
@@ -3455,8 +3678,8 @@ export class CodexStore {
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
     const date = fields.inWorldDate;
     const tagsJson = JSON.stringify(tags(fields.tags));
-    database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
+    database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_id, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionId, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
     this.indexEntry(entryId, fields.playerText, fields.gmText, tagsJson);
     this.bumpRevision();
     return entryId;
@@ -3471,7 +3694,12 @@ export class CodexStore {
     return {
       id: row.id, playerText: row.player_text, gmText: row.gm_text, revealedToPlayers: row.revealed === 1,
       attachMarkerId: row.attach_marker_id, attachPageId: row.attach_page_id, kind,
-      sourceEncounterId: row.source_encounter_id, sessionNumber: row.session_number, realDate: row.real_date,
+      sourceEncounterId: row.source_encounter_id, sessionId: row.session_id,
+      // D9: the LIVE number from the joined session, falling back to the bare label the row stores. After
+      // v19 that fallback fires for exactly one thing: a revealed session that was deleted and stamped its
+      // number back onto its entries (director ruling R2).
+      sessionNumber: row.live_session_number ?? row.session_number,
+      realDate: row.real_date,
       inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant,
       inWorldDate: row.in_world_year !== null && row.in_world_month !== null && row.in_world_day !== null ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day } : null,
       sortKey: row.sort_key, tags: parseTags(row.tags_json),
@@ -3486,7 +3714,7 @@ export class CodexStore {
   }
   private journalRowRaw(entryId: string): JournalRowRaw | undefined {
     if (!ID.test(entryId)) return undefined;
-    return this.requireDatabase().prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE id = ?`).get(entryId) as JournalRowRaw | undefined;
+    return this.requireDatabase().prepare(`SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} WHERE j.id = ?`).get(entryId) as JournalRowRaw | undefined;
   }
 
   private toMap(row: MapRowRaw): CodexMapRow {
@@ -3525,12 +3753,14 @@ export class CodexStore {
       recap_body: body(input.recapBody),
       revealed: input.revealedToPlayers ? 1 : 0,
       status: sessionStatus(input.status),
-      rev: 1, created_at: stamp, updated_at: stamp
+      rev: 1, created_at: stamp, updated_at: stamp,
+      tags_json: JSON.stringify(tags(input.tags))
     };
     this.guardSessionNumber(row.session_number, () => {
       this.transaction(() => {
-        database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at);
+        database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at, row.tags_json);
+        this.indexSession(row);
         this.bumpRevision();
       });
     });
@@ -3559,6 +3789,7 @@ export class CodexStore {
       prep_body: input.prepBody === undefined ? existing.prep_body : body(input.prepBody),
       recap_body: input.recapBody === undefined ? existing.recap_body : body(input.recapBody),
       status: input.status === undefined ? existing.status : sessionStatus(input.status),
+      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
       // `rev` and `updated_at` move TOGETHER on an edit: the conflict token and the recency stamp both
       // describe "this record was written", and splitting them is what CI-9's exceptions below are for.
       rev: existing.rev + 1,
@@ -3566,8 +3797,9 @@ export class CodexStore {
     };
     this.guardSessionNumber(next.session_number, () => {
       this.transaction(() => {
-        database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, rev = ?, updated_at = ? WHERE id = ?")
-          .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.rev, next.updated_at, sessionId);
+        database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, tags_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+          .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.tags_json, next.rev, next.updated_at, sessionId);
+        this.indexSession(next);
         this.bumpRevision();
       });
     });
@@ -3595,12 +3827,31 @@ export class CodexStore {
     return this.getSession(sessionId)!;
   }
 
-  /** Idempotent, and an early return on a malformed id - every other codex delete behaves this way. */
+  /**
+   * Idempotent, and an early return on a malformed id - every other codex delete behaves this way.
+   *
+   * **The entries it leaves behind (director ruling R2).** `session_id` has no foreign key, so this scrubs
+   * the join itself - and what it writes in the number's place is CONDITIONAL, because the two cases have
+   * opposite right answers:
+   *
+   *  - The deleted session was REVEALED and numbered: its number is stamped back onto its entries as a bare
+   *    display label. Behaviour-preserving - the players were already reading "Session 4" on those entries,
+   *    and deleting the record must not silently erase the history's own numbering.
+   *  - The deleted session was HIDDEN (or unnumbered): the entries get NO label. A bare label passes through
+   *    the player projection by construction - there is no record left to gate on - so stamping a hidden
+   *    session's number back would tell the table that a session they were never shown existed. Secret by
+   *    default wins, and losing a label the players never saw costs nothing.
+   */
   deleteSession(sessionId: string): void {
     const database = this.requireDatabase();
     if (!ID.test(sessionId)) return;
+    const existing = this.sessionRowRaw(sessionId);
+    const stampBack = existing && existing.revealed === 1 ? existing.session_number : null;
     this.transaction(() => {
+      if (stampBack !== null) database.prepare("UPDATE codex_journal SET session_id = NULL, session_number = ? WHERE session_id = ?").run(stampBack, sessionId);
+      else database.prepare("UPDATE codex_journal SET session_id = NULL WHERE session_id = ?").run(sessionId);
       database.prepare("DELETE FROM codex_sessions WHERE id = ?").run(sessionId);
+      this.unindex("session", sessionId);
       // Clearing the pointer is PART of the delete, not a separate tidy-up: there is no FK doing it (see
       // migration v13), and a dangling `active_session_id` would have `activeSessionId` name a record that
       // no longer exists - which the sessions list hands straight to the GM.
@@ -3627,25 +3878,25 @@ export class CodexStore {
   }
 
   /**
-   * The `session_number`s that name a session record the players have NOT been shown. The resolution the
-   * player journal reads need before they may hand a player an entry's `sessionNumber` - a session's very
-   * EXISTENCE is GM information (`GET /codex/sessions/:id` 404s a player on an unrevealed one rather than
-   * 403ing, and the list omits it), so a number that resolves to a hidden record announces it.
+   * The session IDS the players have NOT been shown. The resolution every player journal read needs before
+   * it may hand a player an entry's session link OR its number - a session's very EXISTENCE is GM
+   * information (`GET /codex/sessions/:id` 404s a player on an unrevealed one rather than 403ing, and the
+   * list omits it), so either half of the link would announce it.
    *
-   * Deliberately the UNREVEALED set rather than the revealed one, and that asymmetry IS the rule: a number
-   * with no session record at all - every entry from before M9, which shipped with no backfill - is in
-   * NEITHER set, and must keep travelling exactly as it does today, because there is no record whose
-   * existence it could give away. The mirror-image question ("which numbers are revealed?") would answer no
-   * for those too and blank a label that has always been correct.
+   * D9 changed the KEY from number to id, and that is what closes the gap the number version could not: an
+   * unnumbered hidden session could not appear in a set of numbers at all, so an entry filed under one had
+   * nothing to gate on. Now the gate is the join, which every filed entry has.
    *
-   * Rows with `session_number IS NULL` are excluded: they name no number, and a set that could contain a
-   * null would only be a value every caller has to remember not to look up.
+   * Deliberately the UNREVEALED set rather than the revealed one, and the asymmetry is still the rule: an
+   * entry with a bare LABEL and no join (director ruling R2's stamp-back, the only writer left) is in
+   * neither set and keeps travelling, because there is no record left whose existence it could give away -
+   * and R2 only ever stamps a number the players had already been shown.
    */
-  unrevealedSessionNumbers(): ReadonlySet<number> {
+  unrevealedSessionIds(): ReadonlySet<string> {
     const rows = this.requireDatabase()
-      .prepare("SELECT session_number FROM codex_sessions WHERE revealed = 0 AND session_number IS NOT NULL")
-      .all() as Array<{ session_number: number }>;
-    return new Set(rows.map((row) => row.session_number));
+      .prepare("SELECT id FROM codex_sessions WHERE revealed = 0")
+      .all() as Array<{ id: string }>;
+    return new Set(rows.map((row) => row.id));
   }
 
   /** The session the table is currently playing, or null. One meta row, therefore one pointer (v13). */
@@ -3671,18 +3922,27 @@ export class CodexStore {
   }
 
   /**
-   * The active session's NUMBER, or null - the one resolution both auto-linking call sites share, so a
-   * hand-written note and an auto-logged battle can never disagree about which session "now" is.
+   * D9's write-resolution rule, in one place so every journal creator obeys it identically.
    *
-   * Degrades to null in every gap: nothing active, or an active session the GM has not numbered yet. Both
-   * are exactly the pre-M9 behaviour at those call sites, so auto-linking can only ever ADD a number where
-   * there would have been none - it never borrows some other session's. (The `?? null` on a pointer whose
-   * record has gone is belt and braces: `deleteSession` clears the pointer with the row, so that state is
-   * unreachable and consequently untested - it is here so a torn database cannot make this throw.)
+   *  - OMITTED (`undefined`) -> auto-file under the ACTIVE session, by id.
+   *  - explicit `null`       -> no session.
+   *  - an id                 -> that session, which must exist.
+   *
+   * This is strictly better than the number-stamping it replaces. Auto-linking used to resolve the active
+   * session's NUMBER, so an UNNUMBERED active session could not auto-link at all; now the entry joins the
+   * record and its number appears on every entry the moment the GM numbers it.
    */
-  private activeSessionNumber(): number | null {
-    const active = this.activeSessionId;
-    return active === null ? null : (this.getSession(active)?.sessionNumber ?? null);
+  private resolveEntrySession(sessionId: string | null | undefined): string | null {
+    if (sessionId === undefined) return this.activeSessionId;
+    if (sessionId === null) return null;
+    return this.requireSession(sessionId);
+  }
+
+  /** The id of a session that must exist. Not-found rather than a silent null: a write naming a session that is gone is a mistake worth hearing about. */
+  private requireSession(sessionId: string): string {
+    const resolved = id(sessionId);
+    if (!this.sessionRowRaw(resolved)) throw new CodexNotFoundError("That session no longer exists.");
+    return resolved;
   }
 
   /**
@@ -3718,6 +3978,7 @@ export class CodexStore {
       // Anything unrecognised reads as `planned`, the harmless half of the enum - the same fail-safe
       // `toEntry` applies to a journal row's `kind`.
       status: row.status === "played" ? "played" : "planned",
+      tags: parseTags(row.tags_json),
       rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
@@ -3754,12 +4015,13 @@ export class CodexStore {
       // means nothing), while two objectives may legitimately read the same and still be two steps.
       entity_ids_json: JSON.stringify(idArray(input.entityIds)),
       revealed: input.revealedToPlayers ? 1 : 0,
-      rev: 1, created_at: stamp, updated_at: stamp
+      rev: 1, created_at: stamp, updated_at: stamp,
+      tags_json: JSON.stringify(tags(input.tags))
     };
     this.transaction(() => {
-      database.prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(row.id, row.title, row.status, row.player_body, row.gm_body, row.objectives_json, row.entity_ids_json, row.revealed, row.rev, row.created_at, row.updated_at);
-      this.indexQuest(row.id, row.title, row.player_body, row.gm_body, row.objectives_json);
+      database.prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(row.id, row.title, row.status, row.player_body, row.gm_body, row.objectives_json, row.entity_ids_json, row.revealed, row.rev, row.created_at, row.updated_at, row.tags_json);
+      this.indexQuest(row.id, row.title, row.player_body, row.gm_body, row.objectives_json, row.tags_json);
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -3787,6 +4049,7 @@ export class CodexStore {
       gm_body: input.gmBody === undefined ? existing.gm_body : body(input.gmBody),
       objectives_json: input.objectives === undefined ? existing.objectives_json : JSON.stringify(questObjectives(input.objectives)),
       entity_ids_json: input.entityIds === undefined ? existing.entity_ids_json : JSON.stringify(idArray(input.entityIds)),
+      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
       // `rev` and `updated_at` move TOGETHER on an edit, exactly as `updateSession` does - the conflict
       // token and the recency stamp both mean "this record was written". `setQuestRevealed` is the
       // documented exception (CI-9).
@@ -3794,11 +4057,11 @@ export class CodexStore {
       updated_at: this.stamp()
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_quests SET title = ?, status = ?, player_body = ?, gm_body = ?, objectives_json = ?, entity_ids_json = ?, rev = ?, updated_at = ? WHERE id = ?")
-        .run(next.title, next.status, next.player_body, next.gm_body, next.objectives_json, next.entity_ids_json, next.rev, next.updated_at, questId);
+      database.prepare("UPDATE codex_quests SET title = ?, status = ?, player_body = ?, gm_body = ?, objectives_json = ?, entity_ids_json = ?, tags_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+        .run(next.title, next.status, next.player_body, next.gm_body, next.objectives_json, next.entity_ids_json, next.tags_json, next.rev, next.updated_at, questId);
       // The indexed TEXT really can change here (title, player body, objective text), so this write has an
       // index twin; `setQuestRevealed` below deliberately does not, because reveal is resolved at read time.
-      this.indexQuest(questId, next.title, next.player_body, next.gm_body, next.objectives_json);
+      this.indexQuest(questId, next.title, next.player_body, next.gm_body, next.objectives_json, next.tags_json);
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -3867,7 +4130,7 @@ export class CodexStore {
       objectives: parseObjectives(row.objectives_json),
       entityIds: parseIdArray(row.entity_ids_json),
       revealedToPlayers: row.revealed === 1,
-      rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
+      tags: parseTags(row.tags_json), rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
 
@@ -3974,7 +4237,7 @@ export class CodexStore {
         // around a standing change writes an ordinary note; this record is the structured fact.
         playerText: "", gmText: null, revealed: 0,
         attachMarkerId: null, attachPageId: null, kind: "standing",
-        sourceEncounterId: null, sessionNumber: this.activeSessionNumber(), realDate: null,
+        sourceEncounterId: null, sessionId: this.activeSessionId, realDate: null,
         inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, payload
       });
     });
@@ -4115,14 +4378,40 @@ export class CodexStore {
    * indexing it for players matches what they already receive. The GM row carries it too, or the GM's
    * search would be strictly weaker than the player's on the same record.
    *
-   * Quests carry NO tags (they are not in the spec's column list), so unlike every other kind here there
-   * is no tag text to append.
+   * D10 gives quests tags, so the tag text is appended to BOTH audience rows. Tags are single-layer by
+   * CI-2 - there is no GM-only tag - and every other kind already indexes theirs, so leaving quests out
+   * would make ONE search box answer a tag query differently depending on what carried the tag.
    */
-  private indexQuest(questId: string, questTitle: string, playerBody: string, gmBody: string, objectivesJson: string) {
+  private indexQuest(questId: string, questTitle: string, playerBody: string, gmBody: string, objectivesJson: string, tagsJson: string) {
     const objectiveText = parseObjectives(objectivesJson).map((objective) => objective.text).join(" ");
+    const tagText = parseTags(tagsJson).join(" ");
     this.indexRecord("quest", questId,
-      { title: questTitle, body: `${playerBody}\n${objectiveText}` },
-      { title: questTitle, body: `${playerBody}\n${gmBody}\n${objectiveText}` });
+      { title: questTitle, body: `${playerBody}\n${objectiveText}\n${tagText}` },
+      { title: questTitle, body: `${playerBody}\n${gmBody}\n${objectiveText}\n${tagText}` });
+  }
+
+  /**
+   * D10: a session in the ONE search index. GATE 1 (see `CodexRecordKind`), and the gate with no second
+   * line of defence - so the split between the two audience rows is the whole safety argument here:
+   *
+   *  - PLAYER: recap, real date, tags. Every one of those is already emitted by `projectPlayerSession` on a
+   *    revealed session, so a player's query can only match text they could already read.
+   *  - GM: the same PLUS `prep_body` and the attendee names. Prep is the single most important secret this
+   *    record carries and attendees are real-world personal data. Either in the player row would make a
+   *    player's query on a GM-only phrase MATCH, and the hit's EXISTENCE is the leak even though the body
+   *    is never returned - gates 2 and 3 would both pass it, because the session really is revealed and
+   *    really did match.
+   *
+   * The title is the number, which is player-visible on a revealed session. Reveal itself is resolved at
+   * READ time, so `setSessionRevealed` deliberately does not reindex - `setQuestRevealed`'s rule verbatim.
+   */
+  private indexSession(row: SessionRowRaw) {
+    const title = row.session_number === null ? "" : `Session ${row.session_number}`;
+    const tagText = parseTags(row.tags_json).join(" ");
+    const attendeeText = parseTags(row.attendees_json).join(" ");
+    this.indexRecord("session", row.id,
+      { title, body: `${row.recap_body}\n${row.real_date ?? ""}\n${tagText}` },
+      { title, body: `${row.prep_body}\n${row.recap_body}\n${row.real_date ?? ""}\n${attendeeText}\n${tagText}` });
   }
 
   /** A journal entry is two-layer like a page: `gmText` goes ONLY into the GM index. */

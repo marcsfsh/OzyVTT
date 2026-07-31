@@ -25,14 +25,14 @@ function entryRow(overrides: Partial<CodexJournalRow> & { kind: CodexJournalKind
   return {
     id: "11111111-1111-4111-8111-111111111111",
     playerText: "The tax is due.", gmText: "The duke will send the guard.", revealedToPlayers: false,
-    attachMarkerId: null, attachPageId: null, sourceEncounterId: null, sessionNumber: null, realDate: null,
+    attachMarkerId: null, attachPageId: null, sourceEncounterId: null, sessionId: null, sessionNumber: null, realDate: null,
     inWorldLabel: "Hammer 10, 1492 DR", calendarInstant: 9, inWorldDate: { year: 1492, month: 0, day: 10 },
     sortKey: 0, tags: [], payload: null, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z",
     ...overrides
   };
 }
 const DOWNTIME: CodexDowntimePayload = { who: "Brannor", activity: "Forging a blade", days: 8, applied: true };
-const playerContext = (publishedInstant: number | null = null) => ({ unrevealedSessionNumbers: new Set<number>(), publishedInstant });
+const playerContext = (publishedInstant: number | null = null) => ({ unrevealedSessionIds: new Set<string>(), publishedInstant });
 
 describe("M11 calendar projection - the GM's prep clock never reaches a player (O-1 / D11-G)", () => {
   /**
@@ -331,7 +331,7 @@ describe("M12 reveal audit projection - CT-9, an aggregation and not a second op
   it("names a journal row's KIND in its own field, so a deadline with prose is not a note with prose", () => {
     const deadline = entryRow({ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", kind: "deadline", revealedToPlayers: true, playerText: "The tax is due." });
     const note = entryRow({ id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", kind: "note", revealedToPlayers: true, playerText: "The tax is due." });
-    const sessionContext = { unrevealedSessionNumbers: new Set<number>() };
+    const sessionContext = { unrevealedSessionIds: new Set<string>() };
     const rows = projectRevealAudit([
       { kind: "journal", entry: deadline, sessionContext },
       { kind: "journal", entry: note, sessionContext }

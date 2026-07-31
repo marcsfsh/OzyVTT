@@ -2715,7 +2715,7 @@ Adds a journal/timeline entry.
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
@@ -2738,7 +2738,7 @@ CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the 
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate | yes | WHEN it happens - the date the campaign clock has to reach for this to fire. Required, and never null. |
@@ -2761,7 +2761,7 @@ CT-10: records DOWNTIME - who spent how many days doing what between adventures.
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
@@ -2785,7 +2785,7 @@ CT-8: records a MILESTONE - the party reached a level, and why. `level` is the l
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
@@ -2811,7 +2811,7 @@ Edits a journal entry.
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
@@ -2879,6 +2879,7 @@ Creates a session. Every field is optional - an empty POST opens a blank `planne
 | `recapBody` | string | no |  |
 | `status` | `planned` \| `played` | no |  |
 | `revealedToPlayers` | boolean | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 
 **Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401` `403`
 
@@ -2910,6 +2911,7 @@ Edits a session; an omitted field is left alone. `expectedRev` rejects a stale w
 | `prepBody` | string | no |  |
 | `recapBody` | string | no |  |
 | `status` | `planned` \| `played` | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the session moved on. |
 
 **Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `403` `404` `409`
@@ -2975,6 +2977,7 @@ Creates a quest. Only `title` is required - everything else opens empty, so the 
 | `objectives` | CodexQuestObjective[] | no |  |
 | `entityIds` | string (uuid)[] | no |  |
 | `revealedToPlayers` | boolean | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 
 **Responses:** `201` Success - envelope of `CodexQuestData` · errors `400` `401` `403`
 
@@ -3006,6 +3009,7 @@ Edits a quest; an omitted field is left alone. `expectedRev` rejects a stale wri
 | `gmBody` | string | no |  |
 | `objectives` | CodexQuestObjective[] | no |  |
 | `entityIds` | string (uuid)[] | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the quest moved on. |
 
 **Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `403` `404` `409`
@@ -3331,11 +3335,12 @@ One row on the ONE chronicle (CT-11/CT-12) as the **GM** receives it, in the sin
 | `text` | string | yes | The player-facing layer: a journal entry's full text, or a bounded excerpt of an event page's player body. |
 | `gmText` | string \| null | yes | GM-only: an entry's GM note, or an excerpt of an event page's GM body. Not declared at all on `CodexChronicleRecordPlayer`. |
 | `revealedToPlayers` | boolean | yes | GM-only field; not declared on `CodexChronicleRecordPlayer` (a player only ever receives revealed records). |
-| `sessionNumber` | integer \| null | yes |  |
+| `sessionId` | string \| null | yes | D9: the session this row belongs to, by identity. Null for an `event` page and for an unfiled entry. |
+| `sessionNumber` | integer \| null | yes | The linked session's number, resolved live from that record. |
 | `realDate` | string \| null | yes |  |
 | `inWorldLabel` | string \| null | yes | The in-world date as text - what the row is grouped under in the by-date lens. |
-| `calendarInstant` | number \| null | yes | GM-only sort key; not declared on `CodexChronicleRecordPlayer`. |
-| `inWorldDate` | CodexInWorldDate \| null | yes | GM-only raw date; not declared on `CodexChronicleRecordPlayer`. |
+| `calendarInstant` | number \| null | yes | Sortable absolute day index derived from the calendar. |
+| `inWorldDate` | CodexInWorldDate \| null | yes | The raw in-world date the GM typed; the instant and the label are derived from it. |
 | `tags` | string[] | yes |  |
 | `attachPageId` | string \| null | yes | GM-only; not declared on `CodexChronicleRecordPlayer`. |
 | `attachMarkerId` | string \| null | yes | GM-only; not declared on `CodexChronicleRecordPlayer`. |
@@ -3348,7 +3353,7 @@ One row on the ONE chronicle (CT-11/CT-12) as the **GM** receives it, in the sin
 
 ### `CodexChronicleRecordPlayer`
 
-One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `revealedToPlayers`, `calendarInstant`, `inWorldDate`, `attachPageId`, `attachMarkerId`, `sourceEncounterId`, `proposedDate` and `updatedAt`. `fired` is measured against the PUBLISHED date, never the GM's clock, so it can never tell the party that a date they have not been shown has gone by.
+One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `revealedToPlayers`, `attachPageId`, `attachMarkerId`, `sourceEncounterId`, `proposedDate` and `updatedAt`. `fired` is measured against the PUBLISHED date, never the GM's clock, so it can never tell the party that a date they have not been shown has gone by.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -3356,9 +3361,12 @@ One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `re
 | `id` | string (uuid) | yes |  |
 | `title` | string \| null | yes |  |
 | `text` | string | yes |  |
+| `sessionId` | string \| null | yes | Present only when the linked session is revealed; nulled together with `sessionNumber` otherwise. |
 | `sessionNumber` | integer \| null | yes |  |
 | `realDate` | string \| null | yes |  |
 | `inWorldLabel` | string \| null | yes |  |
+| `inWorldDate` | CodexInWorldDate \| null | yes | D17: the row's raw in-world date, so a calendar view can place it on a day without re-parsing prose. Information-equivalent to `inWorldLabel` beside it, which already spells out weekday, day, month and year - the structured parts add no bits and remove a client parse. Not the campaign's "now": the GM's clock is `CodexCalendarPlayer.currentDate`, which is the PUBLISHED date. |
+| `calendarInstant` | number \| null | yes | D17: the sortable day index for `inWorldDate` against the calendar the player already holds - a pure function of two things they have, computed once on the server. It is here so the client never re-derives it: the two derivations disagreed on a day that overflows its month, and one authority for one number is the fix. Null exactly when `inWorldDate` is. |
 | `tags` | string[] | yes |  |
 | `fired` | boolean | yes | Derived against the PUBLISHED date. |
 | `payload` | CodexDowntimePlayerPayload \| CodexMilestonePayload \| CodexStandingPlayerPayload \| null | yes | The player half of the kind's structured facts: downtime without `applied` (CT-10), a milestone's `{ level, reason }` unchanged (CT-8), a standing change with `factionPageId` nulled unless that faction page is revealed (CT-6). |
@@ -3472,7 +3480,8 @@ A revealed downtime record as a PLAYER sees it: the three campaign facts, and `a
 | `attachPageId` | string \| null | yes |  |
 | `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` | yes | What the row IS. `deadline` (CT-5) and `downtime` (CT-10) are M11; `milestone` (CT-8) and `standing` (CT-6) are M12, and the database has permitted all six since M11's migration so neither needed a table rebuild. Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
 | `sourceEncounterId` | integer \| null | yes |  |
-| `sessionNumber` | integer \| null | yes |  |
+| `sessionId` | string \| null | yes | D9: the session this entry belongs to, BY IDENTITY. Null when it is filed under no session. This is what a WRITE sets; `sessionNumber` beside it is what a reader displays. |
+| `sessionNumber` | integer \| null | yes | The linked session's number, resolved LIVE from that record - so renumbering a session updates every one of its entries with no journal write. Server-owned display data: a write body that carries it is a 400. It survives its session in exactly one case: deleting a REVEALED numbered session stamps its number back onto its entries as a bare label, because the players were already reading it. |
 | `realDate` | string \| null | yes |  |
 | `inWorldLabel` | string \| null | yes |  |
 | `calendarInstant` | number \| null | yes | Sortable absolute day index derived from the calendar. |
@@ -3497,7 +3506,8 @@ A journal entry as a PLAYER receives it - the mini-timeline row on a page or a p
 | `id` | string (uuid) | yes |  |
 | `text` | string | yes | The entry's `playerText`. |
 | `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` | yes | Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
-| `sessionNumber` | integer \| null | yes | Nulled when a session record carries this number and has not been revealed - a session's very existence is GM information. |
+| `sessionId` | string \| null | yes | D9/D14: the session this entry belongs to, so a player can navigate from an entry to its recap. Present ONLY when that session is revealed - in which case the player can already list and open it, so this adds no information. Nulled TOGETHER with `sessionNumber` when the session is hidden: either half of the link would announce that a session they have not been shown exists. |
+| `sessionNumber` | integer \| null | yes | Nulled together with `sessionId` when the linked session has not been revealed - a session's very existence is GM information. A bare label with no link survives only where the number was already player-visible. |
 | `realDate` | string \| null | yes |  |
 | `inWorldLabel` | string \| null | yes |  |
 | `tags` | string[] | yes |  |
@@ -3804,6 +3814,7 @@ One quest: a thread the party is pulling on, and whether it is still open. Two l
 | `objectives` | CodexQuestObjective[] | yes | The ordered checklist. Player-facing in full - order is content, not incidental. |
 | `entityIds` | string (uuid)[] | yes | Codex pages this quest involves (the NPC who gave it, the location it points at). Player-facing, but filtered to the revealed subset - the same rule a marker's `pageIds` follows, so a quest can never name a page the player cannot open. |
 | `revealedToPlayers` | boolean | yes | GM-only field; absent from a player projection (a player only ever receives revealed quests). |
+| `tags` | string[] | yes | D10: the codex-wide tag vocabulary, so quests filter and cross-link like every other record. Single-layer, and player-facing on a revealed quest. |
 | `rev` | integer (≥ 0) | yes | GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit. |
 | `createdAt` | string (date-time) | yes | GM-only; absent from a player projection. |
 | `updatedAt` | string (date-time) | yes | GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal - a reveal is not an edit. |
@@ -3841,6 +3852,7 @@ A quest as a PLAYER receives it. `status` is KEPT - this is the one place a ques
 | `body` | string | yes | The quest's `playerBody`. |
 | `objectives` | CodexQuestObjective[] | yes |  |
 | `entityIds` | string (uuid)[] | yes | Filtered to the revealed subset. |
+| `tags` | string[] | yes | D10: the `CodexSessionPlayer.tags` rule verbatim - tags are single-layer, and the quest's own reveal flag remains the whole predicate. |
 
 ### `CodexQuestProjected`
 
@@ -3968,6 +3980,7 @@ How much page version history the codex keeps, and what keeping it costs. The tw
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `hits` | CodexSearchHit[] | yes | The one ranked result list, all record kinds. |
+| `truncated` | boolean | yes | The result list was CUT at the cap - narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference. Measured by asking the index for one row past the cap, so it can distinguish "exactly 50 matches" from "50 and more". For a player it reports whether the SEARCH was cut, before their own reveal gates removed anything - so it stays true rather than becoming a count of what they may see. |
 
 ### `CodexSearchHit`
 
@@ -3975,10 +3988,10 @@ One row of the single suite-wide result list. Uniform across record types - ever
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `kind` | `page` \| `journal` \| `map` \| `marker` \| `quest` | yes | Which record matched; decides where the client navigates. |
+| `kind` | `page` \| `journal` \| `map` \| `marker` \| `quest` \| `session` | yes | Which record matched; decides where the client navigates. |
 | `id` | string (uuid) | yes |  |
-| `title` | string | yes | Page title, map name, marker label, or quest title; for a journal entry, a bounded one-line excerpt of its text (empty string when the record has no name). |
-| `tags` | string[] | yes | Always present, so no consumer branches on key presence: empty for a kind that carries no tags at all (a quest). |
+| `title` | string | yes | Page title, map name, marker label, or quest title; for a journal entry, a bounded one-line excerpt of its text; for a SESSION, `Session {n}`, else a recap excerpt, else `Untitled session` - never an empty string. |
+| `tags` | string[] | yes | Always present, so no consumer branches on key presence. |
 | `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` \| null | yes | The page's entity type; null for every other kind. |
 | `mapId` | string \| null | yes | The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed. |
 
@@ -3989,13 +4002,14 @@ One play session: the GM's prep for an evening at the table, and the recap of it
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `id` | string (uuid) | yes |  |
-| `sessionNumber` | integer \| null | yes | "Session 12" - the number journal entries are stamped with. Unique across sessions; null until the GM assigns one. |
+| `sessionNumber` | integer \| null | yes | "Session 12" - the session's DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID (D9) and resolve this live, so renumbering a session relabels every one of its entries with no journal write. |
 | `realDate` | string \| null | yes | The real-world date the group played, as the GM typed it. Free text, not a calendar instant - a session sits on the real calendar, never the world's, which is why sessions are their own route and not rows on `/codex/timeline`. |
 | `attendees` | string[] | yes | Who was at the table. GM-only; absent from a player projection. |
 | `prepBody` | string | yes | GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not - revealing a session publishes its recap, never its prep. |
 | `recapBody` | string | yes | The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`. |
 | `revealedToPlayers` | boolean | yes | GM-only field; absent from a player projection (a player only ever receives revealed sessions). |
 | `status` | `planned` \| `played` | yes | GM-only; absent from a player projection. |
+| `tags` | string[] | yes | D10: the codex-wide tag vocabulary, so sessions filter and cross-link like every other record. Single-layer - there is no GM-only tag - and player-facing on a revealed session. |
 | `rev` | integer (≥ 0) | yes | GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit. |
 | `createdAt` | string (date-time) | yes | GM-only; absent from a player projection. |
 | `updatedAt` | string (date-time) | yes | GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal or an activate - neither is an edit. |
@@ -4029,6 +4043,7 @@ A session as a PLAYER receives it - the tightest projection in the Codex, and ev
 | `sessionNumber` | integer \| null | yes |  |
 | `realDate` | string \| null | yes |  |
 | `recap` | string | yes | The session's `recapBody`. |
+| `tags` | string[] | yes | D10: tags are SINGLE-LAYER in this codex - there is no GM-only tag - and every other record kind already ships its tags to players. A revealed session's tags are its player-facing categorization, and they are already in the player search index by the same rule. |
 
 ### `CodexSessionProjected`
 
