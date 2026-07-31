@@ -75,7 +75,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexPageSummary, PlayerCodexChronicleRecord, PlayerCodexMap, PlayerCodexPageSummary } from "./api";
 
@@ -105,14 +105,14 @@ const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   id: "j1", playerText: "The party crossed the mists.", gmText: null, revealedToPlayers: false, kind: "note",
   attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
 /** One GM chronicle row — the shape the dashboard's own feed has taken since M11 (see the suite below). */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -120,7 +120,7 @@ const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord 
 const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", revealedToPlayers: true };
 
-const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 const gmDefaults = () => {
   listPages.mockResolvedValue(PAGES);
   listRelationships.mockResolvedValue([]);
@@ -145,10 +145,10 @@ const PLAYER_PAGES: PlayerCodexPageSummary[] = [
 ];
 const PLAYER_MAPS: PlayerCodexMap[] = [{ id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", parentMapId: null, tags: [] }];
 // CT-11: the player Journal reads the CHRONICLE, so a player's rows arrive in the unified record shape.
-const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionNumber: 3, realDate: null, inWorldLabel: null, tags: [], payload: null, fired: false, createdAt: "2026-07-20T00:00:00.000Z" };
-const PLAYER_OLDER: PlayerCodexChronicleRecord = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
+const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionId: null, sessionNumber: 3, realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false, createdAt: "2026-07-20T00:00:00.000Z" };
+const PLAYER_OLDER: PlayerCodexChronicleRecord = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionId: null, sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
 /** A revealed dated `event` page on the same chronicle — the record kind CT-11 added to this feed. */
-const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", tags: [], payload: null, fired: false, createdAt: "2026-07-10T00:00:00.000Z" };
+const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false, createdAt: "2026-07-10T00:00:00.000Z" };
 const playerDefaults = () => {
   playerListPages.mockResolvedValue(PLAYER_PAGES);
   playerListMaps.mockResolvedValue(PLAYER_MAPS);
@@ -318,7 +318,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
   });
   const STANDING = RECORD({ kind: "standing", id: "s1", text: "", payload: { factionPageId: "p1", delta: -2, reason: "the stolen ledger" } });
   const MILESTONE = RECORD({ kind: "milestone", id: "m1", text: "", payload: { level: 5, reason: "Barovia" } });
-  const DOWNTIME = RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging", days: 7, applied: false } });
+  const DOWNTIME = RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging", days: 7, characterPageId: null, applied: false } });
 
   beforeEach(() => {
     gmDefaults();

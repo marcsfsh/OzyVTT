@@ -1,15 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { Button, Skeleton } from "@vtt/ui";
 import { iconChildren } from "./icons";
-import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
-import { type CodexLinkEdge, type CodexRelationshipEdge } from "./api";
+import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
+import { type CodexConnection, type PlayerCodexConnection } from "./api";
 
 /**
- * The web of the world: entities as nodes (colored + sized by how connected they are), and TWO kinds of
- * edge between them — typed relationships, and the `[[wiki links]]` the bodies already carry. A small
- * deterministic force simulation (Fruchterman-Reingold + gravity) lays it out — the same world always
- * draws the same map — then it's framed to fit. Toggle types in the legend, hover to focus a node's
- * neighborhood, pan/drag + wheel/pinch zoom, click to open.
+ * The web of the world: pages as nodes (coloured and sized by how connected they are), joined by
+ * **ONE kind of edge** (D8). A small deterministic force simulation (Fruchterman-Reingold + gravity)
+ * lays it out — the same world always draws the same map — then it is framed to fit. Toggle kinds in
+ * the legend, hover to focus a node's neighbourhood, pan/drag + wheel/pinch zoom, click to open.
+ *
+ * **D8: one edge style.** Typed relationships and `[[wiki links]]` used to be two edge kinds with two
+ * line styles and a two-row key explaining the difference. They are one concept now, so the picture
+ * draws one line; `origin` survives as a quiet attribute on the label ("mentions" where there is no
+ * label of its own), never as a second layer of the render.
+ *
+ * **Non-page sources stay off the canvas in v1** (a recorded design call). The unified feed carries
+ * session-, quest- and journal-sourced connections (D13); the graph draws `fromKind === "page"` edges
+ * only and those others surface in the per-page Connections panel, rather than the graph inventing
+ * three new node types nobody asked for. D8's "drawn one way" holds for everything it does draw.
+ *
  * Viewer-safe by construction: the caller passes whichever node/edge set the role may see.
  */
 export type GraphNode = Readonly<{ id: string; title: string; entityType: EntityType }>;
@@ -20,11 +30,9 @@ export type GraphNode = Readonly<{ id: string; title: string; entityType: Entity
  * Before this the Graph drew typed relationships alone, and a codex wired together with wiki-links read
  * as a field of orphans: the picture disagreed with the notebook.
  */
-type GraphEdge = Readonly<{ key: string; fromPageId: string; toPageId: string; kind: "typed" | "link"; label: string }>;
-/** What a wiki-link edge is called on screen. One word, so the edge label reads without a legend. */
-const LINK_LABEL = "mentions";
-
-const REL_LABEL = new Map(RELATIONSHIP_TYPES.map((entry) => [entry.type, entry.label]));
+type GraphEdge = Readonly<{ key: string; fromPageId: string; toPageId: string; origin: "declared" | "mention"; label: string }>;
+/** What an unlabelled derived edge is called on screen, so a line reads without a key. */
+const MENTION_LABEL = "mentions";
 const VB = { minX: -520, minY: -390, w: 1040, h: 780 };
 
 function hashOf(id: string): number { let hash = 0; for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0; return Math.abs(hash); }
@@ -95,18 +103,17 @@ function computeLayout(nodes: readonly GraphNode[], edges: readonly GraphEdge[])
   return pos;
 }
 
-export function RelationshipGraph({ nodes, edges, links = [], onOpen, emptyState, loading = false, focusPageId = null, onFocused = () => {} }: Readonly<{
+export function ConnectionGraph({ nodes, connections, onOpen, emptyState, loading = false, focusPageId = null, onFocused = () => {} }: Readonly<{
   nodes: readonly GraphNode[];
-  edges: readonly CodexRelationshipEdge[];
   /**
-   * CI-8: the wiki-link edges, from `/codex/links`. Role-scoped by the CALLER, exactly like `edges` —
-   * the GM workspace passes the GM feed and the player Codex passes the player feed, and this component
-   * filters neither. It cannot: it has no token and no notion of who is looking.
+   * D8: the ONE connection feed, from `GET /codex/connections`. Role-scoped by the CALLER — the GM shell
+   * passes the GM feed and the player shell passes the player feed, and this component filters neither.
+   * It cannot: it has no token and no notion of who is looking.
    */
-  links?: readonly CodexLinkEdge[];
+  connections: ReadonlyArray<CodexConnection | PlayerCodexConnection>;
   onOpen: (pageId: string) => void;
   emptyState?: ReactNode;
-  /** CF-2: true while the first fetch is in flight — "No entities yet" must not front-run the data. */
+  /** CF-2: true while the first fetch is in flight — "No pages yet" must not front-run the data. */
   loading?: boolean;
   /**
    * CI-5 / R1: land the graph ON an entity — centred and focused — rather than dropping the GM into the
@@ -165,13 +172,19 @@ export function RelationshipGraph({ nodes, edges, links = [], onOpen, emptyState
   const [pinned, setPinned] = useState<string | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<EntityType>>(new Set());
 
-  // Both edge kinds, in one list, in a stable order (typed first) so the layout stays deterministic.
-  const graphEdges = useMemo<GraphEdge[]>(() => [
-    ...edges.map((edge) => ({ key: `rel:${edge.id}`, fromPageId: edge.fromPageId, toPageId: edge.toPageId, kind: "typed" as const, label: REL_LABEL.get(edge.type) ?? edge.type })),
-    ...links.map((link) => ({ key: `link:${link.fromPageId}>${link.toPageId}`, fromPageId: link.fromPageId, toPageId: link.toPageId, kind: "link" as const, label: LINK_LABEL }))
-  ], [edges, links]);
+  /**
+   * One edge list. Page sources only (see the note above); the key falls back to the endpoint pair for
+   * a mention, which has no id of its own, and the order is the feed's so the layout stays deterministic.
+   */
+  const graphEdges = useMemo<GraphEdge[]>(() => connections
+    .filter((edge) => edge.fromKind === "page")
+    .map((edge) => ({
+      key: ("id" in edge && edge.id) ? `c:${edge.id}` : `m:${edge.fromId}>${edge.toPageId}:${edge.label ?? ""}`,
+      fromPageId: edge.fromId, toPageId: edge.toPageId, origin: edge.origin,
+      label: edge.label ?? MENTION_LABEL
+    })), [connections]);
 
-  const signature = nodes.map((node) => node.id).join(",") + "|" + graphEdges.map((edge) => `${edge.kind}:${edge.fromPageId}>${edge.toPageId}`).join(",");
+  const signature = nodes.map((node) => node.id).join(",") + "|" + graphEdges.map((edge) => `${edge.fromPageId}>${edge.toPageId}`).join(",");
   const pos = useMemo(() => computeLayout(nodes, graphEdges), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
   const allEdges = useMemo(() => graphEdges.filter((edge) => pos.has(edge.fromPageId) && pos.has(edge.toPageId) && edge.fromPageId !== edge.toPageId), [graphEdges, pos]);
   const degree = useMemo(() => { const map = new Map<string, number>(); for (const edge of allEdges) { map.set(edge.fromPageId, (map.get(edge.fromPageId) ?? 0) + 1); map.set(edge.toPageId, (map.get(edge.toPageId) ?? 0) + 1); } return map; }, [allEdges]);
@@ -186,8 +199,7 @@ export function RelationshipGraph({ nodes, edges, links = [], onOpen, emptyState
   const visibleNodes = nodes.filter((node) => !hidden.has(node.entityType));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
   const drawnEdges = allEdges.filter((edge) => visibleIds.has(edge.fromPageId) && visibleIds.has(edge.toPageId));
-  const typedCount = drawnEdges.filter((edge) => edge.kind === "typed").length;
-  const linkCount = drawnEdges.length - typedCount;
+
   // One focus, two sources: the node a jump pinned (CI-5), overridden while the pointer is on another
   // node so hovering still explores. Everything downstream reads `focusId` and cannot tell them apart.
   const focusId = hover ?? pinned;
@@ -314,31 +326,15 @@ export function RelationshipGraph({ nodes, edges, links = [], onOpen, emptyState
   if (nodes.length === 0) {
     return emptyState
       ? <div className="codex-main-empty">{emptyState}</div>
-      : <div className="codex-main-empty"><h3>No entities yet</h3><p>The relationship graph draws every entity and the relationships between them. Create a few in the Pages tab and connect them.</p></div>;
+      : <div className="codex-main-empty"><h3>No pages yet</h3><p>The Graph draws every page and the connections between them. Create a few in Pages and connect them.</p></div>;
   }
 
   return (
     <div className="codex-graph">
       <div className="codex-graph-bar">
-        <span className="codex-graph-hint">{visibleNodes.length} entities · {typedCount} relationship{typedCount === 1 ? "" : "s"} · {linkCount} mention{linkCount === 1 ? "" : "s"} · drag to pan, scroll to zoom</span>
-        {/**
-          * R2: the two edge kinds must not read by colour alone, and a per-edge label is not always on
-          * screen (labels appear only when lit, zoomed in, or on a small graph). So the key states the
-          * difference three ways at once — a drawn sample carrying the real dash pattern and weight, and
-          * the word for it. Deliberately not a toggle: it is a key, so it has no hit area to size.
-          */}
-        {drawnEdges.length > 0 && (
-          <div className="codex-graph-edgekey">
-            <span className="codex-graph-edgekey-item">
-              <svg className="codex-graph-edgekey-swatch" viewBox="0 0 26 4" aria-hidden="true"><line className="codex-graph-edgekey-line" x1="1" y1="2" x2="25" y2="2" /></svg>
-              Relationship
-            </span>
-            <span className="codex-graph-edgekey-item">
-              <svg className="codex-graph-edgekey-swatch" viewBox="0 0 26 4" aria-hidden="true"><line className="codex-graph-edgekey-line is-link" x1="1" y1="2" x2="25" y2="2" /></svg>
-              Mention
-            </span>
-          </div>
-        )}
+        {/* D8: ONE count, because there is one kind of connection. The old two-row edge key explaining
+            "Relationship" versus "Mention" retires with the two edge styles it described. */}
+        <span className="codex-graph-hint">{visibleNodes.length} pages · {drawnEdges.length} connection{drawnEdges.length === 1 ? "" : "s"} · drag to pan, scroll to zoom</span>
         <div className="codex-graph-legend">
           {usedTypes.map((type) => (
             <button key={type} type="button" className={`codex-graph-legenditem${hidden.has(type) ? " is-off" : ""}`} aria-pressed={!hidden.has(type)} title={hidden.has(type) ? `Show ${ENTITY_DEFS[type].label}` : `Hide ${ENTITY_DEFS[type].label}`} onClick={() => toggleType(type)}>
@@ -366,10 +362,10 @@ export function RelationshipGraph({ nodes, edges, links = [], onOpen, emptyState
             const dim = focus ? !lit : false;
             const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
             return (
-              /* R2: kind reads by SHAPE, not colour — a wiki-link is dashed, lighter, and carries no
-                 arrowhead (it has no direction worth claiming), plus the word "mentions" on its label. */
-              <g key={edge.key} data-edgekind={edge.kind} className={`codex-graph-edge is-${edge.kind}${lit ? " is-lit" : ""}${dim ? " is-dim" : ""}`}>
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd={edge.kind === "typed" ? "url(#codex-graph-arrow)" : undefined} />
+              /* D8: ONE style. Every edge is a solid arrow with its label; `origin` is carried as a data
+                 attribute for the label text alone, never as a second line style. */
+              <g key={edge.key} data-edgeorigin={edge.origin} className={`codex-graph-edge${lit ? " is-lit" : ""}${dim ? " is-dim" : ""}`}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd="url(#codex-graph-arrow)" />
                 {(lit || view.k > 1.4 || drawnEdges.length <= 10) && <text x={midX} y={midY} className="codex-graph-edgelabel">{edge.label}</text>}
               </g>
             );

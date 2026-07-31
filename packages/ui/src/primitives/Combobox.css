@@ -1,0 +1,71 @@
+.nh-combobox { position: relative; display: block; }
+.nh-combobox-input { width: 100%; }
+
+.nh-combobox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.4 var(--font-body);
+  max-width: 100%;
+}
+.nh-combobox-chiplabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* §4 route 2: 20px paint, `.tap-target` centres a 44px box on it. It is the last thing in the chip and
+   nothing sits beside it, so the overhang has nothing to steal. */
+.nh-combobox-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+}
+.nh-combobox-clear:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+
+.nh-combobox-list {
+  position: absolute;
+  z-index: 40;
+  inset-inline: 0;
+  top: calc(100% + var(--space-1));
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  max-height: 17rem;
+  overflow-y: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2, 0 8px 24px rgb(0 0 0 / 35%));
+}
+
+/* §4 route 1 (grow the paint): a stacked list must never use `::after` overhang. */
+.nh-combobox-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: 500 var(--fs-body) / 1.35 var(--font-body);
+  text-align: start;
+  cursor: pointer;
+}
+.nh-combobox-option:hover,
+.nh-combobox-option.is-active { background: var(--surface-3); }
+.nh-combobox-optionlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nh-combobox-optionmeta { color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; }

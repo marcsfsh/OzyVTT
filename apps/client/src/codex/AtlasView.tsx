@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, IconEyeOff, Input, Modal, Select, Skeleton, Switch, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, IconEyeOff, IconPlus, Input, Modal, Select, Skeleton, Switch, TagInput, useToast } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
 import { codexApi } from "./api";
@@ -8,6 +8,9 @@ import { MarkerInspector } from "./MarkerInspector";
 import { RevealSwitch } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
+import { atlasPath } from "./routes";
+import type { QuickCreateRequest } from "./QuickCreate";
+import type { CodexAutosaveSettings } from "./api";
 
 /**
  * The atlas: a navigable tree of maps (world → region → local) with polymorphic markers. The GM makes a
@@ -17,7 +20,7 @@ import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
 type AtlasScene = Readonly<{ id: string; name: string }>;
 type AtlasActor = Readonly<{ id: string; name: string }>;
 const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
-  { value: "world", label: "World" }, { value: "regional", label: "Regional" }, { value: "battlemap", label: "Local / battlemap" }
+  { value: "world", label: "World" }, { value: "regional", label: "Regional" }, { value: "battlemap", label: "Battle map" }
 ];
 /**
  * CI-1 / R1 ("every cross-mode jump prepares its destination"): an incoming request to *land somewhere*
@@ -42,14 +45,40 @@ function GmOnlyMark() {
   return <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM-only — players can't see this map yet"><IconEyeOff /></span>;
 }
 
-export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene, onOpenReplay, openTarget = null, onOpenedTarget = () => {} }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void; openTarget?: AtlasTarget | null; onOpenedTarget?: () => void }>) {
+export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActivateScene, onOpenReplay, mapId, pinId, filter = "", tagFilter, autosave: _autosave, onQuickCreate, onNavigate, onReplaceQuery }: Readonly<{
+  gmToken: string;
+  scenes: readonly AtlasScene[];
+  actors?: readonly AtlasActor[];
+  activeSceneId: string | null;
+  onActivateScene: (sceneId: string) => void;
+  onOpenReplay?: (archiveId: number) => void;
+  /** D3: from `/codex/atlas/:mapId`. Null opens the first root map. */
+  mapId: string | null;
+  /** D3: from `?pin=`. Resolves its own map through `GET /codex/markers/{id}` when `mapId` is absent. */
+  pinId: string | null;
+  /** D10: in-place pin filters, in the URL so a tag chip can deep-link. */
+  filter?: string;
+  tagFilter?: string | null;
+  autosave: CodexAutosaveSettings;
+  onQuickCreate: (request: QuickCreateRequest) => void;
+  onNavigate: (path: string) => void;
+  onReplaceQuery: (mutate: (query: URLSearchParams) => void) => void;
+}>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const { toast } = useToast();
   const [maps, setMaps] = useState<CodexMap[]>([]);
   const [assets, setAssets] = useState<MapAsset[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
-  const [currentMapId, setCurrentMapId] = useState<string | null>(null);
+  /**
+   * D3: the open map is the ADDRESS. This mirror exists only for the two cases the address cannot answer
+   * on its own — the very first load (no `:mapId` yet, so the first root map is chosen here and the URL
+   * is rewritten to match) and a `?pin=` deep link whose map must be resolved server-side first.
+   */
+  const [currentMapId, setCurrentMapId] = useState<string | null>(mapId);
+  useEffect(() => { if (mapId) setCurrentMapId(mapId); }, [mapId]);
   const [markers, setMarkers] = useState<CodexMarker[]>([]);
-  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(pinId);
+  useEffect(() => { if (pinId) setSelectedMarkerId(pinId); }, [pinId]);
   /**
    * "Show the pin" must SHOW the pin (`ux-principles.md` §9). It used to call `setSelectedMarkerId` alone,
    * which opens the inspector and rings the pin — neither of which helps if the pin is off the current view,
@@ -59,6 +88,8 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
    */
   const [centerOnMarkerId, setCenterOnMarkerId] = useState<string | null>(null);
   const mapBodyRef = useRef<HTMLDivElement>(null);
+  /** ≤760 the inspector sits BELOW the map, so selecting a pin must bring it into the page viewport. */
+  const inspectorRef = useRef<HTMLDivElement>(null);
   const showPin = (markerId: string) => {
     setSelectedMarkerId(markerId);
     setCenterOnMarkerId(markerId);
@@ -80,7 +111,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
     try {
       const [nextMaps, nextPages, nextAssets] = await Promise.all([atlasApi.listMaps(gmToken), codexApi.listPages(gmToken), atlasApi.listAssets(gmToken).catch(() => [])]);
       setMaps(nextMaps); setPages(nextPages); setAssets(nextAssets); setError(null);
-      setCurrentMapId((current) => current ?? nextMaps[0]?.id ?? null);
+      setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the atlas."); }
     finally { setLoading(false); }
   }, [gmToken]);
@@ -102,47 +133,34 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Arriving from a search hit: open the requested map, THEN select the requested marker. The pin lives
-  // in `markers`, which only loads once `currentMapId` changes, so this sets the id and lets the existing
-  // load effect resolve it — `selectedMarker` is derived, so the inspector opens when the pin arrives.
-  // Same handled-latch shape as ReplayPanel's `openArchiveId`: without it a caller that passes a target
-  // and no `onOpenedTarget` would yank the view back every time the atlas refreshes. Clearing the latch
-  // when the target goes away is the one deviation — it lets the SAME pin be re-opened from a later search.
-  const handledTargetRef = useRef<string | null>(null);
-  const mountedRef = useRef(true);
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  /**
+   * D15 — a `?pin=` deep link with no `:mapId`: a journal entry stores only `attachMarkerId`, and a
+   * search hit for a pin can arrive without one.
+   *
+   * This used to be a **client-side scan of every map**, one `GET /maps/:id/markers` per map, because
+   * there was no marker-by-id read. There is now (`GET /codex/markers/{id}`), and that scan is DELETED
+   * rather than kept as a fallback — a second way to answer one question is exactly what this overhaul
+   * removes, and the scan's cost grew with the atlas.
+   */
+  const resolvedPinRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!openTarget) { handledTargetRef.current = null; return; }
-    if (loading) return; // wait for the map list either way: a failed load settles too, and must not hang the jump
-    const key = `${openTarget.mapId ?? ""}:${openTarget.markerId ?? ""}`;
-    if (handledTargetRef.current === key) return;
-    handledTargetRef.current = key;
-    if (openTarget.mapId !== null) {
-      if (maps.some((map) => map.id === openTarget.mapId)) {
-        setCurrentMapId(openTarget.mapId);
-        setSelectedMarkerId(openTarget.markerId);
-      } // No such map (deleted since the search) => the GM simply lands on the atlas they were already on.
-      onOpenedTarget();
-      return;
-    }
-    // CI-6: a pin without its map. There is no marker-by-id read on the codex surface — markers are
-    // only listed per map — so the map is found by asking each one. Bounded by the size of the atlas,
-    // paid only when this edge is actually used, and never on the Atlas's own load path.
-    if (!openTarget.markerId) { onOpenedTarget(); return; }
-    const markerId = openTarget.markerId;
-    void (async () => {
-      const found = await findMarkerMap(gmToken, maps, markerId);
-      // Cancelled by UNMOUNT only, deliberately — not by this effect re-running. A `codex:changed` ping
-      // mid-lookup gives `maps` a new identity, and a per-effect `live` flag would abandon the lookup
-      // there while the latch above stops it ever being retried: the jump would just quietly do nothing.
-      if (!mountedRef.current) return;
-      if (found) { setError(null); setCurrentMapId(found); setSelectedMarkerId(markerId); }
-      // R4: the jump failed for a reason the GM can act on — say so rather than dropping them on
-      // whatever map happened to be open and letting them wonder which pin they were promised.
-      else setError("That pin is no longer on any map in the atlas.");
-      onOpenedTarget();
-    })();
-  }, [openTarget, loading, maps, onOpenedTarget, gmToken]);
+    if (!pinId || mapId || loading) return;
+    if (resolvedPinRef.current === pinId) return;
+    resolvedPinRef.current = pinId;
+    let live = true;
+    void codexApi.marker(gmToken, pinId)
+      .then((marker) => {
+        if (!live) return;
+        setError(null);
+        setCurrentMapId(marker.mapId);
+        // Rewrite the address so the map is in the URL from here on — a refresh must land in the same place.
+        onNavigate(atlasPath(marker.mapId, pinId));
+      })
+      // R4: say what happened. A 404 here means the pin is gone (or was never ours), and dropping the GM
+      // on whatever map happened to be open, silently, is how a jump becomes a mystery.
+      .catch(() => { if (live) setError("That pin is no longer in the atlas."); });
+    return () => { live = false; };
+  }, [pinId, mapId, loading, gmToken, onNavigate]);
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;
@@ -157,6 +175,22 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
    * map whose pins have not loaded looks identical.
    */
   const partyMarker = markers.find((marker) => marker.isParty) ?? null;
+  /**
+   * D10 — Atlas is one of the lists D10 names, and it had no filter at all. Client-side over the pins
+   * already fetched for this map, so it costs no read; non-matching pins DIM rather than disappearing,
+   * because a map with pins removed is a different picture of the world, not a filtered list of one.
+   */
+  const pinNeedle = filter.trim().toLowerCase();
+  const matchesFilter = useCallback((marker: CodexMarker) =>
+    (!pinNeedle || (marker.label ?? "").toLowerCase().includes(pinNeedle) || marker.tags.some((tag) => tag.includes(pinNeedle)))
+    && (!tagFilter || marker.tags.includes(tagFilter)), [pinNeedle, tagFilter]);
+  const filtering = pinNeedle !== "" || Boolean(tagFilter);
+  const matchCount = filtering ? markers.filter(matchesFilter).length : markers.length;
+  const dimmedIds = useMemo(
+    () => (filtering ? new Set(markers.filter((marker) => !matchesFilter(marker)).map((marker) => marker.id)) : null),
+    [filtering, markers, matchesFilter]
+  );
+  const pinTags = useMemo(() => [...new Set(markers.flatMap((marker) => marker.tags))].sort(), [markers]);
   // Hint from the tags already in use on pages and on other maps — one vocabulary across the suite.
   const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(), [pages, maps]);
 
@@ -174,12 +208,33 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
   // second root map becomes unreachable the moment you leave it (the view remounts onto the first root).
   const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
   const currentRootId = breadcrumb[0]?.id ?? null;
-  const enterMap = useCallback((mapId: string) => { setSelectedMarkerId(null); setCurrentMapId(mapId); }, []);
+  const enterMap = useCallback((next: string) => { setSelectedMarkerId(null); onNavigate(atlasPath(next)); }, [onNavigate]);
+
+  const [uploading, setUploading] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  /** The shared map-asset library — the same route `MapManager` posts to, so one upload serves both. */
+  const uploadAsset = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true); setError(null);
+    try {
+      const response = await fetch(`/api/v1/map-assets?filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${gmToken}`, "content-type": file.type || "application/octet-stream" },
+        body: file
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.ok) throw new Error(body?.error?.message ?? "The upload failed.");
+      const next = await atlasApi.listAssets(gmToken).catch(() => assets);
+      setAssets(next);
+      toast("Map image uploaded.", { tone: "success" });
+    } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "The upload failed."); }
+    finally { setUploading(false); }
+  };
 
   const createFromAsset = async (asset: MapAsset) => {
     try {
       const map = await atlasApi.createMap(gmToken, { assetId: asset.id, name: asset.name, kind: asset.kind, parentMapId: nestNew ? currentMapId : null });
-      setPicking(false); await loadMeta(); setCurrentMapId(map.id);
+      setPicking(false); await loadMeta(); onNavigate(atlasPath(map.id));
     } catch (createError) { setError(createError instanceof Error ? createError.message : "Could not add the map."); }
   };
   // Every map beneath the current one — excluded from the "sits inside" options so a map can't be
@@ -218,22 +273,26 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
   const placeMarker = async (point: { x: number; y: number }) => {
     if (!currentMapId) return;
     try { const marker = await atlasApi.createMarker(gmToken, currentMapId, { x: point.x, y: point.y, iconId: DEFAULT_ICON, iconColor: DEFAULT_COLOR }); setMarkers((prev) => [...prev, marker]); setSelectedMarkerId(marker.id); setPlacing(false); }
-    catch (placeError) { setError(placeError instanceof Error ? placeError.message : "Could not place the marker."); }
+    catch (placeError) { setError(placeError instanceof Error ? placeError.message : "Could not place the pin."); }
   };
   const moveMarker = async (markerId: string, point: { x: number; y: number }) => {
     setMarkers((prev) => prev.map((marker) => (marker.id === markerId ? { ...marker, x: point.x, y: point.y } : marker)));
     try { await atlasApi.moveMarker(gmToken, markerId, point.x, point.y); } catch { void loadMarkers(currentMapId!); }
   };
   const onMarkerUpdated = (marker: CodexMarker) => setMarkers((prev) => prev.map((existing) => (existing.id === marker.id ? marker : existing)));
-  // One-tap: turn a pin into a linked page (titled from its label), then open it - no round-trip through the Pages tab.
-  const createPageForMarker = async (marker: CodexMarker) => {
-    try {
-      const page = await codexApi.createPage(gmToken, { title: marker.label?.trim() || "New location" });
+  /**
+   * D7: turn a pin into a linked page. It used to create an UNTYPED page silently; it now opens the one
+   * quick-create dialog with the pin's label prefilled, and links the result to the pin on success — so
+   * the page starts life with a kind, and cancelling creates nothing.
+   */
+  const createPageForMarker = (marker: CodexMarker) => onQuickCreate({
+    title: marker.label?.trim() || "",
+    entityType: "location",
+    onCreated: async (page) => {
       onMarkerUpdated(await atlasApi.updateMarker(gmToken, marker.id, { pageIds: [...marker.pageIds, page.id] }));
       await loadMeta();
-      onOpenPage(page.id);
-    } catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
-  };
+    }
+  });
   const revealLinkedPage = async (pageId: string) => {
     try { await codexApi.revealPage(gmToken, pageId, true); await loadMeta(); }
     catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Could not reveal the page."); }
@@ -245,7 +304,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
     try { onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed)); }
     catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Couldn't change who can see this map."); }
   };
-  const deleteMap = async () => { if (currentMap && await confirm({ title: "Delete map", body: `Delete map "${currentMap.name}"? Its markers are removed.`, confirmLabel: "Delete", danger: true })) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); setCurrentMapId(parent); } };
+  const deleteMap = async () => { if (currentMap && await confirm({ title: "Delete map", body: `Delete map "${currentMap.name}"? Its markers are removed.`, confirmLabel: "Delete", danger: true })) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); onNavigate(parent ? atlasPath(parent) : "/codex/atlas"); } };
 
   return (
     <div className="codex-atlas">
@@ -272,18 +331,31 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
         </nav>
         <div className="codex-atlas-actions">
           {currentMap && <RevealSwitch revealed={currentMap.revealedToPlayers} onChange={revealMap} ariaLabel="Show this map to players" />}
-          {currentMap && <Button variant={placing ? "primary" : "secondary"} size="sm" aria-pressed={placing} onClick={() => setPlacing((value) => !value)}>{placing ? "Placing…" : "Add marker"}</Button>}
+          {currentMap && <Button variant={placing ? "primary" : "secondary"} size="sm" aria-pressed={placing} onClick={() => setPlacing((value) => !value)}>{placing ? "Placing…" : "Add pin"}</Button>}
           <Button variant="secondary" size="sm" onClick={() => { setNestNew(true); setPicking(true); }}>{currentMap ? "Add sub-map" : "New map"}</Button>
           {currentMap && <Button variant="ghost" size="sm" onClick={() => { setSettingsName(currentMap.name); setSettingsOpen(true); }}>Map settings</Button>}
         </div>
       </div>
+
+      {currentMap && markers.length > 0 && (
+        <div className="codex-atlas-filter">
+          <Input aria-label="Filter pins" placeholder="Filter pins…" value={filter}
+            onChange={(event) => onReplaceQuery((query) => { if (event.target.value) query.set("q", event.target.value); else query.delete("q"); })} />
+          {pinTags.length > 0 && (
+            <Combobox options={pinTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={tagFilter ?? null}
+              onChange={(tag) => onReplaceQuery((query) => { if (tag) query.set("tag", tag); else query.delete("tag"); })}
+              ariaLabel="Filter pins by tag" placeholder="Filter by tag…" />
+          )}
+          {filtering && <span className="codex-atlas-filtercount" role="status">{matchCount} of {markers.length} pins match</span>}
+        </div>
+      )}
 
       {childMaps.length > 0 && (
         <nav className="codex-atlas-descend" aria-label="Maps within this one">
           <span className="codex-descend-label">Drill into</span>
           {childMaps.map((child) => (
             <button key={child.id} type="button" className="codex-descend-chip" onClick={() => enterMap(child.id)}>
-              <span className="codex-descend-arrow" aria-hidden="true">↳</span>{child.name}
+              <span className="codex-descend-arrow" aria-hidden="true" />{child.name}
               {!child.revealedToPlayers && <GmOnlyMark />}
             </button>
           ))}
@@ -305,12 +377,14 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
       <div className="codex-atlas-body" ref={mapBodyRef}>
         {currentMap
           ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
+              dimmedMarkerIds={dimmedIds}
               centerOnMarkerId={centerOnMarkerId} onCentered={() => setCenterOnMarkerId(null)}
-              onBackgroundClick={placeMarker} onMarkerClick={setSelectedMarkerId} onMarkerDragEnd={moveMarker} />
+              onBackgroundClick={placeMarker} onMarkerClick={(markerId) => { setSelectedMarkerId(markerId); if (window.innerWidth <= 760) requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} onMarkerDragEnd={moveMarker} />
           : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
+        <div ref={inspectorRef} />
         {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
-          onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={onOpenPage}
+          onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={(pageId) => onNavigate(`/codex/pages/${pageId}`)}
           onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onRevealMap={() => void revealMap(true)} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay}
           /* M12-C: setting the party clears whichever pin held it before — possibly on another map — so
              the whole map's pins are re-read rather than one row being patched. */
@@ -327,7 +401,16 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
               : <>The new map starts its own tree at the top level — for a separate continent, plane, or city.</>}</p>
           </div>
         )}
-        {assetsEmpty(assets) ? <p className="codex-list-empty">No maps uploaded yet. Upload one under Scenes → Manage maps, then come back.</p> : (
+        {/* D15 / G5: upload HERE. The atlas used to send the GM to Scenes → Manage maps and back, which
+            is the only place in the Codex that asked you to leave it to finish a job. Same shared asset
+            library underneath, so a map uploaded here is available to Scenes and vice versa. */}
+        <div className="codex-atlas-upload">
+          <Button variant="secondary" size="sm" disabled={uploading} onClick={() => uploadInputRef.current?.click()}>
+            <IconPlus /> {uploading ? "Uploading…" : "Upload a map image"}
+          </Button>
+          <input ref={uploadInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadAsset(event.target.files?.[0]); event.target.value = ""; }} />
+        </div>
+        {assetsEmpty(assets) ? <p className="codex-list-empty">No map images yet. Upload one to start your atlas — Scenes uses the same library.</p> : (
           <div className="codex-asset-grid">
             {assets.map((asset) => (
               <button key={asset.id} type="button" className="codex-asset-card" onClick={() => createFromAsset(asset)}>
@@ -379,17 +462,3 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
 }
 
 function assetsEmpty(assets: readonly MapAsset[]) { return assets.length === 0; }
-
-/**
- * CI-6: which map is this pin on? Asked in parallel across the atlas because the codex exposes markers
- * only per map (`GET /maps/:id/markers`) — there is no marker-by-id route to ask instead. A failed map
- * contributes no markers rather than failing the whole lookup, so one unreadable map cannot break a
- * jump to a pin that lives on another.
- */
-async function findMarkerMap(token: string, maps: readonly CodexMap[], markerId: string): Promise<string | null> {
-  const perMap = await Promise.all(maps.map(async (map) => {
-    const markers = await atlasApi.listMarkers(token, map.id).catch(() => [] as CodexMarker[]);
-    return markers.some((marker) => marker.id === markerId) ? map.id : null;
-  }));
-  return perMap.find((mapId) => mapId !== null) ?? null;
-}

@@ -38,7 +38,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { CodexShell } from "./CodexShell";
 import type { CodexPage, CodexPageSummary } from "./api";
 
 /**
@@ -56,9 +56,9 @@ const summary = (id: string, title: string, entityType: CodexPageSummary["entity
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
-/** The app mounts inside a ToastProvider (`main.tsx:411`); `CodexWorkspace` uses `useToast`, so a bare
+/** The app mounts inside a ToastProvider (`main.tsx:411`); `CodexShell` uses `useToast`, so a bare
     render would throw. Rendering it the way the app does is the point of an integration-shaped test. */
-const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 
 describe("Codex shell — cross-mode navigation", () => {
   beforeEach(() => {

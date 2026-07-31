@@ -32,18 +32,76 @@ export type CodexPageSummary = Readonly<{
 }>;
 
 export type CodexPage = CodexPageSummary & Readonly<{ playerBody: string; gmBody: string; gmFields: Readonly<Record<string, string>> }>;
-export type CodexBacklink = Readonly<{ sourcePageId: string; sourceTitle: string; section: string | null }>;
-/** A relationship as listed against one page: the OTHER endpoint resolved, plus which way the edge points. */
-export type CodexRelationship = Readonly<{ id: string; type: string; direction: "out" | "in"; otherPageId: string; otherTitle: string; otherType: EntityType; otherRevealed: boolean }>;
-export type CodexRelationshipEdge = Readonly<{ id: string; fromPageId: string; toPageId: string; type: string; createdAt: string }>;
+
+// ----- D8/D13: ONE connection system (typed relationships + [[wiki-links]] unified) -----
+
 /**
- * CI-8: one `[[wiki link]]` edge between two pages — the Graph's SECOND edge kind, beside the typed
- * relationships above. Mirrors the server's `CodexLinkEdge` (`codex-projections.ts`) exactly, including
- * its deliberate narrowness: endpoints and nothing else. A wiki-link has no type, no author and no id of
- * its own — it is a fact derived from a body, not a stored record — so there is nothing else to carry,
- * and the same pair written twice is the same edge.
+ * Which record a connection comes FROM. Session, quest and journal bodies join the graph (D13); every
+ * connection points INTO a page, so there is no `toKind`.
  */
-export type CodexLinkEdge = Readonly<{ fromPageId: string; toPageId: string }>;
+export type CodexConnectionSourceKind = "page" | "session" | "quest" | "journal";
+/** Whether the GM drew this line themselves, or it was derived from `[[wiki link]]` text. */
+export type CodexConnectionOrigin = "declared" | "mention";
+/** Which layer the connection lives on. A GM-layer edge never travels to a player. */
+export type CodexConnectionLayer = "player" | "gm";
+
+/**
+ * One row of a page's Connections panel, GM view — the OTHER endpoint resolved, plus which way the edge
+ * points. Mirrors the contract's `CodexPageConnection`.
+ *
+ * `id` is **null exactly when `origin === "mention"`**: a derived edge has no row of its own, cannot be
+ * patched or deleted, and is edited by editing the text that produced it. `label` is FREE TEXT (migration
+ * v22 rewrote the twelve legacy slugs into the labels a reader sees), so it is rendered verbatim beside
+ * the arrow — there is no translation table and no generic inverse.
+ */
+export type CodexPageConnection = Readonly<{
+  id: string | null;
+  direction: "out" | "in";
+  otherKind: CodexConnectionSourceKind;
+  otherId: string;
+  otherTitle: string;
+  otherEntityType: EntityType | null;
+  otherRevealed: boolean;
+  label: string | null;
+  origin: CodexConnectionOrigin;
+  layer: CodexConnectionLayer;
+  section: string | null;
+}>;
+/**
+ * The same row as a PLAYER receives it. `id`, `layer` and `otherRevealed` are absent by design — a player
+ * only ever receives connections to records they can see, and there is no player write route.
+ */
+export type PlayerCodexPageConnection = Readonly<{
+  direction: "out" | "in";
+  otherKind: CodexConnectionSourceKind;
+  otherId: string;
+  otherTitle: string;
+  otherEntityType: EntityType | null;
+  label: string | null;
+  origin: CodexConnectionOrigin;
+  section: string | null;
+}>;
+/** One edge of the whole-codex graph, GM view. ONE edge kind — `origin` is an attribute, not a system. */
+export type CodexConnection = Readonly<{
+  id: string | null;
+  fromKind: CodexConnectionSourceKind;
+  fromId: string;
+  toPageId: string;
+  label: string | null;
+  origin: CodexConnectionOrigin;
+  layer: CodexConnectionLayer;
+  createdAt: string | null;
+}>;
+/** The graph as a PLAYER receives it: five keys, already through the three server-side gates. */
+export type PlayerCodexConnection = Readonly<{
+  fromKind: CodexConnectionSourceKind;
+  fromId: string;
+  toPageId: string;
+  label: string | null;
+  origin: CodexConnectionOrigin;
+}>;
+/** The wire bound on a connection label, restated so an input can refuse rather than earn a 400. */
+export const CONNECTION_LABEL_MAX = 40;
 export type CodexPageRevision = Readonly<{
   id: number;
   pageId: string;
@@ -75,6 +133,24 @@ export type CodexPageRevision = Readonly<{
  */
 export type CodexRevisionHistorySettings = Readonly<{ enabled: boolean; windowMinutes: number }>;
 /**
+ * D6 / director ruling R4 — does the Codex save your edits as you type, and how often?
+ *
+ * The server stores a **preference and nothing else**: there is no server-side draft, so the debounce,
+ * the saved-state chip, the explicit Save and the unsaved-changes warning are all the editor's
+ * (`autosave.ts`). Storing it here is what makes the setting follow the GM from a phone to a laptop.
+ *
+ * `intervalSeconds` is an integer 1…600 on the wire. Default `{ enabled: true, intervalSeconds: 1 }` —
+ * which is the 800 ms debounce the editors always ran, expressed on this scale, so an upgraded codex
+ * saves as often as it used to. `0` is not in range: a zero-second autosave is a save per keystroke, and
+ * a GM who wants none says `enabled: false`.
+ */
+export type CodexAutosaveSettings = Readonly<{ enabled: boolean; intervalSeconds: number }>;
+export const AUTOSAVE_INTERVAL_MIN = 1;
+export const AUTOSAVE_INTERVAL_MAX = 600;
+/** The four the picker offers. Any other stored value renders as a fifth "custom" option, never silently. */
+export const AUTOSAVE_INTERVAL_CHOICES: readonly number[] = [1, 10, 60, 300];
+export const AUTOSAVE_DEFAULT: CodexAutosaveSettings = { enabled: true, intervalSeconds: 1 };
+/**
  * What the GM READS: the two settings plus what the history currently costs. The usage figures are
  * server-computed and read-only, which is why they are not on `CodexSettingsInput` below — a client that
  * could send them could disagree with the table they describe.
@@ -83,9 +159,17 @@ export type CodexRevisionHistorySettings = Readonly<{ enabled: boolean; windowMi
  * approximate on purpose: it exists to answer "is my history worth trimming?", and a figure precise enough
  * to invite comparison against the sqlite file's size would be a figure that disagrees with it.
  */
-export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistorySettings & Readonly<{ versionCount: number; versionBytes: number }> }>;
-/** What the GM WRITES. Deliberately narrower than the read: the usage figures are the server's to report. */
-export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionHistorySettings }>;
+export type CodexSettings = Readonly<{
+  revisionHistory: CodexRevisionHistorySettings & Readonly<{ versionCount: number; versionBytes: number }>;
+  autosave: CodexAutosaveSettings;
+}>;
+/**
+ * What the GM WRITES. Deliberately narrower than the read: the usage figures are the server's to report.
+ *
+ * **The PUT is wholesale** — both groups are required, and a body carrying only `revisionHistory` is a
+ * 400. The settings screen therefore always sends the pair it is holding.
+ */
+export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionHistorySettings; autosave: CodexAutosaveSettings }>;
 /**
  * The bounds the server ENFORCES, restated so a control can refuse a value instead of earning a 400.
  *
@@ -99,8 +183,12 @@ export const REVISION_WINDOW_MAX = 10_080;
 
 // ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----
 
-/** The five things the codex indexes. Mirrors the server's `CodexRecordKind` (`codex-store.ts`). */
-export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest";
+/**
+ * The six things the codex indexes. Mirrors the server's `CodexRecordKind` (`codex-store.ts`).
+ * D10 added `session`; a session hit's `title` is server-built ("Session {n}" → recap excerpt →
+ * "Untitled session") and is **never** composed on this client.
+ */
+export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest" | "session";
 /**
  * One row of the single result list, discriminated by `kind`. Mirrors `CodexSearchHit` in
  * `apps/server/src/codex-projections.ts` EXACTLY, including the deliberate narrowness: it carries only
@@ -123,6 +211,15 @@ export type CodexSearchHit = Readonly<{
   mapId: string | null;
 }>;
 
+/**
+ * D19: what `GET /codex/search` answers. `truncated` is REQUIRED — the Codex is unpaginated by design at
+ * LAN scale, which is honest only while a caller can tell a complete list from a clipped one. `true`
+ * means "narrow the search", never "load more"; there is no pagination control to offer.
+ */
+export type CodexSearchResult = Readonly<{ hits: readonly CodexSearchHit[]; truncated: boolean }>;
+/** The server's cap. Restated so the honesty line can name the number the GM is actually looking at. */
+export const SEARCH_HIT_CAP = 50;
+
 export type CodexPageInput = Readonly<{
   title?: string;
   entityType?: EntityType;
@@ -137,6 +234,13 @@ export type CodexPageInput = Readonly<{
   /** CT-11: omitted leaves the stored date alone; `null` clears it (the journal's contract exactly). */
   inWorldDate?: CodexInWorldDate | null;
   expectedRev?: number;
+  /**
+   * D19: optional idempotency key. Resend the same id to retry a write safely — the replay carries the
+   * same status and the same bytes, plus `x-idempotent-replay: true`. Worth minting for a create the GM
+   * can double-tap (quick-create) and for anything issued from a flaky mobile connection; never minted
+   * for an autosave, where the next debounce is the retry.
+   */
+  commandId?: string;
 }>;
 
 const BASE = "/api/v1/codex";
@@ -159,18 +263,38 @@ async function request<T>(token: string, path: string, init: RequestInit = {}): 
 
 export const codexApi = {
   listPages: (token: string) => request<{ pages: CodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
-  // CI-1: reads `hits` (all four record kinds), never the legacy page-only `results` the route still
-  // returns for the transition. Two lists off one route is the second parallel path this overhaul removes.
-  search: (token: string, query: string) => request<{ hits: CodexSearchHit[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.hits),
-  getPage: (token: string, id: string) => request<{ page: CodexPage; backlinks: CodexBacklink[]; relationships: CodexRelationship[] }>(token, `/pages/${id}`),
-  addRelationship: (token: string, pageId: string, toPageId: string, type: string) => request<{ relationship: CodexRelationshipEdge }>(token, `/pages/${pageId}/relationships`, { method: "POST", body: JSON.stringify({ toPageId, type }) }).then((data) => data.relationship),
-  removeRelationship: (token: string, relId: string) => request<{ deleted: boolean }>(token, `/relationships/${relId}`, { method: "DELETE" }),
-  listRelationships: (token: string) => request<{ relationships: CodexRelationshipEdge[] }>(token, "/relationships").then((data) => data.relationships),
+  // CI-1: reads `hits` (every record kind), never a page-only list. D19: `truncated` rides with them, so
+  // a clipped list can say so instead of pretending to be complete.
+  search: (token: string, query: string) => request<CodexSearchResult>(token, `/search?q=${encodeURIComponent(query)}`),
+  /** D8: `{ page, connections }`. The old `backlinks`/`relationships` keys are gone, not empty. */
+  getPage: (token: string, id: string) => request<{ page: CodexPage; connections: CodexPageConnection[] }>(token, `/pages/${id}`),
   /**
-   * CI-8: every wiki-link edge in the codex, GM-scoped — the sibling of `listRelationships`, and its
-   * neighbour here for the same reason it is the `/relationships` route's neighbour on the server.
+   * D8: declare a connection from this page to another. Idempotent on `(from, to, label)` — and on the
+   * reverse pair for a symmetric label — so declaring the same alliance from both ends is one edge.
    */
-  listLinks: (token: string) => request<{ links: CodexLinkEdge[] }>(token, "/links").then((data) => data.links),
+  addConnection: (token: string, pageId: string, input: Readonly<{ toPageId: string; label?: string | null; layer?: CodexConnectionLayer; commandId?: string }>) =>
+    request<{ connection: CodexConnection }>(token, `/pages/${pageId}/connections`, { method: "POST", body: JSON.stringify(input) }).then((data) => data.connection),
+  /** Relabel a DECLARED connection or move it between layers. A mention has no id and is not patchable. */
+  updateConnection: (token: string, id: string, input: Readonly<{ label?: string | null; layer?: CodexConnectionLayer; commandId?: string }>) =>
+    request<{ connection: CodexConnection }>(token, `/connections/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.connection),
+  removeConnection: (token: string, id: string) => request<{ deleted: boolean }>(token, `/connections/${id}`, { method: "DELETE" }),
+  /**
+   * D8: the WHOLE graph as one edge list — this replaces both the typed-relationship feed and the
+   * wiki-link feed. A declared edge and a mention differ by `origin`, never by being two systems.
+   */
+  listConnections: (token: string) => request<{ connections: CodexConnection[] }>(token, "/connections").then((data) => data.connections),
+  /**
+   * D15: where the party pin is, and the map it sits on — one read, replacing the client-side scan of
+   * every map. **Never 404s**: `party` is null when no pin carries the flag. The jump target is
+   * `party.marker.mapId`; there is no sibling `mapId` key.
+   */
+  party: (token: string) => request<{ party: { marker: CodexMarker; mapName: string } | null }>(token, "/party").then((data) => data.party),
+  /**
+   * D15: one pin by id, without knowing its map first — what resolves a `?pin=` deep link and a search
+   * hit that carries no `mapId`. A 404 means "not available"; for a player it is deliberately the same
+   * answer a hidden pin and a bogus id both get.
+   */
+  marker: (token: string, id: string) => request<{ marker: CodexMarker }>(token, `/markers/${id}`).then((data) => data.marker),
   /**
    * CI-4: the REVERSE of `atlasApi.listMarkers` — every atlas pin that links THIS page, so an open page
    * can point back at the map instead of the Atlas being the only way to find out. GM projection (full
@@ -209,8 +333,30 @@ export const codexApi = {
     request<{ deleted: number }>(token, "/page-revisions", { method: "DELETE", body: JSON.stringify({ olderThanDays }) }),
   /** Mints a short-lived PLAYER token so the GM can preview the player Codex through the real player projection. */
   createPreviewSession: (token: string) => request<{ token: string }>(token, "/preview-session", { method: "POST" }).then((data) => data.token),
-  exportBundle: (token: string) => request<{ codex: unknown; exportedAt: string }>(token, "/export")
+  /**
+   * D16: the backup file. `bundleVersion: 1` rides beside `codex` and `exportedAt`; save the whole object
+   * and POST it back to `importBundle` **verbatim** — that is the round trip the contract now honours.
+   */
+  exportBundle: (token: string) => request<CodexExportBundle>(token, "/export"),
+  /**
+   * D16: restore a backup. **Destructive and irreversible** — every codex table is wiped and reloaded
+   * inside one transaction, so a bad bundle is a 400 with the codex completely untouched (a retry is
+   * safe). `bundleVersion` absent is legal (a pre-versioning backup restores); anything but 1 is a 400.
+   * `counts` is the DATABASE's own post-import row count, not the bundle's claim.
+   */
+  importBundle: (token: string, bundle: CodexImportBundle) =>
+    request<{ replaced: true; counts: CodexImportCounts }>(token, "/import", { method: "POST", body: JSON.stringify(bundle) })
 };
+
+/** D16: exactly what `GET /codex/export` answers, and exactly what `POST /codex/import` accepts back. */
+export type CodexExportBundle = Readonly<{ codex: unknown; exportedAt: string; bundleVersion: number }>;
+/** The POST body. `bundleVersion`/`exportedAt` are optional so a pre-versioning backup restores unedited. */
+export type CodexImportBundle = Readonly<{ codex: unknown; exportedAt?: string; bundleVersion?: number; commandId?: string }>;
+export type CodexImportCounts = Readonly<{
+  pages: number; folders: number; maps: number; markers: number; journal: number;
+  /** DECLARED connections only — mentions are rebuilt from body text by the restore itself. */
+  connections: number; sessions: number; quests: number; standing: number; revisions: number;
+}>;
 
 /** A page title reduced to a stable [[wiki-link]] key (must match the server's `pageLinkKey`). */
 export function pageLinkKey(title: string): string {
@@ -241,31 +387,36 @@ export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: strin
 // party pin is FOR the players. Nothing else about a marker's gate changes: an unrevealed pin, or a pin
 // on an unrevealed map, is absent from this list whether or not it is the party's.
 export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null; isParty: boolean; tags: readonly string[] }>;
-export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: CodexJournalKind; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string }>;
+export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: CodexJournalKind; sessionId: string | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string }>;
 /**
  * M9: a session as a PLAYER sees it — the tightest projection the server has (`projectPlayerSession`),
  * FOUR keys and nothing else. `prepBody` (the GM's plan), `rev`, `status` and `attendees` are absent by
  * design, and `recapBody` arrives renamed `recap` — the layer prefix only means something where there
  * are two layers, and here only one is left. An unrevealed session is not in this list at all.
  */
-export type PlayerCodexSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string }>;
+export type PlayerCodexSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string; tags: readonly string[] }>;
 
 export const playerCodexApi = {
   listPages: (token: string) => request<{ pages: PlayerCodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
-  getPage: (token: string, id: string) => request<{ page: PlayerCodexPage; backlinks: CodexBacklink[]; relationships: CodexRelationship[] }>(token, `/pages/${id}`),
-  // Same route, same `hits` key, same row type — the server has already dropped everything this player
+  /** D8/D14: the same `{ page, connections }` shape the GM read answers, through the player projection. */
+  getPage: (token: string, id: string) => request<{ page: PlayerCodexPage; connections: PlayerCodexPageConnection[] }>(token, `/pages/${id}`),
+  // Same route, same `{hits, truncated}` shape — the server has already dropped everything this player
   // may not see (`projectPlayerSearchHit`), so a player result list is narrower, never differently shaped.
-  search: (token: string, query: string) => request<{ hits: CodexSearchHit[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.hits),
-  listRelationships: (token: string) => request<{ relationships: CodexRelationshipEdge[] }>(token, "/relationships").then((data) => data.relationships),
+  search: (token: string, query: string) => request<CodexSearchResult>(token, `/search?q=${encodeURIComponent(query)}`),
   /**
-   * CI-8, the PLAYER's wiki-link feed. Same route as `codexApi.listLinks`; the server has already
-   * dropped every edge with an endpoint this player cannot see AND every edge written in a GM body
-   * (`projectPlayerLinkEdges`). The player Graph must read THIS and never the GM method — a client-side
-   * filter over the GM feed could only ever disagree with the gate that actually counts.
+   * D8, the PLAYER's graph feed. Same route as `codexApi.listConnections`; the server has already applied
+   * all three gates (target revealed, source revealed by its own kind's rule, `layer === "player"`). The
+   * player Graph must read THIS and never the GM method — a client-side filter over the GM feed could
+   * only ever disagree with the gate that actually counts.
    */
-  listLinks: (token: string) => request<{ links: CodexLinkEdge[] }>(token, "/links").then((data) => data.links),
+  listConnections: (token: string) => request<{ connections: PlayerCodexConnection[] }>(token, "/connections").then((data) => data.connections),
   listMaps: (token: string) => request<{ maps: PlayerCodexMap[] }>(token, "/maps").then((data) => data.maps),
   listMarkers: (token: string, mapId: string) => request<{ markers: PlayerCodexMarker[] }>(token, `/maps/${mapId}/markers`).then((data) => data.markers),
+  /**
+   * D15: where the party is, as the player is allowed to know it. `null` covers BOTH "no party pin" and
+   * "the party pin is hidden from you" — deliberately indistinguishable.
+   */
+  party: (token: string) => request<{ party: { marker: PlayerCodexMarker; mapName: string } | null }>(token, "/party").then((data) => data.party),
   /**
    * CT-11: the player's chronicle — revealed journal entries AND revealed dated `event` pages, in one
    * list. This replaces the old journal-only `timeline` read here: the moment `event` pages resolved onto
@@ -385,7 +536,7 @@ export const atlasApi = {
  * the server's `CodexJournalKind` (`codex-store.ts`), which M12 widened to exactly this set; the DB's
  * CHECK has admitted all six since M11's v15, so no table was rebuilt for the two new ones.
  */
-export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing";
+export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 /**
  * M11 / CT-10: what a downtime record carries beyond its prose. Mirrors the server's
  * `CodexDowntimePayload` (`codex-store.ts`) exactly.
@@ -398,7 +549,18 @@ export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "mi
  * There is deliberately no `outcome` field. A downtime's prose already has two layers on this record
  * (`playerText` / `gmText`); a third prose channel inside a payload would sit outside the reveal split.
  */
-export type CodexDowntimeSummary = Readonly<{ who: string; activity: string; days: number }>;
+export type CodexDowntimeSummary = Readonly<{
+  who: string;
+  activity: string;
+  days: number;
+  /**
+   * D12: the character page this downtime belongs to, or null. **Always present**, including on records
+   * written before the field existed — the stored-payload reader supplies the null, so no consumer
+   * branches on key presence. `who` survives as the display fallback when the page is gone (or, for a
+   * player, when it is not revealed), which is what lets the tracker total by person rather than spelling.
+   */
+  characterPageId: string | null;
+}>;
 export type CodexDowntimePayload = CodexDowntimeSummary & Readonly<{ applied: boolean }>;
 /**
  * M12 / CT-8. What a level-up record carries beyond its prose. Mirrors the server's
@@ -435,10 +597,27 @@ export type CodexStandingChange = PlayerCodexStandingPayload;
  * being rendered as a kind it is not. Widening this to a union is deliberate — it makes a call site that
  * forgot the gate a compile error rather than a silent mis-render.
  */
-export type CodexJournalPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload;
+/**
+ * D11: what a QUEST-HISTORY record carries. Written by the server on quest create and on every
+ * status-changing PATCH — this client never writes one. There is deliberately no cached quest title: a
+ * reader resolves `questId` against the quest feed it already holds, so a renamed quest renames its
+ * history. `questId` is nullable on the player's copy (nulled until the quest itself is revealed).
+ */
+export type CodexQuestEventPayload = Readonly<{ questId: string; status: CodexQuestStatus }>;
+export type PlayerCodexQuestEventPayload = Readonly<{ questId: string | null; status: CodexQuestStatus }>;
+export type CodexJournalPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload | CodexQuestEventPayload;
 export type CodexJournalEntry = Readonly<{
   id: string; playerText: string; gmText: string | null; revealedToPlayers: boolean;
   attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null;
+  /**
+   * D9: the session this entry belongs to, **by identity**. `sessionNumber` is resolved LIVE from that
+   * record and is server-owned display data — never cached against the entry, and never sent on a write.
+   *
+   * A row with `sessionId: null` and a non-null `sessionNumber` is a real, expected state (ruling R2: a
+   * deleted but previously-revealed session stamps its number back as a bare label). Render the number
+   * with no link; there is nothing to navigate to.
+   */
+  sessionId: string | null;
   sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null;
   /** M12: `null` for every kind except `downtime`, `milestone` and `standing` — the store parses
       `payload_json` only for those three. */
@@ -448,16 +627,34 @@ export type CodexJournalEntry = Readonly<{
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
 export type CodexJournalInput = Readonly<{
   playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null;
-  attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null;
+  attachPageId?: string | null;
+  /**
+   * D9: file this entry under a session BY ID. Omitted on a **create** auto-files it under the ACTIVE
+   * session; omitted on a PATCH leaves the filing alone; explicit `null` files it under none; an id
+   * naming no session is a 404.
+   *
+   * `sessionNumber` is deliberately absent from this type and is a **400** on any write body — the
+   * number is display data the server resolves from the linked record.
+   */
+  sessionId?: string | null;
+  realDate?: string | null; inWorldLabel?: string | null;
   inWorldDate?: CodexInWorldDate | null; tags?: readonly string[];
+  /** D19: optional idempotency key — resend the same id to retry a write safely. */
+  commandId?: string;
 }>;
+/**
+ * D12: the narrow edit group for a DOWNTIME record's own facts. 400 on any entry that is not a downtime
+ * record, and 400 if `days` is sent — `days` is what `apply-downtime` moved the clock by, so editing it
+ * would leave the clock disagreeing with the record that justified it. A typo is delete-and-recreate.
+ */
+export type CodexDowntimeEditInput = Readonly<{ who?: string; activity?: string; characterPageId?: string | null }>;
 /**
  * M11: the downtime triple, sent NESTED beside the ordinary journal input — the server's
  * `createDowntime(input & { downtime: { who, activity, days } })`. Bounded here as well as on the
  * server (`who`/`activity` at 120 chars, `days` an integer 0…3650) so the composer cannot hand a GM a
  * generic save failure for something the field could have prevented.
  */
-export type CodexDowntimeInput = Readonly<{ who: string; activity: string; days: number }>;
+export type CodexDowntimeInput = Readonly<{ who: string; activity: string; days: number; characterPageId?: string | null }>;
 /**
  * M12 / CT-8: the milestone pair, sent NESTED beside the ordinary journal input — `createDowntime`'s
  * shape verbatim, because it is the same kind of thing (a payload that is not prose riding alongside a
@@ -489,12 +686,28 @@ export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexC
  */
 export type GmCodexCalendar = CodexCalendar & Readonly<{ publishedDate: CodexInWorldDate | null }>;
 export function calendarDaysPerYear(calendar: CodexCalendar): number { return calendar.months.reduce((sum, month) => sum + month.days, 0); }
-/** Absolute day-instant for a date (inverse of instantToDate) - used to place the "now" marker on the timeline. */
+/**
+ * Absolute day-instant for a date (inverse of instantToDate) — used to place the "now" marker on the
+ * timeline and the two clocks on the Calendar view.
+ *
+ * The day is clamped at BOTH ends, into the month it names, exactly as the server's `calendarInstantOf`
+ * does. Clamping only at the bottom (`>= 1`) was the ledgered divergence at `known-bugs.md:457-466`: a
+ * stored "day 31 of a 30-day month" — the one lossy date the calendar admits — landed a day later here
+ * than on the server, so a client-side "now" marker and a server-derived `calendarInstant` disagreed
+ * about which side of a deadline the campaign was on. The Calendar view (D17) puts that number on screen
+ * as a grid cell, so the divergence stops being invisible; one authority for one number is the fix.
+ *
+ * Server-computed instants (`record.calendarInstant`) are ALWAYS preferred where one exists. This
+ * function exists only for the residual conversions the client genuinely owns — the calendar's own
+ * `currentDate`/`publishedDate` markers, which arrive as raw dates and carry no instant.
+ */
 export function dateToInstant(calendar: CodexCalendar, date: CodexInWorldDate): number {
   const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
   let dayOfYear = 0;
   for (let i = 0; i < monthIdx; i += 1) dayOfYear += calendar.months[i].days;
-  return Math.trunc(date.year) * (calendarDaysPerYear(calendar) || 1) + dayOfYear + (Math.max(1, Math.trunc(date.day)) - 1);
+  const daysInMonth = calendar.months[monthIdx]?.days ?? 1;
+  const day = Math.min(Math.max(1, Math.trunc(date.day)), Math.max(1, daysInMonth));
+  return Math.trunc(date.year) * (calendarDaysPerYear(calendar) || 1) + dayOfYear + (day - 1);
 }
 export function calendarYearOf(calendar: CodexCalendar, instant: number): number { const perYear = calendarDaysPerYear(calendar) || 1; return Math.floor(instant / perYear); }
 export function formatWorldYear(calendar: CodexCalendar, year: number): string { return `${year}${calendar.yearName ? ` ${calendar.yearName}` : ""}`; }
@@ -539,7 +752,7 @@ export const calendarApi = {
  * colour alone). `combat` is split from `entry` because a battle already renders with its own badge and
  * its replay edge; it is the same store row, discriminated for display.
  */
-export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing";
+export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 
 /**
  * One chronicle row, GM view. Mirrors `GmCodexChronicleRecord` in `apps/server/src/codex-projections.ts`
@@ -559,6 +772,8 @@ export type CodexChronicleRecord = Readonly<{
   text: string;
   gmText: string | null;
   revealedToPlayers: boolean;
+  /** D9: the session record this row belongs to, or null. `sessionNumber` beside it is display-only. */
+  sessionId: string | null;
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
@@ -605,7 +820,7 @@ export type CodexChronicleRecord = Readonly<{
  * arrives with a nullable `factionPageId` — which is why the two unions are named separately rather than
  * one being reused for both.
  */
-export type CodexPlayerChroniclePayload = CodexDowntimeSummary | CodexMilestonePayload | PlayerCodexStandingPayload;
+export type CodexPlayerChroniclePayload = CodexDowntimeSummary | CodexMilestonePayload | PlayerCodexStandingPayload | PlayerCodexQuestEventPayload;
 
 /**
  * One chronicle row, PLAYER view — `PlayerCodexJournalEntry` plus `title`, and nothing else. The server
@@ -617,9 +832,19 @@ export type PlayerCodexChronicleRecord = Readonly<{
   id: string;
   title: string | null;
   text: string;
+  /** D9: present only when that session is revealed; nulled TOGETHER with `sessionNumber` when it is not. */
+  sessionId: string | null;
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
+  /**
+   * D17 / director ruling R3: the RAW date, unclamped, and the server's own sortable index. Both null
+   * exactly when the row is undated. Use `calendarInstant` for placement and sorting and **never**
+   * re-derive it client-side — the two derivations disagreed on a day that overflows its month, which is
+   * the ledgered bug this closes.
+   */
+  inWorldDate: CodexInWorldDate | null;
+  calendarInstant: number | null;
   tags: readonly string[];
   /**
    * M11: the downtime payload **without `applied`** (`CodexDowntimeSummary`). Who did what, and for how
@@ -680,7 +905,7 @@ export const journalApi = {
    */
   applyDowntime: (token: string, id: string) =>
     request<{ entry: CodexJournalEntry; calendar: CodexCalendar }>(token, `/journal/${id}/apply-downtime`, { method: "POST" }),
-  update: (token: string, id: string, input: CodexJournalInput) => request<{ entry: CodexJournalEntry }>(token, `/journal/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.entry),
+  update: (token: string, id: string, input: CodexJournalInput & { downtime?: CodexDowntimeEditInput }) => request<{ entry: CodexJournalEntry }>(token, `/journal/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.entry),
   reveal: (token: string, id: string, revealed: boolean) => request<{ entry: CodexJournalEntry }>(token, `/journal/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.entry),
   remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/journal/${id}`, { method: "DELETE" })
 };
@@ -706,6 +931,8 @@ export type CodexSession = Readonly<{
   recapBody: string;
   revealedToPlayers: boolean;
   status: CodexSessionStatus;
+  /** D10: sessions are taggable, on the same vocabulary and the same slug rules pages use. */
+  tags: readonly string[];
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -725,6 +952,10 @@ export type CodexSessionInput = Readonly<{
   prepBody?: string;
   recapBody?: string;
   status?: CodexSessionStatus;
+  /** D10: ≤24 items, each 1–40 chars, slug-normalized server-side — send whatever the GM typed. */
+  tags?: readonly string[];
+  /** D19: optional idempotency key. */
+  commandId?: string;
 }>;
 
 export const sessionApi = {
@@ -782,6 +1013,8 @@ export type CodexQuest = Readonly<{
   objectives: readonly CodexQuestObjective[];
   entityIds: readonly string[];
   revealedToPlayers: boolean;
+  /** D10: quests are taggable, on the same vocabulary and the same slug rules pages use. */
+  tags: readonly string[];
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -800,6 +1033,10 @@ export type CodexQuestInput = Readonly<{
   gmBody?: string;
   objectives?: readonly CodexQuestObjective[];
   entityIds?: readonly string[];
+  /** D10: ≤24 items, each 1–40 chars, slug-normalized server-side — send whatever the GM typed. */
+  tags?: readonly string[];
+  /** D19: optional idempotency key. */
+  commandId?: string;
 }>;
 /**
  * A quest as a PLAYER sees it — the server's `projectPlayerQuest`, six keys. `gmBody` and `rev` are
@@ -817,6 +1054,8 @@ export type PlayerCodexQuest = Readonly<{
   body: string;
   objectives: readonly CodexQuestObjective[];
   entityIds: readonly string[];
+  /** D10: single-layer, exactly as on every other record kind. */
+  tags: readonly string[];
 }>;
 
 export const questApi = {

@@ -72,7 +72,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker, CodexSearchHit, PlayerCodexMap, PlayerCodexMarker } from "./api";
 
@@ -108,12 +108,12 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 /** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape. */
 const RECORD = (id: string, text: string): CodexChronicleRecord => ({
   kind: "entry", id, title: null, text, gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
-const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 /** Type into the rail's search box and wait for the result list to settle. */
 const searchInRail = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());

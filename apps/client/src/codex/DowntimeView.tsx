@@ -1,0 +1,294 @@
+import { useMemo, useState } from "react";
+import { Alert, Badge, Button, Combobox, Field, Input, NumberField, Skeleton, Textarea } from "@vtt/ui";
+import {
+  formatWorldDate, journalApi,
+  type CodexChronicleRecord, type CodexDowntimePayload, type CodexInWorldDate, type CodexPageSummary,
+  type GmCodexCalendar, type PlayerCodexChronicleRecord
+} from "./api";
+import { deadlinesPassedBy, downtimeOf, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
+import { CodexIcon, EntityIcon } from "./icons";
+import { newId } from "../lib/ids";
+
+/**
+ * D12 — the Downtime tracker: per-character totals, pending confirmations, and history in one place.
+ *
+ * **A lens over the Journal, never a second store** (invariant 7). Every row here is a `downtime`
+ * chronicle record the Journal already carries; there is deliberately no aggregation endpoint, because
+ * a server aggregate would be a second read path with its own per-audience visibility arms to keep in
+ * step with the projections that already exist.
+ *
+ * Totals group by `characterPageId ?? who`, which is the point of D12's new field: before it, "Vex",
+ * "vex" and "Vex the Bold" were three people. The **Edit** action on a history row is the adoption path
+ * for everything recorded before the field existed — it is what lets a GM point an old free-text row at
+ * a real character page.
+ */
+export type DowntimeViewProps = Readonly<{
+  gmToken: string;
+  records: readonly CodexChronicleRecord[];
+  calendar: GmCodexCalendar | null;
+  pages: readonly CodexPageSummary[];
+  loading: boolean;
+  error: string | null;
+  onChanged: () => void;
+  onOpenEntry: (entryId: string) => void;
+  onOpenPage: (pageId: string) => void;
+}>;
+
+type DowntimeRow = Readonly<{ record: CodexChronicleRecord; payload: CodexDowntimePayload }>;
+
+export function DowntimeView({ gmToken, records, calendar, pages, loading, error, onChanged, onOpenEntry, onOpenPage }: DowntimeViewProps) {
+  const [who, setWho] = useState("");
+  const [whoPageId, setWhoPageId] = useState<string | null>(null);
+  const [activity, setActivity] = useState("");
+  const [days, setDays] = useState(7);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editWho, setEditWho] = useState("");
+  const [editActivity, setEditActivity] = useState("");
+  const [editPageId, setEditPageId] = useState<string | null>(null);
+
+  const rows = useMemo<readonly DowntimeRow[]>(
+    () => records
+      .map((record) => ({ record, payload: downtimeOf<CodexDowntimePayload>(record) }))
+      .filter((row): row is DowntimeRow => row.payload !== null),
+    [records]
+  );
+  const pending = useMemo(() => rows.filter((row) => !row.payload.applied), [rows]);
+  const characterOptions = useMemo(
+    () => pages.filter((page) => page.entityType === "character").map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type="character" /> })),
+    [pages]
+  );
+  const pageTitle = (id: string | null) => (id ? pages.find((page) => page.id === id)?.title ?? null : null);
+
+  /** Totals by person. `characterPageId` wins, so a linked row totals with its page whatever `who` says. */
+  const totals = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; pageId: string | null; days: number; last: string | null }>();
+    for (const { record, payload } of rows) {
+      const key = payload.characterPageId ?? (payload.who.trim().toLowerCase() || "—");
+      const name = pageTitle(payload.characterPageId) ?? (payload.who.trim() || "Unnamed");
+      const existing = map.get(key);
+      const when = record.inWorldLabel ?? record.realDate ?? null;
+      if (existing) { existing.days += payload.days; existing.last = when ?? existing.last; }
+      else map.set(key, { key, name, pageId: payload.characterPageId, days: payload.days, last: when });
+    }
+    return [...map.values()].sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+  }, [rows, pages]);
+
+  const proposed = downtimeProposedDate(calendar, days);
+  const log = async () => {
+    if (busy || (!who.trim() && !whoPageId) || days < 0) return;
+    setBusy(true); setFormError(null);
+    try {
+      await journalApi.createDowntime(gmToken, {
+        playerText: note.trim(),
+        downtime: {
+          who: whoPageId ? pageTitle(whoPageId) ?? who.trim() : who.trim(),
+          activity: activity.trim(), days: Math.max(0, Math.trunc(days)),
+          ...(whoPageId ? { characterPageId: whoPageId } : {})
+        },
+        commandId: newId()
+      });
+      setWho(""); setWhoPageId(null); setActivity(""); setNote("");
+      onChanged();
+    } catch (logError) { setFormError(logError instanceof Error ? logError.message : "Couldn't log that downtime."); }
+    finally { setBusy(false); }
+  };
+  const confirmRow = async (row: DowntimeRow) => {
+    setFormError(null);
+    try { await journalApi.applyDowntime(gmToken, row.record.id); onChanged(); }
+    catch (applyError) { setFormError(applyError instanceof Error ? applyError.message : "Couldn't move the clock."); }
+  };
+  const saveEdit = async (id: string) => {
+    setBusy(true); setFormError(null);
+    try {
+      await journalApi.update(gmToken, id, {
+        downtime: { who: editWho.trim(), activity: editActivity.trim(), characterPageId: editPageId },
+        commandId: newId()
+      });
+      setEditing(null); onChanged();
+    } catch (editError) { setFormError(editError instanceof Error ? editError.message : "Couldn't save that change."); }
+    finally { setBusy(false); }
+  };
+
+  const confirmLabel = (target: CodexInWorldDate | null) => {
+    if (!calendar || !target) return "Confirm";
+    const passes = deadlinesPassedBy(records, calendar, target);
+    return `Confirm — move your date to ${formatWorldDate(calendar, target)}${passes > 0 ? ` (passes ${passes} deadline${passes === 1 ? "" : "s"})` : ""}`;
+  };
+
+  if (loading && rows.length === 0) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
+
+  return (
+    <div className="codex-downtime">
+      {error && <Alert tone="danger" title="Couldn't load downtime">{error}</Alert>}
+      {formError && <Alert tone="danger">{formError}</Alert>}
+
+      <section className="codex-downtime-section">
+        <h3 className="codex-campaign-h">Log downtime</h3>
+        {/* The SAME write the Journal composer uses — one write path, two doors. */}
+        <div className="codex-downtime-form">
+          <Field label="Who" htmlFor="codex-downtime-who" help="Pick a character page, or type a name.">
+            {characterOptions.length > 0 && !who
+              ? <Combobox options={characterOptions} value={whoPageId} onChange={setWhoPageId} ariaLabel="Who spent the time" placeholder="Search characters…" />
+              : <Input id="codex-downtime-who" value={who} placeholder="Vex, the party…" onChange={(event) => setWho(event.target.value)} />}
+          </Field>
+          {characterOptions.length > 0 && !whoPageId && (
+            <Input aria-label="Or type a name" value={who} placeholder="…or type a name" onChange={(event) => setWho(event.target.value)} />
+          )}
+          <Field label="Activity" htmlFor="codex-downtime-activity"><Input id="codex-downtime-activity" value={activity} placeholder="Forging a blade" onChange={(event) => setActivity(event.target.value)} /></Field>
+          <Field label="Days" htmlFor="codex-downtime-days"><NumberField id="codex-downtime-days" aria-label="Days" value={days} min={0} max={3650} onChange={(next) => setDays(next ?? 0)} /></Field>
+          <Field label="Note" htmlFor="codex-downtime-note" className="codex-field-wide"><Textarea id="codex-downtime-note" value={note} placeholder="What came of it…" onChange={(event) => setNote(event.target.value)} /></Field>
+        </div>
+        {proposed && calendar && <p className="codex-composer-hint">Logging this proposes moving your date to <strong>{formatWorldDate(calendar, proposed)}</strong>. Nothing moves until you confirm it below.</p>}
+        <Button variant="primary" disabled={busy || (!who.trim() && !whoPageId)} onClick={() => void log()}>Log downtime</Button>
+      </section>
+
+      {pending.length > 0 && (
+        <section className="codex-downtime-section">
+          <h3 className="codex-campaign-h">Pending confirmations</h3>
+          <ul className="codex-downtime-pending">
+            {pending.map((row) => (
+              <li key={row.record.id} className="codex-downtime-pendingrow">
+                <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
+                <span className="codex-list-title">{downtimeSummaryLabel(row.payload)}</span>
+                {/* Secondary, not primary: the row already states the consequence in words, and this view's
+                    one primary action is "Log downtime" above (§5, one primary per view). */}
+                <Button variant="secondary" size="sm" onClick={() => void confirmRow(row)}>{confirmLabel(row.record.proposedDate)}</Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="codex-downtime-section">
+        <h3 className="codex-campaign-h">Totals</h3>
+        {totals.length === 0
+          ? <p className="codex-list-empty">No downtime recorded yet.</p>
+          : <table className="nh-table codex-downtime-totals">
+              <thead><tr><th scope="col">Who</th><th scope="col">Days</th><th scope="col">Last downtime</th></tr></thead>
+              <tbody>
+                {totals.map((row) => (
+                  <tr key={row.key}>
+                    <th scope="row">
+                      {row.pageId
+                        ? <button type="button" className="codex-md-link" onClick={() => onOpenPage(row.pageId!)}>{row.name}</button>
+                        : row.name}
+                    </th>
+                    <td>{row.days}</td>
+                    <td>{row.last ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>}
+      </section>
+
+      <section className="codex-downtime-section">
+        <h3 className="codex-campaign-h">History</h3>
+        {rows.length === 0
+          ? <p className="codex-list-empty">Nothing yet. Log the party's first week off above.</p>
+          : <ul className="codex-downtime-history">
+              {rows.map(({ record, payload }) => (
+                <li key={record.id} className="codex-downtime-historyrow">
+                  {editing === record.id ? (
+                    <div className="codex-downtime-edit">
+                      <Field label="Who" htmlFor={`codex-dt-who-${record.id}`}><Input id={`codex-dt-who-${record.id}`} value={editWho} onChange={(event) => setEditWho(event.target.value)} /></Field>
+                      <Field label="Activity" htmlFor={`codex-dt-act-${record.id}`}><Input id={`codex-dt-act-${record.id}`} value={editActivity} onChange={(event) => setEditActivity(event.target.value)} /></Field>
+                      <Field label="Character page" htmlFor={`codex-dt-page-${record.id}`} help="Days can't be edited — they're what the clock already moved by. A typo is a delete and re-log.">
+                        <Combobox options={characterOptions} value={editPageId} onChange={setEditPageId} ariaLabel="Link to a character page" placeholder="Search characters…" />
+                      </Field>
+                      <div className="codex-conn-formactions">
+                        <Button variant="secondary" size="sm" disabled={busy} onClick={() => void saveEdit(record.id)}>Save</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(record.id)}>
+                        <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
+                        <span className="codex-list-title">{downtimeSummaryLabel(payload)}</span>
+                        {payload.characterPageId
+                          ? <Badge tone="info">{pageTitle(payload.characterPageId) ?? "Linked"}</Badge>
+                          : <Badge>Not linked</Badge>}
+                        {payload.applied ? <Badge tone="success">Confirmed</Badge> : <Badge tone="caution">Pending</Badge>}
+                        <span className="codex-campaign-recentwhen">{record.inWorldLabel ?? record.realDate ?? ""}</span>
+                      </button>
+                      <Button variant="ghost" size="sm" onClick={() => { setEditing(record.id); setEditWho(payload.who); setEditActivity(payload.activity); setEditPageId(payload.characterPageId); }}>Edit</Button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>}
+      </section>
+    </div>
+  );
+}
+
+/**
+ * D12/D14 — the player's Downtime, the same lens over their own chronicle.
+ *
+ * No Pending section, and by construction rather than by a role check: `applied` is on the GM payload
+ * and has no field on the player's, so this component could not render one.
+ */
+export function PlayerDowntimeView({ records, pages, onOpenEntry, onOpenPage }: Readonly<{
+  records: readonly PlayerCodexChronicleRecord[];
+  pages: ReadonlyArray<Readonly<{ id: string; title: string }>>;
+  onOpenEntry: (entryId: string) => void;
+  onOpenPage: (pageId: string) => void;
+}>) {
+  const rows = useMemo(
+    () => records
+      .map((record) => ({ record, payload: downtimeOf(record) }))
+      .filter((row): row is { record: PlayerCodexChronicleRecord; payload: NonNullable<ReturnType<typeof downtimeOf>> } => row.payload !== null),
+    [records]
+  );
+  const pageTitle = (id: string | null) => (id ? pages.find((page) => page.id === id)?.title ?? null : null);
+  const totals = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; pageId: string | null; days: number; last: string | null }>();
+    for (const { record, payload } of rows) {
+      const key = payload.characterPageId ?? (payload.who.trim().toLowerCase() || "—");
+      const name = pageTitle(payload.characterPageId) ?? (payload.who.trim() || "Unnamed");
+      const existing = map.get(key);
+      const when = record.inWorldLabel ?? record.realDate ?? null;
+      if (existing) { existing.days += payload.days; existing.last = when ?? existing.last; }
+      else map.set(key, { key, name, pageId: payload.characterPageId, days: payload.days, last: when });
+    }
+    return [...map.values()].sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+  }, [rows, pages]);
+
+  if (rows.length === 0) return <div className="codex-main-empty"><h3>No downtime yet</h3><p>Weeks the party spends between adventures show up here.</p></div>;
+  return (
+    <div className="codex-downtime">
+      <section className="codex-downtime-section">
+        <h3 className="codex-campaign-h">Totals</h3>
+        <table className="nh-table codex-downtime-totals">
+          <thead><tr><th scope="col">Who</th><th scope="col">Days</th><th scope="col">Last downtime</th></tr></thead>
+          <tbody>
+            {totals.map((row) => (
+              <tr key={row.key}>
+                <th scope="row">{row.pageId ? <button type="button" className="codex-md-link" onClick={() => onOpenPage(row.pageId!)}>{row.name}</button> : row.name}</th>
+                <td>{row.days}</td>
+                <td>{row.last ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+      <section className="codex-downtime-section">
+        <h3 className="codex-campaign-h">History</h3>
+        <ul className="codex-downtime-history">
+          {rows.map(({ record, payload }) => (
+            <li key={record.id} className="codex-downtime-historyrow">
+              <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(record.id)}>
+                <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
+                <span className="codex-list-title">{downtimeSummaryLabel(payload)}</span>
+                <span className="codex-campaign-recentwhen">{record.inWorldLabel ?? record.realDate ?? ""}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}

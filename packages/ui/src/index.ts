@@ -71,8 +71,10 @@ export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/Sa
    richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx. */
 export {
   IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil, IconWarning, IconInfo,
-  IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff
+  IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff, IconX, IconPlay
 } from "./primitives/icons";
+export { Combobox, type ComboboxProps, type ComboboxOption } from "./primitives/Combobox";
+export { MarkdownEditor, type MarkdownEditorProps, type MarkdownSuggestion } from "./primitives/MarkdownEditor";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";

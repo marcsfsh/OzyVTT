@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Skeleton } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { entityDef } from "./entities";
-import type { CodexRecordKind, CodexSearchHit } from "./api";
+import { SEARCH_HIT_CAP, type CodexRecordKind, type CodexSearchHit } from "./api";
 
 /**
  * CI-1 / R8: **one search box, one result list, every record kind.**
@@ -23,7 +23,8 @@ export type SearchState =
   | Readonly<{ status: "idle" }>
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "error"; message: string }>
-  | Readonly<{ status: "ready"; hits: readonly CodexSearchHit[] }>;
+  /** D19: `truncated` rides with the hits — a clipped list must be able to say so. */
+  | Readonly<{ status: "ready"; hits: readonly CodexSearchHit[]; truncated: boolean }>;
 
 /**
  * How long the box stays quiet after the last keystroke before the request goes out. The suite-wide search
@@ -43,7 +44,7 @@ const SEARCH_DEBOUNCE_MS = 250;
  */
 export function useCodexSearch(
   query: string,
-  search: (query: string) => Promise<readonly CodexSearchHit[]>,
+  search: (query: string) => Promise<Readonly<{ hits: readonly CodexSearchHit[]; truncated: boolean }>>,
   refreshKey?: unknown
 ): SearchState {
   const [state, setState] = useState<SearchState>({ status: "idle" });
@@ -59,7 +60,7 @@ export function useCodexSearch(
     setState({ status: "loading" });
     const timer = setTimeout(() => {
       void search(trimmed)
-        .then((hits) => { if (live) setState({ status: "ready", hits }); })
+        .then((result) => { if (live) setState({ status: "ready", hits: result.hits, truncated: result.truncated }); })
         .catch((cause: unknown) => { if (live) setState({ status: "error", message: cause instanceof Error ? cause.message : "The search could not be completed." }); });
     }, SEARCH_DEBOUNCE_MS);
     return () => { live = false; clearTimeout(timer); };
@@ -82,12 +83,16 @@ const KIND_MARKS: Readonly<Record<Exclude<CodexRecordKind, "page">, Readonly<{ i
   // year headings) - not `--codex-type-note`, which resolves to `--text-muted` and would dim the glyph.
   journal: { icon: "scroll", label: "Journal", color: "var(--cyan)" },
   map: { icon: "compass", label: "Map", color: "var(--codex-type-location)" },
-  marker: { icon: "pin", label: "Marker", color: "var(--magenta)" },
+  // D5 glossary: a map marker is a PIN everywhere in the UI. The wire kind stays `marker`.
+  marker: { icon: "pin", label: "Pin", color: "var(--magenta)" },
   // M10. `--caution` is the one accent no entity type has claimed on this list; the design tokens
   // already say near-neighbour hues are fine here "because the entity icon + label always carry the
   // finer distinction", and R2 means the WORD "Quest" is what actually names the kind. The glyph is the
   // registry's `quest` (a circled `!`, the tabletop quest marker), which no other kind uses.
-  quest: { icon: "quest", label: "Quest", color: "var(--caution)" }
+  quest: { icon: "quest", label: "Quest", color: "var(--caution)" },
+  // D10: sessions joined the index. `sessions` is the sidebar's own glyph, so a session reads the same
+  // in a result list as it does in the navigation.
+  session: { icon: "sessions", label: "Session", color: "var(--violet)" }
 };
 
 /** The kind label as it reads on the row — a page reads as its entity type ("Character"), which is what the rest of the suite calls it. */
@@ -100,7 +105,9 @@ export function searchHitKindLabel(hit: CodexSearchHit): string {
 export function searchHitTitle(hit: CodexSearchHit): string {
   const title = hit.title.trim();
   if (title) return title;
-  return hit.kind === "marker" ? "Unlabelled marker" : hit.kind === "journal" ? "Untitled entry" : "Untitled";
+  // A session hit's title is SERVER-built and is never empty ("Session 4" / a recap excerpt /
+  // "Untitled session"), so it never reaches this fallback — the same string is used if it ever does.
+  return hit.kind === "marker" ? "Unlabelled pin" : hit.kind === "journal" ? "Untitled entry" : hit.kind === "session" ? "Untitled session" : "Untitled";
 }
 
 /** Stable across lists: two kinds can share an id space only by accident, but the pair never collides. */
@@ -156,6 +163,9 @@ export function SearchResultList({ state, onOpen, selectedId = null, emptyLabel 
       {state.hits.map((hit) => (
         <SearchResultRow key={searchHitKey(hit)} hit={hit} active={hit.kind === "page" && hit.id === selectedId} onOpen={onOpen} />
       ))}
+      {/* D19: the Codex is unpaginated by design at LAN scale, which is honest only while a caller can
+          tell a complete list from a clipped one. Non-interactive on purpose — there is no page 2. */}
+      {state.truncated && <p className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} — narrow the search.</p>}
     </>
   );
 }

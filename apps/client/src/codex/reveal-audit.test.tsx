@@ -86,7 +86,7 @@ const AUDIT: CodexRevealAudit = answer([
 
 const renderAudit = async (audit: unknown = AUDIT) => {
   getAudit.mockResolvedValue(audit);
-  render(<RevealAudit gmToken="gm" onClose={vi.fn()} />);
+  render(<RevealAudit gmToken="gm" />);
   await waitFor(() => expect(getAudit).toHaveBeenCalled());
 };
 
@@ -243,7 +243,7 @@ describe("Nothing revealed and not loaded never look the same (CF-2)", () => {
     // CF-2: before the read settles, "nothing is revealed" is not a claim this screen may make.
     let release: (value: CodexRevealAudit) => void = () => {};
     getAudit.mockReturnValue(new Promise<CodexRevealAudit>((resolve) => { release = resolve; }));
-    render(<RevealAudit gmToken="gm" onClose={vi.fn()} />);
+    render(<RevealAudit gmToken="gm" />);
 
     expect(screen.queryByText(/are shown to players across the Codex/)).toBeNull();
     expect(screen.queryByText("No pages are shown to players.")).toBeNull();

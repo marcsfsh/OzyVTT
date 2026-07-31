@@ -63,8 +63,39 @@ export const CHRONICLE_KIND_META: Readonly<Record<CodexChronicleKind, Readonly<{
    * `standing.test.tsx` asserts both of these resolve in `CODEX_ICONS`.
    */
   milestone: { iconId: "star", label: "Milestone", tone: "info" },
-  standing: { iconId: "banner", label: "Standing", tone: "info" }
+  standing: { iconId: "banner", label: "Standing", tone: "info" },
+  /**
+   * D11 — quest history. The server writes one of these on quest CREATE and on every status-changing
+   * PATCH, so a lead's story is on the one timeline instead of only in the quest log.
+   *
+   * `quest` is the registry's own quest glyph (a circled `!`, the tabletop quest marker), so a quest
+   * row reads the same on the chronicle as it does in the log, the palette and search. `info` groups it
+   * with the other "a dated thing happened" rows rather than with the ordinary entry's neutral.
+   *
+   * The server's switches carry no `default` arm precisely so a new kind is a compile error here rather
+   * than a blank row — which is how this entry came to be added.
+   */
+  quest: { iconId: "quest", label: "Quest", tone: "info" }
 };
+
+/**
+ * D11 — how a quest-history row READS. The payload carries a status, and the verb is read from it; a
+ * `failed → active` transition records `active`, and "reopened" is a fact about the SEQUENCE rather
+ * than about the payload, so this deliberately does not try to say it. The quest's own title is
+ * resolved by the caller against the quest feed it holds — there is no cached title on the record, so a
+ * renamed quest renames its history.
+ */
+export const QUEST_EVENT_VERB: Readonly<Record<"active" | "completed" | "failed", string>> = {
+  active: "started", completed: "completed", failed: "failed"
+};
+export function questEventLabel(payload: Readonly<{ status: "active" | "completed" | "failed" }>, questTitle: string | null): string {
+  return `${questTitle?.trim() || "A quest"} ${QUEST_EVENT_VERB[payload.status]}`;
+}
+/** The kind gate for a quest-history payload, on `downtimeOf`'s exact terms. */
+export function questEventOf(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>): Readonly<{ questId: string | null; status: "active" | "completed" | "failed" }> | null {
+  const payload = record.payload;
+  return record.kind === "quest" && payload !== null && "questId" in payload ? payload : null;
+}
 
 // ----- M12 / CT-6: what a standing NUMBER means -----
 
@@ -194,8 +225,10 @@ export function standingMeterTone(value: number): MeterTone {
  * one the player's timeline could not use.
  */
 export type ChroniclePayloadRef<P> = Readonly<{ kind: CodexChronicleKind; payload: P | null }>;
+/** D11: the narrowest shape a quest-history payload satisfies in BOTH projections (the player's id is nullable). */
+export type CodexQuestEventRef = Readonly<{ questId: string | null; status: "active" | "completed" | "failed" }>;
 
-export function downtimeOf<P extends CodexDowntimeSummary>(record: ChroniclePayloadRef<P | CodexMilestonePayload | CodexStandingChange>): P | null {
+export function downtimeOf<P extends CodexDowntimeSummary>(record: ChroniclePayloadRef<P | CodexMilestonePayload | CodexStandingChange | CodexQuestEventRef>): P | null {
   const payload = record.payload;
   return record.kind === "downtime" && payload !== null && "days" in payload ? payload : null;
 }
@@ -374,7 +407,7 @@ export function deadlinesPassedBy(records: readonly DatedDeadlineRef[], calendar
  * here, which is the same discipline `CHRONICLE_KIND_META` and `AUDIT_JOURNAL_FALLBACK` keep.
  */
 const JOURNAL_TO_CHRONICLE_KIND: Readonly<Record<CodexJournalKind, CodexChronicleKind>> = {
-  note: "entry", combat: "combat", deadline: "deadline", downtime: "downtime", milestone: "milestone", standing: "standing"
+  note: "entry", combat: "combat", deadline: "deadline", downtime: "downtime", milestone: "milestone", standing: "standing", quest: "quest"
 };
 export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKind { return JOURNAL_TO_CHRONICLE_KIND[kind]; }
 
@@ -437,6 +470,12 @@ export function revealAheadOfPlayers(record: Readonly<{ calendarInstant: number 
 }
 
 export function chronicleRowSummary(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload> & Readonly<{ text: string; gmText?: string | null }>): string {
+  // D11: a quest-history record carries NO prose at all (the server writes an empty player text on
+  // purpose), so without this it would render as a blank row exactly the way standing records did.
+  // The title cannot be resolved here — this module has no quest list — so the caller's own row
+  // resolves it where it can; this is the honest fallback.
+  const questEvent = questEventOf(record);
+  if (questEvent) return questEventLabel(questEvent, null);
   const standing = standingOf(record);
   if (standing) return standingChangeLabel(standing, null);
   const milestone = milestoneOf(record);

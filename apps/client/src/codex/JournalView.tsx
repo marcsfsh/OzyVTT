@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "./api";
-import { CHRONICLE_KIND_META, CHRONICLE_LENSES, chronicleWhenLabel, deadlineFired, deadlinesPassedBy, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, revealAheadOfPlayers, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
+import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexAutosaveSettings, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type CodexSession, type GmCodexCalendar } from "./api";
+import { CHRONICLE_KIND_META, CHRONICLE_LENSES, questEventLabel, questEventOf, chronicleWhenLabel, deadlineFired, deadlinesPassedBy, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, revealAheadOfPlayers, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
 import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
-import { EntityPicker } from "./EntityPicker";
+import { CodexEditor } from "./CodexEditor";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
-import { sessionByNumber, type SessionRef } from "./sessions";
+import { sessionByNumber, sessionTitle } from "./sessions";
 import { Notice, useConfirm, type NoticeMessage } from "../components/feedback";
 
 /**
@@ -52,10 +52,16 @@ const MILESTONE_LEVEL_MIN = 1;
 const MILESTONE_LEVEL_MAX = 20;
 const MILESTONE_REASON_MAX = 120;
 
-type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionNumber: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean; tags: readonly string[]; who: string; activity: string; days: string; level: string; reason: string };
-const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "", level: "", reason: "" };
+type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionId: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean; tags: readonly string[]; who: string; activity: string; days: string; level: string; reason: string };
+const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionId: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "", level: "", reason: "" };
 const DRAFT_KEY = "codex-journal-draft";
 const LENS_KEY = "codex-chronicle-lens";
+/**
+ * D10 — the kinds the filter offers, every one the chronicle can hold. Named explicitly (rather than
+ * `Object.keys(CHRONICLE_KIND_META)`) so the order is the reading order rather than declaration order,
+ * and typed as the union so a new kind is a compile error here instead of a silently missing option.
+ */
+const FILTER_KINDS: readonly CodexChronicleKind[] = ["entry", "combat", "event", "deadline", "downtime", "milestone", "standing", "quest"];
 /**
  * OWNER DECISION (2026-07-30): the prep-clock reveal warning is switchable off, and the switch is per
  * DEVICE — `localStorage`, like every other GM reading preference in this app (`vtt.show-occupied`,
@@ -75,20 +81,32 @@ const writeRevealWarn = (on: boolean) => { try { localStorage.setItem(REVEAL_WAR
  * journal hands the id up rather than reaching sideways into either. `onOpenReplay` is the SAME prop
  * `PageTimeline` already takes, threaded from the same place, so there is one replay path and not two.
  */
-export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, openEntryId = null, onOpenedEntry = () => {}, sessions = [], onOpenSession }: Readonly<{
+export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, onOpenMarker, onOpenReplay, openEntryId = null, onOpenedEntry = () => {}, sessions = [], activeSessionId = null, onOpenSession, onOpenCalendar, kindFilter = null, tagFilter = null, textFilter = "", onFilterChange }: Readonly<{
   gmToken: string;
+  /** D6: the GM's cadence, for the edit path. The composer keeps an explicit Add (creation ≠ editing). */
+  autosave: CodexAutosaveSettings;
+  /** The shell's one page feed, for `[[` autocomplete. Never a second fetch. */
+  pages: readonly CodexPageSummary[];
   onOpenPage: (pageId: string) => void;
   onOpenMarker?: (markerId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
   openEntryId?: string | null;
   onOpenedEntry?: () => void;
+  /** D10: in-place filters, held in the URL so a dashboard card can deep-link to a filtered Journal. */
+  kindFilter?: string | null;
+  tagFilter?: string | null;
+  textFilter?: string;
+  onFilterChange?: (next: Readonly<Record<string, string | null>>) => void;
+  /** D17: the Calendar is a section of its own now, not a modal opened from here. */
+  onOpenCalendar?: () => void;
+  activeSessionId?: string | null;
   /**
    * M9: the session RECORDS, handed down from the workspace's single feed rather than fetched here.
    * A second read would be a second answer to "which sessions exist", and the by-session lens would be
    * the surface where the two disagreed.
    */
-  sessions?: readonly SessionRef[];
-  /** R1: opens the session log ON that session. Absent = the lens keeps rendering exactly as it did. */
+  sessions?: readonly CodexSession[];
+  /** R1: opens Sessions ON that session. Absent = the lens keeps rendering exactly as it did. */
   onOpenSession?: (sessionId: string) => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -187,7 +205,14 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
     const input = {
       playerText: draft.playerText, gmText: draft.gmText.trim() || null, revealedToPlayers: draft.revealed,
       attachPageId: draft.attachPageId || null,
-      sessionNumber: draft.sessionNumber.trim() ? Number(draft.sessionNumber) : null,
+      /**
+       * D9: entries join their session **by identity**. `sessionNumber` is display data the server
+       * resolves from the linked record and is a 400 on any write body, so it is never serialized here.
+       * An empty string means "— none —" and travels as an explicit null; omitting the key on a CREATE
+       * would auto-file under the active session, which is a different (and also correct) behaviour, so
+       * the composer states its choice rather than relying on the default.
+       */
+      sessionId: draft.sessionId ? draft.sessionId : null,
       inWorldDate,
       // Always sent, never omitted: on an edit, omitting `tags` would leave the old ones in place, so
       // removing the last tag from an entry has to travel as an explicit empty array.
@@ -244,7 +269,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       // The composer's kind is a NEW-record choice; on the edit path it is never read (see `submit`), so
       // it is parked back on `entry` rather than pretending a deadline's kind can be changed here.
       kind: "entry",
-      playerText: record.text, gmText: record.gmText ?? "", sessionNumber: record.sessionNumber?.toString() ?? "",
+      playerText: record.text, gmText: record.gmText ?? "", sessionId: record.sessionId ?? "",
       dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : "",
       attachPageId: record.attachPageId ?? "", revealed: record.revealedToPlayers, tags: record.tags,
       // A downtime's who/activity/days and a milestone's level/reason are not editable — there is no
@@ -299,7 +324,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       const seen = calendar?.publishedDate && calendar ? formatWorldDate(calendar, calendar.publishedDate) : "no date yet";
       const proceed = await confirm({
         title: "This is dated ahead of the players",
-        body: `This record is dated ${dated}. Players are still on ${seen}, so revealing it tells them the campaign has reached ${dated}. Publish the date first if that is not what you want.`,
+        body: `Players' date is still ${seen} — revealing this tells them the story has reached ${dated}. Publish the date first if that's not what you want.`,
         confirmLabel: "Reveal anyway",
         suppress: { label: "Stop warning me about this", onChange: (suppressed) => { if (suppressed) { setRevealWarn(false); writeRevealWarn(false); } } }
       });
@@ -317,7 +342,19 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
 
   // CT-12: the same records, grouped for whichever lens is on. Regrouping only — nothing is refetched and
   // nothing is written, so toggling can never change what the chronicle contains.
-  const groups = useMemo(() => groupChronicle(records, lens, calendar), [records, lens, calendar]);
+  /**
+   * D10: the filtered set, then the groups. Filtering BEFORE grouping is what keeps an empty group from
+   * rendering as a heading with nothing under it.
+   */
+  const allTags = useMemo(() => [...new Set(records.flatMap((record) => record.tags))].sort(), [records]);
+  const filtered = useMemo(() => {
+    const needle = textFilter.trim().toLowerCase();
+    return records.filter((record) =>
+      (!kindFilter || record.kind === kindFilter)
+      && (!tagFilter || record.tags.includes(tagFilter))
+      && (!needle || record.text.toLowerCase().includes(needle) || (record.gmText ?? "").toLowerCase().includes(needle) || (record.title ?? "").toLowerCase().includes(needle)));
+  }, [records, kindFilter, tagFilter, textFilter]);
+  const groups = useMemo(() => groupChronicle(filtered, lens, calendar), [filtered, lens, calendar]);
 
   // The world's "now": a readout + a Today marker placed in its year on the timeline. Since M11 this is
   // explicitly the GM's OWN clock — see the prep-clock row below for what the table is currently on.
@@ -380,8 +417,9 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
           <strong>{editingId ? "Edit entry" : COMPOSER_COPY[draft.kind].heading}</strong>
           {editingId && stashedDraft && <span className="codex-entry-when">Your unsaved entry is kept — it returns when you finish here.</span>}
           <div className="codex-composer-head-actions">
-            {nowLabel && <span className="codex-now-chip" title="The campaign's current date — set it in the calendar">Now: {nowLabel}</span>}
-            <Button variant="ghost" size="sm" onClick={() => setCalendarOpen(true)}>Calendar</Button>
+            {nowLabel && <span className="codex-now-chip" title="Your own clock — what a new record is dated at">Your date: {nowLabel}</span>}
+            {nowLabel && <GmOnlyTag />}
+            <Button variant="ghost" size="sm" onClick={() => (onOpenCalendar ? onOpenCalendar() : setCalendarOpen(true))}>Calendar</Button>
             {editingId && <Button variant="ghost" size="sm" onClick={cancelEdit}>Cancel</Button>}
           </div>
         </div>
@@ -391,9 +429,11 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
             as it does directly above the composer's own stack of fields. */}
         {clockDiverged && (
           <div className="codex-prepclock">
-            <span className="codex-prepclock-label">Players still see</span>
-            <span className="codex-now-chip">{publishedLabel ?? "no date yet"}</span>
-            <Button variant="primary" onClick={publishDate}>Publish the date</Button>
+            <span className="codex-prepclock-label">Players' date:</span>
+            <span className="codex-now-chip">{publishedLabel ?? "not shared yet"}</span>
+            {/* SECONDARY here, primary on the Calendar. §5 allows one primary action per view, and on the
+                Journal that is the composer's own submit. */}
+            <Button variant="secondary" onClick={publishDate}>Publish the date</Button>
             {/* The way BACK from "Stop warning me about this". It lives here rather than in a settings screen
                 because this row is the only place both clocks are on screen, and it renders exactly when the
                 warning would have mattered — so the GM meets the switch at the moment they want it, instead
@@ -409,14 +449,36 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
             )}
           </div>
         )}
-        <Field label={COMPOSER_COPY[draft.kind].textLabel} htmlFor="j-player"><Textarea id="j-player" className="codex-composer-body" value={draft.playerText} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder} onChange={(event) => set({ playerText: event.target.value })} /></Field>
-        <Field label={<span className="codex-composer-gm-label">GM-only notes <GmOnlyTag /></span>} htmlFor="j-gm"><Textarea id="j-gm" className="codex-composer-body codex-gm-block" value={draft.gmText} placeholder="Notes hidden from players…" onChange={(event) => set({ gmText: event.target.value })} /></Field>
+        {/* D13: the SAME writing surface a page body gets, so `[[links]]` typed into a journal entry
+            autocomplete and join the connection graph instead of silently doing nothing. */}
+        <Field label={COMPOSER_COPY[draft.kind].textLabel} htmlFor="j-player">
+          <CodexEditor id="j-player" token={gmToken} value={draft.playerText} onChange={(playerText) => set({ playerText })}
+            ariaLabel={COMPOSER_COPY[draft.kind].textLabel} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder}
+            pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} rows={5} />
+        </Field>
+        <Field label={<span className="codex-composer-gm-label">GM-only notes <GmOnlyTag /></span>} htmlFor="j-gm">
+          <CodexEditor id="j-gm" token={gmToken} value={draft.gmText} onChange={(gmText) => set({ gmText })}
+            ariaLabel="GM-only notes" placeholder="Notes hidden from players…"
+            pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} gmLayer rows={4} />
+        </Field>
         <div className="codex-composer-meta">
-          <Field label="Session #" htmlFor="j-session"><Input id="j-session" type="number" inputMode="numeric" value={draft.sessionNumber} onChange={(event) => set({ sessionNumber: event.target.value })} /></Field>
+          {/* D9: a session is chosen by RECORD, not by typing a number. Renumbering then relabels every
+              entry with no journal write at all, and a hidden session's number can no longer leak. */}
+          <Field label="Session" htmlFor="j-session">
+            <Select id="j-session" value={draft.sessionId} onChange={(event) => set({ sessionId: event.target.value })}>
+              <option value="">— none —</option>
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>{sessionTitle(session)}{session.id === activeSessionId ? " (active)" : ""}</option>
+              ))}
+            </Select>
+          </Field>
           <Field label="Year" htmlFor="j-year"><Input id="j-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => set({ dateYear: event.target.value })} /></Field>
           <Field label="Month" htmlFor="j-month"><Select id="j-month" value={draft.dateMonth} disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateMonth: event.target.value })}>{(calendar?.months ?? []).map((month, index) => <option key={index} value={String(index)}>{month.name}</option>)}</Select></Field>
           <Field label="Day" htmlFor="j-day"><Input id="j-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateDay: event.target.value })} /></Field>
-          <Field label="Pin to page" htmlFor="j-page"><EntityPicker id="j-page" pages={pages} value={draft.attachPageId || null} onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Pin to page" placeholder="— none —" /></Field>
+          <Field label="Attach to page" htmlFor="j-page">
+            <Combobox id="j-page" options={pages.map((page) => ({ id: page.id, label: page.title }))} value={draft.attachPageId || null}
+              onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Attach to page" placeholder="— none —" />
+          </Field>
         </div>
         {/* A deadline's date is not optional metadata, it is half the record — so say so where the button
             will not arm, rather than letting the GM discover it as a save failure. */}
@@ -485,16 +547,31 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
           so it reaches a screen reader without interrupting; `error` above stays the assertive channel. */}
       <Notice notice={notice} />
 
-      {/* CT-12: the lens toggle. Above the timeline and outside the groups, because it governs all of
-          them; `SegmentedControl` is the `@vtt/ui` primitive (R9) and carries its own 44px floor. */}
+      {/* CT-12: the lens toggle, and D10's in-place filters beside it. Above the timeline and outside
+          the groups, because both govern all of them. Filter state lives in the URL, so a dashboard card
+          can deep-link to "the Journal, deadlines only". Client-side over the records already fetched —
+          the chronicle is one read and filtering it is not a second one. */}
       <div className="codex-timeline-lens">
-        <SegmentedControl ariaLabel="Timeline lens" value={lens} onChange={(next) => setLens(next as ChronicleLens)}
+        <SegmentedControl ariaLabel="Journal lens" value={lens} onChange={(next) => setLens(next as ChronicleLens)}
           options={CHRONICLE_LENSES.map((option) => ({ value: option.id, label: option.label }))} />
+        <Select aria-label="Filter by kind" value={kindFilter ?? ""} onChange={(event) => onFilterChange?.({ kind: event.target.value || null })}>
+          <option value="">All kinds</option>
+          {FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{CHRONICLE_KIND_META[kind].label}</option>)}
+        </Select>
+        <Input aria-label="Filter the journal" placeholder="Filter the journal…" value={textFilter}
+          onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
+        {allTags.length > 0 && (
+          <Select aria-label="Filter by tag" value={tagFilter ?? ""} onChange={(event) => onFilterChange?.({ tag: event.target.value || null })}>
+            <option value="">All tags</option>
+            {allTags.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
+          </Select>
+        )}
       </div>
 
       <div className="codex-timeline">
         {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
         {!loading && records.length === 0 && <p className="codex-list-empty">No journal entries yet.</p>}
+        {!loading && records.length > 0 && filtered.length === 0 && <p className="codex-list-empty">Nothing in the Journal matches these filters.</p>}
         {groups.map((group) => {
           /**
            * M9: a session heading opens the session — but ONLY when a session record actually exists
@@ -534,6 +611,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
               const downtime = downtimeOf(record);
               const milestone = milestoneOf(record);
               const standing = standingOf(record);
+              const questEvent = questEventOf(record);
               // The SERVER's proposed date, not a second local computation: Confirm says this date out
               // loud and then the server decides where the clock actually lands, so only one of the two
               // can be authoritative. `downtimeProposedDate` stays for the composer's preview, where no
@@ -555,7 +633,14 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
                         badge tone is a scanning aid and nothing is said by it alone. */}
                     {isDeadline && <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>}
                     <span className="codex-entry-when">{chronicleWhenLabel(record)}</span>
-                    {record.sessionNumber !== null && <span className="codex-entry-when">Session {record.sessionNumber}</span>}
+                    {/* D9 / ruling R2: render whatever the row carries, never a label built from a number.
+                        `sessionId` present → a link. `sessionId` null with a number → a deleted-but-once-
+                        revealed session's bare label, with nothing to navigate to. Both are real states. */}
+                    {record.sessionId && onOpenSession
+                      ? <button type="button" className="codex-entry-sessionlink" onClick={() => onOpenSession(record.sessionId!)}>
+                          {record.sessionNumber !== null ? `Session ${record.sessionNumber}` : "This session"}
+                        </button>
+                      : record.sessionNumber !== null && <span className="codex-entry-when">Session {record.sessionNumber}</span>}
                   </div>
                   <RevealSwitch revealed={record.revealedToPlayers} onChange={(revealed) => reveal(record, revealed)} ariaLabel={isEvent ? "Show this event to players" : "Show this entry to players"} />
                 </header>
@@ -583,13 +668,15 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
                       ? <p className="codex-downtime-state">The campaign clock has already been advanced for this downtime.</p>
                       : proposed && calendar
                       ? <div className="codex-downtime-apply">
-                          <span className="codex-downtime-proposal">Advance the campaign clock to {formatWorldDate(calendar, proposed)}{passing > 0 ? ` — this passes ${passing} ${passing === 1 ? "deadline" : "deadlines"}.` : ""}</span>
+                          <span className="codex-downtime-proposal">Move your date to {formatWorldDate(calendar, proposed)}{passing > 0 ? ` — this passes ${passing} ${passing === 1 ? "deadline" : "deadlines"}.` : ""}</span>
                           {/* §4 route 1: `Button` at its default size grows its own paint to 44px and
                               has no `::after`, which is what a control stacked above the row's footer
-                              buttons needs — a route-2 overhang here would reach into their hit areas. */}
-                          <Button variant="primary" onClick={() => applyDowntime(record)}>Confirm</Button>
+                              buttons needs — a route-2 overhang here would reach into their hit areas.
+                              SECONDARY, not primary: the row already states the consequence in words, and
+                              the view's one primary action is the composer's own submit (§5). */}
+                          <Button variant="secondary" onClick={() => applyDowntime(record)}>Confirm</Button>
                         </div>
-                      : <p className="codex-downtime-state">Set the campaign's current date in the calendar to advance the clock from this downtime.</p>}
+                      : <p className="codex-downtime-state">Set your date on the Calendar to move the clock from this downtime.</p>}
                   </div>
                 )}
                 {/* CT-8 / CT-6: what the record actually says, beyond its prose. Both are read-only — a
@@ -597,6 +684,9 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
                     that rewrites a payload. A standing row names its faction where the page is known;
                     where it is not, the shared label says "A faction" rather than inventing a name. */}
                 {milestone && <p className="codex-downtime-what">{milestoneSummaryLabel(milestone)}</p>}
+                {/* D11: a quest-history row carries no prose at all, so its whole sentence is this — the
+                    quest's title resolved against the shell's quest feed where we have one. */}
+                {questEvent && <p className="codex-downtime-what">{questEventLabel(questEvent, null)}</p>}
                 {standing && <p className="codex-downtime-what">{standingChangeLabel(standing, pages.find((page) => page.id === standing.factionPageId)?.title ?? null)}</p>}
                 {/* CI-6: the entry's two return edges sit beside the page edge it already had, so an
                     entry reads as "here is what happened, here is where, here is the fight itself".
@@ -608,7 +698,7 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
                   {isEvent && <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.id)}>Open page</Button>}
                   {!isEvent && record.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(record.attachPageId!)}>Open page</Button>}
                   {record.attachMarkerId && onOpenMarker &&
-                    <Button variant="ghost" size="sm" onClick={() => onOpenMarker(record.attachMarkerId!)}>Open marker</Button>}
+                    <Button variant="ghost" size="sm" onClick={() => onOpenMarker(record.attachMarkerId!)}>Open pin</Button>}
                   {record.kind === "combat" && record.sourceEncounterId !== null && onOpenReplay &&
                     <Button variant="ghost" size="sm" onClick={() => onOpenReplay(record.sourceEncounterId!)}>Open replay</Button>}
                   {!isEvent && <Button variant="ghost" size="sm" onClick={() => edit(record)}>Edit</Button>}

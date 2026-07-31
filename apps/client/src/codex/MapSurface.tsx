@@ -37,6 +37,12 @@ type MapSurfaceProps = Readonly<{
   markers: readonly SurfaceMarker[];
   placing: boolean;
   selectedMarkerId: string | null;
+  /**
+   * D10: pins that do NOT match the Atlas's filter. They dim to 30% rather than disappearing — a map
+   * with pins removed is a different picture of the world, not a filtered list of one. Selection and
+   * hit-testing are unaffected, so a dimmed pin is still tappable.
+   */
+  dimmedMarkerIds?: ReadonlySet<string> | null;
   readOnly?: boolean;
   /**
    * A request to bring ONE pin into view (`ux-principles.md` §9 — actions name their result). The camera
@@ -53,7 +59,7 @@ type MapSurfaceProps = Readonly<{
   onMarkerDragEnd: (markerId: string, point: { x: number; y: number }) => void;
 }>;
 
-export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, readOnly = false, centerOnMarkerId = null, onCentered, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
+export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, dimmedMarkerIds = null, readOnly = false, centerOnMarkerId = null, onCentered, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
   const image = useAuthorizedMapImage(assetId, token);
   const svgRef = useRef<SVGSVGElement>(null);
   const gesture = useRef<Gesture>({ mode: "idle" });
@@ -186,7 +192,7 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
           const s = glyphSize;
           return (
             <g key={marker.id} data-marker-id={marker.id} transform={`translate(${pos.x} ${pos.y})`}
-              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}${marker.isParty ? " is-party" : ""}`}>
+              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}${marker.isParty ? " is-party" : ""}${dimmedMarkerIds?.has(marker.id) ? " is-dimmed" : ""}`}>
               {/* CT-7 / R2, the accessible half: the party pin's meaning reaches a screen reader as a
                   NAME, not as a ring it cannot see. Ordinary pins keep no title, exactly as before. */}
               {marker.isParty && <title>{marker.label ? `${marker.label} — ${PARTY_LABEL.toLowerCase()}` : PARTY_LABEL}</title>}

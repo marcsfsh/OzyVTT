@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import { useId } from "react";
 import { cx } from "./util";
+import { IconX } from "./icons";
 import "./Drawer.css";
 
 export interface DrawerProps {
@@ -61,7 +62,7 @@ export function Drawer({ open, onClose, title, children, side = "right", ariaLab
     >
       <header className="nh-drawer-head">
         <h2 className="nh-drawer-title" id={titleId}>{title}</h2>
-        <button type="button" className="nh-drawer-close tap-target interactive" aria-label="Close" onClick={onClose}>✕</button>
+        <button type="button" className="nh-drawer-close tap-target interactive" aria-label="Close" onClick={onClose}><IconX /></button>
       </header>
       <div className="nh-drawer-body scroll-y">{children}</div>
     </aside>

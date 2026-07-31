@@ -73,7 +73,7 @@ const renderAtlas = async (markers: CodexMarker[]) => {
   listAssets.mockResolvedValue([]);
   listPages.mockResolvedValue([]);
   forMarker.mockResolvedValue([]);
-  render(<AtlasView gmToken="gm" scenes={[]} activeSceneId={null} onOpenPage={vi.fn()} onActivateScene={vi.fn()} />);
+  render(<AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} />);
   await waitFor(() => expect(listMarkers).toHaveBeenCalled());
 };
 

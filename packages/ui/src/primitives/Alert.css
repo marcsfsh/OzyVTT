@@ -29,7 +29,7 @@
 .nh-alert--success { border-left-color: var(--success); }
 .nh-alert--success .nh-alert-icon { color: var(--cyan-hi); background: color-mix(in srgb, var(--cyan) 20%, transparent); }
 .nh-alert--warning { border-left-color: var(--caution); }
-.nh-alert--warning .nh-alert-icon { color: var(--violet-hi); background: color-mix(in srgb, var(--caution) 22%, transparent); }
+.nh-alert--warning .nh-alert-icon { color: var(--caution-hi); background: color-mix(in srgb, var(--caution) 22%, transparent); }
 .nh-alert--danger  { border-left-color: var(--danger); }
 .nh-alert--danger  .nh-alert-icon { color: var(--danger-hi); background: color-mix(in srgb, var(--danger) 20%, transparent); }
 :root[data-theme="light"] .nh-alert--info .nh-alert-icon { color: var(--info); }

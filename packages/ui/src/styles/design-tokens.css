@@ -50,15 +50,35 @@
   --codex-type-religion: var(--violet-hi);
   --codex-type-item: var(--indigo);
 
+  /* D25: the atlas pin palette. These were eight hardcoded hex values inside `icons.tsx`, which meant
+     the light theme drew map pins at dark-theme saturation. The palette OFFERED is tokenized; the value
+     PERSISTED stays hex on the wire (the server stores `#rrggbb` and no API changed), so an
+     already-placed pin in a colour outside this list still renders as itself. */
+  --pin-1: #FF2E9A;
+  --pin-2: #2DE2FF;
+  --pin-3: #A45CFF;
+  --pin-4: #FF2D5E;
+  --pin-5: #FFB020;
+  --pin-6: #57E39A;
+  --pin-7: #E8ECF4;
+  --pin-8: #94A3B8;
+
   /* Semantic (hue is a hint; always pair with icon + label) */
   --primary: var(--magenta);
   --success: var(--cyan);
-  --caution: #C77DFF;
+  /* D21 / director ruling R8 — caution is a WARM ORANGE and no longer violet.
+     It aliased --violet, which invariant 8 reserves exclusively for GM-only content, so
+     a warning badge and a GM-secret block were the same hue: the one colour in the system
+     that must mean exactly one thing meant two. Orange is the only direction left that is
+     neither loss-red, brand magenta/cyan, nor GM-violet; the restraint rule's "no yellow"
+     is respected in letter and intent. Measured 2026-07-31 (Chromium, WCAG 2.1):
+     --caution-hi #FFB877 reads 10.77 / 9.96 / 8.85 on dark's three surfaces and
+     7.06 / 6.07 / 5.05 on dusk's; light's #8F4406 reads 6.80 / 6.36 / 5.93. */
+  --caution: #FF9E4A;
   /* Caution as TEXT. The --danger/--danger-hi pair exists because the fill hue isn't
-     readable as small type; caution needs the same pair, and --violet-hi is already the
-     system's "readable violet on this theme's surfaces". Use --caution for edges and
+     readable as small type; caution needs the same pair. Use --caution for edges and
      fills, --caution-hi for the words. */
-  --caution-hi: var(--violet-hi);
+  --caution-hi: #FFB877;
   --danger: #FF2D5E;
   --danger-hi: #FF6B8E;
   --info: var(--indigo);
@@ -66,7 +86,12 @@
   /* Text */
   --text: #ECEAFB;
   --text-dim: #A8A2CC;
-  --text-muted: #6E6892;
+  /* D21 #1. Was #6E6892 — 3.53 / 3.26 / 2.90 on this theme's three surfaces, below AA on
+     every one of them, across ~207 usages (placeholders, help text, chronicle when-labels,
+     the whole quiet half of the interface). Raised until it passes: measured 2026-07-31
+     (Chromium, WCAG 2.1) at 6.43 / 5.94 / 5.29. Dusk and light carry their own values
+     below, each measured the same way. */
+  --text-muted: #9A94C2;
   --text-on-neon: #0C0A18;   /* dark ink on bright neon fills */
 
   /* Glows: bloom in dark/dusk. State only, never resting elevation.
@@ -173,9 +198,14 @@
   --line: #574D88;
   --line-strong: #7166A8;
 
+  /* D21 #2: dusk inherits the dark theme's warm-orange caution pair — #FFB877 measures
+     7.06 / 6.07 / 5.05 on dusk's surfaces, so it needs no override of its own. */
+
   --text: #F0EEFB;
   --text-dim: #C4BEE2;
-  --text-muted: #938CB6;
+  /* D21 #1. Was #938CB6 — 3.80 / 3.27 / 2.72, the worst of the three themes because dusk's
+     surfaces are the lightest of the dark pair. Measured at 6.55 / 5.63 / 4.68. */
+  --text-muted: #C2BBE0;
   --text-on-neon: #16132C;
 
   --violet-hi: #D3AEFF;
@@ -221,14 +251,30 @@
 
   --primary: var(--magenta);
   --success: var(--cyan);
-  --caution: #7A3FD0;
+  /* D25: darkened pins, so a marker on a pale map is as legible as one on a dark map. */
+  --pin-1: #C81D80;
+  --pin-2: #0F7FC0;
+  --pin-3: #7A3FD0;
+  --pin-4: #C8143E;
+  --pin-5: #9A6100;
+  --pin-6: #0E7A55;
+  --pin-7: #4A4568;
+  --pin-8: #5A6472;
+  /* D21 #2: the deep warm orange, the light theme's readable twin of the dark pair.
+     `--caution` is the edge/fill (4.77 / 4.46 / 4.16 — an edge, not small type);
+     `--caution-hi` below is what the words use and measures 6.80 / 6.36 / 5.93. */
+  --caution: #B4560A;
+  --caution-hi: #8F4406;
   --danger: #C8143E;
   --danger-hi: #E24C6C;
   --info: var(--indigo);
 
   --text: #17132E;      /* deep indigo ink */
   --text-dim: #4A4568;
-  --text-muted: #726C90;
+  /* D21 #1. Was #726C90 — 5.02 / 4.70 / 4.38: it passed on --surface-1 and failed on the
+     other two, which is the worst kind of near-miss because it reads fine where you check
+     it. Measured at 6.76 / 6.32 / 5.90. */
+  --text-muted: #5B5578;
   --text-on-neon: #FFFFFF;
 
   /* Glow becomes a solid accent ring plus a faint soft shadow */

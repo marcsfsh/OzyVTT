@@ -14,7 +14,7 @@
 /* Soft outline tones — a colored edge + readable tinted text, surface stays quiet. */
 .nh-badge--primary { border-color: var(--magenta); color: var(--magenta-hi); }
 .nh-badge--success { border-color: var(--success); color: var(--cyan-hi); }
-.nh-badge--caution { border-color: var(--caution); color: var(--violet-hi); }
+.nh-badge--caution { border-color: var(--caution); color: var(--caution-hi); }
 .nh-badge--danger  { border-color: var(--danger); color: var(--danger-hi); }
 .nh-badge--info    { border-color: var(--info); color: var(--indigo); }
 :root[data-theme="light"] .nh-badge--info { color: var(--info); }
@@ -27,3 +27,9 @@
 .nh-badge--solid.nh-badge--danger  { background: var(--danger); }
 .nh-badge--solid.nh-badge--info    { background: var(--info); }
 .nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not([class*="nh-badge--caution"]):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]) { background: var(--line-strong); color: var(--text); }
+
+/* Violet — reserved for GM-only content and nothing else (design-language §2 / invariant 8).
+   It is a tone rather than a bespoke pill so `GmOnlyTag` and `HiddenFromPlayers` stop being
+   two hand-rolled lookalikes of this component. */
+.nh-badge--violet { border-color: var(--violet); color: var(--violet-hi); }
+.nh-badge--solid.nh-badge--violet { background: var(--violet); }

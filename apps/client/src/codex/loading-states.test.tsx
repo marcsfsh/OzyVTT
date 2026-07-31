@@ -39,7 +39,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { CodexShell } from "./CodexShell";
 
 /**
  * CF-2: **an empty state must never front-run its own fetch.**
@@ -58,7 +58,7 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
-const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 
 describe("Codex loading states (CF-2)", () => {
   beforeEach(() => {

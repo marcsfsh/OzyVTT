@@ -48,13 +48,13 @@ import type { CodexSettings } from "./api";
  *    setting the codex does not hold.
  */
 const SETTINGS = (over: Partial<CodexSettings["revisionHistory"]> = {}): CodexSettings =>
-  ({ revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 1412, versionBytes: 8_400_000, ...over } });
+  ({ autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 1412, versionBytes: 8_400_000, ...over } });
 
 const open = async (settings: CodexSettings) => {
   getSettings.mockResolvedValue(settings);
   setSettings.mockImplementation((_t: string, input: { revisionHistory: { enabled: boolean; windowMinutes: number } }) =>
     Promise.resolve({ revisionHistory: { ...settings.revisionHistory, ...input.revisionHistory } }));
-  render(<CodexSettingsView gmToken="gm" onClose={vi.fn()} />);
+  render(<CodexSettingsView gmToken="gm" />);
   await waitFor(() => expect(getSettings).toHaveBeenCalledWith("gm"));
   return userEvent.setup();
 };
@@ -69,7 +69,7 @@ describe("Version history can be switched off (owner decision, 2026-07-30)", () 
 
     await user.click(toggle);
 
-    await waitFor(() => expect(setSettings).toHaveBeenCalledWith("gm", { revisionHistory: { enabled: false, windowMinutes: 90 } }));
+    await waitFor(() => expect(setSettings).toHaveBeenCalledWith("gm", { autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: false, windowMinutes: 90 } }));
   });
 
   /**
@@ -99,7 +99,7 @@ describe("How often a version is kept is configurable", () => {
     await user.clear(field);
     await user.type(field, "30");
 
-    await waitFor(() => expect(setSettings).toHaveBeenCalledWith("gm", { revisionHistory: { enabled: true, windowMinutes: 30 } }));
+    await waitFor(() => expect(setSettings).toHaveBeenCalledWith("gm", { autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 30 } }));
   });
 
   /**
@@ -130,7 +130,7 @@ describe("How often a version is kept is configurable", () => {
     await user.clear(field);
     await user.type(field, "99999");
 
-    await waitFor(() => expect(setSettings).toHaveBeenLastCalledWith("gm", { revisionHistory: { enabled: true, windowMinutes: 10_080 } }));
+    await waitFor(() => expect(setSettings).toHaveBeenLastCalledWith("gm", { autosave: { enabled: true, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 10_080 } }));
   });
 
   /**
@@ -231,7 +231,7 @@ describe("Existing history can be deleted (owner decision, 2026-07-30)", () => {
 describe("The screen never claims a setting it could not read", () => {
   it("says the read failed instead of rendering a guessed default", async () => {
     getSettings.mockRejectedValue(new Error("The codex request failed (500)."));
-    render(<CodexSettingsView gmToken="gm" onClose={vi.fn()} />);
+    render(<CodexSettingsView gmToken="gm" />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The codex request failed (500).");
     // A switch defaulted to "on" here would be a guess presented as the codex's state (the CF-2 lesson).

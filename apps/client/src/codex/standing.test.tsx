@@ -301,7 +301,7 @@ describe("M12's two new chronicle kinds read by icon AND word (R2)", () => {
     // `delta` as a level, or a milestone's `level` as a faction's id — silently, and in a sentence.
     const record = (over: Partial<CodexChronicleRecord>): CodexChronicleRecord => ({
       kind: "entry", id: "x", title: null, text: "", gmText: null, revealedToPlayers: false,
-      sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+      sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
       tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null,
       fired: false, proposedDate: null, createdAt: "", updatedAt: "", ...over
     });

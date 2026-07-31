@@ -48,7 +48,7 @@ const MAP = (id: string, name: string, revealedToPlayers: boolean, parentMapId: 
 const MAPS = [MAP("m1", "Barovia", false), MAP("m2", "Faerûn", true), MAP("m3", "Castle Ravenloft", false, "m1")];
 
 const renderAtlas = () =>
-  render(<AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onOpenPage={() => {}} onActivateScene={() => {}} />);
+  render(<AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} />);
 
 describe("Atlas GM-only mark — an SVG glyph, never an emoji (design-language §0)", () => {
   beforeEach(() => {

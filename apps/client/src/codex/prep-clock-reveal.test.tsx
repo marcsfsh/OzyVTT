@@ -61,7 +61,7 @@ const NEVER_PUBLISHED: GmCodexCalendar = { ...CALENDAR, publishedDate: null };
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -87,7 +87,7 @@ const renderJournal = async (records: CodexChronicleRecord[], calendar: GmCodexC
   revealEntry.mockResolvedValue({});
   revealPage.mockResolvedValue({});
   publishCalendar.mockResolvedValue({});
-  render(<JournalView gmToken="gm" onOpenPage={vi.fn()} />);
+  render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />);
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 

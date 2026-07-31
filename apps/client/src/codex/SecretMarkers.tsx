@@ -1,4 +1,4 @@
-import { Switch } from "@vtt/ui";
+import { Badge, IconEye, IconEyeOff, Switch } from "@vtt/ui";
 
 /**
  * The Codex's one shared "public vs GM-only" vocabulary, factored so it can never drift again.
@@ -41,10 +41,28 @@ export function RevealSwitch({ revealed, onChange, ariaLabel }: Readonly<{
  * switch's off state, on purpose, because it is the same fact.
  */
 export function HiddenFromPlayers() {
-  return <span className="codex-hidden-pill" aria-label="Hidden from players">Hidden from players</span>;
+  return <Badge tone="neutral" className="codex-hidden-pill"><IconEyeOff /> Hidden from players</Badge>;
 }
 
-/** The one "this content is GM-only" pill. `floating` positions it in a block's top-right corner. */
+/**
+ * The one "this content is GM-only" pill, now over the `Badge` primitive's violet tone (D25: bespoke
+ * lookalikes become primitives). Violet stays exclusively GM-only, which is why the tone exists.
+ * `floating` positions it in a block's top-right corner.
+ */
 export function GmOnlyTag({ floating = false }: Readonly<{ floating?: boolean }>) {
-  return <span className={`codex-gm-pill${floating ? " is-floating" : ""}`} aria-label="GM only, hidden from players">GM only</span>;
+  return <Badge tone="violet" className={`codex-gm-pill${floating ? " is-floating" : ""}`}>GM only</Badge>;
+}
+
+/**
+ * D18 / G11 — **one fact, one badge.** Whether a record is shown to players, said the same way on every
+ * list in the suite: icon + the RevealSwitch's exact words, never colour alone and never a drifted
+ * "Shown"/"Hidden" shorthand that means something subtly different card to card.
+ *
+ * GM-only by construction: the shared card types carry no reveal flag, so a player caller literally
+ * cannot pass `revealed` — the same capability-flag pattern `onAdjustStanding` uses.
+ */
+export function VisibilityBadge({ revealed }: Readonly<{ revealed: boolean }>) {
+  return revealed
+    ? <Badge tone="success" className="codex-visibility-badge"><IconEye /> Shown to players</Badge>
+    : <Badge tone="neutral" className="codex-visibility-badge"><IconEyeOff /> Hidden from players</Badge>;
 }

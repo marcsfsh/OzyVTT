@@ -1,7 +1,7 @@
-import { Alert, Badge, Button, Field, IconButton, Input, Select, Switch, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, IconButton, IconPlay, IconPlus, IconX, Input, Select, Switch, TagInput } from "@vtt/ui";
 import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
-import { IconPicker, EntityIcon } from "./icons";
-import { EntityPicker } from "./EntityPicker";
+import { CodexIcon, IconPicker, EntityIcon, pinSwatchVar } from "./icons";
+
 import { RevealSwitch, HiddenFromPlayers } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { socket } from "../socket";
@@ -106,10 +106,10 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   return (
     <aside className="codex-inspector" aria-label="Marker">
       <div className="codex-inspector-head">
-        <strong>{marker.label || "Marker"}</strong>
+        <strong>{marker.label || "Unlabelled pin"}</strong>
         <div className="codex-inspector-head-actions">
-          <RevealSwitch revealed={marker.revealedToPlayers} onChange={reveal} ariaLabel="Show this marker to players" />
-          <IconButton label="Close" size="sm" onClick={onClose}>✕</IconButton>
+          <RevealSwitch revealed={marker.revealedToPlayers} onChange={reveal} ariaLabel="Show this pin to players" />
+          <IconButton label="Close" size="sm" onClick={onClose}><IconX /></IconButton>
         </div>
       </div>
 
@@ -126,7 +126,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
       <Field label="Tags" htmlFor="marker-tags">
         <TagInput id="marker-tags" ariaLabel="Tags" placeholder="dungeon, shop" values={marker.tags}
           onChange={(next) => patch({ tags: next })}
-          max={24} maxReachedReason="A marker may carry at most 24 tags."
+          max={24} maxReachedReason="A pin may carry at most 24 tags."
           suggestions={tagSuggestions}
           /* DEFAULT slugify — it is the server's own contract (`tags()` throws on a non-slug rather
              than cleaning it up), so normalising here is what keeps a typed "Old Mill" saveable. */ />
@@ -147,8 +147,6 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
           : <>Only one pin in the whole atlas can be the party. Turning this on clears whichever pin held it before, wherever it was.</>}</p>
       </div>
 
-      <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
-
       <Field label="Linked pages">
         <div className="codex-marker-links">
           {linkedPages.map((page) => (
@@ -156,11 +154,14 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
               <button type="button" className="codex-marker-link-open" onClick={() => onOpenPage(page.id)}>
                 <EntityIcon type={page.entityType} /> <span className="codex-list-title">{page.title}</span>
               </button>
-              <button type="button" className="codex-marker-link-x" aria-label={`Unlink ${page.title}`} disabled={busy} onClick={() => patch({ pageIds: marker.pageIds.filter((id) => id !== page.id) })}>✕</button>
+              <IconButton label={`Unlink ${page.title}`} size="sm" onClick={() => patch({ pageIds: marker.pageIds.filter((id) => id !== page.id) })}><IconX /></IconButton>
             </div>
           ))}
-          <EntityPicker pages={unlinkedPages} value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page…" />
-          <Button variant="ghost" size="sm" onClick={onCreatePage}>＋ New page{marker.label ? ` “${marker.label}”` : ""}</Button>
+          <Combobox options={unlinkedPages.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
+            value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page…" />
+          {/* D7: opens the ONE quick-create dialog, prefilled with the pin's label, and links the new
+              page to this pin on success — it no longer creates an untyped page behind the GM's back. */}
+          <Button variant="ghost" size="sm" onClick={onCreatePage}><IconPlus /> New page{marker.label ? ` “${marker.label}”` : ""}</Button>
         </div>
       </Field>
       {shownOnHiddenMap && (
@@ -188,10 +189,10 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             {linkedScenes.map((scene) => (
               <div key={scene.id} className="codex-marker-link">
                 {activeSceneId === scene.id
-                  ? <Badge tone="success">● Live</Badge>
-                  : <Button variant="primary" size="sm" onClick={() => onActivateScene(scene.id)}>▶ Go live</Button>}
+                  ? <Badge tone="success"><span className="codex-dot" aria-hidden="true" /> Live</Badge>
+                  : <Button variant="secondary" size="sm" onClick={() => onActivateScene(scene.id)}><IconPlay /> Go live</Button>}
                 <span className="codex-marker-link-name codex-list-title">{scene.name}</span>
-                <button type="button" className="codex-marker-link-x" aria-label={`Unlink ${scene.name}`} disabled={busy} onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => id !== scene.id) })}>✕</button>
+                <IconButton label={`Unlink ${scene.name}`} size="sm" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => id !== scene.id) })}><IconX /></IconButton>
               </div>
             ))}
             {availableScenes.length > 0 && (
@@ -233,7 +234,19 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             </ul>}
       </div>
 
-      <div className="codex-inspector-foot"><Button variant="ghost" size="sm" onClick={remove}>Delete marker</Button></div>
+      {/* D25 / G16 — the icon-and-colour grid is ~500px tall and used to sit directly under the label,
+          burying every functional control (links, sub-map, scenes, actor, journal) below the fold. It is
+          the least-used half of this panel, so it moves last and starts collapsed, with the current
+          icon in the summary so the GM can see what they have without opening it. */}
+      <details className="codex-marker-appearance">
+        <summary className="codex-marker-appearance-summary">
+          <CodexIcon iconId={marker.iconId} className="codex-ent-icon" style={{ color: pinSwatchVar(marker.iconColor) }} />
+          Appearance
+        </summary>
+        <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
+      </details>
+
+      <div className="codex-inspector-foot"><Button variant="ghost" size="sm" onClick={remove}>Delete pin</Button></div>
       {confirmDialog}
     </aside>
   );

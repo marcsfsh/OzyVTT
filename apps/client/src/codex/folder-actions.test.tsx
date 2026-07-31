@@ -40,7 +40,8 @@ const handlers = () => ({
   onDeleteFolder: vi.fn(),
   onMovePage: vi.fn(),
   onMoveFolder: vi.fn(),
-  onRequestMove: vi.fn()
+  onRequestMove: vi.fn(),
+  onRequestMoveFolder: vi.fn()
 });
 
 const renderTree = (h: ReturnType<typeof handlers>) =>

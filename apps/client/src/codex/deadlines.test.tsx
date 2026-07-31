@@ -89,7 +89,7 @@ const CALENDAR: GmCodexCalendar = {
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -100,7 +100,7 @@ const DEADLINE = RECORD({
 });
 const DOWNTIME = RECORD({
   kind: "downtime", id: "w1", text: "A quiet tenday in Daggerford.",
-  payload: { who: "Aldric", activity: "Forging a blade", days: 7, applied: false },
+  payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null, applied: false },
   // The server's answer for where the clock lands. Hammer 3 + 7 = Hammer 10 — the same date local
   // arithmetic would reach, so the ordinary tests below read naturally; the test that proves WHICH of
   // the two the row is showing deliberately makes them disagree.
@@ -112,7 +112,7 @@ const renderJournal = async (records: CodexChronicleRecord[], calendar: GmCodexC
   chronicle.mockResolvedValue(records);
   listPages.mockResolvedValue([]);
   getCalendar.mockResolvedValue(calendar);
-  render(<JournalView gmToken="gm" onOpenPage={vi.fn()} />);
+  render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />);
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 
@@ -176,7 +176,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     await user.click(screen.getByRole("button", { name: "Log downtime" }));
 
     await waitFor(() => expect(createDowntime).toHaveBeenCalled());
-    expect(createDowntime.mock.calls.at(-1)![1].downtime).toEqual({ who: "Aldric", activity: "Forging a blade", days: 7 });
+    expect(createDowntime.mock.calls.at(-1)![1].downtime).toEqual({ who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null });
     // The whole of O-3 in three lines: nothing here moved the campaign date.
     expect(applyDowntime).not.toHaveBeenCalled();
     expect(setCalendar).not.toHaveBeenCalled();
@@ -302,7 +302,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
   });
 
   it("offers no second confirmation once the clock has already been advanced", async () => {
-    await renderJournal([RECORD({ ...DOWNTIME, id: "w2", payload: { who: "Aldric", activity: "Forging a blade", days: 7, applied: true } })]);
+    await renderJournal([RECORD({ ...DOWNTIME, id: "w2", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null, applied: true } })]);
     const row = within(rowOf("w2"));
 
     expect(row.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
@@ -369,8 +369,8 @@ describe("The prep clock is quiet until it matters (O-1)", () => {
 
 describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
   const PLAYER_RECORD = (over: Partial<PlayerCodexChronicleRecord> = {}): PlayerCodexChronicleRecord => ({
-    kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionNumber: null,
-    realDate: null, inWorldLabel: null, tags: [], payload: null, fired: false,
+    kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionId: null, sessionNumber: null,
+    realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false,
     createdAt: "2026-07-20T00:00:00.000Z", ...over
   });
 
@@ -392,7 +392,7 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
     const user = userEvent.setup();
     await renderPlayer([
       PLAYER_RECORD({ kind: "deadline", id: "d1", text: "The duke's ultimatum expires.", inWorldLabel: "Hammer 10, 1492 DR", fired: true }),
-      PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7 } })
+      PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null } })
     ]);
     await user.click(screen.getByRole("tab", { name: "Journal" }));
 
@@ -405,7 +405,7 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
   });
 
   it("never asks the GM calendar route, and never offers a Confirm", async () => {
-    await renderPlayer([PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7 } })]);
+    await renderPlayer([PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null } })]);
 
     // The one half of the prep clock a client test can honestly prove: which route this surface asks.
     // `calendarApi.get` is the GM read and its answer carries the GM's own clock beside `publishedDate`.
@@ -529,8 +529,8 @@ describe("The shared reading rules themselves", () => {
   });
 
   it("says a downtime in one line without inventing punctuation for the halves it was not given", () => {
-    expect(downtimeSummaryLabel({ who: "Aldric", activity: "Forging a blade", days: 7 })).toBe("Aldric — Forging a blade · 7 days");
-    expect(downtimeSummaryLabel({ who: "", activity: "Carousing", days: 1 })).toBe("Carousing · 1 day");
-    expect(downtimeSummaryLabel({ who: "", activity: "", days: 0 })).toBe("0 days");
+    expect(downtimeSummaryLabel({ who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null })).toBe("Aldric — Forging a blade · 7 days");
+    expect(downtimeSummaryLabel({ who: "", activity: "Carousing", days: 1, characterPageId: null })).toBe("Carousing · 1 day");
+    expect(downtimeSummaryLabel({ who: "", activity: "", days: 0, characterPageId: null })).toBe("0 days");
   });
 });

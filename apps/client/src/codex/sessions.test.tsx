@@ -70,7 +70,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import { useRecapBadge } from "./useRecapBadge";
 import { pickNextSession, sessionByNumber, sessionTitle } from "./sessions";
@@ -95,7 +95,7 @@ import type { CodexCalendar, CodexChronicleRecord, CodexSession, PlayerCodexSess
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
 const SESSION = (over: Partial<CodexSession> = {}): CodexSession => ({
-  id: "s1", sessionNumber: 3, realDate: "2026-07-12", attendees: ["Ozy"],
+  id: "s1", sessionNumber: 3, tags: [], realDate: "2026-07-12", attendees: ["Ozy"],
   prepBody: "Strahd ambushes them at the bridge.", recapBody: "The party crossed the mists.",
   revealedToPlayers: false, status: "planned", rev: 1,
   createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z", ...over
@@ -105,7 +105,7 @@ const S8 = SESSION({ id: "s8", sessionNumber: 8, realDate: "2026-07-26", prepBod
 
 const record = (id: string, sessionNumber: number | null): CodexChronicleRecord => ({
   kind: "entry", id, title: null, text: `Entry ${id}`, gmText: null, revealedToPlayers: false,
-  sessionNumber, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
@@ -128,7 +128,7 @@ const gmDefaults = (sessions: CodexSession[] = [S3, S8], activeSessionId: string
   listSessions.mockResolvedValue({ sessions, activeSessionId });
 };
 const renderWorkspace = async () => {
-  render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+  render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
   await waitFor(() => expect(listSessions).toHaveBeenCalled());
 };
 
@@ -197,13 +197,13 @@ describe("The session console is a VIEW (M9)", () => {
     // write, and the READ on a fresh mount — a persisted value nothing reads back is not persistence.
     gmDefaults();
     const user = userEvent.setup();
-    const first = render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+    const first = render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
     await waitFor(() => expect(listSessions).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Session console" }));
     expect(localStorage.getItem("codex-session-console")).toBe("open");
     first.unmount();
 
-    render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+    render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
     await waitFor(() => expect(listSessions).toHaveBeenCalledTimes(2));
     expect(screen.getByRole("complementary", { name: "Session console" })).not.toHaveAttribute("inert");
   });
@@ -270,7 +270,7 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
 });
 
 describe("The player's session card (M9, viewer safety)", () => {
-  const PLAYER_SESSION: PlayerCodexSession = { id: "s8", sessionNumber: 8, realDate: "2026-07-26", recap: "They reached the spire." };
+  const PLAYER_SESSION: PlayerCodexSession = { id: "s8", sessionNumber: 8, realDate: "2026-07-26", recap: "They reached the spire.", tags: [] };
   beforeEach(() => {
     playerListPages.mockResolvedValue([]);
     playerListMaps.mockResolvedValue([]);
@@ -330,7 +330,7 @@ function BadgeProbe({ token }: Readonly<{ token: string | null }>) {
 }
 
 describe("The recap badge keys on session ID (CT-3, correction C2)", () => {
-  const sessionRow = (id: string, sessionNumber: number): PlayerCodexSession => ({ id, sessionNumber, realDate: null, recap: "…" });
+  const sessionRow = (id: string, sessionNumber: number): PlayerCodexSession => ({ id, sessionNumber, realDate: null, recap: "…", tags: [] });
 
   it("counts revealed sessions the reader has not opened, and forgets them once they have", async () => {
     playerSessions.mockResolvedValue([sessionRow("s1", 1), sessionRow("s2", 2)]);

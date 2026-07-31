@@ -49,7 +49,7 @@ const CALENDAR: GmCodexCalendar = {
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null,
   fired: false, proposedDate: null, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z", ...over
 });
@@ -64,7 +64,7 @@ const renderJournal = async (records: CodexChronicleRecord[] = [], pages: CodexP
   chronicle.mockResolvedValue(records);
   listPages.mockResolvedValue(pages);
   getCalendar.mockResolvedValue(CALENDAR);
-  render(<JournalView gmToken="gm" onOpenPage={vi.fn()} />);
+  render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />);
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 

@@ -75,7 +75,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import { openQuests, questProgress } from "./quests";
 import type { CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from "./api";
@@ -104,7 +104,7 @@ const QUEST = (over: Partial<CodexQuest> = {}): CodexQuest => ({
   playerBody: "The burgomaster wants the crown returned.",
   gmBody: "The crown is a phylactery and the burgomaster knows it.",
   objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
-  entityIds: [], revealedToPlayers: false, rev: 3,
+  entityIds: [], revealedToPlayers: false, tags: [], rev: 3,
   createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-02T00:00:00.000Z", ...over
 });
 const OPEN = QUEST();
@@ -139,7 +139,7 @@ const gmDefaults = (quests: CodexQuest[] = [OPEN, OTHER, DONE, LOST]) => {
   listQuests.mockResolvedValue(quests);
 };
 const renderWorkspace = async () => {
-  render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+  render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
   await waitFor(() => expect(listQuests).toHaveBeenCalled());
 };
 
@@ -291,14 +291,14 @@ const PLAYER_QUEST: PlayerCodexQuest = {
   id: "q1", title: "The Sunless Crown", status: "active",
   body: "The burgomaster wants the crown returned.",
   objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
-  entityIds: []
+  entityIds: [], tags: []
 };
 /** The quest the reader exists for: finished, so the open-quests card never lists it. */
 const PLAYER_DONE: PlayerCodexQuest = {
   id: "q2", title: "The Bell of Vallaki", status: "completed",
-  body: "The bell was hauled back up the hill.", objectives: [{ text: "Raise the bell", done: true }], entityIds: []
+  body: "The bell was hauled back up the hill.", objectives: [{ text: "Raise the bell", done: true }], entityIds: [], tags: []
 };
-const PLAYER_LOST: PlayerCodexQuest = { id: "q3", title: "The Missing Caravan", status: "failed", body: "", objectives: [], entityIds: [] };
+const PLAYER_LOST: PlayerCodexQuest = { id: "q3", title: "The Missing Caravan", status: "failed", body: "", objectives: [], entityIds: [], tags: [] };
 
 const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
   playerListPages.mockResolvedValue([]);

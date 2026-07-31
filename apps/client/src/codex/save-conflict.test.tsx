@@ -44,8 +44,8 @@ const page: CodexPage = {
 
 function renderEditor() {
   return render(
-    <PageEditor gmToken="gm" page={page} pages={[page]} backlinks={[]} relationships={[]}
-      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onRelationshipsChanged={() => {}} />
+    <PageEditor gmToken="gm" page={page} pages={[page]} connections={[]} autosave={{ enabled: true, intervalSeconds: 1 }}
+      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onOpenConnection={vi.fn()} onConnectionsChanged={() => {}} />
   );
 }
 
