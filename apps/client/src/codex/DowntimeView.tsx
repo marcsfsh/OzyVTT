@@ -253,9 +253,6 @@ export function PlayerDowntimeView({ records, pages, onOpenEntry, onOpenPage }: 
     [records]
   );
   const pageTitle = (id: string | null) => (id ? pages.find((page) => page.id === id)?.title ?? null : null);
-  /** A value that names a character page is a link; anything else is the free-text name the GM typed. */
-  const whoPageId = whoValue && characterOptions.some((option) => option.id === whoValue) ? whoValue : null;
-  const who = whoPageId ? "" : whoValue ?? "";
   const totals = useMemo(() => {
     const map = new Map<string, { key: string; name: string; pageId: string | null; days: number; last: string | null }>();
     for (const { record, payload } of rows) {
