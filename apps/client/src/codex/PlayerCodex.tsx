@@ -23,6 +23,7 @@ import { PlayerCalendarView } from "./CalendarView";
 import { PlayerDowntimeView } from "./DowntimeView";
 import { CommandPalette } from "./CommandPalette";
 import { SidebarNav } from "./SidebarNav";
+import { useSidebarRailBand } from "./useSidebarRail";
 import { TagView } from "./TagView";
 import { NotFoundView } from "../components/NotFoundView";
 import { playerCampaignFeedProps } from "./dashboard";
@@ -198,26 +199,34 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
     return () => window.removeEventListener("keydown", onKey);
   }, [embedded]);
 
+  /**
+   * The same forced rail the GM shell uses. It matters MORE here: a player has no collapse control and
+   * no persisted preference, so before this an iPad in portrait gave them the crushed strip with no way
+   * out of it at all. The embedded preview is exempt — it renders inside a modal, not at the viewport.
+   */
+  const railBand = useSidebarRailBand() && !embedded;
   const sidebarHeader = (
-    <button type="button" className="codex-sidebar-search" onClick={() => { closeDrawer(); setPaletteOpen(true); }} aria-keyshortcuts="Meta+K Control+K">
-      <CodexIcon iconId="eye" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
-      <span className="codex-navitem-label">Search</span>
-      {!embedded && <Kbd>⌘K</Kbd>}
+    <button type="button" className="codex-sidebar-search" onClick={() => { closeDrawer(); setPaletteOpen(true); }} aria-keyshortcuts="Meta+K Control+K"
+      title={railBand ? "Search" : undefined} aria-label={railBand ? "Search" : undefined}>
+      <CodexIcon iconId="search" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
+      {!railBand && <span className="codex-navitem-label">Search</span>}
+      {!embedded && !railBand && <Kbd>⌘K</Kbd>}
     </button>
   );
-  const nav = <SidebarNav groups={PLAYER_SIDEBAR} activePath={path} onNavigate={goto} header={sidebarHeader} />;
+  /* The aside is the only place the rail applies; the phone drawer (<=760px) is always expanded. */
+  const nav = (collapsed: boolean) => <SidebarNav groups={PLAYER_SIDEBAR} activePath={path} collapsed={collapsed} onNavigate={goto} header={sidebarHeader} />;
 
   return (
-    <div className={`codex-root codex-player codex-shell${embedded ? " is-embedded" : ""}`}>
-      <aside className="codex-shell-side">{nav}</aside>
-      <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">{nav}</Drawer>
+    <div className={`codex-root codex-player codex-shell${embedded ? " is-embedded" : ""}${railBand ? " is-rail" : ""}`}>
+      <aside className="codex-shell-side">{nav(railBand)}</aside>
+      <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">{nav(false)}</Drawer>
 
       <div className="codex-shell-main">
         <div className="codex-topbar">
           <IconButton label="Codex sections" className="codex-topbar-menu" onClick={openDrawer}><CodexIcon iconId="menu" className="codex-navitem-icon" /></IconButton>
           <h2 className="codex-topbar-title">{section ? SECTION_TITLE[section] : "Codex"}</h2>
           <div className="codex-topbar-actions">
-            <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}><CodexIcon iconId="eye" className="codex-navitem-icon" /></IconButton>
+            <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}><CodexIcon iconId="search" className="codex-navitem-icon" /></IconButton>
           </div>
         </div>
 

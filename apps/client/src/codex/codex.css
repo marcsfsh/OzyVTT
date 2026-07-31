@@ -1045,6 +1045,22 @@
   .codex-topbar-menu { display: none; }
   .codex-navdrawer { display: none; }
 }
+/* 761–849: the icon rail is the DEFAULT here, and it is forced rather than chosen — the grid track above
+   is 56px whatever the GM prefers, so the expanded sidebar has nowhere to go. Both shells drive
+   `collapsed` from the same query (`useSidebarRail.ts`) so the MARKUP agrees: labels leave the tree and
+   each icon gains its title/aria-label. This block is the belt for that brace. Without either of them the
+   band rendered thirteen labels, three group eyebrows and the ⌘K chip into a 20px content box and spilled
+   the lot over the main column — with the hamburger and the phone drawer both hidden, so the broken strip
+   was the only navigation on an iPad in portrait. */
+@media (min-width: 761px) and (max-width: 849px) {
+  .codex-sidebar { padding-inline: var(--space-1); }
+  .codex-sidebar .codex-navitem,
+  .codex-sidebar .codex-sidebar-search { justify-content: center; padding-inline: 0; }
+  .codex-sidebar .codex-navitem-label,
+  .codex-sidebar .codex-sidebar-grouplabel,
+  .codex-sidebar .codex-sidebar-search .nh-kbd,
+  .codex-sidebar .codex-sidebar-foot { display: none; }
+}
 @media (min-width: 850px) {
   .codex-shell { grid-template-columns: 220px minmax(0, 1fr); }
   .codex-shell.is-rail { grid-template-columns: 56px minmax(0, 1fr); }

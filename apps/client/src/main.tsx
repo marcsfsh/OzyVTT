@@ -72,6 +72,8 @@ function App() {
   const setGmTab = (next: GmTab) => navigate(pathForGmTab(next));
   /** D4: the player's two views. Every address that is not the Codex is the table. */
   const playerView: "table" | "codex" = route.segments[0] === "codex" ? "codex" : "table";
+  /** The player is READING the Codex, so the table's own furniture above it is not what they asked for. */
+  const playerCodexOpen = mode === "player" && playerView === "codex";
   const [state, setState] = useState<PlayerView | GmView | null>(null);
   const [notice, setNotice] = useState<NoticeMessage>(null);
   const [password, setPassword] = useState("");
@@ -343,10 +345,19 @@ function App() {
           Roster" disclosure - the arrow is the only toggle (v5 #6.1) - still one tap away mid-fight. */}
       {/* v5 #7: a player's own character is no longer inside the roster; it rides the always-shown
           YouArePlaying bar below, so the roster can collapse for both roles without hiding their identity. */}
-      {state.combat.active
+      {/* D4 moved the player Codex out of a top-layer `<dialog>.showModal()` and into document flow. The
+          roster and the YouArePlaying bar sit above it, and out of combat the roster is a full one-column
+          card grid at =<760px — so a player tapping Codex, reloading, or following a deep link landed at
+          scroll 0 looking at the party roster with the Codex about 1500px below it. The modal it replaced
+          was visible immediately regardless of scroll, which makes this a regression D4 introduced rather
+          than the shell's pre-existing tab problem. The Codex is a WHOLE VIEW of the player app: while it
+          is open, the table's furniture is not what they asked for. (The GM's Codex tab has the same
+          shell above it, but the Codex was already GM_TABS[3] before this engagement — see
+          known-bugs.md — so that half stays out of this pass.) */}
+      {!playerCodexOpen && (state.combat.active
         ? <details className="roster-collapsed"><summary>Character Roster</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, onCreateCharacter: () => setBuilderOpen(true) } : { role: "player" as const, state: state as PlayerView })} /></details>
-        : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, onCreateCharacter: () => setBuilderOpen(true) } : { role: "player" as const, state: state as PlayerView })} />}
-      {mode === "player" && <YouArePlaying state={state as PlayerView} />}
+        : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, onCreateCharacter: () => setBuilderOpen(true) } : { role: "player" as const, state: state as PlayerView })} />)}
+      {mode === "player" && !playerCodexOpen && <YouArePlaying state={state as PlayerView} />}
 
       {mode === "gm" && <Tabs
         className="gm-tabs"

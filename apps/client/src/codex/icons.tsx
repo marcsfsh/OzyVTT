@@ -87,6 +87,10 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   gear: <path fillRule="evenodd" d="m10.3 2 -.4 2.4a7.9 7.9 0 0 0-1.8 1L5.8 4.6 4 7.8l1.9 1.5a7.9 7.9 0 0 0 0 2.1L4 12.9l1.8 3.2 2.3-.8a7.9 7.9 0 0 0 1.8 1l.4 2.4h3.4l.4-2.4a7.9 7.9 0 0 0 1.8-1l2.3.8 1.8-3.2-1.9-1.5a7.9 7.9 0 0 0 0-2.1L20 7.8l-1.8-3.2-2.3.8a7.9 7.9 0 0 0-1.8-1L13.7 2zM12 8.6a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8z" />,
   mask: <path fillRule="evenodd" d="M12 3c4 0 8 1.1 8 2.6 0 5-1.4 9.2-4.3 11.9A5.5 5.5 0 0 1 12 19a5.5 5.5 0 0 1-3.7-1.5C5.4 14.8 4 10.6 4 5.6 4 4.1 8 3 12 3zM8.4 8.4a1.6 1.9 0 1 0 0 3.8 1.6 1.9 0 0 0 0-3.8zm7.2 0a1.6 1.9 0 1 0 0 3.8 1.6 1.9 0 0 0 0-3.8zM9.5 14.6h5a2.6 2.6 0 0 1-5 0z" />,
   menu: <path d="M3 5.6h18v2.2H3zm0 5.3h18v2.2H3zm0 5.3h18v2.2H3z" />,
+  /* The sidebar's Search entry and the phone top bar's search button both used to draw the EYE — the
+     glyph this product uses for visibility, and the same one "Reveal audit" carries two groups below.
+     The path is `@vtt/ui`'s own `IconSearch`, kept here because this registry is what CodexIcon reads. */
+  search: <path fillRule="evenodd" d="M10.5 3a7.5 7.5 0 1 0 4.55 13.46l4.24 4.25 1.42-1.42-4.25-4.24A7.5 7.5 0 0 0 10.5 3zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z" />,
 
   // Utility (editor toolbar + notebook tree - not in the marker picker)
   image: <path fillRule="evenodd" d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm2 2v7.6l3.6-3.6 3 3 2-2L20 15V6zM8.2 7.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z" />,

@@ -14,6 +14,7 @@ import {
   pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath, graphPath, type CodexSection
 } from "./routes";
 import { SidebarCollapseToggle, SidebarNav } from "./SidebarNav";
+import { useSidebarRailBand } from "./useSidebarRail";
 import { CodexIcon } from "./icons";
 import { NotFoundView } from "../components/NotFoundView";
 import { QuickCreate, type QuickCreateRequest } from "./QuickCreate";
@@ -82,6 +83,12 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
     try { return localStorage.getItem(SIDEBAR_KEY) === "rail" ? "rail" : "open"; } catch { return "open"; }
   });
   useEffect(() => { try { localStorage.setItem(SIDEBAR_KEY, sidebarMode); } catch { /* private mode - fine */ } }, [sidebarMode]);
+  /**
+   * 761-849px is a 56px grid track whatever the GM prefers, so the rail is forced there rather than
+   * chosen. The PREFERENCE is untouched by the band — leaving the band restores whatever they picked.
+   */
+  const railBand = useSidebarRailBand();
+  const collapsed = railBand || sidebarMode === "rail";
   const [drawerOpen, setDrawerOpen] = useState(false);
   const openDrawer = useCallback(() => {
     setDrawerOpen(true);
@@ -244,9 +251,12 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   );
 
   const sidebarHeader = (
-    <button type="button" className="codex-sidebar-search" onClick={() => { closeDrawer(); setPaletteOpen(true); }} aria-keyshortcuts="Meta+K Control+K">
-      <CodexIcon iconId="eye" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
-      {sidebarMode === "open" && <><span className="codex-navitem-label">Search</span><Kbd>⌘K</Kbd></>}
+    <button type="button" className="codex-sidebar-search" onClick={() => { closeDrawer(); setPaletteOpen(true); }} aria-keyshortcuts="Meta+K Control+K"
+      /* Collapsed, the glyph is the whole button — without these it has no accessible name at all,
+         the same reason every rail nav item carries them. */
+      title={collapsed ? "Search" : undefined} aria-label={collapsed ? "Search" : undefined}>
+      <CodexIcon iconId="search" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
+      {!collapsed && <><span className="codex-navitem-label">Search</span><Kbd>⌘K</Kbd></>}
     </button>
   );
 
@@ -258,14 +268,16 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
       onNavigate={goto}
       onAction={() => { closeDrawer(); void openPlayerPreview(); }}
       header={sidebarHeader}
+      /* No collapse control in the forced band: there is nothing to expand INTO, and offering the
+         toggle would write a preference the GM cannot see the effect of until they resize. */
       footer={collapsed || drawerOpen ? undefined : <SidebarCollapseToggle collapsed={sidebarMode === "rail"} onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))} />}
     />
   );
 
   return (
-    <div className={`codex-root codex-shell${sidebarMode === "rail" ? " is-rail" : ""}`}>
+    <div className={`codex-root codex-shell${collapsed ? " is-rail" : ""}`}>
       {/* ≥761px: the sidebar is in the layout. ≤760px it is a Drawer, opened from the top bar. */}
-      <aside className="codex-shell-side">{nav(sidebarMode === "rail")}</aside>
+      <aside className="codex-shell-side">{nav(collapsed)}</aside>
       <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">
         {nav(false)}
       </Drawer>
@@ -278,7 +290,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
           <h2 className="codex-topbar-title">{section ? SECTION_TITLE[section] : "Codex"}</h2>
           <div className="codex-topbar-actions">
             <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}>
-              <CodexIcon iconId="eye" className="codex-navitem-icon" />
+              <CodexIcon iconId="search" className="codex-navitem-icon" />
             </IconButton>
             {/* D24: the session console survives as a right-side prep drawer, renamed into the Sessions
                 vocabulary family, reachable from every section exactly as it always was. */}
