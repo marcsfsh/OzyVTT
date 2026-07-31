@@ -2564,6 +2564,41 @@ describe("codex commandId idempotency (D19)", () => {
     expect((await post(base, "/api/v1/codex/journal", GM, { playerText: "x", commandId: "not-a-uuid" })).status).toBe(400);
   });
 
+  /**
+   * A RECEIPT ANSWERS THE REQUEST IT WAS FOR, AND NO OTHER.
+   *
+   * Keyed on the id alone, an idempotency key reused across two different writes replayed the FIRST
+   * response - so the second write never ran and the caller was told 2xx anyway. That is the precise
+   * failure the mechanism exists to prevent, delivered by the mechanism. It is caller error to reuse a key,
+   * but silently discarding a write is not an acceptable answer to caller error, and nothing in the surface
+   * told them: the contract said only "resend the same id to retry safely".
+   *
+   * The last two assertions are what keep the refusal from being a blunt instrument: the ordinary retry
+   * still replays, and a retry with a CORRECTED body on the same route still replays too (that is a client
+   * finishing the request it started, not a new one).
+   */
+  it("refuses a commandId reused for a different request instead of replaying the wrong answer", async () => {
+    const { base, store } = await fixture();
+    const commandId = randomUUID();
+    const created = await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", commandId });
+    expect(created.status).toBe(201);
+
+    const crossed = await post(base, "/api/v1/codex/quests", GM, { title: "The Coffin Run", commandId });
+    expect(crossed.status, "the quest write must not be answered with the page's 201").toBe(400);
+    expect((await body(crossed)).error.message).toMatch(/already used for a different request/i);
+    expect(crossed.headers.get("x-idempotent-replay"), "a refusal is not a replay").toBeNull();
+    expect(store.listQuests(), "...and the refusal really did refuse - nothing was written either way").toEqual([]);
+
+    // The genuine retry still replays, so the guard is the mismatch and not the key.
+    const retry = await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", commandId });
+    expect(retry.headers.get("x-idempotent-replay")).toBe("true");
+    expect((await body(retry)).data.page.id).toBe((await body(created)).data.page.id);
+    // ...as does a retry of the same route with a corrected body: that is one request being finished, not
+    // a new one, and binding to the body would make the key useless to a client fixing a typo.
+    expect((await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki Rebuilt", commandId })).headers.get("x-idempotent-replay")).toBe("true");
+    expect(store.listPages(), "the corrected retry created nothing new").toHaveLength(1);
+  });
+
   it("never lets a replay skip authorization", async () => {
     const { base } = await fixture();
     const commandId = randomUUID();

@@ -45,7 +45,7 @@ Every request authenticates with `Authorization: Bearer <token>` (the viewer's c
 
 - **Envelopes.** Success: `{ "ok": true, "apiVersion": "1", "data": … }`. Failure: `{ "ok": false, "apiVersion": "1", "error": { "code", "message", "requestId", "details"?, "currentRevision"?, "retryAfterSeconds"? } }`.
 - **Request IDs.** Send `X-Request-Id` (UUID v4) to correlate; every `/api/v1` router echoes it on the response header and in error bodies, minting one when you don't. A value that isn't a UUID v4 is replaced rather than echoed.
-- **Idempotency, per surface.** *Game* writes accept `commandId` (UUID), executed exactly once; a retry replays the stored outcome with `duplicate: true`, and an omitted id is minted server-side and echoed. D19: codex JSON-body writes accept an optional `commandId` (UUID); resend the same id to retry safely and the stored outcome is replayed verbatim - same status, same bytes - with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none - they are naturally idempotent already. *Homebrew* writes still carry none and rely on `expectedRev`.
+- **Idempotency, per surface.** *Game* writes accept `commandId` (UUID), executed exactly once; a retry replays the stored outcome with `duplicate: true`, and an omitted id is minted server-side and echoed. D19: codex JSON-body writes accept an optional `commandId` (UUID), unique to one request; resend the same id to retry THAT request safely and the stored outcome is replayed verbatim - same status, same bytes - with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. Reusing an id on a different route is a `400`, never a replay: answering the first request's response would silently skip the second write. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none - they are naturally idempotent already. *Homebrew* writes still carry none and rely on `expectedRev`.
 - **Optimistic concurrency, two vocabularies.** `expectedRevision` (game) targets the **global** GameState revision. `expectedRev` (codex pages/sessions/quests, homebrew rows) targets **one record's** revision. Both reject a stale write with `409` and `error.currentRevision`. Codex maps, pins, journal entries, calendar, settings and standing are deliberately last-write-wins - a single-GM surface does not need a conflict token on every row, and spreading one costs more than it prevents.
 - **Error statuses.** `400 validation_failed` - malformed request; a schema failure carries every problem in `details.issues` as `{ path, message }`, not just the first. `401 unauthenticated` - **no credential, or an `Authorization` header that isn't parseable**, and nothing else. `403 forbidden` - you presented something and were refused: a role denial, or a token that is invalid, revoked, or missing the required scope. `404 not_found` - absent **or secret**: the existence of a record you may not see is never distinguishable from its absence. `409 conflict` - a domain refusal or a stale revision (`details.needsConfirm` on a timeline navigation: resend with `confirmRewrite`/`confirmDiscard`). `413` - oversized body. The global limit is 512kb; three routes raise their own and each states it on the operation - `POST /homebrew/packs/import` (about 4mb), `POST /codex/import` (64mb, because a backup bundle carries every revision), and `POST /codex-assets` (11mb, one page image).
 - **One stated exception to the 404 rule.** Binary asset-content routes (`/map-assets/{id}/content`, `/codex-assets/{id}/content`) answer `403` **before** any existence check. Media URLs are guessable and get embedded in pages, so answering 404-vs-403 there would turn the route into an existence oracle for ids you were never given.
@@ -2266,7 +2266,7 @@ Creates a page.
 | `revealedToPlayers` | boolean | no |  |
 | `bannerAssetId` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date that places an `event` page on the chronicle. Omit for undated. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexPageData` · errors `400` `401` `403`
 
@@ -2313,7 +2313,7 @@ Edits a page. `expectedRev` rejects a stale write with 409.
 | `bannerAssetId` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date. Omitted leaves the stored date alone; `null` clears it. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the page moved on. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `403` `404` `409`
 
@@ -2340,7 +2340,7 @@ Shows/hides a page to players.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `403` `404`
 
@@ -2359,7 +2359,7 @@ Declares a connection from this page to another. Counts as an edit of BOTH pages
 | `toPageId` | string (uuid) | yes |  |
 | `label` | string \| null | no | Optional. An unlabelled connection is a legitimate "these two are related" - the same thing a `[[wiki link]]` already expresses - so forcing a word would make the declared half of one concept stricter than the derived half. |
 | `layer` | `player` \| `gm` | no | Default: `"player"`. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexConnectionData` · errors `400` `401` `403` `404`
 
@@ -2420,7 +2420,7 @@ Creates (or keeps) an empty folder.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `path` | string | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexFolderCreatedData` · errors `400` `401` `403`
 
@@ -2436,7 +2436,7 @@ Renames/moves a folder subtree, re-pathing every page under it. Returns how many
 | --- | --- | --- | --- |
 | `from` | string | yes |  |
 | `to` | string | yes | Empty string moves the folder to the top level. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexFolderMovedData` · errors `400` `401` `403`
 
@@ -2451,7 +2451,7 @@ Deletes a folder and its subfolders; every page under it drops to the top level 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `path` | string | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexDeletedData` · errors `400` `401` `403`
 
@@ -2477,7 +2477,7 @@ Relabels a DECLARED connection or moves it between layers. A `mention` connectio
 | --- | --- | --- | --- |
 | `label` | string \| null | no |  |
 | `layer` | `player` \| `gm` | no |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexConnectionData` · errors `400` `401` `403` `404`
 
@@ -2515,7 +2515,7 @@ Turns an uploaded map asset into an atlas map node.
 | `kind` | `battlemap` \| `regional` \| `world` | yes |  |
 | `parentMapId` | string \| null | no |  |
 | `revealedToPlayers` | boolean | no |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
@@ -2534,7 +2534,7 @@ Renames/retypes a map.
 | `tags` | string[] | no |  |
 | `name` | string | no |  |
 | `kind` | `battlemap` \| `regional` \| `world` | no |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
@@ -2561,7 +2561,7 @@ Re-parents a map in the atlas tree (null = a root map).
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `parentMapId` | string \| null | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
@@ -2578,7 +2578,7 @@ Shows/hides a map to players.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
@@ -2615,7 +2615,7 @@ Drops a marker on a map.
 | `subMapId` | string \| null | no |  |
 | `sceneIds` | string (uuid)[] | no |  |
 | `actorId` | string \| null | no |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
@@ -2660,7 +2660,7 @@ Edits a marker's icon/label/links.
 | `subMapId` | string \| null | no |  |
 | `sceneIds` | string (uuid)[] | no |  |
 | `actorId` | string \| null | no |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
@@ -2688,7 +2688,7 @@ Repositions a marker in normalized map coordinates.
 | --- | --- | --- | --- |
 | `x` | number (0–1000000) | yes |  |
 | `y` | number (0–1000000) | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
@@ -2705,7 +2705,7 @@ Shows/hides a marker to players.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
@@ -2722,7 +2722,7 @@ CT-7: marks this pin as where the party is, or clears the flag from it. **Exactl
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `isParty` | boolean | yes | `true` makes this the party's pin and clears the flag from whichever pin held it before, anywhere in the atlas. `false` clears it from THIS pin only and never disturbs a different party pin. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
@@ -2764,7 +2764,7 @@ Adds a journal/timeline entry. A `sessionId` naming no session is a **404**, not
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
@@ -2788,7 +2788,7 @@ CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the 
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate | yes | WHEN it happens - the date the campaign clock has to reach for this to fire. Required, and never null. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
@@ -2813,7 +2813,7 @@ CT-10: records DOWNTIME - who spent how many days doing what between adventures.
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
 | `downtime` | CodexDowntimeInput | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexDowntimeCreatedData` · errors `400` `401` `403` `404`
 
@@ -2838,7 +2838,7 @@ CT-8: records a MILESTONE - the party reached a level, and why. `level` is the l
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
 | `milestone` | CodexMilestoneInput | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
@@ -2868,7 +2868,7 @@ Edits a journal entry; an omitted field is left alone. A `downtime` group edits 
 | `downtime.who` | string | no |  |
 | `downtime.activity` | string | no |  |
 | `downtime.characterPageId` | string \| null | no | An id naming no page is a 404; `null` clears the link and leaves `who` as the display fallback. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
@@ -2895,7 +2895,7 @@ Shows/hides a journal entry to players. Works on EVERY journal kind, deadlines a
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
@@ -2935,7 +2935,7 @@ Creates a session. Every field is optional - an empty POST opens a blank `planne
 | `status` | `planned` \| `played` | no |  |
 | `revealedToPlayers` | boolean | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401` `403`
 
@@ -2969,7 +2969,7 @@ Edits a session; an omitted field is left alone. `expectedRev` rejects a stale w
 | `status` | `planned` \| `played` | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the session moved on. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `403` `404` `409`
 
@@ -2996,7 +2996,7 @@ Publishes/retracts a session's recap to players. Revealing is not an edit: it mo
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `403` `404`
 
@@ -3036,7 +3036,7 @@ Creates a quest, and appends its first history record in the SAME transaction - 
 | `entityIds` | string (uuid)[] | no |  |
 | `revealedToPlayers` | boolean | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexQuestData` · errors `400` `401` `403`
 
@@ -3070,7 +3070,7 @@ Edits a quest; an omitted field is left alone. **A status change also appends a 
 | `entityIds` | string (uuid)[] | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the quest moved on. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `403` `404` `409`
 
@@ -3097,7 +3097,7 @@ Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev`
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `403` `404`
 
@@ -3123,7 +3123,7 @@ Sets where the party stands with one faction, and appends the `standing` chronic
 | --- | --- | --- | --- |
 | `value` | integer (-100–100) | yes | The new standing, SIGNED. Rejected outside -100..100 here (the client's control cannot produce a 150, so one is a malformed caller) and clamped to the same range by the store, which is the router-rejects / store-enforces arrangement every bounded field in this surface uses. |
 | `reason` | string | no | Why it moved, in one line - it lands on the `standing` chronicle record. Optional and may be empty: adjusting a standing mid-session should not be blocked on typing a sentence, and the change is recorded either way. Defaults to an empty string. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `403` `404`
 
@@ -3140,7 +3140,7 @@ Shows/hides a faction's standing to players. The ordinary reveal shape every cod
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `403` `404`
 
@@ -3174,7 +3174,7 @@ Replaces the world calendar and reflows every dated record's sort instant and la
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | no |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401` `403`
 
@@ -3206,7 +3206,7 @@ Replaces the codex-wide settings and answers with the full READ shape (usage fig
 | --- | --- | --- | --- |
 | `revisionHistory` | CodexRevisionHistoryInput | yes |  |
 | `autosave` | CodexAutosaveSettings | yes |  |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexSettingsData` · errors `400` `401` `403`
 
@@ -3245,7 +3245,7 @@ Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex tabl
 | `codex` | object (free-form) | yes | The export's `codex` bundle, verbatim. |
 | `bundleVersion` | integer (≥ 1) | no | Optional. Absent = a pre-versioning v1 bundle. Anything but 1 is refused: "This backup was made by a newer version of the app. Update, then restore." |
 | `exportedAt` | string (date-time) | no | Accepted and IGNORED, so a saved export file can be POSTed without editing. |
-| `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `200` Success - envelope of `CodexImportedData` · errors `400` `401` `403` `413`
 

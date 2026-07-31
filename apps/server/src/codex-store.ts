@@ -1553,6 +1553,22 @@ export const MIGRATIONS = [{
       created_at TEXT NOT NULL
     ) STRICT;
   `
+}, {
+  version: 24,
+  // WHAT the receipt was for, so a replay cannot answer a question nobody asked.
+  //
+  // A receipt used to be keyed on the `commandId` alone, so a caller that reused one id across two
+  // DIFFERENT writes got the first response replayed verbatim and the second write silently never ran -
+  // with a 2xx saying it had. That is the one failure mode idempotency exists to prevent, arriving through
+  // the mechanism meant to prevent it, and it is a caller mistake nothing in the surface could tell them
+  // about.
+  //
+  // NULLABLE, and that is the compatibility story: a receipt written before this column existed carries
+  // NULL and is still replayed, because it is genuinely the outcome of some earlier request and refusing it
+  // would break retries in flight across the upgrade. Receipts are pruned after seven days anyway, so the
+  // nulls age out on their own. No backfill: there is no way to recover a fingerprint from a stored body,
+  // and inventing one would be worse than admitting it is unknown.
+  sql: `ALTER TABLE codex_command_receipts ADD COLUMN fingerprint TEXT;`
 }];
 
 /**
@@ -2684,21 +2700,21 @@ export class CodexStore {
    *
    * Pruned lazily on write: a receipt older than seven days is answering a retry nobody is still making.
    */
-  recallCommand(commandId: string): Readonly<{ status: number; body: unknown }> | null {
+  recallCommand(commandId: string): Readonly<{ status: number; body: unknown; fingerprint: string | null }> | null {
     if (!ID.test(commandId)) return null;
-    const row = this.requireDatabase().prepare("SELECT status, body_json FROM codex_command_receipts WHERE command_id = ?").get(commandId) as { status: number; body_json: string } | undefined;
+    const row = this.requireDatabase().prepare("SELECT status, body_json, fingerprint FROM codex_command_receipts WHERE command_id = ?").get(commandId) as { status: number; body_json: string; fingerprint: string | null } | undefined;
     if (!row) return null;
-    try { return { status: row.status, body: JSON.parse(row.body_json) as unknown }; } catch { return null; }
+    try { return { status: row.status, body: JSON.parse(row.body_json) as unknown, fingerprint: row.fingerprint }; } catch { return null; }
   }
 
-  recordCommand(commandId: string, status: number, responseBody: unknown): void {
+  recordCommand(commandId: string, status: number, responseBody: unknown, fingerprint: string): void {
     if (!ID.test(commandId)) return;
     const database = this.requireDatabase();
     const cutoff = new Date(this.now() - 7 * 86_400_000).toISOString();
     // NOT inside `this.transaction`: bumping the coarse revision here would invalidate every client's
     // ETag for a write that already bumped it once, and a receipt is bookkeeping rather than content.
-    database.prepare("INSERT OR REPLACE INTO codex_command_receipts (command_id, status, body_json, created_at) VALUES (?, ?, ?, ?)")
-      .run(commandId, status, JSON.stringify(responseBody ?? null), this.stamp());
+    database.prepare("INSERT OR REPLACE INTO codex_command_receipts (command_id, status, body_json, created_at, fingerprint) VALUES (?, ?, ?, ?, ?)")
+      .run(commandId, status, JSON.stringify(responseBody ?? null), this.stamp(), fingerprint);
     database.prepare("DELETE FROM codex_command_receipts WHERE created_at <= ?").run(cutoff);
   }
 

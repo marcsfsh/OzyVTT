@@ -778,20 +778,36 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * the correct reading of "retry safely". It is also why a body that never succeeded still 400s on
    * retry: there is no receipt to replay, so it reaches the handler and is validated as the first was.
    *
+   * **A receipt remembers WHAT IT WAS FOR, and a mismatched reuse is refused rather than replayed.** The
+   * key alone used to be the whole lookup, so a caller that reused one id across two DIFFERENT writes got
+   * the first response back verbatim and the second write silently never ran - answered 2xx, as though it
+   * had. That is the exact failure idempotency exists to prevent, arriving through the mechanism meant to
+   * prevent it. The fingerprint is the method and the path, which is the finest grain that is stable across
+   * a genuine retry: the same request retried carries the same body too, but a client that retries after
+   * fixing a typo is retrying, and refusing that would make the key useless.
+   *
+   * A receipt with a NULL fingerprint predates the column and is still replayed - it is a real outcome of
+   * some earlier request, and refusing retries in flight across an upgrade would be the worse trade.
+   *
    * Returns true when it has ALREADY answered the request.
    */
   const idempotency = (request: Request, response: Response): boolean => {
     const supplied = (request.body as { commandId?: unknown } | undefined)?.commandId;
     if (typeof supplied !== "string" || request.method === "DELETE") return false;
+    const fingerprint = `${request.method} ${request.baseUrl}${request.path}`;
     const replay = store.recallCommand(supplied);
     if (replay) {
+      if (replay.fingerprint !== null && replay.fingerprint !== fingerprint) {
+        failure(response, 400, "validation_failed", "That commandId was already used for a different request. An idempotency key identifies one request, so retries must resend the same one and a new request needs a new key.");
+        return true;
+      }
       response.setHeader("x-idempotent-replay", "true");
       response.status(replay.status).json(replay.body);
       return true;
     }
     const send = response.json.bind(response);
     response.json = (payload: unknown) => {
-      if (response.statusCode >= 200 && response.statusCode < 300) store.recordCommand(supplied, response.statusCode, payload);
+      if (response.statusCode >= 200 && response.statusCode < 300) store.recordCommand(supplied, response.statusCode, payload, fingerprint);
       return send(payload);
     };
     return false;
