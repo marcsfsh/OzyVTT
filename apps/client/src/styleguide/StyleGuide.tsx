@@ -11,6 +11,7 @@ import {
   ChoiceCard,
   ChoiceGrid,
   Chip,
+  Combobox,
   DiceInputRow,
   Drawer,
   Eyebrow,
@@ -27,14 +28,17 @@ import {
   IconEyeOff,
   IconInfo,
   IconPencil,
+  IconPlay,
   IconPlus,
   IconSearch,
   IconShuffle,
   IconTrash,
   IconWarning,
+  IconX,
   Input,
   Kbd,
   LinkButton,
+  MarkdownEditor,
   Menu,
   Meter,
   MenuItem,
@@ -77,6 +81,8 @@ const LINES = ["--line", "--line-strong"];
 const NEON = ["--magenta", "--magenta-hi", "--cyan", "--cyan-hi", "--violet", "--violet-hi", "--indigo"];
 const SEMANTIC = ["--primary", "--success", "--caution", "--danger", "--danger-hi", "--info"];
 const TEXTS = ["--text", "--text-dim", "--text-muted", "--text-on-neon"];
+/** D21 — the atlas pin palette. Eight hues a GM assigns by MEANING, so they are a set, not a ramp. */
+const PINS = ["--pin-1", "--pin-2", "--pin-3", "--pin-4", "--pin-5", "--pin-6", "--pin-7", "--pin-8"];
 
 function Section({ id, title, blurb, children }: { id: string; title: string; blurb?: string; children: ReactNode }) {
   return (
@@ -107,6 +113,104 @@ function ToastDemo() {
       <Button variant="secondary" onClick={() => toast("Couldn't reach the server", { tone: "error" })}>Error toast</Button>
       <Button variant="secondary" onClick={() => toast("Player joined the table", { tone: "info" })}>Info toast</Button>
     </div>
+  );
+}
+
+// ----- Codex recut demos (D25): the primitives the overhaul promoted out of feature code -----
+
+const PICKER_OPTIONS = [
+  { id: "p1", label: "Strahd von Zarovich", meta: "Character" },
+  { id: "p2", label: "Barovia", meta: "Location" },
+  { id: "p3", label: "The Vistani", meta: "Faction" },
+  { id: "p4", label: "Castle Ravenloft", meta: "Location" },
+  { id: "p5", label: "Ireena Kolyana", meta: "Character" },
+  { id: "p6", label: "The Tome of Strahd", meta: "Item" }
+];
+
+function ComboboxDemo() {
+  const [bound, setBound] = useState<string | null>(null);
+  const [free, setFree] = useState<string | null>(null);
+  return (
+    <div className="sg-stack">
+      <FieldGrid>
+        <Field label="Closed set — pick an existing page" htmlFor="sg-combo-bound">
+          <Combobox id="sg-combo-bound" ariaLabel="Pick a page" options={PICKER_OPTIONS} value={bound} onChange={setBound} placeholder="Search pages…" />
+        </Field>
+        <Field label="Open set — allowFreeText" htmlFor="sg-combo-free" help="Type a name nobody has written a page for yet and press Enter.">
+          <Combobox id="sg-combo-free" ariaLabel="Who took this downtime" options={PICKER_OPTIONS} value={free} onChange={setFree} placeholder="Who?" allowFreeText />
+        </Field>
+      </FieldGrid>
+      <p className="sg-muted">
+        Chosen value: <code>{bound ?? "null"}</code> · free-text value: <code>{free ?? "null"}</code>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The preview renderer is the CALLER's, deliberately — the primitive renders no markdown itself. This
+ * one is four lines of nothing so the styleguide does not quietly ship a second markdown implementation.
+ */
+function tinyPreview(markdown: string): ReactNode {
+  return (
+    <div className="sg-stack">
+      {markdown.split("\n\n").map((block, index) => (
+        <p key={index} className={block.startsWith("> ") ? "sg-muted" : undefined}>
+          {block.replace(/^[#>\-\s]+/, "")}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function MarkdownEditorDemo() {
+  const [body, setBody] = useState("The burgomaster's writ is a forgery.\n\nAsk [[Ireena Kolyana]] who sealed it.");
+  return (
+    <div className="sg-stack">
+      <MarkdownEditor
+        ariaLabel="Page body"
+        value={body}
+        onChange={setBody}
+        placeholder="What do the players know?"
+        renderPreview={tinyPreview}
+        suggest={(query) => PICKER_OPTIONS.filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))}
+        rows={6}
+      />
+      <p className="sg-muted">Type <code>[[</code> in the body to raise the page autocomplete. The Edit/View switch only appears because a <code>renderPreview</code> was supplied — an editor with no reader shows no switch.</p>
+      <h3 className="sg-h3">With an overlay — how the Codex marks its GM layer</h3>
+      <MarkdownEditor
+        ariaLabel="GM-only notes"
+        value={"Strahd already knows. He is letting them carry it."}
+        onChange={() => {}}
+        rows={3}
+        overlay={<Badge tone="violet">GM only</Badge>}
+      />
+      <p className="sg-muted">The overlay slot exists so the design system never learns what a “GM layer” is. Violet is the one hue reserved for it, and it is worn by the badge, not by the editor.</p>
+    </div>
+  );
+}
+
+/** D20: the palette is a COMPOSITION — Modal align='top' + an input + a list. Not a new primitive. */
+function CommandPaletteDemo() {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const matches = PICKER_OPTIONS.filter((option) => option.label.toLowerCase().includes(query.trim().toLowerCase()));
+  return (
+    <>
+      <div className="sg-row">
+        <Button variant="primary" onClick={() => setOpen(true)}>Open the palette</Button>
+        <span className="sg-kbd-hint"><Kbd>⌘</Kbd><Kbd>K</Kbd> in the app</span>
+      </div>
+      <Modal open={open} onClose={() => setOpen(false)} size="sm" align="top" ariaLabel="Demo command palette">
+        <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pages, entries, maps, pins…" aria-label="Search" />
+        <ul className="sg-palette-list">
+          {matches.map((option) => (
+            <li key={option.id}><button type="button" className="sg-palette-item tap-target interactive" onClick={() => setOpen(false)}>{option.label} <span className="sg-muted">{option.meta}</span></button></li>
+          ))}
+          {matches.length === 0 && <li className="sg-muted">No matches.</li>}
+        </ul>
+      </Modal>
+    </>
   );
 }
 
@@ -146,7 +250,12 @@ const ICONS = [
   { name: "IconDrag", glyph: <IconDrag />, use: "reorder grip" },
   { name: "IconCopy", glyph: <IconCopy />, use: "duplicate an existing one" },
   { name: "IconEye", glyph: <IconEye />, use: "shown to players" },
-  { name: "IconEyeOff", glyph: <IconEyeOff />, use: "GM only" }
+  { name: "IconEyeOff", glyph: <IconEyeOff />, use: "GM only" },
+  // Both added by the Codex recut, and both for the same reason the set exists at all: they were being
+  // typed as characters. The close control was a literal "×" in five components (Manrope has no U+00D7
+  // at the right weight, so it substituted), and the run/activate control was a "▶".
+  { name: "IconX", glyph: <IconX />, use: "close / clear a chosen value" },
+  { name: "IconPlay", glyph: <IconPlay />, use: "make live / run" }
 ];
 
 const SAVE_STATUSES: SaveStatus[] = ["idle", "dirty", "saving", "saved", "conflict", "error"];
@@ -661,6 +770,9 @@ export function StyleGuide() {
             <div className="sg-swatches">{SEMANTIC.map((t) => <Swatch key={t} token={t} />)}</div>
             <h3 className="sg-h3">Text</h3>
             <div className="sg-swatches">{TEXTS.map((t) => <Swatch key={t} token={t} />)}</div>
+            <h3 className="sg-h3">Atlas pins</h3>
+            <p className="sg-muted">Eight hues a GM assigns by meaning (capital, ruin, danger, quest). A set rather than a ramp: no order is implied, and every one is darkened in the light theme so a pin on parchment stays a pin.</p>
+            <div className="sg-swatches">{PINS.map((t) => <Swatch key={t} token={t} />)}</div>
             <h3 className="sg-h3">Signature ramp</h3>
             <div className="sg-ramp" />
           </Section>
@@ -706,9 +818,11 @@ export function StyleGuide() {
             <div className="sg-row">
               <Button variant="primary" size="sm">Small primary</Button>
               <Button variant="secondary" size="sm">Small secondary</Button>
-              <IconButton label="Ping">📍</IconButton>
-              <IconButton label="Measure">📏</IconButton>
-              <IconButton label="Fog" aria-pressed>🌫</IconButton>
+              {/* Never an emoji or a symbol character, including here: the styleguide is the one place a
+                  bad example is most likely to be copied. These were 📍 / 📏 / 🌫 and are now real glyphs. */}
+              <IconButton label="Ping"><IconEye /></IconButton>
+              <IconButton label="Measure"><IconDrag /></IconButton>
+              <IconButton label="Fog" aria-pressed><IconEyeOff /></IconButton>
             </div>
             <div className="sg-row">
               <Button variant="primary" arrow>Start encounter</Button>
@@ -735,6 +849,14 @@ export function StyleGuide() {
                 <Textarea id="sg-notes" placeholder="Set the scene…" />
               </Field>
             </div>
+            <h3 className="sg-h3">variant=&quot;title&quot; — the record's own name</h3>
+            <p className="sg-muted">
+              An editor whose subject is one record wants the title to READ as the heading it becomes, not as
+              the first of six identical wells. The variant is display-sized and loses the well; it keeps the
+              focus ring, because it is still a text field and hiding that is how a title becomes a control
+              nobody notices they can edit. Use it once per surface, on the field that names the thing.
+            </p>
+            <Input variant="title" defaultValue="Castle Ravenloft" aria-label="Page title" />
           </Section>
 
           <Section id="fieldgrid" title="Field grid" blurb="The form layout for every authoring surface: as many equal columns as fit, no media query. The load-bearing detail is minmax(min(220px, 100%), 1fr) rather than minmax(220px, 1fr) — the bare version holds a 220px floor even inside a 200px rail, which pushes the document sideways at 375px. Because it is intrinsic rather than breakpoint-driven, the same grid resolves to ONE column in a narrow desktop rail and TWO in a full-width phone column, which is the right answer in both places and takes no thought from the caller. A field that must span the row takes className='nh-fieldgrid-wide' — the escape hatch belongs to the child, so the grid never learns about its children.">
@@ -764,6 +886,18 @@ export function StyleGuide() {
 
           <Section id="taginput" title="Tag input" blurb="An open list of slugs: armour proficiencies, languages, damage resistances, feature tags. Composed from Chip + Input rather than invented, and open rather than a multiselect on purpose — the content schemas keep these fields as free slugs so a homebrew author can name a proficiency the SRD never had. Suggestions are a datalist, which hints without closing the set; a Select here would be a closed-world control over an open-world field. Enter or comma commits, Backspace on an empty input removes the last, and adds and removes are announced politely because a chip appearing above the field you are typing in is otherwise silent. At capacity the field disables and states its reason at full strength — annotate, never hide.">
             <TagInputDemo />
+          </Section>
+
+          <Section id="combobox" title="Combobox (type-to-filter chooser)" blurb="An input, a listbox, arrow-key selection, and the chosen value as a removable chip — the ARIA combobox pattern written once. Promoted out of the Codex, which had grown TWO of these: a page picker and the [[ suggestion list, with different keyboard behaviour and different row heights, so learning one taught you nothing about the other. Rows take the 44px floor as REAL PAINT (route 1); a route-2 ::after on a stacked list overhangs into the row below and steals its tap. allowFreeText is the one real fork: with it the control accepts a value that matches no option and hands the raw text back, which is what lets the same component be a closed-world page picker and an open-world 'who took this downtime' field. Without it, unmatched text is simply not selectable — a picker over a closed set must not invent members.">
+            <ComboboxDemo />
+          </Section>
+
+          <Section id="mdeditor" title="Markdown editor" blurb="One writing surface for every body of text in the app: a formatting toolbar, [[ ]] autocomplete, image drop/paste, and an Edit↔View switch. Before this, the Codex's good editor lived inside the page editor and NOWHERE else, so session prep, quest bodies and journal entries were bare textareas — typing [[ in one of them silently did nothing, which is the kind of inconsistency that teaches a GM not to trust a feature. It is deliberately markdown-AGNOSTIC: renderPreview is the caller's, which is what keeps a viewer-safe redlink renderer (and any GM-layer chrome) out of the design system. Toolbar letterforms (B / I / S / H) stay text because they are genuinely letters in the body face; every other mark is an SVG path, because Manrope has no glyph for most symbol characters and the platform substitutes a face at the wrong size — on phones, emoji.">
+            <MarkdownEditorDemo />
+          </Section>
+
+          <Section id="palette" title="Command palette (a pattern, not a primitive)" blurb="Modal align='top' + an input + a result list. It is documented here as a COMPOSITION on purpose: nothing about it is reusable except the top alignment, which is the one thing the Modal primitive gained for it. A palette anchored in the vertical centre of the viewport puts the result list under the fold on a laptop and under the keyboard on a phone, so align='top' is the whole primitive change and the rest is three ordinary controls. In the app it is scoped to the Codex and deliberately not global — ⌘K means nothing on the Encounter tab, and a test locks that, because 'make it global' is the obvious next step and is out of scope.">
+            <CommandPaletteDemo />
           </Section>
 
           <Section id="panels" title="Panels" blurb="Resting surfaces stay dark. An optional 2px hairline labels a panel kind.">
@@ -827,6 +961,18 @@ export function StyleGuide() {
               <Badge tone="primary" solid>LIVE</Badge>
               <Badge tone="danger" solid>3</Badge>
             </div>
+            <h3 className="sg-h3">tone=&quot;violet&quot; — GM-only, and nothing else, ever</h3>
+            <div className="sg-row">
+              <Badge tone="violet">GM only</Badge>
+              <Badge tone="violet" title="Hidden from players until you show it">Hidden from players</Badge>
+            </div>
+            <p className="sg-muted">
+              Violet is the one hue in this system with a single fixed meaning: “the players cannot see this.”
+              It is not a seventh decorative tone and must not be reached for because a status needs a colour
+              nothing else is using — pick neutral. The second badge also shows the <code>title</code> prop,
+              which is for the abbreviated badge whose full sentence will not fit; it is a supplement to a
+              label that already reads correctly, never a replacement for one.
+            </p>
             <h3 className="sg-h3">Avatars</h3>
             <div className="sg-row sg-row-baseline">
               <Avatar name="Borin Stoneguard" size="sm" />

@@ -130,3 +130,17 @@ body { margin: 0; }
 }
 .sg-grid-demo .grid-floor { position: absolute; inset: 0; }
 .sg-texture span { position: relative; z-index: 1; }
+
+/* Command-palette demo (D25). Deliberately local to the styleguide: the palette is a COMPOSITION, so
+   shipping a `.nh-palette` class would be the design system quietly growing a component it does not own. */
+.sg-palette-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.sg-palette-item {
+  /* §4 route 1 — grow the paint. A stacked result list cannot use a ::after box: it would overhang into
+     the row below and steal its tap, which on a phone means opening the wrong record. */
+  min-height: var(--tap-min);
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; padding: var(--space-2) var(--space-3); text-align: left;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-md);
+  color: var(--text); font: inherit; cursor: pointer;
+}
+.sg-palette-item:hover { background: var(--surface-2); border-color: var(--line); }
