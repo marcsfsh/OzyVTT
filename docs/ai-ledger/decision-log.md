@@ -7,6 +7,40 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-31 — the Codex client: one sidebar, real addresses, one vocabulary
+
+Codex overhaul, Lane C. Durable decisions, plus three OWNER DECISIONS this lane supersedes.
+
+- **A hand-rolled history layer, not react-router.** `apps/client` had zero router dependencies; the app
+  is four separate Vite HTML entries of which only `index.html` needs addresses; the address space is
+  small and fully enumerable; and react-router's data-router idioms (loaders, actions) fight this app's
+  socket-push + ping-and-refetch model. ~230 lines instead of a dependency. Revisit only if the address
+  space stops being enumerable.
+- **The GM's Viewer tab is addressed `/viewer-controls`.** `GET /viewer` is reserved by the server as a
+  307 to the standalone TV viewer in BOTH prod and dev, so the SPA can never receive it — a tab
+  addressed `/viewer` would be a link out of the app. "Viewer controls" is also what the tab is.
+- **An unknown address and a GM-only address render the SAME view.** `NotFoundView` for both, because an
+  address that answered differently would confirm the surface exists. Same family as the 404-not-403
+  rule the record routes keep, one axis up.
+- **The command palette is Codex-scoped, deliberately not global (D20).** Mounted only by `CodexShell`
+  and the player shell, so ⌘K means nothing on the Encounter tab. A test locks it, because "make it
+  global" is the obvious next step and is a separate decision.
+- **Inverse relationship wording is an ACCEPTED LOSS.** `RELATIONSHIP_TYPES` could say "rules" from one
+  end and "ruled by" from the other. A free-text label cannot; a reader now gets direction ("This page
+  points to" / "Points at this page") plus the label. Recorded so it is not rediscovered as a bug.
+- **`discardTransient` exists because `popTransient` cannot serve a caller that is about to navigate.**
+  `history.back()` is a task and `navigate` pushes on a microtask, so close-then-navigate pushed the
+  destination and immediately went back off it. See known-bugs for the bug it caused.
+
+**Superseded owner decisions.** Each was right when made and is wrong now; recorded rather than deleted.
+
+- **D-3 (the Codex is a tab with modes)** → superseded by D1/D3. Modes were unaddressable, so four
+  surfaces had no URL and the tab bar lit "Campaign" over whichever one was open.
+- **D-10 (the player Codex is a modal over the table)** → superseded by D4/D14. A modal cannot be deep
+  linked, cannot be refreshed, and gave players a second, thinner vocabulary.
+- **D-2 (the app always opens on the Encounter tab)** → superseded by D2. It still does when there is
+  nothing to resume; a deep link now always wins, and a bare `/` resumes the last location per role.
+
 ## 2026-07-31 — one connection system, quest history, and a restore that honours old backups
 
 Codex overhaul, Lane B (Phases 2-4). Five durable decisions.

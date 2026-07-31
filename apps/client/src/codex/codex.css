@@ -216,6 +216,17 @@
   color: var(--cyan); font: inherit; border-bottom: 1px dotted var(--cyan); text-align: left;
 }
 .codex-md-link:hover { color: var(--cyan-hi); }
+/* §4 route 2 — grow only the AREA. MEASURED at 40x94.9 at 375px (the Downtime tracker's character-page
+   link), 4px short of the floor. Route 1 is not available to an inline element inside a paragraph: a
+   `min-height` on an inline box does nothing, and making it inline-block would break the line box that
+   wraps prose. The gap budget is (44 − 40) / 2 = 2px per side — the same margin `.encounter-map-tools`
+   already relies on — and the only things within 2px above and below are lines of prose, which are not
+   tappable, so there are no taps to steal. */
+.codex-md-link::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+  height: var(--tap-min); pointer-events: auto;
+}
+.codex-md-link { position: relative; }
 /* Inert wiki-link (unresolved / not-yet-revealed): muted, NOT violet - violet is reserved for GM-only content. */
 .codex-md-link-inert { color: var(--text-muted); border-bottom-style: dashed; cursor: default; }
 
@@ -1083,6 +1094,11 @@
 .codex-editor-tagjumps { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .codex-context-jump { display: none; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); }
 .codex-context-jumplabel { color: var(--text-muted); }
+/* §4 route 1 — grow the paint. MEASURED at 19.5px tall at 375px by `scripts/tap-audit.mjs`, which is
+   below the floor, and this anchor only EXISTS below 761px, so it was sub-floor on exactly the viewport
+   it was added for. Route 1 rather than route 2 because the row is alone in the flow and a taller link
+   costs nothing here, which removes the gap budget from the question entirely. */
+.codex-context-jump a { display: inline-flex; align-items: center; min-height: var(--tap-min); }
 .codex-search-truncated { margin: var(--space-2) 0 0; padding: var(--space-2); color: var(--text-muted); font-size: var(--fs-sm); list-style: none; }
 
 /* ============================================================================

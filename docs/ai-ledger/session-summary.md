@@ -8,6 +8,31 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-31 — Codex overhaul, Lane C: the client recut
+
+Five commits (`2781793`, `dcff52a`, `a1f3dea`, `32d18af`, `ed546fe`, `41e7d08` + this ledger).
+**1626 tests, up from 1546.** check 0, build 0.
+
+The Codex client is now one sidebar (D1) over real addresses (D3), in one vocabulary (D5), with the
+player Codex as a first-class surface rather than a modal (D4/D14). `CodexWorkspace`,
+`RelationshipsPanel`, `EntityPicker`, `RELATIONSHIP_TYPES` and `findMarkerMap`'s O(maps) scan are
+deleted outright. Autosave (D6), quick-create (D7), one connections list (D8), tags (D10), the calendar
+lens (D17), the downtime tracker (D12), backup/restore (D16), the dashboard (D18), the Codex-scoped
+palette (D20), measured D21 tokens, the session-prep drawer (D24) and the D25 styleguide sweep all land.
+
+**Verified in Chromium against a populated database** at 1280x900 and 375x780 — 59/59 checks, 0 console
+errors, 26 screenshots (`scripts/browser-verify.mjs` + `scripts/seed-codex.mjs`, both new). The browser
+pass found two bugs jsdom could not: every tap in the phone nav drawer navigated nowhere (a
+`history.back()`-vs-microtask-push race, fixed with `discardTransient`), and the shared row chassis
+crushed its own title to "Esc…" while non-shrinking chips kept their pixels — which also scrolled the
+document 117px sideways on Downtime at 375px.
+
+**Tap audit is route-driven now** and reaches 17 surfaces instead of 5 tab-driven ones: 805 controls,
+0 below 44px at 375 and 320, except the graph canvas (accepted exception, documented).
+
+Follow-up: the app shell stacks the roster dock above the Codex at 375px, so the Codex starts ~1500px
+down. Not Lane C's to fix; logged in `known-bugs.md`.
+
 ## 2026-07-31 — Codex overhaul, Lane B (continued): connections, history, restore
 
 Five more commits (`c6e9e73`, `73482d7`, `16cf126`, `d97683e` + ledger). 1546 tests, up from 1523.

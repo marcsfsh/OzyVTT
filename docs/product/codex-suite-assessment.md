@@ -1,3 +1,15 @@
+> ## ⚠ SUPERSEDED — 2026-07-31
+>
+> This is a **Stage One investigation**, kept for its evidence and its reasoning, not as a description
+> of the product. The Codex overhaul it triggered has since shipped (D1–D26), and the surface it
+> assesses no longer exists in the shape described here: the five-mode tab bar, the four unaddressed
+> "destination" overlays, the separate Relationships and backlinks panels, the `RELATIONSHIP_TYPES`
+> vocabulary, the marker/notebook wording and the modal-only player Codex are all gone.
+>
+> **Read this for:** why the overhaul happened, and the measured baseline it started from.
+> **Do not read this for:** how the Codex works now. That is `docs/ai-ledger/current-state.md`, the
+> `docs/adr/` decisions, and the code.
+
 # Codex worldbuilding suite — current-state assessment
 
 Date: 2026-07-28 · Baseline: `3144e58` (PR #50) · Status: Stage One output of the Codex suite

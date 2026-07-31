@@ -8,6 +8,38 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **The Codex is one sidebar, one vocabulary and real addresses (2026-07-31, Lane C, branch
+  `claude/ozyvtt-codex-ux-4pl7ib`).** Verified in Chromium against a populated database at 1280x900 and
+  375x780: **59/59 checks, 0 uncaught console errors** (`node scripts/browser-verify.mjs`).
+  - **One navigation surface (D1).** A role-blind `SidebarNav` over Home / World (Pages · Atlas · Graph)
+    / Campaign (Sessions · Quests · Journal · Calendar · Downtime) / Tools (Reveal audit · Preview as
+    player · Backup · Settings). The five-mode tab bar, the nine-button ops row and the four unaddressed
+    "destination" overlays are GONE. Exactly one item is ever lit; `/codex` matches exactly, so Home no
+    longer lights on every codex address. The player sidebar is the same component and the same words,
+    minus Tools.
+  - **Real URLs (D3).** A hand-rolled ~230-line history layer (`apps/client/src/router.ts`) — no router
+    dependency; the app has four Vite entries and one of them needs addresses. Every surface and every
+    record is an address, back/forward work, and the server's SPA fallback already existed (verified,
+    not built). The GM's Viewer tab is `/viewer-controls` because the server reserves `GET /viewer`.
+  - **Resume and deep links (D2).** The GM token is memory-only by design, so a cold deep link shows the
+    login screen AT that address and auth lands on what was asked for; only a bare `/` resumes.
+  - **The player Codex is a first-class surface (D4/D14).** Out of the modal, same shell, same sidebar,
+    same section titles. The GM's "Preview as player" mounts the REAL player surface on a real minted
+    player token, inside a modal, on a LOCAL route so it cannot drive the GM's address bar.
+  - **One glossary, enforced by a test (D5).** `vocabulary.test.ts` reads `src/codex/**` and fails the
+    build on the retired words in anything a user reads. It found seven live violations on its first run.
+  - **Also shipped:** autosave + its setting (D6), quick-create (D7), one connections list (D8), tag
+    view (D10), a calendar lens (D17), a downtime tracker (D12), backup/restore UI (D16), a
+    mission-control dashboard (D18), the Codex-scoped ⌘K palette (D20), measured D21 tokens, the
+    session-prep drawer (D24), and the D25 styleguide sweep (Combobox, Markdown editor, the palette
+    pattern, `Input variant="title"`, `Badge tone="violet"`, `IconX`/`IconPlay`, the pin palette).
+  - **Deleted outright:** `CodexWorkspace`, `RelationshipsPanel`, `EntityPicker`, `RELATIONSHIP_TYPES`,
+    and `findMarkerMap`'s O(maps) scan (now `GET /codex/markers/{id}`).
+  - **Touch floor, measured not asserted:** 805 interactive controls across 17 surfaces, **0 below 44px
+    at 375px and at 320px**, except the graph canvas — an accepted exception now recorded in
+    `design-language.md` §4 with its reasoning. `scripts/tap-audit.mjs` is route-driven.
+
+
 - **The Codex speaks one connection language, records its own history, and restores from backup
   (2026-07-31, Lane B Phases 2-4, migrations v22-v23).**
   - **One connection system (D8/D13).** Typed relationships and `[[wiki-links]]` are one concept with an

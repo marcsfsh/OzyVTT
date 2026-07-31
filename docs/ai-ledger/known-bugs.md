@@ -10,6 +10,29 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex/graph] Graph nodes are below the 44px touch floor and will stay there.** Measured 11–33px at
+  375px and 41–43px at 320px. Node size is data-driven and positions are force-laid, so a 44px area per
+  node overlaps its neighbours at any realistic density: the floor and the layout are in direct conflict
+  and enforcing the floor destroys the thing being tapped. Recorded as an accepted exception in
+  `design-language.md` §4 with its three mitigations (pan/zoom, every node also reachable from Pages and
+  the palette, the graph is a view onto connections rather than the only way to open one). Reproduce
+  with `node scripts/tap-audit.mjs 375`.
+
+- **[app-shell/mobile] At 375px the GM's Codex starts roughly 1500px down the document,** below the
+  character-roster dock and the eight-tab strip. Observed while capturing browser evidence: a viewport
+  screenshot at scroll 0 on any Codex address is a picture of the roster. **Not the Codex's doing** —
+  the dock is the app shell's and the stacking affects every GM tab equally — so it was left untouched
+  rather than worked around inside one tab. It is nonetheless the single worst thing about using the
+  Codex on a phone, and it is a shell-level fix (collapse the dock below the ladder's narrow step, or
+  make the tab strip sticky). Flagged for whoever owns the shell.
+
+- **[codex/verify] `tap-audit.mjs`'s "unresolved" column over-reports at narrow widths.** `reach === 0`
+  means `elementFromPoint` never resolved to the control — for an SVG child, or for anything that could
+  not be scrolled to the viewport centre. Because of the shell-stacking entry above, 25–59 controls per
+  surface report unresolved at 375px while being perfectly reachable. It is a pointer to investigate,
+  never a verdict; the `below 44px` column is the number that means something.
+
+
 - **[codex/ux] Three friction points from the final QA pass still open (2026-07-30).** Seven were raised; the
   owner ruled on four (see `decision-log.md` 2026-07-30) and those are fixed. These three were not ruled on
   and remain design calls rather than defects:
@@ -483,8 +506,14 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   rather than storing it (D11-C), which remains the right trade. Recorded because nothing else says so,
   and because a GM who reshapes their calendar mid-campaign will see it.
 
-- **[codex/client] The client's `dateToInstant` does not clamp the day to its month's length; the
-  server's `calendarInstantOf` does.** `normalizeCalendar` stores a `currentDate` day above the month's
+- **[RESOLVED 2026-07-31, Lane C] [codex/client] The client's `dateToInstant` did not clamp the day to
+  its month's length; the server's `calendarInstantOf` does.** Fixed by clamping inside `dateToInstant`
+  at BOTH ends, which is the fix this entry named. The Calendar view (D17) reads it on every cell, so
+  leaving it would have put the disagreement on screen rather than only in the Today marker. Original
+  entry follows.
+
+  > **[codex/client] The client's `dateToInstant` does not clamp the day to its month's length; the
+  > server's `calendarInstantOf` does.** `normalizeCalendar` stores a `currentDate` day above the month's
   length verbatim (it clamps only at the bottom), so the state is reachable, and the two then disagree by
   a day. **Measured, not theorised**: with the clock on day 31 of a 30-day month, a 5-day downtime has the
   server landing on Alturiak 5 while unclamped client arithmetic reaches Alturiak 6. M11 is not exposed —

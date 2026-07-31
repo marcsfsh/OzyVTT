@@ -211,6 +211,12 @@ the *hit area*, never the paint.
   whole `/styleguide` page: **0 controls below the floor**. New UI composed from
   `@vtt/ui` inherits it for free, which is the main reason to compose rather than
   hand-roll.
+- **The whole Codex.** Measured 2026-07-31 in Chromium against a populated database,
+  17 surfaces including the page editor, the pin inspector, the command palette, the
+  nav drawer and the session-prep drawer: **805 interactive controls, 0 below the
+  floor at 375px and at 320px**, excluding the graph canvas in the table below.
+  Reproduce with `node scripts/tap-audit.mjs 375` (it is route-driven, so a new
+  address is covered by adding one line).
 - **The named app controls that carry it themselves** (they are not primitives, and
   each states its route in a comment): `.encounter-map-icon` (map tools),
   `.combatant-choice` / `.encounter-players-roll-init` / `.manual-nat20` (the
@@ -224,6 +230,7 @@ the *hit area*, never the paint.
 | `DicePanel`'s two `<summary>` disclosures | 39px and 19.5px tall | Unclassed `<summary>` in `apps/client/src/dice/`; needs a scoped rule there. |
 | `.encounter-map-swatches button` (color picker) | 24×24 | Inside a popover grid; 44px areas would overlap at the current 4.8px gap. |
 | Raw `<input type="checkbox">` outside the named labels above | 13–20px | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
+| `.codex-graph-node` (Connection graph) | 11–33px @375, 41–43px @320 | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. Measured 2026-07-31 by `scripts/tap-audit.mjs`. |
 
 Two ways to meet it — pick by whether growing the paint hurts:
 
@@ -330,7 +337,13 @@ off screens that hold dense text.
   on every interactive element; never remove focus outlines without replacing them.
 - Depth through blur on sticky/floating surfaces; reduced-transparency replaces
   blur with a solid surface.
-- A Cmd/Ctrl-K command palette is the intended global search/jump/run surface.
+- A Cmd/Ctrl-K command palette is the search/jump/run surface. **Shipped
+  Codex-scoped, deliberately not global** (D20, 2026-07-31): it is mounted only by
+  `CodexShell` and the player shell, so ⌘K means nothing on the Encounter tab, and a
+  test locks that — "make it global" is the obvious next step and is a separate
+  decision, not an oversight. Its chrome is `Modal align="top"`, which is the only
+  primitive change it needed; see `/styleguide#palette`, documented there as a
+  composition rather than a component.
 - Honor `prefers-reduced-motion` globally: neutralize entrances/drift/smooth
   scroll and present end states statically. Never gate information behind motion.
 
