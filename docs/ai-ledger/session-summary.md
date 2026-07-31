@@ -16,8 +16,10 @@ Browser pass **60/60** in Chromium against a populated database at 1280x900 and 
 width (all graph nodes), 0 surfaces unmeasured.**
 
 Fixing what the 47-agent adversarial pass found in `apps/client`, `packages/ui`, `scripts` and the
-context docs. 45 of 59 findings fixed, 1 verified not real, 13 deferred with reasons (see the fix
-report handed to the director).
+context docs. **47 of 59 fixed, 3 fixed in part, 8 deferred with reasons, 1 out of scope** (a viewer-
+router change in `apps/server` + an ADR). One sub-claim was verified NOT real and skipped:
+`browser-verify.mjs`'s screenshots were already gitignored — only the tap audit's were not. The
+per-finding disposition table went to the director with this pass.
 
 The five that mattered:
 

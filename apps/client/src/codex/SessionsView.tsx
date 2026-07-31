@@ -71,7 +71,12 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
         <aside className="codex-rail">
           <div className="codex-rail-head">
             <Input value={filter} placeholder="Filter sessions…" aria-label="Filter sessions" onChange={(event) => setFilter(event.target.value)} />
-            <Button variant="primary" size="sm" onClick={create}><IconPlus /> New</Button>
+{/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
+                screen, and the empty state's own create is the primary when there is nothing to select
+                — the rail's create steps down rather than competing with either. Two magenta-filled
+                buttons at once (twice with the identical label "New page") make neither one the
+                answer to "what do I do here". */}
+            <Button variant={selected && !autosave.enabled ? "secondary" : "primary"} size="sm" onClick={create}><IconPlus /> New</Button>
           </div>
           <div className="codex-rail-tools">
             <Select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "" | CodexSessionStatus)}>

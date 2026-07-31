@@ -174,7 +174,12 @@ export function PagesView({
         <div className="codex-rail-head">
           <Input value={search} placeholder="Search the Codex…" aria-label="Search the Codex"
             onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setFilter({ type: null, tag: null }); }} />
-          <Button variant="primary" size="sm" className="codex-newpage" onClick={() => onQuickCreate({})}><IconPlus /> New page</Button>
+{/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
+              screen, and the empty state's own create is the primary when there is nothing to select
+              — the rail's create steps down rather than competing with either. Two magenta-filled
+              buttons at once (twice with the identical label "New page") make neither one the
+              answer to "what do I do here". */}
+          <Button variant={selectedId ? (autosave.enabled ? "primary" : "secondary") : "secondary"} size="sm" className="codex-newpage" onClick={() => onQuickCreate({})}><IconPlus /> New page</Button>
         </div>
         {!search.trim() && (
           <div className="codex-rail-tools">
