@@ -2233,7 +2233,7 @@ Server-Sent Events stream of presentation updates for a paired viewer session; n
 
 ## Codex (pages, atlas, journal & calendar)
 
-The GM-authored worldbuilding surface: typed wiki **pages** (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its **pins**, the campaign **journal**, and the fantasy **calendar** - plus page media. Reads accept a GM session, a player session, or an integration credential scoped `codex:read`; writes accept a GM session or `codex:write`. A credential acts at GM grade (it is the GM's own automation); a player session receives the revealed-only projection - GM bodies, GM fields, and unrevealed pages/maps/pins/entries are stripped server-side, and the two shapes are published separately as `X` / `XPlayer` joined by `XProjected`. Every codex GET sends a weak `ETag`; send `If-None-Match` for a free `304`.
+The GM-authored worldbuilding surface: typed wiki **pages** (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its **pins** (`marker` on the wire), the campaign **journal**, and the fantasy **calendar** - plus page media. Reads accept a GM session, a player session, or an integration credential scoped `codex:read`; writes accept a GM session or `codex:write`. A credential acts at GM grade (it is the GM's own automation); a player session receives the revealed-only projection - GM bodies, GM fields, and unrevealed pages/maps/pins/entries are stripped server-side, and the two shapes are published separately as `X` / `XPlayer` joined by `XProjected`. Every codex GET sends a weak `ETag`; send `If-None-Match` for a free `304`.
 
 ### `GET /api/v1/codex/pages`
 
