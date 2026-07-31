@@ -83,6 +83,11 @@
 .codex-hit-meta { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; }
 .codex-hit-kind { flex: none; font-family: var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
 .codex-hit-tag { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; }
+/* The clickable form of the same chip. Route 2 (`.tap-target`) rather than route 1: these sit INLINE in
+   a meta row, so growing the paint would push the row's own height around; a centred hit box does not.
+   The rows they live in are horizontal, which is the case route 2 exists for. */
+.codex-hit-tag--pick { border: 0; background: none; padding: 0; color: var(--text-dim); cursor: pointer; font-size: inherit; }
+.codex-hit-tag--pick:hover { color: var(--cyan); text-decoration: underline; }
 /* Typed-entity glyph (SVG, coloured by its type) rendered inline next to a title, everywhere. */
 .codex-ent-icon { width: 1.05em; height: 1.05em; flex: none; vertical-align: -0.16em; }
 .codex-reader-titleicon { width: 0.82em; height: 0.82em; margin-right: 0.28em; vertical-align: -0.02em; }
@@ -1198,6 +1203,7 @@
 
 /* A live/active dot, drawn rather than typed — `●` is a symbol character the body face may not carry. */
 .codex-campaign-partyreveal { margin: 0; }
+.codex-conn-why { flex: 1 1 100%; color: var(--text-muted); font-size: var(--fs-xs); }
 .codex-dot { display: inline-block; width: .5em; height: .5em; border-radius: var(--radius-pill); background: currentColor; }
 /* D25: SVG icons only — no text or emoji standing in for a glyph. `IconChevron` points down, so the
    left/right forms are rotations of the one path rather than three more hand-drawn arrows. */

@@ -26,6 +26,7 @@ import { SidebarNav } from "./SidebarNav";
 import { useSidebarRailBand } from "./useSidebarRail";
 import { TagView } from "./TagView";
 import { NotFoundView } from "../components/NotFoundView";
+import { TagChip } from "./TagChip";
 import { playerCampaignFeedProps } from "./dashboard";
 import { PLAYER_SIDEBAR, SECTION_TITLE, atlasPath, codexSectionOf, journalEntryPath, pagePath, pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath } from "./routes";
 import { discardTransient, navigate, popTransient, pushTransient, releaseStrandedEntry, replaceQuery, useRoute } from "../router";
@@ -369,7 +370,8 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 
           {section === "sessions" && (
             <PlayerSessions sessions={sessions} loading={loading} openId={recordId} token={token}
-              onOpen={(id) => go(id ? sessionPath(id) : pathForSection("sessions"))} onNavigate={followLink} knownTitles={knownTitles} />
+              onOpen={(id) => go(id ? sessionPath(id) : pathForSection("sessions"))} onNavigate={followLink} knownTitles={knownTitles}
+              onPickTag={(tag) => go(tagPath(tag))} />
           )}
 
           {section === "quests" && (
@@ -418,9 +420,10 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 }
 
 /** D14: revealed sessions, recap rendered as markdown like every other body in the suite. */
-function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, knownTitles }: Readonly<{
+function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, knownTitles, onPickTag }: Readonly<{
   sessions: readonly PlayerCodexSession[]; loading: boolean; openId: string | null; token: string;
   onOpen: (id: string | null) => void; onNavigate: (target: string) => void; knownTitles: ReadonlySet<string>;
+  onPickTag: (tag: string) => void;
 }>) {
   const open = openId ? sessions.find((session) => session.id === openId) ?? null : null;
   return (
@@ -445,7 +448,7 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
           ? <article className="codex-reader">
               <h2 className="codex-reader-title">{sessionTitle(open)}</h2>
               {open.realDate && <div className="codex-entry-meta"><span className="codex-entry-when">{open.realDate}</span></div>}
-              {open.tags.length > 0 && <div className="codex-entry-meta">{open.tags.map((tag) => <span key={tag} className="codex-hit-tag">#{tag}</span>)}</div>}
+              {open.tags.length > 0 && <div className="codex-entry-meta">{open.tags.map((tag) => <TagChip key={tag} tag={tag} onPick={onPickTag} />)}</div>}
               <div className="codex-reader-body">{open.recap.trim() ? <CodexMarkdown text={open.recap} onNavigate={onNavigate} token={token} knownTitles={knownTitles} /> : <p className="codex-preview-empty">No recap written yet.</p>}</div>
             </article>
           : <div className="codex-main-empty"><h3>Pick a session</h3><p>Everything your GM has written up about a game night is here.</p></div>}

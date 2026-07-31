@@ -4,6 +4,7 @@ import { sessionApi, type CodexAutosaveSettings, type CodexPageSummary, type Cod
 import { pickNextSession, sessionTitle } from "./sessions";
 import { CodexEditor } from "./CodexEditor";
 import { GmOnlyTag, RevealSwitch, VisibilityBadge } from "./SecretMarkers";
+import { TagChip } from "./TagChip";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 
@@ -92,7 +93,10 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
                 <span className="codex-list-title">{sessionTitle(session)}</span>
                 {session.id === activeSessionId && <Badge tone="success">Active</Badge>}
                 <VisibilityBadge revealed={session.revealedToPlayers} />
-                {session.tags.slice(0, 2).map((tag) => <span key={tag} className="codex-hit-tag">#{tag}</span>)}
+                {/* The SAME chip the editor two components down renders, and clickable for the same
+                    reason: D10 says a tag opens the cross-type view from anywhere. It was inert here
+                    and a button there — one session, two behaviours, one line apart in one feature. */}
+                {session.tags.slice(0, 2).map((tag) => <TagChip key={tag} tag={tag} onPick={onPickTag} />)}
               </button>
             ))}
           </nav>
@@ -214,7 +218,7 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
       </Field>
       {onPickTag && draft.tags.length > 0 && (
         <div className="codex-editor-tagjumps">
-          {draft.tags.map((tag) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}</button>)}
+          {draft.tags.map((tag) => <TagChip key={tag} tag={tag} onPick={onPickTag} />)}
         </div>
       )}
 

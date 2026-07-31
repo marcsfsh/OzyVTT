@@ -139,10 +139,11 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
                 {row.otherKind !== "page" && <span className="codex-conn-kind">{OTHER_KIND_LABEL[row.otherKind]}</span>}
                 {/* A mention has no row to delete, so it explains itself rather than offering a control
                     that would 404: it is edited by editing the text that produced it. */}
+                {/* The reason this row has no Label or Remove, said in VISIBLE words. It used to be a
+                    native `title` tooltip, which a touch device never shows at all — so on the surface
+                    where the question is most likely to be asked, the answer did not exist. */}
                 {row.origin === "mention" && (
-                  <Badge className="codex-conn-origin" title="Written as a [[link]] in the text — edit the text to change or remove it.">
-                    Mentioned{row.section ? ` · ${row.section}` : ""}
-                  </Badge>
+                  <Badge className="codex-conn-origin">Mentioned{row.section ? ` · ${row.section}` : ""}</Badge>
                 )}
                 {isGmLayer && <GmOnlyTag />}
                 {write && declaredId && editing !== declaredId && (
@@ -150,6 +151,12 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
                     <Button variant="ghost" size="sm" onClick={() => { setEditing(declaredId); setEditLabel(row.label ?? ""); }}>Label</Button>
                     <Button variant="ghost" size="sm" onClick={() => void remove(declaredId)}>Remove</Button>
                   </span>
+                )}
+                {/* Design-language §5: a control that is absent owes the reader a reason, in words on the
+                    row. A mention has no row of its own to edit — it is written by the text and unwritten
+                    the same way — so this is where that is said. */}
+                {write && !declaredId && row.origin === "mention" && (
+                  <span className="codex-conn-why">Written as a [[link]] in the text — edit the text to change it.</span>
                 )}
                 {write && declaredId && editing === declaredId && (
                   <span className="codex-conn-actions">
