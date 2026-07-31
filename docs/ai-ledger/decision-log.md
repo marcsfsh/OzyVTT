@@ -7,6 +7,58 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-31 — the Codex joins the public API, and the API stops overstating itself
+
+Codex overhaul, Lane A (`c7fc8aa`, `5f78d87`). Six durable decisions, three of which consciously
+supersede something already on the record.
+
+- **The Codex is credential-reachable, at GM grade.** `codex:read` / `codex:write` sit beside the
+  sessions on every codex operation. **This supersedes the pin at `contract.test.ts:139-145`** ("no codex
+  op carries `bearerAuth`") and the README sentence that said so in prose. The pin was not wrong when it
+  was written — it recorded a real decision — but its consequence was that an external tool had to borrow
+  the GM's *session token* to read one page, which is the widest possible credential for the narrowest
+  need. The test is rewritten rather than deleted, and the interesting claim survives in it: exactly one
+  codex operation still refuses a credential, and it is the one that mints a session
+  (`POST /codex/preview-session`). A credential acts at GM grade because that is already the game
+  surface's model; a player-grade bot is expressible today with `POST /api/v1/sessions/player`, so a third
+  scope would be a second way to say the same thing. `codex:write` does not imply `codex:read` — scopes
+  are independent everywhere else, and a write-only automation that could also read the GM's secrets
+  would be a scope that means nothing.
+- **401 means "no credential"; 403 means "you presented one and were refused."** The codex answered 401
+  to an authenticated player, which tells a caller who is signed in to sign in — advice that cannot work,
+  and which a retrying client acts on. Any presented-but-failing token (player on a GM surface, junk,
+  revoked, underscoped) is now 403. This is game-http's split, not homebrew's junk-token-401, and it is
+  the API's own published convention finally being true. **Behaviour break, deliberate**; eight tests
+  asserted the old status and most now assert both arms. The *other* status rule is untouched and must
+  stay: a record a player may not see is **404, never 403** — that is a different axis (existence, not
+  authorization), and conflating the two would turn every id into an existence oracle.
+- **Response schemas are role-truthful: named `*Player` components joined by a `*Projected` `oneOf`.**
+  The alternative — keep GM components and describe the deltas in prose — leaves the machine contract
+  false, and a player response failing validation against its own published schema is the worst kind of
+  documentation bug: checkable and silently wrong. What makes `oneOf` sound is a **one-sided** rule (the
+  GM branch requires ≥1 key the player branch does not declare), asserted mechanically. It is one-sided
+  because six player shapes are strict key-subsets of their GM twin, so the symmetric rule is
+  unsatisfiable for them — and an unsatisfiable assertion is one that gets deleted. The contract now
+  *mirrors* `codex-projections.ts`, which stays the implementation source of truth; an Ajv cross-check
+  over real GM and player bodies is what stops the mirror drifting. **If the two ever disagree, the
+  projection is the fact and the contract is the bug** — never widen a component to make a test pass.
+- **Idempotency is stated per surface, because it was never API-wide.** `info.description` promised that
+  "every write accepts an optional `commandId`"; only the game surface implements it, and a codex or
+  homebrew caller who believed it got a 400 from a `.strict()` body. Withdrawn in favour of the honest
+  three-surface statement. (Codex `commandId` is planned; it will be documented when it exists, not
+  before.)
+- **Every codex GET carries a weak ETag, tagged per grade.** Correctness rests on the store's existing
+  discipline that every write bumps the coarse revision inside its own transaction — reveals and clock
+  moves included, since those change what a reader sees without changing any record's `rev`. **That rule
+  is now load-bearing: a new write that skips the bump serves stale reads.** The tag includes the grade
+  so one cached answer can never be served to the other role, and the conditional check runs at
+  serialization, after every auth and existence gate, so a probe cannot turn a 404 into a 304.
+- **ADR-0016 is Accepted, with the normative conventions statement it always promised**, including a
+  compatibility clause scoped honestly: v1 is stable by intent, but this instance ships client and server
+  in lockstep with no known external consumers, so coherence-buying breaks are permitted inside v1 while
+  the product is pre-1.0 — each recorded here. A public or multi-tenant posture would require a major
+  version. That clause is the single place to revisit if the owner ever wants stronger guarantees.
+
 ## 2026-07-30 — version history: a checkpoint is of the state you are about to LOSE
 
 Throttling `codex_page_revisions` is only safe because the snapshot direction changed with it. `updatePage`

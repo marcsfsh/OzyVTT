@@ -149,8 +149,14 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   checklist was the first label-wrapped control in the Codex, so the blind spot had never fired before.
   **A false violation is worse than none: it sends the next session to "fix" working code.**
 
-- **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — OPEN,
-  awaiting an owner decision (2026-07-29, M9).** Reproduced live: a GM creates session 4, leaves it
+- **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — FIXED IN
+  CODE; entry kept for the reasoning.** Option (2) below shipped: `playerSessionNumbers` resolves
+  `store.unrevealedSessionNumbers()` once per request and `projectPlayerJournalEntry` nulls
+  `sessionNumber` when a session record carries that number and is not revealed. Legacy numbers with no
+  record behind them are unaffected, exactly as the option promised. **Do not re-solve this.** The
+  Codex-overhaul D9 work (journal entries joining sessions by *id*) removes the number-list mechanism
+  entirely and gates on session reveal by construction; until then, this is the gate.
+  Original report (2026-07-29, M9): a GM creates session 4, leaves it
   unrevealed and activates it; any revealed journal entry written during play carries `sessionNumber: 4`
   to the player, who sees "Session 4", while their session list shows only `[3]` and a direct fetch of
   session 4 is 404. Content never travels — no prep, attendees or recap — only the ordinal and the fact
@@ -275,13 +281,13 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 - **[homebrew] `reminted.reason` has no honest value for "not our shape"** — the contract enum is
   frozen, so a pack id that is re-minted for shape reasons reports a collision that did not happen.
   Needs a `packages/api-contract` enum addition.
-- **[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
-  components document nowhere — 11 homebrew (`HomebrewRecordDocument`, `HomebrewRecordSummary`,
-  `HomebrewValidity`, `HomebrewValidationIssue`, `HomebrewUsage`, the six `*Data`) and ~73 mostly
-  Codex. Proven by injecting a response-side ghost component: all 32 api-contract tests pass and it
-  renders nowhere. The request side IS genuinely covered — the same injection on a request-reachable
-  path fails the test. Pre-existing seeding choice, not a regression; a one-line change with a large
-  doc diff.
+- ~~**[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
+  components document nowhere.~~ **FIXED 2026-07-31** (`c7fc8aa`, Codex overhaul Lane A).
+  `renderOperation` now seeds from success responses too — the envelope's `data` component, with the
+  existing transitive closure pulling the rows, payloads and branches it reaches — and
+  `reference.test.ts`'s *independent* obligation walker widened with it, so a renderer change cannot
+  silently reopen the hole. `docs/api-reference.md` went from 91 to **241** rendered shared shapes
+  (+1,777 lines), the large mechanical diff this entry predicted.
 - **[ui] `--caution-hi` IS `--violet-hi` in all three themes**, and in light `--caution` is literally
   `--violet` (`#7A3FD0`). The "violet is reserved for GM-only" rule is violated by the caution token
   itself. Harmless today only because the team held the every-state-is-a-word rule, so colour

@@ -8,6 +8,30 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-31 — Codex overhaul, Lane A: API truth (`claude/ozyvtt-codex-ux-4pl7ib`)
+
+The API lane of the Codex overhaul. Two commits: the published contract (`c7fc8aa`) and the router that
+now honours it (`5f78d87`). 1499 tests, up from 1474.
+
+The Codex became credential-reachable (`codex:read` / `codex:write`, GM grade, `preview-session`
+excepted); 401 was narrowed to "no parseable credential" and everything presented-and-refused became
+403; the ten player response shapes were published as `*Player` components joined to their GM twin by a
+`*Projected` `oneOf`, guarded by a disjointness contract test **and** an Ajv cross-check over real GM and
+player bodies for the whole read surface. Router plumbing: request-id echo (now reaching the error body),
+`details.issues`, `error.currentRevision` on stale-`expectedRev` 409s, weak ETags + 304 on all 21 codex
+GETs, sanitized 500s. Docs: the reference generator's request-only seed was the ~84-ghost-component bug —
+fixed, 91 → 241 rendered shared shapes; `archiveSchemaVersion` interpolated; `info.description` and the
+Conventions section stopped promising an API-wide `commandId`; **ADR-0016 accepted** with its normative
+v1 conventions statement, pinned against the generated reference by a five-phrase agreement test.
+
+Two latent contract bugs surfaced while making `oneOf` sound: `CodexChronicleRecord` was a merged
+GM/player shape (a player body matched both branches), and `CodexCalendar` left two keys optional that
+the GM projection always emits.
+
+**Follow-up (handed to the back-end lane, in writing):** every NEW codex route — import/restore,
+pin-by-id, party location, the connections family — plus the `commandId` receipts machinery. A contract
+entry for an unmounted route fails route-table parity immediately, so each must land with its route.
+
 ## 2026-07-29 — Codex Phase 4 M9–M11 (`claude/codex-phase-4-m9-54sebz`)
 
 Sessions/prep/recap (M9), quests (M10), and deadlines/downtime with a private prep clock (M11).

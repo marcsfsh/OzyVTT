@@ -8,6 +8,48 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **The Codex is a first-class citizen of the public API (2026-07-31, branch
+  `claude/ozyvtt-codex-ux-4pl7ib`, Codex overhaul Lane A).** The published contract described a codex
+  only a GM session could reach, returning shapes only a GM ever receives. Both are fixed, and the
+  fixes are pinned by tests rather than by prose.
+  - **`codex:read` / `codex:write` integration scopes.** Every codex operation accepts a GM session, a
+    scoped credential, or (on role-projected reads) a player session. A credential acts at **GM grade** —
+    the game surface's model verbatim — and `codex:write` does **not** imply `codex:read`.
+    `POST /codex/preview-session` is the one bearer-less operation: it mints a player session token.
+    `features.codex: true` joins capability discovery. The client scope picker needed no change (it
+    derives from `IntegrationScopeSchema.options`). Closes the `integration-API (codex:read/write)
+    scopes` item on the M-series deferred list below.
+  - **401 vs 403 now means something.** 401 is *only* a missing or unparseable `Authorization` header.
+    Everything presented-and-refused — player on a GM surface, junk, revoked, underscoped — is 403.
+  - **Player response shapes are published.** Ten `Codex<X>Player` components mirror
+    `codex-projections.ts` key for key, joined to their GM twin by a `Codex<X>Projected` two-branch
+    `oneOf`. A player body used to *fail validation against its own documented schema*. Two shapes had to
+    be fixed first, and both were latent bugs: `CodexChronicleRecord` was a merged GM/player shape whose
+    optional GM keys let a player body match both branches, and `CodexCalendar` left two keys optional
+    that the GM projection always emits.
+  - **Two tests keep it honest.** A contract test pins the one-sided disjointness rule for every pair
+    (both branches closed and all-required; GM branch requires ≥1 key the player branch does not
+    declare). `apps/server/test/codex-conventions.test.ts` Ajv-validates **real GM and player responses
+    for the whole codex read surface** against the served document, with non-empty-row assertions so no
+    check is vacuous — so a projection change without a contract change fails the build, in either
+    direction.
+  - **Router conventions, surface-wide:** caller-supplied `X-Request-Id` echoed on the header *and in the
+    error body*; `details.issues` carrying every schema issue with its `path`; `error.currentRevision` on
+    the three stale-`expectedRev` 409s (and deliberately absent from the apply-downtime state-machine
+    409); weak `ETag` + `304` on all 21 codex GETs, tagged per grade and checked after every auth and
+    existence gate; sanitized 500s (the catch-all used to forward SQLite's message).
+  - **Docs truth.** The reference generator seeded shared shapes from request bodies only, so ~84
+    response-only components printed their names with their field tables rendered nowhere; it now seeds
+    from success responses too and renders **241** shared shapes. `archiveSchemaVersion` is interpolated
+    from one exported constant (the heading said 2, the document said 3). `info.description` and the
+    Conventions section stop promising an API-wide `commandId` that only the game surface implements.
+    **ADR-0016 is Accepted** with the normative "v1 conventions" statement it always promised; a test
+    pins five load-bearing phrases in both it and the generated reference so the two cannot drift.
+  - Verified: `npm run check`, `npm run test` (1499 passing), `npm run build`, all green.
+  - **Deferred to the back-end lane, with a written handoff:** every NEW codex route (import/restore,
+    pin-by-id, party location, the connections family) and the `commandId` receipts machinery — a
+    contract entry for an unmounted route fails the route-table parity test immediately, so each must
+    land with its route.
 - **Character builder — the wizard screens (2026-07-27, branch
   `claude/dndbeyond-sheet-importer-0k6u2e`). A character can now be created through the UI for the
   first time.** A seven-step guided flow (Species · Background · Class & level · Class features ·
@@ -181,8 +223,9 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     needs the `authorizeViewer` seam); map legend / marker-list panel; atlas reset/fit-view dock;
     `useConfirm` for the 4 codex delete flows (still raw `window.confirm`); tag-chip filtering;
     new-session prefill; `commandId` idempotency on codex creates; `DELETE /codex-assets/:id` + orphan
-    GC; revision-snapshot coalescing; FTS5 boot-resilience; ETag on list reads; integration-API
-    (`codex:read/write`) scopes. Still not built from the original vision: ~~mind-map graph~~ (built,
+    GC; revision-snapshot coalescing; FTS5 boot-resilience; ~~ETag on list reads~~ (built 2026-07-31 —
+    every codex GET); ~~integration-API (`codex:read/write`) scopes~~ (built 2026-07-31). Still not
+    built from the original vision: ~~mind-map graph~~ (built,
     pillar 4 below), ~~fantasy calendar~~ (built, pillar 2 below), page transclusion.
 - **Worldbuilding platform — four pillars (2026-07-25, same branch).** The codex grew from a notebook
   into a World-Anvil-class worldbuilding tool, built + verified pillar by pillar on top of it:
