@@ -468,6 +468,11 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   is total rather than partial. The version INSERT is inside the same transaction as the migration, so a
   crash can never record a migration that did not run. Left as-is because making one migration idempotent
   and not the rest would be the worse inconsistency.
+  **2026-07-31:** v18 (`duplicate column name`), **v19** (`CREATE TABLE codex_journal_new` already exists,
+  plus a duplicate synthesized-session number), v20 (`duplicate column name`) and v21 (duplicate FTS rows)
+  join the total-failure class on the same terms. v19 is the one worth naming: it is the file's second
+  table REBUILD, so a re-run aborts before dropping anything and the failure mode is still "the codex will
+  not open, the file is intact". The posture is unchanged, deliberately.
 
 - **[codex/chronicle] A calendar reshape can flip a revealed deadline's state from "Passed" back to
   "Approaching".** `fired` derives from `calendar_instant`, which is recomputed from the raw date on every

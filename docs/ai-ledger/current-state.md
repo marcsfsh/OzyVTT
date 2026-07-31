@@ -8,6 +8,35 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **The Codex's journal, sessions and pins know who they belong to (2026-07-31, branch
+  `claude/ozyvtt-codex-ux-4pl7ib`, Codex overhaul Lane B, Phases 1-3 partial).** Four migrations
+  (v18-v21), all additive or content-preserving, all verified against a real legacy database built from
+  the shipped SQL rather than a fresh one.
+  - **Journal entries join their session by ID (D9, v19).** The display number resolves live from the
+    linked record, so renumbering a session relabels every one of its entries with no journal write -
+    closing the renumber bug open since M9. Writes take `sessionId` only; a bare `sessionNumber` is a 400.
+    The player gate keys on session reveal by identity and nulls BOTH halves of the link, which is
+    strictly stronger than the number-list it replaces (an unnumbered hidden session had no number to put
+    in a set). v13's recorded "no backfill" decision is consciously superseded: orphan numbers get an
+    EMPTY, hidden, played session record so nothing is invented and nothing becomes player-visible.
+  - **Sessions and quests are taggable and sessions are searchable (D10, v20/v21).** A new kind in the
+    one search index is a three-gate change; gate 1 keeps `prep_body` and attendee names out of the
+    player index entirely, so a player cannot find a *revealed* session by the GM's secrets. Search now
+    reports `truncated` rather than silently clipping at 50.
+  - **Autosave is a GM setting (D6, v18)**, in seconds, defaulting to `{enabled: true, intervalSeconds: 1}` -
+    which is what the shipping editors already did. The server stores a preference; enforcement is the
+    editor's.
+  - **`GET /codex/party` and `GET /codex/markers/{id}` (D15)** replace a client-side scan of every map.
+    The party read answers `null` rather than 404 for a hidden pin, so `isParty` still grants nothing.
+  - **Downtime can name a character page (D12)**, gated to revealed pages for players, scrubbed on page
+    delete, and supplied as null for pre-existing rows by the payload reader rather than a data migration.
+  - **`codex:changed` carries only a revision (D22)**; a type-changing page save forces its revision
+    snapshot (D7/R7); every public write is pinned to bump the coarse revision, which is what the ETags
+    rest on.
+  - **Not yet landed in this lane:** the D8/D13 connections unification, D16 import/restore, `commandId`
+    idempotency, D11 quest history (the database CHECK already admits the kind), and the narrow downtime
+    PATCH. See `handoff/B-to-C.md` §7.
+
 - **The Codex is a first-class citizen of the public API (2026-07-31, branch
   `claude/ozyvtt-codex-ux-4pl7ib`, Codex overhaul Lane A).** The published contract described a codex
   only a GM session could reach, returning shapes only a GM ever receives. Both are fixed, and the

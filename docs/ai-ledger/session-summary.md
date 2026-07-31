@@ -8,6 +8,27 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-31 — Codex overhaul, Lane B: the server half (`claude/ozyvtt-codex-ux-4pl7ib`)
+
+Four commits (`b829168`, `d1a695c`, `8a93aab`, `13e3974`) on top of Lane A. 1523 tests, up from 1499.
+
+Migrations v18-v21. D9 gives journal entries a real `session_id` and makes the number a live display
+value (renumber bug closed; v13's no-backfill decision consciously superseded, written into the decision
+log with the migration per R11). D10 tags sessions and quests and puts sessions in the one search index,
+with gate 1 keeping prep and attendees out of the player table. D6 autosave setting (seconds, default 1s).
+D15 adds `GET /codex/party` and `GET /codex/markers/{id}`. D12 links downtime to a character page. D22
+empties the `codex:changed` payload; D7/R7 forces a revision snapshot on a type change; D17/R3 puts both
+date forms on a player chronicle row. A new store test walks every public write and asserts the coarse
+revision strictly increases - the invariant every ETag rests on.
+
+The full migration up-path is tested against a real legacy database assembled from the shipped SQL, not a
+fresh one: synthesis, join backfill, the widened CHECK, index survival, the tags default and the FTS
+backfill's two-audience split are all asserted on real rows.
+
+**Follow-up (`handoff/B-to-C.md` §7):** D8/D13 connections, D16 import, `commandId` receipts, D11 quest
+history and the narrow downtime PATCH are not landed. The v19 CHECK already admits the `quest` kind, so
+D11 needs no second table rebuild.
+
 ## 2026-07-31 — Codex overhaul, Lane A: API truth (`claude/ozyvtt-codex-ux-4pl7ib`)
 
 The API lane of the Codex overhaul. Two commits: the published contract (`c7fc8aa`) and the router that
