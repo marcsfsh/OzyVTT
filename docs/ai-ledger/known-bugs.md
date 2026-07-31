@@ -10,6 +10,26 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex/backup] `export -> import -> export` is not byte-stable for a codex whose calendar was never
+  set.** The first export omits `calendar.currentDate` entirely (`DEFAULT_CALENDAR` has no such key); after
+  a restore, `normalizeCalendar` writes it as an explicit `null` and the second export carries it. Content
+  is identical either way and nothing reads the difference, so this is a stability wrinkle rather than data
+  loss — found while writing the R2 round-trip test (2026-07-31 server QA pass), which scopes its
+  byte-comparison to the journal and sessions sections because of it. The one-line fix is
+  `currentDate: null` on `DEFAULT_CALENDAR`, deliberately NOT taken in a server-only pass: it would flip the
+  key from absent to null in every `GET /codex/calendar` response for a codex that never set one, which is
+  a client-visible change.
+
+- **[codex/store] `normalizeBundle`'s `inWorldDate` accepts an unbounded year where the write path caps it
+  at ±100,000.** `date()` only truncates, so a hand-edited bundle can carry `year: 9e15` and reach
+  `resolveDate` INSIDE the import transaction, where a `calendar_instant` beyond `Number.MAX_SAFE_INTEGER`
+  is a STRICT-column write failure. The transaction rolls back and the caller now gets a sanitized 500
+  rather than driver text, so the codex is safe and nothing leaks — but the file's own rule is that "an
+  import cannot write a row a POST could not", and this is the one validator that is laxer than its POST
+  twin. Found during the 2026-07-31 server QA pass while looking for a post-BEGIN failure; not fixed there
+  because bounding it would have removed the only failure mode the new rollback test could use, and the
+  test was the higher-value change. Bound `date()` and keep the rollback test's probe index.
+
 - **[codex/graph] Graph nodes are below the 44px touch floor and will stay there.** Measured 11–33px at
   375px and 41–43px at 320px. Node size is data-driven and positions are force-laid, so a 44px area per
   node overlaps its neighbours at any realistic density: the floor and the layout are in direct conflict

@@ -7,6 +7,43 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-31 — Codex server QA pass: five durable rules
+
+Settled while fixing the adversarial QA findings on `apps/server` and `packages/api-contract`. Each was
+a choice between two defensible options; recorded so the loser is not re-proposed.
+
+- **A record's PROJECTION decides whether it may be a connection endpoint, never its reveal flag.**
+  `revealedSourceIds` and `projectPlayerPageConnections` both resolve through the record's own player
+  projection, and `CodexPageConnectionRow.otherRevealed` is documented as a GM-facing fact that is NOT the
+  player gate. A flag test is only equal to a projection until the projection grows a second condition —
+  which `projectPlayerJournalEntry` had already done twice (standing→faction, quest event→quest) before
+  anyone noticed the connection surfaces had not followed.
+
+- **What may be forwarded to an API caller is an ALLOW-LIST.** `CodexValidationError` exists so the store's
+  58 GM-readable refusals can be forwarded by TYPE rather than by default. A denylist of driver errors
+  would need extending for every new error class; this way the default for anything unrecognised is the
+  sanitized 500. `CodexStore has not been initialized.` is deliberately left a bare `Error` so it lands
+  there.
+
+- **"No records in this FILE" and "no records in this CAMPAIGN" are different answers, and the wire already
+  distinguishes them.** `exportBundle` writes every section unconditionally, so an empty campaign carries
+  `"pages": []` and a truncated file carries nothing recognised. A restore refuses the second and performs
+  the first. Rejected: "refuse any bundle that produces zero records", which would break the legitimate
+  empty campaign, and "trust `bundleVersion`", which the caller may strip.
+
+- **A journal row's provenance is read from the KEY's presence, not from `bundleVersion`.** D9 writes
+  `sessionId` on every exported journal row even when null, so its absence dates the row to a pre-D9
+  export — which is what tells a lost join apart from director ruling R2's bare display label. Rejected:
+  the bundle-level `bundleVersion`, which is optional on the wire and documented as absent-means-pre-
+  versioning, so a modern backup POSTed with the key stripped would corrupt exactly those labels. The flag
+  rides on a separate `CodexImportBundle` type so it can never reach `exportBundle`'s output.
+
+- **An idempotency key identifies ONE request, and the receipt remembers which.** Migration v24 binds a
+  receipt to `method + path`; a mismatched reuse is a 400 rather than a replay. Bound to the route and NOT
+  to the body on purpose: a client retrying after fixing a typo is finishing one request, and a body hash
+  would make the key useless to it. Pre-v24 receipts (NULL fingerprint) still replay, because refusing
+  retries in flight across an upgrade is the worse trade and receipts age out in seven days.
+
 ## 2026-07-31 — the Codex client: one sidebar, real addresses, one vocabulary
 
 Codex overhaul, Lane C. Durable decisions, plus three OWNER DECISIONS this lane supersedes.

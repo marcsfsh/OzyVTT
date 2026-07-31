@@ -720,6 +720,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul, server QA fix pass (2026-07-31).** An adversarial review raised 24 server findings;
+  21 are fixed, 1 was verified not real, 2 are deferred into `known-bugs.md`. The load-bearing outcomes:
+  journal-sourced connections are gated by `projectPlayerJournalEntry` on BOTH surfaces (a revealed
+  standing record about a hidden faction was publishing its text to players while the reveal audit called
+  it hidden); a backup with no recognised section is refused instead of wiping the codex; and what
+  `malformed()` forwards to a caller is an allow-list (`ZodError` or `CodexValidationError`) with a
+  sanitized 500 for everything else, so SQLite's table and column names no longer reach API callers.
+  Import also stopped converting director ruling R2's bare session label into a phantom hidden session,
+  the ETag names its resource, `POST /codex/import` authorizes before its 64 MB parser, and migration v24
+  binds a `commandId` receipt to the route it was issued for. `docs/api-reference.md` is regenerated for
+  the four journal 404s, the asset upload's 403/413, the corrected apply-downtime 409, the body-limit
+  line and the `commandId` uniqueness rule. **1725 tests** (from 1662).
+
+
 - **Codex version history is bounded, switchable and trimmable — owner decisions (2026-07-30).** Completing
   the export bundle exposed `codex_page_revisions` as **unbounded**: every page save wrote a row, nothing
   pruned, and a revision row weighs the same as a page row (both bodies). Worse than "per save" implies — the

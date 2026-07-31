@@ -8,6 +8,50 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-31 — Codex overhaul, QA fix pass (server lane)
+
+Seven commits (`e4073c6`, `bede1eb`, `273d7e4`, `edc68cf`, `6d5bfe7`, `6339188`, `ec5bf93` + this
+ledger). **1725 tests, up from 1662.** check 0, build 0.
+
+Fixing what a 47-agent adversarial QA pass found in `apps/server` and `packages/api-contract`.
+21 of 24 findings fixed, 1 verified not real and skipped, 2 deferred with reasons.
+
+The three that mattered:
+
+- **Viewer safety.** Both connection surfaces gated a journal source on the entry's raw
+  `revealedToPlayers` instead of `projectPlayerJournalEntry`, which is stronger for two kinds
+  (a `standing` record is also gated on its faction page, a `quest` history row on its quest).
+  Set standing on a hidden faction, type a `[[link]]` into the record's player text, reveal the
+  row — and the record's existence AND its excerpt reached the party on the linked page's
+  Connections panel and in the graph feed, while the journal, the timeline, search and the reveal
+  audit all correctly called it hidden. One predicate now serves both surfaces.
+
+- **Data loss (reproduced through the UI by QA — 22 real pages destroyed).** A backup file that
+  parsed but carried no recognised section wiped the codex and answered 200. "No records in this
+  FILE" and "no records in this CAMPAIGN" are distinguishable on the wire and now take different
+  branches; R1 (a pre-versioning bundle with no `bundleVersion` restores) is intact and pinned.
+
+- **Information disclosure.** `malformed()` forwarded any non-Zod error's message, so a duplicate
+  page id answered 400 with "UNIQUE constraint failed: codex_pages.id". Forwarding is an allow-list
+  now (`ZodError` or the new `CodexValidationError`); everything else takes the sanitized 500.
+
+Also: R2's bare session label survived export→import as a phantom hidden session (fixed, per-row
+discriminator); a `codex:read` credential could not fetch page images the contract promised it
+(fixed); the ETag carried no resource identity, so one endpoint's validator 304'd another (fixed);
+`POST /codex/import` buffered and parsed 64 MB before authorization on the GameState event loop
+(guarded); a reused `commandId` replayed the wrong response and silently skipped a write
+(migration v24 binds the receipt to its route).
+
+Two vacuous tests replaced with real ones and both mutants confirmed: the D16 atomicity test never
+entered the transaction (it now forces a failure after the wipe), and the D22 test claimed the
+socket ping carries nothing while only watching the injected notifier (now split into a router half
+and a real socket half that pins the emitted key set).
+
+Follow-ups logged in `known-bugs.md`: a fresh codex's calendar round-trip is not byte-stable
+(`currentDate` appears on the second export), and the Backup screen's pre-restore inventory is
+client-side work handed to the client fixer.
+
+
 ## 2026-07-31 — Codex overhaul, Lane C: the client recut
 
 Five commits (`2781793`, `dcff52a`, `a1f3dea`, `32d18af`, `ed546fe`, `41e7d08` + this ledger).
