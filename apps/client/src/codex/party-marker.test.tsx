@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 // The atlas renders a real image-backed surface; this file is about the party FLAG, not the camera.
@@ -68,13 +69,36 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   tags: [], createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z", ...over
 });
 
+/**
+ * The atlas, with the address fed back the way `CodexShell` feeds it.
+ *
+ * Selecting a pin is a NAVIGATION now (`?pin=`), not local state — that is what puts it behind the
+ * autosave-off leave guard, see `pin-selection.test.tsx`. So a harness that swallowed `onNavigate` would
+ * render an atlas in which no pin can ever be opened, and every assertion about the inspector below
+ * would be about a surface the GM cannot reach.
+ */
+function AtlasHarness() {
+  const [href, setHref] = useState("/codex/atlas");
+  const [path, search] = href.split("?");
+  const query = new URLSearchParams(search ?? "");
+  return (
+    <ToastProvider>
+      <AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()}
+        mapId={path.split("/")[3] ?? null} pinId={query.get("pin")}
+        autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()}
+        onNavigate={setHref}
+        onReplaceQuery={(mutate) => { const next = new URLSearchParams(search ?? ""); mutate(next); setHref(next.toString() ? `${path}?${next}` : path); }} />
+    </ToastProvider>
+  );
+}
+
 const renderAtlas = async (markers: CodexMarker[]) => {
   listMaps.mockResolvedValue([MAP]);
   listMarkers.mockResolvedValue(markers);
   listAssets.mockResolvedValue([]);
   listPages.mockResolvedValue([]);
   forMarker.mockResolvedValue([]);
-  render(<ToastProvider><AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} /></ToastProvider>);
+  render(<AtlasHarness />);
   await waitFor(() => expect(listMarkers).toHaveBeenCalled());
 };
 

@@ -73,9 +73,9 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
    * Scoped to the two fields a GM TYPES. The pickers below (link a page, choose a sub-map, a scene, an
    * actor, the icon, the colour) stay immediate in both modes, which is D6's own recorded scope call:
    * choosing from a list is a discrete act, not an edit in progress, exactly like the reveal switch and
-   * the party toggle. Known gap, recorded in `known-bugs.md`: selecting a DIFFERENT pin rewrites the
-   * query rather than navigating, so it does not pass the router guard — an unsaved label is lost that
-   * way, and the Save button and the "Unsaved changes" readout are what stand between the GM and it.
+   * the party toggle. Selecting a DIFFERENT pin used to skip the router guard, because the atlas held the
+   * selection in local state and nothing navigated; it is an address now (`AtlasView`'s `selectPin`), so
+   * leaving this draft by any route — another pin, another map, Back, Close — asks first.
    */
   const draft = useMemo(() => ({ label: label.trim(), tags }), [label, tags]);
   const saveDetails = useCallback(async (next: { label: string; tags: readonly string[] }) => {

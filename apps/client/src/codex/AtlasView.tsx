@@ -8,7 +8,8 @@ import { MarkerInspector } from "./MarkerInspector";
 import { RevealSwitch } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
-import { atlasPath } from "./routes";
+import { CODEX_ROOT, atlasPath } from "./routes";
+import { withQuery } from "../router";
 import type { QuickCreateRequest } from "./QuickCreate";
 import type { CodexAutosaveSettings } from "./api";
 
@@ -77,10 +78,41 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   const [currentMapId, setCurrentMapId] = useState<string | null>(mapId);
   useEffect(() => { if (mapId) setCurrentMapId(mapId); }, [mapId]);
   const [markers, setMarkers] = useState<CodexMarker[]>([]);
-  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(pinId);
-  useEffect(() => { if (pinId) setSelectedMarkerId(pinId); }, [pinId]);
   /**
-   * "Show the pin" must SHOW the pin (`ux-principles.md` §9). It used to call `setSelectedMarkerId` alone,
+   * **The selected pin IS the address** (`?pin=`), not a piece of local state beside it.
+   *
+   * It used to be `useState`, and a marker click called the setter directly. That cost two things. The
+   * selection was not addressable — a refresh, or a link sent to yourself, lost the open pin even though
+   * `atlasPath` has always been able to carry it. And, the regression D6 introduced: selecting a
+   * different pin never consulted the router's unsaved-changes guard, because nothing navigated. With
+   * autosave off the inspector holds label and tags as a draft, so a GM who typed a label and tapped the
+   * next pin lost it silently — where the same act on a page or a quest (a real `navigate`) prompts.
+   * Every selection change below therefore goes through `onNavigate`, which is what makes it guarded,
+   * refresh-proof, and reachable with Back.
+   */
+  const selectedMarkerId = pinId;
+  /**
+   * This atlas address with a given pin selected (or none), **keeping the pin filters**.
+   *
+   * `atlasPath` alone would drop `?q=` and `?tag=` — they live on the same address — and a selection
+   * that silently cleared the GM's filter would be a second surprise stacked on the first.
+   */
+  const pinHref = useCallback(
+    (markerId: string | null) => withQuery(currentMapId ? `${CODEX_ROOT}/atlas/${currentMapId}` : `${CODEX_ROOT}/atlas`,
+      { q: filter || null, tag: tagFilter ?? null, pin: markerId }),
+    [currentMapId, filter, tagFilter]
+  );
+  const selectPin = useCallback((markerId: string) => onNavigate(pinHref(markerId)), [onNavigate, pinHref]);
+  /** Closing the inspector is a departure too, so it is guarded the same way. A no-op with nothing open. */
+  const deselectPin = useCallback(() => { if (selectedMarkerId) onNavigate(pinHref(null)); }, [onNavigate, pinHref, selectedMarkerId]);
+  /**
+   * Clear the selection WITHOUT the guard — for the one case where there is nothing left to save: the
+   * pin has just been deleted. Prompting to keep a draft of a record that no longer exists would be a
+   * question with no true answer.
+   */
+  const clearDeletedPin = useCallback(() => onReplaceQuery((query) => query.delete("pin")), [onReplaceQuery]);
+  /**
+   * "Show the pin" must SHOW the pin (`ux-principles.md` §9). It used to select the pin alone,
    * which opens the inspector and rings the pin — neither of which helps if the pin is off the current view,
    * and on a phone the map itself is usually below the fold from this row. So the tap does both halves now:
    * this asks the surface to centre its camera (`MapSurface.centerOnMarkerId`), and the ref below brings the
@@ -91,7 +123,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   /** ≤760 the inspector sits BELOW the map, so selecting a pin must bring it into the page viewport. */
   const inspectorRef = useRef<HTMLDivElement>(null);
   const showPin = (markerId: string) => {
-    setSelectedMarkerId(markerId);
+    selectPin(markerId);
     setCenterOnMarkerId(markerId);
     mapBodyRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
@@ -128,10 +160,10 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
     return () => { socket.off("codex:changed", onChanged); };
   }, [loadMeta, loadMarkers, currentMapId]);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setPlacing(false); setPicking(false); setSelectedMarkerId(null); } };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setPlacing(false); setPicking(false); deselectPin(); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [deselectPin]);
 
   /**
    * D15 — a `?pin=` deep link with no `:mapId`: a journal entry stores only `attachMarkerId`, and a
@@ -162,11 +194,10 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
       .catch(() => {
         if (!live) return;
         setError("That pin is no longer in the atlas.");
-        setSelectedMarkerId(null);
-        onReplaceQuery((query) => query.delete("pin"));
+        clearDeletedPin();
       });
     return () => { live = false; };
-  }, [pinId, mapId, loading, gmToken, onNavigate, onReplaceQuery]);
+  }, [pinId, mapId, loading, gmToken, onNavigate, clearDeletedPin]);
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;
@@ -214,7 +245,9 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   // second root map becomes unreachable the moment you leave it (the view remounts onto the first root).
   const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
   const currentRootId = breadcrumb[0]?.id ?? null;
-  const enterMap = useCallback((next: string) => { setSelectedMarkerId(null); onNavigate(atlasPath(next)); }, [onNavigate]);
+  // Entering another map drops the selection with it — `atlasPath` carries no `?pin=`, and the guard
+  // runs because this is a navigation like any other.
+  const enterMap = useCallback((next: string) => onNavigate(atlasPath(next)), [onNavigate]);
 
   const [uploading, setUploading] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -278,7 +311,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
   };
   const placeMarker = async (point: { x: number; y: number }) => {
     if (!currentMapId) return;
-    try { const marker = await atlasApi.createMarker(gmToken, currentMapId, { x: point.x, y: point.y, iconId: DEFAULT_ICON, iconColor: DEFAULT_COLOR }); setMarkers((prev) => [...prev, marker]); setSelectedMarkerId(marker.id); setPlacing(false); }
+    try { const marker = await atlasApi.createMarker(gmToken, currentMapId, { x: point.x, y: point.y, iconId: DEFAULT_ICON, iconColor: DEFAULT_COLOR }); setMarkers((prev) => [...prev, marker]); setPlacing(false); selectPin(marker.id); }
     catch (placeError) { setError(placeError instanceof Error ? placeError.message : "Could not place the pin."); }
   };
   const moveMarker = async (markerId: string, point: { x: number; y: number }) => {
@@ -303,7 +336,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
     try { await codexApi.revealPage(gmToken, pageId, true); await loadMeta(); }
     catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Could not reveal the page."); }
   };
-  const onMarkerDeleted = (markerId: string) => { setMarkers((prev) => prev.filter((marker) => marker.id !== markerId)); setSelectedMarkerId(null); };
+  const onMarkerDeleted = (markerId: string) => { setMarkers((prev) => prev.filter((marker) => marker.id !== markerId)); clearDeletedPin(); };
   const onMapReplace = (map: CodexMap) => setMaps((prev) => prev.map((existing) => (existing.id === map.id ? map : existing)));
   const revealMap = async (revealed: boolean) => {
     if (!currentMap) return;
@@ -385,7 +418,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
               dimmedMarkerIds={dimmedIds}
               centerOnMarkerId={centerOnMarkerId} onCentered={() => setCenterOnMarkerId(null)}
-              onBackgroundClick={placeMarker} onMarkerClick={(markerId) => { setSelectedMarkerId(markerId); if (window.innerWidth <= 760) requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} onMarkerDragEnd={moveMarker} />
+              onBackgroundClick={placeMarker} onMarkerClick={(markerId) => { selectPin(markerId); if (window.innerWidth <= 760) requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} onMarkerDragEnd={moveMarker} />
           : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop pins on towns and dungeons, link each to a page or a deeper map, and show them to players as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         <div ref={inspectorRef} />
@@ -395,7 +428,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           /* M12-C: setting the party clears whichever pin held it before — possibly on another map — so
              the whole map's pins are re-read rather than one row being patched. */
           onPartyChanged={async () => { if (currentMapId) await loadMarkers(currentMapId); }}
-          onClose={() => setSelectedMarkerId(null)} />}
+          onClose={deselectPin} />}
       </div>
 
       <Modal open={picking} onClose={() => setPicking(false)} title={currentMap && nestNew ? `Add a sub-map under ${currentMap.name}` : "Add a map"} size="md" ariaLabel="Choose a map">
