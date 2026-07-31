@@ -2281,7 +2281,7 @@ Suite-wide full-text search across pages, journal entries, maps and markers, rol
 
 ### `GET /api/v1/codex/pages/{id}`
 
-One page with its backlinks and typed relationships, projected for the caller.
+One page with its connections - one list where backlinks and typed relationships used to be two, projected for the caller.
 
 **Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
@@ -2341,9 +2341,9 @@ Shows/hides a page to players.
 
 **Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `403` `404`
 
-### `POST /api/v1/codex/pages/{id}/relationships`
+### `POST /api/v1/codex/pages/{id}/connections`
 
-Adds a typed relationship edge from this page to another. Counts as an edit of BOTH pages, so both move in "recently updated" - but neither page's `rev` changes, so an open editor is not forced into a conflict.
+Declares a connection from this page to another. Counts as an edit of BOTH pages for "recently updated" - but neither page's `rev` changes, so an open editor is not forced into a conflict. Idempotent on `(from, to, label)`, and on the reverse pair too for a symmetric label ("ally of", "enemy of", "rival of", "related to"), so declaring the same edge twice returns the existing one rather than doubling it.
 
 **Auth:** Integration credential with `codex:write` · GM session
 
@@ -2354,9 +2354,10 @@ Adds a typed relationship edge from this page to another. Counts as an edit of B
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `toPageId` | string (uuid) | yes |  |
-| `type` | string | yes |  |
+| `label` | string \| null | no | Optional. An unlabelled connection is a legitimate "these two are related" - the same thing a `[[wiki link]]` already expresses - so forcing a word would make the declared half of one concept stricter than the derived half. |
+| `layer` | `player` \| `gm` | no | Default: `"player"`. |
 
-**Responses:** `201` Success - envelope of `CodexRelationshipData` · errors `400` `401` `403` `404`
+**Responses:** `201` Success - envelope of `CodexConnectionData` · errors `400` `401` `403` `404`
 
 ### `GET /api/v1/codex/pages/{id}/markers`
 
@@ -2447,31 +2448,40 @@ Deletes a folder and its subfolders; every page under it drops to the top level 
 
 **Responses:** `200` Success - envelope of `CodexDeletedData` · errors `400` `401` `403`
 
-### `GET /api/v1/codex/relationships`
+### `GET /api/v1/codex/connections`
 
-Every relationship edge for the graph, role-scoped (a player sees only edges whose BOTH endpoints are revealed).
+Every connection in the codex - ONE edge kind for the whole graph. A typed relationship and a `[[wiki link]]` are the same thing with a different `origin`; a connection may carry an optional `label`. Role-scoped by three gates, all of which must hold for a player: the target page is revealed, the SOURCE record is revealed by its own kind's player rule, and the connection sits on the `player` layer (a link written in a GM body is a GM note about a connection, not a connection the party has been shown).
 
 **Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexRelationshipEdgeListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
+**Responses:** `200` Success - envelope of `CodexConnectionListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
-### `DELETE /api/v1/codex/relationships/{id}`
+### `PATCH /api/v1/codex/connections/{id}`
 
-Removes one relationship edge; idempotent. Like adding one, it counts as an edit of both endpoint pages for "recently updated" without changing either page's `rev`.
+Relabels a DECLARED connection or moves it between layers. A `mention` connection has no id - it is derived from a body's text - and is edited by editing that text.
+
+**Auth:** Integration credential with `codex:write` · GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `label` | string \| null | no |  |
+| `layer` | `player` \| `gm` | no |  |
+
+**Responses:** `200` Success - envelope of `CodexConnectionData` · errors `400` `401` `403` `404`
+
+### `DELETE /api/v1/codex/connections/{id}`
+
+Removes one declared connection; idempotent. Counts as an edit of both endpoints for "recently updated" without moving either record's `rev`.
 
 **Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
 **Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
-
-### `GET /api/v1/codex/links`
-
-Every `[[wiki link]]` edge between two pages - the Graph's second edge kind, beside the typed relationships. Role-scoped by both rules the existing feeds enforce: a player sees an edge only when BOTH endpoints are revealed pages (never a dangling edge to a page they cannot see) AND only when it was written in a page's PLAYER-facing body, never its GM body. Links to a title no page carries, and a page's link to itself, carry no edge.
-
-**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
-
-**Responses:** `200` Success - envelope of `CodexLinkEdgeListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `GET /api/v1/codex/maps`
 
@@ -3276,14 +3286,6 @@ Whether the Codex's editors save your work as you type, and how often. The serve
 | `enabled` | boolean | yes | Default `true`. `false` does not slow autosave down, it stops it: the editors then require an explicit Save and warn about unsaved changes. |
 | `intervalSeconds` | integer (1–600) | yes | How long the editors wait after you stop typing before saving. SECONDS, and the unit is the same everywhere - wire, column, and store - so nothing converts at a boundary. Default `1`, which is what the shipping editors already did (an 800 ms debounce) expressed on this scale, so an upgraded codex saves exactly as often as it used to. `0` is not in range: a zero-second autosave is a save per keystroke, which is not a cadence anyone means - a GM who wants none says `enabled: false`. The 600 ceiling is ten minutes, past which the setting stops meaning "save while I work". |
 
-### `CodexBacklink`
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `sourcePageId` | string (uuid) | yes |  |
-| `sourceTitle` | string | yes |  |
-| `section` | string \| null | yes |  |
-
 ### `CodexCalendar`
 
 The world's calendar as the **GM** receives it. The campaign has two clocks (M11/O-1): the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. The player's calendar is the separate `CodexCalendarPlayer`, where `currentDate` is sourced from the published date and `publishedDate` is not declared at all; the two are joined by `CodexCalendarProjected`.
@@ -3398,6 +3400,54 @@ One of the following:
 
 - `CodexChronicleRecord`
 - `CodexChronicleRecordPlayer`
+
+### `CodexConnection`
+
+One edge in the codex graph, GM view. ONE shape for both origins: a connection the GM declared and a connection derived from `[[wiki link]]` text differ by an `origin` attribute, not by being two systems with two panels and two edge kinds.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string \| null | yes | Null exactly when `origin` is `mention`: a derived edge has no row of its own, so it is deleted by editing the text that produced it. |
+| `fromKind` | `page` \| `session` \| `quest` \| `journal` | yes | Which record the connection comes FROM. Session, quest and journal bodies join the graph (D13). |
+| `fromId` | string (uuid) | yes |  |
+| `toPageId` | string (uuid) | yes | Connections v1 are edges INTO pages. `[[map:...]]`/`[[marker:...]]` targets still parse and persist but get no graph exposure. |
+| `label` | string \| null | yes | The out-label ("ally of", "located in"). Null for an unlabelled connection. |
+| `origin` | `declared` \| `mention` | yes |  |
+| `layer` | `player` \| `gm` | yes | Which layer the connection lives on. A `mention` inherits the body it was written in; a `declared` one is chosen at create (default `player`). |
+| `createdAt` | string \| null | yes | Null for a mention row. |
+
+### `CodexConnectionData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `connection` | CodexConnection | yes |  |
+
+### `CodexConnectionListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `connections` | CodexConnectionProjected[] | yes |  |
+
+### `CodexConnectionPlayer`
+
+A connection as a PLAYER receives it. No `id` (a player never addresses one), no `layer` (every connection they receive is on the player layer, so the key could only be a constant), no `createdAt`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `fromKind` | `page` \| `session` \| `quest` \| `journal` | yes |  |
+| `fromId` | string (uuid) | yes |  |
+| `toPageId` | string (uuid) | yes |  |
+| `label` | string \| null | yes |  |
+| `origin` | `declared` \| `mention` | yes |  |
+
+### `CodexConnectionProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexConnection`; a player session receives `CodexConnectionPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexConnection`
+- `CodexConnectionPlayer`
 
 ### `CodexDeletedData`
 
@@ -3548,21 +3598,6 @@ One of the following:
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `entries` | CodexJournalEntryProjected[] | yes |  |
-
-### `CodexLinkEdge`
-
-One `[[wiki link]]` edge between two pages. Deliberately narrower than a typed relationship: a wiki link has no id, no type and no authored timestamp - it is simply a mention in a body - so the pair of page ids IS the edge, and one edge is emitted per ordered pair however many times the link is written. Which BODY the link came from is store-side bookkeeping used to decide player visibility and is never carried here.
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `fromPageId` | string (uuid) | yes | The page whose body carries the link. |
-| `toPageId` | string (uuid) | yes | The linked page. Always a page that exists - a link to an unknown title has no node and is omitted. |
-
-### `CodexLinkEdgeListData`
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `links` | CodexLinkEdge[] | yes |  |
 
 ### `CodexMap`
 
@@ -3719,6 +3754,48 @@ CT-8: what a MILESTONE record carries beyond its prose - the level the party rea
 | `createdAt` | string (date-time) | yes |  |
 | `updatedAt` | string (date-time) | yes |  |
 
+### `CodexPageConnection`
+
+One row of a page's Connections panel: the OTHER endpoint resolved, plus which way the edge points. Folds in what used to be two separate views (backlinks and typed relationships).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string \| null | yes |  |
+| `direction` | `out` \| `in` | yes |  |
+| `otherKind` | `page` \| `session` \| `quest` \| `journal` | yes |  |
+| `otherId` | string (uuid) | yes |  |
+| `otherTitle` | string | yes | A page title, "Session 4", a quest title, or a bounded excerpt of a journal entry's player text - the reveal-audit naming rule. |
+| `otherEntityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` \| null | yes | Pages only; null for every other kind. |
+| `otherRevealed` | boolean | yes | GM-only; not declared on `CodexPageConnectionPlayer` (a player only ever receives connections to records they can see). |
+| `label` | string \| null | yes |  |
+| `origin` | `declared` \| `mention` | yes |  |
+| `layer` | `player` \| `gm` | yes |  |
+| `section` | string \| null | yes | The heading the mention sits under; null for a declared connection. |
+
+### `CodexPageConnectionPlayer`
+
+A page's Connections panel as a PLAYER receives it: revealed others only, so `otherRevealed` would be a constant, and no `id` or `layer`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `direction` | `out` \| `in` | yes |  |
+| `otherKind` | `page` \| `session` \| `quest` \| `journal` | yes |  |
+| `otherId` | string (uuid) | yes |  |
+| `otherTitle` | string | yes |  |
+| `otherEntityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` \| null | yes |  |
+| `label` | string \| null | yes |  |
+| `origin` | `declared` \| `mention` | yes |  |
+| `section` | string \| null | yes |  |
+
+### `CodexPageConnectionProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexPageConnection`; a player session receives `CodexPageConnectionPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexPageConnection`
+- `CodexPageConnectionPlayer`
+
 ### `CodexPageData`
 
 | Field | Type | Required | Notes |
@@ -3730,8 +3807,7 @@ CT-8: what a MILESTONE record carries beyond its prose - the level the party rea
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `page` | CodexPageProjected | yes |  |
-| `backlinks` | CodexBacklink[] | yes |  |
-| `relationships` | CodexRelationship[] | yes |  |
+| `connections` | CodexPageConnectionProjected[] | yes |  |
 
 ### `CodexPageListData`
 
@@ -3910,42 +3986,6 @@ One of the following:
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `quest` | CodexQuestProjected | yes |  |
-
-### `CodexRelationship`
-
-A relationship seen from one page: the OTHER endpoint resolved plus which way the edge points.
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `id` | string (uuid) | yes |  |
-| `type` | string | yes |  |
-| `direction` | `out` \| `in` | yes |  |
-| `otherPageId` | string (uuid) | yes |  |
-| `otherTitle` | string | yes |  |
-| `otherType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` | yes |  |
-| `otherRevealed` | boolean | yes |  |
-
-### `CodexRelationshipData`
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `relationship` | CodexRelationshipEdge | yes |  |
-
-### `CodexRelationshipEdge`
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `id` | string (uuid) | yes |  |
-| `fromPageId` | string (uuid) | yes |  |
-| `toPageId` | string (uuid) | yes |  |
-| `type` | string | yes |  |
-| `createdAt` | string (date-time) | yes |  |
-
-### `CodexRelationshipEdgeListData`
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `relationships` | CodexRelationshipEdge[] | yes |  |
 
 ### `CodexRevealAudit`
 

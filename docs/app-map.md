@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 8 GameState fields · 76 commands · 179 HTTP paths
+- 8 GameState fields · 76 commands · 178 HTTP paths
 
 ## GameState shape
 
@@ -121,6 +121,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/codex-assets/{id}/content`
 - `GET PUT /api/v1/codex/calendar`
 - `POST /api/v1/codex/calendar/publish`
+- `GET /api/v1/codex/connections`
+- `DELETE PATCH /api/v1/codex/connections/{id}`
 - `GET /api/v1/codex/export`
 - `GET POST /api/v1/codex/folders`
 - `POST /api/v1/codex/folders/delete`
@@ -132,7 +134,6 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/codex/journal/deadline`
 - `POST /api/v1/codex/journal/downtime`
 - `POST /api/v1/codex/journal/milestone`
-- `GET /api/v1/codex/links`
 - `GET POST /api/v1/codex/maps`
 - `DELETE PATCH /api/v1/codex/maps/{id}`
 - `GET POST /api/v1/codex/maps/{id}/markers`
@@ -145,8 +146,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `DELETE /api/v1/codex/page-revisions`
 - `GET POST /api/v1/codex/pages`
 - `DELETE GET PATCH /api/v1/codex/pages/{id}`
+- `POST /api/v1/codex/pages/{id}/connections`
 - `GET /api/v1/codex/pages/{id}/markers`
-- `POST /api/v1/codex/pages/{id}/relationships`
 - `POST /api/v1/codex/pages/{id}/reveal`
 - `GET /api/v1/codex/pages/{id}/revisions`
 - `POST /api/v1/codex/pages/{id}/revisions/{revisionId}/restore`
@@ -155,8 +156,6 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET POST /api/v1/codex/quests`
 - `DELETE GET PATCH /api/v1/codex/quests/{id}`
 - `POST /api/v1/codex/quests/{id}/reveal`
-- `GET /api/v1/codex/relationships`
-- `DELETE /api/v1/codex/relationships/{id}`
 - `GET /api/v1/codex/reveal-audit`
 - `GET /api/v1/codex/search`
 - `GET POST /api/v1/codex/sessions`

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, downtimePayloadOf, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmCalendar, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectGmStanding, projectPlayerBacklinks, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, projectPlayerStanding, projectRevealAudit, type CodexRevealAuditRecord, type CodexSearchRecord, type PlayerSessionNumberContext } from "./codex-projections.js";
+import { projectGmCalendar, projectGmChronicleRecord, projectGmConnections, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageConnections, projectGmPageSummary, projectGmQuest, projectGmSearchHit, projectGmSession, projectGmStanding, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerConnections, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageConnections, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerSearchHit, projectPlayerSession, projectPlayerStanding, projectRevealAudit, type CodexRevealAuditRecord, type CodexSearchRecord, type PlayerConnectionContext, type PlayerSessionNumberContext } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -52,7 +52,22 @@ const PageUpdateSchema = z.object({
   inWorldDate: InWorldDateSchema.optional(),
   expectedRev: z.number().int().nonnegative().optional()
 }).strict();
-const RelationshipCreateSchema = z.object({ toPageId: z.string().uuid(), type: z.string().trim().min(1).max(40) }).strict();
+/**
+ * D8: declaring a connection. `label` is OPTIONAL and nullable - an unlabelled connection is a legitimate
+ * "these two are related", which is what a `[[wiki link]]` already expresses; forcing a word would make
+ * the declared half of one concept stricter than the derived half. `type` is gone: after v22's relabel
+ * the stored value IS the label, so a slug would be a second vocabulary to translate.
+ */
+const ConnectionCreateSchema = z.object({
+  toPageId: z.string().uuid(),
+  label: z.string().trim().max(40).nullable().optional(),
+  layer: z.enum(["player", "gm"]).optional()
+}).strict();
+/** Relabel or re-layer a DECLARED connection. An omitted field is left alone, as everywhere else here. */
+const ConnectionUpdateSchema = z.object({
+  label: z.string().trim().max(40).nullable().optional(),
+  layer: z.enum(["player", "gm"]).optional()
+}).strict();
 const RevealSchema = z.object({ revealed: z.boolean() }).strict();
 const FolderMoveSchema = z.object({ from: z.string().trim().min(1).max(160), to: z.string().trim().max(160) }).strict();
 const FolderPathSchema = z.object({ path: z.string().trim().min(1).max(160) }).strict();
@@ -493,6 +508,24 @@ function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
   };
 }
 
+/**
+ * D8: the context `projectPlayerConnections` needs, resolved once per request. Sibling of
+ * `revealedPageIdsIn` and `playerSessionNumbers`, with the same division of labour - it ANSWERS which
+ * records a player may see; the projection decides whether that lets an edge travel.
+ *
+ * `revealedSourceIds` covers the three NON-page source kinds D13 added. Each is checked by its own
+ * record's rule (a session, quest or entry's own reveal flag), which is exactly what the corresponding
+ * list endpoint applies - so a connection can never be a way around a record's own gate.
+ */
+function playerConnectionContext(store: CodexStore): PlayerConnectionContext {
+  const revealedPageIds = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
+  const revealedSourceIds = new Set<string>();
+  for (const session of store.listSessions()) if (session.revealedToPlayers) revealedSourceIds.add(session.id);
+  for (const quest of store.listQuests()) if (quest.revealedToPlayers) revealedSourceIds.add(quest.id);
+  for (const entry of store.listTimeline()) if (entry.revealedToPlayers) revealedSourceIds.add(entry.id);
+  return { revealedPageIds, revealedSourceIds };
+}
+
 export function createCodexRouter(options: CodexRouterOptions) {
   const router = Router();
   const { store } = options;
@@ -650,10 +683,13 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!role) return;
     const page = store.getPage(pathParam(request, "id"));
     if (!page) return failure(response, 404, "not_found", "That page was not found.");
-    if (role === "gm") return readEnvelope(request, response, role, { page: projectGmPage(page), backlinks: projectGmBacklinks(store.backlinksToPage(page.id)), relationships: projectGmRelationships(store.listRelationshipsFor(page.id)) });
+    // D8: ONE `connections` list where `backlinks` and `relationships` used to be two. They answered the
+    // same question about the same edges in two shapes, which is precisely what made "relationships" and
+    // "mentions" read to a GM as two features with two panels.
+    if (role === "gm") return readEnvelope(request, response, role, { page: projectGmPage(page), connections: projectGmPageConnections(store.connectionsForPage(page.id)) });
     const projected = projectPlayerPage(page);
     if (!projected) return failure(response, 404, "not_found", "That page was not found.");
-    return readEnvelope(request, response, role, { page: projected, backlinks: projectPlayerBacklinks(store.backlinksToPage(page.id)), relationships: projectPlayerRelationships(store.listRelationshipsFor(page.id)) });
+    return readEnvelope(request, response, role, { page: projected, connections: projectPlayerPageConnections(store.connectionsForPage(page.id)) });
   });
 
   // ----- Pages: authoring (GM only) -----
@@ -744,48 +780,60 @@ export function createCodexRouter(options: CodexRouterOptions) {
     }
   });
 
-  // ----- Relationships (typed entity edges) -----
+  // ----- Connections (D8: one edge concept, one panel, one graph) -----
 
-  router.post(`${CODEX_BASE}/pages/:id/relationships`, requireWrite, (request, response) => {
-    try { const { toPageId, type } = RelationshipCreateSchema.parse(request.body); const relationship = store.createRelationship(pathParam(request, "id"), toPageId, type); options.notifyChanged(); return envelope(response, 201, { relationship }); }
-    catch (error) { return codexError(response, error); }
+  /**
+   * Declare a connection FROM this page TO another. 201, and idempotent on `(from, to, label)` - so a
+   * double-click on "Add" cannot make two edges.
+   *
+   * It counts as an edit of BOTH pages for "recently updated", because the Connections panel is part of
+   * the page - but neither page's `rev` moves, so an open editor is not forced into a conflict by an edit
+   * to a panel beside it.
+   */
+  router.post(`${CODEX_BASE}/pages/:id/connections`, requireWrite, (request, response) => {
+    try {
+      const connection = store.createConnection(pathParam(request, "id"), ConnectionCreateSchema.parse(request.body));
+      options.notifyChanged();
+      return envelope(response, 201, { connection: { id: connection.id, fromKind: "page" as const, fromId: connection.fromPageId, toPageId: connection.toPageId, label: connection.label, origin: "declared" as const, layer: connection.layer, createdAt: connection.createdAt } });
+    } catch (error) { return codexError(response, error); }
   });
 
-  router.delete(`${CODEX_BASE}/relationships/:id`, requireWrite, (request, response) => {
-    store.deleteRelationship(pathParam(request, "id"));
+  /**
+   * Relabel a DECLARED connection, or move it between layers.
+   *
+   * A `mention` has no id and cannot reach this route: it is derived from a body's text, so it is edited
+   * by editing that text. That is not a limitation to route around - it is what keeps one sentence and
+   * one edge from being two things to keep in step.
+   */
+  router.patch(`${CODEX_BASE}/connections/:id`, requireWrite, (request, response) => {
+    try {
+      const connection = store.updateConnection(pathParam(request, "id"), ConnectionUpdateSchema.parse(request.body));
+      options.notifyChanged();
+      return envelope(response, 200, { connection: { id: connection.id, fromKind: "page" as const, fromId: connection.fromPageId, toPageId: connection.toPageId, label: connection.label, origin: "declared" as const, layer: connection.layer, createdAt: connection.createdAt } });
+    } catch (error) { return codexError(response, error); }
+  });
+
+  router.delete(`${CODEX_BASE}/connections/:id`, requireWrite, (request, response) => {
+    store.deleteConnection(pathParam(request, "id"));
     options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
-  router.get(`${CODEX_BASE}/relationships`, (request, response) => {
-    const role = readGrade(request, response);
-
-    if (!role) return;
-    const all = store.listAllRelationships();
-    if (role === "gm") return readEnvelope(request, response, role, { relationships: all });
-    // Player graph: project through the choke point - only edges whose BOTH endpoints are revealed pages.
-    const revealed = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
-    return readEnvelope(request, response, role, { relationships: projectPlayerRelationshipEdges(all, revealed) });
-  });
-
   /**
-   * CI-8: the whole-graph WIKI-LINK feed - the sibling of the typed-edge route above, and deliberately
-   * its neighbour. The Graph drew only typed relationships, so a codex wired together with `[[links]]`
-   * looked like a field of orphans; it now draws both kinds, visually distinguished.
+   * The whole-graph feed. ONE edge list where `GET /codex/relationships` and `GET /codex/links` used to be
+   * two - the Graph drew typed edges and wiki-link edges as separate species, so a codex wired together
+   * with `[[links]]` looked like a field of orphans beside one wired with relationships.
    *
-   * A player's edges obey the SAME both-endpoints-revealed rule the typed feed enforces (a dangling edge
-   * would let a player infer a hidden page exists) AND the layer rule `projectPlayerBacklinks` applies -
-   * player-body links only, never the GM body's. `projectPlayerLinkEdges` holds both; the store hands
-   * over raw rows so that projection is the only gate.
+   * The player's copy passes `projectPlayerConnections`' three-condition gate. The context is resolved
+   * HERE, once per request: which pages are revealed, and which non-page SOURCE records are - because a
+   * connection out of a hidden session's prep body must not travel even to a revealed page.
    */
-  router.get(`${CODEX_BASE}/links`, (request, response) => {
+  router.get(`${CODEX_BASE}/connections`, (request, response) => {
     const role = readGrade(request, response);
-
     if (!role) return;
-    const all = store.listAllLinks();
-    if (role === "gm") return readEnvelope(request, response, role, { links: projectGmLinkEdges(all) });
-    const revealed = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
-    return readEnvelope(request, response, role, { links: projectPlayerLinkEdges(all, revealed) });
+    const all = store.listAllConnections();
+    if (role === "gm") return readEnvelope(request, response, role, { connections: projectGmConnections(all) });
+    return readEnvelope(request, response, role, { connections: projectPlayerConnections(all, playerConnectionContext(store)) });
   });
 
   // ----- Maps (the atlas tree) -----

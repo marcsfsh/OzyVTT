@@ -55,25 +55,65 @@ export type CodexPageRow = Readonly<{
 
 export type CodexPageSummaryRow = Omit<CodexPageRow, "playerBody" | "gmBody" | "gmFields">;
 
-/** A directional typed relationship between two pages (Strahd --rules--> Barovia). */
-export type CodexRelationshipRow = Readonly<{ id: string; fromPageId: string; toPageId: string; type: string; createdAt: string }>;
-/** A relationship as listed against one page: the OTHER endpoint resolved, with the edge direction. */
-export type CodexRelationshipView = Readonly<{ id: string; type: string; direction: "out" | "in"; otherPageId: string; otherTitle: string; otherType: CodexEntityType; otherRevealed: boolean }>;
+/**
+ * D8: which RECORD a connection comes from. D13 puts session, quest and journal bodies in the graph, so a
+ * source is a (kind, id) pair rather than a page id. Connections v1 always point INTO a page.
+ */
+export type CodexConnectionSourceKind = "page" | "session" | "quest" | "journal";
+/**
+ * D8: ONE edge in the codex graph. A connection the GM DECLARED and one derived from `[[wiki link]]` text
+ * differ by an `origin` attribute, not by being two systems with two panels and two edge kinds.
+ *
+ * `id` and `createdAt` are null exactly when `origin` is `mention`: a derived edge has no row of its own,
+ * so it is not addressable and is "deleted" by editing the text that produced it.
+ *
+ * `layer` decides whether a player may see it, for BOTH origins: a mention inherits the body it was
+ * written in (D13 - GM-layer text yields GM-only edges), a declared one carries the column v22 adds.
+ */
+export type CodexConnectionRow = Readonly<{
+  id: string | null;
+  fromKind: CodexConnectionSourceKind;
+  fromId: string;
+  toPageId: string;
+  /** The out-label ("ally of", "located in"). Null for an unlabelled connection - `''` stored, null read. */
+  label: string | null;
+  origin: "declared" | "mention";
+  layer: "player" | "gm";
+  createdAt: string | null;
+}>;
+/**
+ * D8: one row of a page's Connections panel - the OTHER endpoint resolved, plus which way the edge
+ * points. Folds in what used to be two separate views (backlinks and typed relationships).
+ */
+export type CodexPageConnectionRow = Readonly<{
+  id: string | null;
+  direction: "out" | "in";
+  otherKind: CodexConnectionSourceKind;
+  otherId: string;
+  /** A page title, "Session 4", a quest title, or a bounded excerpt of a journal entry's player text. */
+  otherTitle: string;
+  otherEntityType: CodexEntityType | null;
+  /** The other record's own reveal state. GM-only on the wire; the player projection drops it. */
+  otherRevealed: boolean;
+  label: string | null;
+  origin: "declared" | "mention";
+  layer: "player" | "gm";
+  /** The heading a MENTION sits under; null for a declared connection. */
+  section: string | null;
+}>;
+
+/** One DECLARED connection as the store keeps it. The graph's wire shape is `CodexConnectionRow`. */
+export type CodexRelationshipRow = Readonly<{ id: string; fromPageId: string; toPageId: string; label: string | null; layer: "player" | "gm"; createdAt: string }>;
 
 export type CodexLinkRow = Readonly<{
-  sourcePageId: string;
+  sourceKind: CodexConnectionSourceKind;
+  sourceId: string;
   layer: "player" | "gm";
   targetKind: CodexLinkTargetKind;
   targetRef: string;
   section: string | null;
 }>;
 export type CodexLinkTargetKind = "page" | "actor" | "monster" | "spell" | "map" | "marker";
-
-/**
- * CI-8: one `[[wiki link]]` edge between two PAGES, for the whole-graph feed. Carries `layer` because a
- * player edge may only come from a page's player-facing body - the projection decides, not this row.
- */
-export type CodexLinkEdgeRow = Readonly<{ fromPageId: string; toPageId: string; layer: "player" | "gm" }>;
 
 export type CodexPageRevisionRow = Readonly<{
   id: number;
@@ -1326,6 +1366,85 @@ export const MIGRATIONS = [{
                ELSE '' END
       FROM codex_sessions;
   `
+}, {
+  version: 22,
+  // D8 + D13 (client decisions, 2026-07-31): ONE connection system. The substrate for it, in four parts.
+  //
+  // WHAT D8 ACTUALLY ASKS FOR, and what it does not. Typed relationships and `[[wiki links]]` become one
+  // CONCEPT with one panel and one edge in the Graph - but D8 says in as many words that
+  // "mention-vs-declared may remain as an ORIGIN attribute". So the two tables STAY, with their existing
+  // and genuinely different semantics, and "connection" becomes a read model over both:
+  //   - `codex_relationships` rows are DECLARED: id-keyed, created and deleted by a route, symmetric-dedupe.
+  //   - `codex_links` rows are MENTIONS: title-keyed, id-less, REBUILT WHOLESALE from body text on every
+  //     save. Materializing those as declared rows would force a sync protocol ("what does deleting a
+  //     connection whose source is a sentence mean?") and make every page save a relationships write.
+  // Nothing moves, so this migration cannot lose data in either direction.
+  //
+  // 1. `codex_links` REBUILD - the only destructive part, and it is what D13 needs. Today the table can
+  //    only hold PAGE sources: `source_page_id` FK-cascades on `codex_pages`. D13 puts session, quest and
+  //    journal bodies in the graph, so the source becomes a (kind, id) pair. A multi-table FK is not
+  //    expressible, so the FK is DROPPED and scrubbing becomes explicit - `deletePage`, `deleteSession`,
+  //    `deleteQuest` and `deleteEntry` each delete their own rows, joining the documented deletion-scrub
+  //    inventory. v15's rebuild discipline: named columns on both sides, both indexes recreated, STRICT
+  //    kept. Existing rows carry over as `source_kind = 'page'`, which is what every one of them is.
+  //
+  // 2. `codex_relationships.layer` - D13's layer semantics extended to DECLARED edges. A connection
+  //    declared from a GM-only context should be a GM-only connection, and the player gate keys on this
+  //    column for BOTH origins. DEFAULT 'player' is exactly today's behaviour (a declared relationship was
+  //    visible whenever both endpoints were), so no existing edge changes meaning. `ADD COLUMN` with a
+  //    CHECK is legal in SQLite when the DEFAULT satisfies it.
+  //
+  // 3. THE RELABEL. `type` stops being a slug and becomes the out-LABEL the reader sees: "ally" -> "ally
+  //    of", "rules" -> "rules", "located-in" -> "located in". The twelve-row vocabulary is copied from
+  //    `apps/client/src/codex/entities.ts`, which is where it has always lived; an unknown slug falls back
+  //    to dashes-into-spaces, the client's own fallback rule. After this there is no display mapping left
+  //    on either side - the stored value IS the label, which is what makes a free-text label and a legacy
+  //    type the same thing. `SYMMETRIC_RELATIONSHIPS` is re-keyed to the migrated spellings in the same
+  //    change; missing that would silently kill symmetric dedupe for every existing edge.
+  //
+  //    WHAT IS LOST, stated rather than buried: the INVERSE wording ("ruled by" on the inbound end). A
+  //    free-text label cannot be inverted generically, so a reader renders `direction` plus the label.
+  //    "Barovia - rules - Strahd" now reads by its arrow rather than by a second phrase.
+  //
+  // 4. `links_backfilled` on `codex_meta` - the flag for the one-time re-extraction of session, quest and
+  //    journal bodies. That backfill CANNOT live here: migrations are SQL-only strings and SQL cannot
+  //    parse `[[...]]`. It runs once in `initialize()`, guarded by this flag, where the parser lives.
+  sql: `
+    CREATE TABLE codex_links_new (
+      source_kind TEXT NOT NULL CHECK (source_kind IN ('page', 'session', 'quest', 'journal')),
+      source_id   TEXT NOT NULL,
+      layer       TEXT NOT NULL CHECK (layer IN ('player', 'gm')),
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('page', 'actor', 'monster', 'spell', 'map', 'marker')),
+      target_ref  TEXT NOT NULL,
+      section     TEXT
+    ) STRICT;
+    INSERT INTO codex_links_new (source_kind, source_id, layer, target_kind, target_ref, section)
+      SELECT 'page', source_page_id, layer, target_kind, target_ref, section FROM codex_links;
+    DROP TABLE codex_links;
+    ALTER TABLE codex_links_new RENAME TO codex_links;
+    CREATE INDEX codex_links_target ON codex_links (target_kind, target_ref);
+    CREATE INDEX codex_links_source ON codex_links (source_kind, source_id);
+
+    ALTER TABLE codex_relationships ADD COLUMN layer TEXT NOT NULL DEFAULT 'player' CHECK (layer IN ('player', 'gm'));
+
+    UPDATE codex_relationships SET type = CASE type
+      WHEN 'ally' THEN 'ally of'
+      WHEN 'enemy' THEN 'enemy of'
+      WHEN 'rival' THEN 'rival of'
+      WHEN 'rules' THEN 'rules'
+      WHEN 'member' THEN 'member of'
+      WHEN 'leader' THEN 'leads'
+      WHEN 'located-in' THEN 'located in'
+      WHEN 'owns' THEN 'owns'
+      WHEN 'parent' THEN 'parent of'
+      WHEN 'serves' THEN 'serves'
+      WHEN 'created' THEN 'created'
+      WHEN 'related' THEN 'related to'
+      ELSE replace(type, '-', ' ')
+    END;
+
+    ALTER TABLE codex_meta ADD COLUMN links_backfilled INTEGER NOT NULL DEFAULT 0;
+  `
 }];
 
 /**
@@ -1435,7 +1554,9 @@ function pageDateOf(row: Pick<PageRow, "in_world_year" | "in_world_month" | "in_
     ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day }
     : null;
 }
-type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
+type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; layer: string; created_at: string };
+/** D8: `type` is the stored out-LABEL after v22's relabel, and `layer` is v22's new column. */
+const REL_COLUMNS = "id, from_page_id, to_page_id, type, layer, created_at";
 /**
  * The revision columns `CodexPageRevisionRow` is made of, named once for the same reason PAGE_COLUMNS is:
  * two reads share them (`listRevisions` per page, `listAllRevisions` for the backup) and a column added to
@@ -1554,13 +1675,46 @@ function sealSecretFields(fields: Record<string, string>, gmFields: Record<strin
   }
   return { fields: outFields, gmFields: outGm };
 }
-const REL_TYPE = /^[a-z0-9][a-z0-9-]*$/;
-/** Relationship types that read the same both ways (label === inverse) - A->B and B->A are the SAME edge. */
-const SYMMETRIC_RELATIONSHIPS = new Set(["ally", "enemy", "rival", "related"]);
-function relationshipType(value: string): string {
-  const trimmed = value.trim().toLowerCase();
-  if (!REL_TYPE.test(trimmed) || trimmed.length > 40) throw new Error("A relationship type must be a lowercase slug.");
+/**
+ * D8: the labels whose edge means the same thing read from either end, so declaring one twice in opposite
+ * directions is ONE connection rather than two.
+ *
+ * **Re-keyed to the MIGRATED spellings** by v22's relabel, and that is load-bearing rather than cosmetic:
+ * leaving the old slugs here would silently kill symmetric dedupe for every existing edge and every new
+ * one, and nothing would fail loudly - the codex would simply start accumulating duplicate "ally of"
+ * edges in both directions.
+ *
+ * Free-text and UNLABELLED connections are directional. A GM who types "guards" means an arrow, and an
+ * unlabelled edge is "A relates to B" in the direction they drew it.
+ */
+const SYMMETRIC_RELATIONSHIPS = new Set(["ally of", "enemy of", "rival of", "related to"]);
+const MAX_CONNECTION_LABEL = 40;
+/**
+ * D8: a connection's optional out-LABEL, on the way in. This replaces the old slug rule, and every
+ * difference is deliberate:
+ *
+ *  - SPACES ARE LEGAL and case is not forced. The stored value is what a reader sees ("ally of",
+ *    "located in", "owes a debt to"), because after v22's relabel there is no display mapping left on
+ *    either side. A slug plus a lookup table is two representations of one fact, and the lookup is the one
+ *    that goes stale the first time a GM invents a label the table has never heard of.
+ *  - EMPTY IS LEGAL, and it is the whole of "an OPTIONAL label": an unlabelled connection stores `''` and
+ *    reads back `null`. A sentinel beats a nullable column here for one concrete reason - the dedupe key
+ *    includes the label, and SQL's `NULL != NULL` would make every unlabelled edge distinct from every
+ *    other, so re-declaring one would pile up rows.
+ *  - 40 characters is the repo's short-label family (a marker label, a tag).
+ */
+function connectionLabel(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.length > MAX_CONNECTION_LABEL || CONTROL_CHARS.test(trimmed)) throw new Error(`A connection label is up to ${MAX_CONNECTION_LABEL} printable characters.`);
   return trimmed;
+}
+/** Which layer a DECLARED connection sits on. Defaults to `player`, which is what every migrated edge is. */
+function connectionLayer(value: string | null | undefined): "player" | "gm" {
+  if (value === null || value === undefined) return "player";
+  if (value !== "player" && value !== "gm") throw new Error("A connection sits on the player layer or the GM layer.");
+  return value;
 }
 function parseFields(json: string | null | undefined): Record<string, string> {
   if (!json) return {};
@@ -2075,7 +2229,7 @@ export function parseWikiLinks(text: string, layer: "player" | "gm"): CodexLinkR
     const dedupe = `${layer}|${targetKind}|${key}|${section ?? ""}`;
     if (seen.has(dedupe)) continue;
     seen.add(dedupe);
-    links.push({ sourcePageId: "", layer, targetKind, targetRef: key, section });
+    links.push({ sourceKind: "page", sourceId: "", layer, targetKind, targetRef: key, section });
   }
   return links;
 }
@@ -2096,11 +2250,53 @@ export class CodexStore {
       this.migrate();
       const meta = database.prepare("SELECT codex_revision FROM codex_meta WHERE id = 1").get() as { codex_revision: number } | undefined;
       if (!meta) database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
+      this.reconcileLinks();
     } catch (error) {
       database.close();
       this.database = undefined;
       throw error;
     }
+  }
+
+  /**
+   * D13's ONE-TIME backfill: extract `[[wiki links]]` from every session, quest and journal body that
+   * existed before those kinds joined the graph.
+   *
+   * **Why this is not in migration v22.** Migrations in this file are SQL-only strings
+   * (`database.exec(migration.sql)`) and SQL cannot parse `[[...]]`. A post-migration code hook inside
+   * the runner would break that discipline for one case. So the flag lives in the schema (v22's
+   * `links_backfilled`) and the work lives in code, where the parser lives - which is also the only place
+   * that can guarantee the backfill and the steady-state rebuild use the SAME parser and the same layer
+   * mapping. `initialize()` already seeds `codex_meta` after migrating, so this is the established seam.
+   *
+   * Runs ONCE, guarded by the flag, inside one transaction, and bumps the revision so every client
+   * refetches the connection feeds that just gained rows. Idempotent by flag; safe to call on every open.
+   *
+   * Pages are deliberately NOT re-extracted: their rows have been maintained by every save since v1, and
+   * v22 carried them across verbatim as `source_kind = 'page'`.
+   */
+  private reconcileLinks(): void {
+    const database = this.requireDatabase();
+    const flag = database.prepare("SELECT links_backfilled FROM codex_meta WHERE id = 1").get() as { links_backfilled: number } | undefined;
+    if (!flag || flag.links_backfilled === 1) {
+      // No meta row yet means a fresh database with nothing to backfill; mark it done so a codex created
+      // today never pays for a sweep over three empty tables on its second open.
+      if (!flag) database.prepare("UPDATE codex_meta SET links_backfilled = 1 WHERE id = 1").run();
+      return;
+    }
+    this.transaction(() => {
+      for (const row of database.prepare("SELECT id, recap_body, prep_body FROM codex_sessions").all() as Array<{ id: string; recap_body: string; prep_body: string }>) {
+        this.rebuildLinksFor("session", row.id, row.recap_body, row.prep_body);
+      }
+      for (const row of database.prepare("SELECT id, player_body, gm_body FROM codex_quests").all() as Array<{ id: string; player_body: string; gm_body: string }>) {
+        this.rebuildLinksFor("quest", row.id, row.player_body, row.gm_body);
+      }
+      for (const row of database.prepare("SELECT id, player_text, gm_text FROM codex_journal").all() as Array<{ id: string; player_text: string; gm_text: string | null }>) {
+        this.rebuildLinksFor("journal", row.id, row.player_text, row.gm_text ?? "");
+      }
+      database.prepare("UPDATE codex_meta SET links_backfilled = 1 WHERE id = 1").run();
+      this.bumpRevision();
+    });
   }
 
   close() { this.database?.close(); this.database = undefined; }
@@ -2138,7 +2334,7 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.in_world_label, row.calendar_instant, row.in_world_year, row.in_world_month, row.in_world_day, row.rev, row.created_at, row.updated_at);
-      this.rebuildLinks(pageId, row.player_body, row.gm_body);
+      this.rebuildLinksFor("page", pageId, row.player_body, row.gm_body);
       this.indexPage(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json, row.tags_json);
       this.registerFolderPath(row.folder, stamp);
       // NEVER throttled, unlike `updatePage`'s (owner decision, 2026-07-30). Two reasons, and the first is the
@@ -2213,7 +2409,7 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, rev = ?, updated_at = ? WHERE id = ?")
         .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.rev, next.updated_at, pageId);
-      this.rebuildLinks(pageId, next.player_body, next.gm_body);
+      this.rebuildLinksFor("page", pageId, next.player_body, next.gm_body);
       this.indexPage(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json, next.tags_json);
       this.registerFolderPath(next.folder, next.updated_at);
       /**
@@ -2388,7 +2584,10 @@ export class CodexStore {
        * than returning null, and one hand-edited payload must not make a page undeletable.
        */
       database.prepare("UPDATE codex_journal SET payload_json = json_set(payload_json, '$.characterPageId', json('null')), updated_at = ? WHERE kind = 'downtime' AND json_valid(payload_json) AND json_extract(payload_json, '$.characterPageId') = ?").run(this.stamp(), pageId);
-      database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades links + revisions
+      // v22 dropped `codex_links`' foreign key (a multi-table FK is not expressible), so a page's own
+      // outgoing link rows no longer cascade away with it. Explicit, and part of the delete.
+      this.scrubLinks("page", pageId);
+      database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades revisions
       this.bumpRevision();
     });
   }
@@ -2478,75 +2677,237 @@ export class CodexStore {
     //    history would be a backup that lies about being one, and a codex whose history stopped growing is
     //    still a codex whose whole history must round-trip.
     return {
-      pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
+      pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllDeclaredConnections(),
       sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests(),
       publishedDate: this.getPublishedDate(), standing: this.listStanding(), partyMarkerId: this.partyMarker()?.id ?? null,
       calendar: this.getCalendar(), folders: this.listFolders(), revisions: this.listAllRevisions()
     };
   }
 
-  // ----- Relationships (typed entity edges) -----
+  // ----- Connections (D8: ONE edge concept over two storages) -----
+  //
+  // The read model is the point. `codex_relationships` holds DECLARED edges (id-keyed, CRUD-able,
+  // symmetric-dedupe); `codex_links` holds MENTIONS (title-keyed, id-less, rebuilt wholesale from body
+  // text on every save). They are genuinely different things to STORE, and one thing to READ - which is
+  // exactly what D8 asks for, and what its own words permit ("mention-vs-declared may remain as an
+  // ORIGIN attribute"). Every method below composes both; none of them gates. `codex-projections.ts` is
+  // still the single audited place that decides what a player may see.
 
-  createRelationship(fromPageId: string, toPageId: string, type: string): CodexRelationshipRow {
+  /**
+   * Declare a connection from one page to another. Idempotent on `(from, to, label)` - and on the reverse
+   * pair too when the label is symmetric, because "Strahd is an ally of Ireena" and the reverse are one
+   * edge, not two.
+   *
+   * `layer` is NOT part of the dedupe key, deliberately: re-declaring an edge that already exists returns
+   * the existing row unchanged, and changing which layer it sits on is what PATCH is for. Folding layer
+   * into the key would make "declare it again, but GM-only" silently create a second parallel edge.
+   */
+  createConnection(fromPageId: string, input: Readonly<{ toPageId: string; label?: string | null; layer?: "player" | "gm" | null }>): CodexRelationshipRow {
     const database = this.requireDatabase();
     const from = id(fromPageId);
-    const to = id(toPageId);
-    if (from === to) throw new Error("An entity can't relate to itself.");
+    const to = id(input.toPageId);
+    if (from === to) throw new Error("A page can't connect to itself.");
     if (!this.pageRow(from) || !this.pageRow(to)) throw new CodexNotFoundError("One of those pages no longer exists.");
-    const relType = relationshipType(type);
-    // Same from/to/type is idempotent. For symmetric types (ally/enemy/...) the reverse direction is the SAME edge.
-    const existing = (SYMMETRIC_RELATIONSHIPS.has(relType)
-      ? database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE ((from_page_id = ? AND to_page_id = ?) OR (from_page_id = ? AND to_page_id = ?)) AND type = ?").get(from, to, to, from, relType)
-      : database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?").get(from, to, relType)) as RelationshipRowRaw | undefined;
+    const label = connectionLabel(input.label);
+    const layer = connectionLayer(input.layer);
+    const existing = (SYMMETRIC_RELATIONSHIPS.has(label)
+      ? database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE ((from_page_id = ? AND to_page_id = ?) OR (from_page_id = ? AND to_page_id = ?)) AND type = ?`).get(from, to, to, from, label)
+      : database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?`).get(from, to, label)) as RelationshipRowRaw | undefined;
     // An idempotent no-op is not an edit: the early return leaves both pages' recency alone on purpose.
     if (existing) return this.toRel(existing);
     const relId = this.freshId();
     this.transaction(() => {
       const stamp = this.stamp();
-      database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, ?)").run(relId, from, to, relType, stamp);
+      database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, layer, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(relId, from, to, label, layer, stamp);
       this.touchPages([from, to], stamp);
       this.bumpRevision();
     });
-    return this.toRel(database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE id = ?").get(relId) as RelationshipRowRaw);
+    return this.toRel(database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE id = ?`).get(relId) as RelationshipRowRaw);
   }
 
-  deleteRelationship(relId: string): void {
-    if (!ID.test(relId)) return;
+  /**
+   * Relabel a declared connection, or move it between layers. An omitted field is left alone - the
+   * update contract every other record in this store follows.
+   *
+   * There is no `updateMention`, and there cannot be: a mention has no row and no id. It is edited by
+   * editing the sentence that produced it, which is why `CodexConnectionRow.id` is null for one.
+   */
+  updateConnection(connectionId: string, input: Readonly<{ label?: string | null; layer?: "player" | "gm" }>): CodexRelationshipRow {
+    const database = this.requireDatabase();
+    if (!ID.test(connectionId)) throw new CodexNotFoundError("That connection no longer exists.");
+    const existing = database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE id = ?`).get(connectionId) as RelationshipRowRaw | undefined;
+    if (!existing) throw new CodexNotFoundError("That connection no longer exists.");
+    const label = input.label === undefined ? existing.type : connectionLabel(input.label);
+    const layer = input.layer === undefined ? (existing.layer as "player" | "gm") : connectionLayer(input.layer);
+    this.transaction(() => {
+      database.prepare("UPDATE codex_relationships SET type = ?, layer = ? WHERE id = ?").run(label, layer, connectionId);
+      this.touchPages([existing.from_page_id, existing.to_page_id], this.stamp());
+      this.bumpRevision();
+    });
+    return this.toRel(database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE id = ?`).get(connectionId) as RelationshipRowRaw);
+  }
+
+  /** Remove one declared connection; idempotent, and an early return on a malformed id. */
+  deleteConnection(connectionId: string): void {
+    if (!ID.test(connectionId)) return;
     const database = this.requireDatabase();
     // Read the endpoints BEFORE the row goes, so both pages' recency can move with the edit (CI-9).
-    const existing = database.prepare("SELECT from_page_id, to_page_id FROM codex_relationships WHERE id = ?").get(relId) as { from_page_id: string; to_page_id: string } | undefined;
+    const existing = database.prepare("SELECT from_page_id, to_page_id FROM codex_relationships WHERE id = ?").get(connectionId) as { from_page_id: string; to_page_id: string } | undefined;
     this.transaction(() => {
-      database.prepare("DELETE FROM codex_relationships WHERE id = ?").run(relId);
+      database.prepare("DELETE FROM codex_relationships WHERE id = ?").run(connectionId);
       if (existing) this.touchPages([existing.from_page_id, existing.to_page_id], this.stamp());
       this.bumpRevision();
     });
   }
 
-  /** Every relationship touching this page, the OTHER endpoint resolved (title/type/reveal) with direction. */
-  listRelationshipsFor(pageId: string): CodexRelationshipView[] {
-    if (!ID.test(pageId)) return [];
-    const database = this.requireDatabase();
-    const view = (rows: Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>, direction: "out" | "in"): CodexRelationshipView[] =>
-      rows.map((row) => ({ id: row.id, type: row.type, direction, otherPageId: row.other_id, otherTitle: row.other_title, otherType: (row.other_type as CodexEntityType) ?? "note", otherRevealed: row.other_revealed === 1 }));
-    const outgoing = database.prepare(
-      "SELECT r.id, r.type, r.to_page_id AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed FROM codex_relationships r JOIN codex_pages p ON p.id = r.to_page_id WHERE r.from_page_id = ? ORDER BY r.type, p.title COLLATE NOCASE"
-    ).all(pageId) as Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
-    const incoming = database.prepare(
-      "SELECT r.id, r.type, r.from_page_id AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed FROM codex_relationships r JOIN codex_pages p ON p.id = r.from_page_id WHERE r.to_page_id = ? ORDER BY r.type, p.title COLLATE NOCASE"
-    ).all(pageId) as Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
-    return [...view(outgoing, "out"), ...view(incoming, "in")];
-  }
-
-  /** All relationship edges (for the graph). */
-  listAllRelationships(): CodexRelationshipRow[] {
-    return (this.requireDatabase().prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships").all() as RelationshipRowRaw[]).map((row) => this.toRel(row));
+  /** Every DECLARED connection row, for the backup bundle. Mentions are derived and rebuilt on import. */
+  listAllDeclaredConnections(): CodexRelationshipRow[] {
+    return (this.requireDatabase().prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships`).all() as RelationshipRowRaw[]).map((row) => this.toRel(row));
   }
 
   /**
-   * CI-9: a relationship edit IS an edit of both pages it connects - the Connections section is part of
-   * the page - so it moves their recency. It deliberately does NOT bump `rev`: `rev` is the editor's
-   * conflict token, and bumping it would 409 a GM mid-sentence on a page whose body nobody touched.
-   * Recency and conflict detection are separate concerns and this is the seam between them.
+   * ONE page's Connections panel: every declared edge touching it, plus every mention INTO it, plus its
+   * own outgoing mentions - the other endpoint resolved in each case.
+   *
+   * RAW and UNGATED, both layers and every reveal state, exactly as `backlinksToPage` was:
+   * `projectPlayerPageConnections` is the single visibility gate, and a second predicate down here would
+   * be a lower layer no HTTP test can distinguish from the projection.
+   *
+   * The DEDUPE at the end is the one piece of judgement in this method. A GM who both writes
+   * "[[Barovia]]" in a page's body AND declares an unlabelled connection to Barovia has made one
+   * connection twice, and a panel showing it twice reads as a bug. The DECLARED row wins, because it is
+   * the one carrying a deletable id; the mention is folded away silently. A LABELLED declared edge is
+   * never folded against a mention - "ally of" and "mentions" are different statements.
+   */
+  connectionsForPage(pageId: string): CodexPageConnectionRow[] {
+    if (!ID.test(pageId)) return [];
+    const page = this.pageRow(pageId);
+    if (!page) return [];
+    const database = this.requireDatabase();
+    const rows: CodexPageConnectionRow[] = [];
+
+    // 1. Declared edges, both directions. The other end is always a PAGE (connections v1 point into pages
+    //    and are declared from pages), so the join resolves title, type and reveal in one query.
+    const declared = (direction: "out" | "in") => {
+      const mine = direction === "out" ? "from_page_id" : "to_page_id";
+      const theirs = direction === "out" ? "to_page_id" : "from_page_id";
+      return database.prepare(
+        `SELECT r.id, r.type, r.layer, r.created_at, r.${theirs} AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed
+         FROM codex_relationships r JOIN codex_pages p ON p.id = r.${theirs} WHERE r.${mine} = ? ORDER BY r.type, p.title COLLATE NOCASE`
+      ).all(pageId) as Array<{ id: string; type: string; layer: string; created_at: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
+    };
+    for (const direction of ["out", "in"] as const) {
+      for (const row of declared(direction)) {
+        rows.push({
+          id: row.id, direction, otherKind: "page", otherId: row.other_id, otherTitle: row.other_title,
+          otherEntityType: (row.other_type as CodexEntityType) ?? "note", otherRevealed: row.other_revealed === 1,
+          label: row.type === "" ? null : row.type, origin: "declared", layer: row.layer === "gm" ? "gm" : "player", section: null
+        });
+      }
+    }
+
+    // 2. INCOMING mentions - every record whose body names this page's title. Generalized from
+    //    `backlinksToPage`: the source is now a (kind, id) pair, so the title and reveal state of a
+    //    session, quest or journal source are resolved per kind rather than by one page join.
+    const incoming = database.prepare(
+      "SELECT source_kind, source_id, layer, section FROM codex_links WHERE target_kind = 'page' AND target_ref = ? AND NOT (source_kind = 'page' AND source_id = ?)"
+    ).all(pageLinkKey(page.title), pageId) as Array<{ source_kind: CodexConnectionSourceKind; source_id: string; layer: "player" | "gm"; section: string | null }>;
+    for (const row of incoming) {
+      const other = this.resolveConnectionEndpoint(row.source_kind, row.source_id);
+      if (!other) continue;   // the source record has gone; a dangling edge has no node to draw
+      rows.push({ id: null, direction: "in", otherKind: row.source_kind, otherId: row.source_id, otherTitle: other.title, otherEntityType: other.entityType, otherRevealed: other.revealed, label: null, origin: "mention", layer: row.layer, section: row.section });
+    }
+
+    // 3. This page's OWN outgoing mentions, resolved from title key to id. A link to a title no page
+    //    carries has no node to draw and is dropped, exactly as `listAllLinks` drops it.
+    const outgoing = database.prepare(
+      "SELECT layer, target_ref, section FROM codex_links WHERE source_kind = 'page' AND source_id = ? AND target_kind = 'page'"
+    ).all(pageId) as Array<{ layer: "player" | "gm"; target_ref: string; section: string | null }>;
+    for (const row of outgoing) {
+      const target = this.pageByLinkKey(row.target_ref);
+      if (!target || target.id === pageId) continue;
+      rows.push({ id: null, direction: "out", otherKind: "page", otherId: target.id, otherTitle: target.title, otherEntityType: (target.entity_type as CodexEntityType) ?? "note", otherRevealed: target.revealed === 1, label: null, origin: "mention", layer: row.layer, section: row.section });
+    }
+
+    // 4. Fold an UNLABELLED declared edge and a mention over the same pair into one row, declared winning.
+    const declaredPairs = new Set(rows.filter((row) => row.origin === "declared" && row.label === null).map((row) => `${row.direction}|${row.otherKind}|${row.otherId}`));
+    return rows.filter((row) => row.origin === "declared" || !declaredPairs.has(`${row.direction}|${row.otherKind}|${row.otherId}`));
+  }
+
+  /**
+   * The WHOLE graph, as one edge list. Declared rows and mention rows in one shape, discriminated by
+   * `origin` - which is what makes the Graph draw one kind of edge instead of two.
+   *
+   * Mentions are collapsed to ONE edge per `(fromKind, fromId, toPageId)` with a layer UPGRADE: a record
+   * that names the same page from both of its bodies counts as a PLAYER edge, because the player-facing
+   * body genuinely carries it. That is `listAllLinks`' rule, generalized to non-page sources.
+   */
+  listAllConnections(): CodexConnectionRow[] {
+    const database = this.requireDatabase();
+    const edges: CodexConnectionRow[] = [];
+    for (const row of database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships`).all() as RelationshipRowRaw[]) {
+      edges.push({ id: row.id, fromKind: "page", fromId: row.from_page_id, toPageId: row.to_page_id, label: row.type === "" ? null : row.type, origin: "declared", layer: row.layer === "gm" ? "gm" : "player", createdAt: row.created_at });
+    }
+    const idByLinkKey = new Map<string, string>();
+    for (const page of database.prepare("SELECT id, title FROM codex_pages").all() as Array<{ id: string; title: string }>) idByLinkKey.set(pageLinkKey(page.title), page.id);
+    // `layer` in the ORDER BY makes the collapse DETERMINISTIC rather than a bet on insertion order:
+    // 'gm' sorts before 'player', so a pair present in both bodies always arrives gm-first and is upgraded.
+    const mentions = new Map<string, CodexConnectionRow>();
+    const rows = database.prepare("SELECT source_kind, source_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY source_kind, source_id, target_ref, layer").all() as Array<{ source_kind: CodexConnectionSourceKind; source_id: string; layer: "player" | "gm"; target_ref: string }>;
+    for (const row of rows) {
+      const toPageId = idByLinkKey.get(row.target_ref);
+      if (!toPageId || (row.source_kind === "page" && toPageId === row.source_id)) continue;
+      const key = `${row.source_kind}|${row.source_id}|${toPageId}`;
+      const seen = mentions.get(key);
+      if (!seen) mentions.set(key, { id: null, fromKind: row.source_kind, fromId: row.source_id, toPageId, label: null, origin: "mention", layer: row.layer, createdAt: null });
+      else if (row.layer === "player" && seen.layer !== "player") mentions.set(key, { ...seen, layer: "player" });
+    }
+    return [...edges, ...mentions.values()];
+  }
+
+  /**
+   * What a non-page connection endpoint is CALLED, and whether it is revealed - resolved per kind, since
+   * the four kinds keep their names in four different columns (and a journal entry has no name at all,
+   * so it borrows the reveal audit's excerpt-or-fallback rule).
+   *
+   * Returns null when the record has gone, which drops the edge: a connection to a record that no longer
+   * exists has no node to draw, exactly as a wiki link to a missing title does.
+   */
+  private resolveConnectionEndpoint(kind: CodexConnectionSourceKind, recordId: string): Readonly<{ title: string; entityType: CodexEntityType | null; revealed: boolean }> | null {
+    switch (kind) {
+      case "page": {
+        const page = this.pageRow(recordId);
+        return page ? { title: page.title, entityType: (page.entity_type as CodexEntityType) ?? "note", revealed: page.revealed === 1 } : null;
+      }
+      case "session": {
+        const session = this.getSession(recordId);
+        if (!session) return null;
+        const title = session.sessionNumber !== null ? `Session ${session.sessionNumber}` : (session.recapBody.trim().slice(0, 80) || "Untitled session");
+        return { title, entityType: null, revealed: session.revealedToPlayers };
+      }
+      case "quest": {
+        const quest = this.getQuest(recordId);
+        return quest ? { title: quest.title, entityType: null, revealed: quest.revealedToPlayers } : null;
+      }
+      case "journal": {
+        const entry = this.getEntry(recordId);
+        if (!entry) return null;
+        // The PLAYER text for both audiences, never the GM text: this string is a row TITLE, and one title
+        // per row is what keeps the panel from needing per-audience title plumbing. The GM opens the
+        // record to read the rest.
+        return { title: entry.playerText.trim().slice(0, 80) || "Journal entry", entityType: null, revealed: entry.revealedToPlayers };
+      }
+    }
+  }
+
+  private pageByLinkKey(linkKey: string): PageRow | undefined {
+    return (this.requireDatabase().prepare("SELECT * FROM codex_pages").all() as PageRow[]).find((row) => pageLinkKey(row.title) === linkKey);
+  }
+
+  /**
+   * CI-9: a connection edit IS an edit of both pages it connects - the Connections panel is part of the
+   * page - so it moves their recency. It deliberately does NOT bump `rev`: `rev` is the editor's conflict
+   * token, and bumping it would 409 a GM mid-sentence on a page whose body nobody touched.
    */
   private touchPages(pageIds: readonly string[], stamp: string) {
     const update = this.requireDatabase().prepare("UPDATE codex_pages SET updated_at = ? WHERE id = ?");
@@ -2554,8 +2915,9 @@ export class CodexStore {
   }
 
   private toRel(row: RelationshipRowRaw): CodexRelationshipRow {
-    return { id: row.id, fromPageId: row.from_page_id, toPageId: row.to_page_id, type: row.type, createdAt: row.created_at };
+    return { id: row.id, fromPageId: row.from_page_id, toPageId: row.to_page_id, label: row.type === "" ? null : row.type, layer: row.layer === "gm" ? "gm" : "player", createdAt: row.created_at };
   }
+
 
   // ----- Codex-wide settings -----
 
@@ -2819,53 +3181,10 @@ export class CodexStore {
 
   // ----- Links / backlinks -----
 
-  /** Backlinks to a page: every page whose body references this page's title. Includes both layers + reveal state; the projection filters for players. */
-  backlinksToPage(pageId: string): CodexBacklinkRow[] {
-    const page = this.pageRow(pageId);
-    if (!page) return [];
-    return (this.requireDatabase().prepare(
-      `SELECT l.source_page_id, l.layer, l.section, p.title AS source_title, p.revealed AS source_revealed
-       FROM codex_links l JOIN codex_pages p ON p.id = l.source_page_id
-       WHERE l.target_kind = 'page' AND l.target_ref = ? AND l.source_page_id != ?
-       ORDER BY p.title COLLATE NOCASE`
-    ).all(pageLinkKey(page.title), pageId) as Array<{ source_page_id: string; layer: "player" | "gm"; section: string | null; source_title: string; source_revealed: number }>)
-      .map((row) => ({ sourcePageId: row.source_page_id, sourceTitle: row.source_title, sourceRevealed: row.source_revealed === 1, layer: row.layer, section: row.section }));
-  }
-
-  /**
-   * CI-8: every `[[wiki link]]` edge BETWEEN TWO PAGES, for the whole-graph feed - the second edge kind
-   * the Graph draws, beside the typed relationships.
-   *
-   * Deliberately RAW and UNGATED, both layers and every reveal state, exactly as `backlinksToPage` hands
-   * both layers to `projectPlayerBacklinks`: `projectPlayerLinkEdges` is the single visibility gate. A
-   * second predicate down here would be a lower layer that an HTTP test cannot distinguish from the
-   * projection (the blind spot the CI-1 SQL tests exist to cover).
-   *
-   * A wiki link stores its target's TITLE key, not an id, so targets resolve through `pageLinkKey` here
-   * rather than in SQL - the same function that wrote the key, so the two cannot drift. A link to a title
-   * no page carries has no node to draw and is dropped; so is a page's link to itself, which
-   * `backlinksToPage` drops too. ONE edge per ordered pair: when a page links the same target from both
-   * of its bodies the edge counts as player-layer, because the player-facing body genuinely carries it.
-   */
-  listAllLinks(): CodexLinkEdgeRow[] {
-    const database = this.requireDatabase();
-    const idByLinkKey = new Map<string, string>();
-    for (const page of database.prepare("SELECT id, title FROM codex_pages").all() as Array<{ id: string; title: string }>) idByLinkKey.set(pageLinkKey(page.title), page.id);
-    const edges = new Map<string, CodexLinkEdgeRow>();
-    // `layer` is in the ORDER BY so the collapse below is DETERMINISTIC rather than a bet on insertion
-    // order: 'gm' sorts before 'player', so a pair present in both bodies always arrives gm-first and is
-    // then upgraded. Without it the merge silently depended on which row SQLite happened to return first.
-    const rows = database.prepare("SELECT source_page_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY source_page_id, target_ref, layer").all() as Array<{ source_page_id: string; layer: "player" | "gm"; target_ref: string }>;
-    for (const row of rows) {
-      const toPageId = idByLinkKey.get(row.target_ref);
-      if (!toPageId || toPageId === row.source_page_id) continue;
-      const key = `${row.source_page_id}|${toPageId}`;
-      const seen = edges.get(key);
-      if (!seen) edges.set(key, { fromPageId: row.source_page_id, toPageId, layer: row.layer });
-      else if (row.layer === "player" && seen.layer !== "player") edges.set(key, { ...seen, layer: "player" });
-    }
-    return [...edges.values()];
-  }
+  // Backlinks and the whole-graph link feed used to live here as two separate reads with two separate
+  // projections. D8 folded both into `connectionsForPage` / `listAllConnections` above: they answered the
+  // same question about the same edges in two shapes, which is what made "relationships" and "mentions"
+  // read as two features. Nothing was lost - a mention is a connection with `origin: "mention"`.
 
   // ----- Search -----
 
@@ -3611,6 +3930,7 @@ export class CodexStore {
       database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_id = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, tags_json = ?, updated_at = ? WHERE id = ?")
         .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_id, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.tags_json, this.stamp(), entryId);
       this.indexEntry(entryId, next.player_text, next.gm_text, next.tags_json);
+      this.rebuildLinksFor("journal", entryId, next.player_text, next.gm_text ?? "");
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -3630,6 +3950,7 @@ export class CodexStore {
     if (!ID.test(entryId)) return;
     this.transaction(() => {
       this.unindex("journal", entryId);
+      this.scrubLinks("journal", entryId);
       this.requireDatabase().prepare("DELETE FROM codex_journal WHERE id = ?").run(entryId);
       this.bumpRevision();
     });
@@ -3721,6 +4042,9 @@ export class CodexStore {
     database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_id, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionId, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
     this.indexEntry(entryId, fields.playerText, fields.gmText, tagsJson);
+    // D13, at the LEAF: every journal creator composes through here, so a standing record's prose and an
+    // auto-logged battle's join the graph on exactly the terms a hand-written note's does.
+    this.rebuildLinksFor("journal", entryId, fields.playerText, fields.gmText ?? "");
     this.bumpRevision();
     return entryId;
   }
@@ -3801,6 +4125,9 @@ export class CodexStore {
         database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at, row.tags_json);
         this.indexSession(row);
+        // D13: recap is the PLAYER layer, prep is the GM layer - the session's own two-layer split, so a
+        // page named only in prep yields a GM-only connection.
+        this.rebuildLinksFor("session", row.id, row.recap_body, row.prep_body);
         this.bumpRevision();
       });
     });
@@ -3840,6 +4167,7 @@ export class CodexStore {
         database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, tags_json = ?, rev = ?, updated_at = ? WHERE id = ?")
           .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.tags_json, next.rev, next.updated_at, sessionId);
         this.indexSession(next);
+        this.rebuildLinksFor("session", sessionId, next.recap_body, next.prep_body);
         this.bumpRevision();
       });
     });
@@ -3892,6 +4220,7 @@ export class CodexStore {
       else database.prepare("UPDATE codex_journal SET session_id = NULL WHERE session_id = ?").run(sessionId);
       database.prepare("DELETE FROM codex_sessions WHERE id = ?").run(sessionId);
       this.unindex("session", sessionId);
+      this.scrubLinks("session", sessionId);
       // Clearing the pointer is PART of the delete, not a separate tidy-up: there is no FK doing it (see
       // migration v13), and a dangling `active_session_id` would have `activeSessionId` name a record that
       // no longer exists - which the sessions list hands straight to the GM.
@@ -4062,6 +4391,7 @@ export class CodexStore {
       database.prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(row.id, row.title, row.status, row.player_body, row.gm_body, row.objectives_json, row.entity_ids_json, row.revealed, row.rev, row.created_at, row.updated_at, row.tags_json);
       this.indexQuest(row.id, row.title, row.player_body, row.gm_body, row.objectives_json, row.tags_json);
+      this.rebuildLinksFor("quest", row.id, row.player_body, row.gm_body);
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -4102,6 +4432,7 @@ export class CodexStore {
       // The indexed TEXT really can change here (title, player body, objective text), so this write has an
       // index twin; `setQuestRevealed` below deliberately does not, because reveal is resolved at read time.
       this.indexQuest(questId, next.title, next.player_body, next.gm_body, next.objectives_json, next.tags_json);
+      this.rebuildLinksFor("quest", questId, next.player_body, next.gm_body);
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -4135,6 +4466,7 @@ export class CodexStore {
       // left for `PLAYER_VISIBLE_SQL` to gate it on - and `ELSE 0`-style safety does not apply, because
       // the row's `kind` is still a recognised one. The map-delete cascade taught this the hard way.
       this.unindex("quest", questId);
+      this.scrubLinks("quest", questId);
       this.bumpRevision();
     });
   }
@@ -4350,12 +4682,35 @@ export class CodexStore {
     };
   }
 
-  private rebuildLinks(pageId: string, playerBody: string, gmBody: string) {
+  /**
+   * D13: re-extract one record's `[[wiki links]]`, for ANY of the four source kinds.
+   *
+   * **The layer mapping is the viewer-safety decision here**, and it is one rule with four instances:
+   * text written on the GM's layer yields GM-layer edges, text written on the player's layer yields
+   * player-layer edges.
+   *
+   *   page    -> `player_body` / `gm_body`      (unchanged)
+   *   session -> `recap_body`  / `prep_body`    (prep is the session's secret half)
+   *   quest   -> `player_body` / `gm_body`
+   *   journal -> `player_text` / `gm_text`
+   *
+   * The caller passes the two strings, so this function cannot get the mapping wrong for a kind it has
+   * never heard of - it never reads a record.
+   *
+   * Leaf-level: it assumes it is already inside a transaction, exactly as `writeEntry` and `writeCalendar`
+   * do, so a record write and its link rebuild are one atomic act.
+   */
+  private rebuildLinksFor(sourceKind: CodexConnectionSourceKind, sourceId: string, playerText: string, gmText: string) {
     const database = this.requireDatabase();
-    database.prepare("DELETE FROM codex_links WHERE source_page_id = ?").run(pageId);
-    const links = [...parseWikiLinks(playerBody, "player"), ...parseWikiLinks(gmBody, "gm")];
-    const insert = database.prepare("INSERT INTO codex_links (source_page_id, layer, target_kind, target_ref, section) VALUES (?, ?, ?, ?, ?)");
-    for (const link of links) insert.run(pageId, link.layer, link.targetKind, link.targetRef, link.section);
+    database.prepare("DELETE FROM codex_links WHERE source_kind = ? AND source_id = ?").run(sourceKind, sourceId);
+    const links = [...parseWikiLinks(playerText, "player"), ...parseWikiLinks(gmText, "gm")];
+    const insert = database.prepare("INSERT INTO codex_links (source_kind, source_id, layer, target_kind, target_ref, section) VALUES (?, ?, ?, ?, ?, ?)");
+    for (const link of links) insert.run(sourceKind, sourceId, link.layer, link.targetKind, link.targetRef, link.section);
+  }
+
+  /** Every record kind scrubs its own link rows on delete - v22 dropped the FK, so nothing cascades. */
+  private scrubLinks(sourceKind: CodexConnectionSourceKind, sourceId: string) {
+    this.requireDatabase().prepare("DELETE FROM codex_links WHERE source_kind = ? AND source_id = ?").run(sourceKind, sourceId);
   }
 
   // ----- Search index upkeep (the ONE index, both audiences) -----

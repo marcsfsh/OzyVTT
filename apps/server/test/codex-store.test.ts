@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectRevealAudit, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
+import { projectGmConnections, projectPlayerConnections, projectGmPageConnections, projectPlayerPageConnections, projectRevealAudit, projectGmChronicleRecord, projectGmJournalEntry, projectGmMarker, projectGmQuest, projectGmSearchHit, projectGmSession, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
 /** D6/R4's shipped default, spelled once so the settings tests below say what they are actually about. */
 const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
@@ -462,20 +462,21 @@ describe("CodexStore links + search", () => {
   it("parses wiki-links across both layers with entity prefixes", () => {
     const links = parseWikiLinks("See [[Bree]] and [[actor:Gandalf]] and [[Keep#Cellar]]", "gm");
     expect(links).toEqual([
-      { sourcePageId: "", layer: "gm", targetKind: "page", targetRef: "bree", section: null },
-      { sourcePageId: "", layer: "gm", targetKind: "actor", targetRef: "Gandalf", section: null },
-      { sourcePageId: "", layer: "gm", targetKind: "page", targetRef: "keep", section: "Cellar" }
+      { sourceKind: "page", sourceId: "", layer: "gm", targetKind: "page", targetRef: "bree", section: null },
+      { sourceKind: "page", sourceId: "", layer: "gm", targetKind: "actor", targetRef: "Gandalf", section: null },
+      { sourceKind: "page", sourceId: "", layer: "gm", targetKind: "page", targetRef: "keep", section: "Cellar" }
     ]);
   });
 
-  it("builds backlinks keyed by title and tags the source layer", () => {
+  it("builds incoming MENTION connections keyed by title, tagged with the source layer", () => {
     const bree = store.createPage({ title: "Bree" });
     store.createPage({ title: "Road", playerBody: "leads to [[Bree]]", revealedToPlayers: true });
     store.createPage({ title: "Cult", gmBody: "meets near [[Bree]]" }); // gm-layer, unrevealed
-    const backlinks = store.backlinksToPage(bree.id);
-    expect(backlinks).toHaveLength(2);
-    expect(backlinks.find((b) => b.sourceTitle === "Road")).toMatchObject({ layer: "player", sourceRevealed: true });
-    expect(backlinks.find((b) => b.sourceTitle === "Cult")).toMatchObject({ layer: "gm", sourceRevealed: false });
+    const incoming = store.connectionsForPage(bree.id).filter((row) => row.direction === "in");
+    expect(incoming).toHaveLength(2);
+    // D8: a mention is a connection with `origin: "mention"` and no id - not a second kind of thing.
+    expect(incoming.find((row) => row.otherTitle === "Road")).toMatchObject({ layer: "player", otherRevealed: true, origin: "mention", id: null, otherKind: "page" });
+    expect(incoming.find((row) => row.otherTitle === "Cult")).toMatchObject({ layer: "gm", otherRevealed: false, origin: "mention", id: null });
     expect(pageLinkKey("  Bree  ")).toBe("bree");
   });
 
@@ -516,13 +517,13 @@ describe("CodexStore viewer safety (the leak matrix)", () => {
     expect(store.searchPages("gm", "smugglers")).toHaveLength(1);     // the GM still finds it
   });
 
-  it("player backlinks exclude gm-layer references and unrevealed sources", () => {
+  it("player connections exclude gm-layer mentions and unrevealed sources", () => {
     const bree = store.createPage({ title: "Bree" });
     store.createPage({ title: "Road", playerBody: "to [[Bree]]", revealedToPlayers: true });   // visible
     store.createPage({ title: "Cult", gmBody: "near [[Bree]]" });                                // gm-layer secret
     store.createPage({ title: "Draft", playerBody: "mentions [[Bree]]", revealedToPlayers: false }); // player-layer but unrevealed
-    const playerBacklinks = projectPlayerBacklinks(store.backlinksToPage(bree.id));
-    expect(playerBacklinks.map((b) => b.sourceTitle)).toEqual(["Road"]);
+    const player = projectPlayerPageConnections(store.connectionsForPage(bree.id));
+    expect(player.map((row) => row.otherTitle)).toEqual(["Road"]);
   });
 });
 
@@ -746,33 +747,96 @@ describe("CodexStore entities + relationships", () => {
     database.close();
   });
 
-  it("creates typed relationships, resolves both directions, dedupes, and cascades on page delete", () => {
+  it("declares connections, resolves both directions, dedupes, and cascades on page delete", () => {
     const strahd = store.createPage({ title: "Strahd", entityType: "character" });
     const barovia = store.createPage({ title: "Barovia", entityType: "location", revealedToPlayers: true });
-    const rel = store.createRelationship(strahd.id, barovia.id, "Rules");
-    expect(rel).toMatchObject({ fromPageId: strahd.id, toPageId: barovia.id, type: "rules" }); // slugged
-    expect(store.createRelationship(strahd.id, barovia.id, "rules").id).toBe(rel.id); // idempotent
-    expect(() => store.createRelationship(strahd.id, strahd.id, "rules")).toThrow(/itself/);
+    const rel = store.createConnection(strahd.id, { toPageId: barovia.id, label: "  rules  " });
+    // D8: the stored value IS the label - trimmed, but neither slugged nor lowercased, because after v22's
+    // relabel there is no display mapping left to translate it back through.
+    expect(rel).toMatchObject({ fromPageId: strahd.id, toPageId: barovia.id, label: "rules", layer: "player" });
+    expect(store.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" }).id, "idempotent on (from, to, label)").toBe(rel.id);
+    // ...and re-declaring with a different LAYER is still the same edge - layer is not in the dedupe key,
+    // because "declare it again, but GM-only" must not silently create a second parallel edge.
+    expect(store.createConnection(strahd.id, { toPageId: barovia.id, label: "rules", layer: "gm" }).id).toBe(rel.id);
+    expect(() => store.createConnection(strahd.id, { toPageId: strahd.id, label: "rules" })).toThrow(/itself/);
 
-    const fromStrahd = store.listRelationshipsFor(strahd.id);
-    expect(fromStrahd).toEqual([{ id: rel.id, type: "rules", direction: "out", otherPageId: barovia.id, otherTitle: "Barovia", otherType: "location", otherRevealed: true }]);
-    expect(store.listRelationshipsFor(barovia.id)[0]).toMatchObject({ direction: "in", otherPageId: strahd.id, otherTitle: "Strahd", otherRevealed: false });
+    const fromStrahd = store.connectionsForPage(strahd.id).filter((row) => row.origin === "declared");
+    expect(fromStrahd).toEqual([{ id: rel.id, label: "rules", direction: "out", otherKind: "page", otherId: barovia.id, otherTitle: "Barovia", otherEntityType: "location", otherRevealed: true, origin: "declared", layer: "player", section: null }]);
+    expect(store.connectionsForPage(barovia.id)[0]).toMatchObject({ direction: "in", otherId: strahd.id, otherTitle: "Strahd", otherRevealed: false });
 
     store.deletePage(strahd.id); // cascades the edge
-    expect(store.listRelationshipsFor(barovia.id)).toHaveLength(0);
+    expect(store.connectionsForPage(barovia.id)).toHaveLength(0);
   });
 
-  it("player relationship projection hides edges to unrevealed entities", () => {
-    const town = store.createPage({ title: "Town", revealedToPlayers: true });
-    const secret = store.createPage({ title: "Secret cult" });
-    const temple = store.createPage({ title: "Temple", revealedToPlayers: true });
-    store.createRelationship(town.id, secret.id, "near");
-    store.createRelationship(town.id, temple.id, "near");
-    const views = store.listRelationshipsFor(town.id);
-    expect(projectGmRelationships(views)).toHaveLength(2);
-    const playerViews = projectPlayerRelationships(views);
-    expect(playerViews).toHaveLength(1);
-    expect(playerViews[0].otherTitle).toBe("Temple");
+  it("treats a SYMMETRIC label as one edge in either direction, and a free-text one as directional", () => {
+    const a = store.createPage({ title: "The Harpers", entityType: "faction" });
+    const b = store.createPage({ title: "The Zhentarim", entityType: "faction" });
+    // v22 relabelled `ally` -> `ally of`, and `SYMMETRIC_RELATIONSHIPS` is re-keyed to match. If it were
+    // not, this would silently create two rows and nothing would fail loudly.
+    const first = store.createConnection(a.id, { toPageId: b.id, label: "ally of" });
+    expect(store.createConnection(b.id, { toPageId: a.id, label: "ally of" }).id).toBe(first.id);
+    expect(store.listAllConnections().filter((edge) => edge.origin === "declared")).toHaveLength(1);
+    // A free-text label is DIRECTIONAL: "guards" one way is not "guards" the other.
+    store.createConnection(a.id, { toPageId: b.id, label: "guards" });
+    store.createConnection(b.id, { toPageId: a.id, label: "guards" });
+    expect(store.listAllConnections().filter((edge) => edge.origin === "declared")).toHaveLength(3);
+  });
+
+  it("relabels and re-layers a declared connection, and refuses a label that is too long", () => {
+    const a = store.createPage({ title: "Strahd", entityType: "character" });
+    const b = store.createPage({ title: "Barovia", entityType: "location" });
+    const edge = store.createConnection(a.id, { toPageId: b.id });
+    expect(edge.label, "an UNLABELLED connection stores '' and reads back null").toBeNull();
+
+    expect(store.updateConnection(edge.id, { label: "rules" }).label).toBe("rules");
+    expect(store.updateConnection(edge.id, { layer: "gm" })).toMatchObject({ label: "rules", layer: "gm" });   // omitted = unchanged
+    expect(store.updateConnection(edge.id, { label: null }).label, "clearing the label is legal").toBeNull();
+    expect(() => store.updateConnection(edge.id, { label: "x".repeat(41) })).toThrow(/40 printable/);
+    expect(() => store.updateConnection(crypto.randomUUID(), { label: "x" })).toThrow(/no longer exists/i);
+
+    store.deleteConnection(edge.id);
+    expect(store.connectionsForPage(a.id)).toHaveLength(0);
+    store.deleteConnection(edge.id);  // idempotent
+  });
+
+  it("folds an unlabelled declared edge and a mention over the same pair into ONE row, declared winning", () => {
+    const bree = store.createPage({ title: "Bree" });
+    const road = store.createPage({ title: "Road", playerBody: "leads to [[Bree]]" });
+    const declared = store.createConnection(road.id, { toPageId: bree.id });
+
+    const outgoing = store.connectionsForPage(road.id).filter((row) => row.direction === "out");
+    expect(outgoing, "one connection stated twice is one row, not two").toHaveLength(1);
+    expect(outgoing[0]).toMatchObject({ id: declared.id, origin: "declared" });   // the deletable one wins
+
+    // A LABELLED declared edge is never folded against a mention: "ally of" and "mentions" are different
+    // statements about the same pair, and a panel that hid one would be lying about the other.
+    store.updateConnection(declared.id, { label: "leads to" });
+    const both = store.connectionsForPage(road.id).filter((row) => row.direction === "out");
+    expect(both).toHaveLength(2);
+    expect(both.map((row) => row.origin).sort()).toEqual(["declared", "mention"]);
+  });
+
+  it("gates a player's page connections on the layer AND the other end's reveal, for BOTH origins", () => {
+    const hub = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const shown = store.createPage({ title: "The Blue Water Inn", revealedToPlayers: true });
+    const secret = store.createPage({ title: "The Cult", revealedToPlayers: false });
+    const gmLayer = store.createConnection(hub.id, { toPageId: shown.id, label: "hides", layer: "gm" });
+    store.createConnection(hub.id, { toPageId: shown.id, label: "contains" });
+    store.createConnection(hub.id, { toPageId: secret.id, label: "watched by" });
+
+    const player = projectPlayerPageConnections(store.connectionsForPage(hub.id));
+    expect(player.map((row) => row.label)).toEqual(["contains"]);
+    // The GM's own panel carries all three, so the filtering above is the gate and not an empty fixture.
+    expect(projectGmPageConnections(store.connectionsForPage(hub.id))).toHaveLength(3);
+    // A GM-LAYER DECLARED edge between two REVEALED pages never travels - the rule that is genuinely new
+    // in D8, and the one a "both endpoints revealed" gate alone would miss.
+    expect(player.some((row) => row.otherId === shown.id && row.label === "hides")).toBe(false);
+    store.updateConnection(gmLayer.id, { layer: "player" });
+    expect(projectPlayerPageConnections(store.connectionsForPage(hub.id)).map((row) => row.label).sort()).toEqual(["contains", "hides"]);
+
+    // The player row's EXACT key set: no `id`, no `layer`, no `otherRevealed`.
+    expect(Object.keys(projectPlayerPageConnections(store.connectionsForPage(hub.id))[0]!).sort())
+      .toEqual(["direction", "label", "origin", "otherEntityType", "otherId", "otherKind", "otherTitle", "section"]);
   });
 });
 
@@ -1129,52 +1193,112 @@ describe("Codex page→marker reverse lookup — the store and projection layers
  * CI-8. Same reasoning: `GET /codex/links` decides visibility in `projectPlayerLinkEdges`, and the store
  * feeding it is ungated on purpose. These prove each rule at the projection, not only end to end.
  */
-describe("Codex whole-graph wiki-link feed — the store and projection layers, on their own (CI-8)", () => {
-  const revealedIds = () => new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
+/**
+ * D8: the WHOLE-GRAPH feed, at the store and projection layers. This describe used to be about wiki-link
+ * edges alone (CI-8); after D8 there is one feed and one edge kind, so it is about connections - and the
+ * mention arm's three rules are unchanged, because D8 folded the concepts rather than loosening a gate.
+ */
+describe("Codex whole-graph connections — the store and projection layers, on their own (D8)", () => {
+  const context = () => ({
+    revealedPageIds: new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id)),
+    revealedSourceIds: new Set<string>()
+  });
+  const mentions = () => store.listAllConnections().filter((edge) => edge.origin === "mention");
+  const pair = (edge: { fromId: string; toPageId: string }) => ({ fromPageId: edge.fromId, toPageId: edge.toPageId });
 
-  it("the store's link feed is deliberately UNGATED — both layers, every reveal state", () => {
+  it("the store's feed is deliberately UNGATED — both layers, every reveal state, both origins", () => {
     const target = store.createPage({ title: "Vallaki" });                                    // secret
     const source = store.createPage({ title: "Barovia", gmBody: "Answers to [[Vallaki]]." }); // secret, GM-layer link
-    expect(store.listAllLinks()).toEqual([{ fromPageId: source.id, toPageId: target.id, layer: "gm" }]);
+    expect(mentions()).toEqual([{ id: null, fromKind: "page", fromId: source.id, toPageId: target.id, label: null, origin: "mention", layer: "gm", createdAt: null }]);
   });
 
-  it("refuses a GM-BODY link even when both endpoints are revealed", () => {
+  it("refuses a GM-BODY mention even when both endpoints are revealed", () => {
     const target = store.createPage({ title: "Vallaki", revealedToPlayers: true });
     const source = store.createPage({ title: "Barovia", gmBody: "Its burgomaster answers to [[Vallaki]].", revealedToPlayers: true });
-    const edges = store.listAllLinks();
-    expect(projectGmLinkEdges(edges)).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
-    expect(projectPlayerLinkEdges(edges, revealedIds())).toEqual([]);
+    expect(projectGmConnections(store.listAllConnections())).toHaveLength(1);
+    expect(projectPlayerConnections(store.listAllConnections(), context())).toEqual([]);
     // Moving the very same link into the player body lets it through — so the miss is the LAYER rule.
     store.updatePage(source.id, { gmBody: "", playerBody: "Ruled from [[Vallaki]]." }, undefined, "test");
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+    expect(projectPlayerConnections(store.listAllConnections(), context()).map(pair)).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
   });
 
-  it("refuses a player-body link when EITHER endpoint is unrevealed, so no dangling edge names a secret page", () => {
+  it("refuses a player-body mention when EITHER endpoint is unrevealed, so no dangling edge names a secret page", () => {
     const secret = store.createPage({ title: "The Whispered Name" });
     const source = store.createPage({ title: "Barovia", playerBody: "Watched by [[The Whispered Name]].", revealedToPlayers: true });
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([]);   // hidden TARGET
+    expect(projectPlayerConnections(store.listAllConnections(), context())).toEqual([]);   // hidden TARGET
     store.setPageRevealed(secret.id, true);
     store.setPageRevealed(source.id, false);
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([]);   // hidden SOURCE
+    expect(projectPlayerConnections(store.listAllConnections(), context())).toEqual([]);   // hidden SOURCE
     store.setPageRevealed(source.id, true);
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: secret.id }]);
+    expect(projectPlayerConnections(store.listAllConnections(), context()).map(pair)).toEqual([{ fromPageId: source.id, toPageId: secret.id }]);
   });
 
   it("resolves targets by title key, and drops self-links and links to titles no page carries", () => {
     const page = store.createPage({ title: "Barovia", playerBody: "See [[  barovia  ]] and [[A Page Never Written]].", revealedToPlayers: true });
-    expect(store.listAllLinks()).toEqual([]);   // the self-link normalizes to this very page; the other has no node
-    // A link that DOES resolve proves the title-key matching itself works (case/whitespace insensitive).
+    expect(mentions()).toEqual([]);   // the self-link normalizes to this very page; the other has no node
     const other = store.createPage({ title: "Castle  Ravenloft", revealedToPlayers: true });
     store.updatePage(page.id, { playerBody: "Looms over it: [[castle ravenloft]]." }, undefined, "test");
-    expect(store.listAllLinks()).toEqual([{ fromPageId: page.id, toPageId: other.id, layer: "player" }]);
+    expect(mentions().map(pair)).toEqual([{ fromPageId: page.id, toPageId: other.id }]);
   });
 
   it("collapses a target linked from BOTH bodies into ONE player-layer edge", () => {
     const target = store.createPage({ title: "Vallaki", revealedToPlayers: true });
     const source = store.createPage({ title: "Barovia", playerBody: "Ruled from [[Vallaki#Rule]].", gmBody: "[[Vallaki]] hides the coffin.", revealedToPlayers: true });
     // The player body genuinely carries it, so the edge is player-visible - and the graph draws one line.
-    expect(store.listAllLinks()).toEqual([{ fromPageId: source.id, toPageId: target.id, layer: "player" }]);
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+    expect(mentions()).toHaveLength(1);
+    expect(mentions()[0]!.layer).toBe("player");
+    expect(projectPlayerConnections(store.listAllConnections(), context()).map(pair)).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+  });
+
+  /**
+   * D13: session, quest and journal bodies join the graph, with the layer mapping their own two-layer
+   * split already implies. Prep is a session's secret half, so a page named only in prep is a GM-only
+   * connection - the exact leak shape the layer rule exists for, one record kind further out.
+   */
+  it("puts session, quest and journal bodies in the graph, on the layer their own split implies", () => {
+    const shown = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const session = store.createSession({ recapBody: "We reached [[Vallaki]].", prepBody: "The ambush waits in [[Vallaki]]." });
+    const quest = store.createQuest({ title: "Find the Sunsword", playerBody: "Look in [[Vallaki]]." });
+    const entry = store.createEntry({ playerText: "Arrived at [[Vallaki]].", revealedToPlayers: true });
+    const gmOnlyEntry = store.createEntry({ playerText: "Nothing happened.", gmText: "Strahd watches [[Vallaki]].", revealedToPlayers: true });
+
+    const bySource = new Map(store.listAllConnections().filter((edge) => edge.origin === "mention").map((edge) => [edge.fromId, edge]));
+    // The session names the page from BOTH bodies, so the collapse upgrades it to the player layer.
+    expect(bySource.get(session.id)).toMatchObject({ fromKind: "session", toPageId: shown.id, layer: "player" });
+    expect(bySource.get(quest.id)).toMatchObject({ fromKind: "quest", layer: "player" });
+    expect(bySource.get(entry.id)).toMatchObject({ fromKind: "journal", layer: "player" });
+    expect(bySource.get(gmOnlyEntry.id), "a page named only in gmText is a GM-layer edge").toMatchObject({ fromKind: "journal", layer: "gm" });
+
+    // A prep-ONLY mention is GM-layer, which is the half a player must never receive.
+    const prepOnly = store.createSession({ prepBody: "Secretly, [[Vallaki]]." });
+    expect(store.listAllConnections().find((edge) => edge.fromId === prepOnly.id)).toMatchObject({ layer: "gm" });
+
+    // THE PLAYER GATE, per source kind: the source record's own reveal flag decides, so a connection can
+    // never be a way around a session/quest/entry's own gate. Nothing is revealed yet -> nothing travels.
+    const ctx = { revealedPageIds: new Set([shown.id]), revealedSourceIds: new Set<string>() };
+    expect(projectPlayerConnections(store.listAllConnections(), ctx).filter((edge) => edge.fromKind !== "page")).toEqual([]);
+    // Reveal the session and the entry; the quest stays hidden, so its edge stays hidden with it.
+    const revealed = { revealedPageIds: new Set([shown.id]), revealedSourceIds: new Set([session.id, entry.id]) };
+    const travelling = projectPlayerConnections(store.listAllConnections(), revealed);
+    expect(travelling.map((edge) => edge.fromId).sort()).toEqual([entry.id, session.id].sort());
+    // The player edge's EXACT key set: no id, no layer, no createdAt.
+    expect(Object.keys(travelling[0]!).sort()).toEqual(["fromId", "fromKind", "label", "origin", "toPageId"]);
+  });
+
+  it("scrubs a record's link rows when it is deleted — v22 dropped the foreign key, so nothing cascades", () => {
+    const shown = store.createPage({ title: "Vallaki" });
+    const session = store.createSession({ recapBody: "[[Vallaki]]" });
+    const quest = store.createQuest({ title: "Q", playerBody: "[[Vallaki]]" });
+    const entry = store.createEntry({ playerText: "[[Vallaki]]" });
+    const page = store.createPage({ title: "Road", playerBody: "[[Vallaki]]" });
+    expect(store.listAllConnections()).toHaveLength(4);
+
+    store.deleteSession(session.id);
+    store.deleteQuest(quest.id);
+    store.deleteEntry(entry.id);
+    store.deletePage(page.id);
+    expect(store.listAllConnections(), "no orphan edge survives its source record").toEqual([]);
+    expect(store.connectionsForPage(shown.id)).toEqual([]);
   });
 });
 
@@ -1251,13 +1375,13 @@ describe("CodexStore recency semantics — what counts as an update (CI-9)", () 
     expect(rev(page.id)).toBe(bornRev + 1);
   });
 
-  it("DOES count adding a relationship, on BOTH endpoints, without forcing either editor into a conflict", () => {
+  it("DOES count adding a connection, on BOTH endpoints, without forcing either editor into a conflict", () => {
     const strahd = recency.createPage({ title: "Strahd", entityType: "character" });
     const barovia = recency.createPage({ title: "Barovia", entityType: "location" });
     const bornStrahd = updatedAt(strahd.id);
     const bornBarovia = updatedAt(barovia.id);
     tick();
-    const edge = recency.createRelationship(strahd.id, barovia.id, "rules");
+    const edge = recency.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" });
     expect(updatedAt(strahd.id) > bornStrahd).toBe(true);
     expect(updatedAt(barovia.id) > bornBarovia).toBe(true);   // the OTHER end gained a connection too
     expect(rev(strahd.id)).toBe(strahd.rev);                  // `rev` is the conflict token, not recency
@@ -1266,19 +1390,19 @@ describe("CodexStore recency semantics — what counts as an update (CI-9)", () 
     // An idempotent re-add changes nothing, so it is not an edit.
     const settled = updatedAt(strahd.id);
     tick();
-    expect(recency.createRelationship(strahd.id, barovia.id, "rules").id).toBe(edge.id);
+    expect(recency.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" }).id).toBe(edge.id);
     expect(updatedAt(strahd.id)).toBe(settled);
   });
 
-  it("DOES count removing a relationship, on both endpoints", () => {
+  it("DOES count removing a connection, on both endpoints", () => {
     const strahd = recency.createPage({ title: "Strahd", entityType: "character" });
     const barovia = recency.createPage({ title: "Barovia", entityType: "location" });
-    const edge = recency.createRelationship(strahd.id, barovia.id, "rules");
+    const edge = recency.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" });
     const afterCreate = updatedAt(strahd.id);
     expect(updatedAt(barovia.id)).toBe(afterCreate);
     tick();
-    recency.deleteRelationship(edge.id);
-    expect(recency.listRelationshipsFor(strahd.id)).toEqual([]);
+    recency.deleteConnection(edge.id);
+    expect(recency.connectionsForPage(strahd.id)).toEqual([]);
     expect(updatedAt(strahd.id) > afterCreate).toBe(true);
     expect(updatedAt(barovia.id) > afterCreate).toBe(true);
     expect(rev(strahd.id)).toBe(strahd.rev);
@@ -1884,9 +2008,24 @@ describe("CodexStore migration v19 — journal entries join their session by ide
       database.prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, 1, '2026-01-01', '[\"Ana\"]', 'Ambush at the bridge.', 'They crossed.', 1, 'played', 1, '', '')").run(existingSession);
       database.prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', 'Nothing yet.', '', 0, 'planned', 1, '', '')").run(unnumberedSession);
 
+      // v22's fixtures: two pages with a wiki link between them, two relationship rows (one pinned slug,
+      // one unknown), and prose in a session/quest/journal body for the startup reconcile to find.
+      const linkedPage = crypto.randomUUID(), targetPage = crypto.randomUUID(), harpers = crypto.randomUUID(), zhents = crypto.randomUUID();
+      const insertPage = database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, '{}', '{}', NULL, '[]', ?, '', 1, NULL, 1, '', '')");
+      insertPage.run(targetPage, "Vallaki", "location", "A walled town.");
+      insertPage.run(linkedPage, "Barovia", "location", "Ruled from [[Vallaki]].");
+      insertPage.run(harpers, "The Harpers", "faction", "Meddlers.");
+      insertPage.run(zhents, "The Zhentarim", "faction", "Rivals.");
+      database.prepare("INSERT INTO codex_links (source_page_id, layer, target_kind, target_ref, section) VALUES (?, 'player', 'page', 'vallaki', NULL)").run(linkedPage);
+      const insertRel = database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, '')");
+      insertRel.run(crypto.randomUUID(), harpers, zhents, "ally");
+      insertRel.run(crypto.randomUUID(), zhents, harpers, "owes-a-debt-to");
+      database.prepare("UPDATE codex_sessions SET prep_body = ? WHERE id = ?").run("The ambush at [[Vallaki]].", existingSession);
+      database.prepare("INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Find the Sunsword', 'active', 'Search [[Vallaki]].', '', '[]', '[]', 0, 1, '', '')").run(crypto.randomUUID());
+
       const matched = crypto.randomUUID(), orphanA = crypto.randomUUID(), orphanB = crypto.randomUUID(), loose = crypto.randomUUID();
       const insert = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, session_number, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, NULL, ?, 'note', ?, ?, '[]', '', '')");
-      insert.run(matched, "We arrived in Barovia.", 1, 1, 1);
+      insert.run(matched, "We arrived in [[Vallaki]].", 1, 1, 1);
       insert.run(orphanA, "The wolves came.", 1, 7, 2);      // number 7 names no session record
       insert.run(orphanB, "And came again.", 0, 7, 3);       // ...twice, so synthesis must not duplicate
       insert.run(loose, "Undated lore.", 1, null, 4);
@@ -1910,11 +2049,13 @@ describe("CodexStore migration v19 — journal entries join their session by ide
       expect(synthesized.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       expect(upgraded.getSession(synthesized.id)).not.toBeNull();
       // The pre-existing record is untouched, not replaced by a synthesized twin.
-      expect(upgraded.getSession(existingSession)).toMatchObject({ sessionNumber: 1, prepBody: "Ambush at the bridge.", recapBody: "They crossed." });
+      // (its prep was rewritten above to seed a v22 wiki link, so only the recap is compared verbatim)
+      expect(upgraded.getSession(existingSession)).toMatchObject({ sessionNumber: 1, recapBody: "They crossed." });
 
       // Every previously-numbered entry now JOINS the right record, and reads back the SAME display
       // number it carried yesterday - which is the whole "nothing visibly changes" claim.
       expect(upgraded.getEntry(matched)).toMatchObject({ sessionId: existingSession, sessionNumber: 1 });
+      expect(upgraded.getEntry(matched)!.playerText).toBe("We arrived in [[Vallaki]].");
       expect(upgraded.getEntry(orphanA)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
       expect(upgraded.getEntry(orphanB)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
       expect(upgraded.getEntry(loose)).toMatchObject({ sessionId: null, sessionNumber: null });
@@ -1945,6 +2086,31 @@ describe("CodexStore migration v19 — journal entries join their session by ide
       expect(upgraded.searchAll("player", "ambush").hits.some((hit) => hit.id === existingSession)).toBe(false);
       expect(upgraded.searchAll("player", "crossed").hits.some((hit) => hit.kind === "session" && hit.id === existingSession), "a revealed session's RECAP is findable").toBe(true);
       expect(upgraded.searchAll("player", "crossed").hits.some((hit) => hit.id === synthesized.id), "...and a hidden one is not").toBe(false);
+
+      // v22 (D8): the links rebuild carried every existing row over as a PAGE source, the relationships
+      // table gained its layer, and the twelve legacy slugs became the labels a reader sees.
+      const raw2 = new DatabaseSync(path);
+      const linkRows = raw2.prepare("SELECT source_kind, source_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY target_ref").all() as Array<{ source_kind: string; source_id: string; layer: string; target_ref: string }>;
+      expect(linkRows.length, "the legacy page links survived the rebuild").toBeGreaterThanOrEqual(2);
+      // The legacy row is still a PAGE source with its layer intact - that is what the rebuild carried.
+      // (The non-page rows beside it are the startup reconcile's, asserted below.)
+      expect(linkRows.find((row) => row.source_id === linkedPage)).toMatchObject({ source_kind: "page", target_ref: "vallaki", layer: "player" });
+      const rels = raw2.prepare("SELECT type, layer FROM codex_relationships ORDER BY type").all() as Array<{ type: string; layer: string }>;
+      // "ally" -> "ally of" from the pinned vocabulary; an unknown slug falls back to dashes-into-spaces.
+      expect(rels.map((row) => row.type)).toEqual(["ally of", "owes a debt to"]);
+      expect(rels.every((row) => row.layer === "player"), "every migrated edge is on the player layer - today's behaviour").toBe(true);
+      raw2.close();
+
+      // D13's STARTUP RECONCILE ran once on open and re-extracted the pre-existing session, quest and
+      // journal bodies - work no SQL migration could do, because SQL cannot parse `[[...]]`.
+      const reconciled = upgraded.listAllConnections().filter((edge) => edge.origin === "mention");
+      expect(reconciled.find((edge) => edge.fromKind === "session"), "a legacy session's PREP link, on the GM layer").toMatchObject({ fromId: existingSession, layer: "gm" });
+      expect(reconciled.find((edge) => edge.fromKind === "journal"), "a legacy entry's player-text link").toMatchObject({ fromId: matched, layer: "player" });
+      // ...and the symmetric-dedupe re-key works against the MIGRATED spelling, which is the silent
+      // failure v22's relabel would otherwise have caused.
+      const allyA = upgraded.listPages().find((page) => page.title === "The Harpers")!;
+      const allyB = upgraded.listPages().find((page) => page.title === "The Zhentarim")!;
+      expect(upgraded.createConnection(allyB.id, { toPageId: allyA.id, label: "ally of" }).fromPageId, "the reverse direction is the SAME edge").toBe(allyA.id);
 
       // D9's payoff, on the upgraded database: renumbering the session moves every joined entry's
       // display number in one write, with no journal work at all.
@@ -4070,11 +4236,12 @@ describe("every codex write bumps the coarse revision (the ETag's invariant)", (
     bumps("deleteRevisionsOlderThan", () => { store.deleteRevisionsOlderThan(0); });
     bumps("setSettings", () => { store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT }); });
 
-    // Relationships
+    // Connections
     const other = store.createPage({ title: "Strahd", entityType: "character" });
     let relationshipId = "";
-    bumps("createRelationship", () => { relationshipId = store.createRelationship(other.id, page.id, "rules").id; });
-    bumps("deleteRelationship", () => { store.deleteRelationship(relationshipId); });
+    bumps("createConnection", () => { relationshipId = store.createConnection(other.id, { toPageId: page.id, label: "rules" }).id; });
+    bumps("updateConnection", () => { store.updateConnection(relationshipId, { label: "rules over" }); });
+    bumps("deleteConnection", () => { store.deleteConnection(relationshipId); });
 
     // Maps + markers
     let map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional" });

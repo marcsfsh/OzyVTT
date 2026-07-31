@@ -1,5 +1,5 @@
 import { deadlineFired } from "./codex-store.js";
-import type { CodexBacklinkRow, CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
+import type { CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexConnectionRow, CodexConnectionSourceKind, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexPageConnectionRow, CodexRecordKind, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -36,7 +36,6 @@ export type PlayerCodexPageSummary = Readonly<{
   updatedAt: string;
 }>;
 
-export type CodexBacklink = Readonly<{ sourcePageId: string; sourceTitle: string; section: string | null }>;
 
 export function projectGmPage(row: CodexPageRow): GmCodexPage {
   return row;
@@ -60,44 +59,100 @@ export function projectPlayerPageSummary(row: CodexPageSummaryRow): PlayerCodexP
   return { id: row.id, title: row.title, entityType: row.entityType, folder: row.folder, tags: row.tags, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
 }
 
-// ----- Relationships -----
+// ----- Connections (D8: ONE gate, both origins) -----
 
-export function projectGmRelationships(views: readonly CodexRelationshipView[]): CodexRelationshipView[] {
-  return [...views];
+/**
+ * D8/D13: whether ONE connection may travel to a player. Three conditions, ALL of which must hold, and
+ * each is copied from the feed that already enforced it rather than invented here:
+ *
+ *   1. **The target page is revealed.** An edge to a page a player cannot open tells them that page
+ *      EXISTS and draws them a line to it - the leak `projectPlayerQuest` filters `entityIds` for.
+ *   2. **The SOURCE record is revealed, per its own kind's rule.** A page, session or quest by its own
+ *      flag; a journal entry by its own. Resolved by the caller and handed in, because a projection that
+ *      reached back into the store would be a second place that decides what a player may see.
+ *   3. **`layer === "player"`.** D13's rule, and it now applies to DECLARED edges too, which is stronger
+ *      than the old relationship gate: a connection the GM declared on the GM layer never travels, even
+ *      between two revealed pages. A link written in a GM body is a GM note ABOUT a connection, not a
+ *      connection the party has been shown - and the revealed player half of the same record may say
+ *      nothing of the sort.
+ *
+ * All three are load-bearing. (1) alone leaks GM-layer edges between two revealed pages; (3) alone leaks
+ * the existence of unrevealed pages named from a revealed body; (2) alone leaks edges into secret pages.
+ */
+export type PlayerConnectionContext = Readonly<{
+  /** Page ids the player may see. Both a connection's target and a page-kind source are checked against it. */
+  revealedPageIds: ReadonlySet<string>;
+  /** Non-page source records the player may see, by kind. Absent sets fail CLOSED: nothing travels. */
+  revealedSourceIds: ReadonlySet<string>;
+}>;
+
+const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
+
+function connectionSourceVisible(kind: CodexConnectionSourceKind, sourceId: string, context: PlayerConnectionContext): boolean {
+  return kind === "page" ? context.revealedPageIds.has(sourceId) : context.revealedSourceIds.has(sourceId);
 }
-/** A player sees an edge only when the OTHER endpoint is revealed (the page they're on already is). */
-export function projectPlayerRelationships(views: readonly CodexRelationshipView[]): CodexRelationshipView[] {
-  return views.filter((view) => view.otherRevealed);
-}
-/** The whole-graph edge feed: a player sees an edge only when BOTH endpoints are revealed pages. */
-export function projectPlayerRelationshipEdges(edges: readonly CodexRelationshipRow[], revealedPageIds: ReadonlySet<string>): CodexRelationshipRow[] {
-  return edges.filter((edge) => revealedPageIds.has(edge.fromPageId) && revealedPageIds.has(edge.toPageId));
-}
 
-// ----- Wiki-link edges (CI-8: the Graph's second edge kind, beside the typed relationships) -----
-
-/** One `[[wiki link]]` edge as either audience receives it. `layer` is store-side bookkeeping and never ships. */
-export type CodexLinkEdge = Readonly<{ fromPageId: string; toPageId: string }>;
-
-export function projectGmLinkEdges(edges: readonly CodexLinkEdgeRow[]): CodexLinkEdge[] {
-  return edges.map((edge) => ({ fromPageId: edge.fromPageId, toPageId: edge.toPageId }));
+/** The whole-graph feed, GM: passthrough. Ids, labels, layers, origins and timestamps are all GM-visible. */
+export function projectGmConnections(edges: readonly CodexConnectionRow[]): CodexConnectionRow[] {
+  return [...edges];
 }
 
 /**
- * The player's wiki-link graph. TWO rules, each copied from the feed that already enforces it rather
- * than invented here:
- *   1. BOTH endpoints revealed - `projectPlayerRelationshipEdges`. An edge with one visible end is worse
- *      than useless: it tells a player a page they cannot see EXISTS, and draws them a line to it.
- *   2. The `player` layer only - `projectPlayerBacklinks`. A link written in a page's GM body is a GM
- *      note about a connection, not a connection the players have been shown; the revealed player body
- *      of the very same page may say nothing of the sort.
- * Both must hold. Rule 1 alone would leak GM-body links between two revealed pages; rule 2 alone would
- * leak the existence of unrevealed pages linked from a revealed player body.
+ * A connection as a PLAYER receives it.
+ *
+ * VIEWER-SAFETY JUSTIFICATION, per dropped key: `id` goes because a player never addresses a connection
+ * (there is no player write route, and an id would be a handle to something they cannot act on);
+ * `layer` goes because every connection they receive is on the player layer, so the key could only ever
+ * be a constant - and a constant that names the OTHER layer's existence; `createdAt` goes because when
+ * the GM drew a line is GM authoring metadata, exactly as `rev` and `updatedAt` are everywhere else here.
  */
-export function projectPlayerLinkEdges(edges: readonly CodexLinkEdgeRow[], revealedPageIds: ReadonlySet<string>): CodexLinkEdge[] {
+export type PlayerCodexConnection = Readonly<{
+  fromKind: CodexConnectionSourceKind;
+  fromId: string;
+  toPageId: string;
+  label: string | null;
+  origin: "declared" | "mention";
+}>;
+
+export function projectPlayerConnections(edges: readonly CodexConnectionRow[], context: PlayerConnectionContext): PlayerCodexConnection[] {
   return edges
-    .filter((edge) => edge.layer === "player" && revealedPageIds.has(edge.fromPageId) && revealedPageIds.has(edge.toPageId))
-    .map((edge) => ({ fromPageId: edge.fromPageId, toPageId: edge.toPageId }));
+    .filter((edge) => edge.layer === "player" && context.revealedPageIds.has(edge.toPageId) && connectionSourceVisible(edge.fromKind, edge.fromId, context))
+    // Explicit allow-list, never a spread-and-delete: a field added to `CodexConnectionRow` must be added
+    // HERE to reach a player, so the default for anything new is secret.
+    .map((edge) => ({ fromKind: edge.fromKind, fromId: edge.fromId, toPageId: edge.toPageId, label: edge.label, origin: edge.origin }));
+}
+
+/** One page's Connections panel, GM: passthrough - the reveal state of the other end is what the GM needs. */
+export function projectGmPageConnections(rows: readonly CodexPageConnectionRow[]): CodexPageConnectionRow[] {
+  return [...rows];
+}
+
+/**
+ * One page's Connections panel as a PLAYER receives it.
+ *
+ * The gate is the SAME three conditions as the graph feed, stated once and applied here through
+ * `otherRevealed` - which the store already resolved per kind. `otherRevealed` itself then DROPS from the
+ * row: a player only ever receives connections to records they can see, so the key could only be the
+ * constant `true`, and shipping a constant that names a predicate is how a reader learns the predicate
+ * exists. `id` and `layer` drop for the reasons `PlayerCodexConnection` states.
+ *
+ * The page the panel belongs to is assumed already visible - the route 404s a player before it gets here.
+ */
+export type PlayerCodexPageConnection = Readonly<{
+  direction: "out" | "in";
+  otherKind: CodexConnectionSourceKind;
+  otherId: string;
+  otherTitle: string;
+  otherEntityType: CodexEntityType | null;
+  label: string | null;
+  origin: "declared" | "mention";
+  section: string | null;
+}>;
+
+export function projectPlayerPageConnections(rows: readonly CodexPageConnectionRow[]): PlayerCodexPageConnection[] {
+  return rows
+    .filter((row) => row.layer === "player" && row.otherRevealed)
+    .map((row) => ({ direction: row.direction, otherKind: row.otherKind, otherId: row.otherId, otherTitle: row.otherTitle, otherEntityType: row.otherEntityType, label: row.label, origin: row.origin, section: row.section }));
 }
 
 // ----- Maps -----
@@ -992,20 +1047,6 @@ export type CodexSearchHit = Readonly<{
 
 /* A journal entry has no title, so its result row shows a bounded excerpt of its text - see `excerpt` above. */
 
-export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
-  switch (record.kind) {
-    case "page": return { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null };
-    // The GM may see either layer, so an entry with no player text still shows something useful.
-    case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
-    case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
-    case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
-    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null };
-    // The GM sees a session hit whatever its reveal state - reveal is the PLAYER predicate. The title rule
-    // is shared with the player arm and the reveal audit, so one concept has one name everywhere.
-    case "session": return { kind: "session", id: record.session.id, title: sessionDisplayTitle({ sessionNumber: record.session.sessionNumber, recap: record.session.recapBody }), tags: record.session.tags, entityType: null, mapId: null };
-  }
-}
-
 /**
  * null when this record is not player-visible - the audited gate. The predicate per kind is COPIED
  * from that kind's player LIST endpoint and must never be weaker, or search becomes the leak:
@@ -1061,19 +1102,21 @@ export function projectPlayerSearchHit(record: CodexSearchRecord, context: Playe
   }
 }
 
-export function projectGmBacklinks(rows: readonly CodexBacklinkRow[]): CodexBacklink[] {
-  return rows.map((row) => ({ sourcePageId: row.sourcePageId, sourceTitle: row.sourceTitle, section: row.section }));
+
+export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
+  switch (record.kind) {
+    case "page": return { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null };
+    // The GM may see either layer, so an entry with no player text still shows something useful.
+    case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
+    case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
+    case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
+    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null };
+    // The GM sees a session hit whatever its reveal state - reveal is the PLAYER predicate. The title rule
+    // is shared with the player arm and the reveal audit, so one concept has one name everywhere.
+    case "session": return { kind: "session", id: record.session.id, title: sessionDisplayTitle({ sessionNumber: record.session.sessionNumber, recap: record.session.recapBody }), tags: record.session.tags, entityType: null, mapId: null };
+  }
 }
 
-/**
- * A player sees a backlink only when it came from the player-facing body of a page THEY can see - so a
- * GM-body reference, or a reference from a still-secret page, never reveals that a hidden page points here.
- */
-export function projectPlayerBacklinks(rows: readonly CodexBacklinkRow[]): CodexBacklink[] {
-  return rows
-    .filter((row) => row.layer === "player" && row.sourceRevealed)
-    .map((row) => ({ sourcePageId: row.sourcePageId, sourceTitle: row.sourceTitle, section: row.section }));
-}
 
 // ----- The reveal audit (M12 / CT-9: one GM view of everything the party can currently see) -----
 

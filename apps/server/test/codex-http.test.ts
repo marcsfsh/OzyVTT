@@ -355,24 +355,28 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect((await get(base, contentPath, PLAYER)).status).toBe(200);        // now the banner of a revealed page
   });
 
-  it("exposes entity type + fields on reveal, and hides relationships to unrevealed entities", async () => {
+  it("exposes entity type + fields on reveal, and hides connections to unrevealed entities", async () => {
     const { base } = await fixture();
     const strahd = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Strahd", entityType: "character", fields: { race: "Vampire", age: "400" } }));
     const strahdId = strahd.data.page.id as string;
     const cult = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult" })); // stays secret
     const barovia = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Barovia" }));
-    await post(base, `/api/v1/codex/pages/${strahdId}/relationships`, GM, { toPageId: cult.data.page.id, type: "leads" });
-    await post(base, `/api/v1/codex/pages/${strahdId}/relationships`, GM, { toPageId: barovia.data.page.id, type: "rules" });
+    await post(base, `/api/v1/codex/pages/${strahdId}/connections`, GM, { toPageId: cult.data.page.id, label: "leads" });
+    await post(base, `/api/v1/codex/pages/${strahdId}/connections`, GM, { toPageId: barovia.data.page.id, label: "rules" });
     await post(base, `/api/v1/codex/pages/${barovia.data.page.id}/reveal`, GM, { revealed: true });
     await post(base, `/api/v1/codex/pages/${strahdId}/reveal`, GM, { revealed: true });
 
     const view = await body(await get(base, `/api/v1/codex/pages/${strahdId}`, PLAYER));
     expect(view.data.page.entityType).toBe("character");
     expect(view.data.page.fields).toEqual({ race: "Vampire", age: "400" });
-    const rels = view.data.relationships as Json[];
+    // D8: ONE `connections` list where `backlinks` and `relationships` used to be two keys.
+    const rels = view.data.connections as Json[];
+    expect(view.data.backlinks, "the two old keys are GONE, not merely empty").toBeUndefined();
+    expect(view.data.relationships).toBeUndefined();
     expect(rels).toHaveLength(1);                       // only the edge to revealed Barovia
     expect(rels[0].otherTitle).toBe("Barovia");
-    expect(JSON.stringify(view)).not.toContain("Cult"); // the secret entity never leaks via a relationship
+    expect(rels[0].origin).toBe("declared");
+    expect(JSON.stringify(view)).not.toContain("Cult"); // the secret entity never leaks via a connection
   });
 
   it("keeps GM-only structured fields (gmFields) off a revealed page's player projection", async () => {
@@ -424,21 +428,70 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect((gmSecret.data.hits as Json[]).length).toBeGreaterThan(0);       // ...but the GM can find it
   });
 
-  it("GET /relationships returns the whole-graph edge feed, viewer-safe for players", async () => {
+  it("GET /connections returns ONE whole-graph edge feed, viewer-safe for players", async () => {
     const { base } = await fixture();
     const a = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Azalin", entityType: "character" }));
     const b = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Darkon", entityType: "location" }));
     const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Whispered Name" }));
-    await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: b.data.page.id, type: "rules" });
-    await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: secret.data.page.id, type: "serves" });
+    await post(base, `/api/v1/codex/pages/${a.data.page.id}/connections`, GM, { toPageId: b.data.page.id, label: "rules" });
+    await post(base, `/api/v1/codex/pages/${a.data.page.id}/connections`, GM, { toPageId: secret.data.page.id, label: "serves" });
     await post(base, `/api/v1/codex/pages/${a.data.page.id}/reveal`, GM, { revealed: true });
     await post(base, `/api/v1/codex/pages/${b.data.page.id}/reveal`, GM, { revealed: true });
 
-    const gmEdges = (await body(await get(base, "/api/v1/codex/relationships", GM))).data.relationships as Json[];
+    const gmEdges = (await body(await get(base, "/api/v1/codex/connections", GM))).data.connections as Json[];
     expect(gmEdges).toHaveLength(2);
-    const playerEdges = (await body(await get(base, "/api/v1/codex/relationships", PLAYER))).data.relationships as Json[];
+    const playerEdges = (await body(await get(base, "/api/v1/codex/connections", PLAYER))).data.connections as Json[];
     expect(playerEdges).toHaveLength(1); // only the edge whose BOTH endpoints are revealed
-    expect(playerEdges[0].type).toBe("rules");
+    expect(playerEdges[0].label).toBe("rules");
+    // The player edge carries no id, no layer and no createdAt - it is not addressable and every edge it
+    // receives is on the player layer, so both keys could only ever be constants.
+    expect(Object.keys(playerEdges[0]).sort()).toEqual(["fromId", "fromKind", "label", "origin", "toPageId"]);
+    // The four retired routes really are gone from the router, not merely from the contract.
+    for (const path of ["/api/v1/codex/relationships", "/api/v1/codex/links"]) {
+      expect((await get(base, path, GM)).status, path).toBe(404);
+    }
+    expect((await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: b.data.page.id, type: "rules" })).status).toBe(404);
+  });
+
+  /**
+   * D8's create/patch/delete cycle at the boundary, plus the one thing a client most needs to know: a
+   * MENTION has no id, so it cannot be patched or deleted through the API. Editing the sentence is the
+   * only way, which is what keeps one sentence and one edge from being two things to keep in step.
+   */
+  it("declares, relabels and deletes a connection, and refuses to address a mention", async () => {
+    const { base } = await fixture();
+    const from = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Strahd", entityType: "character", playerBody: "Rules [[Barovia]]." }));
+    const to = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Barovia", entityType: "location" }));
+    const created = await post(base, `/api/v1/codex/pages/${from.data.page.id}/connections`, GM, { toPageId: to.data.page.id, label: "rules", layer: "gm" });
+    expect(created.status).toBe(201);
+    const connection = (await body(created)).data.connection as Json;
+    expect(connection).toMatchObject({ fromKind: "page", fromId: from.data.page.id, toPageId: to.data.page.id, label: "rules", origin: "declared", layer: "gm" });
+
+    // The MENTION from Strahd's body is in the same list with `id: null` - one panel, two origins. Checked
+    // while the declared edge still carries a LABEL, because an unlabelled declared edge and a mention
+    // over the same pair are deliberately folded into one row (see the store's fold rule).
+    const panel = (await body(await get(base, `/api/v1/codex/pages/${from.data.page.id}`, GM))).data.connections as Json[];
+    const mention = panel.find((row) => row.origin === "mention");
+    expect(mention, "the [[Barovia]] mention rides in the same list").toBeDefined();
+    expect(mention!.id).toBeNull();
+    expect(panel.filter((row) => row.origin === "declared")).toHaveLength(1);
+
+    const patched = (await body(await patch(base, `/api/v1/codex/connections/${connection.id}`, GM, { label: null, layer: "player" }))).data.connection as Json;
+    expect(patched).toMatchObject({ label: null, layer: "player" });
+    // A 41-character label is a 400, and an unknown id is a 404 - not a silent no-op.
+    expect((await patch(base, `/api/v1/codex/connections/${connection.id}`, GM, { label: "x".repeat(41) })).status).toBe(400);
+    expect((await patch(base, `/api/v1/codex/connections/${randomUUID()}`, GM, { label: "x" })).status).toBe(404);
+    // A player may not write any of it.
+    expect((await post(base, `/api/v1/codex/pages/${from.data.page.id}/connections`, PLAYER, { toPageId: to.data.page.id })).status).toBe(403);
+    expect((await del(base, `/api/v1/codex/connections/${connection.id}`, PLAYER)).status).toBe(403);
+
+    // ...and once the declared edge is UNLABELLED it folds with the mention: one connection stated twice
+    // is one row, with the deletable declared one winning.
+    expect(((await body(await get(base, `/api/v1/codex/pages/${from.data.page.id}`, GM))).data.connections as Json[]).filter((row) => row.direction === "out")).toHaveLength(1);
+
+    expect((await del(base, `/api/v1/codex/connections/${connection.id}`, GM)).status).toBe(200);
+    const after = (await body(await get(base, `/api/v1/codex/pages/${from.data.page.id}`, GM))).data.connections as Json[];
+    expect(after.every((row) => row.origin === "mention"), "the declared edge went; the mention stays, because it is prose").toBe(true);
   });
 
   /**
@@ -536,7 +589,7 @@ describe("codex HTTP viewer-safety boundary", () => {
    * `projectPlayerLinkEdges` in `codex-store.test.ts` - an HTTP test shows the pipeline works, never
    * which layer did the work.
    */
-  it("GET /links returns wiki-link edges, and a player sees neither GM-body links nor edges touching a secret page", async () => {
+  it("GET /connections shows mention edges, and a player sees neither GM-body links nor edges touching a secret page", async () => {
     const { base } = await fixture();
     const make = async (title: string, playerBody: string, gmBody: string, revealed: boolean) => {
       const page = await body(await post(base, "/api/v1/codex/pages", GM, { title, playerBody, gmBody }));
@@ -551,7 +604,8 @@ describe("codex HTTP viewer-safety boundary", () => {
     const barovia = await make("Barovia", "Ruled from [[Vallaki]], watched by [[The Whispered Name]].", "", true);
     const vallaki = await make("Vallaki", "A walled town.", "Its burgomaster answers to [[Barovia]].", true);
 
-    const gmLinks = (await body(await get(base, "/api/v1/codex/links", GM))).data.links as Json[];
+    const pair = (edge: Json) => ({ fromPageId: edge.fromId as string, toPageId: edge.toPageId as string });
+    const gmLinks = ((await body(await get(base, "/api/v1/codex/connections", GM))).data.connections as Json[]).map(pair);
     expect(gmLinks).toEqual(expect.arrayContaining([
       { fromPageId: barovia, toPageId: vallaki },
       { fromPageId: barovia, toPageId: secret },
@@ -559,7 +613,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     ]));
     expect(gmLinks).toHaveLength(3);
 
-    const playerLinks = (await body(await get(base, "/api/v1/codex/links", PLAYER))).data.links as Json[];
+    const playerLinks = ((await body(await get(base, "/api/v1/codex/connections", PLAYER))).data.connections as Json[]).map(pair);
     expect(playerLinks).toEqual([{ fromPageId: barovia, toPageId: vallaki }]);
     // The secret page must not be inferable from a dangling edge, and the GM-body edge must not appear
     // even though BOTH of its endpoints are revealed - the two rules are independent.
@@ -567,12 +621,12 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(playerLinks.some((edge) => edge.fromPageId === vallaki)).toBe(false);
   });
 
-  it("GET /links drops a self-link and a link to a title no page carries", async () => {
+  it("GET /connections drops a self-link and a link to a title no page carries", async () => {
     const { base } = await fixture();
     const page = await body(await post(base, "/api/v1/codex/pages", GM, {
       title: "Barovia", playerBody: "See [[Barovia]] and [[A Page That Was Never Written]].", revealedToPlayers: true
     }));
-    const links = (await body(await get(base, "/api/v1/codex/links", GM))).data.links as Json[];
+    const links = (await body(await get(base, "/api/v1/codex/connections", GM))).data.connections as Json[];
     expect(links).toEqual([]);                                     // no node to draw for either
     expect(JSON.stringify(links)).not.toContain(page.data.page.id as string);
   });

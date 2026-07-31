@@ -347,7 +347,7 @@ describe("codex responses validate against the schemas the document publishes", 
     const shownId = shown.data.page.id as string;
     await reveal(`/api/v1/codex/pages/${shownId}/reveal`);
     await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", gmBody: "Meets under the inn." });
-    await post(base, `/api/v1/codex/pages/${shownId}/relationships`, GM, { toPageId: factionId, type: "ally" });
+    await post(base, `/api/v1/codex/pages/${shownId}/connections`, GM, { toPageId: factionId, label: "ally of" });
     await post(base, "/api/v1/codex/folders", GM, { path: "Places" });
 
     const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: crypto.randomUUID(), name: "Barovia", kind: "regional", tags: ["realm"] }));
@@ -390,12 +390,11 @@ describe("codex responses validate against the schemas the document publishes", 
     // role-projected read test passes while describing a projection it never exercised.
     const reads: ReadonlyArray<readonly [string, string, string?]> = [
       [CODEX_PATHS.pages, "/api/v1/codex/pages", "pages"],
-      [CODEX_PATHS.pageById, `/api/v1/codex/pages/${shownId}`, "relationships"],
+      [CODEX_PATHS.pageById, `/api/v1/codex/pages/${shownId}`, "connections"],
       [CODEX_PATHS.pageMarkers, `/api/v1/codex/pages/${shownId}/markers`, "markers"],
       [CODEX_PATHS.mapMarkers, `/api/v1/codex/maps/${mapId}/markers`, "markers"],
       [CODEX_PATHS.maps, "/api/v1/codex/maps", "maps"],
-      [CODEX_PATHS.relationships, "/api/v1/codex/relationships", "relationships"],
-      [CODEX_PATHS.links, "/api/v1/codex/links", "links"],
+      [CODEX_PATHS.connections, "/api/v1/codex/connections", "connections"],
       [CODEX_PATHS.journal, "/api/v1/codex/journal", "entries"],
       [CODEX_PATHS.timeline, "/api/v1/codex/timeline", "records"],
       [CODEX_PATHS.sessions, "/api/v1/codex/sessions", "sessions"],

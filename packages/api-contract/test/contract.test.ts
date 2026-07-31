@@ -142,7 +142,7 @@ describe("public API contracts", () => {
       expect(paths[path][method].security, `${method} ${path}`).toEqual(write);
     }
     // Role-projected reads: a player receives the revealed-only projection of the same route.
-    for (const [path, method] of [[CODEX_PATHS.pages, "get"], [CODEX_PATHS.pageById, "get"], [CODEX_PATHS.search, "get"], [CODEX_PATHS.relationships, "get"], [CODEX_PATHS.maps, "get"], [CODEX_PATHS.mapMarkers, "get"], [CODEX_PATHS.journal, "get"], [CODEX_PATHS.timeline, "get"], [CODEX_PATHS.sessionById, "get"], [CODEX_PATHS.questById, "get"], [CODEX_PATHS.standing, "get"], [CODEX_PATHS.calendar, "get"], [CODEX_ASSET_PATHS.content, "get"]] as const) {
+    for (const [path, method] of [[CODEX_PATHS.pages, "get"], [CODEX_PATHS.pageById, "get"], [CODEX_PATHS.search, "get"], [CODEX_PATHS.connections, "get"], [CODEX_PATHS.maps, "get"], [CODEX_PATHS.mapMarkers, "get"], [CODEX_PATHS.journal, "get"], [CODEX_PATHS.timeline, "get"], [CODEX_PATHS.sessionById, "get"], [CODEX_PATHS.questById, "get"], [CODEX_PATHS.standing, "get"], [CODEX_PATHS.calendar, "get"], [CODEX_ASSET_PATHS.content, "get"]] as const) {
       expect(paths[path][method].security, `${method} ${path}`).toEqual(roleRead);
     }
     // GM-GRADE reads: organizational, historical, and backup surfaces have no player branch at all.
@@ -209,7 +209,8 @@ describe("public API contracts", () => {
     const schemas = openApiDocument.components.schemas as unknown as Record<string, Schema>;
     const wrappers = Object.keys(schemas).filter((name) => name.startsWith("Codex") && name.endsWith("Projected"));
     // Ten role-projected record kinds today. Pinned so deleting a wrapper cannot silently empty this test.
-    expect(wrappers).toHaveLength(10);
+    // D8 added `CodexConnectionProjected` and `CodexPageConnectionProjected` to the ten Lane A published.
+    expect(wrappers).toHaveLength(12);
     for (const wrapper of wrappers) {
       const branches = schemas[wrapper].oneOf ?? [];
       expect(branches.map((branch) => branch.$ref), wrapper).toEqual([
