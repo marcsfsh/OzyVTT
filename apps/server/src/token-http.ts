@@ -27,9 +27,16 @@ function viewerCookie(request: Request) {
   }
   return undefined;
 }
+/**
+ * ADR-0016 §2's exact rule, shared with every other `/api/v1` router: echo a UUID **v4**, replace
+ * anything else. This used to test `/^[0-9a-f-]{36}$/i`, which admits `aaaaaaaa-…-aaaa` and a row of 36
+ * hyphens — no forgery surface (the charset excludes everything a log line could be broken with), but
+ * not the rule the ADR states, and "nearly the rule" is how six routers become five.
+ */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function requestId(request: Request, response: Response) {
   const supplied = request.header("x-request-id");
-  const id = supplied && /^[0-9a-f-]{36}$/i.test(supplied) ? supplied : randomUUID();
+  const id = supplied && UUID_V4.test(supplied) ? supplied : randomUUID();
   response.setHeader("x-request-id", id); response.setHeader("cache-control", "no-store");
   return id;
 }

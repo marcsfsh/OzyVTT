@@ -61,9 +61,21 @@ function viewerToken(request: Request) {
   return bearer(request) ?? cookies(request).vtt_viewer_session;
 }
 
+/**
+ * ADR-0016 §2, which this router was the last `/api/v1` surface not to keep: a caller-supplied
+ * `X-Request-Id` is echoed **only when it is a UUID v4**, and replaced otherwise.
+ *
+ * It used to accept any `[A-Za-z0-9._:-]{1,128}` string and echo it verbatim. Nothing in the app sends
+ * the header at all, so no caller loses anything — but the id lands in the response body and in logs,
+ * and echoing arbitrary caller text into both is how a log line becomes a forgery. Every other router
+ * (`api-v1`, `game-http`, `codex-http`, `homebrew-http`, `map-http`, `token-http`) already refused it on
+ * exactly that reasoning; this one now agrees, so the ADR's normative clause and the generated reference
+ * are true of the whole surface rather than of six sevenths of it.
+ */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function requestId(request: Request, response: Response) {
   const supplied = request.header("x-request-id");
-  const id = supplied && /^[A-Za-z0-9._:-]{1,128}$/.test(supplied) ? supplied : randomUUID();
+  const id = supplied && UUID_V4.test(supplied) ? supplied : randomUUID();
   response.setHeader("x-request-id", id);
   response.setHeader("cache-control", "no-store");
   return id;
