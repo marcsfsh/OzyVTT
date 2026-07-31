@@ -2596,6 +2596,24 @@ Drops a marker on a map.
 
 **Responses:** `201` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
+### `GET /api/v1/codex/party`
+
+Where the party pin is, and the name of the map it sits on - one read for the dashboard's "party is here" card and the atlas jump, replacing a client-side scan of every map. `party` is null when no pin carries the flag. For a player it is ALSO null when the party pin fails the ordinary compound reveal gate (the pin revealed AND its map revealed) - null rather than 404, so a hidden party pin is indistinguishable from no party pin at all. `isParty` grants no visibility and never enters a reveal predicate.
+
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexPartyLocationData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
+
+### `GET /api/v1/codex/markers/{id}`
+
+One pin, projected for the caller. A player receives it only when the pin is revealed AND its map is revealed - the CD-6 compound gate, the same predicate `GET /codex/maps/{id}/markers` applies before it projects anything - with `pageIds` filtered to the revealed subset and scene/actor links stripped. Either half failing is a 404, never a 403: a pin id must not become a probe for "is there something here?". This is what lets a reader resolve a pin without walking every map.
+
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexMarkerProjectedData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
+
 ### `PATCH /api/v1/codex/markers/{id}`
 
 Edits a marker's icon/label/links.
@@ -3652,6 +3670,12 @@ One of the following:
 - `CodexMarker`
 - `CodexMarkerPlayer`
 
+### `CodexMarkerProjectedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `marker` | CodexMarkerProjected | yes |  |
+
 ### `CodexMilestoneInput`
 
 CT-8: the milestone facts themselves. Exactly two - the spec says "milestone / level history … no XP arithmetic", so there is no XP total, no threshold and no next level.
@@ -3793,6 +3817,21 @@ One of the following:
 
 - `CodexPageSummary`
 - `CodexPageSummaryPlayer`
+
+### `CodexPartyLocation`
+
+The party pin and the map it is on. `marker.mapId` is the jump target; `mapName` rides along so a caller needs no second fetch to label the card.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `marker` | CodexMarkerProjected | yes |  |
+| `mapName` | string | yes |  |
+
+### `CodexPartyLocationData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `party` | CodexPartyLocation \| null | yes | Null when there is no party pin - or, for a player, when the party pin is not visible to them. |
 
 ### `CodexPreviewSessionData`
 

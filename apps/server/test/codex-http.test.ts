@@ -1961,3 +1961,127 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     expect((await settings(base, GM)).revisionHistory.versionCount).toBe(1);
   });
 });
+
+/**
+ * D15: resolving a pin without walking the atlas. Two reads, one gate.
+ *
+ * The gate is the CD-6 COMPOUND predicate - the pin revealed AND its map revealed - copied from
+ * `GET /codex/maps/{id}/markers` rather than re-derived, because a second copy of a visibility rule is a
+ * second thing to weaken alone. The two routes answer the failure differently on purpose, and the
+ * difference is the interesting part: the by-id read 404s (a pin id must not become a probe), and the
+ * party read answers `null` (a 404 there would distinguish "there is a party pin you may not see" from
+ * "there is no party pin", which is precisely the bit `isParty` must never grant).
+ */
+describe("codex pin-by-id and party location, HTTP boundary (D15)", () => {
+  const seed = async (base: string, store: CodexStore) => {
+    const page = store.createPage({ title: "Vallaki", playerBody: "a walled town" });
+    const secretPage = store.createPage({ title: "The Ambush", gmBody: "here" });
+    const map = store.createMap({ assetId: randomUUID(), name: "Barovia", kind: "regional" });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label: "Village", pageIds: [page.id, secretPage.id], tags: ["stop"] });
+    store.setPageRevealed(page.id, true);
+    void base;
+    return { page, secretPage, map, marker };
+  };
+
+  it("gives a player a revealed pin on a revealed map, with links filtered and GM linkage stripped", async () => {
+    const { base, store } = await fixture();
+    const { page, map, marker } = await seed(base, store);
+    store.setMapRevealed(map.id, true);
+    store.setMarkerRevealed(marker.id, true);
+
+    const gm = (await body(await get(base, `/api/v1/codex/markers/${marker.id}`, GM))).data.marker as Json;
+    expect(gm.mapId).toBe(map.id);
+    expect(gm.pageIds).toHaveLength(2);
+
+    const player = (await body(await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER))).data.marker as Json;
+    // The EXACT key set: `sceneIds`, `actorId`, `revealedToPlayers` and the timestamps are absent by
+    // construction, and `pageIds` carries only the page the player can actually open.
+    expect(Object.keys(player).sort()).toEqual(["iconColor", "iconId", "id", "isParty", "label", "mapId", "pageIds", "subMapId", "tags", "x", "y"]);
+    expect(player.pageIds).toEqual([page.id]);
+  });
+
+  it("404s a player on a hidden pin, on a pin sitting on a hidden map, and on a bogus id - the same body each time", async () => {
+    const { base, store } = await fixture();
+    const { map, marker } = await seed(base, store);
+
+    const bodies: string[] = [];
+    // Pin hidden, map hidden.
+    let response = await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER);
+    expect(response.status).toBe(404);
+    bodies.push(JSON.stringify((await body(response)).error.message));
+
+    // Pin REVEALED, map still hidden - the compound half that a marker-flag-only gate would miss. The GM
+    // can read it throughout, so these 404s are the gate and not a broken route.
+    store.setMarkerRevealed(marker.id, true);
+    response = await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER);
+    expect(response.status, "a revealed pin on a SECRET map is invisible - CD-6").toBe(404);
+    bodies.push(JSON.stringify((await body(response)).error.message));
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, GM)).status).toBe(200);
+
+    // An id that names nothing at all.
+    response = await get(base, `/api/v1/codex/markers/${randomUUID()}`, PLAYER);
+    expect(response.status).toBe(404);
+    bodies.push(JSON.stringify((await body(response)).error.message));
+    // Identical bodies: a hidden pin must be indistinguishable from one that never existed.
+    expect(new Set(bodies).size, "the three 404s must not be tellable apart").toBe(1);
+
+    // Revealing the MAP lets it through, so all of the above is the gate rather than a route that never works.
+    store.setMapRevealed(map.id, true);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).status).toBe(200);
+  });
+
+  it("answers the party read with null - never a 404 - when there is no party pin or the player may not see it", async () => {
+    const { base, store } = await fixture();
+    const { map, marker } = await seed(base, store);
+
+    // No party pin at all: both roles get exactly `{ party: null }`.
+    for (const headers of [GM, PLAYER]) {
+      const response = await get(base, "/api/v1/codex/party", headers);
+      expect(response.status).toBe(200);
+      expect((await body(response)).data).toEqual({ party: null });
+    }
+
+    store.setPartyMarker(marker.id);
+    // The GM sees it immediately - reveal state is not the GM's gate.
+    const gmParty = (await body(await get(base, "/api/v1/codex/party", GM))).data.party as Json;
+    expect(gmParty.mapName).toBe("Barovia");
+    expect(gmParty.marker.mapId, "the jump target rides on the marker, not as a sibling key").toBe(map.id);
+
+    // The player gets null while the pin is hidden - INDISTINGUISHABLE from "no party pin", which is the
+    // point: `isParty` must never enter a visibility predicate.
+    expect((await body(await get(base, "/api/v1/codex/party", PLAYER))).data).toEqual({ party: null });
+    store.setMarkerRevealed(marker.id, true);
+    expect((await body(await get(base, "/api/v1/codex/party", PLAYER))).data, "a revealed pin on a hidden map is still null").toEqual({ party: null });
+
+    store.setMapRevealed(map.id, true);
+    const shown = (await body(await get(base, "/api/v1/codex/party", PLAYER))).data.party as Json;
+    expect(shown.mapName).toBe("Barovia");
+    expect(shown.marker.isParty).toBe(true);
+    // `mapName` only ever travels with a projected pin, which requires the map to be revealed - so it can
+    // never name a map the player has not been shown.
+    expect(Object.keys(shown).sort()).toEqual(["mapName", "marker"]);
+  });
+
+  it("serves both reads with an ETag that differs per role and answers 304 to a match", async () => {
+    const { base, store } = await fixture();
+    const { map, marker } = await seed(base, store);
+    store.setMapRevealed(map.id, true);
+    store.setMarkerRevealed(marker.id, true);
+
+    const first = await get(base, `/api/v1/codex/markers/${marker.id}`, GM);
+    const tag = first.headers.get("etag")!;
+    expect(tag).toMatch(/^W\/"codex-r\d+-gm"$/);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...GM, "if-none-match": tag })).status).toBe(304);
+    // A player's tag is a DIFFERENT one, so no cache can hand a GM's answer to a player.
+    const playerTag = (await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).headers.get("etag")!;
+    expect(playerTag).not.toBe(tag);
+    // ...and a write moves the revision, so the old tag stops matching.
+    store.updateMarker(marker.id, { label: "The Village" });
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...GM, "if-none-match": tag })).status).toBe(200);
+
+    // A player's conditional probe of a HIDDEN pin still 404s - the gate runs before the tag, so a
+    // conditional request can never turn a 404 into a 304 and confirm the pin exists unchanged.
+    store.setMarkerRevealed(marker.id, false);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...PLAYER, "if-none-match": playerTag })).status).toBe(404);
+  });
+});

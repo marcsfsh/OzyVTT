@@ -87,6 +87,7 @@ export const CODEX_PATHS = {
   // M12 (CT-7): the party pin is an ORDINARY marker with a flag, so it has exactly one route of its own -
   // the flag - and is moved, revealed and deleted through the marker routes directly above.
   markerParty: `${API_NAMESPACE}/codex/markers/{id}/party`,
+  party: `${API_NAMESPACE}/codex/party`,
   timeline: `${API_NAMESPACE}/codex/timeline`,
   journal: `${API_NAMESPACE}/codex/journal`,
   // M11 (CT-5/CT-10): literal segments, declared BEFORE the `{id}` family so the router registers them
@@ -1351,7 +1352,9 @@ export const openApiDocument = {
       get: codexOp("listCodexMarkers", codexRead, "CodexMarkerListResponse", { notModified: true, bad: false, notFound: true, params: [uuidParam("id")], description: "Markers on a map, role-scoped (a player only for a revealed map, and each pin's links filtered to the revealed subset)." }),
       post: codexOp("createCodexMarker", codexWrite, "CodexMarkerResponse", { ok: "201", body: "CodexMarkerCreateRequest", params: [uuidParam("id")], notFound: true, description: "Drops a marker on a map." })
     },
+    [CODEX_PATHS.party]: { get: codexOp("getCodexPartyLocation", codexRead, "CodexPartyLocationResponse", { notModified: true, bad: false, description: "Where the party pin is, and the name of the map it sits on - one read for the dashboard's \"party is here\" card and the atlas jump, replacing a client-side scan of every map. `party` is null when no pin carries the flag. For a player it is ALSO null when the party pin fails the ordinary compound reveal gate (the pin revealed AND its map revealed) - null rather than 404, so a hidden party pin is indistinguishable from no party pin at all. `isParty` grants no visibility and never enters a reveal predicate." }) },
     [CODEX_PATHS.markerById]: {
+      get: codexOp("getCodexMarker", codexRead, "CodexMarkerProjectedResponse", { notModified: true, bad: false, notFound: true, params: [uuidParam("id")], description: "One pin, projected for the caller. A player receives it only when the pin is revealed AND its map is revealed - the CD-6 compound gate, the same predicate `GET /codex/maps/{id}/markers` applies before it projects anything - with `pageIds` filtered to the revealed subset and scene/actor links stripped. Either half failing is a 404, never a 403: a pin id must not become a probe for \"is there something here?\". This is what lets a reader resolve a pin without walking every map." }),
       patch: codexOp("updateCodexMarker", codexWrite, "CodexMarkerResponse", { body: "CodexMarkerUpdateRequest", params: [uuidParam("id")], notFound: true, description: "Edits a marker's icon/label/links." }),
       delete: codexOp("deleteCodexMarker", codexWrite, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a marker; idempotent." })
     },
@@ -1806,6 +1809,13 @@ export const openApiDocument = {
       CodexMarkerListData: codexDataObject("markers", codexArrayRef("CodexMarkerProjected")),
       CodexMarkerListResponse: envelopeSchema("#/components/schemas/CodexMarkerListData"),
       CodexMarkerData: codexDataObject("marker", { $ref: "#/components/schemas/CodexMarker" }),
+      // D15: the role-projected single-pin read. `CodexMarkerData` above stays GM-shaped because every
+      // route that uses it is a WRITE answering the GM; this is the read, and it has a player branch.
+      CodexMarkerProjectedData: codexDataObject("marker", { $ref: "#/components/schemas/CodexMarkerProjected" }),
+      CodexMarkerProjectedResponse: envelopeSchema("#/components/schemas/CodexMarkerProjectedData"),
+      CodexPartyLocation: { type: "object", additionalProperties: false, description: "The party pin and the map it is on. `marker.mapId` is the jump target; `mapName` rides along so a caller needs no second fetch to label the card.", required: ["marker", "mapName"], properties: { marker: { $ref: "#/components/schemas/CodexMarkerProjected" }, mapName: { type: "string" } } },
+      CodexPartyLocationData: { type: "object", additionalProperties: false, required: ["party"], properties: { party: { oneOf: [{ $ref: "#/components/schemas/CodexPartyLocation" }, { type: "null" }], description: "Null when there is no party pin - or, for a player, when the party pin is not visible to them." } } },
+      CodexPartyLocationResponse: envelopeSchema("#/components/schemas/CodexPartyLocationData"),
       CodexMarkerResponse: envelopeSchema("#/components/schemas/CodexMarkerData"),
       CodexJournalListData: codexDataObject("entries", codexArrayRef("CodexJournalEntryProjected")),
       CodexJournalListResponse: envelopeSchema("#/components/schemas/CodexJournalListData"),

@@ -876,6 +876,69 @@ export function createCodexRouter(options: CodexRouterOptions) {
     catch (error) { return codexError(response, error); }
   });
 
+  /**
+   * D15: WHERE IS THE PARTY - one read, for the dashboard card and the atlas jump.
+   *
+   * Registered before every `/markers/:id` route below it. `/codex/party` is a literal segment under
+   * `/codex/`, so nothing could swallow it either way, but the literals-before-params house rule is what
+   * keeps that true when a `/codex/:something` route eventually exists.
+   *
+   * It replaces a client-side scan of every map looking for the flagged pin. The server already knows -
+   * `partyMarker()` is one indexed read against the partial unique index that makes "exactly one party
+   * pin" structural - and the resolution belongs on the side that owns the answer.
+   *
+   * The player answer is NULL rather than a 404 when the pin is not visible, and that is the whole
+   * viewer-safety argument: a 404 would distinguish "there is a party pin you may not see" from "there is
+   * no party pin", which is exactly the bit `isParty` must never grant. Null says neither. The pin itself
+   * goes through `projectPlayerPageMarker`, so `isParty` still grants no visibility of its own - a hidden
+   * party pin, or one on a hidden map, is as hidden as any other.
+   *
+   * `mapName` is safe for the same structural reason: it is only ever sent when the projection succeeded,
+   * which requires the map to be revealed - and a revealed map's name is already in `GET /codex/maps`.
+   */
+  router.get(`${CODEX_BASE}/party`, (request, response) => {
+    const role = readGrade(request, response);
+    if (!role) return;
+    const marker = store.partyMarker();
+    const map = marker ? store.getMap(marker.mapId) : null;
+    if (!marker || !map) return readEnvelope(request, response, role, { party: null });
+    if (role === "gm") return readEnvelope(request, response, role, { party: { marker: projectGmMarker(marker), mapName: map.name } });
+    const projected = projectPlayerPageMarker({
+      marker,
+      mapRevealed: map.revealedToPlayers,
+      revealedPageIds: revealedPageIdsIn(store, marker.pageIds),
+      subMapRevealed: marker.subMapId ? (store.getMap(marker.subMapId)?.revealedToPlayers ?? false) : false
+    });
+    return readEnvelope(request, response, role, { party: projected === null ? null : { marker: projected, mapName: map.name } });
+  });
+
+  /**
+   * D15: ONE pin, by id - what lets a reader resolve a pin without walking every map.
+   *
+   * The player gate is COPIED, not invented: `projectPlayerPageMarker` is `projectPlayerMarker` plus the
+   * map gate, which is the identical CD-6 compound predicate `GET /codex/maps/{id}/markers` applies
+   * before it projects a single pin. Either half failing is a **404, never a 403** - arriving by id must
+   * not become a probe for "is there something here?", and the body is the same one a bogus id gets.
+   *
+   * Registered BEFORE `PATCH /markers/:id` only for readability; Express matches on method, so the order
+   * of a GET against a PATCH is immaterial. The order that matters is literal-before-param, above.
+   */
+  router.get(`${CODEX_BASE}/markers/:id`, (request, response) => {
+    const role = readGrade(request, response);
+    if (!role) return;
+    const marker = store.getMarker(pathParam(request, "id"));
+    if (!marker) return failure(response, 404, "not_found", "That pin was not found.");
+    if (role === "gm") return readEnvelope(request, response, role, { marker: projectGmMarker(marker) });
+    const projected = projectPlayerPageMarker({
+      marker,
+      mapRevealed: store.getMap(marker.mapId)?.revealedToPlayers ?? false,
+      revealedPageIds: revealedPageIdsIn(store, marker.pageIds),
+      subMapRevealed: marker.subMapId ? (store.getMap(marker.subMapId)?.revealedToPlayers ?? false) : false
+    });
+    if (!projected) return failure(response, 404, "not_found", "That pin was not found.");
+    return readEnvelope(request, response, role, { marker: projected });
+  });
+
   router.patch(`${CODEX_BASE}/markers/:id`, requireWrite, (request, response) => {
     try { const marker = store.updateMarker(pathParam(request, "id"), MarkerUpdateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }

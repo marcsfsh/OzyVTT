@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 8 GameState fields · 76 commands · 178 HTTP paths
+- 8 GameState fields · 76 commands · 179 HTTP paths
 
 ## GameState shape
 
@@ -138,7 +138,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET POST /api/v1/codex/maps/{id}/markers`
 - `POST /api/v1/codex/maps/{id}/parent`
 - `POST /api/v1/codex/maps/{id}/reveal`
-- `DELETE PATCH /api/v1/codex/markers/{id}`
+- `DELETE GET PATCH /api/v1/codex/markers/{id}`
 - `POST /api/v1/codex/markers/{id}/move`
 - `PUT /api/v1/codex/markers/{id}/party`
 - `POST /api/v1/codex/markers/{id}/reveal`
@@ -150,6 +150,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/codex/pages/{id}/reveal`
 - `GET /api/v1/codex/pages/{id}/revisions`
 - `POST /api/v1/codex/pages/{id}/revisions/{revisionId}/restore`
+- `GET /api/v1/codex/party`
 - `POST /api/v1/codex/preview-session`
 - `GET POST /api/v1/codex/quests`
 - `DELETE GET PATCH /api/v1/codex/quests/{id}`

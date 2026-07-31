@@ -380,11 +380,11 @@ describe("codex responses validate against the schemas the document publishes", 
     const entries = (await body(await get(base, "/api/v1/codex/journal", GM))).data.entries as Json[];
     for (const entry of entries.filter((row) => row.kind === "standing")) await reveal(`/api/v1/codex/journal/${entry.id}/reveal`);
 
-    return { base, store, shownId, mapId, sessionId, questId };
+    return { base, store, shownId, mapId, markerId, sessionId, questId };
   }
 
   it("validates every role-projected read, for a GM and for a player, against its published schema", async () => {
-    const { base, shownId, mapId, sessionId, questId } = await populated();
+    const { base, shownId, mapId, markerId, sessionId, questId } = await populated();
     // The third element names a list `data` key that must be NON-EMPTY for both roles. A schema check
     // over an empty array proves nothing, and "the player got nothing back" is precisely how a
     // role-projected read test passes while describing a projection it never exercised.
@@ -404,7 +404,12 @@ describe("codex responses validate against the schemas the document publishes", 
       [CODEX_PATHS.questById, `/api/v1/codex/quests/${questId}`],
       [CODEX_PATHS.standing, "/api/v1/codex/standing", "standing"],
       [CODEX_PATHS.calendar, "/api/v1/codex/calendar"],
-      [CODEX_PATHS.search, "/api/v1/codex/search?q=barovia", "hits"]
+      [CODEX_PATHS.search, "/api/v1/codex/search?q=barovia", "hits"],
+      // D15's two new role-projected reads. Both are seeded in `populated()` above: the marker is
+      // revealed on a revealed map, and it carries the party flag, so BOTH roles get a non-null body and
+      // the player branch of each component is genuinely exercised rather than trivially satisfied.
+      [CODEX_PATHS.markerById, `/api/v1/codex/markers/${markerId}`],
+      [CODEX_PATHS.party, "/api/v1/codex/party"]
     ];
     for (const [contractPath, url, nonEmpty] of reads) {
       const component = documentedResponse(contractPath);
