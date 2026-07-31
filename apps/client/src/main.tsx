@@ -74,6 +74,19 @@ function App() {
   const playerView: "table" | "codex" = route.segments[0] === "codex" ? "codex" : "table";
   /** The player is READING the Codex, so the table's own furniture above it is not what they asked for. */
   const playerCodexOpen = mode === "player" && playerView === "codex";
+  /**
+   * D3 — an address the app does not answer, for a signed-in GM. Two rules, and the second was missing.
+   *
+   * (1) **Inside the Codex, `CodexShell` owns not-found.** The sidebar stays up, so a GM who followed a
+   *     stale bookmark can navigate out of it instead of being handed a dead end. The app shell must
+   *     therefore stand down on any `/codex/*` address, or both render and the GM reads the same
+   *     heading, paragraph and pair of buttons twice, in two `role="status"` regions.
+   * (2) **Outside it, the tab arms must stand down.** `gmTabForPath` falls back to "table" for an
+   *     address it does not recognise, so `/nonsense` painted the whole encounter table — map, panel,
+   *     dice, combat log — underneath the not-found card with the Encounter tab lit. That is the
+   *     lit-tab lie D1 was raised to kill, one level up from where it was killed.
+   */
+  const gmAddressUnknown = !isKnownPath(route.path) && route.segments[0] !== "codex";
   const [state, setState] = useState<PlayerView | GmView | null>(null);
   const [notice, setNotice] = useState<NoticeMessage>(null);
   const [password, setPassword] = useState("");
@@ -368,7 +381,7 @@ function App() {
       />}
       {/* D3: an address the app does not answer, and a GM-only address asked for by a player, both land
           here — indistinguishable on purpose (invariant §3.2). */}
-      {mode === "gm" && gmToken && !isKnownPath(route.path) && <NotFoundView role="gm" />}
+      {mode === "gm" && gmToken && gmAddressUnknown && <NotFoundView role="gm" />}
 
       {/* D4 — the player Codex is a VIEW of the player app now, not a modal over the table. The two
           are a switcher, at real addresses (`/table` and `/codex/*`), so the Android back gesture walks
@@ -390,7 +403,7 @@ function App() {
           and from a genuinely unknown address (invariant §3.2). */}
       {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundView role="player" />}
 
-      {((mode === "player" && playerView === "table" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
+      {((mode === "player" && playerView === "table" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
         <section className="table" ref={measureTablePanel}>
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
               Guarded on the field, not just the mode - the first state after login can still be
@@ -445,7 +458,7 @@ function App() {
         </div>
       </div>}
 
-      {mode === "gm" && gmToken && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view">
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view">
         {scenesView === "maps"
           ? <div className="scenes-maps-view">
               <Button variant="ghost" className="scenes-back" onClick={() => setScenesView("gallery")}>← Back to scenes</Button>
@@ -454,10 +467,10 @@ function App() {
           : <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => setScenesView("maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={(text) => setNotice({ tone: "error", text })} />}
       </div>}
 
-      {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
-      {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
-      {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} openArchiveId={replayArchiveId} onOpenedArchive={() => navigate("/replays", { replace: true })} /></div>}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} openArchiveId={replayArchiveId} onOpenedArchive={() => navigate("/replays", { replace: true })} /></div>}
       {mode === "gm" && gmToken && route.segments[0] === "codex" && <div className="anim-view codex-anim"><CodexShell gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
         actors={(state as GmView | null)?.actors?.map((actor) => ({ id: actor.id, name: actor.name })) ?? []}
@@ -465,7 +478,7 @@ function App() {
         onActivateScene={(sceneId: string) => { makeSceneLive(sceneId); navigate(pathForGmTab("table")); }}
         onOpenReplay={(archiveId: number) => navigate(`/replays?archive=${archiveId}`)} /></div>}
 
-      {mode === "gm" && gmToken && gmTab === "homebrew" && <div className="anim-view"><HomebrewPanel gmToken={gmToken} /></div>}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "homebrew" && <div className="anim-view"><HomebrewPanel gmToken={gmToken} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview &&<ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
@@ -477,7 +490,7 @@ function App() {
         <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} hideHeading onNewScene={() => { setScenesModalOpen(false); setScenePrepOpen(true); }} onManageMaps={() => { setScenesModalOpen(false); navigate("/scenes?view=maps"); }} onClose={() => setScenesModalOpen(false)} onFeedback={(text) => setNotice({ tone: "error", text })} />
       </Modal>}
 
-      {mode === "gm" && gmToken && gmTab === "setup" && <div className="anim-view">
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "setup" && <div className="anim-view">
         <section className="setup-appearance"><span className="eyebrow">APPEARANCE</span><ThemeToggle /></section>
         <IntegrationsPanel gmToken={gmToken} />
         <section className="gm-session-controls"><Button variant="secondary" onClick={signOutGm} disabled={busy}>Sign out</Button><Button variant="destructive" onClick={revokeAllGmSessions} disabled={busy}>Revoke all GM sessions</Button></section>

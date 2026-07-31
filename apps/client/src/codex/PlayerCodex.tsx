@@ -224,7 +224,11 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
       <div className="codex-shell-main">
         <div className="codex-topbar">
           <IconButton label="Codex sections" className="codex-topbar-menu" onClick={openDrawer}><CodexIcon iconId="menu" className="codex-navitem-icon" /></IconButton>
-          <h2 className="codex-topbar-title">{section ? SECTION_TITLE[section] : "Codex"}</h2>
+          {/* Invariant §3.2, and the one place it leaked: a GM-only address must be INDISTINGUISHABLE from an
+              address the app does not answer. `gmOnly` gated the body but not the heading, so a player who
+              opened /codex/audit read "Reveal audit" above the not-found view while /codex/zzz read
+              "Codex" — three GM surfaces confirmed to exist, and named, by address alone. */}
+          <h2 className="codex-topbar-title">{section && !gmOnly ? SECTION_TITLE[section] : "Codex"}</h2>
           <div className="codex-topbar-actions">
             <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}><CodexIcon iconId="search" className="codex-navitem-icon" /></IconButton>
           </div>

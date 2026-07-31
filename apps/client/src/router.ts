@@ -14,6 +14,10 @@
  */
 
 import { useSyncExternalStore } from "react";
+// The Codex owns its own address space (`codex/routes.ts`); this module asks it rather than keeping a
+// second copy of the rules. The cycle back through `withQuery` is import-time-safe: nothing in either
+// module calls across the boundary while the modules are still evaluating.
+import { codexSectionOf } from "./codex/routes";
 
 export type Route = Readonly<{
   /** The pathname, always leading-slash, never trailing-slash (except the bare root). */
@@ -257,21 +261,19 @@ export function isGmOnlyPath(path: string): boolean {
   return tab !== null && tab !== "codex";
 }
 
-/** Every address the app answers, for the not-found decision. Anything else renders "nothing lives here". */
+/**
+ * Every address the app answers, for the not-found decision. Anything else renders "nothing lives here".
+ *
+ * The codex half asks `codexSectionOf` rather than re-deciding: two implementations of one address space
+ * disagreed on `/codex/tags` and `/codex/journal/j1`, and a disagreement between "does this exist" and
+ * "what does it render" puts a not-found card on top of a working surface. `router.test.ts` asserts the
+ * two answers stay locked together over the whole table.
+ */
 export function isKnownPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
   if (segments.length === 0) return true;
   if (segments[0] === "table") return segments.length === 1;
-  if (segments[0] === "codex") {
-    if (segments.length === 1) return true;
-    const section = segments[1];
-    const withRecord = ["pages", "atlas", "sessions", "quests"];
-    const bare = ["journal", "calendar", "downtime", "graph", "audit", "backup", "settings"];
-    if (section === "tags") return segments.length === 3;
-    if (withRecord.includes(section)) return segments.length <= 3;
-    if (bare.includes(section)) return segments.length === 2;
-    return false;
-  }
+  if (segments[0] === "codex") return codexSectionOf(segments) !== null;
   return gmTabForPath(path) !== null && segments.length === 1;
 }
 
@@ -297,6 +299,11 @@ export function resumeTarget(role: "gm" | "player", currentPath: string): string
   if (currentPath !== "/") return null;
   const stored = lastLocation(role);
   const fallback = role === "gm" ? "/encounter" : "/table";
-  const target = stored && isKnownPath(stored.split("?")[0]) ? stored : fallback;
+  // A player is never resumed onto a GM-only address. The not-found view would catch it, but being
+  // *sent* there on sign-in is a worse shape than deep-linking there deliberately: the app would be
+  // volunteering the address rather than declining to answer it.
+  const path = stored?.split("?")[0] ?? "";
+  const usable = stored && isKnownPath(path) && !(role === "player" && isGmOnlyPath(path));
+  const target = usable ? stored : fallback;
   return target === "/" ? fallback : target;
 }

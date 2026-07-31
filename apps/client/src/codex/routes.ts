@@ -29,13 +29,29 @@ export function pathForSection(section: CodexSection): string {
  * Which section an address renders, or null when the address is not in the Codex at all.
  * An unknown child of `/codex` is null too — the shell then shows the not-found view (invariant §3.2:
  * an address must never confirm that a surface exists).
+ *
+ * **The segment COUNT is part of the answer**, and it did not used to be. This checked `segments[1]`
+ * only, while `isKnownPath` counted segments, so the two disagreed on real addresses: `/codex/tags`
+ * rendered a TagView headed "#" with "Nothing carries this tag yet.", and `/codex/journal/j1` rendered
+ * a fully working Journal — each underneath an app-shell not-found card, because the router had
+ * correctly decided the address does not exist. `router.test.ts` locks the two answers together.
  */
 export function codexSectionOf(segments: readonly string[]): CodexSection | null {
   if (segments[0] !== "codex") return null;
   if (segments.length === 1) return "home";
   const candidate = segments[1] as CodexSection;
-  return (CODEX_SECTION_IDS as readonly string[]).includes(candidate) ? candidate : null;
+  // A tag address must actually name a tag; a record section may carry one id and no more; everything
+  // else is exactly its own two segments. A fourth segment is never an address.
+  if (candidate === "tags") return segments.length === 3 ? "tags" : null;
+  if ((RECORD_SECTION_IDS as readonly string[]).includes(candidate)) return segments.length <= 3 ? candidate : null;
+  if ((BARE_SECTION_IDS as readonly string[]).includes(candidate)) return segments.length === 2 ? candidate : null;
+  return null;
 }
+
+/** Sections whose address may carry one record id: `/codex/pages/:id`. */
+export const RECORD_SECTION_IDS: readonly CodexSection[] = ["pages", "atlas", "sessions", "quests"];
+/** Sections that are exactly their own address — the journal focuses an entry with `?entry=`, not a segment. */
+export const BARE_SECTION_IDS: readonly CodexSection[] = ["journal", "calendar", "downtime", "graph", "audit", "backup", "settings"];
 
 const CODEX_SECTION_IDS: readonly CodexSection[] = [
   "pages", "atlas", "graph", "sessions", "quests", "journal", "calendar", "downtime", "tags", "audit", "backup", "settings"

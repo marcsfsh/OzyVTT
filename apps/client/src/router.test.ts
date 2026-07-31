@@ -4,6 +4,7 @@ import {
   currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, navigate, pathForGmTab,
   popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, useRoute, withQuery
 } from "./router";
+import { codexSectionOf } from "./codex/routes";
 import { goTo } from "../test/route";
 
 /**
@@ -64,6 +65,31 @@ describe("Which addresses exist (D3)", () => {
 
   it("does not accept a fourth segment anywhere", () => {
     expect(isKnownPath("/codex/pages/p1/edit")).toBe(false);
+  });
+
+  /**
+   * **"Does this address exist" and "what does it render" must be the same answer.**
+   *
+   * They were two implementations and they disagreed. `isKnownPath` counted segments; `codexSectionOf`
+   * looked only at `segments[1]`. So `/codex/tags` was unknown to the router and "the tag view" to the
+   * shell, and `/codex/journal/j1` was unknown to the router and "the journal" to the shell — each
+   * rendering a live, working surface underneath an app-shell not-found card. `isKnownPath` now asks
+   * `codexSectionOf`, and this pins the two together over the whole space.
+   */
+  it("answers 'exists' and 'renders' identically for every codex address shape", () => {
+    const addresses = [
+      "/codex", "/codex/pages", "/codex/pages/p1", "/codex/pages/p1/edit",
+      "/codex/atlas", "/codex/atlas/m1", "/codex/sessions/s1", "/codex/quests/q1",
+      "/codex/journal", "/codex/journal/j1", "/codex/calendar", "/codex/calendar/x",
+      "/codex/downtime", "/codex/graph", "/codex/graph/g1",
+      "/codex/audit", "/codex/backup", "/codex/settings", "/codex/settings/anything",
+      "/codex/tags", "/codex/tags/dark-gift", "/codex/tags/a/b",
+      "/codex/lore", "/codex/notebook", "/codex/relationships"
+    ];
+    for (const address of addresses) {
+      const renders = codexSectionOf(address.split("/").filter(Boolean)) !== null;
+      expect(isKnownPath(address), `${address} — router says ${isKnownPath(address)}, shell says ${renders}`).toBe(renders);
+    }
   });
 });
 
