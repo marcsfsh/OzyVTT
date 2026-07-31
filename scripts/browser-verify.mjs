@@ -8,7 +8,10 @@
  * pushed off-screen, or that the page does not scroll sideways. This script exercises exactly those.
  *
  * It is a MANUAL audit, not a test: it needs a browser and a populated server, so it is deliberately
- * not wired into `npm test`. Run it against a throwaway data dir — the restore check WRITES.
+ * not wired into `npm test`. **Run it against a throwaway data dir — this pass WRITES**: it quick-creates
+ * a page and edits a quest title to prove autosave round-trips. It does NOT perform a restore; the
+ * Backup check opens the restore confirmation, reads the inventory and cancels, because a real restore
+ * would replace the seeded campaign the twenty checks before it depend on.
  *
  *   DATA_DIR=/tmp/vtt-verify PORT=3011 node --import tsx apps/server/src/index.ts &
  *   node scripts/seed-codex.mjs
@@ -98,6 +101,7 @@ async function go(page, path) {
  * first and forcing is right here and only here — every check that follows does its own real assertion
  * on the resulting state, so a click that "worked" but reached nothing still fails.
  */
+const dispatched = [];
 async function navClick(locator) {
   await locator.waitFor({ state: "visible", timeout: 15_000 });
   await locator.scrollIntoViewIfNeeded();
@@ -108,6 +112,13 @@ async function navClick(locator) {
     // scrollport — which at 375px sits over the Codex top bar's coordinates — received the click
     // instead. Dispatching on the element is the honest fallback for a NAVIGATION click; every check
     // still asserts the resulting state, so a click that reached nothing fails anyway.
+    //
+    // But it is RECORDED. Dispatching bypasses hit-testing entirely, which means no check that uses it
+    // can ever fail on an occluded control — and an occluded control on a phone is a real defect. The
+    // run reports how many clicks were only reachable this way, so the number is visible rather than
+    // absorbed. Silence here is what let "no phone-viewport check can fail when a control is occluded"
+    // be true and invisible at the same time.
+    dispatched.push(`[${currentViewport}] ${await locator.evaluate((node) => (node.getAttribute("aria-label") || node.textContent || node.tagName).trim().slice(0, 48)).catch(() => "?")}`);
     await locator.dispatchEvent("click");
   }
 }
@@ -399,14 +410,33 @@ async function runViewport(browser, label, width, height) {
   });
 
   // ---- 11. Backup exports a real bundle (D16) ----
-  await check("Backup offers an export and states what a restore will do", async () => {
+  await check("the restore confirmation counts every section of the chosen file, zeros included", async () => {
     await go(page, "/codex/backup");
     await page.waitForTimeout(600);
     const text = await page.locator(".codex-shell-content").innerText();
     if (!/replace/i.test(text)) throw new Error("the destructive restore is not described as replacing");
-    const buttons = await page.locator(".codex-shell-content button").count();
-    if (buttons === 0) throw new Error("no controls");
-    return "restore described as a replace";
+
+    // A bundle with two pages and NOTHING else. Restoring it would delete every map, pin, journal
+    // entry, session and quest in the campaign, and the whole job of this dialog is to say so before
+    // the GM presses the button — the old copy dropped a missing section from the sentence entirely.
+    // Chosen, read, and CANCELLED: a real restore would replace the campaign the other checks need.
+    await page.setInputFiles('input[type="file"][accept="application/json,.json"]', {
+      name: "two-pages-only.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ codex: { pages: [{ id: "a" }, { id: "b" }] } }))
+    });
+    const confirm = page.locator('dialog[open]').filter({ hasText: "Restore this backup?" }).first();
+    await confirm.waitFor({ state: "visible", timeout: 8_000 });
+    const body = await confirm.innerText();
+    if (!body.includes("two-pages-only.json")) throw new Error("the confirm does not name the file");
+    for (const clause of ["2 pages", "0 maps", "0 pins", "0 journal entries", "0 sessions", "0 quests"]) {
+      if (!body.includes(clause)) throw new Error(`the inventory is missing "${clause}": ${body.replace(/\n/g, " ").slice(0, 200)}`);
+    }
+    if (/entrys/.test(body)) throw new Error("the plural is wrong: 'journal entrys'");
+    await navClick(confirm.getByRole("button", { name: "Cancel" }).first());
+    await page.waitForTimeout(400);
+    if (await confirm.count() > 0 && await confirm.isVisible()) throw new Error("Cancel did not dismiss the confirm");
+    return "every section counted (zeros stated), file named, cancel dismisses";
   });
 
   // ---- 12. The phone drawer, only where it exists ----
@@ -457,27 +487,88 @@ async function runViewport(browser, label, width, height) {
   }
 
   // ---- 14. The PLAYER surface, on a real minted player session ----
-  await check("the GM's Preview as player mounts the real player Codex", async () => {
+  /**
+   * **This check used to read the wrong screen.** It opened the preview, waited, and read the Home
+   * dashboard — which renders titles and already-projected chronicle summaries and never a page or a
+   * quest BODY. All four strings it forbade were unrenderable there, and one ("phylactery") is not in
+   * the seed at all, so that arm was unconditionally false. It reported "no GM body text" without
+   * having looked at any body text, and that report fed the ledger's pass count.
+   *
+   * It now NAVIGATES the preview to a page and to a quest, and asserts a player-visible string from
+   * each is PRESENT before asserting the GM string is absent — so a preview that rendered nothing, or
+   * rendered an error, fails instead of passing vacuously.
+   */
+  await check("the GM's Preview as player mounts the real player Codex, with no GM body text on a body surface", async () => {
     await go(page, "/codex");
     const nav = await openNav(page, width);
     await navClick(nav.getByRole("button", { name: "Preview as player", exact: true }).first());
     const dialog = page.locator('dialog[open][aria-label="Player Codex preview"]');
     await dialog.waitFor({ state: "visible", timeout: 15_000 });
     await page.waitForTimeout(1500);
-    const text = await dialog.innerText();
-    // Viewer safety, measured rather than asserted: the seed put these strings ONLY in GM bodies.
-    for (const secret of ["Tatyana reborn", "Milivoj took them", "The mists are Strahd's", "phylactery"]) {
-      if (text.includes(secret)) throw new Error(`GM-only text leaked into the preview: "${secret}"`);
-    }
-    // And the GM's own tools must be absent from the player's sidebar.
+
+    // The GM's own tools must be absent from the player's sidebar, read on the dashboard where it lives.
+    const home = await dialog.innerText();
     for (const tool of ["Reveal audit", "Backup", "Settings", "Preview as player"]) {
-      if (new RegExp(`\\b${tool}\\b`).test(text)) throw new Error(`GM tool "${tool}" is in the player sidebar`);
+      if (new RegExp(`\\b${tool}\\b`).test(home)) throw new Error(`GM tool "${tool}" is in the player sidebar`);
     }
-    if (!/Pages|Atlas|Journal/.test(text)) throw new Error("the preview rendered nothing recognisable");
+    if (!/Pages|Atlas|Journal/.test(home)) throw new Error("the preview rendered nothing recognisable");
+
+    /** Drive the preview's OWN local route (it must not touch the browser address) and read the body. */
+    const openInPreview = async (section, recordText) => {
+      const previewNav = dialog.locator('nav[aria-label="Codex sections"]:visible').first();
+      await navClick(previewNav.getByRole("button", { name: section, exact: true }).first());
+      await page.waitForTimeout(700);
+      await navClick(dialog.locator("button").filter({ hasText: recordText }).first());
+      await page.waitForTimeout(900);
+      return dialog.innerText();
+    };
+
+    // A page the player CAN see, whose GM body the seed filled. Both halves are asserted: the control
+    // string must be on screen, or "the secret is absent" means only "the page did not load".
+    const pageText = await openInPreview("Pages", "Ireena");
+    if (!pageText.includes("burgomaster's adopted daughter")) throw new Error(`the player page body did not render: ${pageText.slice(0, 160)}`);
+    if (pageText.includes("Tatyana reborn")) throw new Error('GM body leaked onto the player page: "Tatyana reborn"');
+
+    const questText = await openInPreview("Quests", "Missing Bones");
+    if (!questText.includes("St Andral's bones are gone")) throw new Error(`the player quest body did not render: ${questText.slice(0, 160)}`);
+    if (questText.includes("Milivoj took them")) throw new Error('GM body leaked onto the player quest: "Milivoj took them"');
+
     await page.screenshot({ path: `${SHOTS}/${label}-preview-as-player.png` });
     await page.keyboard.press("Escape");
-    return "no GM body text, no GM tools, real player sidebar";
+    return "player bodies rendered, GM bodies absent from both, no GM tools";
   });
+
+  // ---- 15. The 761–849 band, which neither this script nor the tap audit had ever loaded ----
+  if (width >= 1000) {
+    await check("at 800px the sidebar is an icon rail, labelled and not overflowing", async () => {
+      const tablet = await context.browser().newContext({ viewport: { width: 800, height: 1000 } });
+      const tab = await tablet.newPage();
+      try {
+        await tab.goto(`${BASE}/codex`, NAV);
+        await loginHere(tab);
+        await tab.waitForSelector(".codex-shell-content", { timeout: 15_000 });
+        await tab.waitForTimeout(700);
+        const nav = tab.locator('nav[aria-label="Codex sections"]:visible').first();
+        if (await nav.count() === 0) throw new Error("no sidebar visible at 800px — and the hamburger is hidden in this band");
+        // The rail's whole contract: the label is gone from the box AND still reachable as a name.
+        const quests = nav.getByRole("button", { name: "Quests", exact: true }).first();
+        const title = await quests.getAttribute("title");
+        if (title !== "Quests") throw new Error(`the rail's items carry no tooltip (title=${JSON.stringify(title)})`);
+        const labels = await nav.locator(".codex-navitem-label:visible").count();
+        if (labels > 0) throw new Error(`${labels} nav labels still painted inside a 56px track`);
+        // The eyebrows have no ellipsis rule of their own, so they were the widest thing overflowing.
+        const eyebrows = await nav.locator(".codex-sidebar-grouplabel:visible").count();
+        if (eyebrows > 0) throw new Error(`${eyebrows} group eyebrows still painted`);
+        const overflow = await tab.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
+        if (overflow > 1) throw new Error(`document scrolls sideways by ${overflow}px`);
+        // And the sidebar's painted box must actually be inside the 56px track it was given.
+        const box = await nav.boundingBox();
+        if (box && box.width > 60) throw new Error(`the sidebar paints ${Math.round(box.width)}px wide in a 56px track`);
+        await tab.screenshot({ path: `${SHOTS}/tablet-800-rail.png` });
+        return `rail at 800px: 0 labels, 0 eyebrows, tooltips present, ${Math.round(box?.width ?? 0)}px wide`;
+      } finally { await tablet.close(); }
+    });
+  }
 
   if (consoleErrors.length > 0) fail("no uncaught console errors", `${consoleErrors.length}: ${consoleErrors.slice(0, 3).join(" | ")}`);
   else pass("no uncaught console errors", "0 across the whole pass");
@@ -496,5 +587,14 @@ try {
 const failed = results.filter((row) => !row.ok);
 console.log(`\n===== ${results.length - failed.length}/${results.length} checks passed =====`);
 for (const row of failed) console.log(`  FAILED [${row.viewport}] ${row.name} — ${row.detail}`);
+// Not a failure — some of these are the app shell's tab scrollport sitting over the Codex at 375px, a
+// known and separate problem — but it IS the honest caveat on every check that used one, because a
+// dispatched click cannot fail on an occluded control.
+if (dispatched.length > 0) {
+  console.log(`\n  NOTE  ${dispatched.length} navigation click(s) reached their target only by dispatchEvent, bypassing hit-testing:`);
+  for (const entry of dispatched) console.log(`          ${entry}`);
+} else {
+  console.log("\n  NOTE  0 navigation clicks needed the dispatchEvent fallback — every one hit-tested.");
+}
 console.log(`screenshots: ${SHOTS}/`);
 process.exit(failed.length === 0 ? 0 : 1);
