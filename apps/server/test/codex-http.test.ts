@@ -75,12 +75,18 @@ const del = (base: string, path: string, headers: Record<string, string>, payloa
  * every connected socket, players included, which told the table which part of the codex the GM was working
  * in. The homebrew notifier had already refused exactly that on principle eight lines away in `server.ts`.
  *
- * This is the runtime half of the guarantee. The compile-time half is `notifyChanged: () => void` on
- * `CodexRouterOptions` plus `CodexChangedEvent = { codexRevision }` in `@vtt/domain`; neither is checked by
- * this suite (`apps/server/test` is not typechecked), so the argument list is asserted here.
+ * WHAT THIS FILE CAN AND CANNOT SEE, stated plainly because the test used to overclaim it. The router is
+ * given a `notifyChanged` callback and calls it; the SOCKET emit is `server.ts`'s, and that emit does carry
+ * a payload - `{ codexRevision }`, a bare counter with no scope word, which is D22's actual wire shape. So
+ * this asserts the ROUTER half only: that it hands its notifier nothing to put on the wire. The socket half
+ * is `apps/server/test/realtime-presence.test.ts`, which observes the real emit and pins its key set.
+ *
+ * The compile-time half is `notifyChanged: () => void` on `CodexRouterOptions` plus
+ * `CodexChangedEvent = { codexRevision }` in `@vtt/domain`; neither is checked by this suite
+ * (`apps/server/test` is not typechecked), so the argument list is asserted here.
  */
-describe("codex:changed carries no content (D22)", () => {
-  it("pings with no arguments at all, whichever surface was written", async () => {
+describe("codex:changed carries no content (D22, router half)", () => {
+  it("calls its notifier with no arguments at all, whichever surface was written", async () => {
     const pings: unknown[][] = [];
     const { base, store } = await fixture(pings);
     const page = store.createPage({ title: "Vallaki" });

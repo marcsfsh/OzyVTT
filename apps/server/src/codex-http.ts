@@ -21,8 +21,8 @@ const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
  * D19: the optional idempotency key every codex JSON-body write accepts.
  *
  * It rides on the BODY rather than a header because that is where the game surface puts it, and one
- * convention across two surfaces beats two. It is stripped before the store call - the store knows
- * nothing about retries - and `withCommandId` below owns the recall/record cycle.
+ * convention across two surfaces beats two. It is stripped before the store call (`withoutCommandId`) - the
+ * store knows nothing about retries - and `idempotency`, inside `requireWrite`, owns the recall/record cycle.
  *
  * Body-less POSTs and every DELETE are deliberately WITHOUT one: they are naturally idempotent already
  * (applying an applied downtime is refused, activating an active session is a no-op, deleting a deleted
@@ -643,50 +643,101 @@ function playerConnectionContext(store: CodexStore): PlayerConnectionContext {
   return { revealedPageIds, revealedSourceIds };
 }
 
+const NO_TOKEN = "A GM session, player session, or integration bearer token is required.";
+const BAD_TOKEN = "The token is invalid, revoked, or missing the required scope.";
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Just the three authorization callbacks, so the import guard below can be built from the SAME ones the router gets. */
+export type CodexAuthOptions = Pick<CodexRouterOptions, "authorizeGm" | "authorizePlayer" | "verifyIntegration">;
+
+/**
+ * Honour the caller's own correlation id when it is a UUID v4, mint one otherwise - the exact
+ * arrangement `game-http.ts` uses, so one integration correlating across both surfaces sees one id.
+ * A non-UUID value is REPLACED rather than echoed: this id lands in logs and in error bodies, and
+ * echoing arbitrary caller text into both is how a log line becomes a forgery.
+ *
+ * Idempotent, because the import guard runs it too: an id already resolved for this response is kept, so a
+ * request that meets it twice correlates on one id rather than two.
+ */
+function codexRequestConventions(request: Request, response: Response, next: NextFunction) {
+  if (typeof response.locals.requestId !== "string") {
+    const supplied = request.header("x-request-id");
+    response.locals.requestId = supplied && UUID_V4.test(supplied) ? supplied : randomUUID();
+  }
+  response.setHeader("x-request-id", response.locals.requestId as string);
+  response.setHeader("cache-control", "no-store");
+  next();
+}
+
+/**
+ * Who is calling, and are they allowed to want `scope`? Role derives from the signed session token or
+ * the verified credential and from nothing else - never from a body, a query, or network position.
+ *
+ * Order matters and is deliberate: GM session, then player session, then credential. The preview flow
+ * depends on it in reverse - `POST /codex/preview-session` mints a real PLAYER token precisely so the
+ * GM's preview walks the player branch, and it would silently return GM projections if a GM token
+ * could be reused for it.
+ *
+ * MEMOIZED on `response.locals` for the life of the request, keyed by scope. Not an optimization: a request
+ * that meets the import guard and then the router would otherwise be resolved twice, and
+ * `IntegrationCredentialStore.verify` is not a pure function - it writes a `used` audit row and, on a
+ * refusal, a `failed` one. Resolving twice would double-count a credential's failures.
+ */
+function principalFor(request: Request, response: Response, options: CodexAuthOptions, scope: "codex:read" | "codex:write"): CodexPrincipal {
+  const cached = response.locals.codexPrincipal as Readonly<{ scope: string; principal: CodexPrincipal }> | undefined;
+  if (cached && cached.scope === scope) return cached.principal;
+  const token = bearer(request);
+  const principal: CodexPrincipal = token === undefined ? { kind: "none" }
+    : options.authorizeGm(token) ? { kind: "gm" }
+      : options.authorizePlayer(token) ? { kind: "player" }
+        : options.verifyIntegration(token, scope) ? { kind: "integration" }
+          : { kind: "denied" };
+  response.locals.codexPrincipal = { scope, principal };
+  return principal;
+}
+
+/** The one refusal a codex WRITE can get, spelled once so the router and the import guard cannot drift. */
+function refuseWrite(response: Response, principal: CodexPrincipal) {
+  if (principal.kind === "none") return failure(response, 401, "unauthenticated", NO_TOKEN);
+  if (principal.kind === "player") return failure(response, 403, "forbidden", "Codex writes are the GM's.");
+  return failure(response, 403, "forbidden", BAD_TOKEN);
+}
+
+/**
+ * Authorization for `POST /codex/import`, mounted in `server.ts` AHEAD of that route's 64 MB body parser.
+ *
+ * The parser has to be app-level and has to run before the global 512 KB one (body-parser marks a request
+ * parsed and every later parser skips it), which put it before every router - so the whole body was
+ * buffered, utf-8 decoded and `JSON.parse`d before the codex router's per-route `requireWrite` could write
+ * a 401. Any client on the LAN with no `Authorization` header at all - or a hostile page, since `/api/v1`
+ * has wildcard CORS and `authorization` in its allowed headers - could make the process block on a 64 MB
+ * parse, repeatedly, on the same event loop that owns GameState: Socket.IO, turn order and every combat
+ * command stall for the duration.
+ *
+ * It is the SAME policy, not a copy: the same `principalFor`, the same `refuseWrite`, and the resolved
+ * principal is memoized on `response.locals`, so the router's `requireWrite` reuses this answer rather than
+ * re-verifying the credential. An authorized caller simply falls through to the parser.
+ */
+export function createCodexImportGuard(options: CodexAuthOptions) {
+  return [codexRequestConventions, (request: Request, response: Response, next: NextFunction) => {
+    const principal = principalFor(request, response, options, "codex:write");
+    if (principal.kind === "gm" || principal.kind === "integration") return next();
+    return refuseWrite(response, principal);
+  }];
+}
+
 export function createCodexRouter(options: CodexRouterOptions) {
   const router = Router();
   const { store } = options;
 
-  /**
-   * Honour the caller's own correlation id when it is a UUID v4, mint one otherwise - the exact
-   * arrangement `game-http.ts` uses, so one integration correlating across both surfaces sees one id.
-   * A non-UUID value is REPLACED rather than echoed: this id lands in logs and in error bodies, and
-   * echoing arbitrary caller text into both is how a log line becomes a forgery.
-   */
-  router.use((request, response, next) => {
-    const supplied = request.header("x-request-id");
-    response.locals.requestId = supplied && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(supplied) ? supplied : randomUUID();
-    response.setHeader("x-request-id", response.locals.requestId);
-    response.setHeader("cache-control", "no-store");
-    next();
-  });
-
-  /**
-   * Who is calling, and are they allowed to want `scope`? Role derives from the signed session token or
-   * the verified credential and from nothing else - never from a body, a query, or network position.
-   *
-   * Order matters and is deliberate: GM session, then player session, then credential. The preview flow
-   * depends on it in reverse - `POST /codex/preview-session` mints a real PLAYER token precisely so the
-   * GM's preview walks the player branch, and it would silently return GM projections if a GM token
-   * could be reused for it.
-   */
-  const principalFor = (request: Request, scope: "codex:read" | "codex:write"): CodexPrincipal => {
-    const token = bearer(request);
-    if (token === undefined) return { kind: "none" };
-    if (options.authorizeGm(token)) return { kind: "gm" };
-    if (options.authorizePlayer(token)) return { kind: "player" };
-    if (options.verifyIntegration(token, scope)) return { kind: "integration" };
-    return { kind: "denied" };
-  };
-  const NO_TOKEN = "A GM session, player session, or integration bearer token is required.";
-  const BAD_TOKEN = "The token is invalid, revoked, or missing the required scope.";
+  router.use(codexRequestConventions);
 
   /**
    * The grade a ROLE-PROJECTED read should be projected at, or null when the caller was answered with a
    * 401/403 and the handler must simply return. An integration credential reads at GM grade.
    */
   const readGrade = (request: Request, response: Response): CodexGrade | null => {
-    const principal = principalFor(request, "codex:read");
+    const principal = principalFor(request, response, options, "codex:read");
     if (principal.kind === "gm" || principal.kind === "integration") return "gm";
     if (principal.kind === "player") return "player";
     if (principal.kind === "none") { failure(response, 401, "unauthenticated", NO_TOKEN); return null; }
@@ -696,7 +747,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   /** GM-GRADE reads: folders, revision history, settings, the reveal audit, export. No player branch. */
   const requireGmRead = (request: Request, response: Response, next: NextFunction) => {
-    const principal = principalFor(request, "codex:read");
+    const principal = principalFor(request, response, options, "codex:read");
     if (principal.kind === "gm" || principal.kind === "integration") return next();
     if (principal.kind === "none") return failure(response, 401, "unauthenticated", NO_TOKEN);
     if (principal.kind === "player") return failure(response, 403, "forbidden", "The codex's GM surfaces are the GM's.");
@@ -748,13 +799,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   /** Every write. A player session gets 403, not 401: they are authenticated, and they are refused. */
   const requireWrite = (request: Request, response: Response, next: NextFunction) => {
-    const principal = principalFor(request, "codex:write");
+    const principal = principalFor(request, response, options, "codex:write");
     // The idempotency check runs HERE, inside the guard, so it is provably after authorization - see
     // `idempotency` above for the bug that placement fixes.
     if (principal.kind === "gm" || principal.kind === "integration") return idempotency(request, response) ? undefined : next();
-    if (principal.kind === "none") return failure(response, 401, "unauthenticated", NO_TOKEN);
-    if (principal.kind === "player") return failure(response, 403, "forbidden", "Codex writes are the GM's.");
-    return failure(response, 403, "forbidden", BAD_TOKEN);
+    return refuseWrite(response, principal);
   };
 
   /**
@@ -1787,7 +1836,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     // calling". The 403-for-everyone-else (rather than a 401 for no token) is the deliberate, documented
     // exception this route keeps: a media URL must not become an existence oracle, so it refuses before it
     // looks anything up, and the refusal reads the same whoever asked.
-    const principal = principalFor(request, "codex:read");
+    const principal = principalFor(request, response, options, "codex:read");
     const allowed = principal.kind === "gm" || principal.kind === "integration"
       || (principal.kind === "player" && store.isPageAssetVisibleToPlayers(id));
     if (!allowed) return failure(response, 403, "forbidden", "That image is not available to this session.");

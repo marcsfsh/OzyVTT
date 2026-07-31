@@ -28,11 +28,13 @@ import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.
  * `GAME_COMMAND_SCOPES` entry, and homebrew is not a game command. Writes ping clients through the
  * content-free `homebrew:changed` broadcast instead.
  *
- * Two deliberate deviations from `codex-http.ts`, both toward `game-http.ts`:
- *   1. a client-supplied `x-request-id` is honoured when it is a v4 UUID (the codex always mints,
- *      which is an inconsistency rather than a precedent);
- *   2. failures carry structured `details.issues`, not a single prose string - publish validation
- *      (slice 2) needs a machine-addressable `path` per issue so a form editor can point at a field.
+ * ONE deliberate deviation from `codex-http.ts`, toward `game-http.ts`: failures carry structured
+ * `details.issues`, not a single prose string - publish validation (slice 2) needs a machine-addressable
+ * `path` per issue so a form editor can point at a field.
+ *
+ * (There used to be a second, recorded here as "the codex always mints request ids". The codex now honours
+ * a caller's v4 UUID exactly as this router does, so the three surfaces agree and there is nothing left to
+ * deviate from.)
  */
 
 const RecordBodySchema = z.record(z.string(), z.unknown());

@@ -938,3 +938,61 @@ describe("public game API over /api/v1", () => {
     for (const event of Object.keys(READ_TWINS)) expect(events, `READ_TWINS lists "${event}", which the server no longer handles`).toContain(event);
   });
 });
+
+/**
+ * `POST /codex/import` is the one route with a body limit large enough to be a weapon (64 MB, because a
+ * backup bundle carries every page revision), and its parser has to be app-level and has to run before the
+ * global 512 KB one - body-parser marks a request parsed and every later parser skips it. That put it ahead
+ * of every router, so the codex router's per-route `requireWrite` could not run first: the whole body was
+ * buffered, utf-8 decoded and `JSON.parse`d before a 401 was written. Any client on the LAN with no
+ * Authorization header at all - or a hostile page, since `/api/v1` has wildcard CORS and `authorization` in
+ * its allowed headers - could make the process block on that parse, repeatedly, on the same event loop that
+ * owns GameState.
+ *
+ * Tested at the FULL SERVER rather than at the router, because the defect was entirely in the middleware
+ * order and a router-level test cannot see it. The oversized-body cases are the load-bearing ones: they are
+ * bodies the 512 KB fallback parser also refuses, so a 401/403 there proves the request was answered before
+ * ANY parser ran, not merely that the big parser was skipped.
+ */
+describe("the codex import's 64 MB parser runs after authorization, not before it", () => {
+  const oversized = () => JSON.stringify({ codex: { pages: [] }, filler: "x".repeat(2 * 1024 * 1024) });
+
+  it("refuses an unauthorized oversized import without parsing it, and still restores an authorized one", async () => {
+    const { base, gmToken } = await boot();
+
+    // No credential at all: 401 from the codex surface's own envelope, not a 413 from a parser.
+    const anonymous = await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: { "content-type": "application/json" }, body: oversized() });
+    expect(anonymous.status).toBe(401);
+    const refusal = await anonymous.json();
+    expect(refusal.error.code).toBe("unauthenticated");
+    expect(refusal.error.requestId, "the refusal still speaks the surface's conventions").toEqual(expect.any(String));
+    expect(anonymous.headers.get("access-control-allow-origin"), "...including CORS, so a browser integration can read it").toBe("*");
+
+    /**
+     * THE PROBE THAT ACTUALLY SEES THE ORDERING. A body that is both oversized for the 512 KB fallback and
+     * NOT VALID JSON: if the parser runs first it reports the parse failure (400, "not valid JSON"), and if
+     * authorization runs first there is nothing to report but the missing credential (401). Only the second
+     * is compatible with "the 64 MB parse never happened".
+     */
+    const garbage = await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: { "content-type": "application/json" }, body: `{"codex": ${"x".repeat(2 * 1024 * 1024)}` });
+    expect(garbage.status, "an unauthorized caller must be refused BEFORE their body is parsed").toBe(401);
+    expect((await garbage.json()).error.code).toBe("unauthenticated");
+
+    // A presented-but-wrong credential is 403, the R6 split - and equally unparsed.
+    const readOnly = await issueCredential(base, gmToken, "reader", ["codex:read"]);
+    const underscoped = await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: { authorization: `Bearer ${readOnly.token}`, "content-type": "application/json" }, body: `{"codex": ${"x".repeat(2 * 1024 * 1024)}` });
+    expect(underscoped.status, "...and so must a presented-but-underscoped one").toBe(403);
+
+    // The point of the guard is that it only guards. A GM's real restore still reaches the store through
+    // the LARGE parser, at a size the global 512 KB fallback would have refused - which is what proves the
+    // guard did not simply demote every import to the small limit.
+    const folders = Array.from({ length: 7000 }, (_, index) => `${"Folder".padEnd(39, "x")}/${String(index).padStart(39, "0")}`);
+    const big = JSON.stringify({ codex: { pages: [], folders }, bundleVersion: 1 });
+    expect(Buffer.byteLength(big), "the fixture has to be over the 512 KB fallback to mean anything").toBeGreaterThan(512 * 1024);
+    const authorized = await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: bearer(gmToken), body: big });
+    expect(authorized.status).toBe(200);
+    // >= rather than ==: a nested path registers its parent too, so 7000 leaves under one shared parent
+    // land as 7001 rows. The claim here is "the whole body arrived", not an exact folder count.
+    expect((await authorized.json()).data.counts.folders).toBeGreaterThanOrEqual(7000);
+  });
+});
