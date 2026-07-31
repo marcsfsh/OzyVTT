@@ -942,7 +942,7 @@ export function StyleGuide() {
 
           <Section id="switch" title="Switch" blurb="On/off toggle for settings that take effect immediately (role=switch). Reach for a checkbox only inside a form that's submitted.">
             <div className="sg-row">
-              <Switch checked={switchOn} onChange={setSwitchOn} label="Reveal to players" />
+              <Switch checked={switchOn} onChange={setSwitchOn} label="Shown to players" />
               <Switch checked={!switchOn} onChange={(v) => setSwitchOn(!v)} label="GM-only" />
               <Switch checked={false} onChange={() => {}} disabled aria-label="Disabled off" />
             </div>

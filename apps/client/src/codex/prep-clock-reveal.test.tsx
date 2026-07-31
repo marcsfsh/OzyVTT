@@ -253,14 +253,14 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
     await renderJournal([AHEAD]);
     const user = userEvent.setup();
 
-    expect(screen.queryByRole("button", { name: "Warn me again on reveal" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Warn me again before showing an entry" })).not.toBeInTheDocument();
 
     await user.click(switchIn("m1"));
     await user.click(await screen.findByRole("switch", { name: "Stop warning me about this" }));
     await user.click(screen.getByRole("button", { name: "Reveal anyway" }));
 
-    await user.click(await screen.findByRole("button", { name: "Warn me again on reveal" }));
-    expect(screen.queryByRole("button", { name: "Warn me again on reveal" })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Warn me again before showing an entry" }));
+    expect(screen.queryByRole("button", { name: "Warn me again before showing an entry" })).not.toBeInTheDocument();
 
     // Re-armed without a reload.
     revealEntry.mockClear();

@@ -310,7 +310,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     expect(row.queryByText(/Advance the campaign clock/)).not.toBeInTheDocument();
     // It still says what it was, and that it has been applied — an applied downtime is not a silent row.
     expect(row.getByText("Aldric — Forging a blade · 7 days")).toBeInTheDocument();
-    expect(row.getByText(/already been advanced/)).toBeInTheDocument();
+    expect(row.getByText(/Your date has already been moved/)).toBeInTheDocument();
   });
 });
 

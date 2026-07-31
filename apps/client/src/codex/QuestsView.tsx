@@ -111,7 +111,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
           {selected
             ? <QuestEditor key={selected.id} gmToken={gmToken} quest={selected} pages={pages} autosave={autosave} onPickTag={onPickTag}
                 onChanged={onChanged} onOpenPage={onOpenPage} onDeleted={() => { onOpenQuest(null); void onChanged(); }} />
-            : !loading && !error && <div className="codex-main-empty"><h3>Track what the party is chasing</h3><p>A quest holds the objectives the table is working through, what they were told, and — GM-only — where it is really going. Reveal it and the open ones appear on their dashboard.</p><Button variant="primary" onClick={create}>New quest</Button></div>}
+            : !loading && !error && <div className="codex-main-empty"><h3>Track what the party is chasing</h3><p>A quest holds the objectives the table is working through, what they were told, and — GM-only — where it is really going. Show it to players and the open ones appear on their dashboard.</p><Button variant="primary" onClick={create}>New quest</Button></div>}
         </section>
       </div>
     </>

@@ -387,7 +387,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
               centerOnMarkerId={centerOnMarkerId} onCentered={() => setCenterOnMarkerId(null)}
               onBackgroundClick={placeMarker} onMarkerClick={(markerId) => { setSelectedMarkerId(markerId); if (window.innerWidth <= 760) requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} onMarkerDragEnd={moveMarker} />
           : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
-          : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
+          : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop pins on towns and dungeons, link each to a page or a deeper map, and show them to players as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         <div ref={inspectorRef} />
         {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
           onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={(pageId) => onNavigate(`/codex/pages/${pageId}`)}

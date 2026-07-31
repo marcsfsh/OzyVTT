@@ -214,7 +214,7 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
           );
         })}
       </svg>
-      {placing && <div className="codex-place-hint" role="status">Tap the map to drop a marker · Esc to cancel</div>}
+      {placing && <div className="codex-place-hint" role="status">Tap the map to drop a pin · Esc to cancel</div>}
     </div>
   );
 }

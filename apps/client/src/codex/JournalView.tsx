@@ -445,7 +445,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                 into the first Textarea's top edge. Measured at 176x32 paint before this was corrected.
                 Default size grows the paint itself and carries no ::after at all. */}
             {!revealWarn && (
-              <Button variant="ghost" onClick={() => { setRevealWarn(true); writeRevealWarn(true); }}>Warn me again on reveal</Button>
+              <Button variant="ghost" onClick={() => { setRevealWarn(true); writeRevealWarn(true); }}>Warn me again before showing an entry</Button>
             )}
           </div>
         )}
@@ -665,7 +665,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                   <div className="codex-downtime">
                     <p className="codex-downtime-what">{downtimeSummaryLabel(downtime)}</p>
                     {downtime.applied
-                      ? <p className="codex-downtime-state">The campaign clock has already been advanced for this downtime.</p>
+                      ? <p className="codex-downtime-state">Your date has already been moved for this downtime.</p>
                       : proposed && calendar
                       ? <div className="codex-downtime-apply">
                           <span className="codex-downtime-proposal">Move your date to {formatWorldDate(calendar, proposed)}{passing > 0 ? ` — this passes ${passing} ${passing === 1 ? "deadline" : "deadlines"}.` : ""}</span>

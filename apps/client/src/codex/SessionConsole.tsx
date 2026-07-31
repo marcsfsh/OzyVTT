@@ -58,7 +58,7 @@ export function SessionConsole({ open, onClose, gmToken, session, loading, error
             <Badge tone="success">● Active</Badge>
             <Badge tone={session.status === "played" ? "neutral" : "info"}>{session.status === "played" ? "Played" : "Planned"}</Badge>
             {session.realDate && <span className="codex-entry-when">{session.realDate}</span>}
-            {session.revealedToPlayers ? <Badge tone="info">Recap shown</Badge> : <Badge>Recap hidden</Badge>}
+            {session.revealedToPlayers ? <Badge tone="info">Recap shown to players</Badge> : <Badge>Recap hidden from players</Badge>}
           </div>
           {session.attendees.length > 0 && <p className="codex-console-attendees">Playing: {session.attendees.join(", ")}</p>}
 
