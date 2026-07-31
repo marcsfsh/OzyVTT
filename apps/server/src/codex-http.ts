@@ -274,12 +274,37 @@ const CalendarSchema = z.object({
   currentDate: z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable().optional()
 }).strict();
 
+/**
+ * What a caller turned out to be. `gm` and `integration` are the same GRADE - an integration credential
+ * is the GM's own trusted automation and receives GM projections - but they stay distinct here because
+ * the two denial messages differ, and because conflating them at the resolver is how a future rule that
+ * should apply to only one of them ends up applying to both.
+ *
+ * `none` and `denied` are the 401/403 split, and the boundary is exact: `none` is "there was no
+ * `Authorization: Bearer <token>` to read". Everything a caller actually presented and that failed -
+ * an expired session, a revoked credential, a token scoped for something else, a player token on a GM
+ * surface - is `denied`, because the caller IS authenticated in the sense 401 asks about and telling
+ * them to authenticate again is advice that cannot work.
+ */
+type CodexPrincipal = Readonly<{ kind: "gm" | "player" | "integration" | "none" | "denied" }>;
+type CodexGrade = "gm" | "player";
+
 type CodexRouterOptions = Readonly<{
   store: CodexStore;
   /** Content-addressed store for page media (banners + inline images), separate from map/token assets. */
   assets: MapAssetStore;
   authorizeGm: (token: string | undefined) => boolean;
   authorizePlayer: (token: string | undefined) => boolean;
+  /**
+   * A GM-minted integration credential, checked against the scope THIS route needs. Returns null for a
+   * token that is unparseable, unknown, revoked, expired, or missing the scope - the store does not
+   * distinguish those to the caller, and neither does this router (all four are one 403).
+   *
+   * Required rather than optional on purpose: a mount site that forgot it would silently run a codex
+   * with no credential access at all, and "the integrations panel mints a codex token that does
+   * nothing" is a bug that reads as a product decision.
+   */
+  verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => Readonly<{ id: string; name: string }> | null;
   /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
   notifyChanged: (scope: "pages" | "maps" | "markers" | "journal" | "sessions" | "quests") => void;
   /**
@@ -303,16 +328,49 @@ function pathParam(request: Request, name: string): string {
 function envelope(response: Response, status: number, data: unknown) {
   return response.status(status).json({ ok: true, apiVersion: API_VERSION, data });
 }
-function failure(response: Response, status: number, code: string, message: string) {
-  const id = response.getHeader("x-request-id")?.toString() ?? randomUUID();
-  return response.status(status).json({ ok: false, apiVersion: API_VERSION, error: { code, message, requestId: id } });
+/**
+ * The one error envelope. `details` and `currentRevision` are optional and omitted when absent rather
+ * than sent as null, because `ApiErrorEnvelopeSchema` declares them optional and a present-but-null key
+ * would fail it.
+ *
+ * The request id comes from `res.locals`, which the middleware set from the caller's own `X-Request-Id`
+ * when they sent a usable one. It used to be re-read off the response HEADER, which worked only because
+ * the middleware had just written a fresh uuid there - so a caller who supplied an id got a different one
+ * back in the error body than the one they were correlating on.
+ */
+function failure(response: Response, status: number, code: string, message: string, details?: Record<string, unknown>, currentRevision?: number) {
+  const id = typeof response.locals.requestId === "string" ? response.locals.requestId : (response.getHeader("x-request-id")?.toString() ?? randomUUID());
+  return response.status(status).json({
+    ok: false,
+    apiVersion: API_VERSION,
+    error: { code, message, requestId: id, ...(details ? { details } : {}), ...(currentRevision !== undefined ? { currentRevision } : {}) }
+  });
 }
+/**
+ * A malformed body. `message` stays the FIRST issue, because it is the human-readable line a GM sees;
+ * `details.issues` carries every issue with its machine-addressable `path`, which is what an integration
+ * needs and what the published conventions have always promised. Reporting only the first issue meant a
+ * caller with three bad fields learned about them one round-trip at a time.
+ */
 function malformed(response: Response, error: unknown) {
-  return failure(response, 400, "validation_failed", error instanceof z.ZodError ? (error.issues[0]?.message ?? "The request is malformed.") : (error as Error).message);
+  if (error instanceof z.ZodError) {
+    return failure(response, 400, "validation_failed", error.issues[0]?.message ?? "The request is malformed.", {
+      issues: error.issues.map((issue) => ({ path: [...issue.path], message: issue.message }))
+    });
+  }
+  return failure(response, 400, "validation_failed", (error as Error).message);
 }
-/** Map a store/validation error to its HTTP envelope: 404 not-found, 409 conflict, else 400 malformed. */
-function codexError(response: Response, error: unknown) {
-  if (error instanceof CodexRevisionConflictError) return failure(response, 409, "conflict", error.message);
+/**
+ * Map a store/validation error to its HTTP envelope: 404 not-found, 409 conflict, else 400 malformed.
+ *
+ * `currentRevision` is a THUNK, evaluated only on a conflict, and supplied only by the three routes whose
+ * 409 can be a stale `expectedRev` (page, session and quest PATCH). That is the rule the conventions
+ * state: `error.currentRevision` is present exactly when the 409 is a lost race, so a client can decide
+ * whether to rebase. A state-machine refusal - applying an already-applied downtime - deliberately
+ * carries none, because there is no revision to rebase onto.
+ */
+function codexError(response: Response, error: unknown, currentRevision?: () => number | undefined) {
+  if (error instanceof CodexRevisionConflictError) return failure(response, 409, "conflict", error.message, undefined, currentRevision?.());
   if (error instanceof CodexNotFoundError) return failure(response, 404, "not_found", error.message);
   return malformed(response, error);
 }
@@ -391,35 +449,118 @@ export function createCodexRouter(options: CodexRouterOptions) {
   const router = Router();
   const { store } = options;
 
+  /**
+   * Honour the caller's own correlation id when it is a UUID v4, mint one otherwise - the exact
+   * arrangement `game-http.ts` uses, so one integration correlating across both surfaces sees one id.
+   * A non-UUID value is REPLACED rather than echoed: this id lands in logs and in error bodies, and
+   * echoing arbitrary caller text into both is how a log line becomes a forgery.
+   */
   router.use((request, response, next) => {
-    response.setHeader("x-request-id", randomUUID());
+    const supplied = request.header("x-request-id");
+    response.locals.requestId = supplied && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(supplied) ? supplied : randomUUID();
+    response.setHeader("x-request-id", response.locals.requestId);
     response.setHeader("cache-control", "no-store");
     next();
   });
 
-  const roleOf = (request: Request): "gm" | "player" | null => {
+  /**
+   * Who is calling, and are they allowed to want `scope`? Role derives from the signed session token or
+   * the verified credential and from nothing else - never from a body, a query, or network position.
+   *
+   * Order matters and is deliberate: GM session, then player session, then credential. The preview flow
+   * depends on it in reverse - `POST /codex/preview-session` mints a real PLAYER token precisely so the
+   * GM's preview walks the player branch, and it would silently return GM projections if a GM token
+   * could be reused for it.
+   */
+  const principalFor = (request: Request, scope: "codex:read" | "codex:write"): CodexPrincipal => {
     const token = bearer(request);
-    if (options.authorizeGm(token)) return "gm";
-    if (options.authorizePlayer(token)) return "player";
+    if (token === undefined) return { kind: "none" };
+    if (options.authorizeGm(token)) return { kind: "gm" };
+    if (options.authorizePlayer(token)) return { kind: "player" };
+    if (options.verifyIntegration(token, scope)) return { kind: "integration" };
+    return { kind: "denied" };
+  };
+  const NO_TOKEN = "A GM session, player session, or integration bearer token is required.";
+  const BAD_TOKEN = "The token is invalid, revoked, or missing the required scope.";
+
+  /**
+   * The grade a ROLE-PROJECTED read should be projected at, or null when the caller was answered with a
+   * 401/403 and the handler must simply return. An integration credential reads at GM grade.
+   */
+  const readGrade = (request: Request, response: Response): CodexGrade | null => {
+    const principal = principalFor(request, "codex:read");
+    if (principal.kind === "gm" || principal.kind === "integration") return "gm";
+    if (principal.kind === "player") return "player";
+    if (principal.kind === "none") { failure(response, 401, "unauthenticated", NO_TOKEN); return null; }
+    failure(response, 403, "forbidden", BAD_TOKEN);
     return null;
   };
-  const requireGm = (request: Request, response: Response, next: NextFunction) => {
-    if (!options.authorizeGm(bearer(request))) return failure(response, 401, "unauthenticated", "A valid GM session is required.");
+
+  /** GM-GRADE reads: folders, revision history, settings, the reveal audit, export. No player branch. */
+  const requireGmRead = (request: Request, response: Response, next: NextFunction) => {
+    const principal = principalFor(request, "codex:read");
+    if (principal.kind === "gm" || principal.kind === "integration") return next();
+    if (principal.kind === "none") return failure(response, 401, "unauthenticated", NO_TOKEN);
+    if (principal.kind === "player") return failure(response, 403, "forbidden", "The codex's GM surfaces are the GM's.");
+    return failure(response, 403, "forbidden", BAD_TOKEN);
+  };
+
+  /** Every write. A player session gets 403, not 401: they are authenticated, and they are refused. */
+  const requireWrite = (request: Request, response: Response, next: NextFunction) => {
+    const principal = principalFor(request, "codex:write");
+    if (principal.kind === "gm" || principal.kind === "integration") return next();
+    if (principal.kind === "none") return failure(response, 401, "unauthenticated", NO_TOKEN);
+    if (principal.kind === "player") return failure(response, 403, "forbidden", "Codex writes are the GM's.");
+    return failure(response, 403, "forbidden", BAD_TOKEN);
+  };
+
+  /**
+   * The ONE route a credential may not reach: minting a player session token. A `codex:write` credential
+   * is authorization to change the world, not authorization to hand out ambient player sessions, and no
+   * consumer needs it - the route exists so the GM's own UI can preview the player Codex.
+   */
+  const requireGmSession = (request: Request, response: Response, next: NextFunction) => {
+    const token = bearer(request);
+    if (token === undefined) return failure(response, 401, "unauthenticated", "A valid GM session is required.");
+    if (!options.authorizeGm(token)) return failure(response, 403, "forbidden", "Only a GM session may mint a player preview.");
     next();
+  };
+
+  /**
+   * Send a codex read, with a weak `ETag` and a `304` when the caller already holds this exact answer.
+   *
+   * Correctness rests on one store guarantee: EVERY codex write bumps the coarse revision inside its own
+   * transaction - reveals and clock moves included, since those change what a reader sees even though
+   * they change no record's `rev`. If a future write skips the bump, this serves stale reads, which is
+   * why the bump lives in the store's transaction helper rather than at call sites.
+   *
+   * Weak, because the bytes may differ between two responses at one revision (timestamps in derived
+   * labels), and per GRADE, because a GM and a player at the same revision get different bodies - one
+   * shared tag would let a proxy hand a GM's answer to a player.
+   *
+   * Called at the point of SERIALIZATION, after every authorization and existence gate, so a conditional
+   * request can never turn a 404 into a 304 and confirm that a hidden record exists and is unchanged.
+   */
+  const readEnvelope = (request: Request, response: Response, grade: CodexGrade, data: unknown) => {
+    const etag = `W/"codex-r${store.revision}-${grade}"`;
+    response.setHeader("etag", etag);
+    if (request.header("if-none-match") === etag) return response.status(304).end();
+    return envelope(response, 200, data);
   };
 
   // ----- Pages: list + search (GM or player; player sees only revealed) -----
 
   router.get(`${CODEX_BASE}/pages`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const filter = {
       folder: request.query.folder === undefined ? undefined : (request.query.folder === "" ? null : String(request.query.folder)),
       tag: request.query.tag === undefined ? undefined : String(request.query.tag)
     };
     const rows = store.listPages(filter);
     const pages = role === "gm" ? rows.map(projectGmPageSummary) : rows.map(projectPlayerPageSummary).filter((page) => page !== null);
-    return envelope(response, 200, { pages });
+    return readEnvelope(request, response, role, { pages });
   });
 
   /**
@@ -434,8 +575,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * consumer to keep it for.
    */
   router.get(`${CODEX_BASE}/search`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to search the codex.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const query = typeof request.query.q === "string" ? request.query.q : "";
     // Resolved before the map so it is computed once per request, not once per hit. Built for both
     // roles rather than conditionally: it is two cheap reads, and a `null` here would only push the
@@ -446,23 +588,24 @@ export function createCodexRouter(options: CodexRouterOptions) {
       .filter((record) => record !== null)
       .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record, playerContext)))
       .filter((hit) => hit !== null);
-    return envelope(response, 200, { hits });
+    return readEnvelope(request, response, role, { hits });
   });
 
   router.get(`${CODEX_BASE}/pages/:id`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const page = store.getPage(pathParam(request, "id"));
     if (!page) return failure(response, 404, "not_found", "That page was not found.");
-    if (role === "gm") return envelope(response, 200, { page: projectGmPage(page), backlinks: projectGmBacklinks(store.backlinksToPage(page.id)), relationships: projectGmRelationships(store.listRelationshipsFor(page.id)) });
+    if (role === "gm") return readEnvelope(request, response, role, { page: projectGmPage(page), backlinks: projectGmBacklinks(store.backlinksToPage(page.id)), relationships: projectGmRelationships(store.listRelationshipsFor(page.id)) });
     const projected = projectPlayerPage(page);
     if (!projected) return failure(response, 404, "not_found", "That page was not found.");
-    return envelope(response, 200, { page: projected, backlinks: projectPlayerBacklinks(store.backlinksToPage(page.id)), relationships: projectPlayerRelationships(store.listRelationshipsFor(page.id)) });
+    return readEnvelope(request, response, role, { page: projected, backlinks: projectPlayerBacklinks(store.backlinksToPage(page.id)), relationships: projectPlayerRelationships(store.listRelationshipsFor(page.id)) });
   });
 
   // ----- Pages: authoring (GM only) -----
 
-  router.post(`${CODEX_BASE}/pages`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/pages`, requireWrite, (request, response) => {
     try {
       const input = PageCreateSchema.parse(request.body);
       const page = store.createPage(input);
@@ -471,20 +614,21 @@ export function createCodexRouter(options: CodexRouterOptions) {
     } catch (error) { return malformed(response, error); }
   });
 
-  router.patch(`${CODEX_BASE}/pages/:id`, requireGm, (request, response) => {
+  router.patch(`${CODEX_BASE}/pages/:id`, requireWrite, (request, response) => {
     try {
       const { expectedRev, ...fields } = PageUpdateSchema.parse(request.body);
       const page = store.updatePage(pathParam(request, "id"), fields, expectedRev, "gm");
       options.notifyChanged("pages");
       return envelope(response, 200, { page: projectGmPage(page) });
     } catch (error) {
-      if (error instanceof CodexRevisionConflictError) return failure(response, 409, "conflict", error.message);
-      if (error instanceof CodexNotFoundError) return failure(response, 404, "not_found", error.message);
-      return malformed(response, error);
+      // The row is re-read only on a conflict, so the 409 can name the revision the caller lost the
+      // race to. Reading it here rather than carrying it on the error keeps the store's error class a
+      // plain marker; `store.getPage` is one indexed lookup on a path that is already failing.
+      return codexError(response, error, () => store.getPage(pathParam(request, "id"))?.rev);
     }
   });
 
-  router.post(`${CODEX_BASE}/pages/:id/reveal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/pages/:id/reveal`, requireWrite, (request, response) => {
     try {
       const { revealed } = RevealSchema.parse(request.body);
       const page = store.setPageRevealed(pathParam(request, "id"), revealed);
@@ -496,13 +640,13 @@ export function createCodexRouter(options: CodexRouterOptions) {
     }
   });
 
-  router.delete(`${CODEX_BASE}/pages/:id`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/pages/:id`, requireWrite, (request, response) => {
     store.deletePage(pathParam(request, "id"));
     options.notifyChanged("pages");
     return envelope(response, 200, { deleted: true });
   });
 
-  router.post(`${CODEX_BASE}/folders/move`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/folders/move`, requireWrite, (request, response) => {
     try {
       const { from, to } = FolderMoveSchema.parse(request.body);
       const moved = store.moveFolder(from, to);
@@ -512,29 +656,29 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   // Folder records make empty folders persist (a folder is otherwise only implied by the pages inside it). GM-only.
-  router.get(`${CODEX_BASE}/folders`, requireGm, (_request, response) => envelope(response, 200, { folders: store.listFolders() }));
+  router.get(`${CODEX_BASE}/folders`, requireGmRead, (request, response) => readEnvelope(request, response, "gm", { folders: store.listFolders() }));
   // ----- GM preview: mint a real, short-lived player principal (never a role flag on the GM token) -----
-  router.post(`${CODEX_BASE}/preview-session`, requireGm, (_request, response) => {
+  router.post(`${CODEX_BASE}/preview-session`, requireGmSession, (_request, response) => {
     try { return envelope(response, 201, { token: options.issuePreviewSession() }); }
     catch (error) { return malformed(response, error); }
   });
 
-  router.post(`${CODEX_BASE}/folders`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/folders`, requireWrite, (request, response) => {
     try { const path = store.createFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged("pages"); return envelope(response, 201, { path }); }
     catch (error) { return malformed(response, error); }
   });
-  router.post(`${CODEX_BASE}/folders/delete`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/folders/delete`, requireWrite, (request, response) => {
     try { store.deleteFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged("pages"); return envelope(response, 200, { deleted: true }); }
     catch (error) { return malformed(response, error); }
   });
 
-  router.get(`${CODEX_BASE}/pages/:id/revisions`, requireGm, (request, response) => {
+  router.get(`${CODEX_BASE}/pages/:id/revisions`, requireGmRead, (request, response) => {
     const page = store.getPage(pathParam(request, "id"));
     if (!page) return failure(response, 404, "not_found", "That page was not found.");
-    return envelope(response, 200, { revisions: store.listRevisions(page.id) });
+    return readEnvelope(request, response, "gm", { revisions: store.listRevisions(page.id) });
   });
 
-  router.post(`${CODEX_BASE}/pages/:id/revisions/:revisionId/restore`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/pages/:id/revisions/:revisionId/restore`, requireWrite, (request, response) => {
     try {
       const revisionId = Number(request.params.revisionId);
       if (!Number.isInteger(revisionId)) return failure(response, 400, "validation_failed", "The revision id is malformed.");
@@ -549,25 +693,26 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   // ----- Relationships (typed entity edges) -----
 
-  router.post(`${CODEX_BASE}/pages/:id/relationships`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/pages/:id/relationships`, requireWrite, (request, response) => {
     try { const { toPageId, type } = RelationshipCreateSchema.parse(request.body); const relationship = store.createRelationship(pathParam(request, "id"), toPageId, type); options.notifyChanged("pages"); return envelope(response, 201, { relationship }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.delete(`${CODEX_BASE}/relationships/:id`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/relationships/:id`, requireWrite, (request, response) => {
     store.deleteRelationship(pathParam(request, "id"));
     options.notifyChanged("pages");
     return envelope(response, 200, { deleted: true });
   });
 
   router.get(`${CODEX_BASE}/relationships`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const all = store.listAllRelationships();
-    if (role === "gm") return envelope(response, 200, { relationships: all });
+    if (role === "gm") return readEnvelope(request, response, role, { relationships: all });
     // Player graph: project through the choke point - only edges whose BOTH endpoints are revealed pages.
     const revealed = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
-    return envelope(response, 200, { relationships: projectPlayerRelationshipEdges(all, revealed) });
+    return readEnvelope(request, response, role, { relationships: projectPlayerRelationshipEdges(all, revealed) });
   });
 
   /**
@@ -581,49 +726,51 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * over raw rows so that projection is the only gate.
    */
   router.get(`${CODEX_BASE}/links`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const all = store.listAllLinks();
-    if (role === "gm") return envelope(response, 200, { links: projectGmLinkEdges(all) });
+    if (role === "gm") return readEnvelope(request, response, role, { links: projectGmLinkEdges(all) });
     const revealed = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
-    return envelope(response, 200, { links: projectPlayerLinkEdges(all, revealed) });
+    return readEnvelope(request, response, role, { links: projectPlayerLinkEdges(all, revealed) });
   });
 
   // ----- Maps (the atlas tree) -----
 
   router.get(`${CODEX_BASE}/maps`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the atlas.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const rows = store.listMaps();
     // A player's map keeps its parent link only when that parent is itself revealed - resolve per row (mirrors the marker route below).
     const revealed = new Set(rows.filter((row) => row.revealedToPlayers).map((row) => row.id));
     const maps = role === "gm"
       ? rows.map(projectGmMap)
       : rows.map((row) => projectPlayerMap(row, { parentRevealed: row.parentMapId ? revealed.has(row.parentMapId) : false })).filter((map) => map !== null);
-    return envelope(response, 200, { maps });
+    return readEnvelope(request, response, role, { maps });
   });
 
-  router.post(`${CODEX_BASE}/maps`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/maps`, requireWrite, (request, response) => {
     try { const map = store.createMap(MapCreateSchema.parse(request.body)); options.notifyChanged("maps"); return envelope(response, 201, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.patch(`${CODEX_BASE}/maps/:id`, requireGm, (request, response) => {
+  router.patch(`${CODEX_BASE}/maps/:id`, requireWrite, (request, response) => {
     try { const map = store.updateMap(pathParam(request, "id"), MapUpdateSchema.parse(request.body)); options.notifyChanged("maps"); return envelope(response, 200, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.post(`${CODEX_BASE}/maps/:id/parent`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/maps/:id/parent`, requireWrite, (request, response) => {
     try { const map = store.setMapParent(pathParam(request, "id"), MapParentSchema.parse(request.body).parentMapId); options.notifyChanged("maps"); return envelope(response, 200, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.post(`${CODEX_BASE}/maps/:id/reveal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/maps/:id/reveal`, requireWrite, (request, response) => {
     try { const map = store.setMapRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("maps"); return envelope(response, 200, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.delete(`${CODEX_BASE}/maps/:id`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/maps/:id`, requireWrite, (request, response) => {
     store.deleteMap(pathParam(request, "id"));
     options.notifyChanged("maps");
     return envelope(response, 200, { deleted: true });
@@ -632,13 +779,14 @@ export function createCodexRouter(options: CodexRouterOptions) {
   // ----- Markers -----
 
   router.get(`${CODEX_BASE}/maps/:id/markers`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the atlas.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const mapId = pathParam(request, "id");
     const map = store.getMap(mapId);
     if (!map) return failure(response, 404, "not_found", "That map was not found.");
     const rows = store.listMarkers(mapId);
-    if (role === "gm") return envelope(response, 200, { markers: rows.map(projectGmMarker) });
+    if (role === "gm") return readEnvelope(request, response, role, { markers: rows.map(projectGmMarker) });
     if (!map.revealedToPlayers) return failure(response, 404, "not_found", "That map was not found.");
     const markers = rows
       .map((row) => projectPlayerMarker(row, {
@@ -646,7 +794,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
         subMapRevealed: row.subMapId ? (store.getMap(row.subMapId)?.revealedToPlayers ?? false) : false
       }))
       .filter((marker) => marker !== null);
-    return envelope(response, 200, { markers });
+    return readEnvelope(request, response, role, { markers });
   });
 
   /**
@@ -665,13 +813,14 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * The store's `markersForPage` is deliberately ungated, so this projection is the ONLY gate.
    */
   router.get(`${CODEX_BASE}/pages/:id/markers`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the atlas.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const page = store.getPage(pathParam(request, "id"));
     if (!page) return failure(response, 404, "not_found", "That page was not found.");
     if (role !== "gm" && !page.revealedToPlayers) return failure(response, 404, "not_found", "That page was not found.");
     const rows = store.markersForPage(page.id);
-    if (role === "gm") return envelope(response, 200, { markers: rows.map(projectGmMarker) });
+    if (role === "gm") return readEnvelope(request, response, role, { markers: rows.map(projectGmMarker) });
     const markers = rows
       .map((row) => projectPlayerPageMarker({
         marker: row,
@@ -680,25 +829,25 @@ export function createCodexRouter(options: CodexRouterOptions) {
         subMapRevealed: row.subMapId ? (store.getMap(row.subMapId)?.revealedToPlayers ?? false) : false
       }))
       .filter((marker) => marker !== null);
-    return envelope(response, 200, { markers });
+    return readEnvelope(request, response, role, { markers });
   });
 
-  router.post(`${CODEX_BASE}/maps/:id/markers`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/maps/:id/markers`, requireWrite, (request, response) => {
     try { const marker = store.createMarker(pathParam(request, "id"), MarkerCreateSchema.parse(request.body)); options.notifyChanged("markers"); return envelope(response, 201, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.patch(`${CODEX_BASE}/markers/:id`, requireGm, (request, response) => {
+  router.patch(`${CODEX_BASE}/markers/:id`, requireWrite, (request, response) => {
     try { const marker = store.updateMarker(pathParam(request, "id"), MarkerUpdateSchema.parse(request.body)); options.notifyChanged("markers"); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.post(`${CODEX_BASE}/markers/:id/move`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/markers/:id/move`, requireWrite, (request, response) => {
     try { const { x, y } = MarkerMoveSchema.parse(request.body); const marker = store.moveMarker(pathParam(request, "id"), x, y); options.notifyChanged("markers"); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.post(`${CODEX_BASE}/markers/:id/reveal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/markers/:id/reveal`, requireWrite, (request, response) => {
     try { const marker = store.setMarkerRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("markers"); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
@@ -715,7 +864,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * marker, revealed by revealing the marker, and deleted by deleting the marker - one flag on the record
    * every existing marker route already owns.
    */
-  router.put(`${CODEX_BASE}/markers/:id/party`, requireGm, (request, response) => {
+  router.put(`${CODEX_BASE}/markers/:id/party`, requireWrite, (request, response) => {
     try {
       const markerId = pathParam(request, "id");
       const { isParty } = MarkerPartySchema.parse(request.body);
@@ -731,7 +880,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     } catch (error) { return codexError(response, error); }
   });
 
-  router.delete(`${CODEX_BASE}/markers/:id`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/markers/:id`, requireWrite, (request, response) => {
     store.deleteMarker(pathParam(request, "id"));
     options.notifyChanged("markers");
     return envelope(response, 200, { deleted: true });
@@ -740,8 +889,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
   // ----- Journal / timeline -----
 
   router.get(`${CODEX_BASE}/journal`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the journal.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const markerId = typeof request.query.markerId === "string" ? request.query.markerId : undefined;
     const pageId = typeof request.query.pageId === "string" ? request.query.pageId : undefined;
     // A player may read a location's mini-timeline only when the location (marker/page) is itself revealed -
@@ -751,12 +901,12 @@ export function createCodexRouter(options: CodexRouterOptions) {
       if (pageId && !store.getPage(pageId)?.revealedToPlayers) return failure(response, 404, "not_found", "That was not found.");
     }
     const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();
-    if (role === "gm") return envelope(response, 200, { entries: rows.map(projectGmJournalEntry) });
+    if (role === "gm") return readEnvelope(request, response, role, { entries: rows.map(projectGmJournalEntry) });
     // An entry's `sessionNumber` is gated on the SESSION's reveal state, not the entry's, so the caller
     // resolves that set here - the `revealedPageIdsIn` division of labour, one record type later.
     const context = playerSessionNumbers(store);
     const entries = rows.map((row) => projectPlayerJournalEntry(row, context)).filter((entry) => entry !== null);
-    return envelope(response, 200, { entries });
+    return readEnvelope(request, response, role, { entries });
   });
 
   /**
@@ -775,8 +925,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * polymorphic would hand three unrelated callers records they never asked for.
    */
   router.get(`${CODEX_BASE}/timeline`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the chronicle.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const rows = store.listChronicle();
     if (role === "gm") {
       // The GM's `fired` is measured against `campaignInstant()`, the GM's OWN clock; the player branch below
@@ -788,7 +939,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
         // O-3's proposal, per row: only an unapplied downtime has one, and only the GM ever sees it.
         proposedDate: row.kind === "entry" ? store.proposedDateFor(row.entry) : null
       }));
-      return envelope(response, 200, { records });
+      return readEnvelope(request, response, role, { records });
     }
     // The same session context `GET /codex/journal` resolves, for the same reason: an `entry` row's
     // `sessionNumber` reaches a player through `projectPlayerJournalEntry`, which this delegates to.
@@ -800,10 +951,10 @@ export function createCodexRouter(options: CodexRouterOptions) {
     // whether the id travels. The set is the one `GET /codex/relationships` and `GET /codex/links` build.
     const revealedPageIds = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
     const records = rows.map((row) => projectPlayerChronicleRecord(row, { ...context, publishedInstant, revealedPageIds })).filter((record) => record !== null);
-    return envelope(response, 200, { records });
+    return readEnvelope(request, response, role, { records });
   });
 
-  router.post(`${CODEX_BASE}/journal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/journal`, requireWrite, (request, response) => {
     try { const entry = store.createEntry(JournalWriteSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
@@ -824,7 +975,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * entry, and O-2 makes these records hidden-but-revealable exactly like every other one. A kind-specific
    * reveal route would be a second gate to keep in step with the first.
    */
-  router.post(`${CODEX_BASE}/journal/deadline`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/journal/deadline`, requireWrite, (request, response) => {
     try { const entry = store.createDeadline(DeadlineCreateSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
@@ -834,7 +985,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * GM's confirm affordance can say what it will do before it does it; `apply-downtime` below is the only
    * thing that moves anything.
    */
-  router.post(`${CODEX_BASE}/journal/downtime`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/journal/downtime`, requireWrite, (request, response) => {
     try {
       const entry = store.createDowntime(DowntimeCreateSchema.parse(request.body));
       options.notifyChanged("journal");
@@ -850,7 +1001,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * No reveal route of its own, exactly like a deadline and a downtime: `POST /codex/journal/{id}/reveal`
    * already works on every journal kind, and a kind-specific gate is a second gate to keep in step.
    */
-  router.post(`${CODEX_BASE}/journal/milestone`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/journal/milestone`, requireWrite, (request, response) => {
     try { const entry = store.createMilestone(MilestoneCreateSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
@@ -865,7 +1016,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * Applying twice is refused by the store rather than being made a no-op here: "already applied" is a real
    * answer the GM should see, and a silent second success is how a clock quietly gains a week.
    */
-  router.post(`${CODEX_BASE}/journal/:id/apply-downtime`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/journal/:id/apply-downtime`, requireWrite, (request, response) => {
     try {
       const { entry, calendar } = store.applyDowntime(pathParam(request, "id"));
       options.notifyChanged("journal");
@@ -873,17 +1024,17 @@ export function createCodexRouter(options: CodexRouterOptions) {
     } catch (error) { return codexError(response, error); }
   });
 
-  router.patch(`${CODEX_BASE}/journal/:id`, requireGm, (request, response) => {
+  router.patch(`${CODEX_BASE}/journal/:id`, requireWrite, (request, response) => {
     try { const entry = store.updateEntry(pathParam(request, "id"), JournalWriteSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.post(`${CODEX_BASE}/journal/:id/reveal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/journal/:id/reveal`, requireWrite, (request, response) => {
     try { const entry = store.setEntryRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("journal"); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
-  router.delete(`${CODEX_BASE}/journal/:id`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/journal/:id`, requireWrite, (request, response) => {
     store.deleteEntry(pathParam(request, "id"));
     options.notifyChanged("journal");
     return envelope(response, 200, { deleted: true });
@@ -904,49 +1055,51 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * would clump beneath the very entries they contain.
    */
   router.get(`${CODEX_BASE}/sessions`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the session log.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const rows = store.listSessions();
-    if (role === "gm") return envelope(response, 200, { sessions: rows.map(projectGmSession), activeSessionId: store.activeSessionId });
+    if (role === "gm") return readEnvelope(request, response, role, { sessions: rows.map(projectGmSession), activeSessionId: store.activeSessionId });
     // A player gets `activeSessionId: null`, never the real id: it names a record that may well be
     // unrevealed, and a player has no use for it. The KEY stays present so one response shape serves both
     // roles - a key that appears only for the GM is a tell in itself.
-    return envelope(response, 200, { sessions: rows.map(projectPlayerSession).filter((session) => session !== null), activeSessionId: null });
+    return readEnvelope(request, response, role, { sessions: rows.map(projectPlayerSession).filter((session) => session !== null), activeSessionId: null });
   });
 
-  router.post(`${CODEX_BASE}/sessions`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/sessions`, requireWrite, (request, response) => {
     try { const session = store.createSession(SessionCreateSchema.parse(request.body)); options.notifyChanged("sessions"); return envelope(response, 201, { session: projectGmSession(session) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.get(`${CODEX_BASE}/sessions/:id`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the session log.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const session = store.getSession(pathParam(request, "id"));
     if (!session) return failure(response, 404, "not_found", "That session was not found.");
-    if (role === "gm") return envelope(response, 200, { session: projectGmSession(session) });
+    if (role === "gm") return readEnvelope(request, response, role, { session: projectGmSession(session) });
     const projected = projectPlayerSession(session);
     // The SAME 404 an absent session gets, deliberately - never 403.
     if (!projected) return failure(response, 404, "not_found", "That session was not found.");
-    return envelope(response, 200, { session: projected });
+    return readEnvelope(request, response, role, { session: projected });
   });
 
-  router.patch(`${CODEX_BASE}/sessions/:id`, requireGm, (request, response) => {
+  router.patch(`${CODEX_BASE}/sessions/:id`, requireWrite, (request, response) => {
     try {
       const { expectedRev, ...fields } = SessionUpdateSchema.parse(request.body);
       const session = store.updateSession(pathParam(request, "id"), fields, expectedRev, "gm");
       options.notifyChanged("sessions");
       return envelope(response, 200, { session: projectGmSession(session) });
-    } catch (error) { return codexError(response, error); }
+    } catch (error) { return codexError(response, error, () => store.getSession(pathParam(request, "id"))?.rev); }
   });
 
-  router.delete(`${CODEX_BASE}/sessions/:id`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/sessions/:id`, requireWrite, (request, response) => {
     store.deleteSession(pathParam(request, "id"));
     options.notifyChanged("sessions");
     return envelope(response, 200, { deleted: true });
   });
 
-  router.post(`${CODEX_BASE}/sessions/:id/reveal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/sessions/:id/reveal`, requireWrite, (request, response) => {
     try { const session = store.setSessionRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("sessions"); return envelope(response, 200, { session: projectGmSession(session) }); }
     catch (error) { return codexError(response, error); }
   });
@@ -956,7 +1109,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * ABOUT the session (see `setActiveSession` - no `rev`, no `updated_at`), so echoing the row back would
    * imply an edit that did not happen.
    */
-  router.post(`${CODEX_BASE}/sessions/:id/activate`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/sessions/:id/activate`, requireWrite, (request, response) => {
     try { const activeSessionId = store.setActiveSession(pathParam(request, "id")); options.notifyChanged("sessions"); return envelope(response, 200, { activeSessionId }); }
     catch (error) { return codexError(response, error); }
   });
@@ -978,49 +1131,51 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * story to get wrong - and reordering, inserting and deleting would each need their own verb.
    */
   router.get(`${CODEX_BASE}/quests`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the quest log.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const rows = store.listQuests();
-    if (role === "gm") return envelope(response, 200, { quests: rows.map(projectGmQuest) });
+    if (role === "gm") return readEnvelope(request, response, role, { quests: rows.map(projectGmQuest) });
     const quests = rows
       .map((row) => projectPlayerQuest(row, { revealedEntityIds: revealedPageIdsIn(store,row.entityIds) }))
       .filter((quest) => quest !== null);
-    return envelope(response, 200, { quests });
+    return readEnvelope(request, response, role, { quests });
   });
 
-  router.post(`${CODEX_BASE}/quests`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/quests`, requireWrite, (request, response) => {
     try { const quest = store.createQuest(QuestCreateSchema.parse(request.body)); options.notifyChanged("quests"); return envelope(response, 201, { quest: projectGmQuest(quest) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.get(`${CODEX_BASE}/quests/:id`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the quest log.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const quest = store.getQuest(pathParam(request, "id"));
     if (!quest) return failure(response, 404, "not_found", "That quest was not found.");
-    if (role === "gm") return envelope(response, 200, { quest: projectGmQuest(quest) });
+    if (role === "gm") return readEnvelope(request, response, role, { quest: projectGmQuest(quest) });
     const projected = projectPlayerQuest(quest, { revealedEntityIds: revealedPageIdsIn(store,quest.entityIds) });
     // The SAME 404 an absent quest gets, deliberately - never 403.
     if (!projected) return failure(response, 404, "not_found", "That quest was not found.");
-    return envelope(response, 200, { quest: projected });
+    return readEnvelope(request, response, role, { quest: projected });
   });
 
-  router.patch(`${CODEX_BASE}/quests/:id`, requireGm, (request, response) => {
+  router.patch(`${CODEX_BASE}/quests/:id`, requireWrite, (request, response) => {
     try {
       const { expectedRev, ...fields } = QuestUpdateSchema.parse(request.body);
       const quest = store.updateQuest(pathParam(request, "id"), fields, expectedRev);
       options.notifyChanged("quests");
       return envelope(response, 200, { quest: projectGmQuest(quest) });
-    } catch (error) { return codexError(response, error); }
+    } catch (error) { return codexError(response, error, () => store.getQuest(pathParam(request, "id"))?.rev); }
   });
 
-  router.delete(`${CODEX_BASE}/quests/:id`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/quests/:id`, requireWrite, (request, response) => {
     store.deleteQuest(pathParam(request, "id"));
     options.notifyChanged("quests");
     return envelope(response, 200, { deleted: true });
   });
 
-  router.post(`${CODEX_BASE}/quests/:id/reveal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/quests/:id/reveal`, requireWrite, (request, response) => {
     try { const quest = store.setQuestRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("quests"); return envelope(response, 200, { quest: projectGmQuest(quest) }); }
     catch (error) { return codexError(response, error); }
   });
@@ -1039,14 +1194,15 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * `revealedPageIdsIn` division of labour: this ANSWERS the question, the projection makes the decision.
    */
   router.get(`${CODEX_BASE}/standing`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the campaign standing.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const rows = store.listStanding();
-    if (role === "gm") return envelope(response, 200, { standing: rows.map(projectGmStanding) });
+    if (role === "gm") return readEnvelope(request, response, role, { standing: rows.map(projectGmStanding) });
     const standing = rows
       .map((row) => projectPlayerStanding(row, { factionRevealed: pageRevealedFor(store, row.factionPageId) }))
       .filter((row) => row !== null);
-    return envelope(response, 200, { standing });
+    return readEnvelope(request, response, role, { standing });
   });
 
   /**
@@ -1059,7 +1215,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * regardless of scope. Adding a `"standing"` member would widen `CodexRouterOptions` and break `server.ts`'s
    * annotated handler for no behavioural gain.
    */
-  router.put(`${CODEX_BASE}/standing/:factionPageId`, requireGm, (request, response) => {
+  router.put(`${CODEX_BASE}/standing/:factionPageId`, requireWrite, (request, response) => {
     try {
       const { value, reason } = StandingSetSchema.parse(request.body);
       const standing = store.setStanding(pathParam(request, "factionPageId"), value, reason);
@@ -1068,7 +1224,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     } catch (error) { return codexError(response, error); }
   });
 
-  router.post(`${CODEX_BASE}/standing/:factionPageId/reveal`, requireGm, (request, response) => {
+  router.post(`${CODEX_BASE}/standing/:factionPageId/reveal`, requireWrite, (request, response) => {
     try {
       const standing = store.setStandingRevealed(pathParam(request, "factionPageId"), RevealSchema.parse(request.body).revealed);
       options.notifyChanged("journal");
@@ -1096,7 +1252,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * visibility system with different rules, and folding it in would make this the second place that decides
    * what a player can see - exactly what the aggregation rule above exists to prevent.
    */
-  router.get(`${CODEX_BASE}/reveal-audit`, requireGm, (_request, response) => {
+  router.get(`${CODEX_BASE}/reveal-audit`, requireGmRead, (request, response) => {
     const maps = store.listMaps();
     const mapRevealed = new Map(maps.map((map) => [map.id, map.revealedToPlayers]));
     const sessionContext = playerSessionNumbers(store);
@@ -1120,7 +1276,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
         factionTitle: store.getPage(standing.factionPageId)?.title ?? null
       } as const))
     ];
-    return envelope(response, 200, { audit: projectRevealAudit(records) });
+    return readEnvelope(request, response, "gm", { audit: projectRevealAudit(records) });
   });
 
   // ----- Calendar (the world's own months / weekdays / era, and M11's two clocks) -----
@@ -1135,11 +1291,12 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * `currentDate` sourced ONLY from the published date. Neither branch touches the other's projection.
    */
   router.get(`${CODEX_BASE}/calendar`, (request, response) => {
-    const role = roleOf(request);
-    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the calendar.");
+    const role = readGrade(request, response);
+
+    if (!role) return;
     const calendar = store.getCalendar();
     const publishedDate = store.getPublishedDate();
-    return envelope(response, 200, { calendar: role === "gm" ? projectGmCalendar(calendar, publishedDate) : projectPlayerCalendar(calendar, publishedDate) });
+    return readEnvelope(request, response, role, { calendar: role === "gm" ? projectGmCalendar(calendar, publishedDate) : projectPlayerCalendar(calendar, publishedDate) });
   });
 
   /**
@@ -1147,7 +1304,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * answers with the GM projection, the same shape the GM's GET returns, so the console does not have to
    * hold two spellings of one object.
    */
-  router.put(`${CODEX_BASE}/calendar`, requireGm, (request, response) => {
+  router.put(`${CODEX_BASE}/calendar`, requireWrite, (request, response) => {
     try { const calendar = store.setCalendar(CalendarSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) }); }
     catch (error) { return malformed(response, error); }
   });
@@ -1160,7 +1317,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * Registered after `GET`/`PUT /codex/calendar`; there is no param route on `/calendar` at all, so the
    * literal `/calendar/publish` segment cannot be mis-matched.
    */
-  router.post(`${CODEX_BASE}/calendar/publish`, requireGm, (_request, response) => {
+  router.post(`${CODEX_BASE}/calendar/publish`, requireWrite, (_request, response) => {
     try {
       const calendar = store.publishCampaignDate();
       options.notifyChanged("journal");
@@ -1190,7 +1347,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * The store still bumps the coarse codex revision inside each write's transaction (every write does), so an
    * ETag-driven reader is not left holding a stale token; there is simply no content to push.
    */
-  router.get(`${CODEX_BASE}/settings`, requireGm, (_request, response) => envelope(response, 200, { settings: store.getSettings() }));
+  router.get(`${CODEX_BASE}/settings`, requireGmRead, (request, response) => readEnvelope(request, response, "gm", { settings: store.getSettings() }));
 
   /**
    * Replaces the settings wholesale and answers with the full READ shape, never with what was sent - so a caller
@@ -1204,7 +1361,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * carrying them is a caller asserting something it does not know, and hearing so is better than being
    * quietly overruled. `CodexSettingsInput` has no shape for them either, so there is no path that stores them.
    */
-  router.put(`${CODEX_BASE}/settings`, requireGm, (request, response) => {
+  router.put(`${CODEX_BASE}/settings`, requireWrite, (request, response) => {
     try { return envelope(response, 200, { settings: store.setSettings(CodexSettingsSchema.parse(request.body)) }); }
     catch (error) { return malformed(response, error); }
   });
@@ -1222,20 +1379,20 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * OFF - a GM who disabled it is exactly the GM reclaiming space - and it never touches `codex_pages`: a page
    * as it stands now is not a version of itself.
    */
-  router.delete(`${CODEX_BASE}/page-revisions`, requireGm, (request, response) => {
+  router.delete(`${CODEX_BASE}/page-revisions`, requireWrite, (request, response) => {
     try { return envelope(response, 200, { deleted: store.deleteRevisionsOlderThan(RevisionsDeleteSchema.parse(request.body).olderThanDays) }); }
     catch (error) { return malformed(response, error); }
   });
 
   // ----- Export (GM backup / round-trip) -----
 
-  router.get(`${CODEX_BASE}/export`, requireGm, (_request, response) => {
-    return envelope(response, 200, { codex: store.exportBundle(), exportedAt: new Date().toISOString() });
+  router.get(`${CODEX_BASE}/export`, requireGmRead, (request, response) => {
+    return readEnvelope(request, response, "gm", { codex: store.exportBundle(), exportedAt: new Date().toISOString() });
   });
 
   // ----- Media (page banners + inline images) -----
 
-  router.post(CODEX_ASSET_BASE, requireGm, express.raw({ type: () => true, limit: "11mb" }), async (request, response) => {
+  router.post(CODEX_ASSET_BASE, requireWrite, express.raw({ type: () => true, limit: "11mb" }), async (request, response) => {
     try {
       if (!Buffer.isBuffer(request.body) || request.body.length === 0) return failure(response, 400, "validation_failed", "Upload the image as the request body.");
       const filename = typeof request.query.filename === "string" ? request.query.filename : "image";
@@ -1262,8 +1419,15 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return response.send(content);
   });
 
+  /**
+   * The catch-all. It used to forward `error.message` to the caller, which on a SQLite failure is a table
+   * name, a column name, or a file path - detail a player session and an integration credential have no
+   * business receiving, and detail nobody can act on anyway. One fixed sentence out, the real error to
+   * the server log, matching the game surface's discipline.
+   */
   router.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
-    return failure(response, 500, "internal_error", error instanceof Error ? error.message : "The codex request failed.");
+    console.error("codex request failed:", error);
+    return failure(response, 500, "internal_error", "The codex request failed.");
   });
   return router;
 }

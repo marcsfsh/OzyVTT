@@ -38,6 +38,9 @@ async function fixture() {
     // The preview token is a REAL player principal, exactly as `auth.issuePreviewPlayerSession()` mints
     // one in production - so it authorizes as a player and gets the player projection, nothing else.
     authorizePlayer: (token) => token === "player-token" || token === PREVIEW_TOKEN,
+    // Two single-scope credentials and nothing else, so "has codex:read" and "has codex:write" are
+    // genuinely different tokens here - a verifier that ignored the scope would pass a weaker test.
+    verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
     notifyChanged: () => {},
     issuePreviewSession: () => PREVIEW_TOKEN
   }));
@@ -50,6 +53,9 @@ async function fixture() {
 const PREVIEW_TOKEN = "preview-player-token";
 const GM = { authorization: "Bearer gm-token", "content-type": "application/json" };
 const PLAYER = { authorization: "Bearer player-token", "content-type": "application/json" };
+/** Integration credentials, one per scope: `codex:write` deliberately does NOT imply `codex:read`. */
+const INTEGRATION_READ = { authorization: "Bearer int-codex:read", "content-type": "application/json" };
+const INTEGRATION_WRITE = { authorization: "Bearer int-codex:write", "content-type": "application/json" };
 type Json = Record<string, any>;
 async function body(response: Response) { return response.json() as Promise<Json>; }
 const get = (base: string, path: string, headers: Record<string, string>) => fetch(`${base}${path}`, { headers });
@@ -92,8 +98,10 @@ describe("codex HTTP viewer-safety boundary", () => {
     const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", playerBody: "", gmBody: "Meets under the inn." }));
     const secretId = secret.data.page.id as string;
 
-    // Minting is GM-only.
-    expect((await post(base, "/api/v1/codex/preview-session", PLAYER, {})).status).toBe(401);
+    // Minting is GM-only - and a player is authenticated-and-refused, which is a 403, not a 401.
+    expect((await post(base, "/api/v1/codex/preview-session", PLAYER, {})).status).toBe(403);
+    // Not even a codex:write credential: this route hands out a player SESSION TOKEN.
+    expect((await post(base, "/api/v1/codex/preview-session", INTEGRATION_WRITE, {})).status).toBe(403);
     const minted = await post(base, "/api/v1/codex/preview-session", GM, {});
     expect(minted.status).toBe(201);
     const token = (await body(minted)).data.token as string;
@@ -140,12 +148,25 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(JSON.stringify(playerView)).not.toContain("cultist");
   });
 
-  it("rejects player writes and missing auth with the right envelopes", async () => {
+  /**
+   * The 401/403 split, which is the whole distinction: 401 means "I could not read a credential", 403
+   * means "I read yours and you may not do this". A player who writes used to get 401, which told an
+   * authenticated caller to authenticate - advice that cannot work, and which a retrying client acts on.
+   */
+  it("rejects player writes with 403 and missing auth with 401", async () => {
     const { base } = await fixture();
-    expect((await post(base, "/api/v1/codex/pages", PLAYER, { title: "Nope" })).status).toBe(401);
+    const denied = await post(base, "/api/v1/codex/pages", PLAYER, { title: "Nope" });
+    expect(denied.status).toBe(403);
+    expect((await body(denied)).error.code).toBe("forbidden");
     const noauth = await get(base, "/api/v1/codex/pages", { "content-type": "application/json" });
     expect(noauth.status).toBe(401);
-    expect((await body(noauth)).ok).toBe(false);
+    const noauthBody = await body(noauth);
+    expect(noauthBody.ok).toBe(false);
+    expect(noauthBody.error.code).toBe("unauthenticated");
+    // A token that was PRESENTED and failed is 403 too, never 401 - it is not a missing credential.
+    const junk = await get(base, "/api/v1/codex/pages", { authorization: "Bearer nonsense", "content-type": "application/json" });
+    expect(junk.status).toBe(403);
+    expect((await body(junk)).error.code).toBe("forbidden");
   });
 
   it("returns a 409 conflict envelope on a stale expectedRev", async () => {
@@ -547,7 +568,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(got.data.calendar.yearName).toBe("AE");
     const entry = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Dawn.", inWorldDate: { year: 0, month: 0, day: 1 } }));
     expect(entry.data.entry.inWorldLabel).toBe("Sol, Rise 1, 0 AE"); // weekday now wired into the label
-    expect((await put(base, "/api/v1/codex/calendar", PLAYER, cal)).status).toBe(401); // players cannot edit it (GM only)
+    expect((await put(base, "/api/v1/codex/calendar", PLAYER, cal)).status).toBe(403); // players cannot edit it (authenticated, refused)
   });
 });
 
@@ -840,7 +861,7 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
       await post(base, `/api/v1/codex/sessions/${sessionId}/reveal`, PLAYER, { revealed: true }),
       await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, PLAYER, {}),
       await fetch(`${base}/api/v1/codex/sessions/${sessionId}`, { method: "DELETE", headers: PLAYER })
-    ]) expect(response.status).toBe(401);
+    ]) expect(response.status).toBe(403);
     const noauth = await get(base, "/api/v1/codex/sessions", { "content-type": "application/json" });
     expect(noauth.status).toBe(401);
     expect((await body(noauth)).ok).toBe(false);
@@ -1062,7 +1083,7 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
       await patch(base, `/api/v1/codex/quests/${questId}`, PLAYER, { gmBody: "mine now" }),
       await post(base, `/api/v1/codex/quests/${questId}/reveal`, PLAYER, { revealed: true }),
       await fetch(`${base}/api/v1/codex/quests/${questId}`, { method: "DELETE", headers: PLAYER })
-    ]) expect(response.status).toBe(401);
+    ]) expect(response.status).toBe(403);
     const noauth = await get(base, "/api/v1/codex/quests", { "content-type": "application/json" });
     expect(noauth.status).toBe(401);
     expect((await body(noauth)).ok).toBe(false);
@@ -1224,11 +1245,11 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
     const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8 } }))).data.entry as Json;
 
-    for (const headers of [PLAYER, { "content-type": "application/json" }]) {
+    for (const [headers, status, code] of [[PLAYER, 403, "forbidden"], [{ "content-type": "application/json" }, 401, "unauthenticated"]] as const) {
       for (const path of ["/api/v1/codex/journal/deadline", "/api/v1/codex/journal/downtime", "/api/v1/codex/calendar/publish", `/api/v1/codex/journal/${downtime.id}/apply-downtime`]) {
         const response = await post(base, path, headers, { downtime: { who: "x", activity: "y", days: 1 }, inWorldDate: { year: 1492, month: 0, day: 1 } });
-        expect(response.status, `${path}`).toBe(401);
-        expect((await body(response)).error.code).toBe("unauthenticated");
+        expect(response.status, `${path}`).toBe(status);
+        expect((await body(response)).error.code, `${path}`).toBe(code);
       }
     }
     // ...and none of those refusals moved anything.
@@ -1321,7 +1342,7 @@ describe("Codex routes vs the published contract", () => {
     cleanups.push(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
     const router = createCodexRouter({
       store, assets, authorizeGm: (token) => token === "gm-token", authorizePlayer: () => false,
-      notifyChanged: () => {}, issuePreviewSession: () => PREVIEW_TOKEN
+      verifyIntegration: () => null, notifyChanged: () => {}, issuePreviewSession: () => PREVIEW_TOKEN
     }) as unknown as { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };
     const byPath = new Map<string, Set<string>>();
     for (const layer of router.stack) {
@@ -1525,10 +1546,10 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
   /** T-9: the audit is a GM surface. A player is refused, and so is an anonymous caller. */
   it("refuses the reveal audit to a player and to an anonymous caller", async () => {
     const { base } = await fixture();
-    for (const headers of [PLAYER, { "content-type": "application/json" }]) {
+    for (const [headers, status, code] of [[PLAYER, 403, "forbidden"], [{ "content-type": "application/json" }, 401, "unauthenticated"]] as const) {
       const response = await get(base, "/api/v1/codex/reveal-audit", headers);
-      expect(response.status).toBe(401);
-      expect((await body(response)).error.code).toBe("unauthenticated");
+      expect(response.status).toBe(status);
+      expect((await body(response)).error.code).toBe(code);
     }
     expect((await get(base, "/api/v1/codex/reveal-audit", GM)).status).toBe(200);
   });
@@ -1763,13 +1784,13 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     expect(payload.revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 });
   });
 
-  it("is GM-only on BOTH sides, and on the delete — a player gets 401 and changes nothing", async () => {
+  it("is GM-only on BOTH sides, and on the delete — a player gets 403 and changes nothing", async () => {
     const { base, store } = await fixture();
     store.createPage({ title: "Barovia", playerBody: "a valley" });
 
-    expect((await get(base, "/api/v1/codex/settings", PLAYER)).status).toBe(401);
-    expect((await put(base, "/api/v1/codex/settings", PLAYER, { revisionHistory: { enabled: false, windowMinutes: 0 } })).status).toBe(401);
-    expect((await del(base, "/api/v1/codex/page-revisions", PLAYER, { olderThanDays: 0 })).status).toBe(401);
+    expect((await get(base, "/api/v1/codex/settings", PLAYER)).status).toBe(403);
+    expect((await put(base, "/api/v1/codex/settings", PLAYER, { revisionHistory: { enabled: false, windowMinutes: 0 } })).status).toBe(403);
+    expect((await del(base, "/api/v1/codex/page-revisions", PLAYER, { olderThanDays: 0 })).status).toBe(403);
     // ...and the refusals really refused: the settings are untouched and the history is intact.
     expect((await settings(base, GM)).revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 1, versionBytes: expect.any(Number) });
   });

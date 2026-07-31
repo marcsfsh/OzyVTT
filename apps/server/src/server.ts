@@ -406,6 +406,9 @@ export function createServer(options: CreateServerOptions) {
     assets: codexAssets,
     authorizeGm,
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+    // The same credential store the game router gets, so one minted token is checked one way. A codex
+    // credential acts at GM grade; the scope decides read-vs-write, and `admin` implies both.
+    verifyIntegration: (token, scope) => credentials.verify(token, scope),
     notifyChanged: notifyCodexChanged,
     issuePreviewSession: () => auth.issuePreviewPlayerSession()
   }));
