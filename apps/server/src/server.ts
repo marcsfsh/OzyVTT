@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { API_VERSION } from "@vtt/api-contract";
+import { API_VERSION, CODEX_PATHS } from "@vtt/api-contract";
 import type { ClientToServerEvents, ClientRole, CombatLogEntry, GameState, ServerToClientEvents, TableEvent } from "@vtt/domain";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
@@ -278,6 +278,11 @@ export function createServer(options: CreateServerOptions) {
   // works when it runs FIRST - hence this one line above the global parser rather than inside the
   // homebrew router.
   app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
+  // A codex backup bundle reaches tens of megabytes (two prose layers per page, plus the whole revision
+  // history), which does not fit the global limit below. Same one-line arrangement, same reason:
+  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
+  // works when it runs FIRST.
+  app.use(CODEX_PATHS.import, express.json({ limit: "64mb" }));
   // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
   // by the operation itself) fit through the HTTP surface too.
   app.use(express.json({ limit: "512kb" }));

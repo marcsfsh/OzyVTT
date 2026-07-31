@@ -3530,11 +3530,14 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
    * consumer reads this bundle by key, so this is not about JSON ordering for its own sake - it is the
    * guard that stops a future fifth-time addition being slipped into the middle of the record.
    */
-  it("appends the three keys LAST, leaving the previous eleven in their established order", () => {
+  it("appends each new key LAST, leaving every previous one in its established order", () => {
     expect(Object.keys(store.exportBundle())).toEqual([
       "pages", "maps", "markers", "journal", "relationships", "sessions", "activeSessionId", "quests",
       "publishedDate", "standing", "partyMarkerId",
-      "calendar", "folders", "revisions"
+      "calendar", "folders", "revisions",
+      // D16: the settings knobs exist nowhere else, so a bundle without them restores a codex whose
+      // preferences have silently reverted. Appended last, like every key before it.
+      "settings"
     ]);
   });
 });
@@ -4640,5 +4643,140 @@ describe("CodexStore quest history (D11, R5)", () => {
     // stays hidden) and an unrecognised status reads as `active`, the harmless one.
     expect(questEventPayloadOf(store.getEntry(record.id)!)).toEqual({ questId: "", status: "active" });
     expect(projectPlayerJournalEntry(store.setEntryRevealed(record.id, true), { unrevealedSessionIds: new Set<string>(), revealedQuestIds: new Set([quest.id]) })).toBeNull();
+  });
+});
+
+/**
+ * D16: true backup AND restore. The contract's round-trip promise finally becomes true.
+ *
+ * The three things worth proving, in order of what would hurt most if they were wrong: a round trip is
+ * lossless, a bad bundle leaves the codex EXACTLY as it was, and a backup taken before this feature
+ * existed still restores (director ruling R1 - honoring the GM's existing backups is the whole point).
+ */
+describe("CodexStore import — replace, all-or-nothing (D16)", () => {
+  /** A codex with one of everything, so a round trip has something to lose. */
+  const populate = () => {
+    store.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["First", "Second"], currentDate: { year: 1492, month: 1, day: 12 } });
+    store.publishCampaignDate();
+    const faction = store.createPage({ title: "The Harpers", entityType: "faction", playerBody: "Meddlers.", gmBody: "Compromised.", tags: ["faction"], folder: "Factions" });
+    const place = store.createPage({ title: "Vallaki", entityType: "location", playerBody: "A walled town. See [[The Harpers]].", revealedToPlayers: true, inWorldDate: null });
+    store.createConnection(place.id, { toPageId: faction.id, label: "watched by", layer: "gm" });
+    store.setStanding(faction.id, -40, "Killed their envoy");
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional", tags: ["realm"] });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label: "Vallaki", pageIds: [place.id], tags: ["stop"] });
+    store.setPartyMarker(marker.id);
+    const session = store.createSession({ sessionNumber: 4, prepBody: "The ambush.", recapBody: "They crossed.", attendees: ["Ozy"], tags: ["arc-one"] });
+    store.setActiveSession(session.id);
+    store.createQuest({ title: "Find the Sunsword", playerBody: "Search the crypt.", gmBody: "It is a fake.", tags: ["main"] });
+    store.createEntry({ playerText: "We arrived in [[Vallaki]].", gmText: "Strahd watched.", tags: ["travel"], revealedToPlayers: true });
+    store.createDowntime({ playerText: "A month forging.", downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: faction.id } });
+    store.updatePage(place.id, { playerBody: "A walled town, and a wall." }, undefined, "gm");   // a revision to carry
+    return { faction, place, map, marker, session };
+  };
+
+  it("round-trips a whole codex: export, wipe, import, and the bundle comes back the same", () => {
+    populate();
+    const before = store.exportBundle();
+    const beforeJson = JSON.stringify(before);
+
+    // Wipe by importing an EMPTY bundle first, so the restore below is provably doing the work.
+    store.importBundle({});
+    expect(store.listPages()).toEqual([]);
+    expect(store.listSessions()).toEqual([]);
+
+    const counts = store.importBundle(JSON.parse(beforeJson) as unknown);
+    // 4 journal rows: the note, the downtime, `setStanding`'s standing record and `createQuest`'s
+    // start record - the two auto-written kinds ride in the bundle like any other entry.
+    expect(counts).toEqual({ pages: 2, folders: 1, maps: 1, markers: 1, journal: 4, connections: 1, sessions: 1, quests: 1, standing: 1, revisions: expect.any(Number) });
+    expect(counts.revisions).toBeGreaterThan(0);
+    // The bundle is byte-identical on the way back out, which is the strongest statement of "lossless"
+    // available: every id, every timestamp, every rev, both bodies, the calendar, the two clocks.
+    expect(JSON.stringify(store.exportBundle())).toBe(beforeJson);
+
+    // ...and the codex WORKS afterwards, not merely reads back: revision restore still resolves by the
+    // integer ids the bundle preserved, so a saved `.../revisions/{id}/restore` URL survives a restore.
+    const pageWithHistory = store.listPages().find((page) => page.title === "Vallaki")!;
+    const revision = store.listRevisions(pageWithHistory.id).at(-1)!;
+    expect(store.restoreRevision(pageWithHistory.id, revision.id, "gm").playerBody).toContain("A walled town");
+    // Derived link rows were rebuilt, not restored from a stale copy.
+    expect(store.listAllConnections().some((edge) => edge.origin === "mention")).toBe(true);
+    // The search index was rebuilt too, with gate 1 intact: prep is GM-only.
+    expect(store.searchAll("gm", "ambush").hits.some((hit) => hit.kind === "session")).toBe(true);
+    expect(store.searchAll("player", "ambush").hits).toEqual([]);
+  });
+
+  it("writes NOTHING when a bundle is bad — the codex is exactly as it was", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const revisionBefore = store.revision;
+
+    const bundle = JSON.parse(before) as { pages: Array<Record<string, unknown>>; sessions: Array<Record<string, unknown>> };
+    // A record that fails validation MID-BUNDLE: the pages before it would already have been inserted if
+    // the whole thing were not one transaction, which is exactly what this is here to prove.
+    const corrupt = { ...bundle, pages: [...bundle.pages, { ...bundle.pages[0], id: "not-a-uuid" }] };
+    expect(() => store.importBundle(corrupt)).toThrow();
+    expect(JSON.stringify(store.exportBundle()), "row for row, the codex is untouched").toBe(before);
+    expect(store.revision, "...and nothing bumped the revision, so no client was told to refetch").toBe(revisionBefore);
+
+    // The two CROSS-record invariants are refused up front with copy a GM can act on, rather than
+    // surfacing as a mid-transaction constraint failure.
+    expect(() => store.importBundle({ ...bundle, sessions: [{ ...bundle.sessions[0], id: crypto.randomUUID() }, { ...bundle.sessions[0], id: crypto.randomUUID() }] })).toThrow(/same number/i);
+    expect(JSON.stringify(store.exportBundle())).toBe(before);
+  });
+
+  it("restores a PRE-VERSIONING bundle — the backups a GM already has (director ruling R1)", () => {
+    // Hand-built in the shape an export produced BEFORE this engagement: no `settings`, no `tags` on
+    // sessions or quests, no `layer` on a relationship, a slug `type` rather than a label, and journal
+    // rows carrying a bare `sessionNumber` instead of a `sessionId`.
+    const pageId = crypto.randomUUID(), otherId = crypto.randomUUID();
+    const legacy = {
+      pages: [
+        { id: pageId, title: "Barovia", entityType: "location", fields: {}, gmFields: {}, folder: null, tags: [], playerBody: "A misty valley.", gmBody: "", revealedToPlayers: true, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 3, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-02T00:00:00.000Z" },
+        { id: otherId, title: "Strahd", entityType: "character", fields: { race: "Vampire" }, gmFields: {}, folder: null, tags: [], playerBody: "", gmBody: "Rules [[Barovia]].", revealedToPlayers: false, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 1, createdAt: "", updatedAt: "" }
+      ],
+      maps: [], markers: [],
+      journal: [
+        { id: crypto.randomUUID(), playerText: "We arrived.", gmText: null, revealedToPlayers: true, attachMarkerId: null, attachPageId: null, kind: "note", sourceEncounterId: null, sessionNumber: 4, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, sortKey: 1, tags: [], payload: null, createdAt: "", updatedAt: "" },
+        { id: crypto.randomUUID(), playerText: "And again.", gmText: null, revealedToPlayers: true, attachMarkerId: null, attachPageId: null, kind: "note", sourceEncounterId: null, sessionNumber: 9, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, sortKey: 2, tags: [], payload: null, createdAt: "", updatedAt: "" }
+      ],
+      relationships: [{ id: crypto.randomUUID(), fromPageId: otherId, toPageId: pageId, type: "located-in", createdAt: "" }],
+      sessions: [{ id: crypto.randomUUID(), sessionNumber: 4, realDate: null, attendees: [], prepBody: "", recapBody: "We crossed.", revealedToPlayers: true, status: "played", rev: 1, createdAt: "", updatedAt: "" }],
+      activeSessionId: null, quests: [], publishedDate: null, standing: [], partyMarkerId: null,
+      calendar: { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: ["First"] }, folders: [], revisions: []
+    };
+
+    const counts = store.importBundle(legacy);
+    // The orphan number 9 SYNTHESIZED a session, the v19 rule re-applied so one rule governs both paths
+    // into this state - rather than orphaning an entry's number, which is data loss.
+    expect(counts.sessions).toBe(2);
+    const synthesized = store.listSessions().find((session) => session.sessionNumber === 9)!;
+    expect(synthesized).toMatchObject({ status: "played", revealedToPlayers: false, prepBody: "", recapBody: "" });
+    expect(store.listTimeline().map((entry) => entry.sessionNumber).sort()).toEqual([4, 9]);
+    expect(store.listTimeline().every((entry) => entry.sessionId !== null), "every legacy number became a real join").toBe(true);
+
+    // Missing keys DEFAULTED rather than failing: no tags, a `player` layer, and the settings untouched.
+    expect(store.listSessions().every((session) => session.tags.length === 0)).toBe(true);
+    const edge = store.listAllConnections().find((row) => row.origin === "declared")!;
+    expect(edge.layer).toBe("player");
+    // ...and an old SLUG `type` lands as the label v22's relabel would have made it.
+    expect(edge.label).toBe("located in");
+    expect(store.getSettings().autosave).toEqual({ enabled: true, intervalSeconds: 1 });
+    // The mention in Strahd's GM body was re-extracted on the GM layer, from text, not from a stored row.
+    expect(store.listAllConnections().find((row) => row.origin === "mention")).toMatchObject({ fromId: otherId, toPageId: pageId, layer: "gm" });
+  });
+
+  it("fabricates no history: an import writes no quest records and no revision snapshots", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    store.updateQuest(quest.id, { status: "completed" }, undefined);
+    const bundle = JSON.parse(JSON.stringify(store.exportBundle())) as unknown;
+    const historyBefore = store.listTimeline().filter((entry) => entry.kind === "quest").length;
+    expect(historyBefore).toBe(2);
+
+    store.importBundle(bundle);
+    // Exactly the two records the bundle carried - NOT two more from re-running create + status change.
+    // A restore reproduces a past state; it does not perform a hundred authoring events.
+    expect(store.listTimeline().filter((entry) => entry.kind === "quest")).toHaveLength(2);
+    // ...and no page revision was snapshotted by the raw page writes either.
+    expect(store.getSettings().revisionHistory.versionCount).toBe(0);
   });
 });

@@ -2823,7 +2823,7 @@ CT-8: records a MILESTONE - the party reached a level, and why. `level` is the l
 
 ### `PATCH /api/v1/codex/journal/{id}`
 
-Edits a journal entry.
+Edits a journal entry; an omitted field is left alone. A `downtime` group edits a downtime record's own `who`/`activity`/`characterPageId` - **400** on any other kind of entry, and `days` is immutable (sending it is a 400, because it is what the campaign clock already moved by).
 
 **Auth:** Integration credential with `codex:write` · GM session
 
@@ -2843,6 +2843,10 @@ Edits a journal entry.
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
+| `downtime` | object | no | D12: edits a DOWNTIME record's own facts. **400 when the entry is not a downtime record** - a caller sending downtime details to a milestone has misunderstood something, and hearing so beats being quietly overruled. This is the adoption path the tracker needs: it is what lets a GM link the free-text rows that already exist to real character pages, so D12 works for downtime recorded before the upgrade as well as after it. `days` is deliberately NOT a member and sending it is a 400: it is what `apply-downtime` moved the campaign clock by, so editing it afterwards would leave the clock disagreeing with the record that justified it. A typo in `days` is a delete-and-recreate. `applied` is likewise absent - confirming the clock move is its own explicit act. |
+| `downtime.who` | string | no |  |
+| `downtime.activity` | string | no |  |
+| `downtime.characterPageId` | string \| null | no | An id naming no page is a 404; `null` clears the link and leaves `who` as the display fallback. |
 
 **Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
@@ -3189,11 +3193,27 @@ Deletes every page revision authored more than `olderThanDays` ago, and answers 
 
 ### `GET /api/v1/codex/export`
 
-A full codex backup bundle. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds. **There is no restore route yet**: the bundle is a complete record, but reloading one currently means hand-editing the SQLite file. `POST /codex/import` is planned and this description will name it the day it exists - it deliberately does not promise it today.
+A full codex backup bundle. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds. Round-trips through `POST /codex/import`.
 
 **Auth:** Integration credential with `codex:read` · GM session
 
 **Responses:** `200` Success - envelope of `CodexExportData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
+
+### `POST /api/v1/codex/import`
+
+Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim - `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the same v1 shape (every backup taken before this feature existed lacks the key and MUST restore), and a value other than 1 is a 400. This is the one genuinely destructive route in the Codex - the guardrails are GM/`codex:write` authorization and the caller's own confirmation, and the honest advice is to export first.
+
+**Auth:** Integration credential with `codex:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `codex` | object (free-form) | yes | The export's `codex` bundle, verbatim. |
+| `bundleVersion` | integer (≥ 1) | no | Optional. Absent = a pre-versioning v1 bundle. Anything but 1 is refused: "This backup was made by a newer version of the app. Update, then restore." |
+| `exportedAt` | string (date-time) | no | Accepted and IGNORED, so a saved export file can be POSTed without editing. |
+
+**Responses:** `200` Success - envelope of `CodexImportedData` · errors `400` `401` `403` `413`
 
 ### `POST /api/v1/codex-assets`
 
@@ -3509,8 +3529,9 @@ A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `codex` | object (free-form) | yes | Opaque backup bundle. **Not yet restorable through this API** - there is no import route, and the "round-trips via the codex import surface" this field used to claim was aspirational. |
+| `codex` | object (free-form) | yes | Opaque backup bundle; round-trips through `POST /codex/import`. |
 | `exportedAt` | string (date-time) | yes |  |
+| `bundleVersion` | const `1` | yes | The bundle FORMAT version - a fact about the file, not about the world, which is why it sits beside `codex` rather than inside it. `POST /codex/import` refuses anything else. |
 
 ### `CodexFolderCreatedData`
 
@@ -3529,6 +3550,30 @@ A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `moved` | integer (≥ 0) | yes |  |
+
+### `CodexImportCounts`
+
+What the database actually holds after the restore - its own row counts, not what the bundle claimed.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `pages` | integer (≥ 0) | yes |  |
+| `folders` | integer (≥ 0) | yes |  |
+| `maps` | integer (≥ 0) | yes |  |
+| `markers` | integer (≥ 0) | yes |  |
+| `journal` | integer (≥ 0) | yes |  |
+| `connections` | integer (≥ 0) | yes | DECLARED connections. Mention edges are derived from body text and are rebuilt by the restore, so counting them would double-count the rebuild's own output. |
+| `sessions` | integer (≥ 0) | yes |  |
+| `quests` | integer (≥ 0) | yes |  |
+| `standing` | integer (≥ 0) | yes |  |
+| `revisions` | integer (≥ 0) | yes |  |
+
+### `CodexImportedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `replaced` | const `true` | yes |  |
+| `counts` | CodexImportCounts | yes |  |
 
 ### `CodexInWorldDate`
 

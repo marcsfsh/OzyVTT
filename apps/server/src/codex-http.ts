@@ -3,7 +3,7 @@ import express, { Router, type NextFunction, type Request, type Response } from 
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
-import { CodexNotFoundError, CodexRevisionConflictError, downtimePayloadOf, type CodexSearchRef, type CodexStore } from "./codex-store.js";
+import { CODEX_BUNDLE_VERSION, CodexNotFoundError, CodexRevisionConflictError, downtimePayloadOf, type CodexSearchRef, type CodexStore } from "./codex-store.js";
 import { projectGmCalendar, projectGmChronicleRecord, projectGmConnections, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageConnections, projectGmPageSummary, projectGmQuest, projectGmSearchHit, projectGmSession, projectGmStanding, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerConnections, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageConnections, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerSearchHit, projectPlayerSession, projectPlayerStanding, projectRevealAudit, type CodexRevealAuditRecord, type CodexSearchRecord, type PlayerConnectionContext, type PlayerSessionNumberContext } from "./codex-projections.js";
 
 /**
@@ -170,6 +170,21 @@ const DowntimeInputSchema = z.object({
 }).strict();
 const DowntimeCreateSchema = JournalWriteSchema.extend({ downtime: DowntimeInputSchema });
 /**
+ * D12: the journal UPDATE body, which is the create body plus one narrow payload group.
+ *
+ * The group carries exactly three keys. `days` is absent DELIBERATELY, not by oversight: it is what
+ * `applyDowntime` moved the campaign clock by, so editing it afterwards would leave the clock disagreeing
+ * with the record that justified it - `.strict()` therefore 400s a stray `days`, which is the honest
+ * answer rather than a silent drop. `applied` is absent for the same reason it is absent from create.
+ */
+const JournalUpdateSchema = JournalWriteSchema.extend({
+  downtime: z.object({
+    who: z.string().trim().max(120).optional(),
+    activity: z.string().trim().max(120).optional(),
+    characterPageId: z.string().uuid().nullable().optional()
+  }).strict().optional()
+});
+/**
  * M12 milestones (CT-8) - `DowntimeCreateSchema`'s shape verbatim, one kind later, so the third structured
  * journal kind is composed the way the first two are rather than inventing a third convention.
  *
@@ -315,6 +330,22 @@ const CodexSettingsSchema = z.object({
  * mirrors, because a cutoff date past the representable range would otherwise 500 rather than 400.
  */
 const RevisionsDeleteSchema = z.object({ olderThanDays: z.number().int().min(0).max(36_500) }).strict();
+/**
+ * D16 / director ruling R1: the restore body IS a saved export's `data`, posted back unedited.
+ *
+ * `bundleVersion` is OPTIONAL, and that is the whole point of the feature: every backup a GM already has
+ * was taken before this key existed, and refusing those would make "true backup and restore" a promise
+ * only kept for files created after the upgrade. Absent means a pre-versioning v1 bundle. Anything other
+ * than 1 is refused - a bundle from a NEWER build may carry shapes this one cannot honour, and silently
+ * dropping them is the failure mode a restore must not have.
+ *
+ * `exportedAt` is accepted and ignored, so nothing has to be stripped from the file before POSTing it.
+ */
+const CodexImportSchema = z.object({
+  codex: z.record(z.string(), z.unknown()),
+  bundleVersion: z.number().int().refine((value) => value === CODEX_BUNDLE_VERSION, { message: "This backup was made by a newer version of the app. Update, then restore." }).optional(),
+  exportedAt: z.string().optional()
+}).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
   months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
@@ -1192,7 +1223,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.patch(`${CODEX_BASE}/journal/:id`, requireWrite, (request, response) => {
-    try { const entry = store.updateEntry(pathParam(request, "id"), JournalWriteSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.updateEntry(pathParam(request, "id"), JournalUpdateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1491,6 +1522,26 @@ export function createCodexRouter(options: CodexRouterOptions) {
     } catch (error) { return codexError(response, error); }
   });
 
+  /**
+   * D16: restore a backup. The one genuinely destructive route in the Codex.
+   *
+   * REPLACE-ONLY and all-or-nothing - the store wipes and reloads every table inside one transaction, so
+   * a bad row aborts the lot and the codex is left exactly as it was. The guardrails are authorization
+   * (GM session or `codex:write`) and the caller's own confirmation; there is deliberately no `confirm`
+   * literal in the body, because the body has to be a saved export file posted back unedited.
+   *
+   * The ping is emitted after a successful restore and every client refetches everything - which is
+   * exactly right when the whole world has just been replaced underneath them.
+   */
+  router.post(`${CODEX_BASE}/import`, requireWrite, (request, response) => {
+    try {
+      const { codex } = CodexImportSchema.parse(request.body);
+      const counts = store.importBundle(codex);
+      options.notifyChanged();
+      return envelope(response, 200, { replaced: true, counts });
+    } catch (error) { return codexError(response, error); }
+  });
+
   // ----- Codex-wide settings (GM-only: how much version history the codex keeps) -----
 
   /**
@@ -1553,7 +1604,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   // ----- Export (GM backup / round-trip) -----
 
   router.get(`${CODEX_BASE}/export`, requireGmRead, (request, response) => {
-    return readEnvelope(request, response, "gm", { codex: store.exportBundle(), exportedAt: new Date().toISOString() });
+    return readEnvelope(request, response, "gm", { codex: store.exportBundle(), exportedAt: new Date().toISOString(), bundleVersion: CODEX_BUNDLE_VERSION });
   });
 
   // ----- Media (page banners + inline images) -----

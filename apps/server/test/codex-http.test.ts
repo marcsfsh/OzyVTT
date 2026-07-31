@@ -2139,3 +2139,109 @@ describe("codex pin-by-id and party location, HTTP boundary (D15)", () => {
     expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...PLAYER, "if-none-match": playerTag })).status).toBe(404);
   });
 });
+
+/**
+ * D12's ADOPTION PATH: linking downtime rows that already exist to real character pages. Without it the
+ * tracker could only total downtime recorded after the upgrade, which is most of the value gone.
+ */
+describe("codex journal PATCH — the narrow downtime group (D12)", () => {
+  it("edits who/activity/characterPageId, refuses `days`, and refuses the group on any other kind", async () => {
+    const { base, store } = await fixture();
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", downtime: { who: "Irena", activity: "Forgeing", days: 30 } });
+
+    const patched = (await body(await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, {
+      downtime: { who: "Ireena", activity: "Forging", characterPageId: character.id }
+    }))).data.entry as Json;
+    expect(patched.payload).toEqual({ who: "Ireena", activity: "Forging", days: 30, applied: false, characterPageId: character.id });
+
+    // `days` is IMMUTABLE - it is what `apply-downtime` moves the clock by, so editing it afterwards would
+    // leave the clock disagreeing with the record that justified it. `.strict()` says so rather than
+    // dropping the key silently.
+    const withDays = await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { days: 5 } });
+    expect(withDays.status).toBe(400);
+    expect(JSON.stringify((await body(withDays)).error)).toContain("days");
+    // ...and so is `applied`.
+    expect((await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { applied: true } })).status).toBe(400);
+
+    // An id naming no page is a 404, not a dangling link.
+    expect((await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { characterPageId: randomUUID() } })).status).toBe(404);
+    // `null` clears the link and leaves `who` as the display fallback.
+    const cleared = (await body(await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { characterPageId: null } }))).data.entry as Json;
+    expect(cleared.payload).toMatchObject({ characterPageId: null, who: "Ireena", days: 30 });
+
+    // The group on a NON-downtime record is a 400: a caller sending downtime details to a milestone has
+    // misunderstood something, and hearing so beats being quietly overruled.
+    const milestone = store.createMilestone({ playerText: "Level 5.", milestone: { level: 5, reason: "the crypt" } });
+    const wrongKind = await patch(base, `/api/v1/codex/journal/${milestone.id}`, GM, { downtime: { who: "Ireena" } });
+    expect(wrongKind.status).toBe(400);
+    expect((await body(wrongKind)).error.message).toMatch(/only downtime entries/i);
+    // ...and the milestone's own payload is untouched by the refusal.
+    expect(store.getEntry(milestone.id)!.payload).toEqual({ level: 5, reason: "the crypt" });
+
+    // An ordinary PATCH with no group leaves the payload alone entirely.
+    const prose = (await body(await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { playerText: "A month at the forge, and a week idle." }))).data.entry as Json;
+    expect(prose.payload).toMatchObject({ who: "Ireena", activity: "Forging", days: 30 });
+  });
+});
+
+/**
+ * D16 at the boundary: the export/import round trip a GM actually performs, and the version check.
+ */
+describe("codex export/import, HTTP boundary (D16, R1)", () => {
+  it("round-trips a saved export file POSTed back UNEDITED, and reports the database's own counts", async () => {
+    const { base, store } = await fixture();
+    const page = store.createPage({ title: "Barovia", playerBody: "A misty valley." });
+    store.createSession({ sessionNumber: 4, recapBody: "We crossed." });
+
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    expect(exported.bundleVersion, "the format version is a fact about the FILE, so it sits beside the bundle").toBe(1);
+    expect(Object.keys(exported).sort()).toEqual(["bundleVersion", "codex", "exportedAt"]);
+
+    store.deletePage(page.id);
+    expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(0);
+
+    // The saved file, POSTed back with nothing stripped - `exportedAt` and `bundleVersion` are accepted.
+    const restored = await post(base, "/api/v1/codex/import", GM, exported);
+    expect(restored.status).toBe(200);
+    const result = (await body(restored)).data as Json;
+    expect(result.replaced).toBe(true);
+    expect(result.counts).toMatchObject({ pages: 1, sessions: 1 });
+    expect(Object.keys(result.counts).sort()).toEqual(["connections", "folders", "journal", "maps", "markers", "pages", "quests", "revisions", "sessions", "standing"]);
+    expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(1);
+  });
+
+  it("restores a bundle with NO bundleVersion — every backup taken before this feature existed (R1)", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Barovia" });
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    // The pre-versioning shape: the key simply is not there.
+    const legacy = { codex: exported.codex };
+    expect((await post(base, "/api/v1/codex/import", GM, legacy)).status, "absent = a pre-versioning v1 bundle, and it MUST restore").toBe(200);
+
+    // A version this build does not know is a 400 with structured issues - a bundle from a NEWER build may
+    // carry shapes this one cannot honour, and silently dropping them is the failure a restore must not have.
+    const future = await post(base, "/api/v1/codex/import", GM, { codex: exported.codex, bundleVersion: 2 });
+    expect(future.status).toBe(400);
+    const refusal = await body(future);
+    expect(refusal.error.code).toBe("validation_failed");
+    expect(refusal.error.message).toMatch(/newer version/i);
+    expect((refusal.error.details.issues as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("is GM-only, and refuses a body that is not a bundle without touching the codex", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Barovia" });
+    const before = JSON.stringify(store.exportBundle());
+
+    expect((await post(base, "/api/v1/codex/import", PLAYER, { codex: {} })).status, "a player is authenticated and refused").toBe(403);
+    expect((await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, "no token at all is a 401").toBe(401);
+    // An integration credential with the WRITE scope may restore; a read-only one may not.
+    expect((await post(base, "/api/v1/codex/import", INTEGRATION_READ, { codex: {} })).status).toBe(403);
+
+    expect((await post(base, "/api/v1/codex/import", GM, {})).status, "`codex` is required").toBe(400);
+    expect((await post(base, "/api/v1/codex/import", GM, { codex: {}, surprise: 1 })).status, "`.strict()`, like every other codex body").toBe(400);
+    expect((await post(base, "/api/v1/codex/import", GM, { codex: { pages: [{ id: "nope" }] } })).status).toBe(400);
+    expect(JSON.stringify(store.exportBundle()), "every refusal left the codex exactly as it was").toBe(before);
+  });
+});
