@@ -308,7 +308,7 @@ const DEFAULT_CALENDAR: CodexCalendar = {
  * being more permissive than this union is still the safe direction, and `journalKind` still fails closed,
  * so a seventh kind written by a future build reads back as `note` rather than throwing.
  */
-export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing";
+export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 /**
  * CT-10's downtime activity: WHO spent WHICH days doing WHAT, and whether the GM has confirmed the clock
  * move it proposes (O-3).
@@ -381,7 +381,20 @@ export type CodexStandingPayload = Readonly<{ factionPageId: string; delta: numb
  * and those appear in the projection layer and its tests, which M12 does not own. Use `payloadFor*` below
  * to narrow; they are the type-safe form of the same question and they cannot get the kind wrong.
  */
-export type CodexEntryPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload;
+/**
+ * D11 (ruling R5): a quest CHANGED STATE. The `codex_quests` table says where a quest stands; this says
+ * what happened, exactly as a `standing` record does beside `codex_standing`.
+ *
+ * **No cached quest title**, matching standing's explicit no-cached-title rule: readers resolve `questId`
+ * against the live quest, and a deleted quest is a name they cannot show rather than an error. The id has
+ * no foreign key behind it, so history SURVIVES the quest - "we abandoned the Sunsword hunt in Marpenoth"
+ * stays true after the record is gone.
+ *
+ * `status` is the status REACHED, not a delta - the milestone rule rather than the standing one, and for
+ * the milestone's reason: it is the fact a GM states and the one a reader wants.
+ */
+export type CodexQuestEventPayload = Readonly<{ questId: string; status: CodexQuestStatus }>;
+export type CodexEntryPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload | CodexQuestEventPayload;
 export type CodexJournalRow = Readonly<{
   id: string;
   playerText: string;
@@ -1878,7 +1891,7 @@ function sessionStatus(value: string | undefined): CodexSessionStatus {
   if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new Error("A session is either planned or played.");
   return value as CodexSessionStatus;
 }
-const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime", "milestone", "standing"]);
+const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"]);
 /**
  * A stored `kind` PARSED, not coerced. Before M11 this was inlined in `toEntry` as
  * `row.kind === "combat" ? "combat" : "note"`, which is fine for two kinds and actively dangerous for four:
@@ -2061,6 +2074,25 @@ function autosaveIntervalSeconds(value: number): number {
 function standingPayload(input: Readonly<{ factionPageId: string; delta: number; reason: string }>): CodexStandingPayload {
   return { factionPageId: input.factionPageId, delta: Math.trunc(input.delta), reason: shortLabel(input.reason, 120, "standing reason") ?? "" };
 }
+/** D11's payload on the way IN. `status` is already validated by `questStatus` at the call site. */
+function questEventPayload(input: Readonly<{ questId: string; status: CodexQuestStatus }>): CodexQuestEventPayload {
+  return { questId: input.questId, status: input.status };
+}
+/** Read a stored quest-event payload defensively - `parseStandingPayload`'s rule, one kind later. */
+function parseQuestEventPayload(raw: string | null | undefined): CodexQuestEventPayload | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const value = parsed as { questId?: unknown; status?: unknown };
+    return {
+      questId: typeof value.questId === "string" ? value.questId : "",
+      // Fails CLOSED to `active`, the `toQuest` coercion rule verbatim: an unrecognised status reads as
+      // the harmless one rather than throwing and making one bad row an unopenable codex.
+      status: value.status === "completed" || value.status === "failed" ? value.status : "active"
+    };
+  } catch { return null; }
+}
 /** Read a stored standing payload defensively - malformed JSON degrades to `null` (`parseDowntimePayload`'s rule). */
 function parseStandingPayload(raw: string | null | undefined): CodexStandingPayload | null {
   if (!raw) return null;
@@ -2098,6 +2130,9 @@ export function milestonePayloadOf(entry: PayloadBearing): CodexMilestonePayload
 export function standingPayloadOf(entry: PayloadBearing): CodexStandingPayload | null {
   return entry.kind === "standing" ? (entry.payload as CodexStandingPayload | null) : null;
 }
+export function questEventPayloadOf(entry: PayloadBearing): CodexQuestEventPayload | null {
+  return entry.kind === "quest" ? (entry.payload as CodexQuestEventPayload | null) : null;
+}
 /**
  * The kind -> payload-parser mapping, written ONCE (`toEntry` is its only caller). An EXHAUSTIVE switch with
  * no `default`, deliberately: adding a seventh kind to `CodexJournalKind` is then a compile error here, and
@@ -2109,6 +2144,7 @@ function payloadOf(kind: CodexJournalKind, raw: string | null): CodexEntryPayloa
     case "downtime": return parseDowntimePayload(raw);
     case "milestone": return parseMilestonePayload(raw);
     case "standing": return parseStandingPayload(raw);
+    case "quest": return parseQuestEventPayload(raw);
     case "note": case "combat": case "deadline": return null;
   }
 }
@@ -4392,6 +4428,10 @@ export class CodexStore {
         .run(row.id, row.title, row.status, row.player_body, row.gm_body, row.objectives_json, row.entity_ids_json, row.revealed, row.rev, row.created_at, row.updated_at, row.tags_json);
       this.indexQuest(row.id, row.title, row.player_body, row.gm_body, row.objectives_json, row.tags_json);
       this.rebuildLinksFor("quest", row.id, row.player_body, row.gm_body);
+      // D11 / ruling R5: a quest STARTING is an event, and quests start at creation - so the history
+      // record is written here as well as on a status change, in the SAME transaction as the quest row.
+      // Half of that would be worse than neither: a quest with no start, or a start with no quest.
+      this.writeQuestEvent(row.id, questStatus(row.status));
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -4433,6 +4473,9 @@ export class CodexStore {
       // index twin; `setQuestRevealed` below deliberately does not, because reveal is resolved at read time.
       this.indexQuest(questId, next.title, next.player_body, next.gm_body, next.objectives_json, next.tags_json);
       this.rebuildLinksFor("quest", questId, next.player_body, next.gm_body);
+      // Only a STATUS CHANGE is an event. Editing a quest's prose is not something that happened in the
+      // world, and a history that recorded every keystroke of an autosaving editor would be noise.
+      if (input.status !== undefined && next.status !== existing.status) this.writeQuestEvent(questId, questStatus(next.status));
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -4454,6 +4497,29 @@ export class CodexStore {
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
+  }
+
+  /**
+   * D11 / R5: append the hidden `quest` history record for a quest's start or state change.
+   *
+   * Leaf-level, like `writeEntry` itself: it assumes it is already inside the quest write's transaction,
+   * so the table and the timeline can never disagree - the `setStanding` arrangement verbatim.
+   *
+   * HIDDEN, with EMPTY player text. That combination is deliberate and it is why the projection hides the
+   * whole row rather than nulling a field: a `quest` record has no prose to stand on, exactly like a
+   * `standing` record, and the standing CORRECTION records what happens when a row with nothing but a
+   * structured payload is allowed through. Dated at the GM's clock, the rule an auto-logged battle, a
+   * downtime and a standing record already follow, and filed under the active session by id.
+   */
+  private writeQuestEvent(questId: string, status: CodexQuestStatus): void {
+    const dated = this.resolveDate(this.getCalendar().currentDate ?? null, null);
+    this.writeEntry({
+      playerText: "", gmText: null, revealed: 0,
+      attachMarkerId: null, attachPageId: null, kind: "quest",
+      sourceEncounterId: null, sessionId: this.activeSessionId, realDate: null,
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date,
+      payload: questEventPayload({ questId, status })
+    });
   }
 
   /** Idempotent, and an early return on a malformed id - every other codex delete behaves this way. */

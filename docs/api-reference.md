@@ -2990,7 +2990,7 @@ Every quest - what the party is chasing, and whether it is still open. Role-scop
 
 ### `POST /api/v1/codex/quests`
 
-Creates a quest. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later.
+Creates a quest, and appends its first history record in the SAME transaction - a quest starting is an event (D11), so its initial status is recorded exactly as a later change would be. That record is a hidden `quest` journal entry with empty player text, dated at the GM's clock and filed under the active session; revealing it publishes nothing unless the quest itself is revealed. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later.
 
 **Auth:** Integration credential with `codex:write` · GM session
 
@@ -3021,7 +3021,7 @@ One quest, projected for the caller. An unrevealed quest is **404** to a player 
 
 ### `PATCH /api/v1/codex/quests/{id}`
 
-Edits a quest; an omitted field is left alone. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position.
+Edits a quest; an omitted field is left alone. **A status change also appends a hidden `quest` history record** in the same transaction (D11) - editing prose does not, because that is not something that happened in the world. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position.
 
 **Auth:** Integration credential with `codex:write` · GM session
 
@@ -3349,7 +3349,7 @@ One row on the ONE chronicle (CT-11/CT-12) as the **GM** receives it, in the sin
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `kind` | `entry` \| `combat` \| `event` \| `deadline` \| `downtime` \| `milestone` \| `standing` | yes | What the row IS, read by icon AND word - never by colour alone. A discriminator for DISPLAY only: it never decides visibility, which is `revealedToPlayers` and nothing else. |
+| `kind` | `entry` \| `combat` \| `event` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes | What the row IS, read by icon AND word - never by colour alone. A discriminator for DISPLAY only: it never decides visibility, which is `revealedToPlayers` and nothing else. |
 | `id` | string (uuid) | yes | The record's own id - a journal entry's for `entry`/`combat`, a page's for `event`. |
 | `title` | string \| null | yes | An event page's title; null for a journal entry, which has no name. |
 | `text` | string | yes | The player-facing layer: a journal entry's full text, or a bounded excerpt of an event page's player body. |
@@ -3366,7 +3366,7 @@ One row on the ONE chronicle (CT-11/CT-12) as the **GM** receives it, in the sin
 | `attachMarkerId` | string \| null | yes | GM-only; not declared on `CodexChronicleRecordPlayer`. |
 | `sourceEncounterId` | integer \| null | yes | GM-only replay linkage (K2); not declared on `CodexChronicleRecordPlayer`. |
 | `fired` | boolean | yes | CT-5: has the campaign clock reached this deadline's own date? DERIVED on every read from `inWorldDate` against the clock, never stored - so rewinding the clock correctly un-fires a deadline. `false` for every kind that is not a dated deadline. Measured against WHOSE clock is a viewer-safety decision: the GM's row uses the GM's clock, a player's row uses the PUBLISHED date, so this boolean can never tell the party that a date they have not been shown has already gone by. |
-| `payload` | CodexDowntimePayload \| CodexMilestonePayload \| CodexStandingPayload \| null | yes | The kind's structured facts, discriminated by `kind`; null for the kinds that carry none. Allow-listed per kind, never a spread of the stored blob: the GM receives the full downtime payload including `applied` (CT-10), a milestone's `{ level, reason }` (CT-8), and a standing change's `delta`/`reason` (CT-6). |
+| `payload` | CodexDowntimePayload \| CodexMilestonePayload \| CodexStandingPayload \| CodexQuestHistoryPayload \| null | yes | The kind's structured facts, discriminated by `kind`; null for the kinds that carry none. Allow-listed per kind, never a spread of the stored blob: the GM receives the full downtime payload including `applied` (CT-10), a milestone's `{ level, reason }` (CT-8), and a standing change's `delta`/`reason` (CT-6). |
 | `proposedDate` | CodexInWorldDate \| null | yes | GM-only (not declared on `CodexChronicleRecordPlayer`): for an unapplied downtime, the date `apply-downtime` would move the clock to. Null once applied, and for every other kind. A clock move the GM has not confirmed - and may never confirm - is prep. |
 | `createdAt` | string (date-time) | yes |  |
 | `updatedAt` | string (date-time) | yes | GM-only; not declared on `CodexChronicleRecordPlayer`. |
@@ -3377,7 +3377,7 @@ One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `re
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `kind` | `entry` \| `combat` \| `event` \| `deadline` \| `downtime` \| `milestone` \| `standing` | yes |  |
+| `kind` | `entry` \| `combat` \| `event` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes |  |
 | `id` | string (uuid) | yes |  |
 | `title` | string \| null | yes |  |
 | `text` | string | yes |  |
@@ -3389,7 +3389,7 @@ One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `re
 | `calendarInstant` | number \| null | yes | D17: the sortable day index for `inWorldDate` against the calendar the player already holds - a pure function of two things they have, computed once on the server. It is here so the client never re-derives it: the two derivations disagreed on a day that overflows its month, and one authority for one number is the fix. Null exactly when `inWorldDate` is. |
 | `tags` | string[] | yes |  |
 | `fired` | boolean | yes | Derived against the PUBLISHED date. |
-| `payload` | CodexDowntimePlayerPayload \| CodexMilestonePayload \| CodexStandingPlayerPayload \| null | yes | The player half of the kind's structured facts: downtime without `applied` (CT-10), a milestone's `{ level, reason }` unchanged (CT-8), a standing change with `factionPageId` nulled unless that faction page is revealed (CT-6). |
+| `payload` | CodexDowntimePlayerPayload \| CodexMilestonePayload \| CodexStandingPlayerPayload \| CodexQuestHistoryPlayerPayload \| null | yes | The player half of the kind's structured facts: downtime without `applied` (CT-10), a milestone's `{ level, reason }` unchanged (CT-8), a standing change with `factionPageId` nulled unless that faction page is revealed (CT-6). |
 | `createdAt` | string (date-time) | yes |  |
 
 ### `CodexChronicleRecordProjected`
@@ -3549,7 +3549,7 @@ A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied
 | `revealedToPlayers` | boolean | yes |  |
 | `attachMarkerId` | string \| null | yes |  |
 | `attachPageId` | string \| null | yes |  |
-| `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` | yes | What the row IS. `deadline` (CT-5) and `downtime` (CT-10) are M11; `milestone` (CT-8) and `standing` (CT-6) are M12, and the database has permitted all six since M11's migration so neither needed a table rebuild. Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
+| `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes | What the row IS. `deadline` (CT-5) and `downtime` (CT-10) are M11; `milestone` (CT-8) and `standing` (CT-6) are M12, and the database has permitted all six since M11's migration so neither needed a table rebuild. Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
 | `sourceEncounterId` | integer \| null | yes |  |
 | `sessionId` | string \| null | yes | D9: the session this entry belongs to, BY IDENTITY. Null when it is filed under no session. This is what a WRITE sets; `sessionNumber` beside it is what a reader displays. |
 | `sessionNumber` | integer \| null | yes | The linked session's number, resolved LIVE from that record - so renumbering a session updates every one of its entries with no journal write. Server-owned display data: a write body that carries it is a 400. It survives its session in exactly one case: deleting a REVEALED numbered session stamps its number back onto its entries as a bare label, because the players were already reading it. |
@@ -3558,7 +3558,7 @@ A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied
 | `calendarInstant` | number \| null | yes | Sortable absolute day index derived from the calendar. |
 | `inWorldDate` | CodexInWorldDate \| null | yes |  |
 | `sortKey` | number | yes |  |
-| `payload` | CodexDowntimePayload \| CodexMilestonePayload \| CodexStandingPayload \| null | yes | Kind-specific structured data, discriminated by `kind`: the downtime payload, the milestone payload, the standing payload, and null for the other three kinds. GM-only - the player journal projection carries no payload at all (a revealed record's facts are read on the chronicle). A DEADLINE deliberately has none: its text is the "what" and its `inWorldDate` is the "when". |
+| `payload` | CodexDowntimePayload \| CodexMilestonePayload \| CodexStandingPayload \| CodexQuestHistoryPayload \| null | yes | Kind-specific structured data, discriminated by `kind`: the downtime payload, the milestone payload, the standing payload, and null for the other three kinds. GM-only - the player journal projection carries no payload at all (a revealed record's facts are read on the chronicle). A DEADLINE deliberately has none: its text is the "what" and its `inWorldDate` is the "when". |
 | `createdAt` | string (date-time) | yes |  |
 | `updatedAt` | string (date-time) | yes |  |
 
@@ -3576,7 +3576,7 @@ A journal entry as a PLAYER receives it - the mini-timeline row on a page or a p
 | --- | --- | --- | --- |
 | `id` | string (uuid) | yes |  |
 | `text` | string | yes | The entry's `playerText`. |
-| `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` | yes | Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
+| `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes | Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
 | `sessionId` | string \| null | yes | D9/D14: the session this entry belongs to, so a player can navigate from an entry to its recap. Present ONLY when that session is revealed - in which case the player can already list and open it, so this adds no information. Nulled TOGETHER with `sessionNumber` when the session is hidden: either half of the link would announce that a session they have not been shown exists. |
 | `sessionNumber` | integer \| null | yes | Nulled together with `sessionId` when the linked session has not been revealed - a session's very existence is GM information. A bare label with no link survives only where the number was already player-visible. |
 | `realDate` | string \| null | yes |  |
@@ -3943,6 +3943,24 @@ One quest: a thread the party is pulling on, and whether it is still open. Two l
 | --- | --- | --- | --- |
 | `quest` | CodexQuest | yes |  |
 
+### `CodexQuestHistoryPayload`
+
+D11: a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest starting is an event) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `questId` | string (uuid) | yes |  |
+| `status` | `active` \| `completed` \| `failed` | yes | The status REACHED, not a delta - the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened". |
+
+### `CodexQuestHistoryPlayerPayload`
+
+A quest-history record as a PLAYER sees it. The whole ROW is hidden unless the quest itself is revealed - a quest record carries empty player text, so it cannot stand on its own prose, and a row reading "Quest - completed" for a quest the party has never heard of would announce both its existence and its ending. When it does travel, `status` is the record's only content and the reader can already read it on the quest itself.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `questId` | string \| null | yes | Nulled unless that quest is revealed - a second line of defence behind the whole-row gate, the same arrangement a standing payload's `factionPageId` uses. |
+| `status` | `active` \| `completed` \| `failed` | yes |  |
+
 ### `CodexQuestListData`
 
 | Field | Type | Required | Notes |
@@ -4012,7 +4030,7 @@ One record the party can currently see.
 | `kind` | `page` \| `map` \| `marker` \| `journal` \| `session` \| `quest` \| `standing` | yes | Which reveal surface this row belongs to - and therefore which existing reveal route un-reveals it. |
 | `id` | string (uuid) | yes | The record's OWN id, which is exactly the id that kind's existing reveal route takes. For a `standing` row this is the FACTION PAGE id, because `POST /codex/standing/{factionPageId}/reveal` is addressed that way. |
 | `title` | string | yes | One line naming the record, taken from the record's own PLAYER projection - a page title, a map name, a marker label, a bounded excerpt of a journal entry's player text, "Session 4", a quest title, a faction name. Empty string when the record has no name (an unlabelled pin). |
-| `journalKind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| null | yes | WHICH kind of journal record this is - the same six-value vocabulary `CodexJournalEntry.kind` uses. Set on every `kind: "journal"` row and `null` on all six other kinds, present either way so no consumer branches on key presence. Render it as a badge beside `title`, never by parsing `title`: the title is the record's own prose whenever it has any, and only names the kind when the record is silent. |
+| `journalKind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` \| null | yes | WHICH kind of journal record this is - the same six-value vocabulary `CodexJournalEntry.kind` uses. Set on every `kind: "journal"` row and `null` on all six other kinds, present either way so no consumer branches on key presence. Render it as a badge beside `title`, never by parsing `title`: the title is the record's own prose whenever it has any, and only names the kind when the record is silent. |
 
 ### `CodexRevealAuditSection`
 

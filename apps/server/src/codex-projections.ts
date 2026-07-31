@@ -287,6 +287,12 @@ const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
  */
 export type PlayerSessionNumberContext = Readonly<{
   /**
+   * D11: which quests the players have been shown. A `quest` history record is gated on the QUEST, not on
+   * itself - see `playerQuestEventVisible`. Optional, and the absent value is the EMPTY set, which fails
+   * closed: a caller that forgets to resolve it hides quest history rather than publishing it.
+   */
+  revealedQuestIds?: ReadonlySet<string>;
+  /**
    * D9: keyed by session ID, not by number. That is what closes the gap the number version could not - an
    * UNNUMBERED hidden session could never appear in a set of numbers, so an entry filed under one had
    * nothing to gate on. The join is now the gate, and every filed entry has one.
@@ -351,6 +357,29 @@ function playerStandingVisible(row: CodexJournalRow, context: PlayerSessionNumbe
  *     (director ruling R2), so the number was already player-visible and there is no record left whose
  *     existence it could give away. A hidden session's delete stamps nothing at all.
  */
+/**
+ * D11: a `quest` history record is player-visible only when the QUEST it is about is.
+ *
+ * **This applies the standing lesson before it can recur.** A quest record carries `playerText: ""`, so it
+ * cannot "stand on its own prose" - which is the exact false premise the standing CORRECTION documents.
+ * Nulling `questId` alone would ship a dated row reading "Quest - completed" for a quest the party has
+ * never heard of: the existence of a secret quest, and the fact that it just ended.
+ *
+ * It is NOT a kind filter in O-2's sense. It does not ask "is this a quest record?", it asks "is the thing
+ * this record is ABOUT visible?" - the CD-6-family question `projectPlayerMarker` asks about a pin's map.
+ *
+ * It lives on `projectPlayerJournalEntry` rather than on the chronicle, so all four player journal
+ * surfaces - the journal list, the timeline, search and the reveal audit - inherit it by construction.
+ * That placement is the standing gate's, and it is there because the three surfaces that did NOT go
+ * through the chronicle leaked.
+ */
+function playerQuestEventVisible(row: CodexJournalRow, context: PlayerSessionNumberContext): boolean {
+  if (row.kind !== "quest") return true;
+  const payload = row.payload;
+  const questId = payload !== null && "questId" in payload ? payload.questId : null;
+  return questId !== null && (context.revealedQuestIds ?? EMPTY_PAGE_IDS).has(questId);
+}
+
 function playerSessionLink(row: CodexJournalRow, context: PlayerSessionNumberContext): { sessionId: string | null; sessionNumber: number | null } {
   if (row.sessionId === null) return { sessionId: null, sessionNumber: row.sessionNumber };
   if (context.unrevealedSessionIds.has(row.sessionId)) return { sessionId: null, sessionNumber: null };
@@ -361,6 +390,7 @@ export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry
 export function projectPlayerJournalEntry(row: CodexJournalRow, context: PlayerSessionNumberContext): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
   if (!playerStandingVisible(row, context)) return null;
+  if (!playerQuestEventVisible(row, context)) return null;
   const session = playerSessionLink(row, context);
   return { id: row.id, text: row.playerText, kind: row.kind, sessionId: session.sessionId, sessionNumber: session.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
 }
@@ -543,7 +573,7 @@ function excerpt(text: string): string {
  * `Record<CodexChronicleKind, ...>`, so the compiler, not a reviewer, is what notices a new kind has no
  * icon and no word (F-5: nothing else about a new journal kind produces a single compile error).
  */
-export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing";
+export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 
 /**
  * A journal row's STORE kind mapped to its CHRONICLE kind - a real total function over `CodexJournalKind`,
@@ -567,6 +597,9 @@ function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
     // these two arms existed - which is the design, and it is why no `default` may ever be added here.
     case "milestone": return "milestone";
     case "standing": return "standing";
+    // D11. The same mechanism one milestone later: no `default` may ever be added here, because the
+    // compile error is what forces Lane C's `CHRONICLE_KIND_META` to gain an icon and a word too.
+    case "quest": return "quest";
   }
 }
 
@@ -636,11 +669,22 @@ export type GmCodexMilestone = Readonly<{ level: number; reason: string }>;
 export type PlayerCodexMilestone = Readonly<{ level: number; reason: string }>;
 export type GmCodexStandingChange = Readonly<{ factionPageId: string; delta: number; reason: string }>;
 export type PlayerCodexStandingChange = Readonly<{ factionPageId: string | null; delta: number; reason: string }>;
+/**
+ * D11's quest-history payload.
+ *
+ * VIEWER-SAFETY JUSTIFICATION for the PLAYER shape, individually: the whole ROW is hidden unless the quest
+ * itself is revealed (`playerQuestEventVisible`), so when this travels the reader can already open the
+ * quest and read its status on `GET /codex/quests`. `status` is the record's ONLY content - the same
+ * reasoning that keeps `status` on `PlayerCodexQuest` where a session's is GM-only - and `questId` is
+ * additionally nulled unless the quest is in the revealed set, as a second line of defence.
+ */
+export type GmCodexQuestEvent = Readonly<{ questId: string; status: CodexQuestStatus }>;
+export type PlayerCodexQuestEvent = Readonly<{ questId: string | null; status: CodexQuestStatus }>;
 
 /** Every payload shape a GM chronicle row can carry. `null` for the kinds that carry none. */
-export type GmCodexChroniclePayload = GmCodexDowntime | GmCodexMilestone | GmCodexStandingChange;
+export type GmCodexChroniclePayload = GmCodexDowntime | GmCodexMilestone | GmCodexStandingChange | GmCodexQuestEvent;
 /** Every payload shape a PLAYER chronicle row can carry - each one narrower than, or equal to, its GM twin. */
-export type PlayerCodexChroniclePayload = PlayerCodexDowntime | PlayerCodexMilestone | PlayerCodexStandingChange;
+export type PlayerCodexChroniclePayload = PlayerCodexDowntime | PlayerCodexMilestone | PlayerCodexStandingChange | PlayerCodexQuestEvent;
 
 /**
  * One entry's payload, per kind, per audience. Dispatching on the ENTRY's `kind` rather than sniffing the
@@ -657,6 +701,7 @@ function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | nul
     case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied, characterPageId: payload.characterPageId } : null;
     case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
     case "standing": return "delta" in payload ? { factionPageId: payload.factionPageId, delta: payload.delta, reason: payload.reason } : null;
+    case "quest": return "questId" in payload ? { questId: payload.questId, status: payload.status } : null;
     case "note": case "combat": case "deadline": return null;
   }
 }
@@ -666,7 +711,7 @@ function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | nul
  * standing example - GM workflow state, dropped (D11-E) - and `factionPageId` is the M12 one, carried only
  * when the faction page is itself revealed.
  */
-function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlySet<string>): PlayerCodexChroniclePayload | null {
+function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlySet<string>, revealedQuestIds: ReadonlySet<string>): PlayerCodexChroniclePayload | null {
   const payload = entry.payload;
   if (payload === null) return null;
   switch (entry.kind) {
@@ -676,6 +721,12 @@ function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlyS
     case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
     case "standing": return "delta" in payload
       ? { factionPageId: revealedPageIds.has(payload.factionPageId) ? payload.factionPageId : null, delta: payload.delta, reason: payload.reason }
+      : null;
+    // D11. The WHOLE ROW is already hidden unless the quest is revealed, so this arm only ever runs for a
+    // quest the player can see; `questId` is nulled anyway when the id is not in the revealed set, as the
+    // second line of defence - standing's arrangement verbatim.
+    case "quest": return "questId" in payload
+      ? { questId: revealedQuestIds.has(payload.questId) ? payload.questId : null, status: payload.status }
       : null;
     case "note": case "combat": case "deadline": return null;
   }
@@ -905,7 +956,7 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
       inWorldDate: record.entry.inWorldDate, calendarInstant: record.entry.calendarInstant,
       tags: projected.tags,
       fired: deadlineFired(record.entry, context.publishedInstant ?? null),
-      payload: projectPlayerPayload(record.entry, context.revealedPageIds ?? EMPTY_PAGE_IDS),
+      payload: projectPlayerPayload(record.entry, context.revealedPageIds ?? EMPTY_PAGE_IDS, context.revealedQuestIds ?? EMPTY_PAGE_IDS),
       createdAt: projected.createdAt
     };
   }
@@ -1237,7 +1288,8 @@ const AUDIT_JOURNAL_FALLBACK: Readonly<Record<CodexJournalKind, string>> = {
   deadline: "Deadline",
   downtime: "Downtime",
   milestone: "Milestone",
-  standing: "Faction standing changed"
+  standing: "Faction standing changed",
+  quest: "Quest updated"
 };
 
 function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
+import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, questEventPayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
 import { projectGmConnections, projectPlayerConnections, projectGmPageConnections, projectPlayerPageConnections, projectRevealAudit, projectGmChronicleRecord, projectGmJournalEntry, projectGmMarker, projectGmQuest, projectGmSearchHit, projectGmSession, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
 /** D6/R4's shipped default, spelled once so the settings tests below say what they are actually about. */
@@ -4516,5 +4516,129 @@ describe("CodexStore downtime — the character link (D12)", () => {
     expect((projectPlayerChronicleRecord(record, { unrevealedSessionIds: new Set<string>() })!.payload as { characterPageId: string | null }).characterPageId).toBeNull();
     // `applied` is still never on a player row, whatever this field does.
     expect(Object.keys(shown.payload!).sort()).toEqual(["activity", "characterPageId", "days", "who"]);
+  });
+});
+
+/**
+ * D11 / director ruling R5: quest state changes write themselves onto the Journal, so "what happened to
+ * that lead?" is answered by the one timeline rather than by remembering.
+ */
+describe("CodexStore quest history (D11, R5)", () => {
+  const questRecords = () => store.listTimeline().filter((entry) => entry.kind === "quest");
+
+  it("records a quest's START on create, and every STATUS CHANGE after it — never a prose edit", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 1, day: 12 } });
+    const session = store.createSession({ sessionNumber: 3 });
+    store.setActiveSession(session.id);
+
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    expect(questRecords(), "R5: a quest STARTING is an event, and quests start at creation").toHaveLength(1);
+    const start = questRecords()[0]!;
+    expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "active" });
+    // Hidden, with EMPTY player text - which is why the projection hides the whole row rather than a field.
+    expect(start.revealedToPlayers).toBe(false);
+    expect(start.playerText).toBe("");
+    // Dated at the GM's clock and filed under the active session, the rule every auto-written record uses.
+    expect(start.inWorldDate).toEqual({ year: 1492, month: 1, day: 12 });
+    expect(start.sessionId).toBe(session.id);
+
+    // A prose edit writes NOTHING: it is not something that happened in the world.
+    store.updateQuest(quest.id, { playerBody: "Search the crypt." }, undefined);
+    store.updateQuest(quest.id, { title: "Find the Sunsword, urgently" }, undefined);
+    expect(questRecords()).toHaveLength(1);
+
+    // A status change writes exactly one, carrying the status REACHED.
+    store.updateQuest(quest.id, { status: "completed" }, undefined);
+    expect(questRecords()).toHaveLength(2);
+    expect(questEventPayloadOf(questRecords()[1]!)).toEqual({ questId: quest.id, status: "completed" });
+    // Re-stating the SAME status is not a change, so it writes nothing.
+    store.updateQuest(quest.id, { status: "completed", playerBody: "Done." }, undefined);
+    expect(questRecords()).toHaveLength(2);
+    // Re-activating records `active`; a reader words it "reopened" from the sequence.
+    store.updateQuest(quest.id, { status: "active" }, undefined);
+    expect(questEventPayloadOf(questRecords()[2]!)!.status).toBe("active");
+
+    // History OUTLIVES the quest - "we abandoned that hunt in Marpenoth" stays true.
+    store.deleteQuest(quest.id);
+    expect(questRecords()).toHaveLength(3);
+    expect(questEventPayloadOf(questRecords()[0]!)!.questId).toBe(quest.id);   // a name they cannot show
+  });
+
+  it("writes the record in the SAME transaction as the quest, so neither can exist without the other", () => {
+    // A forced failure inside the composed write must roll BOTH back. `writeEntry` is leaf-level and the
+    // quest INSERT is in the same `BEGIN IMMEDIATE`, so an oversized title on the entry path is the
+    // cheapest way to make the second half throw after the first half has run.
+    const before = store.listQuests().length;
+    const quest = store.createQuest({ title: "Free Ireena" });
+    expect(store.listQuests()).toHaveLength(before + 1);
+    expect(questRecords()).toHaveLength(1);
+
+    // The crash shape, driven for real: a partial UNIQUE index makes a SECOND quest record impossible, so
+    // the history INSERT throws after the quest UPDATE has already run inside the same transaction.
+    const database = new DatabaseSync(join(directory, "vtt.sqlite"));
+    database.exec("CREATE UNIQUE INDEX probe_one_quest_record ON codex_journal (kind) WHERE kind = 'quest';");
+    database.close();
+
+    expect(() => store.updateQuest(quest.id, { status: "failed" }, undefined)).toThrow();
+    expect(store.getQuest(quest.id)!.status, "the quest UPDATE rolled back with the entry INSERT").toBe("active");
+    expect(questRecords(), "...and no second history record was left behind either").toHaveLength(1);
+    // ...and a quest CREATE rolls back the same way: no quest row survives its own failed start record.
+    const questCount = store.listQuests().length;
+    expect(() => store.createQuest({ title: "Escape Barovia" })).toThrow();
+    expect(store.listQuests()).toHaveLength(questCount);
+  });
+
+  it("hides a quest record WHOLE from a player until the quest itself is revealed", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    const record = questRecords()[0]!;
+    // Even REVEALED, the record must not travel while the quest is secret: it carries no prose, so a
+    // player would receive a dated row announcing that a quest they have never heard of exists.
+    store.setEntryRevealed(record.id, true);
+    const context = (revealedQuestIds: readonly string[]) => ({ unrevealedSessionIds: new Set<string>(), revealedQuestIds: new Set(revealedQuestIds) });
+    expect(projectPlayerJournalEntry(store.getEntry(record.id)!, context([]))).toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([]))).toBeNull();
+    // The GM's own row carries it throughout, so the nulls are the gate and not a missing record.
+    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }).payload).toEqual({ questId: quest.id, status: "active" });
+
+    // Absent context fails CLOSED - a caller that forgets to resolve the set hides history, never leaks it.
+    expect(projectPlayerJournalEntry(store.getEntry(record.id)!, { unrevealedSessionIds: new Set<string>() })).toBeNull();
+
+    // Reveal the QUEST and the row travels, carrying its status - the record's only content.
+    store.setQuestRevealed(quest.id, true);
+    const shown = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))!;
+    expect(shown.kind).toBe("quest");
+    expect(shown.payload).toEqual({ questId: quest.id, status: "active" });
+    // ...and the ENTRY's own reveal flag still gates it, so both must hold.
+    store.setEntryRevealed(record.id, false);
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))).toBeNull();
+  });
+
+  it("keeps quest history out of a player's SEARCH and reveal audit by the same one gate", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    const record = store.setEntryRevealed(questRecords()[0]!.id, true);
+    const context = (revealedQuestIds: readonly string[]) => ({ unrevealedSessionIds: new Set<string>(), revealedQuestIds: new Set(revealedQuestIds) });
+    // The gate lives on `projectPlayerJournalEntry`, so search and the audit inherit it by construction
+    // rather than by each surface remembering - the placement the standing leak taught.
+    const auditRows = (sessionContext: ReturnType<typeof context>) =>
+      projectRevealAudit([{ kind: "journal", entry: store.getEntry(record.id)!, sessionContext }]).sections.find((section) => section.kind === "journal")!.rows;
+    expect(projectPlayerSearchHit({ kind: "journal", entry: record }, context([]))).toBeNull();
+    expect(auditRows(context([]))).toEqual([]);
+    store.setQuestRevealed(quest.id, true);
+    expect(projectPlayerSearchHit({ kind: "journal", entry: store.getEntry(record.id)! }, context([quest.id]))).not.toBeNull();
+    // The compile-forced fallback label: a quest record has no prose, so `excerpt(text)` is "" and the row
+    // would otherwise be blank - `AUDIT_JOURNAL_FALLBACK` names the kind instead.
+    expect(auditRows(context([quest.id]))[0]).toMatchObject({ journalKind: "quest", title: "Quest updated" });
+  });
+
+  it("degrades a malformed stored payload to defaults rather than throwing", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    const record = questRecords()[0]!;
+    const database = new DatabaseSync(join(directory, "vtt.sqlite"));
+    database.prepare("UPDATE codex_journal SET payload_json = ? WHERE id = ?").run('{"questId": 7, "status": "exploded"}', record.id);
+    database.close();
+    // Fails CLOSED on both fields: a non-string id becomes "" (which matches no revealed quest, so the row
+    // stays hidden) and an unrecognised status reads as `active`, the harmless one.
+    expect(questEventPayloadOf(store.getEntry(record.id)!)).toEqual({ questId: "", status: "active" });
+    expect(projectPlayerJournalEntry(store.setEntryRevealed(record.id, true), { unrevealedSessionIds: new Set<string>(), revealedQuestIds: new Set([quest.id]) })).toBeNull();
   });
 });

@@ -504,6 +504,9 @@ function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
     .filter((pageId): pageId is string => pageId !== null);
   return {
     unrevealedSessionIds: store.unrevealedSessionIds(),
+    // D11: the candidate set is EVERY quest, because any of them may appear in history. Small table, and
+    // a quest with no entry in the set fails closed - its history stays hidden.
+    revealedQuestIds: new Set(store.listQuests().filter((quest) => quest.revealedToPlayers).map((quest) => quest.id)),
     revealedPageIds: revealedPageIdsIn(store, [...store.listStanding().map((row) => row.factionPageId), ...downtimePages])
   };
 }
