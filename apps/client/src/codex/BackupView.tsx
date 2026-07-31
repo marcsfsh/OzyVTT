@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, Button, Field, Panel, PanelHeader, SegmentedControl, useToast } from "@vtt/ui";
+import { Alert, Button, Field, Modal, Panel, PanelHeader, SegmentedControl, useToast } from "@vtt/ui";
 import { codexApi, type CodexImportBundle, type CodexImportCounts } from "./api";
 import { newId } from "../lib/ids";
 
@@ -12,7 +12,13 @@ import { newId } from "../lib/ids";
  * words — a full backup you can restore, and a way to bring outside notes in.
  *
  * **Restore is destructive by design.** The guardrails are the server's transactionality (a bad bundle
- * is a 400 with the codex completely untouched, so a retry is safe) and a real-count confirm here.
+ * is a 400 with the codex completely untouched, so a retry is safe), the server's refusal of a bundle
+ * that holds no recognised section at all, and a real-count confirm here — one that states every
+ * section unconditionally, so "0 pages" is something the GM reads before they press the button rather
+ * than something they discover after.
+ *
+ * The server's 400s name the section and the row ("That backup's \"pages\" entry 37 is not valid…"), so
+ * `error.message` is rendered verbatim rather than replaced with a generic failure line.
  */
 export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; onChanged: () => void }>) {
   const { toast } = useToast();
@@ -94,10 +100,30 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
     else toast(`Brought in ${imported} page${imported === 1 ? "" : "s"}.`, { tone: "success" });
   };
 
+  /**
+   * The inventory the GM confirms against — **every section, always, including the empty ones.**
+   *
+   * Two defects lived in one line here. It dropped any section the file did not carry, so the most
+   * dangerous file in the world ("no pages at all") described itself the most vaguely and fell through
+   * to the prose "its own records"; and its plural branch was `noun === "journal entry" ? "s" : "s"`,
+   * a dead ternary that printed "17 journal entrys" in the most destructive dialog in the app.
+   *
+   * A missing section is `0`, not silence, because `0` is exactly what the restore will leave behind.
+   */
+  const RESTORE_SECTIONS = [
+    { key: "pages", one: "page", many: "pages" },
+    { key: "maps", one: "map", many: "maps" },
+    { key: "markers", one: "pin", many: "pins" },
+    { key: "journal", one: "journal entry", many: "journal entries" },
+    { key: "sessions", one: "session", many: "sessions" },
+    { key: "quests", one: "quest", many: "quests" }
+  ] as const satisfies ReadonlyArray<{ key: keyof CodexImportCounts; one: string; many: string }>;
+  const countOf = (counts: Partial<CodexImportCounts>, key: keyof CodexImportCounts) => counts[key] ?? 0;
   const countLine = (counts: Partial<CodexImportCounts>) =>
-    ([["pages", "page"], ["maps", "map"], ["markers", "pin"], ["journal", "journal entry"], ["sessions", "session"], ["quests", "quest"]] as const)
-      .map(([key, noun]) => (counts[key] === undefined ? null : `${counts[key]} ${noun}${counts[key] === 1 ? "" : noun === "journal entry" ? "s" : "s"}`))
-      .filter(Boolean).join(", ");
+    RESTORE_SECTIONS.map(({ key, one, many }) => {
+      const value = countOf(counts, key);
+      return `${value} ${value === 1 ? one : many}`;
+    }).join(", ");
 
   return (
     <div className="codex-backup">
@@ -114,16 +140,28 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
         <p className="codex-composer-hint">Download a backup first — restore replaces everything.</p>
         <Button variant="secondary" onClick={() => restoreInputRef.current?.click()}>Choose a backup file…</Button>
         <input ref={restoreInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { void pickRestore(event.target.files?.[0]); event.target.value = ""; }} />
-        {pending && (
-          <div className="codex-backup-confirm" role="alertdialog" aria-label="Restore this backup?">
-            <h4>Restore this backup?</h4>
-            <p>It replaces your entire Codex with the contents of <strong>{pending.name}</strong> — {countLine(pending.counts) || "its own records"}. This cannot be undone.</p>
-            <div className="codex-conn-formactions">
-              <Button variant="destructive" disabled={busy} onClick={() => void restore()}>Replace everything</Button>
-              <Button variant="ghost" onClick={() => setPending(null)}>Cancel</Button>
-            </div>
-          </div>
-        )}
+        {/**
+          * The shared `Modal`, not the inline panel this used to be and not `useConfirm` either.
+          *
+          * Inline, it was an `role="alertdialog"` div with no focus management, no Escape and nothing
+          * stopping the GM scrolling past it — the weakest confirmation in the app attached to the only
+          * irreversible act in it. `useConfirm` takes its body as a single string, which cannot carry an
+          * inventory the GM is meant to READ line by line. `Modal` gives the focus trap, the scrim and
+          * the Escape that every other destructive confirm inherits, and keeps the counts as markup.
+          */}
+        <Modal open={!!pending} onClose={() => setPending(null)} size="sm"
+          title="Restore this backup?" ariaLabel="Restore this backup?"
+          footer={<>
+            <Button variant="secondary" onClick={() => setPending(null)}>Cancel</Button>
+            <Button variant="destructive" disabled={busy} onClick={() => void restore()}>Replace everything</Button>
+          </>}>
+          {pending && <>
+            <p>It replaces your entire Codex with the contents of <strong>{pending.name}</strong>. This cannot be undone.</p>
+            {/* Stated as a list rather than a sentence: a GM about to destroy their campaign is checking
+                a number, and a zero in this list is the loudest thing on the screen. */}
+            <p className="codex-backup-inventory">That file contains {countLine(pending.counts)}.</p>
+          </>}
+        </Modal>
       </Panel>
 
       <Panel>

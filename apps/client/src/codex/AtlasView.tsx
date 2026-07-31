@@ -310,7 +310,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
     try { onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed)); }
     catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Couldn't change who can see this map."); }
   };
-  const deleteMap = async () => { if (currentMap && await confirm({ title: "Delete map", body: `Delete map "${currentMap.name}"? Its markers are removed.`, confirmLabel: "Delete", danger: true })) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); onNavigate(parent ? atlasPath(parent) : "/codex/atlas"); } };
+  const deleteMap = async () => { if (currentMap && await confirm({ title: "Delete map", body: `Delete map "${currentMap.name}"? Its pins are removed.`, confirmLabel: "Delete", danger: true })) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); onNavigate(parent ? atlasPath(parent) : "/codex/atlas"); } };
 
   return (
     <div className="codex-atlas">

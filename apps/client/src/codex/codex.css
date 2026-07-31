@@ -1147,8 +1147,10 @@
 /* D16 — Backup. */
 .codex-backup { display: flex; flex-direction: column; gap: var(--space-4); }
 .codex-backup > .nh-panel { display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
-.codex-backup-confirm { border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--danger) 10%, transparent); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
-.codex-backup-confirm h4 { margin: 0; font-family: var(--font-display); }
+/* The restore confirm's inventory. Bordered in --danger and set in the tabular figures the rest of the
+   Codex uses for counts, because the number a GM is checking here is the one that decides whether they
+   press the button — including when it is zero. */
+.codex-backup-inventory { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--danger) 10%, transparent); font-variant-numeric: tabular-nums; }
 .codex-backup-issues { margin: var(--space-2) 0 0; padding-inline-start: var(--space-4); }
 
 /* D10 — the cross-type tag view. */

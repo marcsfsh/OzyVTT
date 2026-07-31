@@ -383,11 +383,12 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
               onOpenEntry={(entryId) => go(journalEntryPath(entryId))} onOpenPage={(pageId) => go(pagePath(pageId))} />
           )}
 
+          {/* The player's real feeds, passed as they are. `TagView`'s row types make `revealedToPlayers`
+              optional, so this needs no cast and no invented field — and because the rows genuinely do
+              not carry a reveal state, the view is structurally unable to badge one. */}
           {section === "tags" && (
             <TagView gmToken={token} player tag={decodeURIComponent(segments[2] ?? "")}
-              pages={pages.map((summary) => ({ ...summary, revealedToPlayers: true, entityType: summary.entityType, fields: {}, inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 0, createdAt: summary.updatedAt })) as never}
-              maps={maps.map((map) => ({ ...map, revealedToPlayers: true, sortKey: 0, createdAt: "", updatedAt: "" })) as never}
-              records={timeline as never} sessions={sessions as never} quests={quests as never}
+              pages={pages} maps={maps} records={timeline} sessions={sessions} quests={quests}
               onNavigate={go} />
           )}
         </div>

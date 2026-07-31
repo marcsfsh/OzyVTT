@@ -74,13 +74,13 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const setParty = async (isParty: boolean) => {
     setBusy(true); setError(null);
     try { onUpdated(await atlasApi.setPartyMarker(gmToken, marker.id, isParty)); await onPartyChanged(); }
-    catch { setError("Couldn't move the party marker."); }
+    catch { setError("Couldn't move the party pin."); }
     finally { setBusy(false); }
   };
   const remove = async () => {
-    if (!(await confirm({ title: "Delete marker", body: "Delete this marker? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
+    if (!(await confirm({ title: "Delete pin", body: "Delete this pin? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     try { await atlasApi.deleteMarker(gmToken, marker.id); onDeleted(marker.id); }
-    catch { setError("Couldn't delete the marker."); }
+    catch { setError("Couldn't delete the pin."); }
   };
 
   // Hint from the tags already in use on pages and on the atlas, so one vocabulary spans the suite.

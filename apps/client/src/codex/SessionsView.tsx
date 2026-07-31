@@ -240,7 +240,7 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
           pages={pages} onNavigate={() => undefined} gmLayer rows={8} />
       </Field>
 
-      <Field label="Recap" help="Shown to players once this session is revealed." htmlFor="s-recap">
+      <Field label="Recap" help="Shown to players once you show this session to them." htmlFor="s-recap">
         <CodexEditor id="s-recap" token={gmToken} value={draft.recapBody} onChange={(recapBody) => patch({ recapBody })}
           ariaLabel="Recap" placeholder="What the table did, in the party's own words…"
           pages={pages} onNavigate={() => undefined} rows={8} />

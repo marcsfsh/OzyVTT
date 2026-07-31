@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { Badge, Skeleton } from "@vtt/ui";
-import { codexApi, playerCodexApi, type CodexChronicleRecord, type CodexMap, type CodexPageSummary, type CodexQuest, type CodexSession } from "./api";
-import { chronicleRowSummary } from "./chronicle";
-import { sessionTitle } from "./sessions";
+import { codexApi, playerCodexApi, type CodexJournalPayload, type CodexPlayerChroniclePayload, type CodexQuestStatus } from "./api";
+import { chronicleRowSummary, type ChroniclePayloadRef } from "./chronicle";
+import { sessionTitle, type SessionRef } from "./sessions";
+import { QUEST_STATUS_LABEL, questStatusTone } from "./quests";
+import type { EntityType } from "./entities";
 import { CodexIcon, EntityIcon } from "./icons";
 import { VisibilityBadge } from "./SecretMarkers";
 import { useCodexSearch } from "./SearchResults";
@@ -17,14 +19,32 @@ import { atlasPath, journalEntryPath, pagePath, questPath, sessionPath } from ".
  * and are exact-matched on the hit's own `tags`. When search reports `truncated`, the section says so
  * rather than presenting a clipped list as the whole answer.
  */
+/**
+ * **Role-blind row shapes: the minimum this view reads, with the reveal state OPTIONAL.**
+ *
+ * The player shell used to satisfy GM-typed props with five `as never` casts and a fabricated
+ * `revealedToPlayers: true` on every row — switching off the compile-time protection the rest of the
+ * Codex is built on, at exactly the boundary it exists to guard, and inventing a GM field on player
+ * data to do it. A player's real projections satisfy these types unchanged, and the *absence* of the
+ * field is what makes "no reveal state to show" and "no badge" the same fact rather than two.
+ *
+ * Same discipline as `SessionRef` and `ChroniclePayloadRef`: widen the shape, never cast the caller.
+ */
+export type TagPageRef = Readonly<{ id: string; title: string; entityType: EntityType; tags: readonly string[]; revealedToPlayers?: boolean }>;
+export type TagMapRef = Readonly<{ id: string; name: string; tags: readonly string[]; revealedToPlayers?: boolean }>;
+export type TagRecordRef = ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>
+  & Readonly<{ id: string; text: string; gmText?: string | null; tags: readonly string[]; revealedToPlayers?: boolean }>;
+export type TagSessionRef = SessionRef & Readonly<{ tags: readonly string[]; revealedToPlayers?: boolean }>;
+export type TagQuestRef = Readonly<{ id: string; title: string; status: CodexQuestStatus; tags: readonly string[]; revealedToPlayers?: boolean }>;
+
 export type TagViewProps = Readonly<{
   gmToken: string;
   tag: string;
-  pages: readonly CodexPageSummary[];
-  maps: readonly CodexMap[];
-  records: readonly CodexChronicleRecord[];
-  sessions: readonly CodexSession[];
-  quests: readonly CodexQuest[];
+  pages: readonly TagPageRef[];
+  maps: readonly TagMapRef[];
+  records: readonly TagRecordRef[];
+  sessions: readonly TagSessionRef[];
+  quests: readonly TagQuestRef[];
   onNavigate: (path: string) => void;
   /** The player shell passes its own token and reads through `playerCodexApi` — never the GM search. */
   player?: boolean;
@@ -61,7 +81,7 @@ export function TagView({ gmToken, tag, pages, maps, records, sessions, quests, 
               <button key={page.id} type="button" className="codex-campaign-recentitem" onClick={() => onNavigate(pagePath(page.id))}>
                 <EntityIcon type={page.entityType} className="codex-campaign-recentglyph" />
                 <span className="codex-list-title">{page.title}</span>
-                {!player && <VisibilityBadge revealed={page.revealedToPlayers} />}
+                {page.revealedToPlayers !== undefined && <VisibilityBadge revealed={page.revealedToPlayers} />}
               </button>
             ))}
           </nav>
@@ -76,7 +96,7 @@ export function TagView({ gmToken, tag, pages, maps, records, sessions, quests, 
               <button key={map.id} type="button" className="codex-campaign-recentitem" onClick={() => onNavigate(atlasPath(map.id))}>
                 <CodexIcon iconId="compass" className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{map.name}</span>
-                {!player && <VisibilityBadge revealed={map.revealedToPlayers} />}
+                {map.revealedToPlayers !== undefined && <VisibilityBadge revealed={map.revealedToPlayers} />}
               </button>
             ))}
           </nav>
@@ -108,7 +128,7 @@ export function TagView({ gmToken, tag, pages, maps, records, sessions, quests, 
               <button key={`${record.kind}-${record.id}`} type="button" className="codex-campaign-recentitem" onClick={() => onNavigate(journalEntryPath(record.id))}>
                 <CodexIcon iconId="book" className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{chronicleRowSummary(record) || "Untitled entry"}</span>
-                {!player && "revealedToPlayers" in record && <VisibilityBadge revealed={record.revealedToPlayers} />}
+                {record.revealedToPlayers !== undefined && <VisibilityBadge revealed={record.revealedToPlayers} />}
               </button>
             ))}
           </nav>
@@ -123,7 +143,7 @@ export function TagView({ gmToken, tag, pages, maps, records, sessions, quests, 
               <button key={session.id} type="button" className="codex-campaign-recentitem" onClick={() => onNavigate(sessionPath(session.id))}>
                 <CodexIcon iconId="sessions" className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{sessionTitle(session)}</span>
-                {!player && <VisibilityBadge revealed={session.revealedToPlayers} />}
+                {session.revealedToPlayers !== undefined && <VisibilityBadge revealed={session.revealedToPlayers} />}
               </button>
             ))}
           </nav>
@@ -138,8 +158,10 @@ export function TagView({ gmToken, tag, pages, maps, records, sessions, quests, 
               <button key={quest.id} type="button" className="codex-campaign-recentitem" onClick={() => onNavigate(questPath(quest.id))}>
                 <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{quest.title}</span>
-                <Badge>{quest.status}</Badge>
-                {!player && <VisibilityBadge revealed={quest.revealedToPlayers} />}
+                {/* The status LABEL, never the wire value: every other quest surface reads "In progress",
+                    and only this one read "active". */}
+                <Badge tone={questStatusTone(quest.status)}>{QUEST_STATUS_LABEL[quest.status]}</Badge>
+                {quest.revealedToPlayers !== undefined && <VisibilityBadge revealed={quest.revealedToPlayers} />}
               </button>
             ))}
           </nav>

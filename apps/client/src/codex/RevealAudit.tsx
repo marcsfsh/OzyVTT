@@ -66,8 +66,9 @@ const AUDIT_KINDS: Readonly<Record<CodexRevealAuditKind, Readonly<{
   journal: {
     // One journal table, six kinds — notes, battles, deadlines, downtime, and M12's milestones and
     // standing changes — so this section is named for the timeline they all live on rather than for
-    // any one of them.
-    heading: "Chronicle records", iconId: "hourglass",
+    // any one of them. D5 retired "chronicle" from UI copy: the timeline is the **Journal** everywhere
+    // a GM reads it, and this heading is also lowercased into the incomplete-audit alert below.
+    heading: "Journal entries", iconId: "hourglass",
     emptyLabel: "No journal entries, deadlines, downtime, milestones or standing changes are shown to players.",
     setRevealed: (token, id, revealed) => journalApi.reveal(token, id, revealed),
     hideLabel: (title) => `Show the entry ${title} to players`
@@ -227,7 +228,7 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
                          its DEFAULT size — 44px of real paint and no `::after` at all. */
                       <div key={`${kind}:${row.id}`} className={`codex-audit-row${justHidden.has(`${kind}:${row.id}`) ? " is-hidden" : ""}`}>
                         {/* WHICH kind of chronicle record this is — the fix for the one thing this screen
-                            could not say. The section heading is "Chronicle records" because one journal
+                            could not say. The section heading is "Journal entries" because one journal
                             table carries six kinds, so a revealed deadline and a revealed note read
                             identically here the moment either had prose of its own — on the surface whose
                             entire job is answering "is that deadline visible?".

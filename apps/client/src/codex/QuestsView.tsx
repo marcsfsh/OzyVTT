@@ -239,7 +239,7 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
 
       {/* D13: the SAME writing surface a page body gets, so a quest body renders as markdown for the
           party instead of as the deliberate plain text it used to be. */}
-      <Field label="What the party was told" help="Shown to players once this quest is revealed." htmlFor="q-player">
+      <Field label="What the party was told" help="Shown to players once you show this quest to them." htmlFor="q-player">
         <CodexEditor id="q-player" token={gmToken} value={draft.playerBody} onChange={(playerBody) => patch({ playerBody })}
           ariaLabel="What the party was told" placeholder="The hook as the table heard it…"
           pages={pages} onNavigate={() => undefined} rows={7} />
@@ -253,7 +253,7 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
           pages={pages} onNavigate={() => undefined} gmLayer rows={7} />
       </Field>
 
-      <Field label="Pages this quest concerns" help="Players only ever see the ones you have already revealed.">
+      <Field label="Pages this quest concerns" help="Players only ever see the ones you have already shown them.">
         <div className="codex-quest-links">
           {linked.map((page) => (
             <div key={page.id} className="codex-quest-link">

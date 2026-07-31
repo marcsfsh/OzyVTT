@@ -13,14 +13,23 @@ import { CHRONICLE_KIND_META } from "./chronicle";
  * nobody diffs) and the most expensive to notice, because nothing breaks — the product just gets harder
  * to learn. So this test reads the source and fails the build on the retired words.
  *
- * **How it decides what is user-facing.** It scans only strings that reach a user: JSX text nodes, and
- * string literals on the label-ish props (`aria-label`, `label`, `placeholder`, `title`, `empty`, …).
- * Identifiers, comments, CSS classes and wire field names are deliberately out of scope — `NotebookTree`
- * is a component name and `markerId` is the server's field; renaming those is churn, not clarity. The
- * rule is about what the GM and the players READ.
+ * **How it decides what is user-facing.** It scans only strings that reach a user: JSX text nodes,
+ * label-ish props (`aria-label`, `label`, `placeholder`, `title`, `help`, `body`, `heading`, …) whether
+ * written as a JSX attribute *or* as an object-literal key, and the arguments of the three calls that
+ * put a sentence on screen without a prop (`setError`, `toast`, `setNotice`). Identifiers, comments,
+ * CSS classes and wire field names are deliberately out of scope — `NotebookTree` is a component name
+ * and `markerId` is the server's field; renaming those is churn, not clarity. The rule is about what
+ * the GM and the players READ.
  *
- * **Scoped to `src/codex/**` plus the styleguide's Codex sections**, because the words are Codex words.
- * "Reveal the whole map" on the fog-of-war toolbar is combat vocabulary and stays.
+ * **What it used to miss, and why that mattered.** The scanner matched `prop="…"` only, so every
+ * `useConfirm({ title: …, body: … })` dialog, every `Field help=` and every template literal was
+ * invisible to it. It reported 673 strings and 0 offenders while five retired words shipped — including
+ * a pin dialog whose button read "Delete pin" and whose confirm read "Delete marker". Widening it to
+ * `prop[:=]` plus backticks brought the corpus to ~900 strings and the offenders with it.
+ *
+ * **Scoped to `src/codex/**`**, because the words are Codex words. "Reveal the whole map" on the
+ * fog-of-war toolbar is combat vocabulary and stays. The styleguide is deliberately NOT scanned: it is
+ * a developer reference that has to be able to name a retired word in order to say it is retired.
  */
 
 /**
@@ -43,22 +52,34 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
   // The visibility words are the ones that drift hardest, because every surface needs them.
   { pattern: /\breveal(s|ed|ing)?\b/i, use: "“Shown to players” / “Hidden from players” / “Show … to players”" },
   { pattern: /\bpublic\b/i, use: "“Shown to players”" },
-  { pattern: /\bsecret\b(?! )/i, use: "“Hidden from players” or “GM only”" }
+  // No `(?! )` lookahead. It made every mid-sentence "secret " unmatchable, which is most of them — the
+  // rule could only ever fire on "secret." or "secret," and shipped `aria-label="GM secret body"` green.
+  { pattern: /\bsecret\b/i, use: "“Hidden from players” or “GM only”" },
+  // D5 glossary §4: the timeline feature is the **Journal**, never "chronicle" and never "timeline", in
+  // any copy a GM reads. `chronicle.ts` and `CodexChronicleRecord` are identifiers and stay.
+  { pattern: /\bchronicles?\b/i, use: "Journal" },
+  { pattern: /\btimelines?\b/i, use: "Journal" }
 ];
 
 /**
- * Exemptions, each with the reason it is not drift. Kept as exact strings rather than as a loosened
- * regex: a new violation that happens to resemble an exempt one must still fail.
+ * Exemptions, each with the reason it is not drift.
+ *
+ * **Whole-string equality, not `includes`.** As substrings these rescued nothing at all — measured by
+ * removing each and re-running: every one of them was inert from the day it was written, because the
+ * fragments they name carry no retired word. Worse, `includes` meant a *new* violation that happened to
+ * contain an exempt phrase would be excused, which is the opposite of what the comment claimed.
  */
 const ALLOWED = new Set<string>([
   // "Reveal audit" is a proper noun — the name of a section in the sidebar and its own heading.
   "Reveal audit",
-  // The audit's own column headers name the ACT being audited, which is the reveal itself.
-  "Reveal history",
   // §3.4 wording the director approved: "secret" as an adjective in prose about the GM layer reads more
-  // naturally than "hidden from players" mid-sentence, and both appear together in these two hints.
-  "This pin is shown, but the map",
-  "This pin is shown, but"
+  // naturally than "hidden from players" mid-sentence. These are the two pin-inspector hints, and they
+  // are the only two places it survives.
+  "is still secret —",
+  "is still secret, so players cannot see either",
+  // A faction's in-fiction agenda. This is content vocabulary, not visibility vocabulary — the field
+  // holds what the faction is secretly up to, and no reader could mistake it for a reveal state.
+  "Secret agenda"
 ]);
 
 type Found = Readonly<{ file: string; line: number; text: string }>;
@@ -69,16 +90,39 @@ function codexSources(): readonly string[] {
     .sort();
 }
 
-/** JSX text nodes plus label-ish attribute strings — the strings a person actually reads. */
+/** The props that carry copy. Both spellings — `help="…"` in JSX and `help: "…"` in a confirm/meta object. */
+const COPY_PROPS = [
+  "aria-label", "ariaLabel", "label", "placeholder", "title", "empty", "emptyLabel", "heading",
+  "help", "hint", "body", "summary", "confirmLabel", "cancelLabel", "removeLabel", "maxReachedReason"
+].join("|");
+/** The three calls that put a sentence on screen with no prop to hang it on. */
+const COPY_CALLS = "setError|setNotice|toast";
+
+/** JSX text nodes, label-ish props and message calls — the strings a person actually reads. */
 function userFacingStrings(file: string): readonly Found[] {
   const found: Found[] = [];
   readFileSync(`${CODEX_DIR}${file}`, "utf8").split("\n").forEach((line, index) => {
-    for (const match of line.matchAll(/\b(?:aria-label|ariaLabel|label|placeholder|title|empty|emptyLabel|heading|confirmLabel|cancelLabel)=\{?"([^"]+)"/g)) {
-      found.push({ file, line: index + 1, text: match[1] });
+    // `[:=]` catches the object-literal half, and the backtick branch catches template literals —
+    // between them, `confirm({ title: "Delete marker", body: \`…\` })` becomes visible for the first
+    // time. The two branches are separate so a template literal may contain a double quote of its own,
+    // which the atlas's `Delete map "${name}"?` does.
+    const quoted = `(?:"([^"\\n]+)"|\`([^\`\\n]+)\`)`;
+    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_PROPS})\\s*[:=]\\s*\\{?${quoted}`, "g"))) {
+      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
     }
-    for (const match of line.matchAll(/>([^<>{}\n]*[A-Za-z][^<>{}\n]*)</g)) {
+    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_CALLS})\\(\\s*${quoted}`, "g"))) {
+      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
+    }
+    // A JSX text node runs from the `>` that closed a tag up to the next `<` or `{`. The old form
+    // required a literal `<` to close it, so any sentence interrupted by an interpolation vanished
+    // whole — including MarkerInspector's "is still secret, so players cannot see either{onRevealMap …".
+    // `(?<!=)` is what keeps that widening honest: without it every arrow function's `=>` opens a
+    // "text node" and the body of the Codex's own code is scanned as copy.
+    for (const match of line.matchAll(/(?<!=)>([^<>{}\n]*[A-Za-z][^<>{}\n]*)(?=[<{])/g)) {
       const text = match[1].trim();
-      if (text.length > 1) found.push({ file, line: index + 1, text });
+      // A backtick is the tell for the other thing a `>` closes: a generic type argument, as in
+      // `request<{ marker: CodexMarker }>(token, \`/markers/…\`)`. No sentence a GM reads has one.
+      if (text.length > 1 && !text.includes("`")) found.push({ file, line: index + 1, text });
     }
   });
   return found;
@@ -91,17 +135,36 @@ describe("The canonical glossary (D5)", () => {
     // A guard that silently matched nothing would pass forever. This is the tripwire on the tripwire:
     // if a refactor moves the Codex out from under the glob, this fails before the word rules do.
     expect(codexSources().length).toBeGreaterThan(25);
-    expect(strings.length).toBeGreaterThan(400);
+    expect(strings.length).toBeGreaterThan(850);
+  });
+
+  it("sees the object-literal copy the old scanner was blind to", () => {
+    // The specific blindness that let five retired words ship green: a `useConfirm` dialog states its
+    // title and body as object keys, and `prop="…"` never matched one. Named strings rather than a
+    // count, so a future narrowing of the scanner fails here instead of quietly measuring less.
+    const at = (file: string, text: string) => strings.some((entry) => entry.file === file && entry.text === text);
+    expect(at("MarkerInspector.tsx", "Delete pin")).toBe(true);
+    expect(at("MarkerInspector.tsx", "Delete this pin? This cannot be undone.")).toBe(true);
+    expect(at("AtlasView.tsx", 'Delete map "${currentMap.name}"? Its pins are removed.')).toBe(true);
+    expect(strings.some((entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional — players never see"))).toBe(true);
   });
 
   for (const { pattern, use } of RETIRED) {
     it(`never says ${String(pattern)} to a user — say ${use}`, () => {
-      const offenders = strings.filter(
-        (entry) => pattern.test(entry.text) && ![...ALLOWED].some((allowed) => entry.text.includes(allowed))
-      );
+      const offenders = strings.filter((entry) => pattern.test(entry.text) && !ALLOWED.has(entry.text));
       expect(offenders.map((entry) => `${entry.file}:${entry.line}  ${JSON.stringify(entry.text)}`)).toEqual([]);
     });
   }
+
+  it("has no exemption that rescues nothing — a dead exemption is a comment pretending to be a rule", () => {
+    // Every ALLOWED entry was inert when this lock was written: as substrings they matched fragments
+    // carrying no retired word at all, so removing any of them changed nothing. Now they are whole
+    // strings, and each one must be load-bearing or be deleted.
+    for (const allowed of ALLOWED) {
+      const rescued = strings.filter((entry) => entry.text === allowed && RETIRED.some(({ pattern }) => pattern.test(entry.text)));
+      expect(rescued.length, `exemption ${JSON.stringify(allowed)} rescues nothing`).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe("The words the navigation itself uses (D1/D5)", () => {

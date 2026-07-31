@@ -115,7 +115,7 @@ describe("Revealing a record dated ahead of the players (owner decision, 2026-07
     // Nothing has been revealed yet. A dialog that paints AFTER the route fires is decoration.
     expect(revealEntry).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Reveal anyway" }));
+    await user.click(screen.getByRole("button", { name: "Show anyway" }));
     await waitFor(() => expect(revealEntry).toHaveBeenCalledWith("gm", "m1", true));
   });
 
@@ -191,7 +191,7 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
 
     await user.click(switchIn("m1"));
     await user.click(await screen.findByRole("switch", { name: "Stop warning me about this" }));
-    await user.click(screen.getByRole("button", { name: "Reveal anyway" }));
+    await user.click(screen.getByRole("button", { name: "Show anyway" }));
     await waitFor(() => expect(revealEntry).toHaveBeenCalledWith("gm", "m1", true));
 
     // The next reveal of an equally-ahead record goes straight through.
@@ -223,7 +223,7 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
    * A flicked switch belongs to the request it was flicked on, and dies with it.
    *
    * The shared dialog keeps this state, so without a reset per request a switch flicked on a dialog the GM
-   * backed out of arrives pre-flicked on the NEXT one — and the next "Reveal anyway" would disable the
+   * backed out of arrives pre-flicked on the NEXT one — and the next "Show anyway" would disable the
    * warning without the GM asking for it in that interaction at all.
    */
   it("does not carry a flicked switch into the next dialog", async () => {
@@ -236,7 +236,7 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
 
     await user.click(switchIn("m3"));
     expect(await screen.findByRole("switch", { name: "Stop warning me about this" })).toHaveAttribute("aria-checked", "false");
-    await user.click(screen.getByRole("button", { name: "Reveal anyway" }));
+    await user.click(screen.getByRole("button", { name: "Show anyway" }));
     await waitFor(() => expect(revealEntry).toHaveBeenCalledWith("gm", "m3", true));
 
     // Nothing was suppressed, so the warning is still armed.
@@ -257,7 +257,7 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
 
     await user.click(switchIn("m1"));
     await user.click(await screen.findByRole("switch", { name: "Stop warning me about this" }));
-    await user.click(screen.getByRole("button", { name: "Reveal anyway" }));
+    await user.click(screen.getByRole("button", { name: "Show anyway" }));
 
     await user.click(await screen.findByRole("button", { name: "Warn me again before showing an entry" }));
     expect(screen.queryByRole("button", { name: "Warn me again before showing an entry" })).not.toBeInTheDocument();

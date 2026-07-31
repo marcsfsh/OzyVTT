@@ -94,13 +94,13 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   trash: <path fillRule="evenodd" d="M10 3h4a1 1 0 0 1 1 1v1h5v2H4V5h5V4a1 1 0 0 1 1-1zM6.5 8h11l-.9 11.6a1.5 1.5 0 0 1-1.5 1.4H8.9a1.5 1.5 0 0 1-1.5-1.4zm3.5 3v7h1.4v-7zm3 0v7h1.4v-7z" />
 };
 
-/** Marker-picker groupings (a curated subset - the registry holds more, incl. entity glyphs). */
+/** Pin-picker groupings (a curated subset - the registry holds more, incl. entity glyphs). */
 export const ICON_CATEGORIES: ReadonlyArray<{ label: string; ids: readonly string[] }> = [
   { label: "Settlements", ids: ["village", "town", "city", "capital", "castle", "fort", "tower", "watchtower"] },
   { label: "Structures", ids: ["temple", "shrine", "lighthouse", "gate", "bridge", "mine", "ruin", "obelisk"] },
   { label: "Wilds", ids: ["mountain", "hills", "volcano", "forest", "tree", "water", "river", "swamp", "island", "desert", "cave"] },
   { label: "Sites", ids: ["dungeon", "portal", "henge", "statue", "graveyard", "battle", "camp", "campfire", "treasure", "ship", "anchor", "road"] },
-  { label: "Markers", ids: ["pin", "flag", "star", "quest", "danger", "skull", "eye", "compass"] }
+  { label: "Symbols", ids: ["pin", "flag", "star", "quest", "danger", "skull", "eye", "compass"] }
 ];
 
 /**

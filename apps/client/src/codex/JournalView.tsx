@@ -324,8 +324,8 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
       const seen = calendar?.publishedDate && calendar ? formatWorldDate(calendar, calendar.publishedDate) : "no date yet";
       const proceed = await confirm({
         title: "This is dated ahead of the players",
-        body: `Players' date is still ${seen} — revealing this tells them the story has reached ${dated}. Publish the date first if that's not what you want.`,
-        confirmLabel: "Reveal anyway",
+        body: `Players' date is still ${seen} — showing this tells them the story has reached ${dated}. Publish the date first if that's not what you want.`,
+        confirmLabel: "Show anyway",
         suppress: { label: "Stop warning me about this", onChange: (suppressed) => { if (suppressed) { setRevealWarn(false); writeRevealWarn(false); } } }
       });
       if (!proceed) return;
@@ -498,7 +498,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                 changes nothing. Without this the "Confirm" that appears on the row afterwards would be
                 the first the GM heard that the clock was involved at all. */}
             {composerProposal && calendar && (
-              <p className="codex-composer-hint">Logging this proposes advancing the campaign clock to {formatWorldDate(calendar, composerProposal)} — nothing moves until you confirm it on the record.</p>
+              <p className="codex-composer-hint">Logging this proposes moving your date to {formatWorldDate(calendar, composerProposal)} — nothing moves until you confirm it on the record.</p>
             )}
           </>
         )}

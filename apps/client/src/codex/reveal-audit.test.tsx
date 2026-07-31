@@ -100,7 +100,7 @@ describe("The audit lists every Codex record type (CT-9)", () => {
     expect(within(sectionOf("Pages")).getByText("Strahd")).toBeInTheDocument();
     expect(within(sectionOf("Maps")).getByText("Barovia")).toBeInTheDocument();
     expect(within(sectionOf("Map pins")).getByText("Vallaki")).toBeInTheDocument();
-    expect(within(sectionOf("Chronicle records")).getByText("The party crossed the mists.")).toBeInTheDocument();
+    expect(within(sectionOf("Journal entries")).getByText("The party crossed the mists.")).toBeInTheDocument();
     expect(within(sectionOf("Session recaps")).getByText("Session 4")).toBeInTheDocument();
     expect(within(sectionOf("Quests")).getByText("Find the Sunsword")).toBeInTheDocument();
     // A standing row arrives already NAMED by the server; nothing here resolves an id.
@@ -112,7 +112,7 @@ describe("The audit lists every Codex record type (CT-9)", () => {
     // `revealed of total` is the question a GM actually opens this screen with, and both halves are the
     // server's: `revealed` is what a PLAYER would receive, not how many flags are set.
     expect(within(sectionOf("Pages")).getByText("1 of 12 shared")).toBeInTheDocument();
-    expect(within(sectionOf("Chronicle records")).getByText("1 of 40 shared")).toBeInTheDocument();
+    expect(within(sectionOf("Journal entries")).getByText("1 of 40 shared")).toBeInTheDocument();
     expect(screen.getByText("7 records are shown to players across the Codex.")).toBeInTheDocument();
   });
 
@@ -126,7 +126,7 @@ describe("The audit lists every Codex record type (CT-9)", () => {
 /**
  * A chronicle row on this surface must say WHICH kind of record it is (fixed 2026-07-30).
  *
- * One journal table carries six kinds, so the section is headed "Chronicle records" — and until this, a
+ * One journal table carries six kinds, so the section is headed "Journal entries" — and until this, a
  * revealed deadline and a revealed note read identically the moment either had prose of its own. The
  * server's `AUDIT_JOURNAL_FALLBACK` names the kind only for a record with NO player text, which is the
  * silent minority. "Is that deadline visible?" is the question this whole screen exists to answer.
@@ -145,7 +145,7 @@ describe("A chronicle row says which kind of record it is", () => {
       ], 40)
     ]));
 
-    const chronicle = within(sectionOf("Chronicle records"));
+    const chronicle = within(sectionOf("Journal entries"));
     // "Deadline" and "Entry" — the timeline's own labels, so a row here says what the same record says
     // there. `note` reads as "Entry": the DB's word and the chronicle's differ by exactly that one, and
     // `CHRONICLE_KIND_META["note"]` does not exist, so crossing that gap by hand would throw on the most

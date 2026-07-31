@@ -155,7 +155,7 @@ await p.waitForTimeout(700);
 const suppress = p.locator("dialog[open]").getByRole("switch", { name: "Stop warning me about this" });
 ok(await suppress.isVisible(), "the dialog offers a way to stop the warnings");
 await suppress.click({ force: true });
-await p.getByRole("button", { name: "Reveal anyway" }).click({ force: true });
+await p.getByRole("button", { name: "Show anyway" }).click({ force: true });
 await p.waitForTimeout(1000);
 ok(await p.evaluate(() => localStorage.getItem("codex.warn-reveal-ahead")) === "off", "the preference persists");
 // A second ahead-dated reveal now goes straight through, with no dialog.
@@ -212,7 +212,7 @@ const auditBtn = p.getByRole("button", { name: /shared with players|reveal audit
 if (await auditBtn.isVisible().catch(() => false)) {
   await auditBtn.click();
   await p.waitForTimeout(1500);
-  const chronicleSection = p.locator(".codex-audit-section").filter({ hasText: "Chronicle records" }).first();
+  const chronicleSection = p.locator(".codex-audit-section").filter({ hasText: "Journal entries" }).first();
   const badges = await chronicleSection.locator("[class*=badge]").allTextContents().catch(() => []);
   log(`  chronicle-row badges: ${JSON.stringify(badges)}`);
   ok(badges.some((t) => /Entry|Deadline|Downtime|Milestone|Standing|Battle/.test(t)), "an audit chronicle row badges its kind");
