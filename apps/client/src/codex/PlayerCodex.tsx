@@ -206,7 +206,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
           <IconButton label="Codex sections" className="codex-topbar-menu" onClick={openDrawer}><CodexIcon iconId="menu" className="codex-navitem-icon" /></IconButton>
           <h2 className="codex-topbar-title">{section ? SECTION_TITLE[section] : "Codex"}</h2>
           <div className="codex-topbar-actions">
-            <IconButton label="Search the Codex" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}><CodexIcon iconId="eye" className="codex-navitem-icon" /></IconButton>
+            <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}><CodexIcon iconId="eye" className="codex-navitem-icon" /></IconButton>
           </div>
         </div>
 
@@ -217,7 +217,9 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 
           {section === "home" && !gmOnly && (
             <CampaignHome pages={pages} entries={dash.entries} maps={maps} today={dash.today} loading={loading} showReveal={false}
-              session={pickNextSession(sessions)}
+              /* A player only ever sees a session whose recap has been revealed, which is by definition
+                 one that has already happened — so the heading is stated rather than inferred. */
+              session={(() => { const next = pickNextSession(sessions); return next && { ...next, heading: "Latest recap" }; })()}
               onOpenSession={(sessionId) => go(sessionPath(sessionId))}
               quests={quests}
               onOpenQuest={(questId) => go(questPath(questId))}

@@ -157,10 +157,16 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
         onNavigate(atlasPath(marker.mapId, pinId));
       })
       // R4: say what happened. A 404 here means the pin is gone (or was never ours), and dropping the GM
-      // on whatever map happened to be open, silently, is how a jump becomes a mystery.
-      .catch(() => { if (live) setError("That pin is no longer in the atlas."); });
+      // on whatever map happened to be open, silently, is how a jump becomes a mystery. The selection is
+      // cleared with it — a `?pin=` naming nothing must not leave the surface claiming a pin is chosen.
+      .catch(() => {
+        if (!live) return;
+        setError("That pin is no longer in the atlas.");
+        setSelectedMarkerId(null);
+        onReplaceQuery((query) => query.delete("pin"));
+      });
     return () => { live = false; };
-  }, [pinId, mapId, loading, gmToken, onNavigate]);
+  }, [pinId, mapId, loading, gmToken, onNavigate, onReplaceQuery]);
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;

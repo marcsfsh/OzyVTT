@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -47,6 +47,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { JournalView } from "./JournalView";
 import { MarkerInspector } from "./MarkerInspector";
+import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
 import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
 
@@ -129,7 +130,10 @@ describe("Journal entry tags (CI-2)", () => {
     updateEntry.mockResolvedValue(ENTRY());
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    // Scoped to the entry row: D13's one editor puts an Edit/Preview segmented control on each of the
+    // composer's two bodies, so an unscoped "Edit" is now three buttons. The one under test is the row's.
+    const row = within(await screen.findByRole("article"));
+    await user.click(row.getByRole("button", { name: "Edit" }));
     expect(await screen.findByRole("list", { name: /chosen/i })).toHaveTextContent("dark-gift");
 
     await user.type(screen.getByLabelText("Tags"), "Ravenloft{Enter}");
@@ -181,7 +185,7 @@ describe("Map tags (CI-2)", () => {
     listAssets.mockResolvedValue([]);
     listMarkers.mockResolvedValue([]);
     listPages.mockResolvedValue([]);
-    render(<AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} />);
+    render(<ToastProvider><AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} /></ToastProvider>);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Map settings" }));
     return user;

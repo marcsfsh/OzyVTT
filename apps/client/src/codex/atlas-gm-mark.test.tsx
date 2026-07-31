@@ -23,6 +23,7 @@ vi.mock("./api", async (importOriginal) => {
   };
 });
 
+import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
 import type { CodexMap } from "./api";
 
@@ -48,7 +49,7 @@ const MAP = (id: string, name: string, revealedToPlayers: boolean, parentMapId: 
 const MAPS = [MAP("m1", "Barovia", false), MAP("m2", "Faerûn", true), MAP("m3", "Castle Ravenloft", false, "m1")];
 
 const renderAtlas = () =>
-  render(<AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} />);
+  render(<ToastProvider><AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} /></ToastProvider>);
 
 describe("Atlas GM-only mark — an SVG glyph, never an emoji (design-language §0)", () => {
   beforeEach(() => {

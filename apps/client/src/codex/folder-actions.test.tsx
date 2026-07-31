@@ -64,7 +64,9 @@ describe("Notebook folder row — one action control, not four (§4)", () => {
 
     await user.click(folderMenu());
     const items = within(row).getAllByRole("menuitem").map((item) => item.textContent);
-    expect(items).toEqual(["New subfolder", "New note here", "Rename folder", "Delete folder"]);
+    // Intake Mobile #5 added "Move to top level": a folder could only be moved by DRAGGING it, which
+    // is unreachable with a thumb. The menu is still one control, which is what this test guards.
+    expect(items).toEqual(["New subfolder", "New page here", "Rename folder", "Move to top level", "Delete folder"]);
   });
 
   it("no action sits on a bare button any more — each is a menu item, which is what carries the floor", async () => {
@@ -76,7 +78,7 @@ describe("Notebook folder row — one action control, not four (§4)", () => {
     expect(container.querySelectorAll(".codex-tree-folder-btn")).toHaveLength(0);
 
     await user.click(folderMenu());
-    for (const label of ["New subfolder", "New note here", "Rename folder", "Delete folder"]) {
+    for (const label of ["New subfolder", "New page here", "Rename folder", "Move to top level", "Delete folder"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
   });
@@ -88,7 +90,7 @@ describe("Notebook folder row — one action control, not four (§4)", () => {
 
     for (const [label, spy] of [
       ["New subfolder", h.onNewSubfolder],
-      ["New note here", h.onNewInFolder],
+      ["New page here", h.onNewInFolder],
       ["Rename folder", h.onRenameFolder],
       ["Delete folder", h.onDeleteFolder]
     ] as const) {

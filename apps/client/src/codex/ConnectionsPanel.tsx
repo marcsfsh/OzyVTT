@@ -50,9 +50,15 @@ export type ConnectionsPanelProps = Readonly<{
     pages: readonly CodexPageSummary[];
     onChanged: () => void;
   }>;
+  /**
+   * `false` drops the panel's own heading and landmark, for the page editor — which wraps this together
+   * with "On the atlas" and "In the journal" under ONE "Connections" region, because they are one
+   * question ("where else does this appear?") and three headings would be three features again.
+   */
+  standalone?: boolean;
 }>;
 
-export function ConnectionsPanel({ connections, onOpen, write }: ConnectionsPanelProps) {
+export function ConnectionsPanel({ connections, onOpen, write, standalone = true }: ConnectionsPanelProps) {
   const [adding, setAdding] = useState(false);
   const [target, setTarget] = useState<string | null>(null);
   const [label, setLabel] = useState("");
@@ -62,6 +68,7 @@ export function ConnectionsPanel({ connections, onOpen, write }: ConnectionsPane
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const Wrapper = standalone ? "section" : "div";
   const options = useMemo(
     () => (write?.pages ?? [])
       .filter((page) => page.id !== write?.pageId)
@@ -107,8 +114,10 @@ export function ConnectionsPanel({ connections, onOpen, write }: ConnectionsPane
   };
 
   return (
-    <div className="codex-connections-panel">
-      <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>
+    /* A named region when it stands alone, so "where else does this appear?" is a landmark a reader can
+       jump to rather than a heading buried in a rail. */
+    <Wrapper className="codex-connections-panel" {...(standalone ? { "aria-labelledby": "codex-connections-h" } : {})}>
+      {standalone && <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>}
       {connections.length === 0 && <p className="codex-page-timeline-empty">Nothing is connected to this page yet.</p>}
       {connections.length > 0 && (
         <ul className="codex-conn-list">
@@ -178,6 +187,6 @@ export function ConnectionsPanel({ connections, onOpen, write }: ConnectionsPane
       )}
       <datalist id="codex-conn-labels">{labelSuggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}</datalist>
       {error && <Alert tone="danger">{error}</Alert>}
-    </div>
+    </Wrapper>
   );
 }

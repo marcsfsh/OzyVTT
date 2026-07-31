@@ -50,3 +50,10 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 }
 
 afterEach(() => cleanup());
+
+/**
+ * D3 made every Codex surface an ADDRESS, so a component test has to say which one it is rendering.
+ * Each test file sets its own path (`goTo("/codex/pages")`); this resets the URL between tests so one
+ * test's navigation cannot leak into the next, which is the same isolation `cleanup()` gives the DOM.
+ */
+afterEach(() => { window.history.replaceState(null, "", "/"); window.dispatchEvent(new PopStateEvent("popstate", { state: null })); });

@@ -24,8 +24,8 @@ vi.mock("./api", async (importOriginal) => {
     codexApi: {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
-      listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a),
+      listConnections: (...a: unknown[]) => listRelationships(...a),
+      party: (...a: unknown[]) => listLinks(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
@@ -38,6 +38,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
+import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import type { CodexPage, CodexPageSummary } from "./api";
 
@@ -58,38 +59,38 @@ const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", 
 
 /** The app mounts inside a ToastProvider (`main.tsx:411`); `CodexShell` uses `useToast`, so a bare
     render would throw. Rendering it the way the app does is the point of an integration-shaped test. */
-const renderWorkspace = () => render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 
 describe("Codex shell — cross-mode navigation", () => {
   beforeEach(() => {
     listPages.mockResolvedValue(PAGES);
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    search.mockResolvedValue([]);
+    search.mockResolvedValue({ hits: [], truncated: false });
     timeline.mockResolvedValue([]);
     listMaps.mockResolvedValue([]);
     getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] });
     getPage.mockImplementation(async (_t: string, id: string) => ({
       page: { ...PAGES.find((p) => p.id === id)!, playerBody: "", gmBody: "", gmFields: {} } as CodexPage,
-      backlinks: [], relationships: []
+      connections: []
     }));
   });
 
   it("starts on Pages — the GM's first action is actionable", async () => {
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    expect(screen.getByRole("tab", { name: "Pages" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");
   });
 
   it("switches mode when a mode tab is chosen", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
-    expect(screen.getByRole("tab", { name: "Campaign" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("button", { name: "Home" }));
+    expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
   });
 
   it("Campaign → Pages prepares its destination: picking a type filters the notebook AND lands on Pages", async () => {
@@ -98,9 +99,9 @@ describe("Codex shell — cross-mode navigation", () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await user.click(screen.getByRole("button", { name: "Home" }));
     await user.click(await screen.findByText(/character/i));
-    expect(screen.getByRole("tab", { name: "Pages" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");
     // The filter chip is visible and names the type, and the non-matching page is filtered out.
     expect(await screen.findByText(/Characters/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Barovia")).not.toBeInTheDocument());
@@ -111,9 +112,9 @@ describe("Codex shell — cross-mode navigation", () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await user.click(screen.getByRole("button", { name: "Home" }));
     await user.click(await screen.findByText(/character/i));
-    await user.click(await screen.findByRole("button", { name: /clear filter/i }));
+    await user.click(await screen.findByRole("button", { name: /clear (kind|tag) filter/i }));
     expect(await screen.findByText("Barovia")).toBeInTheDocument();
   });
 });

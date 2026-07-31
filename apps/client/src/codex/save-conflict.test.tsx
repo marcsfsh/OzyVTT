@@ -54,7 +54,7 @@ describe("PageEditor save/conflict path", () => {
     updatePage.mockReset();
     getPage.mockReset();
     updatePage.mockResolvedValue({ ...page, rev: 4 });
-    getPage.mockResolvedValue({ page: { ...page, rev: 9 }, backlinks: [], relationships: [] });
+    getPage.mockResolvedValue({ page: { ...page, rev: 9 }, connections: [] });
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
   });

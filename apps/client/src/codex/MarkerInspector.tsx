@@ -104,7 +104,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const danglingActor = marker.actorId !== null && !actors.some((actor) => actor.id === marker.actorId);
 
   return (
-    <aside className="codex-inspector" aria-label="Marker">
+    <aside className="codex-inspector" aria-label="Pin">
       <div className="codex-inspector-head">
         <strong>{marker.label || "Unlabelled pin"}</strong>
         <div className="codex-inspector-head-actions">

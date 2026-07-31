@@ -262,7 +262,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
           </IconButton>
           <h2 className="codex-topbar-title">{section ? SECTION_TITLE[section] : "Codex"}</h2>
           <div className="codex-topbar-actions">
-            <IconButton label="Search the Codex" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}>
+            <IconButton label="Search" className="codex-topbar-search" onClick={() => setPaletteOpen(true)}>
               <CodexIcon iconId="eye" className="codex-navitem-icon" />
             </IconButton>
             {/* D24: the session console survives as a right-side prep drawer, renamed into the Sessions

@@ -46,10 +46,12 @@ export type PageEditorProps = Readonly<{
   onOpenConnection: (kind: CodexPageConnection["otherKind"], id: string) => void;
   /** Open a pin on the Atlas — the page's "elsewhere" edge. Both halves travel (map, then pin). */
   onOpenMarker?: (markerId: string, mapId: string) => void;
+  /** Land the Graph ON this page's own node — the page's fourth return edge. */
+  onShowInGraph?: (pageId: string) => void;
   onPickTag?: (tag: string) => void;
 }>;
 
-export function PageEditor({ gmToken, page, pages, connections, autosave, onChange, onDeleted, onNavigate, onOpenReplay, onConnectionsChanged, onOpenConnection, onOpenMarker, onPickTag }: PageEditorProps) {
+export function PageEditor({ gmToken, page, pages, connections, autosave, onChange, onDeleted, onNavigate, onOpenReplay, onConnectionsChanged, onOpenConnection, onOpenMarker, onShowInGraph, onPickTag }: PageEditorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
@@ -296,12 +298,22 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
             <span className="codex-context-jumplabel">Jump to:</span>
             <a href="#codex-connections-h">Connections</a>
           </nav>
-          {/* D8: ONE panel, both directions, both origins — this replaces the separate Relationships
-              panel and the "Linked from" backlink block that used to sit below it. */}
-          <ConnectionsPanel connections={connections} onOpen={onOpenConnection}
-            write={{ gmToken, pageId: page.id, pages, onChanged: onConnectionsChanged }} />
-          <section className="codex-connections" aria-labelledby="codex-elsewhere-h">
-            <h4 className="codex-backlinks-title" id="codex-elsewhere-h">Elsewhere</h4>
+          {/**
+            * ONE region answering ONE question — *where else does this entity appear?* — with a
+            * sub-block per place it can: other records, the atlas, the journal, the graph.
+            *
+            * D8 folded the first two of those together: the separate Relationships panel and the
+            * "Linked from" backlink block below it were the same fact told twice, and are now one list
+            * with an `origin` attribute. The atlas and journal edges keep their own blocks because they
+            * are different relations, not different renderings of one.
+            */}
+          <section className="codex-connections" aria-labelledby="codex-connections-h">
+            <div className="codex-connections-head">
+              <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>
+              {onShowInGraph && <Button variant="ghost" size="sm" onClick={() => onShowInGraph(page.id)}>Show in graph</Button>}
+            </div>
+            <ConnectionsPanel standalone={false} connections={connections} onOpen={onOpenConnection}
+              write={{ gmToken, pageId: page.id, pages, onChanged: onConnectionsChanged }} />
             <PageMarkers gmToken={gmToken} pageId={page.id} onOpenMarker={onOpenMarker} />
             <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} onOpenEntry={(entryId) => onOpenConnection("journal", entryId)} />
           </section>

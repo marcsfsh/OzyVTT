@@ -187,27 +187,27 @@ describe("It aggregates; it does not decide (CT-9's stated risk)", () => {
     expect(screen.queryByRole("button", { name: /hide all/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /hide everything/i })).toBeNull();
     // One Hide per row, and there are seven rows.
-    expect(screen.getAllByRole("button", { name: /^Hide the /i })).toHaveLength(7);
+    expect(screen.getAllByRole("switch")).toHaveLength(7);
   });
 });
 
 describe("Un-revealing goes back out through each record's own route", () => {
   const cases: ReadonlyArray<[string, string, () => ReturnType<typeof vi.fn>, unknown[]]> = [
-    ["Pages", "Hide the page Strahd from players", () => revealPage, ["gm", "p1", false]],
-    ["Maps", "Hide the map Barovia from players", () => revealMap, ["gm", "m1", false]],
-    ["Map pins", "Hide the pin Vallaki from players", () => revealMarker, ["gm", "k1", false]],
-    ["Chronicle records", "Hide the record The party crossed the mists. from players", () => revealEntry, ["gm", "j1", false]],
-    ["Session recaps", "Hide the recap for Session 4 from players", () => revealSession, ["gm", "e1", false]],
-    ["Quests", "Hide the quest Find the Sunsword from players", () => revealQuest, ["gm", "q1", false]],
+    ["Pages", "Show the page Strahd to players", () => revealPage, ["gm", "p1", false]],
+    ["Maps", "Show the map Barovia to players", () => revealMap, ["gm", "m1", false]],
+    ["Map pins", "Show the pin Vallaki to players", () => revealMarker, ["gm", "k1", false]],
+    ["Journal entries", "Show the entry The party crossed the mists. to players", () => revealEntry, ["gm", "j1", false]],
+    ["Session recaps", "Show the recap for Session 4 to players", () => revealSession, ["gm", "e1", false]],
+    ["Quests", "Show the quest Find the Sunsword to players", () => revealQuest, ["gm", "q1", false]],
     // Standing reveals by FACTION page id, which is what its route takes — not the standing row's own id.
-    ["Faction standing", "Hide the standing with The Zhentarim from players", () => revealStanding, ["gm", "f1", false]]
+    ["Faction standing", "Show standing with The Zhentarim to players", () => revealStanding, ["gm", "f1", false]]
   ];
 
   for (const [kind, label, route, args] of cases) {
     it(`${kind}`, async () => {
       await renderAudit();
       route().mockResolvedValue({});
-      await userEvent.setup().click(screen.getByRole("button", { name: label }));
+      await userEvent.setup().click(screen.getByRole("switch", { name: label }));
       await waitFor(() => expect(route()).toHaveBeenCalledWith(...args));
       // And it re-reads, so the row it just hid leaves the list.
       await waitFor(() => expect(getAudit).toHaveBeenCalledTimes(2));

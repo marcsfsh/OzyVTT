@@ -60,7 +60,10 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
       // The PUT is WHOLESALE — both groups are required, so a body carrying one is a 400. Every write
       // from this screen therefore sends the pair it is holding, not the field that changed.
       const next = await codexApi.setSettings(gmToken, { revisionHistory, autosave });
-      setSettings(next); onSettingsChanged?.(next); setError(null);
+      // Keep the optimistic value if the answer is unusable rather than blanking the screen: the next
+      // control the GM touches must still know what the codex holds.
+      if (next) { setSettings(next); onSettingsChanged?.(next); }
+      setError(null);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "That setting could not be saved.");
       // Re-read, so the control shows what the codex holds rather than a value that never landed.

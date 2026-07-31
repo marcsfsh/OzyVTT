@@ -22,8 +22,8 @@ vi.mock("./api", async (importOriginal) => {
     codexApi: {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
-      listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a),
+      listConnections: (...a: unknown[]) => listRelationships(...a),
+      party: (...a: unknown[]) => listLinks(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
@@ -39,6 +39,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
+import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 
 /**
@@ -58,17 +59,17 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
-const renderWorkspace = () => render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 
 describe("Codex loading states (CF-2)", () => {
   beforeEach(() => {
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    search.mockResolvedValue([]);
-    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
+    search.mockResolvedValue({ hits: [], truncated: false });
+    getPage.mockResolvedValue({ page: null, connections: [] });
     timeline.mockResolvedValue([]);
     listMaps.mockResolvedValue([]);
     getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] });
@@ -80,9 +81,9 @@ describe("Codex loading states (CF-2)", () => {
     const user = userEvent.setup();
     renderWorkspace();
 
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await user.click(screen.getByRole("button", { name: "Home" }));
     // The fetch is still open: the invitation to create a first page must not be on screen.
-    expect(screen.queryByText(/No entries yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument();
 
     // ...and once it settles with real data, the mode renders content rather than the empty branch.
     pages.resolve([{
@@ -90,7 +91,7 @@ describe("Codex loading states (CF-2)", () => {
       revealedToPlayers: false, bannerAssetId: null, rev: 1,
       createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
     }]);
-    await waitFor(() => expect(screen.queryByText(/No entries yet/i)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument());
     expect(await screen.findByText("Strahd")).toBeInTheDocument();
   });
 
@@ -100,11 +101,11 @@ describe("Codex loading states (CF-2)", () => {
     const user = userEvent.setup();
     renderWorkspace();
 
-    await user.click(screen.getByRole("tab", { name: "Graph" }));
-    expect(screen.queryByText(/No entities yet/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Graph" }));
+    expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument();
     pages.resolve([]);
     // A genuinely empty campaign SHOULD reach the empty state — the fix must not suppress it forever.
-    expect(await screen.findByText(/No entities yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No pages yet/i)).toBeInTheDocument();
   });
 
   it("still shows the empty state once the fetch settles empty (the fix must not swallow it)", async () => {
@@ -112,7 +113,7 @@ describe("Codex loading states (CF-2)", () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
-    expect(await screen.findByText(/No entries yet/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Home" }));
+    expect(await screen.findByText(/No pages yet/i)).toBeInTheDocument();
   });
 });

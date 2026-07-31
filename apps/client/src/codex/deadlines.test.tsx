@@ -48,14 +48,15 @@ vi.mock("./api", async (importOriginal) => {
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
       chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listRelationships: (...a: unknown[]) => playerListRelationships(...a),
-      listLinks: (...a: unknown[]) => playerListLinks(...a),
+      listConnections: (...a: unknown[]) => playerListRelationships(...a),
+      party: (...a: unknown[]) => playerListLinks(...a),
       calendar: (...a: unknown[]) => playerCalendar(...a)
     }
   };
 });
 
 import { JournalView } from "./JournalView";
+import { goTo } from "../../test/route";
 import { PlayerCodex } from "./PlayerCodex";
 import { CampaignHome } from "./CampaignHome";
 import { CHRONICLE_KIND_META, campaignDeadlines, deadlineFired, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
@@ -176,7 +177,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     await user.click(screen.getByRole("button", { name: "Log downtime" }));
 
     await waitFor(() => expect(createDowntime).toHaveBeenCalled());
-    expect(createDowntime.mock.calls.at(-1)![1].downtime).toEqual({ who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null });
+    expect(createDowntime.mock.calls.at(-1)![1].downtime).toEqual({ who: "Aldric", activity: "Forging a blade", days: 7 });
     // The whole of O-3 in three lines: nothing here moved the campaign date.
     expect(applyDowntime).not.toHaveBeenCalled();
     expect(setCalendar).not.toHaveBeenCalled();
@@ -190,7 +191,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     const row = within(rowOf("w1"));
 
     // Hammer 3 + 7 days = Hammer 10. The sentence is the affordance; the button only agrees with it.
-    expect(row.getByText("Advance the campaign clock to Hammer 10, 1492 DR")).toBeInTheDocument();
+    expect(row.getByText("Move your date to Hammer 10, 1492 DR")).toBeInTheDocument();
     expect(row.getByText("Aldric — Forging a blade · 7 days")).toBeInTheDocument();
 
     await user.click(row.getByRole("button", { name: "Confirm" }));
@@ -221,13 +222,13 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     ]);
     const row = within(rowOf("w1"));
 
-    expect(row.getByText("Advance the campaign clock to Hammer 10, 1492 DR — this passes 2 deadlines.")).toBeInTheDocument();
+    expect(row.getByText("Move your date to Hammer 10, 1492 DR — this passes 2 deadlines.")).toBeInTheDocument();
   });
 
   /** One is "1 deadline", not "1 deadlines" — the sentence is read mid-session, at speed. */
   it("counts one deadline in the singular", async () => {
     await renderJournal([DOWNTIME, DEADLINE]);
-    expect(within(rowOf("w1")).getByText("Advance the campaign clock to Hammer 10, 1492 DR — this passes 1 deadline.")).toBeInTheDocument();
+    expect(within(rowOf("w1")).getByText("Move your date to Hammer 10, 1492 DR — this passes 1 deadline.")).toBeInTheDocument();
   });
 
   /**
@@ -242,7 +243,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
       inWorldLabel: "Alturiak 20, 1492 DR", calendarInstant: 1492 * 60 + 49, inWorldDate: { year: 1492, month: 1, day: 20 } })]);
     const row = within(rowOf("w1"));
 
-    expect(row.getByText("Advance the campaign clock to Hammer 10, 1492 DR")).toBeInTheDocument();
+    expect(row.getByText("Move your date to Hammer 10, 1492 DR")).toBeInTheDocument();
     expect(row.queryByText(/deadline/)).not.toBeInTheDocument();
   });
 
@@ -260,7 +261,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     await renderJournal([RECORD({ ...DOWNTIME, id: "w3", proposedDate: { year: 1492, month: 1, day: 12 } })]);
     const row = within(rowOf("w3"));
 
-    expect(row.getByText("Advance the campaign clock to Alturiak 12, 1492 DR")).toBeInTheDocument();
+    expect(row.getByText("Move your date to Alturiak 12, 1492 DR")).toBeInTheDocument();
     expect(row.queryByText(/Hammer 10/)).not.toBeInTheDocument();
   });
 
@@ -345,9 +346,9 @@ describe("The prep clock is quiet until it matters (O-1)", () => {
     // The normal state is the matching state; a permanent "in sync" readout would make every GM who has
     // never prepped ahead learn a second clock exists for no reason.
     expect(screen.queryByRole("button", { name: "Publish the date" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Players still see")).not.toBeInTheDocument();
+    expect(screen.queryByText("Players' date:")).not.toBeInTheDocument();
     // The GM's own clock still reads, exactly as it did before M11.
-    expect(screen.getByText("Now: Hammer 3, 1492 DR")).toBeInTheDocument();
+    expect(screen.getByText(/(Your date|Today): Hammer 3, 1492 DR/)).toBeInTheDocument();
   });
 
   it("shows what the table is on, and publishes, once the two diverge", async () => {
@@ -355,9 +356,9 @@ describe("The prep clock is quiet until it matters (O-1)", () => {
     publishCalendar.mockResolvedValue(CALENDAR);
     const user = userEvent.setup();
 
-    expect(screen.getByText("Players still see")).toBeInTheDocument();
+    expect(screen.getByText("Players' date:")).toBeInTheDocument();
     // BOTH dates on screen at once, and they are different values — the GM's ahead, the table's behind.
-    expect(screen.getByText("Now: Hammer 20, 1492 DR")).toBeInTheDocument();
+    expect(screen.getByText("Your date: Hammer 20, 1492 DR")).toBeInTheDocument();
     expect(screen.getByText("Hammer 3, 1492 DR")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Publish the date" }));
@@ -380,11 +381,11 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
     playerListMarkers.mockResolvedValue([]);
     playerChronicle.mockResolvedValue(records);
     playerListRelationships.mockResolvedValue([]);
-    playerListLinks.mockResolvedValue([]);
+    playerListLinks.mockResolvedValue(null);
     // The PLAYER's projection: `currentDate` is the published date, and there is no `publishedDate` key
     // and no GM clock on this shape at all.
     playerCalendar.mockResolvedValue({ yearName: "DR", months: CALENDAR.months, weekdays: [], currentDate: { year: 1492, month: 0, day: 3 } });
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerChronicle).toHaveBeenCalled());
   };
 
@@ -394,7 +395,7 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
       PLAYER_RECORD({ kind: "deadline", id: "d1", text: "The duke's ultimatum expires.", inWorldLabel: "Hammer 10, 1492 DR", fired: true }),
       PLAYER_RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null } })
     ]);
-    await user.click(screen.getByRole("tab", { name: "Journal" }));
+    await user.click(screen.getByRole("button", { name: "Journal" }));
 
     expect(playerRowOf("d1").textContent).toContain("Deadline");
     expect(playerRowOf("d1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
@@ -412,7 +413,7 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
     expect(playerCalendar).toHaveBeenCalledWith("player");
     expect(getCalendar).not.toHaveBeenCalled();
     // The date a player sees is the one the player projection sent.
-    expect(await screen.findByText("Now: Hammer 3, 1492 DR")).toBeInTheDocument();
+    expect(await screen.findByText(/(Your date|Today): Hammer 3, 1492 DR/)).toBeInTheDocument();
     // Applying downtime is a GM action against the GM's clock; neither the control nor the state that
     // drives it exists here — `applied` is not even a field on the player payload.
     expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();

@@ -33,12 +33,18 @@ describe("Drawer", () => {
     // Closed but still mounted (so the slide plays both ways) - `inert` is what keeps its controls out of
     // the tab order and out of the accessibility tree while it is off-screen.
     expect(panel.hasAttribute("inert")).toBe(true);
-    // Named by its own visible title without a caller-supplied label.
-    expect(panel.getAttribute("aria-labelledby")).toBe(screen.getByRole("heading", { name: "Session 14" }).id);
+    // …and `aria-hidden` says the same thing to engines that do not implement `inert` yet. Safe to pair
+    // here precisely BECAUSE `inert` has already made the subtree unfocusable.
+    expect(panel.getAttribute("aria-hidden")).toBe("true");
+    // Named by its own visible title without a caller-supplied label. Queried through the DOM rather
+    // than by role, since the closed panel is (correctly) absent from the accessibility tree.
+    expect(panel.getAttribute("aria-labelledby")).toBe(panel.querySelector("h2")!.id);
 
     rerender(<><button type="button">Outside</button><Drawer open onClose={onClose} title="Session 14"><button type="button">Inside</button></Drawer></>);
     expect(panel.className).toContain("is-open");
     expect(panel.hasAttribute("inert")).toBe(false);
+    expect(panel.hasAttribute("aria-hidden")).toBe(false);
+    expect(screen.getByRole("heading", { name: "Session 14" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);

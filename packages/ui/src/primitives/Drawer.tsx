@@ -58,6 +58,11 @@ export function Drawer({ open, onClose, title, children, side = "right", ariaLab
       aria-label={ariaLabel}
       aria-labelledby={ariaLabel ? undefined : titleId}
       inert={!open}
+      /* Belt and braces with `inert`, which is what actually removes the closed panel from the tab order
+         and the accessibility tree — but only in engines that implement it. `aria-hidden` says the same
+         thing to everything else, and it is safe to pair here precisely BECAUSE `inert` has already made
+         the subtree unfocusable: the usual "never aria-hidden a focusable subtree" hazard cannot arise. */
+      aria-hidden={!open || undefined}
       onKeyDown={onKeyDown}
     >
       <header className="nh-drawer-head">

@@ -52,8 +52,9 @@ const SETTINGS = (over: Partial<CodexSettings["revisionHistory"]> = {}): CodexSe
 
 const open = async (settings: CodexSettings) => {
   getSettings.mockResolvedValue(settings);
-  setSettings.mockImplementation((_t: string, input: { revisionHistory: { enabled: boolean; windowMinutes: number } }) =>
-    Promise.resolve({ revisionHistory: { ...settings.revisionHistory, ...input.revisionHistory } }));
+  // The PUT is WHOLESALE now: both groups travel on every write, and the answer carries both back.
+  setSettings.mockImplementation((_t: string, input: { revisionHistory: { enabled: boolean; windowMinutes: number }; autosave: { enabled: boolean; intervalSeconds: number } }) =>
+    Promise.resolve({ revisionHistory: { ...settings.revisionHistory, ...input.revisionHistory }, autosave: { ...settings.autosave, ...input.autosave } }));
   render(<CodexSettingsView gmToken="gm" />);
   await waitFor(() => expect(getSettings).toHaveBeenCalledWith("gm"));
   return userEvent.setup();

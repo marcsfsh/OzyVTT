@@ -37,6 +37,7 @@ vi.mock("./api", async (importOriginal) => {
   };
 });
 
+import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
 import { MapSurface } from "./MapSurface";
 import type { CodexMap, CodexMarker } from "./api";
@@ -73,7 +74,7 @@ const renderAtlas = async (markers: CodexMarker[]) => {
   listAssets.mockResolvedValue([]);
   listPages.mockResolvedValue([]);
   forMarker.mockResolvedValue([]);
-  render(<AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} />);
+  render(<ToastProvider><AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()} mapId={null} pinId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()} onNavigate={vi.fn()} onReplaceQuery={vi.fn()} /></ToastProvider>);
   await waitFor(() => expect(listMarkers).toHaveBeenCalled());
 };
 
@@ -216,7 +217,7 @@ describe("One party pin for the whole atlas (M12-C)", () => {
     // Asserted by COUNTING, which is the only way to catch a control being added later: exactly ONE
     // control in the inspector is about the party, and it is the flag. A coordinate field or a
     // "move the party here" action would be a second path onto `moveMarker` and would make this two.
-    const inspector = screen.getByRole("complementary", { name: "Marker" });
+    const inspector = screen.getByRole("complementary", { name: "Pin" });
     const partyControls = [...inspector.querySelectorAll("button, input, select, textarea")]
       .filter((element) => /party/i.test(`${element.getAttribute("aria-label") ?? ""} ${element.textContent ?? ""}`));
     expect(partyControls).toHaveLength(1);

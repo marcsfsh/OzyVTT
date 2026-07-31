@@ -166,7 +166,11 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
           >
             {page.entityType !== "note" && <EntityIcon type={page.entityType} className="codex-tree-icon" />}
             <span className="codex-list-title">{page.title}</span>
-            <VisibilityBadge revealed={page.revealedToPlayers} />
+            {/* D18's one badge — but only on the EXCEPTIONAL state. The Codex is secret by default, so on a
+              dense tree "Hidden from players" on every row would be noise on the majority and would bury
+              the one row that is actually shared. The full phrase still appears wherever the state is the
+              subject: list rows, the editor, the reveal audit. */}
+          {page.revealedToPlayers && <VisibilityBadge revealed />}
           </button>
           <button type="button" className="codex-tree-page-move tap-target" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}><IconDrag /></button>
         </div>
