@@ -8,7 +8,7 @@ import {
   type CodexPageSummary, type CodexQuest, type CodexSession, type CodexSettings, type CodexStanding,
   type GmCodexCalendar
 } from "./api";
-import { navigate, replaceQuery, pushTransient, popTransient, discardTransient, useRoute } from "../router";
+import { navigate, replaceQuery, pushTransient, popTransient, discardTransient, releaseStrandedEntry, useRoute } from "../router";
 import {
   CODEX_ROOT, GM_SIDEBAR, SECTION_TITLE, atlasPath, codexSectionOf, journalEntryPath, pagePath,
   pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath, graphPath, type CodexSection
@@ -217,7 +217,12 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   const goto = useCallback((path: string) => {
     const stranded = discardTransient(DRAWER_TRANSIENT);
     setDrawerOpen(false);
-    navigate(path, { replace: stranded });
+    void navigate(path, { replace: stranded }).then((moved) => {
+      // The guard can say stay (D6, autosave off, dirty draft). The entry was released on the assumption
+      // the destination would overwrite it, so if we did not move it is still on the stack with nothing
+      // registered to absorb it — and the GM's next Back would silently do nothing.
+      if (!moved && stranded) releaseStrandedEntry();
+    });
   }, []);
 
   const standingRows = useMemo(() => {

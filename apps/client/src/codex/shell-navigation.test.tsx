@@ -47,6 +47,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
+import { navigate, registerNavigationGuard } from "../router";
 import { CodexShell } from "./CodexShell";
 import { GM_SIDEBAR } from "./routes";
 
@@ -253,18 +254,57 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
     expect(window.location.pathname).toBe("/codex/quests");
   });
 
+  /**
+   * The assertion here is the history DEPTH, not the pathname after one back().
+   *
+   * `pushTransient` pushes at the same href, so the stranded entry and the entry before it have the
+   * same pathname — one back() lands on "/codex" whether the destination replaced the transient or was
+   * pushed on top of it, and the obvious version of this test passed either way. Counting entries is
+   * the only thing that can tell the two apart.
+   */
   it("replaces the drawer's own history entry, so back from the destination is one press", async () => {
     const user = userEvent.setup();
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
+    const depth = window.history.length;
 
     await user.click(screen.getByRole("button", { name: "Codex sections" }));
     await waitFor(() => expect(drawerNav()).toHaveLength(2));
     await user.click(within(drawerNav()[1]).getByRole("button", { name: "Journal" }));
     await waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
 
-    // The transient entry was REPLACED rather than left stranded: one back returns to where the drawer
-    // was opened. Leaving it would make the GM press back twice to undo one tap.
+    // Exactly ONE new entry for one tap: the drawer's own entry was overwritten by the destination.
+    // Two would mean the GM has to press back twice to undo a single tap.
+    expect(window.history.length).toBe(depth + 1);
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/codex"));
+  });
+
+  /**
+   * D6 meets the drawer. `goto` releases the drawer's history entry *before* the guard has answered,
+   * because it expects the destination to overwrite it. When the GM answers "stay", nothing overwrites
+   * it — and the released entry sits on the stack with nothing registered to absorb its pop, so the next
+   * Back press is spent closing a drawer that is already closed and appears to do nothing.
+   */
+  it("does not swallow the next Back when the guard refuses a destination chosen from the drawer", async () => {
+    const user = userEvent.setup();
+    renderShell("/codex");
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    void navigate("/codex/quests");
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/quests"));
+
+    const release = registerNavigationGuard(() => false);
+    await user.click(screen.getByRole("button", { name: "Codex sections" }));
+    await waitFor(() => expect(drawerNav()).toHaveLength(2));
+    await user.click(within(drawerNav()[1]).getByRole("button", { name: "Journal" }));
+
+    // Vetoed: the drawer closed and the GM stayed put.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(window.location.pathname).toBe("/codex/quests");
+    await waitFor(() => expect(drawerNav()).toHaveLength(1));
+    release();   // the GM saves, so the guard goes away
+
+    // ONE press must now leave the section. If the drawer's entry is still on the stack it is spent here.
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe("/codex"));
   });

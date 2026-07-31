@@ -27,7 +27,7 @@ import { TagView } from "./TagView";
 import { NotFoundView } from "../components/NotFoundView";
 import { playerCampaignFeedProps } from "./dashboard";
 import { PLAYER_SIDEBAR, SECTION_TITLE, atlasPath, codexSectionOf, journalEntryPath, pagePath, pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath } from "./routes";
-import { discardTransient, navigate, popTransient, pushTransient, replaceQuery, useRoute } from "../router";
+import { discardTransient, navigate, popTransient, pushTransient, releaseStrandedEntry, replaceQuery, useRoute } from "../router";
 import { entityDef, type EntityType } from "./entities";
 import "./codex.css";
 
@@ -185,8 +185,10 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   const goto = (next: string) => {
     const stranded = !embedded && discardTransient("player-codex-nav");
     setDrawerOpen(false);
-    if (embedded) setLocalPath(next);
-    else navigate(next, { replace: stranded });
+    if (embedded) { setLocalPath(next); return; }
+    // A vetoed navigation leaves the released drawer entry on the stack with nothing to absorb it, so
+    // the next Back press would be swallowed. Same reasoning as the GM shell.
+    void navigate(next, { replace: stranded }).then((moved) => { if (!moved && stranded) releaseStrandedEntry(); });
   };
 
   useEffect(() => {

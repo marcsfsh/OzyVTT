@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
 import {
   currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, navigate, pathForGmTab,
-  popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, withQuery
+  popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, useRoute, withQuery
 } from "./router";
 import { goTo } from "../test/route";
 
@@ -128,6 +129,17 @@ describe("Navigating", () => {
 });
 
 describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
+  /**
+   * **Flush past the guard chain before asserting a non-navigation.**
+   *
+   * `mayLeave()` awaits each guard, so the `.then` that actually pushes lands three microtasks after
+   * `navigate()` returns. A test that awaited a single `Promise.resolve()` resumed at microtask two —
+   * unconditionally before the push, whether or not the guard's answer was honoured. Three assertions
+   * were written that way and all three passed against a `navigate` mutated to ignore the veto. A
+   * macrotask boundary is past every microtask the chain can queue, so the absence it asserts is real.
+   */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
   it("lets a navigation through when the guard says yes", async () => {
     goTo("/codex/pages/p1");
     const unregister = registerNavigationGuard(() => true);
@@ -141,8 +153,8 @@ describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
     const unregister = registerNavigationGuard(() => false);
     navigate("/codex/journal");
     // A vetoed navigation must not half-apply: the address stands, so the editor stays mounted with the
-    // draft in it. Awaiting a tick first, because the guard is allowed to be async.
-    await Promise.resolve();
+    // draft in it.
+    await settle();
     expect(window.location.pathname).toBe("/codex/pages/p1");
     unregister();
   });
@@ -153,7 +165,7 @@ describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
     const off1 = registerNavigationGuard(() => false);
     const off2 = registerNavigationGuard(second);
     navigate("/codex/journal");
-    await Promise.resolve();
+    await settle();
     expect(second).not.toHaveBeenCalled();
     off1(); off2();
   });
@@ -163,6 +175,65 @@ describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
     registerNavigationGuard(() => false)();
     navigate("/codex/journal");
     await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
+  });
+});
+
+/**
+ * **Back is a navigation.** The guards were wired into `navigate()` and nowhere else, so with autosave
+ * off the browser Back button and the Android back gesture left a dirty editor with no prompt and the
+ * draft gone — reproduced in Chromium at 1280x900 and at 375x780, the only way this app loses work.
+ *
+ * These use jsdom's real `history.back()`, not a synthetic `popstate`: the fiction cannot show that the
+ * address was put back, because nothing moved it in the first place.
+ */
+describe("Back and forward are guarded too (D6, mobile parity)", () => {
+  // Released in `afterEach`, not at the end of the body: a guard left registered by a FAILING assertion
+  // silently vetoes the next test, which is how one real failure becomes three misleading ones.
+  const registered: Array<() => void> = [];
+  const guardWith = (answer: boolean) => {
+    const guard = vi.fn(() => answer);
+    registered.push(registerNavigationGuard(guard));
+    return guard;
+  };
+  afterEach(() => { for (const release of registered.splice(0)) release(); });
+
+  it("asks the guard before honouring a Back, and puts the address back when it says no", async () => {
+    goTo("/codex/pages/p1");
+    navigate("/codex/journal");
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
+
+    const guard = guardWith(false);
+    window.history.back();
+
+    await vi.waitFor(() => expect(guard).toHaveBeenCalledTimes(1));
+    // The pop has already moved the browser by the time we hear about it, so "vetoed" means "put back".
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
+    // And it STAYS put back — a restore that is itself undone one task later is not a restore.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(window.location.pathname).toBe("/codex/journal");
+  });
+
+  it("lets a Back through when the guard says yes, and republishes the address it landed on", async () => {
+    goTo("/codex/pages/p1");
+    navigate("/codex/journal");
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
+
+    const route = renderHook(() => useRoute());
+    guardWith(true);
+    window.history.back();
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p1"));
+    // Not just the URL: the store has to publish, or the app keeps rendering the section it already left.
+    await vi.waitFor(() => expect(route.result.current.path).toBe("/codex/pages/p1"));
+    route.unmount();
+  });
+
+  it("does not consult a guard that is not there, so a plain Back is not slowed by the check", async () => {
+    goTo("/codex/pages/p1");
+    navigate("/codex/journal");
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
+    window.history.back();
+    await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p1"));
   });
 });
 

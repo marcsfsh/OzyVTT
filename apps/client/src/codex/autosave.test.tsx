@@ -212,10 +212,52 @@ describe("Autosave OFF", () => {
 
     await user.type(screen.getByLabelText("Body"), "b");
     navigate("/codex/journal");
-    await Promise.resolve();
+    // A macrotask, not one microtask: `mayLeave` awaits the guard, so the push that this asserts the
+    // ABSENCE of lands three microtasks out. Resuming earlier passed whether or not the answer was
+    // honoured, which is no test at all.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     // The address must not half-move: the editor stays mounted with the draft in it.
     expect(window.location.pathname).toBe("/codex/pages/p1");
+    confirmSpy.mockRestore();
+  });
+
+  /**
+   * **The phone case, and the one that lost work.** The guard was consulted by `navigate()` and by
+   * nothing else, so browser Back and the Android back gesture walked out of a dirty editor with no
+   * prompt at all. On a phone, Back *is* the navigation.
+   */
+  it("BLOCKS the browser Back when the GM declines, and the draft is still on screen after", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<Editor settings={OFF} save={vi.fn().mockResolvedValue(undefined)} />);
+
+    // A real history entry to go back FROM, pushed while the draft is still clean.
+    navigate("/codex/pages/p2");
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p2"));
+    await user.type(screen.getByLabelText("Body"), "b");
+
+    window.history.back();
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p2"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(window.location.pathname).toBe("/codex/pages/p2");
+    expect(screen.getByLabelText("Body")).toHaveValue("ab");
+    confirmSpy.mockRestore();
+  });
+
+  it("LETS the browser Back through when the GM accepts", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<Editor settings={OFF} save={vi.fn().mockResolvedValue(undefined)} />);
+
+    navigate("/codex/pages/p2");
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p2"));
+    await user.type(screen.getByLabelText("Body"), "b");
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p1"));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
     confirmSpy.mockRestore();
   });
 

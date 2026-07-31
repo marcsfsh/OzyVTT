@@ -25,6 +25,14 @@ export type Route = Readonly<{
 
 const listeners = new Set<() => void>();
 let snapshot: Route = readLocation();
+/**
+ * The address the router believes it is at, kept in step with `snapshot`.
+ *
+ * Only the popstate handler reads it, and only for one job: a Back the guards veto has already moved the
+ * browser's cursor by the time we hear about it, so undoing the veto means pushing *this* address back
+ * on top of the one we were moved to.
+ */
+let currentEntry: string = `${window.location.pathname}${window.location.search}`;
 
 function readLocation(): Route {
   const raw = window.location.pathname || "/";
@@ -34,6 +42,7 @@ function readLocation(): Route {
 
 function publish(): void {
   snapshot = readLocation();
+  currentEntry = currentHref();
   for (const listener of [...listeners]) listener();
 }
 
@@ -107,6 +116,19 @@ export function discardTransient(key: string): boolean {
   return true;
 }
 
+/**
+ * Hand back an entry `discardTransient` released for a navigation that was then VETOED.
+ *
+ * The drawer's entry is still on the stack and nothing is registered to absorb its pop any more, so the
+ * GM's next Back would be spent closing an already-closed drawer — it would appear to do nothing, which
+ * is exactly the trap the transient mechanism exists to prevent. Popping it here costs no prompt: the
+ * entry sits at the address we are already on, and a pop that does not move the address is not a
+ * departure (see the popstate handler).
+ */
+export function releaseStrandedEntry(): void {
+  window.history.back();
+}
+
 window.addEventListener("popstate", (event) => {
   const key = (event.state as { transient?: string } | null)?.transient;
   // Popping FORWARD onto a transient entry is not a thing we ever want to honour; only the disappearance
@@ -117,22 +139,47 @@ window.addEventListener("popstate", (event) => {
     onPop();
     if (key === undefined) return;
   }
-  publish();
+  /**
+   * **Back is a navigation, and on a phone it is THE navigation.** The guards were wired into
+   * `navigate()` only, so with autosave off the browser Back button and the Android back gesture walked
+   * straight out of a dirty editor and the draft was gone with no prompt — the one way to lose work in
+   * this app.
+   *
+   * The browser has already moved the cursor by the time popstate fires, so a veto cannot be a "don't":
+   * it has to be an undo. Pushing the address we were on back on top of the one we were moved to is the
+   * standard shape, and it costs nothing — the entry we were popped past is overwritten, so history
+   * length is unchanged and a second Back reaches the same place a first one would have.
+   *
+   * Two fast paths, both load-bearing. With no editor open there are no guards, and the pop must
+   * publish synchronously so a plain Back is not a frame slower than it was. And **a pop that does not
+   * move the address is not a departure** — `popTransient` and `releaseStrandedEntry` both go back onto
+   * an entry at the address we are already on, and asking the GM to confirm leaving a page they are
+   * staying on would be a prompt with no true answer.
+   */
+  if (guards.size === 0 || currentHref() === currentEntry) { publish(); return; }
+  const from = currentEntry;
+  void mayLeave().then((allowed) => {
+    if (allowed) { publish(); return; }
+    window.history.pushState(null, "", from);
+  });
 });
 
 /**
  * Go to an address. Guards run first; a vetoed navigation leaves the URL alone.
  *
- * Deliberately fire-and-forget at call sites (`onClick={() => navigate(path)}`) — the promise exists so
- * a guard may prompt, not so callers can await it.
+ * Deliberately fire-and-forget at almost every call site (`onClick={() => navigate(path)}`) — the
+ * promise exists so a guard may prompt, not so callers can await it. It resolves to **whether the
+ * navigation happened**, which the phone nav drawer does need: it released its own history entry on the
+ * assumption this was about to overwrite it, and has to take that back if the GM chose to stay.
  */
-export function navigate(path: string, opts: Readonly<{ replace?: boolean }> = {}): void {
-  if (path === currentHref()) return;
-  void mayLeave().then((allowed) => {
-    if (!allowed) return;
+export function navigate(path: string, opts: Readonly<{ replace?: boolean }> = {}): Promise<boolean> {
+  if (path === currentHref()) return Promise.resolve(false);
+  return mayLeave().then((allowed) => {
+    if (!allowed) return false;
     if (opts.replace) window.history.replaceState(null, "", path);
     else window.history.pushState(null, "", path);
     publish();
+    return true;
   });
 }
 
