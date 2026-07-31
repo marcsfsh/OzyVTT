@@ -225,7 +225,7 @@ the *hit area*, never the paint.
   editor, the session editor, the quest editor, the pin inspector *with its Appearance
   disclosure open*, the cross-type tag view, the quick-create dialog, the command
   palette, the nav drawer and the session-prep drawer) and the player's thirteen, on a
-  real player session rather than the GM's preview modal. **1,112 interactive controls,
+  real player session rather than the GM's preview modal. **1,119 interactive controls,
   16 below the floor at 375px and 16 at 320px — every one of them a graph node**, the
   accepted exception in the table below. Reproduce with `node scripts/tap-audit.mjs 375`
   (route-driven: a new address is one line) — the run exits non-zero if anything is

@@ -8,6 +8,51 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-31 — Codex overhaul, QA fix pass (CLIENT lane)
+
+Ten commits (`99dff3e` … this ledger). **1783 tests, up from 1725.** check 0, build 0.
+Browser pass **60/60** in Chromium against a populated database at 1280x900 and 375x780, plus a new
+800px check. Tap audit re-run at 375 and 320: **1,119 controls across 35 surfaces, 16 sub-floor at each
+width (all graph nodes), 0 surfaces unmeasured.**
+
+Fixing what the 47-agent adversarial pass found in `apps/client`, `packages/ui`, `scripts` and the
+context docs. 45 of 59 findings fixed, 1 verified not real, 13 deferred with reasons (see the fix
+report handed to the director).
+
+The five that mattered:
+
+1. **The Back gesture destroyed unsaved work** (the blocker, RUNTIME-OBSERVED at both viewports). The
+   D6 autosave-off guard was wired into `navigate()` and nowhere else, so a popstate walked out of a
+   dirty editor with no prompt. `popstate` consults the guards now and undoes a vetoed pop by pushing
+   the address back; `navigate()` returns whether it moved so the phone nav drawer can take back the
+   history entry it released. Re-verified by pressing Back in Chromium with a dirty draft at 1280 and
+   375: one prompt, dismiss keeps the address AND the draft, accept leaves.
+2. **761–849px rendered an expanded sidebar in a 56px track.** Only the CSS half of "icon rail by
+   default" ever shipped; CSS alone could not fix it, because `SidebarNav` withholds each item's
+   tooltip unless `collapsed`. Both shells read one matchMedia query now, and the player — who has no
+   collapse control at all — gains the rail too.
+3. **Verification evidence was not sound.** The recorded "805 controls, 0 below the floor" came from a
+   GM-only script whose pin and palette openers silently re-measured the previous surface. It also
+   could not select a pin at 375px. Two genuinely sub-floor controls it could not see are fixed
+   (`.codex-list-item` 43.6px, `.codex-marker-link-open` 35.6px). The graph exception's "41–43px @320"
+   was the opposite of the measurement and is corrected.
+4. **A player at `/codex/audit` read "Reveal audit"** above the not-found view, while an unknown
+   address read "Codex" — three GM surfaces named by address alone. And `resumeTarget` sent a player
+   back to a GM-only address on every sign-in.
+5. **One vocabulary.** Five retired "marker" strings shipped, including a dialog whose button read
+   "Delete pin" and whose confirm read "Delete marker"; the Reveal audit headed a section "Chronicle
+   records"; StandingAdjuster claimed a required field that is optional and named a slider that does
+   not exist. The glossary lock could see none of it — it matched `prop="…"` only, so every
+   `useConfirm` title/body and every `help=` was invisible. Widened to 892 strings; its four
+   exemptions were all inert from birth and two are deleted.
+
+Follow-up, all recorded in the fix report: the Sessions/Quests filters still live in component state
+while the other three lists put theirs in the URL; the palette's four "New …" verbs still only
+navigate; the player's lists have no in-place filters; `calendar-view` / `downtime-view` / `tag-view`
+tests and coverage for `MarkdownEditor`/`Combobox` are still owed.
+
+---
+
 ## 2026-07-31 — Codex overhaul, QA fix pass (server lane)
 
 Seven commits (`e4073c6`, `bede1eb`, `273d7e4`, `edc68cf`, `6d5bfe7`, `6339188`, `ec5bf93` + this
@@ -75,7 +120,7 @@ document 117px sideways on Downtime at 375px.
 0 below 44px at 375 and 320, except the graph canvas (accepted exception, documented).
 **Superseded 2026-07-31 by the QA client fix pass — this figure was not sound.** The script was GM-only,
 and two of its openers fell through a `count() > 0` guard with no else and re-measured the previous
-surface. Re-measured across 35 surfaces in both roles: **1,112 controls, 16 sub-floor at each width, all
+surface. Re-measured across 35 surfaces in both roles: **1,119 controls, 16 sub-floor at each width, all
 graph nodes.** See `current-state.md` and `design-language.md` §4.
 
 Follow-up: the app shell stacks the roster dock above the Codex at 375px, so the Codex starts ~1500px

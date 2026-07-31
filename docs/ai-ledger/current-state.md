@@ -35,7 +35,12 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     pattern, `Input variant="title"`, `Badge tone="violet"`, `IconX`/`IconPlay`, the pin palette).
   - **Deleted outright:** `CodexWorkspace`, `RelationshipsPanel`, `EntityPicker`, `RELATIONSHIP_TYPES`,
     and `findMarkerMap`'s O(maps) scan (now `GET /codex/markers/{id}`).
-  - **Touch floor, measured not asserted:** **1,112 interactive controls across 35 surfaces — 22 GM and
+  - **Back is guarded (D6).** The autosave-off leave prompt fires on browser Back and the Android back
+    gesture, not only on in-app navigation — a vetoed pop is undone by pushing the address back, so the
+    draft survives. Verified in Chromium at 1280x900 and 375x780.
+  - **761–849px is a real icon rail.** Both shells drive `collapsed` from one matchMedia query, so the
+    markup agrees with the 56px grid track the CSS has always set there; the player gets it too.
+  - **Touch floor, measured not asserted:** **1,119 interactive controls across 35 surfaces — 22 GM and
     13 player, the latter on a real player session — with 16 below 44px at 375px and 16 at 320px, every
     one of them a graph node**, the accepted exception recorded in `design-language.md` §4 with its
     reasoning. Corrected 2026-07-31: the earlier "805 controls across 17 surfaces, 0 below the floor"

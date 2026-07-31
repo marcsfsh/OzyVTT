@@ -10,6 +10,32 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex/atlas] Switching to another PIN does not pass the autosave-off leave guard.** With autosave
+  off, the pin inspector now holds label and tags as a draft with a Save button (D6). Selecting a
+  different pin rewrites `?pin=` through `replaceQuery`, which by design creates no history entry and
+  therefore never consults the navigation guard — so an unsaved pin label is lost that way, where the
+  same act on a page or a quest (a real `navigate`) would prompt. The Save button and the "Unsaved
+  changes" readout are what stand between the GM and it. Fixing it properly means making pin selection
+  a navigation, which is a bigger change than this QA pass should make. Found 2026-07-31.
+
+- **[codex/lists] The Sessions and Quests filters live in component state; Pages, Atlas and Journal put
+  theirs in the URL.** So two of the five lists lose their filter on navigation and cannot be linked to
+  a filtered view, against D10's "in-place filters on every list". `CodexShell` already owns
+  `replaceQuery`, so the fix is threading `route.query` through both views. Found 2026-07-31.
+
+- **[codex/palette] "New session" and "New quest" only NAVIGATE.** Both are labelled as creates and both
+  run `onNavigate(pathForSection(...))` — the identical target of the "Go to Sessions"/"Go to Quests"
+  rows six lines below them, so four of the palette's seventeen empty-query rows are exact duplicates
+  and the GM still has to find "+ New" on the rail. D20 asked the palette to learn quick-create verbs.
+  Separately, every verb and goto is gated on an EMPTY query (`CommandPalette.tsx:68`), so no section
+  can be reached by typing its name — pre-existing, and it makes a twelve-item goto list hard to use.
+  Found 2026-07-31.
+
+- **[codex/player] The player's lists have no in-place filters.** D10's filters landed on the GM's five
+  lists and none of the player's: their type filter is component state only the dashboard can set, and
+  the player Journal, Sessions and Quests have no filter at all. Found 2026-07-31.
+
+
 - **[codex/backup] `export -> import -> export` is not byte-stable for a codex whose calendar was never
   set.** The first export omits `calendar.currentDate` entirely (`DEFAULT_CALENDAR` has no such key); after
   a restore, `normalizeCalendar` writes it as an explicit `null` and the second export carries it. Content
