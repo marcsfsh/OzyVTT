@@ -122,9 +122,16 @@ export function createServer(options: CreateServerOptions) {
       socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
   }
-  /** Ping every client that the worldbuilding codex changed so it refetches its own projected view. Content-free (scope + revision only), so it carries nothing GM-only - the projection boundary lives in the HTTP reads. */
-  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal" | "sessions" | "quests") {
-    io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
+  /**
+   * Ping every client that the worldbuilding codex changed so it refetches its own projected view.
+   *
+   * CONTENT-FREE BY DESIGN (D22) - a revision counter and nothing else, the same rule the homebrew notifier
+   * below states for itself. It used to carry a `scope`, which went to every socket including the players'
+   * and told the table which part of the codex the GM was touching. That buys nothing at a home group's
+   * scale and is a small leak of GM intent; no listener ever read it.
+   */
+  function notifyCodexChanged() {
+    io.emit("codex:changed", { codexRevision: codexStore.revision });
   }
   /**
    * Ping every client that the GM's homebrew library changed so it refetches its own merged catalog.
@@ -257,7 +264,7 @@ export function createServer(options: CreateServerOptions) {
         const marker = sceneId ? codexStore.markerForScene(sceneId) : null;
         const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
         codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageIds[0] ?? null, playerText: `A battle was fought here${turns}.` });
-        notifyCodexChanged("journal");
+        notifyCodexChanged();
       } catch (error) {
         // Best-effort - a codex hiccup must never affect ending a fight - but don't fail silently.
         console.error("codex combat-history bridge failed to log the encounter:", error instanceof Error ? error.message : error);

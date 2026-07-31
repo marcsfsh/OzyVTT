@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
 import { projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
+/** D6/R4's shipped default, spelled once so the settings tests below say what they are actually about. */
+const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
+
 let directory: string;
 let store: CodexStore;
 
@@ -3187,7 +3190,7 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
      * the BUNDLE carries and therefore needs a history deeper than one entry; the throttle's own behaviour is
      * tested in "CodexStore revision history" below, not here.
      */
-    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT });
     const page = store.createPage({ title: "Strahd", entityType: "character", fields: { race: "Vampire" }, gmFields: { goals: "Reclaim Tatyana" }, playerBody: "A count.", gmBody: "The darklord." });
     store.updatePage(page.id, { title: "Strahd von Zarovich", playerBody: "A count of Barovia." }, undefined, "gm");
     store.updatePage(page.id, { title: "Strahd, Lord of Barovia" }, undefined, "gm");
@@ -3268,7 +3271,12 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
   });
 
   it("starts every codex on the owner's defaults: history on, a 90-minute window, nothing stored yet", () => {
-    expect(clock.getSettings()).toEqual({ revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 } });
+    expect(clock.getSettings()).toEqual({
+      revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 },
+      // D6 / director ruling R4: autosave ON at the 1-second floor, which is what the shipping editors'
+      // 800 ms debounce already did expressed on the wire's scale - an upgraded codex saves as often as it did.
+      autosave: { enabled: true, intervalSeconds: 1 }
+    });
   });
 
   it("coalesces a save INSIDE the window and checkpoints one OUTSIDE it", () => {
@@ -3294,7 +3302,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
    * between these saves, so nothing here can pass by accident of elapsed time.
    */
   it("checkpoints EVERY save at windowMinutes 0 — the OLD behaviour, not 'never'", () => {
-    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT });
     at(0);
     const page = clock.createPage({ title: "Vallaki", playerBody: "v0" });
     clock.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
@@ -3317,7 +3325,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     const before = clock.listRevisions(page.id);
     expect(before.map((row) => row.playerBody)).toEqual(["second", "the good version"]);
 
-    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     at(1000); clock.updatePage(page.id, { playerBody: "fourth" }, undefined, "gm");
     at(2000); clock.updatePage(page.id, { playerBody: "fifth" }, undefined, "gm");
     // Not one new row - and, just as important, not one row DESTROYED. Disabling a feature must not delete the
@@ -3346,7 +3354,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
    * "Globally disable-able" was the owner's phrase, and a switch that leaves a per-page row behind is not that.
    */
   it("writes NO checkpoint at all with history disabled, not even a page's creation", () => {
-    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     at(0);
     const page = clock.createPage({ title: "Berez", playerBody: "as created" });
     expect(clock.listRevisions(page.id)).toEqual([]);
@@ -3366,7 +3374,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
    * restored away from and "I picked the wrong one" would be unrecoverable.
    */
   it("checkpoints the state a RESTORE discards, even well inside the window", () => {
-    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 } });
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     /**
      * THE TIMING IS THE TEST, and it is fiddly enough to spell out — a first attempt spaced these saves so far
      * apart that the ordinary window fired anyway, and the assertion passed with `force` doing nothing at all
@@ -3402,7 +3410,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
   });
 
   it("never throttles createPage — even with a window nothing could fall outside", () => {
-    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 10_080 } }); // a week
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 10_080 }, autosave: AUTOSAVE_DEFAULT }); // a week
     at(0);
     const first = clock.createPage({ title: "One" });
     at(1);
@@ -3460,14 +3468,14 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
   });
 
   it("clamps and truncates the window on the way in, and answers with what was STORED", () => {
-    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 999_999 } }).revisionHistory.windowMinutes).toBe(10_080);
+    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 999_999 }, autosave: AUTOSAVE_DEFAULT }).revisionHistory.windowMinutes).toBe(10_080);
     expect(clock.getSettings().revisionHistory.windowMinutes).toBe(10_080);
-    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: -12 } }).revisionHistory.windowMinutes).toBe(0);
-    expect(clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 45.7 } }).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
+    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: -12 }, autosave: AUTOSAVE_DEFAULT }).revisionHistory.windowMinutes).toBe(0);
+    expect(clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 45.7 }, autosave: AUTOSAVE_DEFAULT }).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
     expect(clock.getSettings().revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
     // A non-finite window is an ERROR, not a clamp: `Math.trunc(NaN)` is NaN, and clamping that would write
     // NaN into a STRICT INTEGER column. `standingValue`'s rule, for the same reason.
-    expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: Number.NaN } })).toThrow(/minutes/i);
+    expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: Number.NaN }, autosave: AUTOSAVE_DEFAULT })).toThrow(/minutes/i);
     // ...and `enabled` must be stated rather than coerced from a missing field, because the coercion would land
     // on `false` and silently switch the GM's undo history off.
     expect(() => clock.setSettings({ revisionHistory: { windowMinutes: 90 } } as never)).toThrow(/on or off/i);
@@ -3531,6 +3539,114 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
 
     // Reopened at the end so the fixture's `afterEach` has a live store to close.
     clock = await reopen();
+  });
+
+  /**
+   * D6 / director ruling R4: the autosave knobs, held to `revisionHistory`'s standard because they are stored
+   * in the same row by the same write and read back through the same fail-closed discipline.
+   */
+  it("clamps and truncates the autosave interval on the way in, and answers with what was STORED", () => {
+    const set = (autosave: { enabled: boolean; intervalSeconds: number }) =>
+      clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 }, autosave });
+    // Overshoot in either direction lands on the end of the scale; a fractional second is a picker artefact.
+    expect(set({ enabled: true, intervalSeconds: 5000 }).autosave.intervalSeconds).toBe(600);
+    expect(set({ enabled: true, intervalSeconds: 0 }).autosave.intervalSeconds).toBe(1);
+    expect(set({ enabled: true, intervalSeconds: -30 }).autosave.intervalSeconds).toBe(1);
+    expect(set({ enabled: false, intervalSeconds: 10.9 }).autosave).toEqual({ enabled: false, intervalSeconds: 10 });
+    expect(clock.getSettings().autosave).toEqual({ enabled: false, intervalSeconds: 10 });
+    // A non-finite interval is an ERROR, not a clamp - `Math.trunc(NaN)` is NaN and a STRICT INTEGER column
+    // would take it. `revisionWindowMinutes`' rule, one setting over.
+    expect(() => set({ enabled: true, intervalSeconds: Number.NaN })).toThrow(/seconds/i);
+    // ...and `enabled` must be STATED, because a coerced missing field lands on `false` and switches off the
+    // one thing D6 promises: that the codex keeps your work.
+    expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 } } as never)).toThrow(/on or off/i);
+    expect(clock.getSettings().autosave).toEqual({ enabled: false, intervalSeconds: 10 }); // neither throw wrote
+  });
+
+  /**
+   * The autosave READ guard, `revisionSettings`' for the same measured reason: the write is not the only way
+   * into an INTEGER column, and a stored value JavaScript cannot represent throws on the WHOLE row read.
+   */
+  it("reads a hand-edited autosave value as the default rather than propagating it", async () => {
+    const path = join(clockDirectory, "vtt.sqlite");
+    clock.close();
+    const write = (sql: string, ...values: Array<number | bigint>) => {
+      const database = new DatabaseSync(path);
+      database.prepare(sql).run(...values);
+      database.close();
+    };
+    const reopen = async () => { const reopened = new CodexStore(path, () => now); await reopened.initialize(); return reopened; };
+
+    // Non-vacuity first: an in-range value really does survive, so the assertions below are the guard firing.
+    write("UPDATE codex_meta SET autosave_interval_seconds = ? WHERE id = 1", 45);
+    const inRange = await reopen();
+    expect(inRange.getSettings().autosave.intervalSeconds).toBe(45);
+    inRange.close();
+
+    for (const stored of [0, -1, 601, 2n ** 53n]) {
+      write("UPDATE codex_meta SET autosave_interval_seconds = ? WHERE id = 1", stored);
+      const reopened = await reopen();
+      expect(reopened.getSettings().autosave.intervalSeconds, `stored ${stored}`).toBe(1);
+      reopened.close();
+    }
+    // `enabled` fails OPEN, like revision history and for the same reason: a garbled value must not silently
+    // stop the editors saving. 0 is still honoured, so "reads as on" is a fallback and not the only answer.
+    write("UPDATE codex_meta SET autosave_enabled = 7, autosave_interval_seconds = 30 WHERE id = 1");
+    const garbled = await reopen();
+    expect(garbled.getSettings().autosave).toEqual({ enabled: true, intervalSeconds: 30 });
+    garbled.close();
+    write("UPDATE codex_meta SET autosave_enabled = 0 WHERE id = 1");
+    const off = await reopen();
+    expect(off.getSettings().autosave.enabled).toBe(false);
+    off.close();
+
+    clock = await reopen();
+  });
+
+  /**
+   * D7 / director ruling R7. A type-changing save PRUNES every field the new type does not declare, and the
+   * client's confirm dialog promises the values are recoverable from History. Under the coalescing window
+   * alone that promise held only by luck - a GM who types a page and then fixes its kind is inside the window
+   * by construction - so a type change forces the checkpoint the way a restore does.
+   *
+   * The negative half is the load-bearing one: an ordinary save inside the window still coalesces, so this is
+   * a rule about type changes and not the throttle quietly switched off.
+   */
+  it("forces a checkpoint when a page's TYPE changes, even well inside the coalescing window", () => {
+    at(0);
+    const page = clock.createPage({ title: "Strahd", entityType: "character", fields: { role: "the devil" } });
+    expect(clock.listRevisions(page.id)).toHaveLength(1); // the creation checkpoint
+
+    at(1); // one minute in: far inside the 90-minute window
+    clock.updatePage(page.id, { playerBody: "an ordinary edit" }, undefined, "gm");
+    expect(clock.listRevisions(page.id), "an ordinary save inside the window still coalesces").toHaveLength(1);
+
+    at(2);
+    const changed = clock.updatePage(page.id, { entityType: "faction" }, undefined, "gm");
+    expect(changed.entityType).toBe("faction");
+    expect(changed.fields.role, "the character-only field is pruned by the switch").toBeUndefined();
+    const revisions = clock.listRevisions(page.id);
+    expect(revisions, "the type change forced a checkpoint of the pre-change state").toHaveLength(2);
+
+    // ...and the promise the confirm dialog makes is real: restoring brings the pruned field back.
+    const restored = clock.restoreRevision(page.id, revisions[0]!.id, "gm");
+    expect(restored.entityType).toBe("character");
+    expect(restored.fields.role).toBe("the devil");
+  });
+
+  /**
+   * The switch still wins. `enabled: false` writes NO new revisions at all, and a type change is not an
+   * exception to it - `revisionDue` checks the switch before the force, and that ordering is the promise
+   * "off means off" makes.
+   */
+  it("writes no forced checkpoint for a type change when history is switched off", () => {
+    at(0);
+    const page = clock.createPage({ title: "Ireena", entityType: "character" });
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
+    const before = clock.listRevisions(page.id).length;
+    at(1);
+    clock.updatePage(page.id, { entityType: "location" }, undefined, "gm");
+    expect(clock.listRevisions(page.id)).toHaveLength(before);
   });
 
   /**
@@ -3627,7 +3743,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     pruner = new CodexStore(join(pruneDirectory, "vtt.sqlite"), () => now);
     await pruner.initialize();
     // Every save checkpointed, so a test can build a history of a known depth without moving the clock for it.
-    pruner.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+    pruner.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT });
   });
   afterEach(async () => {
     pruner.close();
@@ -3757,7 +3873,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     pruner.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
     expect(pruner.getSettings().revisionHistory.versionCount).toBe(2);
 
-    pruner.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    pruner.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     expect(pruner.deleteRevisionsOlderThan(0)).toBe(2);
     expect(pruner.getSettings().revisionHistory.versionCount).toBe(0);
   });
@@ -3777,5 +3893,108 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     // unbounded value would push the cutoff date out of range and throw `RangeError: Invalid time value`.
     expect(pruner.deleteRevisionsOlderThan(36_500)).toBe(0);
     expect(pruner.listRevisions(page.id)).toHaveLength(1);
+  });
+});
+
+/**
+ * THE ETAG'S LOAD-BEARING INVARIANT, pinned at the layer that owns it.
+ *
+ * `readEnvelope` serves `W/"codex-r{store.revision}-{grade}"` and answers 304 to a matching
+ * `If-None-Match`. That is only correct while EVERY public write bumps the coarse revision inside its own
+ * transaction - reveals and clock moves included, since those change what a reader sees without moving any
+ * record's `rev`. A single write that forgets `bumpRevision()` does not fail visibly: it serves a stale 304
+ * to every conditional caller, forever, and no existing test would notice.
+ *
+ * So this walks the write surface rather than sampling it, and asserts STRICT increase per call. A new write
+ * method added without a bump does not fail here automatically - nothing can enumerate the class - which is
+ * exactly why the list below is the checklist: a new public write belongs in it.
+ */
+describe("every codex write bumps the coarse revision (the ETag's invariant)", () => {
+  it("strictly increases `revision` across every public write", () => {
+    const seen: string[] = [];
+    let previous = store.revision;
+    const bumps = (what: string, work: () => void) => {
+      work();
+      const now = store.revision;
+      expect(now, `${what} must bump the codex revision - the ETag depends on it`).toBeGreaterThan(previous);
+      previous = now;
+      seen.push(what);
+    };
+
+    // Pages, folders, revisions
+    const faction = store.createPage({ title: "The Keepers of the Feather", entityType: "faction" });
+    let page = store.createPage({ title: "Barovia" });
+    bumps("createPage", () => { page = store.createPage({ title: "Vallaki" }); });
+    bumps("updatePage", () => { store.updatePage(page.id, { playerBody: "a walled town" }, undefined, "gm"); });
+    bumps("setPageRevealed", () => { store.setPageRevealed(page.id, true); });
+    bumps("createFolder", () => { store.createFolder("Places"); });
+    bumps("moveFolder", () => { store.moveFolder("Places", "Locations"); });
+    bumps("deleteFolder", () => { store.deleteFolder("Locations"); });
+    const revisionId = store.listRevisions(page.id)[0]!.id;
+    bumps("restoreRevision", () => { store.restoreRevision(page.id, revisionId, "gm"); });
+    bumps("deleteRevisionsOlderThan", () => { store.deleteRevisionsOlderThan(0); });
+    bumps("setSettings", () => { store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT }); });
+
+    // Relationships
+    const other = store.createPage({ title: "Strahd", entityType: "character" });
+    let relationshipId = "";
+    bumps("createRelationship", () => { relationshipId = store.createRelationship(other.id, page.id, "rules").id; });
+    bumps("deleteRelationship", () => { store.deleteRelationship(relationshipId); });
+
+    // Maps + markers
+    let map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional" });
+    let marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff0000" });
+    bumps("createMap", () => { map = store.createMap({ assetId: crypto.randomUUID(), name: "Castle Ravenloft", kind: "battlemap" }); });
+    bumps("updateMap", () => { store.updateMap(map.id, { name: "Ravenloft" }); });
+    bumps("setMapParent", () => { store.setMapParent(map.id, null); });
+    bumps("setMapRevealed", () => { store.setMapRevealed(map.id, true); });
+    bumps("createMarker", () => { marker = store.createMarker(map.id, { x: 0.1, y: 0.1, iconId: "pin", iconColor: "#00ff00" }); });
+    bumps("updateMarker", () => { store.updateMarker(marker.id, { label: "the gate" }); });
+    bumps("moveMarker", () => { store.moveMarker(marker.id, 0.2, 0.2); });
+    bumps("setMarkerRevealed", () => { store.setMarkerRevealed(marker.id, true); });
+    bumps("setPartyMarker", () => { store.setPartyMarker(marker.id); });
+    bumps("deleteMarker", () => { store.deleteMarker(marker.id); });
+    bumps("deleteMap", () => { store.deleteMap(map.id); });
+
+    // Calendar + the two clocks
+    bumps("setCalendar", () => { store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 12 } }); });
+    bumps("publishCampaignDate", () => { store.publishCampaignDate(); });
+
+    // Journal, in every flavour it is written
+    let entry = store.createEntry({ playerText: "we arrived" });
+    bumps("createEntry", () => { entry = store.createEntry({ playerText: "we left" }); });
+    bumps("updateEntry", () => { store.updateEntry(entry.id, { playerText: "we left at dawn" }); });
+    bumps("setEntryRevealed", () => { store.setEntryRevealed(entry.id, true); });
+    bumps("appendCombatEntry", () => { store.appendCombatEntry({ sourceEncounterId: 1, playerText: "a battle" }); });
+    bumps("createDeadline", () => { store.createDeadline({ playerText: "the ritual", inWorldDate: { year: 1492, month: 3, day: 1 } }); });
+    let downtime = store.createDowntime({ playerText: "smithing", downtime: { who: "Ireena", activity: "smithing", days: 3 } });
+    bumps("createDowntime", () => { downtime = store.createDowntime({ playerText: "training", downtime: { who: "Ismark", activity: "training", days: 2 } }); });
+    bumps("applyDowntime", () => { store.applyDowntime(downtime.id); });
+    bumps("createMilestone", () => { store.createMilestone({ playerText: "level 5", milestone: { level: 5, reason: "cleared the crypt" } }); });
+    bumps("deleteEntry", () => { store.deleteEntry(entry.id); });
+
+    // Sessions
+    let session = store.createSession({ sessionNumber: 1 });
+    bumps("createSession", () => { session = store.createSession({ sessionNumber: 2 }); });
+    bumps("updateSession", () => { store.updateSession(session.id, { recapBody: "we survived" }, undefined, "gm"); });
+    bumps("setSessionRevealed", () => { store.setSessionRevealed(session.id, true); });
+    bumps("setActiveSession", () => { store.setActiveSession(session.id); });
+    bumps("deleteSession", () => { store.deleteSession(session.id); });
+
+    // Quests
+    let quest = store.createQuest({ title: "Find the Sunsword" });
+    bumps("createQuest", () => { quest = store.createQuest({ title: "Free Ireena" }); });
+    bumps("updateQuest", () => { store.updateQuest(quest.id, { status: "completed" }, undefined); });
+    bumps("setQuestRevealed", () => { store.setQuestRevealed(quest.id, true); });
+    bumps("deleteQuest", () => { store.deleteQuest(quest.id); });
+
+    // Standing (against the faction page created at the top)
+    bumps("setStanding", () => { store.setStanding(faction.id, 30, "kind words"); });
+    bumps("setStandingRevealed", () => { store.setStandingRevealed(faction.id, true); });
+
+    bumps("deletePage", () => { store.deletePage(other.id); });
+
+    // Non-vacuity: the walk really covered the surface rather than short-circuiting after two calls.
+    expect(seen.length).toBeGreaterThanOrEqual(40);
   });
 });

@@ -3137,6 +3137,7 @@ Replaces the codex-wide settings and answers with the full READ shape (usage fig
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revisionHistory` | CodexRevisionHistoryInput | yes |  |
+| `autosave` | CodexAutosaveSettings | yes |  |
 
 **Responses:** `200` Success - envelope of `CodexSettingsData` · errors `400` `401` `403`
 
@@ -3243,6 +3244,15 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `asset` | CodexAsset | yes |  |
+
+### `CodexAutosaveSettings`
+
+Whether the Codex's editors save your work as you type, and how often. The server stores a PREFERENCE and nothing else - there is no server-side draft, so the behaviour (and the explicit Save plus unsaved-changes warning when it is off) is the editor's. Storing it here is what makes the setting follow the GM from a phone to a laptop.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `enabled` | boolean | yes | Default `true`. `false` does not slow autosave down, it stops it: the editors then require an explicit Save and warn about unsaved changes. |
+| `intervalSeconds` | integer (1–600) | yes | How long the editors wait after you stop typing before saving. SECONDS, and the unit is the same everywhere - wire, column, and store - so nothing converts at a boundary. Default `1`, which is what the shipping editors already did (an 800 ms debounce) expressed on this scale, so an upgraded codex saves exactly as often as it used to. `0` is not in range: a zero-second autosave is a save per keystroke, which is not a cadence anyone means - a GM who wants none says `enabled: false`. The 600 ceiling is ten minutes, past which the setting stops meaning "save while I work". |
 
 ### `CodexBacklink`
 
@@ -4037,11 +4047,12 @@ One of the following:
 
 ### `CodexSettings`
 
-Every codex-WIDE setting as a READER sees it, nested by area, including the read-only usage figures. The `revisionHistory` nesting is what gives a later codex-wide setting a home without inventing fields for it today: `codex_meta` is the codex's singleton settings row, and this is that row as a caller sees it.
+Every codex-WIDE setting as a READER sees it, nested by area, including the read-only usage figures. The nesting by area is what gives a later codex-wide setting a home without inventing fields for it today: `codex_meta` is the codex's singleton settings row, and this is that row as a caller sees it.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revisionHistory` | CodexRevisionHistorySettings | yes |  |
+| `autosave` | CodexAutosaveSettings | yes |  |
 
 ### `CodexSettingsData`
 

@@ -129,17 +129,34 @@ export type CodexRevisionHistoryUsage = Readonly<{ versionCount: number; version
 /** The revision-history section as a READER sees it: the two settable knobs plus what the history costs. */
 export type CodexRevisionHistory = CodexRevisionSettings & CodexRevisionHistoryUsage;
 /**
+ * D6: "the Codex always keeps your work" made configurable. Two knobs, and the split is the same one
+ * `CodexRevisionSettings` makes: `enabled` is whether the editors autosave at all, `intervalSeconds` is how
+ * often they do it when they do.
+ *
+ * **The unit is SECONDS because the wire says seconds** (director ruling R4) - the column, this type and the
+ * request body all agree, so nothing converts at a boundary and nothing can convert twice. The floor of 1 is
+ * what today's 800 ms page-editor debounce maps onto, so an upgraded codex keeps effectively today's cadence.
+ *
+ * The server stores a PREFERENCE and nothing more. Autosave is editor behaviour: enforcement (explicit Save
+ * and unsaved-changes warnings when it is off) lives in the client, because there is no server-side draft to
+ * save. Storing it here is what makes the preference follow the GM from phone to laptop.
+ */
+export type CodexAutosaveSettings = Readonly<{ enabled: boolean; intervalSeconds: number }>;
+/**
  * Every codex-wide setting, nested by area. `codex_meta` is the codex's singleton settings row, so this is
  * the shape of that row as a caller sees it; the `revisionHistory` nesting is what gives a later codex-wide
  * setting a home without inventing fields for it today.
  */
-export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistory }>;
+export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistory; autosave: CodexAutosaveSettings }>;
 /**
  * The WRITABLE half, and the reason the read and write shapes are two types rather than one: `versionCount` /
  * `versionBytes` are facts about a table the caller cannot see, so a body that could carry them would be a
  * client asserting them. They are absent here by construction, not filtered out later.
+ *
+ * `autosave` has no read-only half at all, so it is the SAME type on both sides - stated rather than mirrored,
+ * because a second identical type is the one that drifts.
  */
-export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionSettings }>;
+export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionSettings; autosave: CodexAutosaveSettings }>;
 
 export type CodexBacklinkRow = Readonly<{
   sourcePageId: string;
@@ -1069,6 +1086,32 @@ export const MIGRATIONS = [{
     ALTER TABLE codex_meta ADD COLUMN revision_history_enabled INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE codex_meta ADD COLUMN revision_window_minutes INTEGER NOT NULL DEFAULT 90;
   `
+}, {
+  version: 18,
+  // D6 (client decision, 2026-07-31): autosave becomes GM-configurable - on/off plus an interval.
+  //
+  // v17's shape VERBATIM, for the same reasons and with the same upgrade story: two columns on
+  // `codex_meta`, the codex's singleton settings row, both carrying DEFAULTs so an existing codex reads
+  // `{enabled: true, intervalSeconds: 1}` without a backfill pass and a fresh database takes the defaults
+  // through `initialize()`'s named-column seed. INTEGER for the boolean, the encoding `revealed`,
+  // `is_party` and `revision_history_enabled` already use.
+  //
+  // **SECONDS, not milliseconds** (director ruling R4). The wire unit is seconds, so the column is seconds:
+  // a stored millisecond value converted at the boundary is a value that can be converted twice, and the
+  // one thing worse than a wrong interval is an interval nobody can read off the row.
+  //
+  // The DEFAULT of 1 is not a new cadence - today's page editor debounces at 800 ms, which is below the
+  // wire's 1 s floor, so 1 is the honest expression of "what this codex already did". D6's promise is that
+  // the codex always keeps your work; an upgrade that quietly slowed saving down would break it.
+  //
+  // No CHECK on either column, the v16/v17 decision applied a third time: 1..600 is a PRODUCT bound on a
+  // number, not an ENUM whose legal set is structural, and baking it in would cost a full table rebuild to
+  // widen later. The clamp lives in `autosaveIntervalSeconds` on the way in and `autosaveSettings`
+  // re-validates on the way OUT, because the write is not the only way into an INTEGER column.
+  sql: `
+    ALTER TABLE codex_meta ADD COLUMN autosave_enabled INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE codex_meta ADD COLUMN autosave_interval_seconds INTEGER NOT NULL DEFAULT 1;
+  `
 }];
 
 /**
@@ -1596,6 +1639,31 @@ function revisionWindowMinutes(value: number): number {
   return Math.min(MAX_REVISION_WINDOW_MINUTES, Math.max(MIN_REVISION_WINDOW_MINUTES, Math.trunc(value)));
 }
 /**
+ * D6 / director ruling R4: the autosave interval's bounds and default, in SECONDS - the wire's unit, so no
+ * conversion happens anywhere between the request body and the column.
+ *
+ * `1` is the FLOOR rather than a special value: today's page editor debounces at 800 ms, so one second is the
+ * nearest honest expression of "what this codex already did", and it is also the default. Unlike
+ * `windowMinutes`, `0` is not in range - a zero-second autosave is a save on every keystroke, which is not a
+ * cadence anyone means; a GM who wants no autosave says `enabled: false`.
+ *
+ * `600` is ten minutes: past that the setting stops meaning "save while I work" and starts meaning "I will
+ * save it myself", which `enabled: false` says more honestly - v17's ceiling reasoning applied to this scale.
+ */
+const MIN_AUTOSAVE_INTERVAL_SECONDS = 1;
+const MAX_AUTOSAVE_INTERVAL_SECONDS = 600;
+const DEFAULT_AUTOSAVE_SETTINGS: CodexAutosaveSettings = { enabled: true, intervalSeconds: 1 };
+/**
+ * The interval on the way in: CLAMPED and TRUNCATED, `revisionWindowMinutes`' arrangement verbatim and for
+ * the same reason - the GM is picking from a scale, so an overshoot asks for the end of it, and a fractional
+ * second is a control artefact rather than an intent. The HTTP router still REJECTS out-of-range values with
+ * a 400; this clamp stands behind it for every non-HTTP writer (import, tests, a repair script).
+ */
+function autosaveIntervalSeconds(value: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`An autosave interval must be a number of seconds from ${MIN_AUTOSAVE_INTERVAL_SECONDS} to ${MAX_AUTOSAVE_INTERVAL_SECONDS}.`);
+  return Math.min(MAX_AUTOSAVE_INTERVAL_SECONDS, Math.max(MIN_AUTOSAVE_INTERVAL_SECONDS, Math.trunc(value)));
+}
+/**
  * CT-6's payload on the way IN. `delta` is passed in already computed by `setStanding` (it is the difference
  * between two clamped values, so it is bounded by -200..200 and needs no clamp of its own).
  */
@@ -1944,8 +2012,19 @@ export class CodexStore {
        * throws the current text away, which makes it the one that most needs the state it throws away kept.
        *
        * `revisionExistsAt` still applies, so this cannot write a duplicate of a state already captured.
+       *
+       * D7 / director ruling R7 adds the SECOND forcing condition, and it is the same argument one case
+       * further along: a TYPE-CHANGING save is the other save that deliberately throws content away. The
+       * pruning a few lines above drops every field the new type does not declare, and the client's confirm
+       * dialog promises "you can restore them from History" - a promise the coalescing window would break
+       * roughly half the time, because a GM who types a page and then fixes its kind is inside the window by
+       * construction. Forcing here turns that copy into a guarantee instead of a probability.
+       *
+       * It is computed here rather than passed in: no caller should be able to ask for it or forget it, and
+       * "the type changed" is a fact about this save that `updatePage` already knows.
        */
-      if (this.revisionDue(pageId, forceRevision) && !this.revisionExistsAt(pageId, existing.rev)) {
+      const typeChanged = nextEntityType !== existing.entity_type;
+      if (this.revisionDue(pageId, forceRevision || typeChanged) && !this.revisionExistsAt(pageId, existing.rev)) {
         this.snapshotRevision(pageId, existing, authorTag);
       }
       this.bumpRevision();
@@ -2241,7 +2320,7 @@ export class CodexStore {
    * for the settings screen.
    */
   getSettings(): CodexSettings {
-    return { revisionHistory: { ...this.revisionSettings(), ...this.revisionHistoryUsage() } };
+    return { revisionHistory: { ...this.revisionSettings(), ...this.revisionHistoryUsage() }, autosave: this.autosaveSettings() };
   }
 
   /**
@@ -2325,6 +2404,32 @@ export class CodexStore {
    * nothing composes a settings write today. The read side is a plain SELECT and is therefore safe to call from
    * inside `updatePage`'s transaction, which is exactly where the throttle calls it.
    */
+  /**
+   * D6's autosave preference, read with the SAME discipline `revisionSettings` above uses and for the same
+   * measured reason: the write is not the only way into an INTEGER column, and a stored value JavaScript
+   * cannot represent makes `node:sqlite` throw on the WHOLE row read rather than on its own column - hence
+   * one try/catch and one shared fallback rather than a guard per field.
+   *
+   * `enabled` accepts exactly 0 or 1 and reads anything else as the default (ON). Fail-OPEN, deliberately, and
+   * for the same reason revision history does: a garbled value must not silently stop the editors saving the
+   * GM's work, which is the one outcome here that loses data. An out-of-range interval reads as the default
+   * rather than propagating - an interval outside the scale is not an interval.
+   */
+  private autosaveSettings(): CodexAutosaveSettings {
+    let row: { autosave_enabled: number; autosave_interval_seconds: number } | undefined;
+    try {
+      row = this.requireDatabase().prepare("SELECT autosave_enabled, autosave_interval_seconds FROM codex_meta WHERE id = 1")
+        .get() as { autosave_enabled: number; autosave_interval_seconds: number } | undefined;
+    } catch { return DEFAULT_AUTOSAVE_SETTINGS; }
+    if (!row) return DEFAULT_AUTOSAVE_SETTINGS;
+    const stored = row.autosave_interval_seconds;
+    const inRange = Number.isSafeInteger(stored) && stored >= MIN_AUTOSAVE_INTERVAL_SECONDS && stored <= MAX_AUTOSAVE_INTERVAL_SECONDS;
+    return {
+      enabled: row.autosave_enabled === 0 || row.autosave_enabled === 1 ? row.autosave_enabled === 1 : DEFAULT_AUTOSAVE_SETTINGS.enabled,
+      intervalSeconds: inRange ? stored : DEFAULT_AUTOSAVE_SETTINGS.intervalSeconds
+    };
+  }
+
   setSettings(input: CodexSettingsInput): CodexSettings {
     const database = this.requireDatabase();
     // Normalized OUTSIDE the transaction: both of these throw on a value they cannot make sense of, and a
@@ -2337,9 +2442,14 @@ export class CodexStore {
     const enabled = input?.revisionHistory?.enabled;
     if (typeof enabled !== "boolean") throw new Error("Revision history must be switched on or off explicitly.");
     const windowMinutes = revisionWindowMinutes(input?.revisionHistory?.windowMinutes);
+    // D6: the same explicit-boolean rule, for the same reason one step further along - a coerced missing
+    // field would land on `false` and switch AUTOSAVE off, which is the outcome that loses the GM's work.
+    const autosaveEnabled = input?.autosave?.enabled;
+    if (typeof autosaveEnabled !== "boolean") throw new Error("Autosave must be switched on or off explicitly.");
+    const intervalSeconds = autosaveIntervalSeconds(input?.autosave?.intervalSeconds);
     this.transaction(() => {
-      database.prepare("UPDATE codex_meta SET revision_history_enabled = ?, revision_window_minutes = ? WHERE id = 1")
-        .run(enabled ? 1 : 0, windowMinutes);
+      database.prepare("UPDATE codex_meta SET revision_history_enabled = ?, revision_window_minutes = ?, autosave_enabled = ?, autosave_interval_seconds = ? WHERE id = 1")
+        .run(enabled ? 1 : 0, windowMinutes, autosaveEnabled ? 1 : 0, intervalSeconds);
       this.bumpRevision();
     });
     return this.getSettings();

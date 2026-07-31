@@ -17,6 +17,9 @@ import { CODEX_ASSET_PATHS, CODEX_PATHS, openApiDocument } from "@vtt/api-contra
  * journal-by-attachment reveal gates, the media gate, and the envelope shapes).
  */
 
+/** D6/R4's shipped default, spelled once - `PUT /codex/settings` is wholesale, so every body carries it. */
+const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
+
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => { while (cleanups.length) await cleanups.pop()!(); });
 
@@ -27,7 +30,7 @@ function png(width: number, height: number) {
   return buffer;
 }
 
-async function fixture() {
+async function fixture(pings?: unknown[][]) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-codex-http-"));
   const store = new CodexStore(join(directory, "vtt.sqlite"), () => Date.parse("2026-07-16T03:00:00.000Z"));
   const assets = new MapAssetStore(join(directory, "codex-assets"));
@@ -41,7 +44,9 @@ async function fixture() {
     // Two single-scope credentials and nothing else, so "has codex:read" and "has codex:write" are
     // genuinely different tokens here - a verifier that ignored the scope would pass a weaker test.
     verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
-    notifyChanged: () => {},
+    // Recorded ARGUMENTS, not just calls: D22's whole point is that the ping carries nothing, and a
+    // recorder that only counted could not tell a content-free ping from one carrying a scope word.
+    notifyChanged: (...args: unknown[]) => { pings?.push(args); },
     issuePreviewSession: () => PREVIEW_TOKEN
   }));
   const server = createServer(app); await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -62,6 +67,35 @@ const get = (base: string, path: string, headers: Record<string, string>) => fet
 const post = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(payload) });
 const patch = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
 const put = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PUT", headers, body: JSON.stringify(payload) });
+
+/**
+ * D22: the `codex:changed` ping is CONTENT-FREE. It used to carry a `scope` word - "pages", "journal" - to
+ * every connected socket, players included, which told the table which part of the codex the GM was working
+ * in. The homebrew notifier had already refused exactly that on principle eight lines away in `server.ts`.
+ *
+ * This is the runtime half of the guarantee. The compile-time half is `notifyChanged: () => void` on
+ * `CodexRouterOptions` plus `CodexChangedEvent = { codexRevision }` in `@vtt/domain`; neither is checked by
+ * this suite (`apps/server/test` is not typechecked), so the argument list is asserted here.
+ */
+describe("codex:changed carries no content (D22)", () => {
+  it("pings with no arguments at all, whichever surface was written", async () => {
+    const pings: unknown[][] = [];
+    const { base, store } = await fixture(pings);
+    const page = store.createPage({ title: "Vallaki" });
+    const faction = store.createPage({ title: "The Keepers of the Feather", entityType: "faction" });
+
+    await post(base, "/api/v1/codex/pages", GM, { title: "Krezk" });
+    await patch(base, `/api/v1/codex/pages/${page.id}`, GM, { playerBody: "a walled town" });
+    await post(base, `/api/v1/codex/pages/${page.id}/reveal`, GM, { revealed: true });
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "we arrived" });
+    await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1 });
+    await post(base, "/api/v1/codex/quests", GM, { title: "Find the Sunsword" });
+    await put(base, `/api/v1/codex/standing/${faction.id}`, GM, { value: 10, reason: "kind words" });
+
+    expect(pings.length, "every one of those writes pinged").toBeGreaterThanOrEqual(7);
+    for (const args of pings) expect(args).toEqual([]);
+  });
+});
 
 describe("codex HTTP viewer-safety boundary", () => {
   it("never exposes a combat entry's replay linkage to a player, even when the entry is revealed", async () => {
@@ -1779,7 +1813,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     const { base } = await fixture();
     const payload = await settings(base, GM);
     // The whole shape, asserted by key set as well as by value: an extra or renamed key here is a client break.
-    expect(Object.keys(payload)).toEqual(["revisionHistory"]);
+    expect(Object.keys(payload)).toEqual(["revisionHistory", "autosave"]);
     expect(Object.keys(payload.revisionHistory).sort()).toEqual(["enabled", "versionBytes", "versionCount", "windowMinutes"]);
     expect(payload.revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 });
   });
@@ -1789,7 +1823,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     store.createPage({ title: "Barovia", playerBody: "a valley" });
 
     expect((await get(base, "/api/v1/codex/settings", PLAYER)).status).toBe(403);
-    expect((await put(base, "/api/v1/codex/settings", PLAYER, { revisionHistory: { enabled: false, windowMinutes: 0 } })).status).toBe(403);
+    expect((await put(base, "/api/v1/codex/settings", PLAYER, { revisionHistory: { enabled: false, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT })).status).toBe(403);
     expect((await del(base, "/api/v1/codex/page-revisions", PLAYER, { olderThanDays: 0 })).status).toBe(403);
     // ...and the refusals really refused: the settings are untouched and the history is intact.
     expect((await settings(base, GM)).revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 1, versionBytes: expect.any(Number) });
@@ -1797,20 +1831,45 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
 
   it("stores the two knobs, answers with the full read shape, and reports them back on the next GET", async () => {
     const { base } = await fixture();
-    const written = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: false, windowMinutes: 240 } }))).data.settings as Json;
+    const written = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: false, windowMinutes: 240 }, autosave: AUTOSAVE_DEFAULT }))).data.settings as Json;
     // The PUT's response IS the read shape, usage figures included - the client puts it straight into state.
     expect(written.revisionHistory).toEqual({ enabled: false, windowMinutes: 240, versionCount: 0, versionBytes: 0 });
     expect((await settings(base, GM)).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 240 });
   });
 
+  /**
+   * D6 / director ruling R4, at the boundary Lane C builds against: the wire unit is SECONDS and the default
+   * is `{enabled: true, intervalSeconds: 1}`. The bounds are REJECTED (the picker cannot produce one, so a
+   * caller that does is malformed) and a fractional value inside them is truncated - `windowMinutes`'
+   * arrangement verbatim, so the two knobs on one screen behave the same way.
+   */
+  it("carries autosave in seconds, defaults to on at one second, and rejects an out-of-range interval", async () => {
+    const { base } = await fixture();
+    expect((await settings(base, GM)).autosave).toEqual({ enabled: true, intervalSeconds: 1 });
+
+    const written = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: { enabled: false, intervalSeconds: 60.4 } }))).data.settings as Json;
+    expect(written.autosave).toEqual({ enabled: false, intervalSeconds: 60 });
+    expect((await settings(base, GM)).autosave).toEqual({ enabled: false, intervalSeconds: 60 });
+
+    for (const intervalSeconds of [0, -1, 601]) {
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: { enabled: true, intervalSeconds } });
+      expect(rejected.status, `intervalSeconds ${intervalSeconds}`).toBe(400);
+      expect((await body(rejected)).error.details.issues.length).toBeGreaterThan(0);
+    }
+    // An unknown key inside the group is a 400 too - `.strict()`, like every other codex body.
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: { enabled: true, intervalSeconds: 5, intervalMs: 5000 } })).status).toBe(400);
+    // ...and nothing the refusals sent was stored.
+    expect((await settings(base, GM)).autosave).toEqual({ enabled: false, intervalSeconds: 60 });
+  });
+
   it("truncates a fractional window but REJECTS one out of range", async () => {
     const { base } = await fixture();
     // In range but unrounded: accepted and truncated, because that is a slider artefact rather than a mistake.
-    const truncated = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45.7 } }))).data.settings as Json;
+    const truncated = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45.7 }, autosave: AUTOSAVE_DEFAULT }))).data.settings as Json;
     expect(truncated.revisionHistory.windowMinutes).toBe(45);
     // Out of range either way: a 400, because the GM's control cannot produce one, so a caller that does is malformed.
     for (const windowMinutes of [-1, 10_081]) {
-      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes } });
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes }, autosave: AUTOSAVE_DEFAULT });
       expect(rejected.status, `windowMinutes ${windowMinutes}`).toBe(400);
       expect((await body(rejected)).error.code).toBe("validation_failed");
     }
@@ -1830,11 +1889,13 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     const before = await settings(base, GM);
 
     for (const extra of [{ versionCount: 0 }, { versionBytes: 0 }, { versionCount: 9, versionBytes: 9 }]) {
-      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90, ...extra } });
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90, ...extra }, autosave: AUTOSAVE_DEFAULT });
       expect(rejected.status, JSON.stringify(extra)).toBe(400);
     }
     // A missing knob is a 400 too - the PUT replaces the settings wholesale, so a half-body is not a partial edit.
-    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { windowMinutes: 90 } })).status).toBe(400);
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT })).status).toBe(400);
+    // ...and so is a body that forgets the autosave group entirely, for the same wholesale-PUT reason.
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 } })).status).toBe(400);
     expect((await put(base, "/api/v1/codex/settings", GM, {})).status).toBe(400);
     // The real figures are unchanged and still the server's own.
     expect(await settings(base, GM)).toEqual(before);
@@ -1843,7 +1904,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
 
   it("deletes every revision at olderThanDays 0 and answers with the real count", async () => {
     const { base, store } = await fixture();
-    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } }); // keep every save, frozen clock
+    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT }); // keep every save, frozen clock
     const page = store.createPage({ title: "Krezk", playerBody: "v0" });
     // Two edits: the first one's prior state is rev 1, which the creation already checkpointed, so the
     // byte-identical duplicate is suppressed. Two pages plus one distinct edit = three rows.

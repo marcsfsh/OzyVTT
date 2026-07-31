@@ -254,6 +254,19 @@ const CodexSettingsSchema = z.object({
   revisionHistory: z.object({
     enabled: z.boolean(),
     windowMinutes: z.number().min(0).max(10_080)
+  }).strict(),
+  /**
+   * D6 / director ruling R4: autosave, in SECONDS - the wire unit, the column's unit and this schema's unit
+   * are one, so nothing converts at a boundary. 1..600, and the looseness is `windowMinutes`' exactly: the
+   * BOUNDS are rejected (a control that produced 0 or 9999 would be a malformed caller and deserves to hear
+   * so), a FRACTIONAL value inside the range is a picker artefact and is truncated by the store.
+   *
+   * REQUIRED, like `revisionHistory`: this is a wholesale PUT that answers with the full read shape, so an
+   * omitted group would silently reset a setting the caller never mentioned.
+   */
+  autosave: z.object({
+    enabled: z.boolean(),
+    intervalSeconds: z.number().min(1).max(600)
   }).strict()
 }).strict();
 /**
@@ -305,8 +318,14 @@ type CodexRouterOptions = Readonly<{
    * nothing" is a bug that reads as a product decision.
    */
   verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => Readonly<{ id: string; name: string }> | null;
-  /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
-  notifyChanged: (scope: "pages" | "maps" | "markers" | "journal" | "sessions" | "quests") => void;
+  /**
+   * Emit a content-free `codex:changed` ping so every client refetches its projected view.
+   *
+   * D22: it takes NO argument. It used to take a `scope` word that was broadcast to every socket, players
+   * included - telling the table which part of the codex the GM is working in. No listener read it, the
+   * homebrew notifier already refused the same thing on principle, and the honest ping is a revision.
+   */
+  notifyChanged: () => void;
   /**
    * Mints a short-lived PLAYER token so the GM can preview the player Codex truthfully. The preview must
    * be a real player principal - `roleOf` below checks `authorizeGm` FIRST, so reusing the GM's own token
@@ -609,7 +628,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     try {
       const input = PageCreateSchema.parse(request.body);
       const page = store.createPage(input);
-      options.notifyChanged("pages");
+      options.notifyChanged();
       return envelope(response, 201, { page: projectGmPage(page) });
     } catch (error) { return malformed(response, error); }
   });
@@ -618,7 +637,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     try {
       const { expectedRev, ...fields } = PageUpdateSchema.parse(request.body);
       const page = store.updatePage(pathParam(request, "id"), fields, expectedRev, "gm");
-      options.notifyChanged("pages");
+      options.notifyChanged();
       return envelope(response, 200, { page: projectGmPage(page) });
     } catch (error) {
       // The row is re-read only on a conflict, so the 409 can name the revision the caller lost the
@@ -632,7 +651,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     try {
       const { revealed } = RevealSchema.parse(request.body);
       const page = store.setPageRevealed(pathParam(request, "id"), revealed);
-      options.notifyChanged("pages");
+      options.notifyChanged();
       return envelope(response, 200, { page: projectGmPage(page) });
     } catch (error) {
       if (error instanceof CodexNotFoundError) return failure(response, 404, "not_found", error.message);
@@ -642,7 +661,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   router.delete(`${CODEX_BASE}/pages/:id`, requireWrite, (request, response) => {
     store.deletePage(pathParam(request, "id"));
-    options.notifyChanged("pages");
+    options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
@@ -650,7 +669,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     try {
       const { from, to } = FolderMoveSchema.parse(request.body);
       const moved = store.moveFolder(from, to);
-      options.notifyChanged("pages");
+      options.notifyChanged();
       return envelope(response, 200, { moved });
     } catch (error) { return malformed(response, error); }
   });
@@ -664,11 +683,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/folders`, requireWrite, (request, response) => {
-    try { const path = store.createFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged("pages"); return envelope(response, 201, { path }); }
+    try { const path = store.createFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged(); return envelope(response, 201, { path }); }
     catch (error) { return malformed(response, error); }
   });
   router.post(`${CODEX_BASE}/folders/delete`, requireWrite, (request, response) => {
-    try { store.deleteFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged("pages"); return envelope(response, 200, { deleted: true }); }
+    try { store.deleteFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged(); return envelope(response, 200, { deleted: true }); }
     catch (error) { return malformed(response, error); }
   });
 
@@ -683,7 +702,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
       const revisionId = Number(request.params.revisionId);
       if (!Number.isInteger(revisionId)) return failure(response, 400, "validation_failed", "The revision id is malformed.");
       const page = store.restoreRevision(pathParam(request, "id"), revisionId, "gm");
-      options.notifyChanged("pages");
+      options.notifyChanged();
       return envelope(response, 200, { page: projectGmPage(page) });
     } catch (error) {
       if (error instanceof CodexNotFoundError) return failure(response, 404, "not_found", error.message);
@@ -694,13 +713,13 @@ export function createCodexRouter(options: CodexRouterOptions) {
   // ----- Relationships (typed entity edges) -----
 
   router.post(`${CODEX_BASE}/pages/:id/relationships`, requireWrite, (request, response) => {
-    try { const { toPageId, type } = RelationshipCreateSchema.parse(request.body); const relationship = store.createRelationship(pathParam(request, "id"), toPageId, type); options.notifyChanged("pages"); return envelope(response, 201, { relationship }); }
+    try { const { toPageId, type } = RelationshipCreateSchema.parse(request.body); const relationship = store.createRelationship(pathParam(request, "id"), toPageId, type); options.notifyChanged(); return envelope(response, 201, { relationship }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.delete(`${CODEX_BASE}/relationships/:id`, requireWrite, (request, response) => {
     store.deleteRelationship(pathParam(request, "id"));
-    options.notifyChanged("pages");
+    options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
@@ -751,28 +770,28 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/maps`, requireWrite, (request, response) => {
-    try { const map = store.createMap(MapCreateSchema.parse(request.body)); options.notifyChanged("maps"); return envelope(response, 201, { map: projectGmMap(map) }); }
+    try { const map = store.createMap(MapCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.patch(`${CODEX_BASE}/maps/:id`, requireWrite, (request, response) => {
-    try { const map = store.updateMap(pathParam(request, "id"), MapUpdateSchema.parse(request.body)); options.notifyChanged("maps"); return envelope(response, 200, { map: projectGmMap(map) }); }
+    try { const map = store.updateMap(pathParam(request, "id"), MapUpdateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.post(`${CODEX_BASE}/maps/:id/parent`, requireWrite, (request, response) => {
-    try { const map = store.setMapParent(pathParam(request, "id"), MapParentSchema.parse(request.body).parentMapId); options.notifyChanged("maps"); return envelope(response, 200, { map: projectGmMap(map) }); }
+    try { const map = store.setMapParent(pathParam(request, "id"), MapParentSchema.parse(request.body).parentMapId); options.notifyChanged(); return envelope(response, 200, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.post(`${CODEX_BASE}/maps/:id/reveal`, requireWrite, (request, response) => {
-    try { const map = store.setMapRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("maps"); return envelope(response, 200, { map: projectGmMap(map) }); }
+    try { const map = store.setMapRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged(); return envelope(response, 200, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.delete(`${CODEX_BASE}/maps/:id`, requireWrite, (request, response) => {
     store.deleteMap(pathParam(request, "id"));
-    options.notifyChanged("maps");
+    options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
@@ -833,22 +852,22 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/maps/:id/markers`, requireWrite, (request, response) => {
-    try { const marker = store.createMarker(pathParam(request, "id"), MarkerCreateSchema.parse(request.body)); options.notifyChanged("markers"); return envelope(response, 201, { marker: projectGmMarker(marker) }); }
+    try { const marker = store.createMarker(pathParam(request, "id"), MarkerCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.patch(`${CODEX_BASE}/markers/:id`, requireWrite, (request, response) => {
-    try { const marker = store.updateMarker(pathParam(request, "id"), MarkerUpdateSchema.parse(request.body)); options.notifyChanged("markers"); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
+    try { const marker = store.updateMarker(pathParam(request, "id"), MarkerUpdateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.post(`${CODEX_BASE}/markers/:id/move`, requireWrite, (request, response) => {
-    try { const { x, y } = MarkerMoveSchema.parse(request.body); const marker = store.moveMarker(pathParam(request, "id"), x, y); options.notifyChanged("markers"); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
+    try { const { x, y } = MarkerMoveSchema.parse(request.body); const marker = store.moveMarker(pathParam(request, "id"), x, y); options.notifyChanged(); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.post(`${CODEX_BASE}/markers/:id/reveal`, requireWrite, (request, response) => {
-    try { const marker = store.setMarkerRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("markers"); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
+    try { const marker = store.setMarkerRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged(); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -875,14 +894,14 @@ export function createCodexRouter(options: CodexRouterOptions) {
       // this read. An up-front `getMarker` guard as well was measurably dead: no mutation of it failed a test.
       const marker = store.getMarker(markerId);
       if (!marker) return failure(response, 404, "not_found", "That marker was not found.");
-      options.notifyChanged("markers");
+      options.notifyChanged();
       return envelope(response, 200, { marker: projectGmMarker(marker) });
     } catch (error) { return codexError(response, error); }
   });
 
   router.delete(`${CODEX_BASE}/markers/:id`, requireWrite, (request, response) => {
     store.deleteMarker(pathParam(request, "id"));
-    options.notifyChanged("markers");
+    options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
@@ -955,7 +974,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/journal`, requireWrite, (request, response) => {
-    try { const entry = store.createEntry(JournalWriteSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.createEntry(JournalWriteSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -976,7 +995,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * reveal route would be a second gate to keep in step with the first.
    */
   router.post(`${CODEX_BASE}/journal/deadline`, requireWrite, (request, response) => {
-    try { const entry = store.createDeadline(DeadlineCreateSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.createDeadline(DeadlineCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -988,7 +1007,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.post(`${CODEX_BASE}/journal/downtime`, requireWrite, (request, response) => {
     try {
       const entry = store.createDowntime(DowntimeCreateSchema.parse(request.body));
-      options.notifyChanged("journal");
+      options.notifyChanged();
       return envelope(response, 201, { entry: projectGmJournalEntry(entry), proposedDate: store.proposedDateFor(entry) });
     } catch (error) { return codexError(response, error); }
   });
@@ -1002,7 +1021,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * already works on every journal kind, and a kind-specific gate is a second gate to keep in step.
    */
   router.post(`${CODEX_BASE}/journal/milestone`, requireWrite, (request, response) => {
-    try { const entry = store.createMilestone(MilestoneCreateSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.createMilestone(MilestoneCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1019,24 +1038,24 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.post(`${CODEX_BASE}/journal/:id/apply-downtime`, requireWrite, (request, response) => {
     try {
       const { entry, calendar } = store.applyDowntime(pathParam(request, "id"));
-      options.notifyChanged("journal");
+      options.notifyChanged();
       return envelope(response, 200, { entry: projectGmJournalEntry(entry), calendar: projectGmCalendar(calendar, store.getPublishedDate()) });
     } catch (error) { return codexError(response, error); }
   });
 
   router.patch(`${CODEX_BASE}/journal/:id`, requireWrite, (request, response) => {
-    try { const entry = store.updateEntry(pathParam(request, "id"), JournalWriteSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.updateEntry(pathParam(request, "id"), JournalWriteSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.post(`${CODEX_BASE}/journal/:id/reveal`, requireWrite, (request, response) => {
-    try { const entry = store.setEntryRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("journal"); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.setEntryRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged(); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.delete(`${CODEX_BASE}/journal/:id`, requireWrite, (request, response) => {
     store.deleteEntry(pathParam(request, "id"));
-    options.notifyChanged("journal");
+    options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
@@ -1067,7 +1086,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/sessions`, requireWrite, (request, response) => {
-    try { const session = store.createSession(SessionCreateSchema.parse(request.body)); options.notifyChanged("sessions"); return envelope(response, 201, { session: projectGmSession(session) }); }
+    try { const session = store.createSession(SessionCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { session: projectGmSession(session) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1088,19 +1107,19 @@ export function createCodexRouter(options: CodexRouterOptions) {
     try {
       const { expectedRev, ...fields } = SessionUpdateSchema.parse(request.body);
       const session = store.updateSession(pathParam(request, "id"), fields, expectedRev, "gm");
-      options.notifyChanged("sessions");
+      options.notifyChanged();
       return envelope(response, 200, { session: projectGmSession(session) });
     } catch (error) { return codexError(response, error, () => store.getSession(pathParam(request, "id"))?.rev); }
   });
 
   router.delete(`${CODEX_BASE}/sessions/:id`, requireWrite, (request, response) => {
     store.deleteSession(pathParam(request, "id"));
-    options.notifyChanged("sessions");
+    options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
   router.post(`${CODEX_BASE}/sessions/:id/reveal`, requireWrite, (request, response) => {
-    try { const session = store.setSessionRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("sessions"); return envelope(response, 200, { session: projectGmSession(session) }); }
+    try { const session = store.setSessionRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged(); return envelope(response, 200, { session: projectGmSession(session) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1110,7 +1129,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * imply an edit that did not happen.
    */
   router.post(`${CODEX_BASE}/sessions/:id/activate`, requireWrite, (request, response) => {
-    try { const activeSessionId = store.setActiveSession(pathParam(request, "id")); options.notifyChanged("sessions"); return envelope(response, 200, { activeSessionId }); }
+    try { const activeSessionId = store.setActiveSession(pathParam(request, "id")); options.notifyChanged(); return envelope(response, 200, { activeSessionId }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1143,7 +1162,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/quests`, requireWrite, (request, response) => {
-    try { const quest = store.createQuest(QuestCreateSchema.parse(request.body)); options.notifyChanged("quests"); return envelope(response, 201, { quest: projectGmQuest(quest) }); }
+    try { const quest = store.createQuest(QuestCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { quest: projectGmQuest(quest) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1164,19 +1183,19 @@ export function createCodexRouter(options: CodexRouterOptions) {
     try {
       const { expectedRev, ...fields } = QuestUpdateSchema.parse(request.body);
       const quest = store.updateQuest(pathParam(request, "id"), fields, expectedRev);
-      options.notifyChanged("quests");
+      options.notifyChanged();
       return envelope(response, 200, { quest: projectGmQuest(quest) });
     } catch (error) { return codexError(response, error, () => store.getQuest(pathParam(request, "id"))?.rev); }
   });
 
   router.delete(`${CODEX_BASE}/quests/:id`, requireWrite, (request, response) => {
     store.deleteQuest(pathParam(request, "id"));
-    options.notifyChanged("quests");
+    options.notifyChanged();
     return envelope(response, 200, { deleted: true });
   });
 
   router.post(`${CODEX_BASE}/quests/:id/reveal`, requireWrite, (request, response) => {
-    try { const quest = store.setQuestRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("quests"); return envelope(response, 200, { quest: projectGmQuest(quest) }); }
+    try { const quest = store.setQuestRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged(); return envelope(response, 200, { quest: projectGmQuest(quest) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1210,16 +1229,15 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * chronicle record in ONE transaction, so the table and the history can never disagree - which is also why
    * `reason` belongs on this body rather than on a second call.
    *
-   * `notifyChanged("journal")` rather than a scope of its own: this write really does change the journal (it
-   * appends a chronicle record), the ping is content-free, and every client listener refetches its whole view
-   * regardless of scope. Adding a `"standing"` member would widen `CodexRouterOptions` and break `server.ts`'s
-   * annotated handler for no behavioural gain.
+   * The ping it emits carries nothing, like every other one (D22): a standing write really does change the
+   * journal as well as the table, and telling the whole table which of the two a GM just touched was the
+   * `scope` word that D22 removed. Every client listener refetches its own view regardless.
    */
   router.put(`${CODEX_BASE}/standing/:factionPageId`, requireWrite, (request, response) => {
     try {
       const { value, reason } = StandingSetSchema.parse(request.body);
       const standing = store.setStanding(pathParam(request, "factionPageId"), value, reason);
-      options.notifyChanged("journal");
+      options.notifyChanged();
       return envelope(response, 200, { standing: projectGmStanding(standing) });
     } catch (error) { return codexError(response, error); }
   });
@@ -1227,7 +1245,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.post(`${CODEX_BASE}/standing/:factionPageId/reveal`, requireWrite, (request, response) => {
     try {
       const standing = store.setStandingRevealed(pathParam(request, "factionPageId"), RevealSchema.parse(request.body).revealed);
-      options.notifyChanged("journal");
+      options.notifyChanged();
       return envelope(response, 200, { standing: projectGmStanding(standing) });
     } catch (error) { return codexError(response, error); }
   });
@@ -1305,7 +1323,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * hold two spellings of one object.
    */
   router.put(`${CODEX_BASE}/calendar`, requireWrite, (request, response) => {
-    try { const calendar = store.setCalendar(CalendarSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) }); }
+    try { const calendar = store.setCalendar(CalendarSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) }); }
     catch (error) { return malformed(response, error); }
   });
 
@@ -1320,7 +1338,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.post(`${CODEX_BASE}/calendar/publish`, requireWrite, (_request, response) => {
     try {
       const calendar = store.publishCampaignDate();
-      options.notifyChanged("journal");
+      options.notifyChanged();
       return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) });
     } catch (error) { return codexError(response, error); }
   });

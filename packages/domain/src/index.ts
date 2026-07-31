@@ -463,9 +463,16 @@ export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" |
 
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
 export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save"; text: string; actorIds: readonly string[]; at: number }>;
-/** Which slice of the worldbuilding codex changed; the `codex:changed` ping carries no content, so it is viewer-safe - every recipient refetches only its own projected view over HTTP. */
-export type CodexChangeScope = "pages" | "maps" | "markers" | "journal" | "sessions" | "quests";
-export type CodexChangedEvent = Readonly<{ scope: CodexChangeScope; codexRevision: number }>;
+/**
+ * The worldbuilding codex changed. CONTENT-FREE BY DESIGN (D22) - a revision counter and nothing else, so
+ * every recipient refetches only its own projected view over HTTP.
+ *
+ * It used to carry a `scope` ("pages" | "journal" | ...). That word went out to EVERY connected socket,
+ * players included, which told the table which part of the codex the GM is working on right now - a small
+ * but real leak of GM intent, and one the homebrew notifier eight lines below already refused on exactly
+ * that principle. No client ever read it: every listener is a wholesale refetch. Two notifiers, one rule.
+ */
+export type CodexChangedEvent = Readonly<{ codexRevision: number }>;
 /** The homebrew library changed. Like `codex:changed` this carries NO content - only a revision, so every recipient refetches its own audience-filtered view over HTTP. A ping that carried the record would hand a player a GM-only draft. */
 export type HomebrewChangedEvent = Readonly<{ revision: number }>;
 export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; "codex:changed": (event: CodexChangedEvent) => void; "homebrew:changed": (event: HomebrewChangedEvent) => void; }
