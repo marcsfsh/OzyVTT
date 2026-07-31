@@ -330,7 +330,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           {breadcrumb.length === 0 && <span className="codex-crumb is-current">Atlas</span>}
           {breadcrumb.map((map, index) => (
             <span key={map.id}>
-              {index > 0 && <span className="codex-crumb-sep">›</span>}
+              {index > 0 && <span className="codex-crumb-sep" aria-hidden="true">›</span>}
               <button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => enterMap(map.id)}>{map.name}</button>
             </span>
           ))}

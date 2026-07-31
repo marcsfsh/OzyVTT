@@ -8,9 +8,13 @@
   flex-wrap: wrap;
 }
 
-/* Route 2 controls in a row: `IconButton` is 36px paint with a `.tap-target` ::after, so each overhangs
-   by 4px per side. `--space-2` (8px) clears the 8px sum exactly — the design language's gap budget. */
-.nh-mdeditor-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Route 2 controls in a wrapping row, and the gap budget measured rather than assumed.
+   `IconButton size="sm"` paints **29.6px**, not the 36px this comment used to claim, and its
+   `.tap-target` ::after is 44px — so each hit box overhangs by (44 − 29.6) / 2 = 7.2px per side and two
+   neighbours need 14.4px between them. At `--space-2` (8px) the boxes overlapped by 6.4px and the later
+   sibling took every tap in that band. `--space-4` (16px) clears it in both axes, which is what
+   `flex-wrap` makes necessary — the rows overlap the same way the columns do. */
+.nh-mdeditor-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 
 .nh-mdeditor-letter { font: 800 var(--fs-sm) / 1 var(--font-body); }
 .nh-mdeditor-letter--italic { font-style: italic; font-weight: 600; }

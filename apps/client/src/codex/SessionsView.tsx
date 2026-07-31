@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, IconPlus, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Field, IconChevron, IconPlus, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
 import { sessionApi, type CodexAutosaveSettings, type CodexPageSummary, type CodexSession, type CodexSessionStatus } from "./api";
 import { pickNextSession, sessionTitle } from "./sessions";
 import { CodexEditor } from "./CodexEditor";
@@ -99,7 +99,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
         </aside>
 
         <section className="codex-main">
-          {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenSession(null)}>‹ All sessions</Button>}
+          {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenSession(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All sessions</Button>}
           {/* R4: this surface's own failure. The log reads one feed; a silent one is an empty log that
               looks exactly like a campaign that has never had a session. */}
           {error && <Alert tone="danger" title="Couldn't load the sessions">{error}</Alert>}

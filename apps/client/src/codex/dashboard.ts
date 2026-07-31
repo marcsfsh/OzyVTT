@@ -29,7 +29,9 @@ export function pendingDowntime(records: readonly CodexChronicleRecord[]): reado
     .filter((row): row is { record: CodexChronicleRecord; payload: CodexDowntimePayload } => row.payload !== null && !row.payload.applied)
     .map(({ record, payload }) => ({
       id: record.id, who: payload.who, activity: payload.activity, days: payload.days,
-      when: chronicleWhenLabel(record)
+      when: chronicleWhenLabel(record),
+      // D18: this row names a record, so it states the record's reveal state like every other one.
+      revealed: record.revealedToPlayers
     }));
 }
 
@@ -38,8 +40,14 @@ export function pendingDowntime(records: readonly CodexChronicleRecord[]): reado
  * which chronicle they hand over — theirs — which is the whole of the role difference.
  */
 export function campaignFeedProps(input: Readonly<{ records: readonly CodexChronicleRecord[]; calendar: GmCodexCalendar | null }>) {
+  const pending = pendingDowntime(input.records);
+  // A downtime record waiting on the GM has its OWN card, with the Confirm affordance on it. Leaving it
+  // in the feed as well rendered the same record twice on one dashboard. `downtime` stays out of
+  // DASHBOARD_CARDED_KINDS because that set is shared with the player, who has no such card and should
+  // still read downtime on their timeline — so the exclusion is by id and only for the rows carded here.
+  const carded = new Set(pending.map((row) => row.id));
   const entries: readonly CampaignEntry[] = [...input.records]
-    .filter((record) => !DASHBOARD_CARDED_KINDS.has(record.kind))
+    .filter((record) => !DASHBOARD_CARDED_KINDS.has(record.kind) && !carded.has(record.id))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((record) => ({ id: record.id, summary: chronicleRowSummary(record), when: chronicleWhenLabel(record), kind: record.kind, revealed: record.revealedToPlayers }));
   const deadlines: readonly CampaignDeadline[] = campaignDeadlines(input.records)
@@ -47,7 +55,7 @@ export function campaignFeedProps(input: Readonly<{ records: readonly CodexChron
   return {
     entries,
     deadlines,
-    downtimePending: pendingDowntime(input.records),
+    downtimePending: pending,
     today: input.calendar?.currentDate ? formatWorldDate(input.calendar, input.calendar.currentDate) : null,
     nextSession: nextSessionCard
   };
@@ -60,7 +68,7 @@ export function campaignFeedProps(input: Readonly<{ records: readonly CodexChron
  * answer "Next session", so a campaign whose only sessions were played read "Next session — Session 4"
  * about a game already behind them. Three honest headings, chosen from the record itself.
  */
-export function nextSessionCard<T extends SessionRef & { realDate: string | null; recapBody?: string; recap?: string; status?: "planned" | "played" }>(
+export function nextSessionCard<T extends SessionRef & { realDate: string | null; recapBody?: string; recap?: string; status?: "planned" | "played"; revealedToPlayers?: boolean }>(
   sessions: readonly T[], activeSessionId: string | null
 ): (CampaignSession & Readonly<{ heading: string }>) | null {
   const active = activeSessionId ? sessions.find((session) => session.id === activeSessionId) ?? null : null;
@@ -75,7 +83,10 @@ export function nextSessionCard<T extends SessionRef & { realDate: string | null
     : "Next session";
   return {
     id: chosen.id, sessionNumber: chosen.sessionNumber, realDate: chosen.realDate,
-    recap: chosen.recapBody ?? chosen.recap ?? "", heading
+    recap: chosen.recapBody ?? chosen.recap ?? "", heading,
+    // D18: the card states the recap's reveal state like every other dashboard row that names a record.
+    // Absent on the player projection, so a player caller carries `undefined` and the card renders none.
+    ...(chosen.revealedToPlayers === undefined ? {} : { revealed: chosen.revealedToPlayers })
   };
 }
 

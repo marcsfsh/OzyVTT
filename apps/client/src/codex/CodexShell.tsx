@@ -316,7 +316,11 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
               deadlines={dash.deadlines}
               downtimePending={dash.downtimePending}
               onOpenDowntime={() => navigate(pathForSection("downtime"))}
-              party={campaign.party ? { label: campaign.party.marker.label, mapId: campaign.party.marker.mapId, mapName: campaign.party.mapName, markerId: campaign.party.marker.id } : null}
+              /* D18: the party card states the PIN's reveal state. Deliberately the pin's own flag and
+                 not a computed "can players see this": the map gates it too, and a card that folded the
+                 two together would say "hidden" about a shown pin and give the GM nothing to act on.
+                 The Atlas is where the map's own switch lives, one tap away via "Show the pin". */
+              party={campaign.party ? { label: campaign.party.marker.label, mapId: campaign.party.marker.mapId, mapName: campaign.party.mapName, markerId: campaign.party.marker.id, revealed: campaign.party.marker.revealedToPlayers } : null}
               onOpenParty={(mapId, markerId) => navigate(atlasPath(mapId, markerId))}
               standing={standingRows}
               onAdjustStanding={setAdjustingFactionId}

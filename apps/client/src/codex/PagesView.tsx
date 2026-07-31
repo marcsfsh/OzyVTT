@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Chip, Combobox, IconPlus, Input, MenuItem, Modal, Select, Skeleton } from "@vtt/ui";
+import { Button, Chip, Combobox, IconChevron, IconPlus, Input, MenuItem, Modal, Select, Skeleton } from "@vtt/ui";
 import { codexApi, type CodexAutosaveSettings, type CodexPage, type CodexPageConnection, type CodexPageSummary } from "./api";
 import { PageEditor } from "./PageEditor";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
@@ -232,7 +232,7 @@ export function PagesView({
         {selectedId && (
           /* D25/G17: the bespoke `.codex-back` link becomes the ghost Button primitive, which carries the
              44px floor itself (route 2, `.nh-btn--sm` + `.tap-target`). */
-          <Button variant="ghost" size="sm" className="codex-back" onClick={() => navigate(pathForSection("pages"))}>‹ All pages</Button>
+          <Button variant="ghost" size="sm" className="codex-back" onClick={() => navigate(pathForSection("pages"))}><IconChevron className="codex-chevron-left" aria-hidden="true" />All pages</Button>
         )}
         {missing && <MissingRecordNotice noun="page" />}
         {selected

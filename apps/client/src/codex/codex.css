@@ -1197,7 +1197,13 @@
 .codex-pindetails { display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); }
 
 /* A live/active dot, drawn rather than typed — `●` is a symbol character the body face may not carry. */
+.codex-campaign-partyreveal { margin: 0; }
 .codex-dot { display: inline-block; width: .5em; height: .5em; border-radius: var(--radius-pill); background: currentColor; }
+/* D25: SVG icons only — no text or emoji standing in for a glyph. `IconChevron` points down, so the
+   left/right forms are rotations of the one path rather than three more hand-drawn arrows. */
+.codex-chevron-left, .codex-chevron-right { width: 1em; height: 1em; flex: none; }
+.codex-chevron-left { transform: rotate(90deg); }
+.codex-chevron-right { transform: rotate(-90deg); }
 /* A journal row's session link. §4 route 2 via `.nh-btn--sm`-equivalent padding is not used here: it
    sits inline in a wrapping meta row, so the paint grows instead (route 1). */
 .codex-entry-sessionlink { min-height: var(--tap-min); display: inline-flex; align-items: center; border: none; background: none; color: var(--cyan); cursor: pointer; font: inherit; padding: 0 var(--space-1); }

@@ -226,7 +226,7 @@ describe("The dashboard's open-quests card (M10)", () => {
 
     // The GM backs out to the list — `selectedId` becomes an explicit null, so nothing can quietly
     // re-select the quest and the second landing is the latch's work alone.
-    await user.click(screen.getByRole("button", { name: "‹ All quests" }));
+    await user.click(screen.getByRole("button", { name: "All quests" }));
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).not.toHaveAttribute("aria-current"));
 
     await jumpViaPalette();

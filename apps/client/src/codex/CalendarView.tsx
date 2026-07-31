@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Input, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, IconChevron, Input, Skeleton } from "@vtt/ui";
 import {
   calendarApi, calendarDaysPerYear, dateToInstant, formatWorldDate, formatWorldYear,
   type CodexChronicleRecord, type CodexInWorldDate, type GmCodexCalendar
@@ -136,9 +136,9 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
       {publishError && <Alert tone="danger">{publishError}</Alert>}
 
       <div className="codex-calendar-monthbar">
-        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}>‹</Button>
+        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}><IconChevron className="codex-chevron-left" /></Button>
         <h3 className="codex-calendar-monthname">{grid.monthDef.name} {formatWorldYear(calendar, viewYear)}</h3>
-        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}>›</Button>
+        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}><IconChevron className="codex-chevron-right" /></Button>
         <label className="codex-calendar-yearjump">
           <span className="nh-sr-only">Jump to year</span>
           <Input type="number" inputMode="numeric" aria-label="Jump to year" value={String(viewYear)}
@@ -262,9 +262,9 @@ export function PlayerCalendarView({ calendar, records, year, month, onMonthChan
         </div>
       </header>
       <div className="codex-calendar-monthbar">
-        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}>‹</Button>
+        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}><IconChevron className="codex-chevron-left" /></Button>
         <h3 className="codex-calendar-monthname">{grid.monthDef.name} {formatWorldYear(calendar, viewYear)}</h3>
-        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}>›</Button>
+        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}><IconChevron className="codex-chevron-right" /></Button>
       </div>
       <div className="codex-calendar-grid" role="grid" aria-label={`${grid.monthDef.name} ${formatWorldYear(calendar, viewYear)}`}
         style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}>

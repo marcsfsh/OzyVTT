@@ -90,9 +90,12 @@ const KIND_MARKS: Readonly<Record<Exclude<CodexRecordKind, "page">, Readonly<{ i
   // finer distinction", and R2 means the WORD "Quest" is what actually names the kind. The glyph is the
   // registry's `quest` (a circled `!`, the tabletop quest marker), which no other kind uses.
   quest: { icon: "quest", label: "Quest", color: "var(--caution)" },
-  // D10: sessions joined the index. `sessions` is the sidebar's own glyph, so a session reads the same
-  // in a result list as it does in the navigation.
-  session: { icon: "sessions", label: "Session", color: "var(--violet)" }
+  // D10: sessions joined the index — including the PLAYER's, which is why this may not be violet.
+  // Invariant 8 reserves that hue for GM-only content and nothing else, and a revealed session is a
+  // record the player is explicitly allowed to see. `--info` (indigo) is unclaimed on this list, and
+  // R2 means the word "Session" is what actually names the kind. `sessions` is the sidebar's own glyph,
+  // so a session reads the same in a result list as it does in the navigation.
+  session: { icon: "sessions", label: "Session", color: "var(--info)" }
 };
 
 /** The kind label as it reads on the row — a page reads as its entity type ("Character"), which is what the rest of the suite calls it. */

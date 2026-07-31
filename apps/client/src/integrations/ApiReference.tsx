@@ -368,9 +368,20 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
     <div className="api-reference-body">
       <p className="api-reference-intro">
         Base URL: <code>{origin}/api/v1</code> · Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> - a credential from above, your GM session, or a player session.
-        Writes accept an optional <code>commandId</code> (resend it to retry safely) and <code>expectedRevision</code>.
         The machine-readable contract lives at <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>; a full generated write-up ships in the repo at <code>docs/api-reference.md</code>.
       </p>
+      {/**
+        * D19: the idempotency and revision rules are READ FROM THE SERVED CONTRACT, never restated here.
+        *
+        * This panel used to carry a hand-copied sentence — "Writes accept an optional commandId (resend
+        * it to retry safely) and expectedRevision" — above both the Codex and Homebrew groups. It was
+        * false for both: `expectedRevision` exists on the game surface only (codex and homebrew use
+        * `expectedRev`), `commandId` reaches no homebrew write at all, and every body schema on both
+        * surfaces is `.strict()`, so a GM who followed the panel got a 400 naming the key they added.
+        * The contract's own `info.description` was corrected per-surface and this copy was not. Rendering
+        * it means the panel cannot diverge from the server again.
+        */}
+      {document?.info.description && <p className="api-reference-intro">{document.info.description}</p>}
       {state.status === "loading" && <p>Loading the contract…</p>}
       {state.status === "error" && <p className="api-reference-error">{state.message} <Button variant="ghost" onClick={load}>Retry</Button></p>}
       {document && <>

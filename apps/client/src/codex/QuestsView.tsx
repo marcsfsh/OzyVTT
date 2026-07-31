@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconPlus, IconX, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
 import { questApi, type CodexAutosaveSettings, type CodexQuest, type CodexQuestObjective, type CodexQuestStatus } from "./api";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
 import { CodexEditor } from "./CodexEditor";
@@ -104,7 +104,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
         </aside>
 
         <section className="codex-main">
-          {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenQuest(null)}>‹ All quests</Button>}
+          {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenQuest(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All quests</Button>}
           {/* R4: this surface's own failure. The log reads one feed; a silent one is an empty log that
               looks exactly like a campaign that has never had a quest. */}
           {error && <Alert tone="danger" title="Couldn't load the quests">{error}</Alert>}

@@ -1,6 +1,6 @@
 import { Alert, Badge, Button, Drawer, Skeleton } from "@vtt/ui";
 import { CodexMarkdown } from "./CodexMarkdown";
-import { GmOnlyTag } from "./SecretMarkers";
+import { GmOnlyTag, VisibilityBadge } from "./SecretMarkers";
 import { sessionTitle } from "./sessions";
 import type { CodexSession } from "./api";
 
@@ -55,10 +55,14 @@ export function SessionConsole({ open, onClose, gmToken, session, loading, error
       {session && (
         <div className="codex-console">
           <div className="codex-console-meta">
-            <Badge tone="success">● Active</Badge>
+            <Badge tone="success"><span className="codex-dot" aria-hidden="true" /> Active</Badge>
             <Badge tone={session.status === "played" ? "neutral" : "info"}>{session.status === "played" ? "Played" : "Planned"}</Badge>
             {session.realDate && <span className="codex-entry-when">{session.realDate}</span>}
-            {session.revealedToPlayers ? <Badge tone="info">Recap shown to players</Badge> : <Badge>Recap hidden from players</Badge>}
+            {/* The SHARED badge, not a second wording of the same fact. Every list in the Codex states a
+                record's visibility as success + eye / neutral + eye-off; this panel stated it as a
+                bare `tone="info"` with no icon, so the identical fact read two ways depending on which
+                surface the GM happened to be on (intake A6). */}
+            <VisibilityBadge revealed={session.revealedToPlayers} />
           </div>
           {session.attendees.length > 0 && <p className="codex-console-attendees">Playing: {session.attendees.join(", ")}</p>}
 

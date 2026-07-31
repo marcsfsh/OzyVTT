@@ -961,17 +961,30 @@ export function StyleGuide() {
               <Badge tone="primary" solid>LIVE</Badge>
               <Badge tone="danger" solid>3</Badge>
             </div>
-            <h3 className="sg-h3">tone=&quot;violet&quot; — GM-only, and nothing else, ever</h3>
+            <h3 className="sg-h3">tone=&quot;violet&quot; — GM-only CONTENT, and nothing else, ever</h3>
             <div className="sg-row">
               <Badge tone="violet">GM only</Badge>
-              <Badge tone="violet" title="Hidden from players until you show it">Hidden from players</Badge>
+              <Badge tone="violet" title="Only you can read this layer">GM notes</Badge>
             </div>
             <p className="sg-muted">
-              Violet is the one hue in this system with a single fixed meaning: “the players cannot see this.”
+              Violet marks the <strong>content axis</strong>: a layer of a record that exists for the GM and is
+              never projected to a player at all — a page's GM body, a quest's real ending, a session's prep.
               It is not a seventh decorative tone and must not be reached for because a status needs a colour
               nothing else is using — pick neutral. The second badge also shows the <code>title</code> prop,
               which is for the abbreviated badge whose full sentence will not fit; it is a supplement to a
               label that already reads correctly, never a replacement for one.
+            </p>
+            <h3 className="sg-h3">Record visibility — never violet</h3>
+            <div className="sg-row">
+              <Badge tone="success">Shown to players</Badge>
+              <Badge tone="neutral">Hidden from players</Badge>
+            </div>
+            <p className="sg-muted">
+              The <strong>record axis</strong> is a different question: whether a whole record has been shared
+              yet. These two axes collided once and were deliberately separated (see <code>SecretMarkers.tsx</code>),
+              so “Hidden from players” is <em>neutral with an eye-off icon</em> and never violet — a hidden page
+              is one switch away from being shared, while a GM body never will be. Use <code>VisibilityBadge</code>
+              rather than hand-rolling the pair.
             </p>
             <h3 className="sg-h3">Avatars</h3>
             <div className="sg-row sg-row-baseline">

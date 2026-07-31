@@ -1,7 +1,7 @@
 import { Skeleton } from "@vtt/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
-import { iconChildren } from "./icons";
+import { iconChildren, pinSwatchVar } from "./icons";
 
 /** The minimal marker shape the surface renders - satisfied by both the GM marker and the player projection. */
 export type SurfaceMarker = Readonly<{ id: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; revealedToPlayers?: boolean; isParty?: boolean }>;
@@ -200,7 +200,13 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
                   colour, and behind the glyph so it never obscures it. It is decoration — the words
                   below are what actually say this is the party. */}
               {marker.isParty && <circle className="codex-marker-partyring" r={s * 0.72} />}
-              <g transform={`translate(${-s / 2} ${-s / 2}) scale(${s / 24})`} style={{ color: marker.iconColor }}>
+              {/* `pinSwatchVar`, not the raw stored hex. The picker swatch, the inspector's header glyph
+                  and the player's pin sheet all resolve an on-palette colour through its token, and the
+                  light theme darkens those tokens for contrast — so a pin stored as #FF2E9A painted
+                  #C81D80 in the panel and #FF2E9A on the map beside it, and the swatch advertised a
+                  colour the map would never use. An off-palette hex falls through unchanged, so pins
+                  stored before the palette existed are untouched. */}
+              <g transform={`translate(${-s / 2} ${-s / 2}) scale(${s / 24})`} style={{ color: pinSwatchVar(marker.iconColor) }}>
                 <circle cx={12} cy={12} r={11.5} className="codex-marker-bg" />
                 <g className="codex-marker-ico">{iconChildren(marker.iconId)}</g>
               </g>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Checklist, Chip, Drawer, IconButton, Input, Kbd, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Chip, Drawer, IconButton, IconChevron, Input, Kbd, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import {
   formatWorldDate, playerCodexApi,
@@ -283,7 +283,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                 </nav>
               </aside>
               <section className="codex-main">
-                {recordId && <Button variant="ghost" size="sm" className="codex-back" onClick={() => go(pathForSection("pages"))}>‹ All pages</Button>}
+                {recordId && <Button variant="ghost" size="sm" className="codex-back" onClick={() => go(pathForSection("pages"))}><IconChevron className="codex-chevron-left" aria-hidden="true" />All pages</Button>}
                 {page
                   ? <article className="codex-reader">
                       {page.bannerAssetId && <CodexImage assetId={page.bannerAssetId} token={token} alt="" className="codex-banner-img" />}
@@ -328,7 +328,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
               )}
               <nav className="codex-breadcrumb" aria-label="Map path">
                 {breadcrumb.length === 0 && <span className="codex-crumb is-current">Atlas</span>}
-                {breadcrumb.map((map, index) => <span key={map.id}>{index > 0 && <span className="codex-crumb-sep">›</span>}<button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => go(atlasPath(map.id))}>{map.name}</button></span>)}
+                {breadcrumb.map((map, index) => <span key={map.id}>{index > 0 && <span className="codex-crumb-sep" aria-hidden="true">›</span>}<button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => go(atlasPath(map.id))}>{map.name}</button></span>)}
               </nav>
               {childMaps.length > 0 && (
                 <nav className="codex-atlas-descend" aria-label="Maps within this one">
@@ -440,7 +440,7 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
         </nav>
       </aside>
       <section className="codex-main">
-        {open && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpen(null)}>‹ All sessions</Button>}
+        {open && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpen(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All sessions</Button>}
         {open
           ? <article className="codex-reader">
               <h2 className="codex-reader-title">{sessionTitle(open)}</h2>
@@ -479,7 +479,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
         </nav>
       </aside>
       <section className="codex-main">
-        {open && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpen(null)}>‹ All quests</Button>}
+        {open && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpen(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All quests</Button>}
         {open
           ? <article className="codex-reader">
               <h2 className="codex-reader-title"><CodexIcon iconId="quest" className="codex-reader-titleicon codex-quest-rowglyph" />{open.title}</h2>

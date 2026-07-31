@@ -37,8 +37,16 @@ export type DowntimeViewProps = Readonly<{
 type DowntimeRow = Readonly<{ record: CodexChronicleRecord; payload: CodexDowntimePayload }>;
 
 export function DowntimeView({ gmToken, records, calendar, pages, loading, error, onChanged, onOpenEntry, onOpenPage }: DowntimeViewProps) {
-  const [who, setWho] = useState("");
-  const [whoPageId, setWhoPageId] = useState<string | null>(null);
+  /**
+   * ONE control, one state. "Who" used to be two text boxes bound to the same `who`: a Combobox that
+   * rendered while `who` was empty and a bare Input beside it that was always there. Typing a free-text
+   * name into the lower one made `who` truthy, which swapped the Combobox above it for a THIRD input
+   * carrying the same value — two boxes with identical text, one labelled "Who" and one "Or type a
+   * name", focus in the second, on the first control of D12's flagship surface. The Combobox's own
+   * `allowFreeText` mode exists for exactly this field (the styleguide names it), so it holds either a
+   * character page's id or the raw text, and the two are told apart by looking it up.
+   */
+  const [whoValue, setWhoValue] = useState<string | null>(null);
   const [activity, setActivity] = useState("");
   const [days, setDays] = useState(7);
   const [note, setNote] = useState("");
@@ -61,6 +69,9 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
     [pages]
   );
   const pageTitle = (id: string | null) => (id ? pages.find((page) => page.id === id)?.title ?? null : null);
+  /** A value that names a character page is a link; anything else is the free-text name the GM typed. */
+  const whoPageId = whoValue && characterOptions.some((option) => option.id === whoValue) ? whoValue : null;
+  const who = whoPageId ? "" : whoValue ?? "";
 
   /** Totals by person. `characterPageId` wins, so a linked row totals with its page whatever `who` says. */
   const totals = useMemo(() => {
@@ -90,7 +101,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
         },
         commandId: newId()
       });
-      setWho(""); setWhoPageId(null); setActivity(""); setNote("");
+      setWhoValue(null); setActivity(""); setNote("");
       onChanged();
     } catch (logError) { setFormError(logError instanceof Error ? logError.message : "Couldn't log that downtime."); }
     finally { setBusy(false); }
@@ -130,13 +141,11 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
         {/* The SAME write the Journal composer uses — one write path, two doors. */}
         <div className="codex-downtime-form">
           <Field label="Who" htmlFor="codex-downtime-who" help="Pick a character page, or type a name.">
-            {characterOptions.length > 0 && !who
-              ? <Combobox options={characterOptions} value={whoPageId} onChange={setWhoPageId} ariaLabel="Who spent the time" placeholder="Search characters…" />
-              : <Input id="codex-downtime-who" value={who} placeholder="Vex, the party…" onChange={(event) => setWho(event.target.value)} />}
+            {characterOptions.length > 0
+              ? <Combobox id="codex-downtime-who" options={characterOptions} value={whoValue} onChange={setWhoValue} allowFreeText
+                  ariaLabel="Who spent the time" placeholder="Search characters, or type a name…" />
+              : <Input id="codex-downtime-who" value={who} placeholder="Vex, the party…" onChange={(event) => setWhoValue(event.target.value || null)} />}
           </Field>
-          {characterOptions.length > 0 && !whoPageId && (
-            <Input aria-label="Or type a name" value={who} placeholder="…or type a name" onChange={(event) => setWho(event.target.value)} />
-          )}
           <Field label="Activity" htmlFor="codex-downtime-activity"><Input id="codex-downtime-activity" value={activity} placeholder="Forging a blade" onChange={(event) => setActivity(event.target.value)} /></Field>
           <Field label="Days" htmlFor="codex-downtime-days"><NumberField id="codex-downtime-days" aria-label="Days" value={days} min={0} max={3650} onChange={(next) => setDays(next ?? 0)} /></Field>
           <Field label="Note" htmlFor="codex-downtime-note" className="codex-field-wide"><Textarea id="codex-downtime-note" value={note} placeholder="What came of it…" onChange={(event) => setNote(event.target.value)} /></Field>
@@ -244,6 +253,9 @@ export function PlayerDowntimeView({ records, pages, onOpenEntry, onOpenPage }: 
     [records]
   );
   const pageTitle = (id: string | null) => (id ? pages.find((page) => page.id === id)?.title ?? null : null);
+  /** A value that names a character page is a link; anything else is the free-text name the GM typed. */
+  const whoPageId = whoValue && characterOptions.some((option) => option.id === whoValue) ? whoValue : null;
+  const who = whoPageId ? "" : whoValue ?? "";
   const totals = useMemo(() => {
     const map = new Map<string, { key: string; name: string; pageId: string | null; days: number; last: string | null }>();
     for (const { record, payload } of rows) {

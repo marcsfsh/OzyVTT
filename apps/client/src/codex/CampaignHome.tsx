@@ -46,7 +46,7 @@ export type CampaignMap = Readonly<{ id: string; name: string; revealedToPlayers
  * knows whether its own token was sent an active-session pointer. "Next session" / "This session" /
  * "Last session" — never "Next" about a game already played.
  */
-export type CampaignSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string; heading?: string }>;
+export type CampaignSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string; heading?: string; revealed?: boolean }>;
 /**
  * The quest card's shape — a strict subset of the player projection, which is itself a strict subset of
  * the GM row. **No `gmBody` field and no `body` either**: the type not having them is the guarantee.
@@ -59,12 +59,12 @@ export type CampaignDeadline = Readonly<{ id: string; summary: string; when: str
  * no field on the player's, so a player caller cannot produce this list at all, and the card simply
  * never renders for them.
  */
-export type CampaignDowntime = Readonly<{ id: string; who: string; activity: string; days: number; when: string }>;
+export type CampaignDowntime = Readonly<{ id: string; who: string; activity: string; days: number; when: string; revealed?: boolean }>;
 /**
  * D15 — the party-location card. `null` covers both "no party pin" and, for a player, "the party pin is
  * hidden from you"; the server makes those deliberately indistinguishable, and so does this card.
  */
-export type CampaignParty = Readonly<{ label: string | null; mapId: string; mapName: string; markerId: string }>;
+export type CampaignParty = Readonly<{ label: string | null; mapId: string; mapName: string; markerId: string; revealed?: boolean }>;
 /** Where the party stands with one faction. **No `revealedToPlayers`** on the shared shape. */
 export type CampaignStanding = Readonly<{ factionPageId: string; name: string; value: number; revealed?: boolean }>;
 
@@ -172,11 +172,17 @@ export function CampaignHome({
                 ? <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenSession(session.id)}>
                     <CodexIcon iconId="sessions" className="codex-ent-icon codex-campaign-recentglyph" />
                     <span className="codex-list-title">{sessionTitle(session)}</span>
+                    {/* D18: every dashboard row that names a RECORD states its reveal state. Six of the
+                        nine did; the session, the party pin and downtime did not, so the GM could not
+                        tell from Home whether tonight's recap was already published. The capability-flag
+                        pattern the other rows use: a player caller simply omits the field. */}
+                    {showReveal && session.revealed !== undefined && <VisibilityBadge revealed={session.revealed} />}
                     {session.realDate && <span className="codex-campaign-recentwhen">{session.realDate}</span>}
                   </button>
                 : <div className="codex-campaign-sessionrow">
                     <CodexIcon iconId="sessions" className="codex-ent-icon codex-campaign-recentglyph" />
                     <span className="codex-list-title">{sessionTitle(session)}</span>
+                    {showReveal && session.revealed !== undefined && <VisibilityBadge revealed={session.revealed} />}
                     {session.realDate && <span className="codex-campaign-recentwhen">{session.realDate}</span>}
                   </div>}
             </nav>
@@ -188,6 +194,9 @@ export function CampaignHome({
         {party && (
           <DashCard title="Party location" iconId="pin">
             <p className="codex-campaign-partyline">The party is at <strong>{party.label?.trim() || "an unlabelled pin"}</strong> on <strong>{party.mapName}</strong>.</p>
+            {/* The PIN's own state. The map gates it as well, which is why this says nothing about the
+                map — "Show the pin" opens the Atlas, where both switches live together. */}
+            {showReveal && party.revealed !== undefined && <p className="codex-campaign-partyreveal"><VisibilityBadge revealed={party.revealed} /></p>}
             {onOpenParty && <Button variant="secondary" size="sm" onClick={() => onOpenParty(party.mapId, party.markerId)}>Show the pin</Button>}
           </DashCard>
         )}
@@ -259,6 +268,7 @@ export function CampaignHome({
                   <button key={row.id} type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(row.id)}>
                     <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
                     <span className="codex-list-title">{row.who || "Someone"} — {row.days} {row.days === 1 ? "day" : "days"}{row.activity ? `: ${row.activity}` : ""}</span>
+                    {showReveal && row.revealed !== undefined && <VisibilityBadge revealed={row.revealed} />}
                     {row.when && <span className="codex-campaign-recentwhen">{row.when}</span>}
                   </button>
                 ))}

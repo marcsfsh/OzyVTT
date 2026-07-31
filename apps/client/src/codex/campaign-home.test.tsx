@@ -162,14 +162,17 @@ const playerDefaults = () => {
   getCalendar.mockResolvedValue(CALENDAR);
 };
 
-describe("The mode is called Campaign — everywhere (CI-7)", () => {
+describe("Home is the section name, and 'World' is not a destination (CI-7 / D1)", () => {
   it("on the GM mode bar, and 'World' is gone from it", async () => {
     gmDefaults();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "World" })).not.toBeInTheDocument();
+    // Queried as a BUTTON inside the sidebar, not as a `role="tab"`: D1 deleted the tab bar outright,
+    // so `queryByRole("tab")` matches nothing in this app whatever the label is — the assertion could
+    // never have failed. "World" is now a group EYEBROW in the nav, which is not a destination.
+    expect(within(screen.getByRole("navigation", { name: "Codex sections" })).queryByRole("button", { name: "World" })).not.toBeInTheDocument();
   });
 
   it("on the PLAYER mode bar too — the split the plan warned about is between these two", async () => {
@@ -178,7 +181,7 @@ describe("The mode is called Campaign — everywhere (CI-7)", () => {
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
 
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "World" })).not.toBeInTheDocument();
+    expect(within(screen.getAllByRole("navigation", { name: "Codex sections" })[0]).queryByRole("button", { name: "World" })).not.toBeInTheDocument();
     // And it is where a player LANDS (CI-7: "both GM and players land here").
     expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
   });
@@ -358,16 +361,32 @@ describe("A record with a card of its own does not also sit in the feed (owner d
     expect(feed.getByText("The party crossed the mists.")).toBeInTheDocument();
   });
 
-  it("keeps downtime and milestones IN the feed — the dashboard has no card for either", async () => {
+  it("keeps milestones IN the feed — the dashboard has no card for them", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await openCampaign(user);
 
     const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
-    expect(feed.getByText("A quiet tenday.")).toBeInTheDocument();
     // A milestone carries its meaning in its PAYLOAD, not its prose, so the row reads through the shared
     // summary rule rather than through an empty `text`.
     expect(feed.getByText(/Reached level 5/)).toBeInTheDocument();
+  });
+
+  /**
+   * Downtime is the case the rule was written before: `applied: false` gives it a card of its own with
+   * the Confirm affordance on it, so leaving it in the feed rendered one record twice on one dashboard.
+   * De-duplicated by ID rather than by kind, because `DASHBOARD_CARDED_KINDS` is shared with the player,
+   * who has no such card and should still read downtime on their timeline.
+   */
+  it("moves UNCONFIRMED downtime out of the feed and into the card that can act on it", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await openCampaign(user);
+
+    const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
+    expect(feed.queryByText("A quiet tenday.")).not.toBeInTheDocument();
+    // Still on the screen — the half that makes this a de-duplication rather than a deletion.
+    expect(within(screen.getByRole("navigation", { name: "Downtime pending" })).getByText(/Aldric/)).toBeInTheDocument();
   });
 });
 
