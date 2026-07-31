@@ -32,7 +32,7 @@ const renderInspector = (markerRevealed: boolean, mapRevealed: boolean, onReveal
   render(
     <MarkerInspector
       gmToken="gm" marker={MARKER(markerRevealed)} maps={[MAP(mapRevealed)]} pages={[]} scenes={[]} actors={[]}
-      activeSceneId={null} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
+      activeSceneId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
       onCreatePage={vi.fn()} onRevealPage={vi.fn()} onRevealMap={onRevealMap} onActivateScene={vi.fn()}
       onOpenReplay={vi.fn()} onClose={vi.fn()}
     />

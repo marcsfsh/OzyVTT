@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import {
-  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, navigate, pathForGmTab,
+  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, lastLocationForTab, navigate, pathForGmTab,
   popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, useRoute, withQuery
 } from "./router";
 import { codexSectionOf } from "./codex/routes";
@@ -354,5 +354,53 @@ describe("Resume-last-location (D2)", () => {
   it("never resumes to `/`, which would be a loop", () => {
     rememberLocation("gm", "/");
     expect(resumeTarget("gm", "/")).toBe("/encounter");
+  });
+
+  /**
+   * **The half of D2 that the dominant case actually needs.**
+   *
+   * "The Codex reopens exactly where the GM last was (section + selected record)" was implemented only
+   * for a cold sign-in landing on `/`. Every in-app return navigated to the bare tab head, so a GM
+   * editing a page who tapped Encounter to check initiative and tapped Codex again landed on the
+   * dashboard with nothing selected — the exact round trip intake 04 named as the cost of having no
+   * router at all. Remembering per TAB is what makes the tab bar honour the decision.
+   */
+  describe("per tab", () => {
+    it("returns to the record that was open in that tab, not to the tab's front door", () => {
+      rememberLocation("gm", "/codex/pages/p1?tag=x");
+      rememberLocation("gm", "/encounter");
+      expect(lastLocationForTab("gm", "codex")).toBe("/codex/pages/p1?tag=x");
+      expect(lastLocationForTab("gm", "encounter")).toBe("/encounter");
+    });
+
+    it("keeps the tabs apart — leaving one does not overwrite where you were in another", () => {
+      rememberLocation("gm", "/codex/quests/q1");
+      rememberLocation("gm", "/scenes?view=maps");
+      expect(lastLocationForTab("gm", "codex")).toBe("/codex/quests/q1");
+      expect(lastLocationForTab("gm", "scenes")).toBe("/scenes?view=maps");
+    });
+
+    it("has nothing to say about a tab never visited", () => {
+      expect(lastLocationForTab("gm", "homebrew")).toBeNull();
+    });
+
+    it("refuses an address that no longer exists, so a deleted record cannot strand a tab", () => {
+      rememberLocation("gm", "/codex/notebook");
+      expect(lastLocationForTab("gm", "codex")).toBeNull();
+    });
+
+    it("never returns a GM-only address to a player, the same rule resume follows", () => {
+      rememberLocation("player", "/codex/audit");
+      expect(lastLocationForTab("player", "codex")).toBeNull();
+      rememberLocation("player", "/codex/journal?entry=e1");
+      expect(lastLocationForTab("player", "codex")).toBe("/codex/journal?entry=e1");
+    });
+
+    it("keeps the GM's and the player's per-tab memory apart", () => {
+      rememberLocation("gm", "/codex/settings");
+      rememberLocation("player", "/codex/quests/q9");
+      expect(lastLocationForTab("gm", "codex")).toBe("/codex/settings");
+      expect(lastLocationForTab("player", "codex")).toBe("/codex/quests/q9");
+    });
   });
 });

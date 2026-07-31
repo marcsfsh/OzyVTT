@@ -18,6 +18,7 @@ const listAssets = vi.fn();
 const listMarkers = vi.fn();
 const updateMap = vi.fn();
 const updateMarker = vi.fn();
+const revealMarker = vi.fn();
 const forMarker = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
@@ -40,7 +41,8 @@ vi.mock("./api", async (importOriginal) => {
       listAssets: (...a: unknown[]) => listAssets(...a),
       listMarkers: (...a: unknown[]) => listMarkers(...a),
       updateMap: (...a: unknown[]) => updateMap(...a),
-      updateMarker: (...a: unknown[]) => updateMarker(...a)
+      updateMarker: (...a: unknown[]) => updateMarker(...a),
+      revealMarker: (...a: unknown[]) => revealMarker(...a)
     }
   };
 });
@@ -152,7 +154,7 @@ describe("Marker tags (CI-2)", () => {
     return render(
       <MarkerInspector
         gmToken="gm" marker={marker} maps={[MAP()]} pages={[]} scenes={[]} actors={[]}
-        activeSceneId={null} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
+        activeSceneId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
         onCreatePage={vi.fn()} onRevealPage={vi.fn()} onActivateScene={vi.fn()} onClose={vi.fn()}
       />
     );
@@ -172,8 +174,62 @@ describe("Marker tags (CI-2)", () => {
 
     await user.type(screen.getByLabelText("Tags"), "Old Mill{Enter}");
 
-    await waitFor(() => expect(updateMarker).toHaveBeenCalled());
-    expect(updateMarker).toHaveBeenCalledWith("gm", "k1", { tags: ["dungeon", "old-mill"] });
+    // D6: the pin's typed fields ride the shared autosave hook now, so the write lands after the
+    // interval rather than on the keystroke, and it carries the label alongside the tags — one write
+    // for the pair, the same shape every other editor in the Codex sends.
+    await waitFor(() => expect(updateMarker).toHaveBeenCalled(), { timeout: 4_000 });
+    expect(updateMarker).toHaveBeenCalledWith("gm", "k1", { label: "Old Svalich Road", tags: ["dungeon", "old-mill"] });
+  });
+
+  /**
+   * D6 — the arm the pin inspector never had.
+   *
+   * It wrote through on every control in BOTH modes, so a GM who turned autosave off was told, in the
+   * very panel where they turned it off, that "editors show a Save button and warn you before you leave
+   * with unsaved changes" — and then got the one editor that did the opposite. plan-frontend row 335
+   * specified the missing arm verbatim: "off = controls edit a local draft + Save/dirty-guard".
+   */
+  describe("with autosave OFF", () => {
+    const renderOff = (marker: CodexMarker) => {
+      forMarker.mockResolvedValue([]);
+      return render(
+        <MarkerInspector
+          gmToken="gm" marker={marker} maps={[MAP()]} pages={[]} scenes={[]} actors={[]}
+          activeSceneId={null} autosave={{ enabled: false, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()}
+          onOpenMap={vi.fn()} onOpenPage={vi.fn()} onCreatePage={vi.fn()} onRevealPage={vi.fn()}
+          onActivateScene={vi.fn()} onClose={vi.fn()}
+        />
+      );
+    };
+
+    it("holds a typed label as a draft, says it is unsaved, and writes only on Save", async () => {
+      updateMarker.mockResolvedValue(MARKER());
+      renderOff(MARKER({ tags: [] }));
+      const user = userEvent.setup();
+
+      await user.clear(screen.getByLabelText("Label"));
+      await user.type(screen.getByLabelText("Label"), "Tser Pool");
+      // Nothing has gone to the server, and the panel says so rather than resting on "Saved".
+      expect(updateMarker).not.toHaveBeenCalled();
+      expect(await screen.findByText(/Unsaved changes/i)).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Save pin" }));
+      await waitFor(() => expect(updateMarker).toHaveBeenCalledWith("gm", "k1", { label: "Tser Pool", tags: [] }));
+    });
+
+    it("offers no Save button while there is nothing to save", () => {
+      renderOff(MARKER({ tags: [] }));
+      expect(screen.getByRole("button", { name: "Save pin" })).toBeDisabled();
+    });
+
+    it("keeps the discrete pickers immediate — choosing is an act, not an edit in progress", async () => {
+      // D6's own recorded scope call, and the reason this change is scoped to the two typed fields.
+      revealMarker.mockResolvedValue(MARKER());
+      renderOff(MARKER({ tags: [] }));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("switch", { name: "Show this pin to players" }));
+      await waitFor(() => expect(revealMarker).toHaveBeenCalled());
+    });
   });
 });
 

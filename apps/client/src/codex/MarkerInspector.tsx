@@ -1,5 +1,6 @@
-import { Alert, Badge, Button, Combobox, Field, IconButton, IconPlay, IconPlus, IconX, Input, Select, Switch, TagInput } from "@vtt/ui";
-import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
+import { Alert, Badge, Button, Combobox, Field, IconButton, IconPlay, IconPlus, IconX, Input, SaveState, Select, Switch, TagInput } from "@vtt/ui";
+import { atlasApi, journalApi, type CodexAutosaveSettings, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
+import { useCodexAutosave } from "./autosave";
 import { CodexIcon, IconPicker, EntityIcon, pinSwatchVar } from "./icons";
 
 import { RevealSwitch, HiddenFromPlayers } from "./SecretMarkers";
@@ -19,6 +20,8 @@ type MarkerInspectorProps = Readonly<{
   gmToken: string;
   marker: CodexMarker;
   pages: readonly CodexPageSummary[];
+  /** D6's setting, handed down by the shell like every other editor gets it. */
+  autosave: CodexAutosaveSettings;
   maps: readonly CodexMap[];
   scenes: readonly MarkerScene[];
   actors: readonly MarkerActor[];
@@ -43,9 +46,10 @@ type MarkerInspectorProps = Readonly<{
   onClose: () => void;
 }>;
 
-export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onPartyChanged = () => {}, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onRevealMap, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
+export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, autosave, onUpdated, onDeleted, onPartyChanged = () => {}, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onRevealMap, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [label, setLabel] = useState(marker.label ?? "");
+  const [tags, setTags] = useState<readonly string[]>(marker.tags);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // This pin's campaign history — including the battles the combat bridge auto-logs here. Mirrors
@@ -61,6 +65,24 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
     catch { setError("That change didn't save - try again."); }
     finally { setBusy(false); }
   };
+  /**
+   * D6, the arm this panel never had. The inspector wrote through on every control in BOTH modes, so a
+   * GM who turned autosave off — and was told in that very panel that "editors show a Save button and
+   * warn you before you leave with unsaved changes" — got the one editor that behaved the opposite way.
+   *
+   * Scoped to the two fields a GM TYPES. The pickers below (link a page, choose a sub-map, a scene, an
+   * actor, the icon, the colour) stay immediate in both modes, which is D6's own recorded scope call:
+   * choosing from a list is a discrete act, not an edit in progress, exactly like the reveal switch and
+   * the party toggle. Known gap, recorded in `known-bugs.md`: selecting a DIFFERENT pin rewrites the
+   * query rather than navigating, so it does not pass the router guard — an unsaved label is lost that
+   * way, and the Save button and the "Unsaved changes" readout are what stand between the GM and it.
+   */
+  const draft = useMemo(() => ({ label: label.trim(), tags }), [label, tags]);
+  const saveDetails = useCallback(async (next: { label: string; tags: readonly string[] }) => {
+    onUpdated(await atlasApi.updateMarker(gmToken, marker.id, { label: next.label || null, tags: [...next.tags] }));
+  }, [gmToken, marker.id, onUpdated]);
+  const details = useCodexAutosave({ settings: autosave, draft, save: saveDetails });
+
   const reveal = async (revealed: boolean) => {
     setError(null);
     try { onUpdated(await atlasApi.revealMarker(gmToken, marker.id, revealed)); }
@@ -117,15 +139,15 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
 
       <Field label="Label" htmlFor="marker-label">
         <Input id="marker-label" value={label} placeholder="Unnamed" disabled={busy}
-          onChange={(event) => setLabel(event.target.value)} onBlur={() => label !== (marker.label ?? "") && patch({ label: label.trim() || null })} />
+          onChange={(event) => setLabel(event.target.value)} />
       </Field>
 
-      {/* Sits with Label because both describe the pin itself, above the link wiring. Each committed tag
-          saves straight away, like the icon/colour/link controls here — the inspector has no Save button,
-          so a staged tag list would be the one thing in this panel that could be lost by closing it. */}
+      {/* Sits with Label because both describe the pin itself, above the link wiring. Both ride the
+          shared autosave hook: with it on they save shortly after the last edit, with it off they wait
+          for the Save button below and say so until it is pressed. */}
       <Field label="Tags" htmlFor="marker-tags">
-        <TagInput id="marker-tags" ariaLabel="Tags" placeholder="dungeon, shop" values={marker.tags}
-          onChange={(next) => patch({ tags: next })}
+        <TagInput id="marker-tags" ariaLabel="Tags" placeholder="dungeon, shop" values={tags}
+          onChange={setTags}
           max={24} maxReachedReason="A pin may carry at most 24 tags."
           suggestions={tagSuggestions}
           /* DEFAULT slugify — it is the server's own contract (`tags()` throws on a non-slug rather
@@ -246,7 +268,11 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
         <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
       </details>
 
-      <div className="codex-inspector-foot"><Button variant="ghost" size="sm" onClick={remove}>Delete pin</Button></div>
+      <div className="codex-inspector-foot">
+        <SaveState status={details.status} />
+        {!autosave.enabled && <Button variant="secondary" size="sm" disabled={!details.dirty} onClick={() => void details.flush()}>Save pin</Button>}
+        <Button variant="ghost" size="sm" onClick={remove}>Delete pin</Button>
+      </div>
       {confirmDialog}
     </aside>
   );

@@ -282,13 +282,49 @@ export function isKnownPath(path: string): boolean {
 const GM_LOCATION_KEY = "vtt.gm-last-location";
 const PLAYER_LOCATION_KEY = "vtt.player-last-location";
 
+/** The head segment an address belongs to — the tab, in the app shell's terms. `/` belongs to none. */
+function headOf(path: string): string | null {
+  return path.split("/").filter(Boolean)[0] ?? null;
+}
+
 /** The same try/catch discipline every `codex-*` key already uses: private mode throws on read AND write. */
 export function rememberLocation(role: "gm" | "player", href: string): void {
-  try { localStorage.setItem(role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY, href); } catch { /* private mode - fine */ }
+  try {
+    localStorage.setItem(role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY, href);
+    /**
+     * D2 also remembers PER TAB, which is what makes the decision worth anything in the dominant case.
+     *
+     * "The Codex reopens exactly where the GM last was" was implemented only for a cold sign-in landing
+     * on `/`. Every in-app return — the GM tab bar, the player's Table/Codex switcher — navigated to the
+     * bare section head, so a GM editing a page who tapped Encounter to check initiative and tapped
+     * Codex again landed on the dashboard with nothing selected. Intake 04 named that exact round trip
+     * as the cost of having no router; after the recut it cost the same two taps.
+     */
+    const head = headOf(href.split("?")[0] ?? "");
+    if (head) localStorage.setItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`, href);
+  } catch { /* private mode - fine */ }
 }
 
 export function lastLocation(role: "gm" | "player"): string | null {
   try { return localStorage.getItem(role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY); } catch { return null; }
+}
+
+/**
+ * Where this role last was INSIDE a tab, or null to fall back to the tab's own address.
+ *
+ * Validated exactly as `resumeTarget` validates its stored address, and for the same reasons: a stored
+ * `/codex/pages/<deleted>` must not strand anyone, and a player must never be sent to a GM-only address
+ * by a mechanism they cannot see.
+ */
+export function lastLocationForTab(role: "gm" | "player", head: string): string | null {
+  let stored: string | null = null;
+  try { stored = localStorage.getItem(`${role === "gm" ? GM_LOCATION_KEY : PLAYER_LOCATION_KEY}.${head}`); } catch { return null; }
+  if (!stored) return null;
+  const path = stored.split("?")[0] ?? "";
+  if (headOf(path) !== head) return null;
+  if (!isKnownPath(path)) return null;
+  if (role === "player" && isGmOnlyPath(path)) return null;
+  return stored;
 }
 
 /**

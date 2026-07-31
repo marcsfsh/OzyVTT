@@ -24,7 +24,7 @@ import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
 import { SceneBuilder } from "./scenes/SceneBuilder";
 import { EncounterMap } from "./scene/EncounterMap";
 import { socket } from "./socket";
-import { currentHref, gmTabForPath, isGmOnlyPath, isKnownPath, navigate, pathForGmTab, rememberLocation, resumeTarget, useRoute, type GmTab } from "./router";
+import { currentHref, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocationForTab, navigate, pathForGmTab, rememberLocation, resumeTarget, useRoute, type GmTab } from "./router";
 import { NotFoundView } from "./components/NotFoundView";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
@@ -69,7 +69,12 @@ function App() {
    * resolves through the table below, and an unknown one renders the not-found view.
    */
   const gmTab: GmTab = gmTabForPath(route.path) ?? "table";
-  const setGmTab = (next: GmTab) => navigate(pathForGmTab(next));
+  /**
+   * D2: a tab returns you to where you WERE in it, not to its front door. Re-tapping the tab you are
+   * already on is the deliberate exception — that gesture means "take me to the top of this tab".
+   */
+  const setGmTab = (next: GmTab) =>
+    navigate(next === gmTab ? pathForGmTab(next) : lastLocationForTab("gm", pathForGmTab(next).slice(1)) ?? pathForGmTab(next));
   /** D4: the player's two views. Every address that is not the Codex is the table. */
   const playerView: "table" | "codex" = route.segments[0] === "codex" ? "codex" : "table";
   /** The player is READING the Codex, so the table's own furniture above it is not what they asked for. */
@@ -396,7 +401,12 @@ function App() {
           { id: "codex", label: <>Codex{recapBadge.unread > 0 && <> <Badge tone="info" solid>{recapBadge.unread} new</Badge></>}</> }
         ]}
         activeId={playerView}
-        onChange={(id) => { if (id === "codex") recapBadge.markSeen(); navigate(id === "codex" ? "/codex" : "/table"); }}
+        /* Same rule for the player's two views: the Codex reopens on the page they were reading. */
+        onChange={(id) => {
+          if (id === "codex") recapBadge.markSeen();
+          if (id === playerView) { navigate(id === "codex" ? "/codex" : "/table"); return; }
+          navigate(id === "codex" ? lastLocationForTab("player", "codex") ?? "/codex" : "/table");
+        }}
       />}
       {mode === "player" && playerView === "codex" && mapToken && <div className="anim-view codex-anim"><PlayerCodex token={mapToken} /></div>}
       {/* A player on a GM-only or unknown address: the not-found view, indistinguishable from each other

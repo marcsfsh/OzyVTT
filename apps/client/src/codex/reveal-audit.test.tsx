@@ -84,6 +84,24 @@ const AUDIT: CodexRevealAudit = answer([
     section("standing", [{ id: "f1", title: "The Zhentarim" }], 2)
 ]);
 
+/**
+ * D23's coupling, with the ids that make it REACHABLE.
+ *
+ * The main fixture addresses pages as "p1" and standing by its faction page as "f1", so
+ * `standingFactionIds.has(row.id)` is false on every page row in every test — the guard, the modal and
+ * the whole second half of D23 were dead code under test, and deleting them kept the suite green. A
+ * standing row IS a faction page row: same id, two sections. This fixture says so.
+ */
+const COUPLED: CodexRevealAudit = answer([
+  section("page", [{ id: "f1", title: "The Zhentarim" }, { id: "p1", title: "Strahd" }], 12),
+  section("map", [], 3),
+  section("marker", [], 8),
+  section("journal", [], 40),
+  section("session", [], 4),
+  section("quest", [], 5),
+  section("standing", [{ id: "f1", title: "The Zhentarim" }], 2)
+]);
+
 const renderAudit = async (audit: unknown = AUDIT) => {
   getAudit.mockResolvedValue(audit);
   render(<RevealAudit gmToken="gm" />);
@@ -135,6 +153,62 @@ describe("The audit lists every Codex record type (CT-9)", () => {
  * reads by icon and label, and a title with "Deadline: " glued on could not be told from a GM who genuinely
  * began a note with that word.
  */
+describe("Hiding a faction page takes the standing with it (D23)", () => {
+  /**
+   * Losing this warning does not leak anything — it OVER-hides, which is the defect D23 was raised to
+   * fix: a GM hides a faction page and the party's standing with them silently vanishes from the
+   * players' view. The switch is one tap and the consequence is two records away.
+   */
+  it("asks first, and hides nothing while the question is open", async () => {
+    const user = userEvent.setup();
+    await renderAudit(COUPLED);
+
+    const pages = within(sectionOf("Pages"));
+    await user.click(pages.getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+
+    expect(await screen.findByRole("dialog", { name: "Hide this faction page" })).toBeInTheDocument();
+    expect(screen.getByText(/standing with them disappears/)).toBeInTheDocument();
+    // Nothing has happened yet — the warning is BEFORE the act, not an explanation after it.
+    expect(revealPage).not.toHaveBeenCalled();
+  });
+
+  it("Cancel leaves the page shown and calls no route", async () => {
+    const user = userEvent.setup();
+    await renderAudit(COUPLED);
+
+    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+    await screen.findByRole("dialog", { name: "Hide this faction page" });
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Hide this faction page" })).not.toBeInTheDocument());
+    expect(revealPage).not.toHaveBeenCalled();
+    expect(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" })).toBeChecked();
+  });
+
+  it("Hide page proceeds through the page's own reveal route", async () => {
+    const user = userEvent.setup();
+    revealPage.mockResolvedValue(undefined);
+    await renderAudit(COUPLED);
+
+    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+    await screen.findByRole("dialog", { name: "Hide this faction page" });
+    await user.click(screen.getByRole("button", { name: "Hide page" }));
+
+    await waitFor(() => expect(revealPage).toHaveBeenCalledWith("gm", "f1", false));
+  });
+
+  it("does not ask about a page that carries no standing", async () => {
+    // The control: without it, a guard that fired on every page row would pass all three tests above.
+    const user = userEvent.setup();
+    revealPage.mockResolvedValue(undefined);
+    await renderAudit(COUPLED);
+
+    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page Strahd to players" }));
+    await waitFor(() => expect(revealPage).toHaveBeenCalledWith("gm", "p1", false));
+    expect(screen.queryByRole("dialog", { name: "Hide this faction page" })).not.toBeInTheDocument();
+  });
+});
+
 describe("A chronicle row says which kind of record it is", () => {
   it("badges the kind, in the chronicle's own words, beside the record's own prose", async () => {
     await renderAudit(answer([

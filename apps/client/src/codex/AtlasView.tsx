@@ -45,7 +45,7 @@ function GmOnlyMark() {
   return <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM-only — players can't see this map yet"><IconEyeOff /></span>;
 }
 
-export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActivateScene, onOpenReplay, mapId, pinId, filter = "", tagFilter, autosave: _autosave, onQuickCreate, onNavigate, onReplaceQuery }: Readonly<{
+export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActivateScene, onOpenReplay, mapId, pinId, filter = "", tagFilter, autosave, onQuickCreate, onNavigate, onReplaceQuery }: Readonly<{
   gmToken: string;
   scenes: readonly AtlasScene[];
   actors?: readonly AtlasActor[];
@@ -389,7 +389,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop pins on towns and dungeons, link each to a page or a deeper map, and show them to players as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         <div ref={inspectorRef} />
-        {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
+        {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId} autosave={autosave}
           onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={(pageId) => onNavigate(`/codex/pages/${pageId}`)}
           onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onRevealMap={() => void revealMap(true)} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay}
           /* M12-C: setting the party clears whichever pin held it before — possibly on another map — so
