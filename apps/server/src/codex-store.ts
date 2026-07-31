@@ -1491,6 +1491,25 @@ export const MIGRATIONS = [{
 
     ALTER TABLE codex_meta ADD COLUMN links_backfilled INTEGER NOT NULL DEFAULT 0;
   `
+}, {
+  version: 23,
+  // D19: `commandId` idempotency receipts, so a codex write can be retried safely across a dropped
+  // connection instead of the caller having to guess whether it landed.
+  //
+  // `status` is a real column, not a derived one: a replay must reproduce a 201 as a 201, and inferring
+  // it from the body would be a second rule about the same answer. `body_json` is the SERIALIZED
+  // response, so a replay is byte-identical to the original rather than a re-render that could drift.
+  //
+  // Rows are pruned lazily on write, not by a background sweep: this is a LAN-scale single-GM codex with
+  // no scheduler, and a table nobody prunes is the shape `codex_page_revisions` already got wrong once.
+  sql: `
+    CREATE TABLE codex_command_receipts (
+      command_id TEXT PRIMARY KEY,
+      status     INTEGER NOT NULL,
+      body_json  TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    ) STRICT;
+  `
 }];
 
 /**
@@ -2529,6 +2548,35 @@ export class CodexStore {
   }
 
   close() { this.database?.close(); this.database = undefined; }
+
+  /**
+   * D19: the stored outcome of a `commandId`, or null.
+   *
+   * **Recorded AFTER the store call commits, never before**, and the crash window that leaves is stated
+   * honestly rather than hidden: a process that dies between the write committing and the receipt being
+   * written will re-execute ONE identical retry. That is a strictly better failure than the alternative -
+   * a receipt written first can record an outcome that never committed, and a replay would then report
+   * success for a write that did not happen. Re-executing once is recoverable; lying is not.
+   *
+   * Pruned lazily on write: a receipt older than seven days is answering a retry nobody is still making.
+   */
+  recallCommand(commandId: string): Readonly<{ status: number; body: unknown }> | null {
+    if (!ID.test(commandId)) return null;
+    const row = this.requireDatabase().prepare("SELECT status, body_json FROM codex_command_receipts WHERE command_id = ?").get(commandId) as { status: number; body_json: string } | undefined;
+    if (!row) return null;
+    try { return { status: row.status, body: JSON.parse(row.body_json) as unknown }; } catch { return null; }
+  }
+
+  recordCommand(commandId: string, status: number, responseBody: unknown): void {
+    if (!ID.test(commandId)) return;
+    const database = this.requireDatabase();
+    const cutoff = new Date(this.now() - 7 * 86_400_000).toISOString();
+    // NOT inside `this.transaction`: bumping the coarse revision here would invalidate every client's
+    // ETag for a write that already bumped it once, and a receipt is bookkeeping rather than content.
+    database.prepare("INSERT OR REPLACE INTO codex_command_receipts (command_id, status, body_json, created_at) VALUES (?, ?, ?, ?)")
+      .run(commandId, status, JSON.stringify(responseBody ?? null), this.stamp());
+    database.prepare("DELETE FROM codex_command_receipts WHERE created_at <= ?").run(cutoff);
+  }
 
   /** The coarse counter bumped on every write - drives the `codex:changed` ping and list ETags. */
   get revision(): number {

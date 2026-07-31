@@ -153,7 +153,7 @@ describe("generated API reference", () => {
     const rendered = renderApiReference();
     const adr = readFileSync(fileURLToPath(new URL("../../../docs/adr/0016-public-integration-api.md", import.meta.url)), "utf8");
     for (const phrase of [
-      "carry no `commandId`",                            // idempotency is per-surface, not API-wide
+      "`x-idempotent-replay`",                           // idempotency is per-surface, and the codex now has it
       "invalid, revoked, or missing the required scope", // the 403 rule
       "every codex `GET`",                               // the ETag rule
       "unpaginated",                                     // the LAN bound, stated rather than implied

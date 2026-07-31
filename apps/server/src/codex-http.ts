@@ -18,6 +18,18 @@ const CODEX_BASE = "/api/v1/codex";
 
 const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 /**
+ * D19: the optional idempotency key every codex JSON-body write accepts.
+ *
+ * It rides on the BODY rather than a header because that is where the game surface puts it, and one
+ * convention across two surfaces beats two. It is stripped before the store call - the store knows
+ * nothing about retries - and `withCommandId` below owns the recall/record cycle.
+ *
+ * Body-less POSTs and every DELETE are deliberately WITHOUT one: they are naturally idempotent already
+ * (applying an applied downtime is refused, activating an active session is a no-op, deleting a deleted
+ * record succeeds), so a key would be ceremony that implies a guarantee the verb already gives.
+ */
+const CommandIdSchema = z.string().uuid().optional();
+/**
  * A raw in-world date. Declared once and shared by the journal and page write schemas (CT-11) - two copies
  * of the same bounds is how one surface silently accepts a date the other rejects.
  */
@@ -37,7 +49,8 @@ const PageCreateSchema = z.object({
   revealedToPlayers: z.boolean().optional(),
   bannerAssetId: z.string().uuid().nullable().optional(),
   /** CT-11: what places an `event` page on the chronicle. Omitted = undated; `null` = clear the date. */
-  inWorldDate: InWorldDateSchema.optional()
+  inWorldDate: InWorldDateSchema.optional(),
+  commandId: CommandIdSchema
 }).strict();
 const PageUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
@@ -50,7 +63,8 @@ const PageUpdateSchema = z.object({
   gmBody: z.string().max(100_000).optional(),
   bannerAssetId: z.string().uuid().nullable().optional(),
   inWorldDate: InWorldDateSchema.optional(),
-  expectedRev: z.number().int().nonnegative().optional()
+  expectedRev: z.number().int().nonnegative().optional(),
+  commandId: CommandIdSchema
 }).strict();
 /**
  * D8: declaring a connection. `label` is OPTIONAL and nullable - an unlabelled connection is a legitimate
@@ -61,16 +75,18 @@ const PageUpdateSchema = z.object({
 const ConnectionCreateSchema = z.object({
   toPageId: z.string().uuid(),
   label: z.string().trim().max(40).nullable().optional(),
-  layer: z.enum(["player", "gm"]).optional()
+  layer: z.enum(["player", "gm"]).optional(),
+  commandId: CommandIdSchema
 }).strict();
 /** Relabel or re-layer a DECLARED connection. An omitted field is left alone, as everywhere else here. */
 const ConnectionUpdateSchema = z.object({
   label: z.string().trim().max(40).nullable().optional(),
-  layer: z.enum(["player", "gm"]).optional()
+  layer: z.enum(["player", "gm"]).optional(),
+  commandId: CommandIdSchema
 }).strict();
-const RevealSchema = z.object({ revealed: z.boolean() }).strict();
-const FolderMoveSchema = z.object({ from: z.string().trim().min(1).max(160), to: z.string().trim().max(160) }).strict();
-const FolderPathSchema = z.object({ path: z.string().trim().min(1).max(160) }).strict();
+const RevealSchema = z.object({ revealed: z.boolean() , commandId: CommandIdSchema }).strict();
+const FolderMoveSchema = z.object({ from: z.string().trim().min(1).max(160), to: z.string().trim().max(160) , commandId: CommandIdSchema }).strict();
+const FolderPathSchema = z.object({ path: z.string().trim().min(1).max(160) , commandId: CommandIdSchema }).strict();
 
 const MapKindSchema = z.enum(["battlemap", "regional", "world"]);
 const MapCreateSchema = z.object({
@@ -79,10 +95,11 @@ const MapCreateSchema = z.object({
   kind: MapKindSchema,
   parentMapId: z.string().uuid().nullable().optional(),
   revealedToPlayers: z.boolean().optional(),
-  tags: TagsSchema.optional()
+  tags: TagsSchema.optional(),
+  commandId: CommandIdSchema
 }).strict();
-const MapUpdateSchema = z.object({ name: z.string().trim().min(1).max(120).optional(), kind: MapKindSchema.optional(), tags: TagsSchema.optional() }).strict();
-const MapParentSchema = z.object({ parentMapId: z.string().uuid().nullable() }).strict();
+const MapUpdateSchema = z.object({ name: z.string().trim().min(1).max(120).optional(), kind: MapKindSchema.optional(), tags: TagsSchema.optional() , commandId: CommandIdSchema }).strict();
+const MapParentSchema = z.object({ parentMapId: z.string().uuid().nullable() , commandId: CommandIdSchema }).strict();
 
 const Coord = z.number().finite().min(0).max(1_000_000);
 const IconColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -95,19 +112,21 @@ const MarkerLinks = {
 };
 const MarkerCreateSchema = z.object({
   x: Coord, y: Coord, iconId: IconId, iconColor: IconColor,
-  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), tags: TagsSchema.optional(), ...MarkerLinks
+  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), tags: TagsSchema.optional(), ...MarkerLinks,
+  commandId: CommandIdSchema
 }).strict();
 const MarkerUpdateSchema = z.object({
   x: Coord.optional(), y: Coord.optional(), iconId: IconId.optional(), iconColor: IconColor.optional(),
-  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), tags: TagsSchema.optional(), ...MarkerLinks
+  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), tags: TagsSchema.optional(), ...MarkerLinks,
+  commandId: CommandIdSchema
 }).strict();
-const MarkerMoveSchema = z.object({ x: Coord, y: Coord }).strict();
+const MarkerMoveSchema = z.object({ x: Coord, y: Coord , commandId: CommandIdSchema }).strict();
 /**
  * CT-7: mark this pin as the party, or stop it being the party. One boolean and nothing else - the pin's
  * position, label, links and reveal state are all set through the routes that already own them, because the
  * party marker is an ORDINARY marker with a flag, and moving it IS moving a marker (`POST /markers/{id}/move`).
  */
-const MarkerPartySchema = z.object({ isParty: z.boolean() }).strict();
+const MarkerPartySchema = z.object({ isParty: z.boolean() , commandId: CommandIdSchema }).strict();
 
 const JournalWriteSchema = z.object({
   tags: TagsSchema.optional(),
@@ -126,7 +145,8 @@ const JournalWriteSchema = z.object({
   sessionId: z.string().uuid().nullable().optional(),
   realDate: z.string().max(40).nullable().optional(),
   inWorldLabel: z.string().max(120).nullable().optional(),
-  inWorldDate: InWorldDateSchema.optional()
+  inWorldDate: InWorldDateSchema.optional(),
+  commandId: CommandIdSchema
 }).strict();
 /**
  * M11 deadlines (CT-5). Everything a journal entry accepts, with ONE difference: `inWorldDate` is REQUIRED
@@ -220,7 +240,8 @@ const SessionCreateSchema = z.object({
   revealedToPlayers: z.boolean().optional(),
   status: SessionStatusSchema.optional(),
   /** D10: the codex-wide tag vocabulary, `TagsSchema` verbatim - one bound for every taggable record. */
-  tags: TagsSchema.optional()
+  tags: TagsSchema.optional(),
+  commandId: CommandIdSchema
 }).strict();
 /** No `revealedToPlayers`: reveal is its own route, so a PATCH cannot publish a recap as a side effect of an edit. */
 const SessionUpdateSchema = z.object({
@@ -231,7 +252,8 @@ const SessionUpdateSchema = z.object({
   recapBody: z.string().max(100_000).optional(),
   status: SessionStatusSchema.optional(),
   tags: TagsSchema.optional(),
-  expectedRev: z.number().int().nonnegative().optional()
+  expectedRev: z.number().int().nonnegative().optional(),
+  commandId: CommandIdSchema
 }).strict();
 /**
  * M10 quests. The body bound is `z.string().max(100_000)`, the page/session bound verbatim, because a
@@ -258,7 +280,8 @@ const QuestCreateSchema = z.object({
   entityIds: QuestEntityIdsSchema.optional(),
   revealedToPlayers: z.boolean().optional(),
   /** D10: the codex-wide tag vocabulary, `TagsSchema` verbatim - one bound for every taggable record. */
-  tags: TagsSchema.optional()
+  tags: TagsSchema.optional(),
+  commandId: CommandIdSchema
 }).strict();
 /** No `revealedToPlayers`: reveal is its own route, so a PATCH cannot publish a quest as a side effect of an edit. */
 const QuestUpdateSchema = z.object({
@@ -269,7 +292,8 @@ const QuestUpdateSchema = z.object({
   objectives: ObjectivesSchema.optional(),
   entityIds: QuestEntityIdsSchema.optional(),
   tags: TagsSchema.optional(),
-  expectedRev: z.number().int().nonnegative().optional()
+  expectedRev: z.number().int().nonnegative().optional(),
+  commandId: CommandIdSchema
 }).strict();
 /**
  * M12 standing (CT-6). `value` is the SIGNED -100..100 scale (M12-B): a faction can be actively against the
@@ -286,7 +310,8 @@ const QuestUpdateSchema = z.object({
  */
 const StandingSetSchema = z.object({
   value: z.number().int().min(-100).max(100),
-  reason: z.string().trim().max(120).default("")
+  reason: z.string().trim().max(120).default(""),
+  commandId: CommandIdSchema
 }).strict();
 /**
  * OWNER DECISION (2026-07-30): the codex-wide settings body. Nested under `revisionHistory` deliberately -
@@ -317,7 +342,8 @@ const CodexSettingsSchema = z.object({
   autosave: z.object({
     enabled: z.boolean(),
     intervalSeconds: z.number().min(1).max(600)
-  }).strict()
+  }).strict(),
+  commandId: CommandIdSchema
 }).strict();
 /**
  * The delete (owner decision, 2026-07-30). `olderThanDays: 0` deletes EVERY revision, and it is arithmetic
@@ -344,13 +370,15 @@ const RevisionsDeleteSchema = z.object({ olderThanDays: z.number().int().min(0).
 const CodexImportSchema = z.object({
   codex: z.record(z.string(), z.unknown()),
   bundleVersion: z.number().int().refine((value) => value === CODEX_BUNDLE_VERSION, { message: "This backup was made by a newer version of the app. Update, then restore." }).optional(),
-  exportedAt: z.string().optional()
+  exportedAt: z.string().optional(),
+  commandId: CommandIdSchema
 }).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
   months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
   weekdays: z.array(z.string().trim().min(1).max(40)).max(20),
-  currentDate: z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable().optional()
+  currentDate: z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable().optional(),
+  commandId: CommandIdSchema
 }).strict();
 
 /**
@@ -406,6 +434,16 @@ function bearer(request: Request): string | undefined {
   return request.header("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
 }
 /** A route param is always a single string at runtime; coerce the Express `string | string[]` type. */
+/**
+ * Strip the idempotency key before a parsed body reaches the store. The store knows nothing about
+ * retries, and a key that leaked into an input object would be a `.strict()` failure one layer down or,
+ * worse, a field silently persisted on a record.
+ */
+function withoutCommandId<T extends { commandId?: string }>(input: T): Omit<T, "commandId"> {
+  const { commandId, ...rest } = input;
+  void commandId;
+  return rest;
+}
 function pathParam(request: Request, name: string): string {
   const value = request.params[name];
   return typeof value === "string" ? value : "";
@@ -620,10 +658,55 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return failure(response, 403, "forbidden", BAD_TOKEN);
   };
 
+  /**
+   * D19: `commandId` idempotency, as ONE interception point rather than a line in twenty-five handlers.
+   *
+   * A codex JSON-body write may carry `commandId`. Resend the same id and the stored outcome is replayed
+   * verbatim - the same status and the same bytes - with `x-idempotent-replay: true` so a caller can tell
+   * a replay from a fresh execution.
+   *
+   * **It is called from inside `requireWrite`, AFTER authorization, and that placement is load-bearing.**
+   * As a plain `router.use` it ran before the route's own guard, which made a receipt into a bearer
+   * token: a PLAYER who knew (or guessed) a GM's `commandId` got the GM's 201 back. Caught by the test
+   * that asserts a player replaying a GM's key still gets 403. A replay is a cache of a response, and a
+   * cache must never be reachable by a caller who could not have produced the response.
+   *
+   * **The receipt is written AFTER the response is produced**, which means after the store transaction
+   * has committed, and the crash window that leaves is stated honestly rather than hidden: a process that
+   * dies between the commit and the receipt re-executes ONE identical retry. That is strictly better than
+   * the alternative - a receipt written first can record an outcome that never committed, and a replay
+   * would then report success for a write that did not happen. Re-executing once is recoverable; lying
+   * is not.
+   *
+   * **Only a 2xx is recorded.** A failed write stored nothing, so a retry after an error must re-execute -
+   * the correct reading of "retry safely". It is also why a body that never succeeded still 400s on
+   * retry: there is no receipt to replay, so it reaches the handler and is validated as the first was.
+   *
+   * Returns true when it has ALREADY answered the request.
+   */
+  const idempotency = (request: Request, response: Response): boolean => {
+    const supplied = (request.body as { commandId?: unknown } | undefined)?.commandId;
+    if (typeof supplied !== "string" || request.method === "DELETE") return false;
+    const replay = store.recallCommand(supplied);
+    if (replay) {
+      response.setHeader("x-idempotent-replay", "true");
+      response.status(replay.status).json(replay.body);
+      return true;
+    }
+    const send = response.json.bind(response);
+    response.json = (payload: unknown) => {
+      if (response.statusCode >= 200 && response.statusCode < 300) store.recordCommand(supplied, response.statusCode, payload);
+      return send(payload);
+    };
+    return false;
+  };
+
   /** Every write. A player session gets 403, not 401: they are authenticated, and they are refused. */
   const requireWrite = (request: Request, response: Response, next: NextFunction) => {
     const principal = principalFor(request, "codex:write");
-    if (principal.kind === "gm" || principal.kind === "integration") return next();
+    // The idempotency check runs HERE, inside the guard, so it is provably after authorization - see
+    // `idempotency` above for the bug that placement fixes.
+    if (principal.kind === "gm" || principal.kind === "integration") return idempotency(request, response) ? undefined : next();
     if (principal.kind === "none") return failure(response, 401, "unauthenticated", NO_TOKEN);
     if (principal.kind === "player") return failure(response, 403, "forbidden", "Codex writes are the GM's.");
     return failure(response, 403, "forbidden", BAD_TOKEN);
@@ -731,7 +814,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.post(`${CODEX_BASE}/pages`, requireWrite, (request, response) => {
     try {
       const input = PageCreateSchema.parse(request.body);
-      const page = store.createPage(input);
+      const page = store.createPage(withoutCommandId(input));
       options.notifyChanged();
       return envelope(response, 201, { page: projectGmPage(page) });
     } catch (error) { return malformed(response, error); }
@@ -739,7 +822,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   router.patch(`${CODEX_BASE}/pages/:id`, requireWrite, (request, response) => {
     try {
-      const { expectedRev, ...fields } = PageUpdateSchema.parse(request.body);
+      const { expectedRev, commandId, ...fields } = PageUpdateSchema.parse(request.body); void commandId;
       const page = store.updatePage(pathParam(request, "id"), fields, expectedRev, "gm");
       options.notifyChanged();
       return envelope(response, 200, { page: projectGmPage(page) });
@@ -826,7 +909,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    */
   router.post(`${CODEX_BASE}/pages/:id/connections`, requireWrite, (request, response) => {
     try {
-      const connection = store.createConnection(pathParam(request, "id"), ConnectionCreateSchema.parse(request.body));
+      const connection = store.createConnection(pathParam(request, "id"), withoutCommandId(ConnectionCreateSchema.parse(request.body)));
       options.notifyChanged();
       return envelope(response, 201, { connection: { id: connection.id, fromKind: "page" as const, fromId: connection.fromPageId, toPageId: connection.toPageId, label: connection.label, origin: "declared" as const, layer: connection.layer, createdAt: connection.createdAt } });
     } catch (error) { return codexError(response, error); }
@@ -841,7 +924,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    */
   router.patch(`${CODEX_BASE}/connections/:id`, requireWrite, (request, response) => {
     try {
-      const connection = store.updateConnection(pathParam(request, "id"), ConnectionUpdateSchema.parse(request.body));
+      const connection = store.updateConnection(pathParam(request, "id"), withoutCommandId(ConnectionUpdateSchema.parse(request.body)));
       options.notifyChanged();
       return envelope(response, 200, { connection: { id: connection.id, fromKind: "page" as const, fromId: connection.fromPageId, toPageId: connection.toPageId, label: connection.label, origin: "declared" as const, layer: connection.layer, createdAt: connection.createdAt } });
     } catch (error) { return codexError(response, error); }
@@ -886,12 +969,12 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/maps`, requireWrite, (request, response) => {
-    try { const map = store.createMap(MapCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { map: projectGmMap(map) }); }
+    try { const map = store.createMap(withoutCommandId(MapCreateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 201, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
   router.patch(`${CODEX_BASE}/maps/:id`, requireWrite, (request, response) => {
-    try { const map = store.updateMap(pathParam(request, "id"), MapUpdateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { map: projectGmMap(map) }); }
+    try { const map = store.updateMap(pathParam(request, "id"), withoutCommandId(MapUpdateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 200, { map: projectGmMap(map) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -968,7 +1051,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/maps/:id/markers`, requireWrite, (request, response) => {
-    try { const marker = store.createMarker(pathParam(request, "id"), MarkerCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { marker: projectGmMarker(marker) }); }
+    try { const marker = store.createMarker(pathParam(request, "id"), withoutCommandId(MarkerCreateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 201, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1036,7 +1119,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.patch(`${CODEX_BASE}/markers/:id`, requireWrite, (request, response) => {
-    try { const marker = store.updateMarker(pathParam(request, "id"), MarkerUpdateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
+    try { const marker = store.updateMarker(pathParam(request, "id"), withoutCommandId(MarkerUpdateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 200, { marker: projectGmMarker(marker) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1153,7 +1236,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/journal`, requireWrite, (request, response) => {
-    try { const entry = store.createEntry(JournalWriteSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.createEntry(withoutCommandId(JournalWriteSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1174,7 +1257,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * reveal route would be a second gate to keep in step with the first.
    */
   router.post(`${CODEX_BASE}/journal/deadline`, requireWrite, (request, response) => {
-    try { const entry = store.createDeadline(DeadlineCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.createDeadline(withoutCommandId(DeadlineCreateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1185,7 +1268,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    */
   router.post(`${CODEX_BASE}/journal/downtime`, requireWrite, (request, response) => {
     try {
-      const entry = store.createDowntime(DowntimeCreateSchema.parse(request.body));
+      const entry = store.createDowntime(withoutCommandId(DowntimeCreateSchema.parse(request.body)));
       options.notifyChanged();
       return envelope(response, 201, { entry: projectGmJournalEntry(entry), proposedDate: store.proposedDateFor(entry) });
     } catch (error) { return codexError(response, error); }
@@ -1200,7 +1283,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * already works on every journal kind, and a kind-specific gate is a second gate to keep in step.
    */
   router.post(`${CODEX_BASE}/journal/milestone`, requireWrite, (request, response) => {
-    try { const entry = store.createMilestone(MilestoneCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.createMilestone(withoutCommandId(MilestoneCreateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1223,7 +1306,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.patch(`${CODEX_BASE}/journal/:id`, requireWrite, (request, response) => {
-    try { const entry = store.updateEntry(pathParam(request, "id"), JournalUpdateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
+    try { const entry = store.updateEntry(pathParam(request, "id"), withoutCommandId(JournalUpdateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1265,7 +1348,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/sessions`, requireWrite, (request, response) => {
-    try { const session = store.createSession(SessionCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { session: projectGmSession(session) }); }
+    try { const session = store.createSession(withoutCommandId(SessionCreateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 201, { session: projectGmSession(session) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1284,7 +1367,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   router.patch(`${CODEX_BASE}/sessions/:id`, requireWrite, (request, response) => {
     try {
-      const { expectedRev, ...fields } = SessionUpdateSchema.parse(request.body);
+      const { expectedRev, commandId, ...fields } = SessionUpdateSchema.parse(request.body); void commandId;
       const session = store.updateSession(pathParam(request, "id"), fields, expectedRev, "gm");
       options.notifyChanged();
       return envelope(response, 200, { session: projectGmSession(session) });
@@ -1341,7 +1424,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   router.post(`${CODEX_BASE}/quests`, requireWrite, (request, response) => {
-    try { const quest = store.createQuest(QuestCreateSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 201, { quest: projectGmQuest(quest) }); }
+    try { const quest = store.createQuest(withoutCommandId(QuestCreateSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 201, { quest: projectGmQuest(quest) }); }
     catch (error) { return codexError(response, error); }
   });
 
@@ -1360,7 +1443,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   router.patch(`${CODEX_BASE}/quests/:id`, requireWrite, (request, response) => {
     try {
-      const { expectedRev, ...fields } = QuestUpdateSchema.parse(request.body);
+      const { expectedRev, commandId, ...fields } = QuestUpdateSchema.parse(request.body); void commandId;
       const quest = store.updateQuest(pathParam(request, "id"), fields, expectedRev);
       options.notifyChanged();
       return envelope(response, 200, { quest: projectGmQuest(quest) });
@@ -1502,7 +1585,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * hold two spellings of one object.
    */
   router.put(`${CODEX_BASE}/calendar`, requireWrite, (request, response) => {
-    try { const calendar = store.setCalendar(CalendarSchema.parse(request.body)); options.notifyChanged(); return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) }); }
+    try { const calendar = store.setCalendar(withoutCommandId(CalendarSchema.parse(request.body))); options.notifyChanged(); return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) }); }
     catch (error) { return malformed(response, error); }
   });
 
@@ -1579,7 +1662,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * quietly overruled. `CodexSettingsInput` has no shape for them either, so there is no path that stores them.
    */
   router.put(`${CODEX_BASE}/settings`, requireWrite, (request, response) => {
-    try { return envelope(response, 200, { settings: store.setSettings(CodexSettingsSchema.parse(request.body)) }); }
+    try { return envelope(response, 200, { settings: store.setSettings(withoutCommandId(CodexSettingsSchema.parse(request.body))) }); }
     catch (error) { return malformed(response, error); }
   });
 

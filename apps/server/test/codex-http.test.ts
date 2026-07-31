@@ -2245,3 +2245,87 @@ describe("codex export/import, HTTP boundary (D16, R1)", () => {
     expect(JSON.stringify(store.exportBundle()), "every refusal left the codex exactly as it was").toBe(before);
   });
 });
+
+/**
+ * D19: `commandId` idempotency on the codex surface. What a caller needs to be able to rely on is that a
+ * retry across a dropped connection cannot double-create - and that they can tell a replay from a fresh
+ * execution, because otherwise the guarantee is unverifiable from outside.
+ */
+describe("codex commandId idempotency (D19)", () => {
+  it("executes once, replays the identical status and bytes, and says that it replayed", async () => {
+    const { base, store } = await fixture();
+    const commandId = randomUUID();
+    const first = await post(base, "/api/v1/codex/journal", GM, { playerText: "We arrived.", commandId });
+    expect(first.status).toBe(201);
+    expect(first.headers.get("x-idempotent-replay"), "a FIRST execution must not claim to be a replay").toBeNull();
+    const firstBody = await body(first);
+
+    const retry = await post(base, "/api/v1/codex/journal", GM, { playerText: "We arrived.", commandId });
+    expect(retry.status, "a 201 replays as a 201 - the status is stored, not re-derived").toBe(201);
+    expect(retry.headers.get("x-idempotent-replay")).toBe("true");
+    expect(await body(retry), "the same bytes, including the entry's id and timestamps").toEqual(firstBody);
+    // ...and, the point of the whole thing: ONE row.
+    expect(store.listTimeline()).toHaveLength(1);
+
+    // A DIFFERENT id executes again, so the single row above is idempotency and not a broken route.
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "We left.", commandId: randomUUID() });
+    expect(store.listTimeline()).toHaveLength(2);
+    // An omitted id is simply not idempotent - the caller did not ask for it.
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "We left." });
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "We left." });
+    expect(store.listTimeline()).toHaveLength(4);
+  });
+
+  it("records nothing for a FAILED write, so a retry after an error re-executes", async () => {
+    const { base, store } = await fixture();
+    const commandId = randomUUID();
+    // A 404: the session does not exist. Nothing was written, so nothing may be replayed.
+    const failed = await post(base, "/api/v1/codex/journal", GM, { playerText: "Nowhere.", sessionId: randomUUID(), commandId });
+    expect(failed.status).toBe(404);
+
+    // The SAME id now succeeds, because the first attempt stored no outcome - which is the correct
+    // reading of "retry safely": a retry after an error must actually retry.
+    const retried = await post(base, "/api/v1/codex/journal", GM, { playerText: "Somewhere.", commandId });
+    expect(retried.status).toBe(201);
+    expect(retried.headers.get("x-idempotent-replay")).toBeNull();
+    expect(store.listTimeline()).toHaveLength(1);
+  });
+
+  it("works across every JSON-body verb, and is accepted-not-required", async () => {
+    const { base, store } = await fixture();
+    const page = store.createPage({ title: "Barovia" });
+
+    // PATCH
+    const patchId = randomUUID();
+    const patched = await patch(base, `/api/v1/codex/pages/${page.id}`, GM, { playerBody: "A misty valley.", commandId: patchId });
+    expect(patched.status).toBe(200);
+    const revAfterFirst = store.getPage(page.id)!.rev;
+    const patchRetry = await patch(base, `/api/v1/codex/pages/${page.id}`, GM, { playerBody: "A misty valley.", commandId: patchId });
+    expect(patchRetry.headers.get("x-idempotent-replay")).toBe("true");
+    expect(store.getPage(page.id)!.rev, "the replay did not bump the page a second time").toBe(revAfterFirst);
+
+    // PUT
+    const putId = randomUUID();
+    await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45 }, autosave: AUTOSAVE_DEFAULT, commandId: putId });
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45 }, autosave: AUTOSAVE_DEFAULT, commandId: putId })).headers.get("x-idempotent-replay")).toBe("true");
+
+    // A DELETE carries none, and is not replayed: deleting a deleted record already succeeds, so a key
+    // would imply a guarantee the verb already gives. The contract declares no `commandId` on any codex
+    // DELETE body, and the router ignores one rather than treating the second call as a replay.
+    const deleteId = randomUUID();
+    expect((await del(base, `/api/v1/codex/pages/${page.id}`, GM, { commandId: deleteId })).status).toBe(200);
+    expect((await del(base, `/api/v1/codex/pages/${page.id}`, GM, { commandId: deleteId })).headers.get("x-idempotent-replay")).toBeNull();
+    // ...and a malformed key is a 400 like any other bad field, not a silently-ignored one.
+    expect((await post(base, "/api/v1/codex/journal", GM, { playerText: "x", commandId: "not-a-uuid" })).status).toBe(400);
+  });
+
+  it("never lets a replay skip authorization", async () => {
+    const { base } = await fixture();
+    const commandId = randomUUID();
+    expect((await post(base, "/api/v1/codex/journal", GM, { playerText: "We arrived.", commandId })).status).toBe(201);
+    // A player replaying a GM's key gets the ordinary refusal: the guard runs per route, before the
+    // middleware ever sees the body, so a receipt is not a bearer token.
+    expect((await post(base, "/api/v1/codex/journal", PLAYER, { playerText: "We arrived.", commandId })).status).toBe(403);
+    expect((await fetch(`${base}/api/v1/codex/journal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerText: "x", commandId }) })).status).toBe(401);
+  });
+});

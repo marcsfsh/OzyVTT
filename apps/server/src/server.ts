@@ -297,7 +297,9 @@ export function createServer(options: CreateServerOptions) {
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
     res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after");
+    // `x-idempotent-replay` joins the list the day the header exists: a browser integration cannot read
+    // it otherwise, and dead CORS config for an unshipped header is config nobody can verify.
+    res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after, x-idempotent-replay");
     if (req.method === "OPTIONS") return res.status(204).end();
     next();
   });

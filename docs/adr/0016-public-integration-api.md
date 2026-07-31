@@ -40,10 +40,9 @@ the two cannot drift.
    UUID v4 is replaced rather than echoed.
 3. **Idempotency is per surface, and the API does not pretend otherwise.** *Game* writes accept a
    `commandId` (UUID) and execute it exactly once; a retry replays the stored outcome with
-   `duplicate: true`. *Codex* and *homebrew* writes carry no `commandId` — their bodies are
-   `additionalProperties: false`, so sending one is a 400 — and rely on `expectedRev` plus each surface's
-   own collision rule instead. The API-wide "every write accepts `commandId`" claim that shipped in
-   `info.description` was false for two of the three surfaces and has been withdrawn.
+   `duplicate: true`. D19: codex JSON-body writes accept an optional `commandId` (UUID); resend the same id to retry safely and the stored outcome is replayed verbatim — same status, same bytes — with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none — they are naturally idempotent already. *Homebrew* writes still carry none and rely on `expectedRev`.
+   The API-wide "every write accepts `commandId`" claim that shipped in `info.description` was false for
+   two of the three surfaces when it was written; it is now true of two of them and says so.
 4. **Concurrency, two vocabularies.** `expectedRevision` (game) targets the global GameState revision.
    `expectedRev` (codex pages/sessions/quests, homebrew rows) targets one record's revision. Both reject a
    stale write with 409 and `error.currentRevision`. Codex maps, pins, journal entries, calendar, settings

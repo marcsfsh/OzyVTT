@@ -180,19 +180,42 @@ describe("public API contracts", () => {
     expect(Object.keys(content.responses)).toEqual(["200", "304", "403", "404"]);
   });
 
-  it("keeps codex request bodies free of `commandId` - the codex surface does not implement it, and a strict body would 400", () => {
+  /**
+   * D19: the codex surface DOES implement `commandId` now, so this walks the inverse of what it used to.
+   *
+   * Every codex JSON body a POST/PATCH/PUT accepts must declare an optional `commandId` - a body that
+   * forgot it would 400 a caller following the published convention, and `additionalProperties: false`
+   * means the failure is loud rather than a silently ignored key.
+   *
+   * The exemptions are the verbs that are naturally idempotent already: every DELETE (deleting a deleted
+   * record succeeds) and the binary asset upload (not a JSON body at all). Body-less POSTs have no
+   * component to declare it on, so they never reach this walk.
+   */
+  it("gives every codex JSON-body write an optional `commandId`, exempting DELETEs and the binary upload", () => {
     type Op = { requestBody?: { content: Record<string, { schema?: { $ref?: string } }> } };
     const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
-    const schemas = openApiDocument.components.schemas as unknown as Record<string, { properties?: Record<string, unknown> }>;
+    const schemas = openApiDocument.components.schemas as unknown as Record<string, { properties?: Record<string, unknown>; required?: readonly string[] }>;
+    let walked = 0;
     for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
       for (const [method, op] of Object.entries(paths[path])) {
         const ref = op.requestBody?.content?.["application/json"]?.schema?.$ref;
         if (!ref) continue;
         const component = ref.replace("#/components/schemas/", "");
-        expect(Object.keys(schemas[component].properties ?? {}), `${method} ${path} body ${component}`).not.toContain("commandId");
+        const keys = Object.keys(schemas[component].properties ?? {});
+        if (method === "delete") {
+          expect(keys, `${method} ${path} body ${component} is naturally idempotent`).not.toContain("commandId");
+          continue;
+        }
+        expect(keys, `${method} ${path} body ${component}`).toContain("commandId");
+        // OPTIONAL, always: a caller that does not care about retries must not have to mint a uuid.
+        expect(schemas[component].required ?? [], `${method} ${path} body ${component}`).not.toContain("commandId");
+        walked += 1;
       }
     }
+    // Non-vacuity: the walk really covered the surface rather than finding no JSON bodies at all.
+    expect(walked).toBeGreaterThan(15);
   });
+
 
   /**
    * What makes the role `oneOf` sound, asserted mechanically so a future field cannot quietly make both
