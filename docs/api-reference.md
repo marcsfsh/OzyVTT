@@ -3156,7 +3156,7 @@ Deletes every page revision authored more than `olderThanDays` ago, and answers 
 
 ### `GET /api/v1/codex/export`
 
-A full codex backup bundle for round-trip. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds.
+A full codex backup bundle. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds. **There is no restore route yet**: the bundle is a complete record, but reloading one currently means hand-editing the SQLite file. `POST /codex/import` is planned and this description will name it the day it exists - it deliberately does not promise it today.
 
 **Auth:** Integration credential with `codex:read` · GM session
 
@@ -3420,7 +3420,7 @@ A revealed downtime record as a PLAYER sees it: the three campaign facts, and `a
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `codex` | object (free-form) | yes | Opaque backup bundle (round-trips via the codex import surface). |
+| `codex` | object (free-form) | yes | Opaque backup bundle. **Not yet restorable through this API** - there is no import route, and the "round-trips via the codex import surface" this field used to claim was aspirational. |
 | `exportedAt` | string (date-time) | yes |  |
 
 ### `CodexFolderCreatedData`
