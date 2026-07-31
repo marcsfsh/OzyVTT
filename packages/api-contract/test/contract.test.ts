@@ -40,8 +40,13 @@ const credentialMetadata = { id: requestId, name: "overlay", scopes: ["system:re
 describe("public API contracts", () => {
   it("accepts a version and capability response using the advertised constants", () => {
     expect(SystemVersionResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { applicationVersion: "0.1.0", apiVersion: API_VERSION, realtimeProtocolVersion: REALTIME_PROTOCOL_VERSION, schemaVersions: { actorDefinition: 1 } } }).data.apiVersion).toBe(API_VERSION);
-    const capabilities = SystemCapabilitiesResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { api: { version: API_VERSION, namespace: API_NAMESPACE }, realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" }, supportedScopes: IntegrationScopeSchema.options, features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true, rulesEngine: true } } });
+    const capabilities = SystemCapabilitiesResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { api: { version: API_VERSION, namespace: API_NAMESPACE }, realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" }, supportedScopes: IntegrationScopeSchema.options, features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true, rulesEngine: true, codex: true } } });
     expect(capabilities.data.supportedScopes).toContain("system:read");
+    // Discovery must advertise the codex, because a credential can now reach it: `features` is where a
+    // consumer asks "is this surface here?" before it asks for a scope it might not be granted.
+    expect(capabilities.data.features.codex).toBe(true);
+    expect(capabilities.data.supportedScopes).toEqual(expect.arrayContaining(["codex:read", "codex:write"]));
+    expect(() => SystemCapabilitiesResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { api: { version: API_VERSION, namespace: API_NAMESPACE }, realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" }, supportedScopes: [], features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true, rulesEngine: true } } })).toThrow();
   });
 
   it("rejects unknown versions, fields, scopes, and internal credential secrets", () => {
@@ -119,29 +124,105 @@ describe("public API contracts", () => {
     expect(openApiDocument.components.securitySchemes.viewerCookieAuth).toMatchObject({ type: "apiKey", in: "cookie", name: "vtt_viewer_session" });
   });
 
-  it("documents the codex surface: GM-only writes, GM-or-player reads, session auth (never integration scopes)", () => {
-    type Op = { security?: ReadonlyArray<Record<string, readonly string[]>> };
+  /**
+   * This test used to pin the OPPOSITE of what it now pins: "every codex operation is session-authorized
+   * and NONE carry integration-scope bearerAuth". That pin was a recorded decision (codex scopes were
+   * ledgered as accepted debt), and it is consciously superseded - an external tool had to borrow the
+   * GM's own session token to read the codex, which is the widest possible credential for the narrowest
+   * possible need. The pin is rewritten rather than deleted, because the interesting claim survives:
+   * exactly one codex operation still refuses a credential, and it is the one that mints a session.
+   */
+  it("documents the codex surface: GM-grade writes, role-projected reads, and codex:read/codex:write credentials beside the sessions", () => {
+    type Op = { security?: ReadonlyArray<Record<string, readonly string[]>>; responses: Record<string, unknown> };
     const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
-    const gmOnly = [{ gmAuth: [] }];
-    const gmOrPlayer = [{ gmAuth: [] }, { playerAuth: [] }];
-    // Writes are GM-only.
-    for (const [path, method] of [[CODEX_PATHS.pages, "post"], [CODEX_PATHS.pageById, "patch"], [CODEX_PATHS.pageById, "delete"], [CODEX_PATHS.maps, "post"], [CODEX_PATHS.mapMarkers, "post"], [CODEX_PATHS.markerById, "patch"], [CODEX_PATHS.journal, "post"], [CODEX_PATHS.calendar, "put"], [CODEX_ASSET_PATHS.collection, "post"]] as const) {
-      expect(paths[path][method].security, `${method} ${path}`).toEqual(gmOnly);
+    const write = [{ bearerAuth: ["codex:write"] }, { gmAuth: [] }];
+    const roleRead = [{ bearerAuth: ["codex:read"] }, { gmAuth: [] }, { playerAuth: [] }];
+    const gmRead = [{ bearerAuth: ["codex:read"] }, { gmAuth: [] }];
+    for (const [path, method] of [[CODEX_PATHS.pages, "post"], [CODEX_PATHS.pageById, "patch"], [CODEX_PATHS.pageById, "delete"], [CODEX_PATHS.maps, "post"], [CODEX_PATHS.mapMarkers, "post"], [CODEX_PATHS.markerById, "patch"], [CODEX_PATHS.journal, "post"], [CODEX_PATHS.calendar, "put"], [CODEX_PATHS.settings, "put"], [CODEX_PATHS.pageRevisionsCollection, "delete"], [CODEX_ASSET_PATHS.collection, "post"]] as const) {
+      expect(paths[path][method].security, `${method} ${path}`).toEqual(write);
     }
-    // Reads accept a GM or a player session (players receive the revealed-only projection).
-    for (const [path, method] of [[CODEX_PATHS.pages, "get"], [CODEX_PATHS.pageById, "get"], [CODEX_PATHS.search, "get"], [CODEX_PATHS.relationships, "get"], [CODEX_PATHS.maps, "get"], [CODEX_PATHS.mapMarkers, "get"], [CODEX_PATHS.journal, "get"], [CODEX_PATHS.calendar, "get"], [CODEX_ASSET_PATHS.content, "get"]] as const) {
-      expect(paths[path][method].security, `${method} ${path}`).toEqual(gmOrPlayer);
+    // Role-projected reads: a player receives the revealed-only projection of the same route.
+    for (const [path, method] of [[CODEX_PATHS.pages, "get"], [CODEX_PATHS.pageById, "get"], [CODEX_PATHS.search, "get"], [CODEX_PATHS.relationships, "get"], [CODEX_PATHS.maps, "get"], [CODEX_PATHS.mapMarkers, "get"], [CODEX_PATHS.journal, "get"], [CODEX_PATHS.timeline, "get"], [CODEX_PATHS.sessionById, "get"], [CODEX_PATHS.questById, "get"], [CODEX_PATHS.standing, "get"], [CODEX_PATHS.calendar, "get"], [CODEX_ASSET_PATHS.content, "get"]] as const) {
+      expect(paths[path][method].security, `${method} ${path}`).toEqual(roleRead);
     }
-    // Folders, revisions, and export stay GM-only even for reads (organizational + backup surfaces).
-    expect(paths[CODEX_PATHS.folders].get.security).toEqual(gmOnly);
-    expect(paths[CODEX_PATHS.pageRevisions].get.security).toEqual(gmOnly);
-    expect(paths[CODEX_PATHS.export].get.security).toEqual(gmOnly);
-    // Every codex operation accepts a GM session and NONE carry integration-scope bearerAuth (they are session-authorized).
+    // GM-GRADE reads: organizational, historical, and backup surfaces have no player branch at all.
+    for (const path of [CODEX_PATHS.folders, CODEX_PATHS.pageRevisions, CODEX_PATHS.revealAudit, CODEX_PATHS.settings, CODEX_PATHS.export]) {
+      expect(paths[path].get.security, `get ${path}`).toEqual(gmRead);
+    }
+    // The ONE bearer-less codex operation: it mints a real player SESSION TOKEN, and a scoped credential
+    // minting ambient player sessions would widen the token surface for no consumer need.
+    expect(paths[CODEX_PATHS.previewSession].post.security).toEqual([{ gmAuth: [] }]);
     for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
       for (const [method, op] of Object.entries(paths[path])) {
         expect(op.security?.some((entry) => "gmAuth" in entry), `${method} ${path} must accept a GM session`).toBe(true);
-        expect(op.security?.some((entry) => "bearerAuth" in entry), `${method} ${path} must not use integration scopes`).toBe(false);
+        const scopes = op.security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
+        if (path === CODEX_PATHS.previewSession) { expect(scopes, "preview-session must stay GM-session-only").toBeUndefined(); continue; }
+        expect(scopes, `${method} ${path} must name exactly one codex scope`).toEqual([method === "get" ? "codex:read" : "codex:write"]);
       }
+    }
+  });
+
+  it("documents 401 AND 403 on every codex operation, and 304 on every codex GET", () => {
+    type Op = { responses: Record<string, unknown> };
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
+    for (const path of Object.values(CODEX_PATHS)) {
+      for (const [method, op] of Object.entries(paths[path])) {
+        // 401 is "no credential"; 403 is "you presented one and were refused". Every codex route now
+        // accepts a bearer token, so every route can answer both - documenting only 401 was the bug.
+        expect(Object.keys(op.responses), `${method} ${path} must document 401`).toContain("401");
+        expect(Object.keys(op.responses), `${method} ${path} must document 403`).toContain("403");
+        if (method === "get") expect(Object.keys(op.responses), `${method} ${path} must document 304`).toContain("304");
+      }
+    }
+    // The binary asset-content route is the stated exception: it answers 403 before any existence check
+    // (no existence oracle on a media URL), so it has no 401 arm to document - but it does 304.
+    const content = paths[CODEX_ASSET_PATHS.content].get;
+    expect(Object.keys(content.responses)).toEqual(["200", "304", "403", "404"]);
+  });
+
+  it("keeps codex request bodies free of `commandId` - the codex surface does not implement it, and a strict body would 400", () => {
+    type Op = { requestBody?: { content: Record<string, { schema?: { $ref?: string } }> } };
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
+    const schemas = openApiDocument.components.schemas as unknown as Record<string, { properties?: Record<string, unknown> }>;
+    for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
+      for (const [method, op] of Object.entries(paths[path])) {
+        const ref = op.requestBody?.content?.["application/json"]?.schema?.$ref;
+        if (!ref) continue;
+        const component = ref.replace("#/components/schemas/", "");
+        expect(Object.keys(schemas[component].properties ?? {}), `${method} ${path} body ${component}`).not.toContain("commandId");
+      }
+    }
+  });
+
+  /**
+   * What makes the role `oneOf` sound, asserted mechanically so a future field cannot quietly make both
+   * branches match a body (which is a `oneOf` VALIDATION FAILURE, not a widening - the document would
+   * simply stop describing its own responses).
+   *
+   * The rule is ONE-SIDED on purpose: the GM branch must require at least one key the player branch does
+   * not declare. Several player shapes are strict key-subsets of their GM twin, so the symmetric version
+   * of this rule ("each branch has a key the other lacks") is unsatisfiable for them - and an
+   * unsatisfiable assertion is an assertion that gets deleted.
+   */
+  it("keeps every role-projected `*Projected` pair disjoint: closed shapes, all-required keys, and a GM-only key", () => {
+    type Schema = { oneOf?: Array<{ $ref?: string }>; properties?: Record<string, unknown>; required?: string[]; additionalProperties?: unknown };
+    const schemas = openApiDocument.components.schemas as unknown as Record<string, Schema>;
+    const wrappers = Object.keys(schemas).filter((name) => name.startsWith("Codex") && name.endsWith("Projected"));
+    // Ten role-projected record kinds today. Pinned so deleting a wrapper cannot silently empty this test.
+    expect(wrappers).toHaveLength(10);
+    for (const wrapper of wrappers) {
+      const branches = schemas[wrapper].oneOf ?? [];
+      expect(branches.map((branch) => branch.$ref), wrapper).toEqual([
+        `#/components/schemas/${wrapper.replace(/Projected$/, "")}`,
+        `#/components/schemas/${wrapper.replace(/Projected$/, "")}Player`
+      ]);
+      const [gm, player] = branches.map((branch) => schemas[(branch.$ref as string).replace("#/components/schemas/", "")]);
+      for (const [label, branch] of [["GM", gm], ["player", player]] as const) {
+        expect(branch.additionalProperties, `${wrapper} ${label} branch must be closed`).toBe(false);
+        expect([...(branch.required ?? [])].sort(), `${wrapper} ${label} branch must require every key it declares`).toEqual(Object.keys(branch.properties ?? {}).sort());
+      }
+      const gmOnly = (gm.required ?? []).filter((key) => !(key in (player.properties ?? {})));
+      expect(gmOnly.length, `${wrapper}: the GM branch needs a required key the player branch does not declare (else a GM body matches both)`).toBeGreaterThan(0);
     }
   });
 

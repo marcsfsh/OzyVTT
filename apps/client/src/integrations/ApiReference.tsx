@@ -112,7 +112,11 @@ const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }>
   { title: "Encounter archives (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
   { title: "Map assets & calibration", match: (path) => path.startsWith("/api/v1/map-assets") },
   { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") },
-  { title: "Codex (worldbuilding wiki, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") },
+  // Title follows the Codex glossary ("pages", "atlas", "journal", "calendar") so the API panel and the
+  // Codex itself call the same things by the same names. The rest of this panel needs no change when the
+  // codex surface grows: it renders the live document, so new paths, scopes and role-projected `oneOf`
+  // shapes appear on their own, and `ungrouped` below catches anything a matcher misses.
+  { title: "Codex (pages, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") },
   { title: "Homebrew authoring (GM-only)", match: (path) => path.startsWith("/api/v1/homebrew") }
 ];
 

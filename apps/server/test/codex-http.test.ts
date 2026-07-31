@@ -1687,13 +1687,17 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
   /** T-11's boundary half: the M12 routes are documented with the security they actually enforce. */
   it("documents the M12 routes with the roles they enforce", async () => {
     const paths = openApiDocument.paths as unknown as Record<string, Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>>;
-    // The one M12 read a player may make; the audit and every write are GM-only.
-    expect(paths[CODEX_PATHS.standing].get.security).toEqual([{ gmAuth: [] }, { playerAuth: [] }]);
+    // The one M12 read a player may make; the audit and every write have NO player branch. The codex
+    // scopes now sit beside the sessions on every one of these (a credential acts at GM grade), so the
+    // claim this test makes is about the PLAYER branch, which is the one that decides what leaks.
+    expect(paths[CODEX_PATHS.standing].get.security).toEqual([{ bearerAuth: ["codex:read"] }, { gmAuth: [] }, { playerAuth: [] }]);
     for (const [path, method] of [
       [CODEX_PATHS.revealAudit, "get"], [CODEX_PATHS.standingByFaction, "put"], [CODEX_PATHS.standingReveal, "post"],
       [CODEX_PATHS.journalMilestone, "post"], [CODEX_PATHS.markerParty, "put"]
     ] as const) {
-      expect(paths[path][method].security, `${method} ${path}`).toEqual([{ gmAuth: [] }]);
+      const security = paths[path][method].security ?? [];
+      expect(security.some((entry) => "playerAuth" in entry), `${method} ${path} must never accept a player session`).toBe(false);
+      expect(security.find((entry) => "bearerAuth" in entry)?.bearerAuth, `${method} ${path} scope`).toEqual([method === "get" ? "codex:read" : "codex:write"]);
     }
   });
 
