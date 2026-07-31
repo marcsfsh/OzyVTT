@@ -284,7 +284,25 @@ export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "mi
  * else, and it is what makes `applyDowntime` idempotent. It is GM workflow state and must never be
  * projected to a player (D11-E).
  */
-export type CodexDowntimePayload = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
+export type CodexDowntimePayload = Readonly<{
+  who: string;
+  activity: string;
+  days: number;
+  applied: boolean;
+  /**
+   * D12: WHICH character page this downtime belongs to, so the tracker can total a character's days and
+   * link to their sheet rather than grouping on a free-text name that two GMs spell two ways.
+   *
+   * `who` is NOT replaced by it and both may coexist: the free-text name is the fallback for a character
+   * with no page, and it is what an old row shows after this field arrives null. Nothing is required to
+   * have a page - a GM tracking downtime for a hireling should not have to make one first.
+   *
+   * A plain id with no foreign key behind it, the `factionPageId` precedent: history must survive the page.
+   * `deletePage` scrubs it to null so it cannot render as an unfollowable link, and `who` survives as the
+   * display fallback - which is strictly more than the marker-scrub precedent requires.
+   */
+  characterPageId: string | null;
+}>;
 /**
  * CT-8's progression record: the party reached LEVEL n, and WHY.
  *
@@ -369,7 +387,7 @@ export type CodexJournalRow = Readonly<{
 export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionId?: string | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null; tags?: readonly string[] }>;
 export type CodexJournalUpdateInput = CodexJournalCreateInput;
 /** CT-10: what `createDowntime` needs beyond an ordinary entry. `applied` is not an input - it starts false. */
-export type CodexDowntimeCreateInput = CodexJournalCreateInput & Readonly<{ downtime: Readonly<{ who: string; activity: string; days: number }> }>;
+export type CodexDowntimeCreateInput = CodexJournalCreateInput & Readonly<{ downtime: Readonly<{ who: string; activity: string; days: number; characterPageId?: string | null }> }>;
 /** CT-8: what `createMilestone` needs beyond an ordinary entry - `CodexDowntimeCreateInput`'s shape verbatim. */
 export type CodexMilestoneCreateInput = CodexJournalCreateInput & Readonly<{ milestone: Readonly<{ level: number; reason: string }> }>;
 
@@ -1738,13 +1756,14 @@ const MAX_DOWNTIME_DAYS = 3650;
  * `applied` is not an input. Downtime is always created unapplied (O-3): only `applyDowntime` sets it, and
  * only once. Accepting it here would let a caller pre-apply a record and skip the clock move entirely.
  */
-function downtimePayload(input: Readonly<{ who: string; activity: string; days: number }>): CodexDowntimePayload {
+function downtimePayload(input: Readonly<{ who: string; activity: string; days: number; characterPageId?: string | null }>): CodexDowntimePayload {
   const days = input?.days;
   if (!Number.isInteger(days) || days < 0 || days > MAX_DOWNTIME_DAYS) throw new Error(`Downtime days must be a whole number from 0 to ${MAX_DOWNTIME_DAYS}.`);
   return {
     who: shortLabel(input.who, 120, "downtime participant") ?? "",
     activity: shortLabel(input.activity, 120, "downtime activity") ?? "",
-    days, applied: false
+    days, applied: false,
+    characterPageId: optionalId(input.characterPageId)
   };
 }
 /** Read a stored payload defensively - malformed JSON degrades to `null`, never a throw (`parseObjectives`' rule). */
@@ -1753,14 +1772,19 @@ function parseDowntimePayload(raw: string | null | undefined): CodexDowntimePayl
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const value = parsed as { who?: unknown; activity?: unknown; days?: unknown; applied?: unknown };
+    const value = parsed as { who?: unknown; activity?: unknown; days?: unknown; applied?: unknown; characterPageId?: unknown };
     return {
       who: typeof value.who === "string" ? value.who : "",
       activity: typeof value.activity === "string" ? value.activity : "",
       days: typeof value.days === "number" && Number.isFinite(value.days) ? Math.max(0, Math.trunc(value.days)) : 0,
       // Coerced, not trusted, exactly as `questObjectives` treats `done`: anything but exactly `true` is
       // false, so a malformed value can never mark downtime as already applied and suppress the clock move.
-      applied: value.applied === true
+      applied: value.applied === true,
+      // D12: THE PARSER IS THE MIGRATION. Every payload written before this field existed lacks the key,
+      // and this default supplies it as `null` on read - so the wire's "always present" guarantee holds
+      // for old rows with no `json_set` sweep over `payload_json` at all. The same fail-closed reader
+      // discipline every other field here follows: a non-string is null, never a dangling half-value.
+      characterPageId: typeof value.characterPageId === "string" && ID.test(value.characterPageId) ? value.characterPageId : null
     };
   } catch { return null; }
 }
@@ -2353,6 +2377,17 @@ export class CodexStore {
        * no FK to cascade through, which is precisely why it needs saying here.
        */
       database.prepare("UPDATE codex_quests SET entity_ids_json = COALESCE((SELECT json_group_array(value) FROM json_each(codex_quests.entity_ids_json) WHERE value != ?), '[]'), updated_at = ? WHERE EXISTS (SELECT 1 FROM json_each(codex_quests.entity_ids_json) WHERE value = ?)").run(pageId, this.stamp(), pageId);
+      /**
+       * D12: downtime records are the FOURTH referrer to a page, and the only one that keeps its id inside
+       * a JSON blob rather than a column or an array. Scrubbing it to null is what stops the tracker
+       * rendering an unfollowable link; `who` survives as the display fallback, so the row still says whose
+       * week it was. The chronicle RECORD survives the page, exactly as a `standing` record does - "Ireena
+       * spent a month forging" stays true after her page is gone.
+       *
+       * `json_valid` first, as everywhere else in this file: `json_set` THROWS on a malformed blob rather
+       * than returning null, and one hand-edited payload must not make a page undeletable.
+       */
+      database.prepare("UPDATE codex_journal SET payload_json = json_set(payload_json, '$.characterPageId', json('null')), updated_at = ? WHERE kind = 'downtime' AND json_valid(payload_json) AND json_extract(payload_json, '$.characterPageId') = ?").run(this.stamp(), pageId);
       database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades links + revisions
       this.bumpRevision();
     });
@@ -3433,6 +3468,11 @@ export class CodexStore {
    */
   createDowntime(input: CodexDowntimeCreateInput): CodexJournalRow {
     const payload = downtimePayload(input.downtime);
+    // D12: an id must name a live page, or the tracker renders a link nobody can follow. The TYPE is not
+    // enforced - a GM may legitimately track downtime for an NPC or a hireling page - which is the
+    // standing rule's opposite half, and deliberately so: standing is *about* a faction, downtime is
+    // about a person the GM has some record for.
+    if (payload.characterPageId !== null && !this.pageRow(payload.characterPageId)) throw new CodexNotFoundError("That page no longer exists.");
     const dated = this.resolveDate(input.inWorldDate ?? this.getCalendar().currentDate ?? null, input.inWorldLabel);
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,

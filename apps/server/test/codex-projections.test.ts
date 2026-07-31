@@ -31,7 +31,7 @@ function entryRow(overrides: Partial<CodexJournalRow> & { kind: CodexJournalKind
     ...overrides
   };
 }
-const DOWNTIME: CodexDowntimePayload = { who: "Brannor", activity: "Forging a blade", days: 8, applied: true };
+const DOWNTIME: CodexDowntimePayload = { who: "Brannor", activity: "Forging a blade", days: 8, applied: true, characterPageId: null };
 const playerContext = (publishedInstant: number | null = null) => ({ unrevealedSessionIds: new Set<string>(), publishedInstant });
 
 describe("M11 calendar projection - the GM's prep clock never reaches a player (O-1 / D11-G)", () => {
@@ -101,8 +101,8 @@ describe("M11 chronicle projection - deadlines and downtime are gated by reveal 
     const row = entryRow({ kind: "downtime", revealedToPlayers: true, payload: DOWNTIME });
     const player = projectPlayerChronicleRecord({ kind: "entry", entry: row }, playerContext())!;
 
-    expect(player.payload).toEqual({ who: "Brannor", activity: "Forging a blade", days: 8 });
-    expect(Object.keys(player.payload!).sort()).toEqual(["activity", "days", "who"]);
+    expect(player.payload).toEqual({ who: "Brannor", activity: "Forging a blade", days: 8, characterPageId: null });
+    expect(Object.keys(player.payload!).sort()).toEqual(["activity", "characterPageId", "days", "who"]);
     // On the VALUE as well as the key set: `applied` is `true` on the stored payload, so a spread-and-delete
     // that missed it, or a passthrough, would put `true` into the serialized player row.
     expect(JSON.stringify(player)).not.toContain("applied");
@@ -282,7 +282,7 @@ describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => 
   it("never lets one kind's payload ride out on another kind's row", () => {
     // A row whose stored blob does not match its kind projects `null`, never a half-filled object: the
     // dispatch is on the ENTRY's kind, not on the shape of the blob.
-    const mislabelled = entryRow({ kind: "milestone", revealedToPlayers: true, payload: { who: "Brannor", activity: "Forging", days: 8, applied: true } });
+    const mislabelled = entryRow({ kind: "milestone", revealedToPlayers: true, payload: { who: "Brannor", activity: "Forging", days: 8, applied: true, characterPageId: null } });
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: mislabelled }, playerContext())!.payload).toBeNull();
     expect(projectGmChronicleRecord({ kind: "entry", entry: mislabelled }).payload).toBeNull();
   });

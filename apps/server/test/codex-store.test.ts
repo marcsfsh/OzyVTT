@@ -2271,7 +2271,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
   it("stores a deadline and a downtime as THEMSELVES — the widened CHECK, and a kind that is parsed rather than collapsed", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
     const deadline = store.createDeadline({ playerText: "The duke's ultimatum expires.", inWorldDate: { year: 1492, month: 2, day: 14 } });
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
 
     expect(deadline.kind).toBe("deadline");
     expect(downtime.kind).toBe("downtime");
@@ -2284,7 +2284,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(deadline.payload).toBeNull();
     expect(deadline.inWorldDate).toEqual({ year: 1492, month: 2, day: 14 });
     // D11-D: downtime carries exactly one, and `applied` starts false (O-3).
-    expect(downtime.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(downtime.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
     // A note still has none, so `payload` is not quietly universal.
     expect(store.createEntry({ playerText: "plain" }).payload).toBeNull();
 
@@ -2304,7 +2304,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     // The ordinary journal editor must not eat the payload: `updateEntry` names its columns and
     // `payload_json` is not among them, so an unrelated text edit leaves it intact.
     expect(store.updateEntry(downtime.id, { playerText: "Vex brews something worse." }).payload)
-      .toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+      .toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
 
     // A deadline with no structured date is rejected: prose cannot be compared to a clock.
     expect(() => store.createDeadline({ playerText: "Someday, probably" })).toThrow(/in-world date/);
@@ -2458,7 +2458,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
    */
   it("creating downtime does not move the clock, applying it does, and applying it twice is rejected (O-3)", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
 
     // 1. Creating proposes; it does not decide. The clock has not moved.
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
@@ -2471,7 +2471,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     const applied = store.applyDowntime(downtime.id);
     expect(applied.calendar.currentDate).toEqual({ year: 1492, month: 1, day: 10 });
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
-    expect(applied.entry.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+    expect(applied.entry.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null });
     expect(downtimePayloadOf(store.getEntry(downtime.id)!)!.applied).toBe(true);   // re-read, so it is the stored row
     expect(applied.entry.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });  // the record did not re-date itself
     expect(store.proposedDateFor(applied.entry)).toBeNull();            // nothing left to propose
@@ -2506,7 +2506,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
    */
   it("applyDowntime is one transaction: a failed calendar write rolls the entry write back too (D11-F)", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
 
     // Fires on the calendar write specifically, so `bumpRevision` (also an UPDATE on codex_meta) is untouched.
     const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
@@ -2516,7 +2516,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(() => store.applyDowntime(downtime.id)).toThrow();
 
     // BOTH sides unchanged. Re-read from the store, not from the value captured above.
-    expect(store.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(store.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
 
     // ...and with the obstruction gone it still works, so the assertions above are the rollback and not a
@@ -2712,7 +2712,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
 
     // Applying downtime is a clock move like any other, so it must not publish either.
-    const downtime = store.createDowntime({ playerText: "A week off.", downtime: { who: "Vex", activity: "Resting", days: 7 } });
+    const downtime = store.createDowntime({ playerText: "A week off.", downtime: { who: "Vex", activity: "Resting", days: 7, characterPageId: null } });
     store.applyDowntime(downtime.id);
     expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
 
@@ -2808,12 +2808,12 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 3, day: 8 } });
     store.publishCampaignDate();
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 9, day: 2 } });   // GM runs ahead
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
     const deadline = store.createDeadline({ playerText: "The ultimatum expires.", inWorldDate: { year: 1492, month: 11, day: 1 } });
 
     const bundle = store.exportBundle();
     expect(bundle.publishedDate).toEqual({ year: 1492, month: 3, day: 8 });                        // NOT the GM's clock
-    expect(bundle.journal.find((entry) => entry.id === downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(bundle.journal.find((entry) => entry.id === downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
     expect(bundle.journal.find((entry) => entry.id === downtime.id)!.kind).toBe("downtime");
     expect(bundle.journal.find((entry) => entry.id === deadline.id)!.kind).toBe("deadline");
     expect(bundle.journal.find((entry) => entry.id === deadline.id)!.payload).toBeNull();
@@ -2829,7 +2829,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     await reopened.initialize();
     try {
       expect(reopened.getPublishedDate()).toEqual({ year: 1492, month: 3, day: 8 });
-      expect(reopened.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+      expect(reopened.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null });
       expect(reopened.getEntry(deadline.id)!.kind).toBe("deadline");
       expect(reopened.exportBundle().publishedDate).toEqual({ year: 1492, month: 3, day: 8 });
     } finally {
@@ -2897,7 +2897,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
       const insertEntry = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       const note = crypto.randomUUID(), downtime = crypto.randomUUID();
       insertEntry.run(note, "The mists parted.", "Strahd watched.", 1, plain, pageId, "note", null, 2, "2026-01-04", null, null, null, null, null, 1, '["travel"]', null, "2026-01-04T00:00:00.000Z", "2026-01-04T00:00:00.000Z");
-      insertEntry.run(downtime, "Vex brews poison.", null, 0, null, null, "downtime", null, null, null, null, null, null, null, null, 2, '[]', JSON.stringify({ who: "Vex", activity: "Brewing poison", days: 30, applied: true }), "2026-01-05T00:00:00.000Z", "2026-01-05T00:00:00.000Z");
+      insertEntry.run(downtime, "Vex brews poison.", null, 0, null, null, "downtime", null, null, null, null, null, null, null, null, 2, '[]', JSON.stringify({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null }), "2026-01-05T00:00:00.000Z", "2026-01-05T00:00:00.000Z");
 
       const markersBefore = database.prepare("SELECT * FROM codex_markers ORDER BY id").all();
       const journalBefore = database.prepare("SELECT * FROM codex_journal ORDER BY id").all();
@@ -2949,7 +2949,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
       expect(upgraded.getMarker(hidden)!.revealedToPlayers).toBe(false);
       expect(upgraded.listMarkers(mapId).every((marker) => marker.isParty === false)).toBe(true);
       expect(upgraded.partyMarker()).toBeNull();
-      expect(upgraded.getEntry(downtime)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+      expect(upgraded.getEntry(downtime)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null });
       expect(upgraded.getEntry(note)!.tags).toEqual(["travel"]);
       // An empty standing table on every existing codex is the correct and complete upgrade — there has
       // never been a standing to back-fill from (v14's reasoning for quests, verbatim).
@@ -4102,8 +4102,8 @@ describe("every codex write bumps the coarse revision (the ETag's invariant)", (
     bumps("setEntryRevealed", () => { store.setEntryRevealed(entry.id, true); });
     bumps("appendCombatEntry", () => { store.appendCombatEntry({ sourceEncounterId: 1, playerText: "a battle" }); });
     bumps("createDeadline", () => { store.createDeadline({ playerText: "the ritual", inWorldDate: { year: 1492, month: 3, day: 1 } }); });
-    let downtime = store.createDowntime({ playerText: "smithing", downtime: { who: "Ireena", activity: "smithing", days: 3 } });
-    bumps("createDowntime", () => { downtime = store.createDowntime({ playerText: "training", downtime: { who: "Ismark", activity: "training", days: 2 } }); });
+    let downtime = store.createDowntime({ playerText: "smithing", downtime: { who: "Ireena", activity: "smithing", days: 3, characterPageId: null } });
+    bumps("createDowntime", () => { downtime = store.createDowntime({ playerText: "training", downtime: { who: "Ismark", activity: "training", days: 2, characterPageId: null } }); });
     bumps("applyDowntime", () => { store.applyDowntime(downtime.id); });
     bumps("createMilestone", () => { store.createMilestone({ playerText: "level 5", milestone: { level: 5, reason: "cleared the crypt" } }); });
     bumps("deleteEntry", () => { store.deleteEntry(entry.id); });
@@ -4273,5 +4273,81 @@ describe("Codex chronicle — a player's machine-readable dates (D17, R3)", () =
     // and `fired` is still measured against the published date. Nothing here names `currentDate`.
     expect(Object.keys(undatedRow)).not.toContain("proposedDate");
     expect(Object.keys(undatedRow)).not.toContain("campaignInstant");
+  });
+});
+
+/**
+ * D12: linking downtime to a character PAGE, so the tracker totals a person rather than a spelling of
+ * their name. One payload field, and everything interesting about it is what happens at the edges.
+ */
+describe("CodexStore downtime — the character link (D12)", () => {
+  it("round-trips the link, keeps it through applyDowntime, and refuses an id that names no page", () => {
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: character.id } });
+    expect(downtimePayloadOf(entry)).toEqual({ who: "Ireena", activity: "Forging", days: 30, applied: false, characterPageId: character.id });
+
+    // `applyDowntime` rewrites the payload to flip `applied`; the link must ride through untouched.
+    const applied = store.applyDowntime(entry.id).entry;
+    expect(downtimePayloadOf(applied)).toEqual({ who: "Ireena", activity: "Forging", days: 30, applied: true, characterPageId: character.id });
+
+    // An id naming no page is a not-found, not a dangling link the tracker cannot follow.
+    expect(() => store.createDowntime({ playerText: "Nobody.", downtime: { who: "?", activity: "?", days: 1, characterPageId: crypto.randomUUID() } })).toThrow(/no longer exists/i);
+    // The free-text fallback still works with no link at all - nothing is required to have a page.
+    expect(downtimePayloadOf(store.createDowntime({ playerText: "A hireling.", downtime: { who: "Gustav", activity: "Watching the cart", days: 2 } }))!.characterPageId).toBeNull();
+    // ...and a NON-character page is accepted deliberately: a GM may track downtime for an NPC.
+    const npc = store.createPage({ title: "The Burgomaster", entityType: "note" });
+    expect(downtimePayloadOf(store.createDowntime({ playerText: "Politics.", downtime: { who: "Ismark", activity: "Talking", days: 3, characterPageId: npc.id } }))!.characterPageId).toBe(npc.id);
+  });
+
+  it("reads a payload written before the field existed as `characterPageId: null` — the parser IS the migration", () => {
+    const entry = store.createDowntime({ playerText: "Old row.", downtime: { who: "Vex", activity: "Brewing", days: 5 } });
+    // Rewrite the blob to the pre-D12 shape, exactly as an upgraded database holds it.
+    const database = new DatabaseSync(join(directory, "vtt.sqlite"));
+    database.prepare("UPDATE codex_journal SET payload_json = ? WHERE id = ?")
+      .run(JSON.stringify({ who: "Vex", activity: "Brewing", days: 5, applied: false }), entry.id);
+    database.close();
+
+    // The wire promises the key is ALWAYS present; the defensive reader supplies it, so no `json_set`
+    // sweep over old payloads was needed.
+    expect(downtimePayloadOf(store.getEntry(entry.id)!)).toEqual({ who: "Vex", activity: "Brewing", days: 5, applied: false, characterPageId: null });
+  });
+
+  it("nulls the link when the page is deleted, and keeps the record and its free-text `who`", () => {
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: character.id } });
+    const untouched = store.createDowntime({ playerText: "Someone else.", downtime: { who: "Ismark", activity: "Drilling", days: 4 } });
+
+    store.deletePage(character.id);
+
+    // The record SURVIVES its page - "Ireena spent a month forging" stays true - and the link is nulled
+    // rather than left dangling, so the tracker never renders a link nobody can follow.
+    const after = downtimePayloadOf(store.getEntry(entry.id)!)!;
+    expect(after.characterPageId).toBeNull();
+    expect(after.who, "the free-text fallback is what the row shows now").toBe("Ireena");
+    expect(after.days).toBe(30);
+    // ...and the scrub is targeted: an unrelated downtime row is untouched.
+    expect(downtimePayloadOf(store.getEntry(untouched.id)!)).toEqual({ who: "Ismark", activity: "Drilling", days: 4, applied: false, characterPageId: null });
+  });
+
+  it("carries the link to a player only when that page is revealed, and never hides the row for it", () => {
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", revealedToPlayers: true, downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: character.id } });
+    const record = { kind: "entry" as const, entry: store.getEntry(entry.id)! };
+    const context = (revealed: readonly string[]) => ({ unrevealedSessionIds: new Set<string>(), revealedPageIds: new Set(revealed) });
+
+    // Page hidden: the link is nulled, and the ROW still travels with everything else on it. That is the
+    // difference from a `standing` record, which is hidden whole - a standing has no prose to stand on.
+    const gated = projectPlayerChronicleRecord(record, context([]))!;
+    expect(gated.payload).toEqual({ who: "Ireena", activity: "Forging", days: 30, characterPageId: null });
+    expect(gated.text).toBe("A month at the forge.");
+
+    // Page revealed: the link travels, because the player can already open that page by id.
+    const shown = projectPlayerChronicleRecord(record, context([character.id]))!;
+    expect((shown.payload as { characterPageId: string | null }).characterPageId).toBe(character.id);
+    // Absent context fails CLOSED - a caller that forgets to resolve the set loses a link, never leaks one.
+    expect((projectPlayerChronicleRecord(record, { unrevealedSessionIds: new Set<string>() })!.payload as { characterPageId: string | null }).characterPageId).toBeNull();
+    // `applied` is still never on a player row, whatever this field does.
+    expect(Object.keys(shown.payload!).sort()).toEqual(["activity", "characterPageId", "days", "who"]);
   });
 });

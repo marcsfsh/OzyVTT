@@ -3,7 +3,7 @@ import express, { Router, type NextFunction, type Request, type Response } from 
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
-import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
+import { CodexNotFoundError, CodexRevisionConflictError, downtimePayloadOf, type CodexSearchRef, type CodexStore } from "./codex-store.js";
 import { projectGmBacklinks, projectGmCalendar, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectGmStanding, projectPlayerBacklinks, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, projectPlayerStanding, projectRevealAudit, type CodexRevealAuditRecord, type CodexSearchRecord, type PlayerSessionNumberContext } from "./codex-projections.js";
 
 /**
@@ -144,7 +144,14 @@ const DeadlineCreateSchema = JournalWriteSchema.extend({ inWorldDate: InWorldDat
 const DowntimeInputSchema = z.object({
   who: z.string().trim().max(120),
   activity: z.string().trim().max(120),
-  days: z.number().int().min(0).max(3650)
+  days: z.number().int().min(0).max(3650),
+  /**
+   * D12: which character PAGE this downtime belongs to, so the tracker totals a person rather than a
+   * spelling of their name. Optional and nullable - `who` is the fallback for anyone with no page, and
+   * both may coexist. An id that names no page is a 404 from the store; the page's TYPE is not checked
+   * (a GM may track downtime for an NPC), which is the deliberate opposite of the standing rule.
+   */
+  characterPageId: z.string().uuid().nullable().optional()
 }).strict();
 const DowntimeCreateSchema = JournalWriteSchema.extend({ downtime: DowntimeInputSchema });
 /**
@@ -473,9 +480,16 @@ function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
   // The candidate set is the factions standing is tracked against — one row per faction, so this is small
   // and precise rather than "every revealed page". A standing record whose faction page was deleted has no
   // candidate at all and is therefore hidden, which is the right answer.
+  // The candidate set is every page id a player-visible PAYLOAD can name: the factions standing is
+  // tracked against, plus (D12) the character pages downtime records link to. Both are small and precise
+  // rather than "every revealed page", and a payload id with no candidate has no entry in the set at all,
+  // which is the right answer - it fails closed to null.
+  const downtimePages = store.listTimeline()
+    .map((entry) => downtimePayloadOf(entry)?.characterPageId ?? null)
+    .filter((pageId): pageId is string => pageId !== null);
   return {
     unrevealedSessionIds: store.unrevealedSessionIds(),
-    revealedPageIds: revealedPageIdsIn(store, store.listStanding().map((row) => row.factionPageId))
+    revealedPageIds: revealedPageIdsIn(store, [...store.listStanding().map((row) => row.factionPageId), ...downtimePages])
   };
 }
 

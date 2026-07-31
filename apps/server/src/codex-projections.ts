@@ -536,8 +536,19 @@ function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
  * A record that is not downtime carries no payload at all; `null` rather than an omitted key, so no reader
  * branches on key presence (the rule every other chronicle field follows).
  */
-export type GmCodexDowntime = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
-export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days: number }>;
+export type GmCodexDowntime = Readonly<{ who: string; activity: string; days: number; applied: boolean; characterPageId: string | null }>;
+/**
+ * D12 on the player row. VIEWER-SAFETY JUSTIFICATION, individually: `characterPageId` travels only when
+ * that page is itself REVEALED - the `factionPageId` rule on a standing payload verbatim - and in that
+ * case the player can already open the page by id, so it adds no information and buys the same
+ * downtime -> character navigation the GM gets.
+ *
+ * Unlike a `standing` record, the ROW is not hidden when the link is nulled, and the difference is the
+ * test the standing CORRECTION says a row must pass: a downtime row stands on its own player-visible
+ * content (`who`, `activity`, `days`, and usually prose), so a nulled link leaves a row that still means
+ * something. A standing record has `playerText: ""` and means nothing without its faction.
+ */
+export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days: number; characterPageId: string | null }>;
 
 /**
  * M12's two payloads, in the same per-audience allow-listed shape.
@@ -588,7 +599,7 @@ function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | nul
   const payload = entry.payload;
   if (payload === null) return null;
   switch (entry.kind) {
-    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied } : null;
+    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied, characterPageId: payload.characterPageId } : null;
     case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
     case "standing": return "delta" in payload ? { factionPageId: payload.factionPageId, delta: payload.delta, reason: payload.reason } : null;
     case "note": case "combat": case "deadline": return null;
@@ -604,7 +615,9 @@ function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlyS
   const payload = entry.payload;
   if (payload === null) return null;
   switch (entry.kind) {
-    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days } : null;
+    case "downtime": return "who" in payload
+      ? { who: payload.who, activity: payload.activity, days: payload.days, characterPageId: payload.characterPageId !== null && revealedPageIds.has(payload.characterPageId) ? payload.characterPageId : null }
+      : null;
     case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
     case "standing": return "delta" in payload
       ? { factionPageId: revealedPageIds.has(payload.factionPageId) ? payload.factionPageId : null, delta: payload.delta, reason: payload.reason }

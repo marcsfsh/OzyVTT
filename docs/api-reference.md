@@ -3430,6 +3430,7 @@ The downtime facts themselves. `applied` is deliberately not an input: confirmin
 | `who` | string | yes | Who spent the time. May be empty: downtime is often party-wide with nobody in particular to name. |
 | `activity` | string | yes | What they did. May be empty, for the same reason as `who` - the record's prose carries it when the fields do not. |
 | `days` | integer (0–3650) | yes | The time cost in in-world days. Ten years is already well past the point where a GM would set a date instead of counting days. |
+| `characterPageId` | string \| null | no | D12: which character PAGE this downtime belongs to, so the tracker totals a person rather than a spelling of their name. Optional; `who` remains the free-text fallback for anyone with no page, and both may coexist. An id naming no page is a **404**. The page's TYPE is deliberately NOT enforced - a GM may track downtime for an NPC or a hireling - which is the opposite of the standing rule, because standing is *about* a faction while downtime is about someone the GM happens to have a record for. |
 
 ### `CodexDowntimePayload`
 
@@ -3441,16 +3442,18 @@ CT-10: what a downtime record stores beyond its prose - who spent how many days 
 | `activity` | string | yes | What they did with it. |
 | `days` | integer (≥ 0) | yes | The time cost in in-world days - what the clock moves by when the GM confirms. |
 | `applied` | boolean | yes | GM workflow state: has the clock move been confirmed? NEVER present in a player projection - it is a fact about the GM's prep, not about the party's week off. |
+| `characterPageId` | string \| null | yes | D12: the character page this downtime belongs to, or null. Always present, including on records written before the field existed - the stored-payload reader supplies the null, so no consumer branches on key presence. A plain id with no foreign key: the record outlives the page, and deleting the page nulls this while `who` survives as the display fallback. |
 
 ### `CodexDowntimePlayerPayload`
 
-A revealed downtime record as a PLAYER sees it: the three campaign facts, and `applied` allow-listed away (D11-E).
+A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied` allow-listed away (D11-E).
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `who` | string | yes |  |
 | `activity` | string | yes |  |
 | `days` | integer (≥ 0) | yes |  |
+| `characterPageId` | string \| null | yes | D12: carried ONLY when that character page is itself revealed, else null - the `factionPageId` rule on a standing payload verbatim. Unlike a standing record the ROW is not hidden when the link is nulled: a downtime row stands on its own player-visible content (`who`, `activity`, `days`, and usually prose), so a nulled link leaves a row that still means something. |
 
 ### `CodexExportData`
 

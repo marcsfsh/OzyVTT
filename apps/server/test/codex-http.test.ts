@@ -1246,7 +1246,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
       playerText: "The duke's tax falls due.", gmText: "He will send the guard.", inWorldDate: { year: 1492, month: 0, day: 20 }
     }))).data.entry as Json;
     const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, {
-      playerText: "A quiet week.", gmText: "The cult moves while they rest.", downtime: { who: "Brannor", activity: "Forging a blade", days: 8 }
+      playerText: "A quiet week.", gmText: "The cult moves while they rest.", downtime: { who: "Brannor", activity: "Forging a blade", days: 8, characterPageId: null }
     }))).data.entry as Json;
 
     // The GM sees both, with both layers - so the player assertions are the gate working, not an empty list.
@@ -1272,7 +1272,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     expect(shownPayload).not.toContain("He will send the guard.");
     expect(shownPayload).not.toContain("applied");
     expect(shownPayload).not.toContain("proposedDate");
-    expect(shown.find((row) => row.kind === "downtime")!.payload).toEqual({ who: "Brannor", activity: "Forging a blade", days: 8 });
+    expect(shown.find((row) => row.kind === "downtime")!.payload).toEqual({ who: "Brannor", activity: "Forging a blade", days: 8, characterPageId: null });
   });
 
   /**
@@ -1302,7 +1302,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
   it("refuses apply-downtime, deadline/downtime creation and publish to a player and to an anonymous caller", async () => {
     const { base } = await fixture();
     await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
-    const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8 } }))).data.entry as Json;
+    const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8, characterPageId: null } }))).data.entry as Json;
 
     for (const [headers, status, code] of [[PLAYER, 403, "forbidden"], [{ "content-type": "application/json" }, 401, "unauthenticated"]] as const) {
       for (const path of ["/api/v1/codex/journal/deadline", "/api/v1/codex/journal/downtime", "/api/v1/codex/calendar/publish", `/api/v1/codex/journal/${downtime.id}/apply-downtime`]) {
@@ -1322,7 +1322,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
   it("proposes a date on create, moves the clock only on confirm, and refuses a second confirm", async () => {
     const { base } = await fixture();
     await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
-    const created = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "Forging", days: 8 } }))).data as Json;
+    const created = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "Forging", days: 8, characterPageId: null } }))).data as Json;
     expect(created.proposedDate).toEqual({ year: 1492, month: 0, day: 18 });
     expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 10 });   // nothing moved
 
@@ -1382,8 +1382,8 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     const { base } = await fixture();
     for (const payload of [
       { playerText: "The party rests a week.", downtime: { who: "", activity: "", days: 7 } },   // prose only
-      { playerText: "", downtime: { who: "Brannor", activity: "Forging", days: 8 } },            // fields only
-      { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "", days: 3 } }       // one half blank
+      { playerText: "", downtime: { who: "Brannor", activity: "Forging", days: 8, characterPageId: null } },            // fields only
+      { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "", days: 3, characterPageId: null } }       // one half blank
     ]) {
       const response = await post(base, "/api/v1/codex/journal/downtime", GM, payload);
       expect(response.status, JSON.stringify(payload)).toBe(201);
