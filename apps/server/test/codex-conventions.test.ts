@@ -245,7 +245,7 @@ describe("codex conditional reads (weak ETag + 304)", () => {
 
     const first = await get(base, "/api/v1/codex/pages", GM);
     const etag = first.headers.get("etag");
-    expect(etag).toMatch(/^W\/"codex-r\d+-gm"$/);
+    expect(etag).toMatch(/^W\/"codex-r\d+-gm-[0-9a-f]{12}"$/);
 
     const conditional = await get(base, "/api/v1/codex/pages", { ...GM, "if-none-match": etag as string });
     expect(conditional.status).toBe(304);
@@ -277,6 +277,40 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     expect((await get(base, "/api/v1/codex/pages", { ...PLAYER, "if-none-match": gmTag as string })).status).toBe(200);
     // A credential reads at GM grade, so it shares the GM tag rather than minting a third one.
     expect((await get(base, "/api/v1/codex/pages", READ_CREDENTIAL)).headers.get("etag")).toBe(gmTag);
+  });
+
+  /**
+   * A validator is a validator for ONE RESOURCE.
+   *
+   * The tag used to name only the revision and the grade, so every codex read at a given revision handed
+   * out the same string - and presenting it to a DIFFERENT endpoint got a 304 with an empty body. An
+   * integration keeping one "last seen codex ETag" (the contract advertises ETag/304 to credential holders)
+   * would conclude nothing had changed on a resource it had never read once.
+   *
+   * The query is part of the resource and its ORDER is not, both asserted here: a filtered list is a
+   * different answer from an unfiltered one, and a client that reorders its parameters must not silently
+   * lose its cache.
+   */
+  it("scopes the validator to the resource, so one endpoint's tag cannot revalidate another", async () => {
+    const { base } = await fixture();
+    await post(base, "/api/v1/codex/pages", GM, { title: "Keep", folder: "Places", tags: ["ruin"] });
+
+    const pagesTag = (await get(base, "/api/v1/codex/pages", GM)).headers.get("etag") as string;
+    const sessionsTag = (await get(base, "/api/v1/codex/sessions", GM)).headers.get("etag") as string;
+    expect(sessionsTag, "two endpoints at one revision are two resources").not.toBe(pagesTag);
+    // The heart of it: the OTHER endpoint's tag must be a cache MISS, not an empty 304.
+    expect((await get(base, "/api/v1/codex/sessions", { ...GM, "if-none-match": pagesTag })).status).toBe(200);
+    expect((await get(base, "/api/v1/codex/pages", { ...GM, "if-none-match": sessionsTag })).status).toBe(200);
+    // ...and each still 304s against its own.
+    expect((await get(base, "/api/v1/codex/pages", { ...GM, "if-none-match": pagesTag })).status).toBe(304);
+
+    // The QUERY is part of the resource - a filtered list is a different answer from the whole one.
+    const filtered = (await get(base, "/api/v1/codex/pages?folder=Places", GM)).headers.get("etag") as string;
+    expect(filtered).not.toBe(pagesTag);
+    expect((await get(base, "/api/v1/codex/pages?folder=Places", { ...GM, "if-none-match": pagesTag })).status).toBe(200);
+    // ...but its ORDER is not: the same filter written the other way round is the same resource.
+    const bothWays = await get(base, "/api/v1/codex/pages?tag=ruin&folder=Places", GM);
+    expect((await get(base, "/api/v1/codex/pages?folder=Places&tag=ruin", { ...GM, "if-none-match": bothWays.headers.get("etag") as string })).status).toBe(304);
   });
 
   /**

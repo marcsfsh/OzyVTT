@@ -1153,6 +1153,35 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     expect((await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "Nowhere.", downtime: { who: "Ireena", activity: "Forging", days: 3, characterPageId: randomUUID() } })).status).toBe(404);
   });
 
+  /**
+   * ONE spelling of CD-6, not two seventy lines apart.
+   *
+   * `GET /codex/journal?markerId=` gated a player on the pin's OWN reveal flag, while
+   * `GET /codex/markers/{id}` applies the compound predicate (the pin is revealed AND its map is). So a
+   * revealed pin on a hidden map answered 200 here and 404 there - a 200-vs-404 existence oracle for a pin
+   * on a map the party has never been shown, reachable with nothing but the pin's id.
+   *
+   * The 200 was not itself a content leak (entry-level reveal still applies), which is why this is a small
+   * finding rather than a large one; a probe that distinguishes "exists" from "does not" is still one.
+   */
+  it("answers a player's mini-timeline probe the same way the pin route does (CD-6)", async () => {
+    const { base, store } = await fixture();
+    const map = store.createMap({ assetId: "11111111-1111-4111-8111-111111111111", name: "The Under-dark", kind: "regional" });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff8800" });
+    store.setMarkerRevealed(marker.id, true);   // the pin is revealed; its MAP is not
+
+    const probe = `/api/v1/codex/journal?markerId=${marker.id}`;
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).status, "the pin route hides it").toBe(404);
+    expect((await get(base, probe, PLAYER)).status, "...so the mini-timeline must too").toBe(404);
+    // The GM reads both, so the two 404s are the player gate rather than a missing fixture.
+    expect((await get(base, probe, GM)).status).toBe(200);
+
+    // Reveal the MAP and both routes open together - the predicate, not an unconditional refusal.
+    store.setMapRevealed(map.id, true);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).status).toBe(200);
+    expect((await get(base, probe, PLAYER)).status).toBe(200);
+  });
+
   it("never lets an UNREVEALED session's number ride out on a revealed journal entry", async () => {
     // The live scenario, end to end. The GM opens session 4, leaves it unrevealed and activates it; M9's
     // auto-linking then stamps 4 onto the note written during play. Revealing the NOTE must not publish the
@@ -2260,7 +2289,7 @@ describe("codex pin-by-id and party location, HTTP boundary (D15)", () => {
 
     const first = await get(base, `/api/v1/codex/markers/${marker.id}`, GM);
     const tag = first.headers.get("etag")!;
-    expect(tag).toMatch(/^W\/"codex-r\d+-gm"$/);
+    expect(tag).toMatch(/^W\/"codex-r\d+-gm-[0-9a-f]{12}"$/);
     expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...GM, "if-none-match": tag })).status).toBe(304);
     // A player's tag is a DIFFERENT one, so no cache can hand a GM's answer to a player.
     const playerTag = (await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).headers.get("etag")!;

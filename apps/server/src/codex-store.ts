@@ -2616,7 +2616,11 @@ export class CodexStore {
       this.database = database;
       this.migrate();
       const meta = database.prepare("SELECT codex_revision FROM codex_meta WHERE id = 1").get() as { codex_revision: number } | undefined;
-      if (!meta) database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
+      // `links_backfilled = 1` in the SEED, not left to the column default: a database being created right
+      // now has no pre-D13 session, quest or journal body to re-extract, so it must not run the sweep. The
+      // default alone meant every brand-new codex swept three empty tables and bumped its revision to 1
+      // before its first write - which `reconcileLinks`' own comment claimed it avoided.
+      if (!meta) database.prepare("INSERT INTO codex_meta (id, codex_revision, links_backfilled) VALUES (1, 0, 1)").run();
       this.reconcileLinks();
     } catch (error) {
       database.close();
@@ -2639,18 +2643,19 @@ export class CodexStore {
    * Runs ONCE, guarded by the flag, inside one transaction, and bumps the revision so every client
    * refetches the connection feeds that just gained rows. Idempotent by flag; safe to call on every open.
    *
+   * A codex created TODAY never runs it at all: `initialize` seeds the meta row with `links_backfilled = 1`
+   * before calling this, because a database with no pre-D13 rows has nothing to re-extract. That used to be
+   * handled by a branch here on the meta row being absent - which could never fire, since `initialize`
+   * inserts the row two lines above the call. The result was that every new codex swept three empty tables
+   * and reported revision 1 before its first write.
+   *
    * Pages are deliberately NOT re-extracted: their rows have been maintained by every save since v1, and
    * v22 carried them across verbatim as `source_kind = 'page'`.
    */
   private reconcileLinks(): void {
     const database = this.requireDatabase();
     const flag = database.prepare("SELECT links_backfilled FROM codex_meta WHERE id = 1").get() as { links_backfilled: number } | undefined;
-    if (!flag || flag.links_backfilled === 1) {
-      // No meta row yet means a fresh database with nothing to backfill; mark it done so a codex created
-      // today never pays for a sweep over three empty tables on its second open.
-      if (!flag) database.prepare("UPDATE codex_meta SET links_backfilled = 1 WHERE id = 1").run();
-      return;
-    }
+    if (!flag || flag.links_backfilled === 1) return;
     this.transaction(() => {
       for (const row of database.prepare("SELECT id, recap_body, prep_body FROM codex_sessions").all() as Array<{ id: string; recap_body: string; prep_body: string }>) {
         this.rebuildLinksFor("session", row.id, row.recap_body, row.prep_body);
@@ -3379,13 +3384,26 @@ export class CodexStore {
 
     // 3. This page's OWN outgoing mentions, resolved from title key to id. A link to a title no page
     //    carries has no node to draw and is dropped, exactly as `listAllLinks` drops it.
+    //
+    //    Resolved through ONE index built up front, the pattern `listAllConnections` uses fifty lines below,
+    //    rather than a lookup per row. The per-row version ran `SELECT * FROM codex_pages` - both 100 KB
+    //    body columns of every page, materialised into JS objects - and then a linear `.find()`, once per
+    //    stored link, on every GM and player page-document read. A page with thirty links in a three-hundred
+    //    page codex was tens of megabytes of row materialisation and thousands of `pageLinkKey()` calls,
+    //    synchronously, on the event loop that owns GameState, to open one page. Four columns, once.
     const outgoing = database.prepare(
       "SELECT layer, target_ref, section FROM codex_links WHERE source_kind = 'page' AND source_id = ? AND target_kind = 'page'"
     ).all(pageId) as Array<{ layer: "player" | "gm"; target_ref: string; section: string | null }>;
-    for (const row of outgoing) {
-      const target = this.pageByLinkKey(row.target_ref);
-      if (!target || target.id === pageId) continue;
-      rows.push({ id: null, direction: "out", otherKind: "page", otherId: target.id, otherTitle: target.title, otherEntityType: (target.entity_type as CodexEntityType) ?? "note", otherRevealed: target.revealed === 1, label: null, origin: "mention", layer: row.layer, section: row.section });
+    if (outgoing.length > 0) {
+      const byLinkKey = new Map<string, { id: string; title: string; entity_type: string; revealed: number }>();
+      for (const page of database.prepare("SELECT id, title, entity_type, revealed FROM codex_pages").all() as Array<{ id: string; title: string; entity_type: string; revealed: number }>) {
+        byLinkKey.set(pageLinkKey(page.title), page);
+      }
+      for (const row of outgoing) {
+        const target = byLinkKey.get(row.target_ref);
+        if (!target || target.id === pageId) continue;
+        rows.push({ id: null, direction: "out", otherKind: "page", otherId: target.id, otherTitle: target.title, otherEntityType: (target.entity_type as CodexEntityType) ?? "note", otherRevealed: target.revealed === 1, label: null, origin: "mention", layer: row.layer, section: row.section });
+      }
     }
 
     // 4. Fold an UNLABELLED declared edge and a mention over the same pair into one row, declared winning.
@@ -3457,10 +3475,6 @@ export class CodexStore {
         return { title: entry.playerText.trim().slice(0, 80) || "Journal entry", entityType: null, revealed: entry.revealedToPlayers };
       }
     }
-  }
-
-  private pageByLinkKey(linkKey: string): PageRow | undefined {
-    return (this.requireDatabase().prepare("SELECT * FROM codex_pages").all() as PageRow[]).find((row) => pageLinkKey(row.title) === linkKey);
   }
 
   /**
@@ -4551,6 +4565,24 @@ export class CodexStore {
     return (this.requireDatabase().prepare(
       `SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} ORDER BY (j.calendar_instant IS NULL), j.calendar_instant, (live_session_number IS NULL), live_session_number, j.created_at`
     ).all() as JournalRowRaw[]).map((row) => this.toEntry(row));
+  }
+
+  /**
+   * D12: every character page a downtime record names, deduplicated. The candidate set
+   * `projectPlayerJournalEntry` gates a downtime payload's `characterPageId` against.
+   *
+   * A targeted read rather than `listTimeline()` filtered in JS, and the difference is the point: this runs
+   * on EVERY player journal read (the journal, the timeline, per-page and per-marker mini-timelines, search
+   * and the reveal audit), and the JS version made each of those pull every journal row through the session
+   * join and `JSON.parse` two columns per row just to reach one id. The nested CASE, not `AND`, for the
+   * reason migration v15 measured and recorded: whether `json_valid` runs before `json_extract` under an
+   * `AND` is an optimizer decision, and `json_extract` THROWS on a malformed blob rather than returning null.
+   */
+  downtimeCharacterPageIds(): string[] {
+    const rows = this.requireDatabase().prepare(
+      "SELECT DISTINCT (CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.characterPageId') END) AS page_id FROM codex_journal WHERE kind = 'downtime'"
+    ).all() as Array<{ page_id: string | null }>;
+    return rows.map((row) => row.page_id).filter((pageId): pageId is string => typeof pageId === "string");
   }
 
   /**

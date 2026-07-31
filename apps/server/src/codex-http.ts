@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
@@ -444,6 +444,21 @@ function withoutCommandId<T extends { commandId?: string }>(input: T): Omit<T, "
   void commandId;
   return rest;
 }
+/**
+ * Which RESOURCE a read is of, as a short stable fingerprint for the `ETag`.
+ *
+ * The path plus the query, with the query SORTED so `?tag=x&folder=y` and `?folder=y&tag=x` are one
+ * resource rather than two - a client that reorders its parameters must not silently lose its cache. Hashed
+ * rather than embedded so the tag stays a fixed length whatever the query is; it is an opaque validator, so
+ * nothing reads it back, and truncating to 12 hex characters is ample for telling apart the ~40 codex reads
+ * (a collision would only ever mean an unnecessary 200, never a wrong 304 - the revision and grade are
+ * still there in full).
+ */
+function resourceKey(request: Request): string {
+  const [path, rawQuery = ""] = request.originalUrl.split("?");
+  const query = [...new URLSearchParams(rawQuery)].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : (a[1] < b[1] ? -1 : 1))).map(([key, value]) => `${key}=${value}`).join("&");
+  return createHash("sha1").update(`${path}?${query}`).digest("hex").slice(0, 12);
+}
 function pathParam(request: Request, name: string): string {
   const value = request.params[name];
   return typeof value === "string" ? value : "";
@@ -581,9 +596,12 @@ function playerSessionNumbers(store: CodexStore): PlayerSessionNumberContext {
   // tracked against, plus (D12) the character pages downtime records link to. Both are small and precise
   // rather than "every revealed page", and a payload id with no candidate has no entry in the set at all,
   // which is the right answer - it fails closed to null.
-  const downtimePages = store.listTimeline()
-    .map((entry) => downtimePayloadOf(entry)?.characterPageId ?? null)
-    .filter((pageId): pageId is string => pageId !== null);
+  // Both candidate reads are TARGETED - one row per faction, one distinct id per downtime character. The
+  // downtime half used to be `listTimeline()` filtered in JS, which pulled every journal row through the
+  // session join and JSON-parsed two columns per row to reach one id, on every player journal read and
+  // (unconditionally, for both roles) on every keystroke of the search palette. Same answer, one indexed
+  // scan of one column.
+  const downtimePages = store.downtimeCharacterPageIds();
   return {
     unrevealedSessionIds: store.unrevealedSessionIds(),
     // D11: the candidate set is EVERY quest, because any of them may appear in history. Small table, and
@@ -754,20 +772,28 @@ export function createCodexRouter(options: CodexRouterOptions) {
   /**
    * Send a codex read, with a weak `ETag` and a `304` when the caller already holds this exact answer.
    *
-   * Correctness rests on one store guarantee: EVERY codex write bumps the coarse revision inside its own
-   * transaction - reveals and clock moves included, since those change what a reader sees even though
-   * they change no record's `rev`. If a future write skips the bump, this serves stale reads, which is
-   * why the bump lives in the store's transaction helper rather than at call sites.
+   * The tag names three things, and all three are load-bearing:
    *
-   * Weak, because the bytes may differ between two responses at one revision (timestamps in derived
-   * labels), and per GRADE, because a GM and a player at the same revision get different bodies - one
-   * shared tag would let a proxy hand a GM's answer to a player.
+   *   `r{revision}` - the coarse codex revision. Correctness rests on one store guarantee: EVERY codex
+   *      write bumps it inside its own transaction, reveals and clock moves included, since those change
+   *      what a reader sees even though they change no record's `rev`. A write that skipped the bump would
+   *      make this serve stale reads, which is why `codex-conventions.test.ts` walks every mutating store
+   *      method and fails if one leaves `store.revision` where it found it.
+   *   `{grade}` - because a GM and a player at the same revision get different bodies, and one shared tag
+   *      would let a proxy hand a GM's answer to a player.
+   *   `{resource}` - WHICH read this is. Without it the validator was global, so a tag obtained from one
+   *      endpoint revalidated a DIFFERENT endpoint to 304 with an empty body: an integration keeping one
+   *      "last seen codex ETag" (the contract advertises ETag/304 to credential holders) would conclude
+   *      nothing had changed on a resource it had never read. An `ETag` is a validator for one resource;
+   *      one that is not scoped to a resource is not an ETag.
+   *
+   * Weak, because the bytes may differ between two responses at one revision (timestamps in derived labels).
    *
    * Called at the point of SERIALIZATION, after every authorization and existence gate, so a conditional
    * request can never turn a 404 into a 304 and confirm that a hidden record exists and is unchanged.
    */
   const readEnvelope = (request: Request, response: Response, grade: CodexGrade, data: unknown) => {
-    const etag = `W/"codex-r${store.revision}-${grade}"`;
+    const etag = `W/"codex-r${store.revision}-${grade}-${resourceKey(request)}"`;
     response.setHeader("etag", etag);
     if (request.header("if-none-match") === etag) return response.status(304).end();
     return envelope(response, 200, data);
@@ -805,8 +831,10 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!role) return;
     const query = typeof request.query.q === "string" ? request.query.q : "";
     // Resolved before the map so it is computed once per request, not once per hit. Built for both
-    // roles rather than conditionally: it is two cheap reads, and a `null` here would only push the
-    // branch into the projection call below, where forgetting it is a leak rather than a type error.
+    // roles rather than conditionally: every read behind it is a targeted one over a small table, and a
+    // `null` here would only push the branch into the projection call below, where forgetting it is a leak
+    // rather than a type error. (It briefly was NOT cheap - a full `listTimeline()` per request, paid by a
+    // GM search that never uses the result - which is why the cost is now named rather than asserted.)
     const playerContext = playerSessionNumbers(store);
     const found = store.searchAll(role, query);
     const hits = found.hits
@@ -1205,10 +1233,25 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!role) return;
     const markerId = typeof request.query.markerId === "string" ? request.query.markerId : undefined;
     const pageId = typeof request.query.pageId === "string" ? request.query.pageId : undefined;
-    // A player may read a location's mini-timeline only when the location (marker/page) is itself revealed -
-    // otherwise a hidden pin/page id (however obtained) could be probed. Entry-level reveal is still enforced below.
+    // A player may read a location's mini-timeline only when the location (marker/page) is itself
+    // player-visible - otherwise a hidden pin/page id (however obtained) could be probed. Entry-level reveal
+    // is still enforced below.
+    //
+    // The pin gate goes through `projectPlayerPageMarker`, which is the CD-6 compound predicate
+    // (`marker.revealed AND map.revealed`), NOT the pin's own flag. Written as the flag alone, this route
+    // answered 200 for a revealed pin on a hidden map while `GET /codex/markers/{id}` seventy lines up 404'd
+    // the same pin - a 200-vs-404 existence oracle, and two spellings of one rule. There is one spelling now.
     if (role !== "gm") {
-      if (markerId && !store.getMarker(markerId)?.revealedToPlayers) return failure(response, 404, "not_found", "That was not found.");
+      if (markerId) {
+        const marker = store.getMarker(markerId);
+        const visible = marker !== null && projectPlayerPageMarker({
+          marker,
+          mapRevealed: store.getMap(marker.mapId)?.revealedToPlayers ?? false,
+          revealedPageIds: revealedPageIdsIn(store, marker.pageIds),
+          subMapRevealed: marker.subMapId ? (store.getMap(marker.subMapId)?.revealedToPlayers ?? false) : false
+        }) !== null;
+        if (!visible) return failure(response, 404, "not_found", "That was not found.");
+      }
       if (pageId && !store.getPage(pageId)?.revealedToPlayers) return failure(response, 404, "not_found", "That was not found.");
     }
     const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();

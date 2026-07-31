@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -4932,5 +4933,171 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
     expect(store.listTimeline().filter((entry) => entry.kind === "quest")).toHaveLength(2);
     // ...and no page revision was snapshotted by the raw page writes either.
     expect(store.getSettings().revisionHistory.versionCount).toBe(0);
+  });
+});
+
+/**
+ * THE ETAG CORRECTNESS ARGUMENT, MADE CHECKABLE.
+ *
+ * `readEnvelope` serves `W/"codex-r{revision}-{grade}-{resource}"` and answers 304 to a match, so its whole
+ * claim rests on one store guarantee: EVERY write bumps the coarse revision inside its own transaction,
+ * reveals and clock moves included, because those change what a reader sees without changing any record's
+ * `rev`. The router's comment used to say the bump "lives in the store's transaction helper rather than at
+ * call sites" - which was simply false. `transaction()` bumps nothing; `bumpRevision()` is hand-written at
+ * forty-odd call sites, and a forty-first write that forgot it would silently serve stale reads to every
+ * poller and every integration, with no failing test anywhere.
+ *
+ * So the guarantee is checked instead of asserted. Every public method is classified as a WRITE or a READ,
+ * every write is invoked and must move `store.revision`, and a method that is in neither list fails the
+ * suite - which is what makes this hold for code nobody has written yet.
+ */
+/**
+ * A codex created today has nothing to backfill, and must not act as though it does.
+ *
+ * `reconcileLinks` guarded its fresh-database case on the meta row being ABSENT - a branch that could never
+ * fire, because `initialize` inserts that row two lines before calling it. So every new codex swept three
+ * empty tables and bumped its revision to 1 before its first write, while the code's comment said the
+ * opposite ("a codex created today never pays for a sweep"). The seed now sets the flag, and the comment
+ * describes what happens.
+ *
+ * The revision is the observable: it is what every ETag and every `codex:changed` ping is derived from, so
+ * "a fresh codex reports revision 0" is the statement worth pinning.
+ */
+describe("a fresh codex does not run the D13 link backfill", () => {
+  it("reports revision 0 before its first write, and still backfills a database that predates D13", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-codex-fresh-"));
+    const fresh = new CodexStore(join(directory, "vtt.sqlite"));
+    await fresh.initialize();
+    expect(fresh.revision, "nothing has happened yet").toBe(0);
+    // Reopening does not sweep either - the flag is durable, not a per-process guess.
+    fresh.close();
+    const reopened = new CodexStore(join(directory, "vtt.sqlite"));
+    await reopened.initialize();
+    expect(reopened.revision).toBe(0);
+    reopened.close();
+
+    // The half that must still work: a database whose flag is 0 (a real pre-D13 codex) DOES sweep, and the
+    // sweep finds the wiki links in a session recap that no page save ever extracted.
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-legacy-"));
+    const seeded = new CodexStore(join(legacyDirectory, "vtt.sqlite"));
+    await seeded.initialize();
+    const page = seeded.createPage({ title: "Vallaki" });
+    const session = seeded.createSession({ recapBody: "We reached [[Vallaki]]." });
+    seeded.close();
+    const raw = new DatabaseSync(join(legacyDirectory, "vtt.sqlite"));
+    raw.exec("DELETE FROM codex_links; UPDATE codex_meta SET links_backfilled = 0;");
+    raw.close();
+    const migrated = new CodexStore(join(legacyDirectory, "vtt.sqlite"));
+    await migrated.initialize();
+    expect(migrated.listAllConnections().find((edge) => edge.fromId === session.id), "the sweep re-extracted the recap's link").toMatchObject({ toPageId: page.id, origin: "mention" });
+    expect(migrated.revision, "...and it told every client to refetch").toBeGreaterThan(0);
+    migrated.close();
+    await rm(directory, { recursive: true, force: true });
+    await rm(legacyDirectory, { recursive: true, force: true });
+  });
+});
+
+describe("every codex write bumps the coarse revision (the ETag's one premise)", () => {
+  /** Reads, and the three bookkeeping methods that deliberately move nothing. Everything else is a write. */
+  const NOT_WRITES = new Set([
+    "constructor", "initialize", "close", "recallCommand",
+    // A receipt is bookkeeping about a response, not content - bumping here would invalidate every client's
+    // ETag a second time for a write that already bumped it once. Stated in `recordCommand` itself.
+    "recordCommand",
+    "listFolders", "getPage", "listPages", "exportBundle", "listAllDeclaredConnections", "connectionsForPage",
+    "listAllConnections", "getSettings", "listRevisions", "listAllRevisions", "searchAll", "searchPages",
+    "getMap", "listMaps", "getMarker", "listMarkers", "markersForPage", "isAssetRevealedToPlayers",
+    "isPageAssetVisibleToPlayers", "markerForScene", "partyMarker", "getCalendar", "getPublishedDate",
+    "campaignInstant", "publishedInstant", "dateForInstant", "proposedDateFor", "getEntry", "listTimeline",
+    "listDatedEventPages", "listChronicle", "listEntriesFor", "getSession", "listSessions",
+    "unrevealedSessionIds", "getQuest", "listQuests", "listStanding", "getStanding", "revision",
+    "activeSessionId", "downtimeCharacterPageIds"
+  ]);
+
+  /** One invocation per write, each on a store this function has just seeded for it. */
+  const WRITES: Record<string, (from: CodexStore) => void> = {
+    createPage: (s) => { s.createPage({ title: "New" }); },
+    updatePage: (s) => { s.updatePage(s.createPage({ title: "A" }).id, { playerBody: "b" }, undefined, "gm"); },
+    setPageRevealed: (s) => { s.setPageRevealed(s.createPage({ title: "A" }).id, true); },
+    deletePage: (s) => { s.deletePage(s.createPage({ title: "A" }).id); },
+    createFolder: (s) => { s.createFolder("Places"); },
+    moveFolder: (s) => { s.createFolder("Places"); s.moveFolder("Places", "Realms"); },
+    deleteFolder: (s) => { s.createFolder("Places"); s.deleteFolder("Places"); },
+    importBundle: (s) => { s.importBundle({ pages: [] }); },
+    createConnection: (s) => { s.createConnection(s.createPage({ title: "A" }).id, { toPageId: s.createPage({ title: "B" }).id }); },
+    updateConnection: (s) => { s.updateConnection(s.createConnection(s.createPage({ title: "A" }).id, { toPageId: s.createPage({ title: "B" }).id }).id, { label: "ally of" }); },
+    deleteConnection: (s) => { s.deleteConnection(s.createConnection(s.createPage({ title: "A" }).id, { toPageId: s.createPage({ title: "B" }).id }).id); },
+    setSettings: (s) => { s.setSettings({ revisionHistory: { enabled: false, windowMinutes: 30 }, autosave: AUTOSAVE_DEFAULT }); },
+    deleteRevisionsOlderThan: (s) => { s.deleteRevisionsOlderThan(0); },
+    restoreRevision: (s) => {
+      const page = s.createPage({ title: "A", playerBody: "one" });
+      s.updatePage(page.id, { playerBody: "two" }, undefined, "gm");
+      s.restoreRevision(page.id, s.listRevisions(page.id).at(-1)!.id, "gm");
+    },
+    createMap: (s) => { s.createMap({ assetId: ASSET, name: "M", kind: "world" }); },
+    updateMap: (s) => { s.updateMap(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, { name: "N" }); },
+    setMapParent: (s) => { const parent = s.createMap({ assetId: ASSET, name: "P", kind: "world" }); s.setMapParent(s.createMap({ assetId: ASSET, name: "C", kind: "regional" }).id, parent.id); },
+    setMapRevealed: (s) => { s.setMapRevealed(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, true); },
+    deleteMap: (s) => { s.deleteMap(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id); },
+    createMarker: (s) => { s.createMarker(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, MARKER); },
+    updateMarker: (s) => { s.updateMarker(seedMarker(s).id, { label: "L" }); },
+    moveMarker: (s) => { s.moveMarker(seedMarker(s).id, 0.25, 0.25); },
+    setMarkerRevealed: (s) => { s.setMarkerRevealed(seedMarker(s).id, true); },
+    deleteMarker: (s) => { s.deleteMarker(seedMarker(s).id); },
+    setPartyMarker: (s) => { s.setPartyMarker(seedMarker(s).id); },
+    setCalendar: (s) => { s.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: ["First"], currentDate: { year: 1492, month: 0, day: 1 } }); },
+    publishCampaignDate: (s) => { s.publishCampaignDate(); },
+    createEntry: (s) => { s.createEntry({ playerText: "We arrived." }); },
+    appendCombatEntry: (s) => { s.appendCombatEntry({ playerText: "A battle.", gmText: null, sourceEncounterId: 1 }); },
+    createDeadline: (s) => { s.createDeadline({ playerText: "Dawn.", inWorldDate: { year: 1492, month: 0, day: 2 } }); },
+    createDowntime: (s) => { s.createDowntime({ playerText: "Forging.", downtime: { who: "Ireena", activity: "Forging", days: 3 } }); },
+    createMilestone: (s) => { s.createMilestone({ playerText: "Level 5.", milestone: { level: 5, reason: "the crypt" } }); },
+    applyDowntime: (s) => {
+      s.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: ["First"], currentDate: { year: 1492, month: 0, day: 1 } });
+      s.applyDowntime(s.createDowntime({ playerText: "Forging.", downtime: { who: "Ireena", activity: "Forging", days: 3 } }).id);
+    },
+    updateEntry: (s) => { s.updateEntry(s.createEntry({ playerText: "A" }).id, { playerText: "B" }); },
+    setEntryRevealed: (s) => { s.setEntryRevealed(s.createEntry({ playerText: "A" }).id, true); },
+    deleteEntry: (s) => { s.deleteEntry(s.createEntry({ playerText: "A" }).id); },
+    createSession: (s) => { s.createSession({ sessionNumber: 1 }); },
+    updateSession: (s) => { s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined); },
+    setSessionRevealed: (s) => { s.setSessionRevealed(s.createSession({ sessionNumber: 1 }).id, true); },
+    deleteSession: (s) => { s.deleteSession(s.createSession({ sessionNumber: 1 }).id); },
+    setActiveSession: (s) => { s.setActiveSession(s.createSession({ sessionNumber: 1 }).id); },
+    createQuest: (s) => { s.createQuest({ title: "Q" }); },
+    updateQuest: (s) => { s.updateQuest(s.createQuest({ title: "Q" }).id, { status: "completed" }, undefined); },
+    setQuestRevealed: (s) => { s.setQuestRevealed(s.createQuest({ title: "Q" }).id, true); },
+    deleteQuest: (s) => { s.deleteQuest(s.createQuest({ title: "Q" }).id); },
+    setStanding: (s) => { s.setStanding(s.createPage({ title: "F", entityType: "faction" }).id, 10, "kind words"); },
+    setStandingRevealed: (s) => { const page = s.createPage({ title: "F", entityType: "faction" }).id; s.setStanding(page, 10, "kind words"); s.setStandingRevealed(page, true); }
+  };
+  const MARKER = { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff8800" } as const;
+  const seedMarker = (from: CodexStore) => from.createMarker(from.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, MARKER);
+
+  /**
+   * Read from the SOURCE rather than from the prototype, because `private` is erased at runtime and this
+   * has to be a statement about the public surface. The regex takes members at exactly two spaces of
+   * indent whose first token is an identifier followed by `(` - which `private foo(` is not, and which no
+   * comment line or statement body can be. The floor assertion is there so a regex that stops matching
+   * fails loudly instead of quietly classifying nothing.
+   */
+  it("classifies every public method, so a write added tomorrow cannot slip past this", () => {
+    const source = readFileSync(new URL("../src/codex-store.ts", import.meta.url), "utf8");
+    const classBody = source.slice(source.indexOf("export class CodexStore {"));
+    const surface = [...classBody.matchAll(/^ {2}(?:get |async )?([a-zA-Z][A-Za-z0-9_]*)\s*\(/gm)]
+      .map((match) => match[1]!)
+      .filter((name) => !["if", "for", "while", "switch", "catch", "return"].includes(name));
+    expect(surface.length, "the source scan found nothing - the regex, not the store, is broken").toBeGreaterThan(50);
+
+    const declared = new Set([...NOT_WRITES, ...Object.keys(WRITES)]);
+    expect([...new Set(surface)].filter((name) => !declared.has(name)), "classify each of these as a read (NOT_WRITES) or a write (WRITES)").toEqual([]);
+    // ...and nothing is classified that no longer exists, so the lists cannot rot in the other direction.
+    expect([...declared].filter((name) => name !== "constructor" && !surface.includes(name)), "these are classified but no longer on CodexStore").toEqual([]);
+  });
+
+  it.each(Object.keys(WRITES))("%s moves store.revision", (name) => {
+    const before = store.revision;
+    WRITES[name]!(store);
+    expect(store.revision, `${name} wrote without bumping the coarse revision - every ETag it invalidated stays valid`).toBeGreaterThan(before);
   });
 });
