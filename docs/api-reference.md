@@ -47,7 +47,7 @@ Every request authenticates with `Authorization: Bearer <token>` (the viewer's c
 - **Request IDs.** Send `X-Request-Id` (UUID v4) to correlate; every `/api/v1` router echoes it on the response header and in error bodies, minting one when you don't. A value that isn't a UUID v4 is replaced rather than echoed.
 - **Idempotency, per surface.** *Game* writes accept `commandId` (UUID), executed exactly once; a retry replays the stored outcome with `duplicate: true`, and an omitted id is minted server-side and echoed. D19: codex JSON-body writes accept an optional `commandId` (UUID); resend the same id to retry safely and the stored outcome is replayed verbatim - same status, same bytes - with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none - they are naturally idempotent already. *Homebrew* writes still carry none and rely on `expectedRev`.
 - **Optimistic concurrency, two vocabularies.** `expectedRevision` (game) targets the **global** GameState revision. `expectedRev` (codex pages/sessions/quests, homebrew rows) targets **one record's** revision. Both reject a stale write with `409` and `error.currentRevision`. Codex maps, pins, journal entries, calendar, settings and standing are deliberately last-write-wins - a single-GM surface does not need a conflict token on every row, and spreading one costs more than it prevents.
-- **Error statuses.** `400 validation_failed` - malformed request; a schema failure carries every problem in `details.issues` as `{ path, message }`, not just the first. `401 unauthenticated` - **no credential, or an `Authorization` header that isn't parseable**, and nothing else. `403 forbidden` - you presented something and were refused: a role denial, or a token that is invalid, revoked, or missing the required scope. `404 not_found` - absent **or secret**: the existence of a record you may not see is never distinguishable from its absence. `409 conflict` - a domain refusal or a stale revision (`details.needsConfirm` on a timeline navigation: resend with `confirmRewrite`/`confirmDiscard`). `413` - oversized body (global limit 512kb; the homebrew pack import raises its own).
+- **Error statuses.** `400 validation_failed` - malformed request; a schema failure carries every problem in `details.issues` as `{ path, message }`, not just the first. `401 unauthenticated` - **no credential, or an `Authorization` header that isn't parseable**, and nothing else. `403 forbidden` - you presented something and were refused: a role denial, or a token that is invalid, revoked, or missing the required scope. `404 not_found` - absent **or secret**: the existence of a record you may not see is never distinguishable from its absence. `409 conflict` - a domain refusal or a stale revision (`details.needsConfirm` on a timeline navigation: resend with `confirmRewrite`/`confirmDiscard`). `413` - oversized body. The global limit is 512kb; three routes raise their own and each states it on the operation - `POST /homebrew/packs/import` (about 4mb), `POST /codex/import` (64mb, because a backup bundle carries every revision), and `POST /codex-assets` (11mb, one page image).
 - **One stated exception to the 404 rule.** Binary asset-content routes (`/map-assets/{id}/content`, `/codex-assets/{id}/content`) answer `403` **before** any existence check. Media URLs are guessable and get embedded in pages, so answering 404-vs-403 there would turn the route into an existence oracle for ids you were never given.
 - **Polling.** `GET /game` and **every codex `GET`** send a weak ETag derived from the relevant revision; send `If-None-Match` for a free `304`. Presence and timed-annotation expiry don't bump the game revision - re-fetch when you need those fresh. A conditional request is checked *after* authorization and existence, so a `304` never leaks that a record you can't see is unchanged.
 - **Change observation.** Socket.IO emits a `codex:changed` / `homebrew:changed` ping whenever that surface moves. Treat a ping as "re-read", not as data - it exists so integrations don't have to poll tightly, and the payload is not part of this contract.
@@ -2746,7 +2746,7 @@ The campaign timeline, or a location's mini-timeline via `markerId`/`pageId`, ro
 
 ### `POST /api/v1/codex/journal`
 
-Adds a journal/timeline entry.
+Adds a journal/timeline entry. A `sessionId` naming no session is a **404**, not a 400 - the body is well-formed and the record it points at is gone.
 
 **Auth:** Integration credential with `codex:write` · GM session
 
@@ -2766,7 +2766,7 @@ Adds a journal/timeline entry.
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
 | `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
 
-**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403`
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/journal/deadline`
 
@@ -2790,7 +2790,7 @@ CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the 
 | `inWorldDate` | CodexInWorldDate | yes | WHEN it happens - the date the campaign clock has to reach for this to fire. Required, and never null. |
 | `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
 
-**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403`
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/journal/downtime`
 
@@ -2815,7 +2815,7 @@ CT-10: records DOWNTIME - who spent how many days doing what between adventures.
 | `downtime` | CodexDowntimeInput | yes |  |
 | `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
 
-**Responses:** `201` Success - envelope of `CodexDowntimeCreatedData` · errors `400` `401` `403`
+**Responses:** `201` Success - envelope of `CodexDowntimeCreatedData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/journal/milestone`
 
@@ -2840,7 +2840,7 @@ CT-8: records a MILESTONE - the party reached a level, and why. `level` is the l
 | `milestone` | CodexMilestoneInput | yes |  |
 | `commandId` | string (uuid) | no | Optional idempotency key: resend the same id to retry safely; the replay carries `x-idempotent-replay: true`. |
 
-**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403`
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `PATCH /api/v1/codex/journal/{id}`
 
@@ -3251,7 +3251,7 @@ Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex tabl
 
 ### `POST /api/v1/codex-assets`
 
-Uploads a page image (banner or inline) as raw bytes in the request body; `filename` is a query parameter. Content-addressed: identical bytes return the existing asset with 200 instead of 201.
+Uploads a page image (banner or inline) as raw bytes in the request body; `filename` is a query parameter. Content-addressed: identical bytes return the existing asset with 200 instead of 201. The body limit on this route is 11 MB and an oversized upload is a **413**.
 
 **Auth:** Integration credential with `codex:write` · GM session
 
@@ -3259,7 +3259,7 @@ Uploads a page image (banner or inline) as raw bytes in the request body; `filen
 
 **Request body:** raw `image/*` bytes.
 
-**Responses:** `200` Identical bytes already stored; the existing asset is returned - envelope of `CodexAssetUploadData` · `201` New image stored - envelope of `CodexAssetUploadData` · errors `400` `401`
+**Responses:** `200` Identical bytes already stored; the existing asset is returned - envelope of `CodexAssetUploadData` · `201` New image stored - envelope of `CodexAssetUploadData` · errors `400` `401` `403` `413`
 
 ### `GET /api/v1/codex-assets/{id}/content`
 

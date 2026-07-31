@@ -165,19 +165,41 @@ describe("public API contracts", () => {
   it("documents 401 AND 403 on every codex operation, and 304 on every codex GET", () => {
     type Op = { responses: Record<string, unknown> };
     const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
-    for (const path of Object.values(CODEX_PATHS)) {
+    // The ASSET paths are walked too. They were outside this loop, which is how the upload route came to
+    // document 400 and 401 but not the 403 `requireWrite` genuinely answers - the exact drift this test
+    // exists to catch, sitting in the one pair of paths it did not look at.
+    for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
       for (const [method, op] of Object.entries(paths[path])) {
+        // The binary asset-CONTENT route is the stated exception, pinned exactly below rather than waved
+        // through: it answers 403 before any existence check, so it has no 401 arm to document.
+        if (path === CODEX_ASSET_PATHS.content) continue;
         // 401 is "no credential"; 403 is "you presented one and were refused". Every codex route now
         // accepts a bearer token, so every route can answer both - documenting only 401 was the bug.
         expect(Object.keys(op.responses), `${method} ${path} must document 401`).toContain("401");
         expect(Object.keys(op.responses), `${method} ${path} must document 403`).toContain("403");
+        // ...and only the JSON reads answer 304. The asset upload is a POST and the asset content route is
+        // handled below, so this stays a statement about the codex GETs.
         if (method === "get") expect(Object.keys(op.responses), `${method} ${path} must document 304`).toContain("304");
       }
     }
-    // The binary asset-content route is the stated exception: it answers 403 before any existence check
-    // (no existence oracle on a media URL), so it has no 401 arm to document - but it does 304.
     const content = paths[CODEX_ASSET_PATHS.content].get;
     expect(Object.keys(content.responses)).toEqual(["200", "304", "403", "404"]);
+    // A route that mounts a body parser above the server's global limit must document the 413 that parser
+    // raises - the caller cannot otherwise tell "your image is too big" from "we broke".
+    expect(Object.keys(paths[CODEX_ASSET_PATHS.collection].post.responses)).toContain("413");
+    expect(Object.keys(paths[CODEX_PATHS.import].post.responses)).toContain("413");
+
+    /**
+     * Every journal CREATOR documents 404. All four accept `sessionId` (the deadline/downtime/milestone
+     * bodies extend the journal one), which flows to `requireSession` and throws `CodexNotFoundError`;
+     * downtime additionally 404s on a `characterPageId` naming no page. None of the four declared it, so
+     * the same document contradicted itself - the `sessionId` and `characterPageId` field descriptions
+     * inside these very request components both state the status is 404. A spec-generated client would
+     * throw on the undeclared status, or a retry layer would keep retrying a write that cannot succeed.
+     */
+    for (const path of [CODEX_PATHS.journal, CODEX_PATHS.journalDeadline, CODEX_PATHS.journalDowntime, CODEX_PATHS.journalMilestone]) {
+      expect(Object.keys(paths[path].post.responses), `post ${path} must document 404`).toContain("404");
+    }
   });
 
   /**

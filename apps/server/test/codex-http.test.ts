@@ -356,6 +356,51 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect((await get(base, contentPath, PLAYER)).status).toBe(200);        // now the banner of a revealed page
   });
 
+  /**
+   * A `codex:read` CREDENTIAL reaches page images, which the served OpenAPI, the generated reference and
+   * the scope table have all promised from the start.
+   *
+   * This route hand-rolled its authorization (`authorizeGm || authorizePlayer`) instead of going through
+   * `principalFor`, so it was the one codex route a credential could not reach - and, since the sibling
+   * upload moved to `requireWrite`, `codex:write` could store a banner that `codex:read` could never fetch
+   * back. It fails closed, so it was never a leak; it was the document being false.
+   *
+   * The scope split is asserted in both directions on the SAME asset, so "a credential works" cannot pass
+   * by a verifier that ignores the scope.
+   */
+  it("serves page media to a codex:read credential, and not to a write-only one", async () => {
+    const { base } = await fixture();
+    const upload = await fetch(`${base}/api/v1/codex-assets?filename=a.png`, { method: "POST", headers: { authorization: "Bearer int-codex:write", "content-type": "image/png" }, body: png(8, 8) });
+    expect(upload.status, "a codex:write credential may upload").toBe(201);
+    const contentPath = `/api/v1/codex-assets/${(await body(upload)).data.asset.id as string}/content`;
+
+    expect((await get(base, contentPath, INTEGRATION_READ)).status, "…and codex:read may read it back").toBe(200);
+    expect((await get(base, contentPath, INTEGRATION_WRITE)).status, "write is not read - the scope still decides").toBe(403);
+    // No token at all stays a 403 rather than a 401: this route refuses before it looks anything up, so a
+    // media URL cannot become an existence oracle. That is the contract's one stated exception.
+    expect((await fetch(`${base}${contentPath}`)).status).toBe(403);
+  });
+
+  /**
+   * An oversized page image is the documented 413, not a sanitized 500.
+   *
+   * The upload mounts its own `express.raw` parser at 11 MB, and an error from a route-level parser reaches
+   * the CODEX router's catch-all rather than the app-level body-parser handler in `server.ts` (Express
+   * propagates errors forward, and that handler is registered before this router). So the catch-all
+   * swallowed it as "The codex request failed." and a GM could not tell a too-big image from a broken
+   * server. The limit is asserted with a 12 MB body, one megabyte over.
+   */
+  it("answers 413 for an oversized page image instead of a sanitized 500", async () => {
+    const { base } = await fixture();
+    const tooBig = await fetch(`${base}/api/v1/codex-assets?filename=a.png`, {
+      method: "POST", headers: { authorization: "Bearer gm-token", "content-type": "image/png" }, body: Buffer.alloc(12 * 1024 * 1024)
+    });
+    expect(tooBig.status).toBe(413);
+    const refusal = await body(tooBig);
+    expect(refusal.error.code).toBe("bad_request");
+    expect(refusal.error.message).toBe("The request body is too large.");
+  });
+
   it("exposes entity type + fields on reveal, and hides connections to unrevealed entities", async () => {
     const { base } = await fixture();
     const strahd = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Strahd", entityType: "character", fields: { race: "Vampire", age: "400" } }));
@@ -1092,8 +1137,20 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     // tell this apart from a generic bad body.
     expect(JSON.stringify(refusal.error)).toContain("sessionNumber");
     expect((refusal.error.details.issues as unknown[]).length).toBeGreaterThan(0);
-    // ...and an id naming no session is a 404, not a silently unfiled entry.
-    expect((await post(base, "/api/v1/codex/journal", GM, { playerText: "Nowhere.", sessionId: randomUUID() })).status).toBe(404);
+    // ...and an id naming no session is a 404, not a silently unfiled entry. ALL FOUR journal creators take
+    // `sessionId` (the deadline/downtime/milestone bodies extend the journal one), so all four are walked:
+    // the contract documented 404 on none of them, and a spec-generated client would have thrown on an
+    // undeclared status or retried a write that can never succeed.
+    for (const [path, extra] of [
+      ["/api/v1/codex/journal", {}],
+      ["/api/v1/codex/journal/deadline", { inWorldDate: { year: 1492, month: 0, day: 1 } }],
+      ["/api/v1/codex/journal/downtime", { downtime: { who: "Ireena", activity: "Forging", days: 3 } }],
+      ["/api/v1/codex/journal/milestone", { milestone: { level: 5, reason: "the crypt" } }]
+    ] as const) {
+      expect((await post(base, path, GM, { playerText: "Nowhere.", sessionId: randomUUID(), ...extra })).status, path).toBe(404);
+    }
+    // Downtime has a SECOND 404 of its own: a `characterPageId` naming no page.
+    expect((await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "Nowhere.", downtime: { who: "Ireena", activity: "Forging", days: 3, characterPageId: randomUUID() } })).status).toBe(404);
   });
 
   it("never lets an UNREVEALED session's number ride out on a revealed journal entry", async () => {

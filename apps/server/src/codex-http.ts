@@ -1733,9 +1733,20 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   router.get(`${CODEX_ASSET_BASE}/:id/content`, async (request, response) => {
     const id = pathParam(request, "id");
-    const token = bearer(request);
-    // GM always; a player only when the asset is used by a revealed page (banner or inline image).
-    const allowed = options.authorizeGm(token) || (options.authorizePlayer(token) && store.isPageAssetVisibleToPlayers(id));
+    // GM (or a credential, which reads at GM grade) always; a player only when the asset is used by a
+    // revealed page (banner or inline image).
+    //
+    // This was the ONE codex route that hand-rolled its authorization - `authorizeGm(token) ||
+    // (authorizePlayer(token) && ...)` - and so the one route a `codex:read` credential could not reach,
+    // while the served OpenAPI, the generated reference and the scope table all promise it does. A
+    // `codex:write` credential could upload a page banner it could never read back. Routed through
+    // `principalFor` like every other codex read, there is no longer a route with its own answer to "who is
+    // calling". The 403-for-everyone-else (rather than a 401 for no token) is the deliberate, documented
+    // exception this route keeps: a media URL must not become an existence oracle, so it refuses before it
+    // looks anything up, and the refusal reads the same whoever asked.
+    const principal = principalFor(request, "codex:read");
+    const allowed = principal.kind === "gm" || principal.kind === "integration"
+      || (principal.kind === "player" && store.isPageAssetVisibleToPlayers(id));
     if (!allowed) return failure(response, 403, "forbidden", "That image is not available to this session.");
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;
@@ -1754,8 +1765,16 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * name, a column name, or a file path - detail a player session and an integration credential have no
    * business receiving, and detail nobody can act on anyway. One fixed sentence out, the real error to
    * the server log, matching the game surface's discipline.
+   *
+   * The ONE thing it does look at is a body-parser refusal, and only because this router owns a parser of
+   * its own: the asset upload mounts `express.raw` at 11 MB, and an error thrown by a route-level parser
+   * reaches THIS handler, not the app-level one in `server.ts` that renders 413s - Express propagates
+   * errors forward through the stack and that handler is registered before this router. So an oversized
+   * page image answered a sanitized 500 and the caller could not tell "too big" from "we broke". The status
+   * and the sentence are copied from the app-level handler so the surface answers one way.
    */
   router.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
+    if ((error as { type?: string } | null)?.type === "entity.too.large") return failure(response, 413, "bad_request", "The request body is too large.");
     console.error("codex request failed:", error);
     return failure(response, 500, "internal_error", "The codex request failed.");
   });
