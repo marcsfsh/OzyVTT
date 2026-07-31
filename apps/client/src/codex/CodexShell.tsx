@@ -18,6 +18,7 @@ import { useSidebarRailBand } from "./useSidebarRail";
 import { CodexIcon } from "./icons";
 import { NotFoundView } from "../components/NotFoundView";
 import { QuickCreate, type QuickCreateRequest } from "./QuickCreate";
+import { createQuest, createSession } from "./creates";
 import { PagesView } from "./PagesView";
 import { AtlasView } from "./AtlasView";
 import { JournalView } from "./JournalView";
@@ -232,6 +233,39 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
     });
   }, []);
 
+  /**
+   * D3/D10: a list's filters are part of its ADDRESS, so a filtered log is linkable and survives a
+   * refresh. One writer for every list that has filters — the Journal already used this exact shape,
+   * and Sessions and Quests were the two holding theirs in component state.
+   */
+  const setListFilter = useCallback((next: Readonly<Record<string, string | null>>) => {
+    replaceQuery((query) => {
+      for (const [key, value] of Object.entries(next)) { if (value) query.set(key, value); else query.delete(key); }
+    });
+  }, []);
+
+  /**
+   * D7: create-and-open, for the doors that are not on the record's own rail — today the palette.
+   *
+   * The create itself is `creates.ts`, shared with the rail buttons, so there is one answer to "what does
+   * creating a session do". Failure surfaces on the shell's own Alert: the palette closes on the verb, so
+   * an error raised inside it would have nowhere to render.
+   */
+  const newSession = useCallback(async () => {
+    try {
+      const session = await createSession(gmToken, sessions);
+      await loadSessions();
+      void navigate(sessionPath(session.id));
+    } catch (createError) { setError(createError instanceof Error ? createError.message : "Couldn't create the session."); }
+  }, [gmToken, sessions, loadSessions]);
+  const newQuest = useCallback(async () => {
+    try {
+      const quest = await createQuest(gmToken);
+      await loadQuests();
+      void navigate(questPath(quest.id));
+    } catch (createError) { setError(createError instanceof Error ? createError.message : "Couldn't create the quest."); }
+  }, [gmToken, loadQuests]);
+
   const standingRows = useMemo(() => {
     const byFaction = new Map(standing.map((row) => [row.factionPageId, row.value]));
     return pages
@@ -367,6 +401,8 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
               loading={sessionsLoading} error={sessionsError} onChanged={loadSessions}
               autosave={autosave} pages={pages}
               openSessionId={recordId} onOpenSession={(id) => navigate(id ? sessionPath(id) : pathForSection("sessions"))}
+              filter={route.query.get("q") ?? ""} statusFilter={route.query.get("status")}
+              onFilterChange={setListFilter}
               onPickTag={(tag) => navigate(tagPath(tag))} />
           )}
 
@@ -376,6 +412,8 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
               autosave={autosave}
               openQuestId={recordId} onOpenQuest={(id) => navigate(id ? questPath(id) : pathForSection("quests"))}
               onOpenPage={(pageId) => navigate(pagePath(pageId))}
+              filter={route.query.get("q") ?? ""} statusFilter={route.query.get("status")}
+              onFilterChange={setListFilter}
               onPickTag={(tag) => navigate(tagPath(tag))} />
           )}
 
@@ -386,9 +424,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
               onOpenReplay={onOpenReplay}
               openEntryId={route.query.get("entry")} onOpenedEntry={() => replaceQuery((query) => query.delete("entry"))}
               kindFilter={route.query.get("kind")} tagFilter={route.query.get("tag")} textFilter={route.query.get("q") ?? ""}
-              onFilterChange={(next) => replaceQuery((query) => {
-                for (const [key, value] of Object.entries(next)) { if (value) query.set(key, value); else query.delete(key); }
-              })}
+              onFilterChange={setListFilter}
               sessions={sessions} activeSessionId={activeSessionId}
               onOpenSession={(sessionId) => navigate(sessionPath(sessionId))}
               onOpenCalendar={() => navigate(pathForSection("calendar"))} />
@@ -434,6 +470,10 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
         <CommandPalette gmToken={gmToken}
           onOpenHit={(hit) => navigate(pathForHit(hit))}
           onCreatePage={(title) => setQuickCreate({ title })}
+          /* D7: the palette's create verbs run the SAME creates the rails do (`creates.ts`) and land on
+             the new record — they used to navigate to the list and leave the GM to find the button. */
+          onCreateSession={() => void newSession()}
+          onCreateQuest={() => void newQuest()}
           onNavigate={navigate}
           onClose={() => setPaletteOpen(false)} />
       )}

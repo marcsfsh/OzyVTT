@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Checklist, Chip, Drawer, IconButton, IconChevron, Input, Kbd, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Chip, Combobox, Drawer, IconButton, IconChevron, Input, Kbd, Select, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import {
   formatWorldDate, playerCodexApi,
@@ -7,7 +7,7 @@ import {
   type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageConnection,
   type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession, type PlayerCodexStanding
 } from "./api";
-import { CHRONICLE_KIND_META, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeSummaryLabel, milestoneOf, milestoneSummaryLabel, questEventLabel, questEventOf, standingChangeLabel, standingOf } from "./chronicle";
+import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeSummaryLabel, milestoneOf, milestoneSummaryLabel, questEventLabel, questEventOf, standingChangeLabel, standingOf } from "./chronicle";
 import { pickNextSession, sessionTitle } from "./sessions";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
 import { CodexIcon, EntityIcon } from "./icons";
@@ -29,8 +29,8 @@ import { NotFoundView } from "../components/NotFoundView";
 import { TagChip } from "./TagChip";
 import { playerCampaignFeedProps } from "./dashboard";
 import { PLAYER_SIDEBAR, SECTION_TITLE, atlasPath, codexSectionOf, journalEntryPath, pagePath, pathForHit, pathForSection, questPath, recordIdOf, sessionPath, tagPath } from "./routes";
-import { discardTransient, navigate, popTransient, pushTransient, releaseStrandedEntry, replaceQuery, useRoute } from "../router";
-import { entityDef, type EntityType } from "./entities";
+import { discardTransient, navigate, popTransient, pushTransient, releaseStrandedEntry, replaceQuery, useRoute, withQuery } from "../router";
+import { ENTITY_TYPE_LIST, entityDef, type EntityType } from "./entities";
 import "./codex.css";
 
 /**
@@ -99,7 +99,25 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<EntityType | null>(null);
+  /**
+   * D10 — **the filters are the player's too, and they live in the address like the GM's.**
+   *
+   * D10's "in-place search/filter on every list" landed on the GM's five lists and none of these: the
+   * kind filter was component state that only the dashboard could set (so a player who cleared it could
+   * not set it again), and Sessions, Quests and the Journal had no filter at all. Same controls, same
+   * words, same `?type=` / `?q=` / `?status=` / `?kind=` parameters, read through `query` so they survive
+   * a refresh here exactly as they do for the GM — and through `setQuery`, so the GM's embedded preview
+   * keeps its own local address rather than driving the browser's.
+   */
+  const typeFilter = (query.get("type") as EntityType | null) ?? null;
+  const textFilter = query.get("q") ?? "";
+  const statusFilter = query.get("status");
+  const kindFilter = query.get("kind");
+  const setFilter = useCallback((next: Readonly<Record<string, string | null>>) => {
+    setQuery((params) => {
+      for (const [key, value] of Object.entries(next)) { if (value) params.set(key, value); else params.delete(key); }
+    });
+  }, [setQuery]);
 
   const load = useCallback(async () => {
     try {
@@ -145,6 +163,17 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
     return () => { live = false; };
   }, [token, currentMapId]);
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
+  /** D10's Atlas filter, client-side over the pins already fetched for this map — it costs no read. */
+  const pinTags = useMemo(() => [...new Set(markers.flatMap((pin) => pin.tags))].sort(), [markers]);
+  const dimmedPinIds = useMemo(() => {
+    const needle = query.get("q")?.trim().toLowerCase() ?? "";
+    const tag = query.get("tag");
+    if (!needle && !tag) return null;
+    const matches = (pin: PlayerCodexMarker) =>
+      (!needle || (pin.label ?? "").toLowerCase().includes(needle) || pin.tags.some((each) => each.includes(needle)))
+      && (!tag || pin.tags.includes(tag));
+    return new Set(markers.filter((pin) => !matches(pin)).map((pin) => pin.id));
+  }, [markers, query]);
   const selectedPinId = query.get("pin");
   const selectedPin = markers.find((marker) => marker.id === selectedPinId) ?? null;
   const breadcrumb = useMemo(() => {
@@ -153,6 +182,13 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
     return chain;
   }, [currentMap, maps]);
   const childMaps = useMemo(() => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []), [maps, currentMapId]);
+
+  // ----- Pages: D10's in-place filters, client-side over the pages already fetched -----
+  const playerPageTags = useMemo(() => [...new Set(pages.flatMap((summary) => summary.tags))].sort(), [pages]);
+  const shownPages = useMemo(() => {
+    const tag = query.get("tag");
+    return pages.filter((summary) => (!typeFilter || summary.entityType === typeFilter) && (!tag || summary.tags.includes(tag)));
+  }, [pages, typeFilter, query]);
 
   // ----- Search -----
   const runSearch = useCallback((text: string) => playerCodexApi.search(token, text), [token]);
@@ -256,7 +292,9 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
               onOpenEntry={(entryId) => go(journalEntryPath(entryId))}
               onOpenMap={(mapId) => go(atlasPath(mapId))}
               onSeeAll={(target) => go(pathForSection(target === "recent" ? "pages" : target === "deadlines" ? "journal" : target === "atlas" ? "atlas" : target))}
-              onPickType={(type) => { setTypeFilter(type); go(pathForSection("pages")); }}
+              /* The card sets the same `?type=` the Pages rail's own control sets — one filter, two
+                 doors, and the player can now change or clear it where they landed. */
+              onPickType={(type) => go(withQuery(pathForSection("pages"), { type }))}
               onPickTag={(tag) => go(tagPath(tag))} />
           )}
 
@@ -265,16 +303,35 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
               <aside className="codex-rail">
                 <div className="codex-rail-head">
                   <Input value={search} placeholder="Search what you know…" aria-label="Search the Codex"
-                    onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setTypeFilter(null); }} />
+                    onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setFilter({ type: null, tag: null }); }} />
                 </div>
+                {/* D10, the same two controls the GM's Pages rail carries, in the same order and words. */}
+                {!search.trim() && (
+                  <div className="codex-rail-tools">
+                    <Select aria-label="Filter by kind" value={typeFilter ?? ""} onChange={(event) => setFilter({ type: event.target.value || null })}>
+                      <option value="">All kinds</option>
+                      {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{entityDef(type).label}</option>)}
+                    </Select>
+                  </div>
+                )}
+                {!search.trim() && playerPageTags.length > 0 && (
+                  <div className="codex-rail-tagfilter">
+                    <Combobox options={playerPageTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={query.get("tag")}
+                      onChange={(tag) => setFilter({ tag })} ariaLabel="Filter by tag" placeholder="Filter by tag…" />
+                  </div>
+                )}
                 <nav className="codex-list" aria-label="Pages">
                   {search.trim()
                     ? <SearchResultList state={searchState} selectedId={recordId} onOpen={(hit) => go(pathForHit(hit))} emptyLabel="Nothing you know matches that." />
                     : <>
-                        {typeFilter && <Chip onRemove={() => setTypeFilter(null)} removeLabel="Clear filter">{entityDef(typeFilter).label}s</Chip>}
+                        <div className="codex-filter-chips">
+                          {typeFilter && <Chip onRemove={() => setFilter({ type: null })} removeLabel="Clear kind filter">{entityDef(typeFilter).label}s</Chip>}
+                          {query.get("tag") && <Chip onRemove={() => setFilter({ tag: null })} removeLabel="Clear tag filter">#{query.get("tag")}</Chip>}
+                        </div>
                         {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
                         {!loading && pages.length === 0 && <p className="codex-list-empty">Nothing shared yet.</p>}
-                        {pages.filter((summary) => !typeFilter || summary.entityType === typeFilter).map((summary) => (
+                        {!loading && pages.length > 0 && shownPages.length === 0 && <p className="codex-list-empty">Nothing you know matches these filters.</p>}
+                        {shownPages.map((summary) => (
                           <button key={summary.id} type="button" className={`codex-list-item${summary.id === recordId ? " is-active" : ""}`} onClick={() => go(pagePath(summary.id))}>
                             {summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}
                             <span className="codex-list-title">{summary.title}</span>
@@ -341,9 +398,24 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                   ))}
                 </nav>
               )}
+              {/* D10: the GM's pin filter, on the player's map. Non-matching pins DIM rather than
+                  disappearing, for the reason the GM's does — a map with pins removed is a different
+                  picture of the world, not a filtered list of one. */}
+              {currentMap && markers.length > 0 && (
+                <div className="codex-atlas-filter">
+                  <Input aria-label="Filter pins" placeholder="Filter pins…" value={textFilter}
+                    onChange={(event) => setFilter({ q: event.target.value || null })} />
+                  {pinTags.length > 0 && (
+                    <Combobox options={pinTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={query.get("tag")}
+                      onChange={(tag) => setFilter({ tag })} ariaLabel="Filter pins by tag" placeholder="Filter by tag…" />
+                  )}
+                  {dimmedPinIds && <span className="codex-atlas-filtercount" role="status">{markers.length - dimmedPinIds.size} of {markers.length} pins match</span>}
+                </div>
+              )}
               <div className="codex-atlas-body">
                 {currentMap
                   ? <MapSurface token={token} assetId={currentMap.assetId} markers={markers} placing={false} readOnly selectedMarkerId={selectedPinId}
+                      dimmedMarkerIds={dimmedPinIds}
                       onBackgroundClick={() => undefined}
                       onMarkerClick={(markerId) => setQuery((params) => params.set("pin", markerId))}
                       onMarkerDragEnd={() => undefined} />
@@ -371,18 +443,21 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
           {section === "sessions" && (
             <PlayerSessions sessions={sessions} loading={loading} openId={recordId} token={token}
               onOpen={(id) => go(id ? sessionPath(id) : pathForSection("sessions"))} onNavigate={followLink} knownTitles={knownTitles}
+              filter={textFilter} onFilterChange={setFilter}
               onPickTag={(tag) => go(tagPath(tag))} />
           )}
 
           {section === "quests" && (
             <PlayerQuests quests={quests} pages={pages} loading={loading} openId={recordId} token={token}
               onOpen={(id) => go(id ? questPath(id) : pathForSection("quests"))} onOpenPage={(pageId) => go(pagePath(pageId))}
+              filter={textFilter} statusFilter={statusFilter} onFilterChange={setFilter}
               onNavigate={followLink} knownTitles={knownTitles} />
           )}
 
           {section === "journal" && (
             <PlayerJournal records={timeline} calendar={calendar} pages={pages} token={token}
               focusedId={query.get("entry")} onNavigate={followLink} knownTitles={knownTitles}
+              kindFilter={kindFilter} tagFilter={query.get("tag")} textFilter={textFilter} onFilterChange={setFilter}
               quests={quests} />
           )}
 
@@ -420,20 +495,35 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 }
 
 /** D14: revealed sessions, recap rendered as markdown like every other body in the suite. */
-function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, knownTitles, onPickTag }: Readonly<{
+function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, knownTitles, onPickTag, filter, onFilterChange }: Readonly<{
   sessions: readonly PlayerCodexSession[]; loading: boolean; openId: string | null; token: string;
   onOpen: (id: string | null) => void; onNavigate: (target: string) => void; knownTitles: ReadonlySet<string>;
   onPickTag: (tag: string) => void;
+  /** D10: the same in-place filter the GM's Sessions rail has, over the fields a player actually gets. */
+  filter: string;
+  onFilterChange: (next: Readonly<Record<string, string | null>>) => void;
 }>) {
   const open = openId ? sessions.find((session) => session.id === openId) ?? null : null;
+  const shown = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    if (!needle) return sessions;
+    return sessions.filter((session) =>
+      sessionTitle(session).toLowerCase().includes(needle)
+      || (session.realDate ?? "").toLowerCase().includes(needle)
+      || session.tags.some((tag) => tag.includes(needle))
+      || session.recap.toLowerCase().includes(needle));
+  }, [sessions, filter]);
   return (
     <div className={`codex-workspace${open ? " has-selection" : ""}`}>
       <aside className="codex-rail">
-        <div className="codex-rail-head"><strong className="codex-sessions-railtitle">Sessions</strong></div>
+        <div className="codex-rail-head">
+          <Input value={filter} placeholder="Filter sessions…" aria-label="Filter sessions" onChange={(event) => onFilterChange({ q: event.target.value || null })} />
+        </div>
         <nav className="codex-list" aria-label="Sessions">
           {loading && sessions.length === 0 && <div className="codex-list-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</div>}
           {!loading && sessions.length === 0 && <p className="codex-list-empty">No recaps shared yet.</p>}
-          {sessions.map((session) => (
+          {!loading && sessions.length > 0 && shown.length === 0 && <p className="codex-list-empty">No sessions match.</p>}
+          {shown.map((session) => (
             <button key={session.id} type="button" aria-current={session.id === open?.id ? "true" : undefined}
               className={`codex-session-row${session.id === open?.id ? " is-active" : ""}`} onClick={() => onOpen(session.id)}>
               <span className="codex-list-title">{sessionTitle(session)}</span>
@@ -458,20 +548,41 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
 }
 
 /** D14: quest bodies render as markdown now, the same as every other body in the suite. */
-function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPage, onNavigate, knownTitles }: Readonly<{
+function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPage, onNavigate, knownTitles, filter, statusFilter, onFilterChange }: Readonly<{
   quests: readonly PlayerCodexQuest[]; pages: readonly PlayerCodexPageSummary[]; loading: boolean; openId: string | null; token: string;
   onOpen: (id: string | null) => void; onOpenPage: (pageId: string) => void; onNavigate: (target: string) => void; knownTitles: ReadonlySet<string>;
+  /** D10: the GM's two quest filters, over the player's own feed. `status` is player-facing on a quest. */
+  filter: string;
+  statusFilter: string | null;
+  onFilterChange: (next: Readonly<Record<string, string | null>>) => void;
 }>) {
   const open = openId ? quests.find((quest) => quest.id === openId) ?? null : null;
   const questPages = (open?.entityIds ?? []).map((id) => pages.find((summary) => summary.id === id)).filter((summary): summary is PlayerCodexPageSummary => Boolean(summary));
+  const shown = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    return quests.filter((quest) =>
+      (!statusFilter || quest.status === statusFilter)
+      && (!needle || quest.title.toLowerCase().includes(needle) || quest.tags.some((tag) => tag.includes(needle))));
+  }, [quests, filter, statusFilter]);
   return (
     <div className={`codex-workspace${open ? " has-selection" : ""}`}>
       <aside className="codex-rail">
-        <div className="codex-rail-head"><strong className="codex-sessions-railtitle">Quests</strong></div>
+        <div className="codex-rail-head">
+          <Input value={filter} placeholder="Filter quests…" aria-label="Filter quests" onChange={(event) => onFilterChange({ q: event.target.value || null })} />
+        </div>
+        <div className="codex-rail-tools">
+          <Select aria-label="Filter by status" value={statusFilter ?? ""} onChange={(event) => onFilterChange({ status: event.target.value || null })}>
+            <option value="">All quests</option>
+            <option value="active">{QUEST_STATUS_LABEL.active}</option>
+            <option value="completed">{QUEST_STATUS_LABEL.completed}</option>
+            <option value="failed">{QUEST_STATUS_LABEL.failed}</option>
+          </Select>
+        </div>
         <nav className="codex-list" aria-label="Quests">
           {loading && quests.length === 0 && <div className="codex-list-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</div>}
           {!loading && quests.length === 0 && <p className="codex-list-empty">No quests shared yet.</p>}
-          {quests.map((quest) => (
+          {!loading && quests.length > 0 && shown.length === 0 && <p className="codex-list-empty">No quests match.</p>}
+          {shown.map((quest) => (
             <button key={quest.id} type="button" aria-current={quest.id === open?.id ? "true" : undefined}
               className={`codex-quest-row${quest.id === open?.id ? " is-active" : ""}`} onClick={() => onOpen(quest.id)}>
               <CodexIcon iconId="quest" className="codex-ent-icon codex-quest-rowglyph" />
@@ -525,7 +636,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
  * function of already-projected data), so the same `groupChronicle` runs here unmodified — no client
  * date arithmetic, and no second chronology.
  */
-function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate, knownTitles, quests }: Readonly<{
+function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate, knownTitles, quests, kindFilter, tagFilter, textFilter, onFilterChange }: Readonly<{
   records: readonly PlayerCodexChronicleRecord[];
   calendar: CodexCalendar | null;
   pages: readonly PlayerCodexPageSummary[];
@@ -534,17 +645,32 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
   onNavigate: (target: string) => void;
   knownTitles: ReadonlySet<string>;
   quests: readonly PlayerCodexQuest[];
+  /** D10: the GM's three Journal filters, over the player's own records. Same kinds, same order. */
+  kindFilter: string | null;
+  tagFilter: string | null;
+  textFilter: string;
+  onFilterChange: (next: Readonly<Record<string, string | null>>) => void;
 }>) {
   useEffect(() => {
     if (!focusedId) return;
     document.getElementById(`codex-player-entry-${focusedId}`)?.scrollIntoView({ block: "center" });
   }, [focusedId, records]);
 
+  /** Filter BEFORE grouping, exactly as the GM's Journal does — otherwise a year keeps an empty heading. */
+  const allTags = useMemo(() => [...new Set(records.flatMap((record) => record.tags))].sort(), [records]);
+  const filtered = useMemo(() => {
+    const needle = textFilter.trim().toLowerCase();
+    return records.filter((record) =>
+      (!kindFilter || record.kind === kindFilter)
+      && (!tagFilter || record.tags.includes(tagFilter))
+      && (!needle || record.text.toLowerCase().includes(needle) || (record.title ?? "").toLowerCase().includes(needle)));
+  }, [records, kindFilter, tagFilter, textFilter]);
+
   /** Grouped by in-world YEAR, using the server's own instants — never a client re-derivation. */
   const groups = useMemo(() => {
     const buckets = new Map<number | null, PlayerCodexChronicleRecord[]>();
     const perYear = calendar ? calendar.months.reduce((sum, month) => sum + month.days, 0) || 1 : 1;
-    for (const record of records) {
+    for (const record of filtered) {
       const key = record.calendarInstant !== null && calendar ? Math.floor(record.calendarInstant / perYear) : null;
       const bucket = buckets.get(key) ?? [];
       bucket.push(record); buckets.set(key, bucket);
@@ -552,7 +678,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
     return [...buckets.keys()]
       .sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b))
       .map((key) => ({ key: key === null ? "none" : String(key), label: key === null ? "Undated" : `${key}${calendar?.yearName ? ` ${calendar.yearName}` : ""}`, records: buckets.get(key)! }));
-  }, [records, calendar]);
+  }, [filtered, calendar]);
   const todayYear = calendar?.currentDate
     ? Math.floor(((calendar.months.slice(0, calendar.currentDate.month).reduce((sum, month) => sum + month.days, 0) + calendar.currentDate.day - 1) + calendar.currentDate.year * (calendar.months.reduce((sum, month) => sum + month.days, 0) || 1)) / (calendar.months.reduce((sum, month) => sum + month.days, 0) || 1))
     : null;
@@ -560,8 +686,28 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
 
   return (
     <div className="codex-journal">
+      {/* D10, the GM's own filter row: above the timeline and outside the groups, because all three
+          govern every group. In the address, so the dashboard's deadline card can deep-link to
+          "the Journal, deadlines only" for a player exactly as it does for their GM. */}
+      {records.length > 0 && (
+        <div className="codex-timeline-lens">
+          <Select aria-label="Filter by kind" value={kindFilter ?? ""} onChange={(event) => onFilterChange({ kind: event.target.value || null })}>
+            <option value="">All kinds</option>
+            {CHRONICLE_FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{CHRONICLE_KIND_META[kind].label}</option>)}
+          </Select>
+          <Input aria-label="Filter the journal" placeholder="Filter the journal…" value={textFilter}
+            onChange={(event) => onFilterChange({ q: event.target.value || null })} />
+          {allTags.length > 0 && (
+            <Select aria-label="Filter by tag" value={tagFilter ?? ""} onChange={(event) => onFilterChange({ tag: event.target.value || null })}>
+              <option value="">All tags</option>
+              {allTags.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
+            </Select>
+          )}
+        </div>
+      )}
       <div className="codex-timeline">
         {records.length === 0 && <p className="codex-list-empty">No entries shared yet.</p>}
+        {records.length > 0 && filtered.length === 0 && <p className="codex-list-empty">Nothing in the Journal matches these filters.</p>}
         {groups.map((group) => (
           <section key={group.key} className="codex-timeline-group">
             <div className="codex-timeline-year">{group.label}</div>

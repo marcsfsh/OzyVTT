@@ -15,6 +15,11 @@ import { GM_SIDEBAR, PLAYER_SIDEBAR, pathForSection } from "./routes";
  * twelve), create verbs that open the one quick-create dialog rather than making an untyped page, and
  * the truncation line. Its chrome is now the `Modal` primitive with the new top alignment, replacing the
  * bespoke scrim + panel it used to hand-roll (D25).
+ *
+ * **A verb here does the thing it is named for.** "New page…" opens quick-create; "New session" and "New
+ * quest" run the same creates the rails run and land on the new record (D7 — one create habit, whichever
+ * door starts it). The two "Log …" rows navigate, because a journal entry and a downtime record are
+ * composed in a form and the form is what they are a door to; they are named accordingly.
  */
 
 type Action =
@@ -28,6 +33,14 @@ export type CommandPaletteProps = Readonly<{
   onOpenHit: (hit: CodexSearchHit) => void;
   /** Opens quick-create prefilled with the typed name. Absent on the player palette — no create verbs. */
   onCreatePage?: (title: string) => void;
+  /**
+   * D7: **genuinely create**, then open the new record — the same call the Sessions rail's "New" makes
+   * (`creates.ts`). These rows used to navigate to the list, which is exactly what "Go to Sessions" does
+   * six rows below, so a GM who asked the palette for a new session got a list and still had to find the
+   * rail button. Supplied together with `onCreatePage`; absent on the player palette.
+   */
+  onCreateSession?: () => void;
+  onCreateQuest?: () => void;
   onNavigate: (path: string) => void;
   onClose: () => void;
   player?: boolean;
@@ -36,7 +49,7 @@ export type CommandPaletteProps = Readonly<{
 /** A quick-switcher stays a switcher: the full result list lives in the rail. */
 const MAX_HITS = 8;
 
-export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onNavigate, onClose, player = false }: CommandPaletteProps) {
+export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSession, onCreateQuest, onNavigate, onClose, player = false }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,8 +82,11 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onNavigate, o
       if (onCreatePage) {
         list.push(
           { kind: "create", label: "New page…", title: "" },
-          { kind: "verb", label: "New session", run: () => onNavigate(pathForSection("sessions")) },
-          { kind: "verb", label: "New quest", run: () => onNavigate(pathForSection("quests")) },
+          // D7: these two CREATE. The two below them do not, and are not labelled as though they do —
+          // a journal entry and a downtime record are both composed in a form, so their door is the
+          // surface that holds the form, and "Log …" is the honest name for going there.
+          ...(onCreateSession ? [{ kind: "verb" as const, label: "New session", run: onCreateSession }] : []),
+          ...(onCreateQuest ? [{ kind: "verb" as const, label: "New quest", run: onCreateQuest }] : []),
           { kind: "verb", label: "Log a journal entry", run: () => onNavigate(pathForSection("journal")) },
           { kind: "verb", label: "Log downtime", run: () => onNavigate(pathForSection("downtime")) }
         );
@@ -78,7 +94,7 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onNavigate, o
       list.push(...gotoVerbs);
     }
     return list;
-  }, [state, query, gotoVerbs, onCreatePage, onNavigate]);
+  }, [state, query, gotoVerbs, onCreatePage, onCreateSession, onCreateQuest, onNavigate]);
 
   useEffect(() => { setActive(0); }, [query]);
 

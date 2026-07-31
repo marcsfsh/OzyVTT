@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Combobox, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexAutosaveSettings, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type CodexSession, type GmCodexCalendar } from "./api";
-import { CHRONICLE_KIND_META, CHRONICLE_LENSES, questEventLabel, questEventOf, chronicleWhenLabel, deadlineFired, deadlinesPassedBy, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, revealAheadOfPlayers, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
+import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META, CHRONICLE_LENSES, questEventLabel, questEventOf, chronicleWhenLabel, deadlineFired, deadlinesPassedBy, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, revealAheadOfPlayers, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
 import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
@@ -56,12 +56,6 @@ type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionId
 const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionId: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "", level: "", reason: "" };
 const DRAFT_KEY = "codex-journal-draft";
 const LENS_KEY = "codex-chronicle-lens";
-/**
- * D10 — the kinds the filter offers, every one the chronicle can hold. Named explicitly (rather than
- * `Object.keys(CHRONICLE_KIND_META)`) so the order is the reading order rather than declaration order,
- * and typed as the union so a new kind is a compile error here instead of a silently missing option.
- */
-const FILTER_KINDS: readonly CodexChronicleKind[] = ["entry", "combat", "event", "deadline", "downtime", "milestone", "standing", "quest"];
 /**
  * OWNER DECISION (2026-07-30): the prep-clock reveal warning is switchable off, and the switch is per
  * DEVICE — `localStorage`, like every other GM reading preference in this app (`vtt.show-occupied`,
@@ -556,7 +550,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           options={CHRONICLE_LENSES.map((option) => ({ value: option.id, label: option.label }))} />
         <Select aria-label="Filter by kind" value={kindFilter ?? ""} onChange={(event) => onFilterChange?.({ kind: event.target.value || null })}>
           <option value="">All kinds</option>
-          {FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{CHRONICLE_KIND_META[kind].label}</option>)}
+          {CHRONICLE_FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{CHRONICLE_KIND_META[kind].label}</option>)}
         </Select>
         <Input aria-label="Filter the journal" placeholder="Filter the journal…" value={textFilter}
           onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />

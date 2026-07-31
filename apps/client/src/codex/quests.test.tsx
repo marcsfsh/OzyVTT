@@ -424,9 +424,18 @@ describe("The player's quest reader", () => {
     expect(objectives.getByText("Find the crypt")).toBeInTheDocument();
     expect(objectives.getByText("— done")).toBeInTheDocument();
     expect(objectives.getByText("— not done")).toBeInTheDocument();
-    // Read-only, on the same terms as the card: nothing here is operable, anywhere on the surface.
+    /**
+     * Read-only, on the same terms as the card: **nothing on this surface can change a quest.**
+     *
+     * Scoped to the reader for the textbox, and deliberately: D10 gave the player's rail the same
+     * in-place filter the GM's has, so there is now exactly one text input on the screen and it is that
+     * filter. Asserting "no textbox anywhere" would forbid a control that writes nothing — so the claim
+     * is stated as it is meant: no writable control in the reader, no checkbox anywhere (an objective a
+     * player could tick would be a real write), and the one input outside it is the filter by name.
+     */
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
-    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+    expect(reader.queryAllByRole("textbox")).toHaveLength(0);
+    expect(screen.getAllByRole("textbox").map((box) => box.getAttribute("aria-label"))).toEqual(["Filter quests"]);
   });
 
   it("is where the FINISHED quests live — the dashboard card stays open-only", async () => {

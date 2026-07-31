@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Combobox, Field, Input, NumberField, Skeleton, Textarea } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, Input, NumberField, Skeleton } from "@vtt/ui";
 import {
   formatWorldDate, journalApi,
   type CodexChronicleRecord, type CodexDowntimePayload, type CodexInWorldDate, type CodexPageSummary,
   type GmCodexCalendar, type PlayerCodexChronicleRecord
 } from "./api";
 import { deadlinesPassedBy, downtimeOf, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
+import { CodexEditor } from "./CodexEditor";
 import { CodexIcon, EntityIcon } from "./icons";
 import { newId } from "../lib/ids";
 
@@ -148,7 +149,14 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
           </Field>
           <Field label="Activity" htmlFor="codex-downtime-activity"><Input id="codex-downtime-activity" value={activity} placeholder="Forging a blade" onChange={(event) => setActivity(event.target.value)} /></Field>
           <Field label="Days" htmlFor="codex-downtime-days"><NumberField id="codex-downtime-days" aria-label="Days" value={days} min={0} max={3650} onChange={(next) => setDays(next ?? 0)} /></Field>
-          <Field label="Note" htmlFor="codex-downtime-note" className="codex-field-wide"><Textarea id="codex-downtime-note" value={note} placeholder="What came of it…" onChange={(event) => setNote(event.target.value)} /></Field>
+          {/* D13, one editor everywhere: this note becomes a journal record's player text, so it gets the
+              SAME writing surface the journal composer gives the same field — toolbar, `[[` autocomplete,
+              Edit/View. It was the last bare `Textarea` left in the suite, which meant typing `[[` here
+              silently did nothing while the identical write through the Journal linked pages properly. */}
+          <Field label="Note" htmlFor="codex-downtime-note" className="codex-field-wide">
+            <CodexEditor id="codex-downtime-note" token={gmToken} value={note} onChange={setNote}
+              ariaLabel="Note" placeholder="What came of it…" pages={pages} onNavigate={() => undefined} rows={3} />
+          </Field>
         </div>
         {proposed && calendar && <p className="codex-composer-hint">Logging this proposes moving your date to <strong>{formatWorldDate(calendar, proposed)}</strong>. Nothing moves until you confirm it below.</p>}
         <Button variant="primary" disabled={busy || (!who.trim() && !whoPageId)} onClick={() => void log()}>Log downtime</Button>

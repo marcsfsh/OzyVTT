@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
 import { questApi, type CodexAutosaveSettings, type CodexQuest, type CodexQuestObjective, type CodexQuestStatus } from "./api";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
+import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";
 import { GmOnlyTag, RevealSwitch, VisibilityBadge } from "./SecretMarkers";
 import { CodexIcon, EntityIcon } from "./icons";
@@ -35,6 +36,14 @@ type QuestsViewProps = Readonly<{
   error: string | null;
   /** D3: which quest is open comes from the ADDRESS (`/codex/quests/:id`), not from local state. */
   openQuestId?: string | null;
+  /**
+   * D3/D10: the filters live in the ADDRESS too (`?q=`, `?status=`), as Pages, Atlas and Journal already
+   * did. In component state they were lost on every navigation and a filtered log could not be linked to
+   * or refreshed back into — two of the five lists behaving unlike the other three.
+   */
+  filter?: string;
+  statusFilter?: string | null;
+  onFilterChange?: (next: Readonly<Record<string, string | null>>) => void;
   onOpenQuest: (questId: string | null) => void;
   onChanged: () => void | Promise<void>;
   /** A linked page opens in Pages, which also leaves this section. */
@@ -43,11 +52,8 @@ type QuestsViewProps = Readonly<{
   onPickTag?: (tag: string) => void;
 }>;
 
-export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId = null, onOpenQuest, onChanged, onOpenPage, autosave, onPickTag }: QuestsViewProps) {
+export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId = null, onOpenQuest, onChanged, onOpenPage, autosave, onPickTag, filter = "", statusFilter = null, onFilterChange }: QuestsViewProps) {
   const [listError, setListError] = useState<string | null>(null);
-  // D10: in-place filters, on every list.
-  const [filter, setFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"" | CodexQuestStatus>("");
 
   const selected = openQuestId ? quests.find((quest) => quest.id === openQuestId) ?? null : null;
   const shown = useMemo(() => {
@@ -60,9 +66,9 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
   const create = async () => {
     setListError(null);
     try {
-      // A title is required by the route (`min(1)`), so one is supplied rather than sending a blank and
-      // letting the server 400 at a GM who has not typed anything yet.
-      const quest = await questApi.create(gmToken, { title: "Untitled quest" });
+      // D7: the SAME create the palette's "New quest" runs — one create per record type, whichever door
+      // starts it.
+      const quest = await createQuest(gmToken);
       await onChanged();
       onOpenQuest(quest.id);
     } catch (createError) { setListError(createError instanceof Error ? createError.message : "Couldn't create the quest."); }
@@ -73,7 +79,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
       <div className={`codex-workspace${selected ? " has-selection" : ""}`}>
         <aside className="codex-rail">
           <div className="codex-rail-head">
-            <Input value={filter} placeholder="Filter quests…" aria-label="Filter quests" onChange={(event) => setFilter(event.target.value)} />
+            <Input value={filter} placeholder="Filter quests…" aria-label="Filter quests" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
 {/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
                 screen, and the empty state's own create is the primary when there is nothing to select
                 — the rail's create steps down rather than competing with either. Two magenta-filled
@@ -82,7 +88,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
             <Button variant={selected && !autosave.enabled ? "secondary" : "primary"} size="sm" onClick={create}><IconPlus /> New</Button>
           </div>
           <div className="codex-rail-tools">
-            <Select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "" | CodexQuestStatus)}>
+            <Select aria-label="Filter by status" value={statusFilter ?? ""} onChange={(event) => onFilterChange?.({ status: event.target.value || null })}>
               <option value="">All quests</option>
               <option value="active">{QUEST_STATUS_LABEL.active}</option>
               <option value="completed">{QUEST_STATUS_LABEL.completed}</option>

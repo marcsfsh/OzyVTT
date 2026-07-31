@@ -21,6 +21,8 @@ const getCalendar = vi.fn();
 const playerCalendar = vi.fn();
 const listSessions = vi.fn();
 const listQuests = vi.fn();
+const createSessionCall = vi.fn();
+const createQuestCall = vi.fn();
 const listStanding = vi.fn();
 const playerListPages = vi.fn();
 const playerListMaps = vi.fn();
@@ -53,8 +55,8 @@ vi.mock("./api", async (importOriginal) => {
     journalApi: { ...actual.journalApi, chronicle: (...a: unknown[]) => chronicle(...a), forPage: async () => [] },
     atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a), listAssets: async () => [], listMarkers: async () => [] },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
-    sessionApi: { ...actual.sessionApi, list: (...a: unknown[]) => listSessions(...a) },
-    questApi: { ...actual.questApi, list: (...a: unknown[]) => listQuests(...a) },
+    sessionApi: { ...actual.sessionApi, list: (...a: unknown[]) => listSessions(...a), create: (...a: unknown[]) => createSessionCall(...a) },
+    questApi: { ...actual.questApi, list: (...a: unknown[]) => listQuests(...a), create: (...a: unknown[]) => createQuestCall(...a) },
     standingApi: { ...actual.standingApi, list: (...a: unknown[]) => listStanding(...a) }
   };
 });
@@ -106,6 +108,8 @@ beforeEach(() => {
   playerCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] });
   listSessions.mockResolvedValue({ sessions: [], activeSessionId: null });
   listQuests.mockResolvedValue([]);
+  createSessionCall.mockResolvedValue({ id: "s-new", sessionNumber: 1, status: "planned" });
+  createQuestCall.mockResolvedValue({ id: "q-new", title: "Untitled quest", status: "active" });
   listStanding.mockResolvedValue([]);
   playerListPages.mockResolvedValue([]);
   playerListMaps.mockResolvedValue([]);
@@ -255,7 +259,66 @@ describe("What it can do", () => {
     // The first action with an empty query is "New page…", the second "New session"; one press down and
     // Enter must run the second, not the first.
     await user.keyboard("{ArrowDown}{Enter}");
-    await waitFor(() => expect(window.location.pathname).toBe("/codex/sessions"));
+    await waitFor(() => expect(createSessionCall).toHaveBeenCalled());
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/sessions/s-new"));
+  });
+
+  /**
+   * D7 — **the create verbs create.** They used to run `onNavigate(pathForSection("sessions"))`: the
+   * identical target of the "Go to Sessions" row six lines below, so the palette answered "new session"
+   * with a list and the GM still had to find the rail's "+ New". Two rows of the empty-query list were
+   * exact duplicates of two others, and both were labelled as creates.
+   *
+   * Asserted as **the write, then the address of the new record** — landing on the list would satisfy a
+   * weaker assertion while leaving the bug exactly as it was.
+   */
+  it("New session creates a session and opens it — it does not just go to the list", async () => {
+    const user = userEvent.setup();
+    renderGm();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.keyboard("{Control>}k{/Control}");
+
+    await user.click(within(await palette()).getByRole("button", { name: "New session" }));
+
+    await waitFor(() => expect(createSessionCall).toHaveBeenCalledTimes(1));
+    // The same create the rail runs (`creates.ts`): the next number suggested, planned, and an
+    // idempotency key so a double tap on a phone does not leave two sessions behind.
+    expect(createSessionCall.mock.calls[0][1]).toMatchObject({ sessionNumber: 1, status: "planned" });
+    expect(createSessionCall.mock.calls[0][1].commandId).toEqual(expect.any(String));
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/sessions/s-new"));
+    // And the palette got out of the way, as it does for every other action.
+    expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
+  });
+
+  it("New quest creates a quest and opens it", async () => {
+    const user = userEvent.setup();
+    renderGm();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.keyboard("{Control>}k{/Control}");
+
+    await user.click(within(await palette()).getByRole("button", { name: "New quest" }));
+
+    await waitFor(() => expect(createQuestCall).toHaveBeenCalledTimes(1));
+    expect(createQuestCall.mock.calls[0][1]).toMatchObject({ title: "Untitled quest" });
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/quests/q-new"));
+  });
+
+  /**
+   * The two rows that are NOT creates must not pretend to be. A journal entry and a downtime record are
+   * both composed in a form, so their honest door is the surface that holds the form — "Log …", not
+   * "New …" — and they are the only two verbs here that navigate.
+   */
+  it("the two Log verbs go to their composer and write nothing", async () => {
+    const user = userEvent.setup();
+    renderGm();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.keyboard("{Control>}k{/Control}");
+
+    await user.click(within(await palette()).getByRole("button", { name: "Log downtime" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/downtime"));
+    expect(createSessionCall).not.toHaveBeenCalled();
+    expect(createQuestCall).not.toHaveBeenCalled();
   });
 });
 

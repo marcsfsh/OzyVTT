@@ -40,6 +40,17 @@ export function chronicleWhenLabel(record: ChronicleWhen): string {
  * an unknown id, so a typo would not throw — it would silently render the wrong glyph on every row of
  * that kind. `deadlines.test.tsx` and `standing.test.tsx` assert each one resolves.
  */
+/**
+ * D10 — the kinds a Journal filter offers, every one the chronicle can hold.
+ *
+ * Named explicitly (rather than `Object.keys(CHRONICLE_KIND_META)`) so the order is the reading order
+ * rather than declaration order, and typed as the union so a new kind is a compile error here instead of
+ * a silently missing option. It lives beside the labels because BOTH journals filter by it now: the GM's
+ * and — since D10's filters reached the player's lists — the player's, which must offer the same kinds in
+ * the same order or the two readers disagree about what the Journal contains.
+ */
+export const CHRONICLE_FILTER_KINDS: readonly CodexChronicleKind[] = ["entry", "combat", "event", "deadline", "downtime", "milestone", "standing", "quest"];
+
 export const CHRONICLE_KIND_META: Readonly<Record<CodexChronicleKind, Readonly<{ iconId: string; label: string; tone: "neutral" | "caution" | "info" }>>> = {
   entry: { iconId: "scroll", label: "Entry", tone: "neutral" },
   combat: { iconId: "battle", label: "Battle", tone: "caution" },

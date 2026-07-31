@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, IconChevron, IconPlus, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
 import { sessionApi, type CodexAutosaveSettings, type CodexPageSummary, type CodexSession, type CodexSessionStatus } from "./api";
 import { pickNextSession, sessionTitle } from "./sessions";
+import { createSession } from "./creates";
 import { CodexEditor } from "./CodexEditor";
 import { GmOnlyTag, RevealSwitch, VisibilityBadge } from "./SecretMarkers";
 import { TagChip } from "./TagChip";
@@ -27,6 +28,14 @@ type SessionsViewProps = Readonly<{
   error: string | null;
   /** D3: which session is open comes from the ADDRESS (`/codex/sessions/:id`), not from local state. */
   openSessionId?: string | null;
+  /**
+   * D3/D10: the filters live in the ADDRESS too (`?q=`, `?status=`), as Pages, Atlas and Journal already
+   * did. In component state they were lost on every navigation and a filtered log could not be linked to
+   * or refreshed back into — two of the five lists behaving unlike the other three.
+   */
+  filter?: string;
+  statusFilter?: string | null;
+  onFilterChange?: (next: Readonly<Record<string, string | null>>) => void;
   /** Navigate. `null` goes back to the list. */
   onOpenSession: (sessionId: string | null) => void;
   onChanged: () => void | Promise<void>;
@@ -36,11 +45,8 @@ type SessionsViewProps = Readonly<{
   onPickTag?: (tag: string) => void;
 }>;
 
-export function SessionsView({ gmToken, sessions, activeSessionId, loading, error, openSessionId = null, onOpenSession, onChanged, autosave, pages, onPickTag }: SessionsViewProps) {
+export function SessionsView({ gmToken, sessions, activeSessionId, loading, error, openSessionId = null, onOpenSession, onChanged, autosave, pages, onPickTag, filter = "", statusFilter = null, onFilterChange }: SessionsViewProps) {
   const [listError, setListError] = useState<string | null>(null);
-  // D10: in-place filters, on every list.
-  const [filter, setFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"" | CodexSessionStatus>("");
 
   const selected = openSessionId ? sessions.find((session) => session.id === openSessionId) ?? null : null;
   const shown = useMemo(() => {
@@ -55,11 +61,10 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
 
   const create = async () => {
     setListError(null);
-    // Suggest the next number rather than asking for one. A duplicate is a clean 400 with a message
-    // written for a GM to read, so the suggestion can be wrong without being destructive.
-    const highest = sessions.reduce((best, session) => Math.max(best, session.sessionNumber ?? 0), 0);
+    // D7: the SAME create the palette's "New session" runs — one create per record type, whichever door
+    // starts it, including the number suggestion.
     try {
-      const session = await sessionApi.create(gmToken, { sessionNumber: highest + 1, status: "planned" });
+      const session = await createSession(gmToken, sessions);
       await onChanged();
       onOpenSession(session.id);
     } catch (createError) { setListError(createError instanceof Error ? createError.message : "Couldn't create the session."); }
@@ -70,7 +75,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
       <div className={`codex-workspace${selected ? " has-selection" : ""}`}>
         <aside className="codex-rail">
           <div className="codex-rail-head">
-            <Input value={filter} placeholder="Filter sessions…" aria-label="Filter sessions" onChange={(event) => setFilter(event.target.value)} />
+            <Input value={filter} placeholder="Filter sessions…" aria-label="Filter sessions" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
 {/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
                 screen, and the empty state's own create is the primary when there is nothing to select
                 — the rail's create steps down rather than competing with either. Two magenta-filled
@@ -79,7 +84,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
             <Button variant={selected && !autosave.enabled ? "secondary" : "primary"} size="sm" onClick={create}><IconPlus /> New</Button>
           </div>
           <div className="codex-rail-tools">
-            <Select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "" | CodexSessionStatus)}>
+            <Select aria-label="Filter by status" value={statusFilter ?? ""} onChange={(event) => onFilterChange?.({ status: event.target.value || null })}>
               <option value="">All sessions</option>
               <option value="planned">Planned</option>
               <option value="played">Played</option>
