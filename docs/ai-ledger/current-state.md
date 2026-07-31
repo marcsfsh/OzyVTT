@@ -8,6 +8,24 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **The Codex speaks one connection language, records its own history, and restores from backup
+  (2026-07-31, Lane B Phases 2-4, migrations v22-v23).**
+  - **One connection system (D8/D13).** Typed relationships and `[[wiki-links]]` are one concept with an
+    optional label and an `origin`; session, quest and journal bodies join the graph with their own
+    two-layer split (prep and `gmText` yield GM-only edges). `GET /codex/pages/{id}` answers
+    `{page, connections}`; `GET /codex/relationships`, `GET /codex/links`,
+    `POST /codex/pages/{id}/relationships` and `DELETE /codex/relationships/{id}` are RETIRED. The
+    one-time re-extraction of existing bodies rides a startup reconcile, because SQL cannot parse
+    `[[..]]`.
+  - **Quest history (D11).** Creating a quest and changing its status each append a hidden `quest`
+    journal record in the same transaction. Hidden WHOLE from players until the quest is revealed.
+  - **Backup and restore (D16).** `POST /codex/import` replaces the codex transactionally from an export
+    file POSTed back unedited. `bundleVersion` is optional, so pre-versioning backups restore.
+  - **`commandId` idempotency (D19).** Codex JSON-body writes accept one; a replay carries
+    `x-idempotent-replay: true`. Checked inside the write guard, after authorization.
+  - **The narrow downtime PATCH (D12).** `PATCH /codex/journal/{id}` takes `downtime: {who, activity,
+    characterPageId}` so existing free-text rows can be linked to character pages. `days` is immutable.
+
 - **The Codex's journal, sessions and pins know who they belong to (2026-07-31, branch
   `claude/ozyvtt-codex-ux-4pl7ib`, Codex overhaul Lane B, Phases 1-3 partial).** Four migrations
   (v18-v21), all additive or content-preserving, all verified against a real legacy database built from
@@ -33,9 +51,6 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   - **`codex:changed` carries only a revision (D22)**; a type-changing page save forces its revision
     snapshot (D7/R7); every public write is pinned to bump the coarse revision, which is what the ETags
     rest on.
-  - **Not yet landed in this lane:** the D8/D13 connections unification, D16 import/restore, `commandId`
-    idempotency, D11 quest history (the database CHECK already admits the kind), and the narrow downtime
-    PATCH. See `handoff/B-to-C.md` §7.
 
 - **The Codex is a first-class citizen of the public API (2026-07-31, branch
   `claude/ozyvtt-codex-ux-4pl7ib`, Codex overhaul Lane A).** The published contract described a codex

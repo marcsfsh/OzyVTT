@@ -7,6 +7,42 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-31 — one connection system, quest history, and a restore that honours old backups
+
+Codex overhaul, Lane B (Phases 2-4). Five durable decisions.
+
+- **Typed relationships and `[[wiki-links]]` are ONE concept, over TWO storages (D8/D13, v22).** The
+  Codex had two ways to say two records are related, and a GM had to remember which one they had used.
+  They unify into a CONNECTION with an optional label and an `origin`. The storages stay: a declared
+  edge is id-keyed and CRUD-able, a mention is title-keyed and rebuilt from body text on every save, and
+  materializing mentions as rows would need a sync protocol ("what does deleting a connection whose
+  source is a sentence mean?"). D8 permits this in its own words. Nothing moves, so the unification is
+  lossless in both directions. The twelve legacy slugs become the labels a reader sees, which retires
+  the client display mapping - and costs the inverse wording ("ruled by"), which a free-text label
+  cannot express; a reader renders direction plus label instead.
+- **The connection gate is one predicate with three conditions, for BOTH origins.** Target page
+  revealed, source record revealed by its own kind's rule, and `layer === 'player'`. That is stronger
+  than what it replaces: a GM-layer DECLARED edge between two revealed pages no longer travels, and a
+  connection out of a hidden session's prep body cannot be a way around that session's own gate.
+- **Quest history is written on CREATE and on status change (D11, ruling R5), and hidden WHOLE.** A
+  quest record carries empty player text, so it cannot stand on its own prose - the standing CORRECTION's
+  exact false premise - and nulling `questId` alone would ship "Quest - completed" for a quest the party
+  has never heard of. The whole row is gated on the quest's reveal, on `projectPlayerJournalEntry` so all
+  four player journal surfaces inherit it. Migration v19 widened the CHECK for this in Phase 2, so D11
+  needed no second table rebuild.
+- **Import is REPLACE-only, and `bundleVersion` is OPTIONAL (D16, ruling R1).** Merge is undefinable for
+  the singleton, invariant-bearing state a bundle carries; every merge rule would be a reconciliation
+  policy with its own silent-corruption mode. A bundle with no version is a pre-versioning backup and
+  restores, because honoring the backups a GM already has is the entire point - a required key would keep
+  the promise only for files made after the upgrade. Rows are written RAW: a restore reproduces a state,
+  it does not perform a hundred authoring events, so it fabricates no quest history and no snapshots.
+- **`commandId` idempotency is checked INSIDE the write guard, not before it (D19, v23).** As a plain
+  router middleware the replay ran before authorization, which made a receipt into a bearer token - a
+  player who knew a GM's key got the GM's 201. A replay is a cache of a response, and a cache must never
+  be reachable by a caller who could not have produced the response. The receipt is recorded after the
+  commit, and the one-retry crash window that leaves is documented rather than hidden: a receipt written
+  first can report success for a write that never landed, which is the worse failure.
+
 ## 2026-07-31 — journal entries join their session by identity, and the Codex learns to autosave
 
 Codex overhaul, Lane B (Phases 1-2). Five durable decisions; one of them consciously supersedes a

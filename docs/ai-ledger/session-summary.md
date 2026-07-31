@@ -8,6 +8,22 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-31 — Codex overhaul, Lane B (continued): connections, history, restore
+
+Five more commits (`c6e9e73`, `73482d7`, `16cf126`, `d97683e` + ledger). 1546 tests, up from 1523.
+
+D8/D13 unify typed relationships and wiki-links into one connection concept over two storages
+(migration v22: generalized link sources, a `layer` on declared edges, the twelve slugs relabelled, a
+startup reconcile for the one-time re-extraction). D11 writes quest history on create and on status
+change, hidden whole until the quest is revealed. D16 lands `POST /codex/import` - transactional
+replace, `bundleVersion` optional per R1. D12's narrow journal PATCH gives existing downtime rows an
+adoption path. D19's `commandId` idempotency lands with migration v23 and the four-document conventions
+sync.
+
+**Two real bugs were caught by the new tests rather than by review**: the import validator truncated
+marker coordinates to integers (every pin to the corner on restore), and the idempotency middleware
+originally ran before the write guard, which made a receipt into a bearer token.
+
 ## 2026-07-31 — Codex overhaul, Lane B: the server half (`claude/ozyvtt-codex-ux-4pl7ib`)
 
 Four commits (`b829168`, `d1a695c`, `8a93aab`, `13e3974`) on top of Lane A. 1523 tests, up from 1499.
