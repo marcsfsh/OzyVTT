@@ -4838,6 +4838,42 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
     }
   });
 
+  /**
+   * DIRECTOR RULING R2 SURVIVES A BACKUP AND RESTORE.
+   *
+   * `deleteSession` stamps a REVEALED session's number back onto its entries as a bare display label, on the
+   * ground that the party was already reading it. On the wire that row is `{sessionId: null, sessionNumber:
+   * 4}` - byte-identical to a PRE-D9 row whose 4 is a lost join. Import used to treat every such row as the
+   * second, so a restore minted a HIDDEN "Session 4" that was never in the exported codex, joined the entry
+   * to it, and nulled the entry's own label. `playerSessionLink` then blanks both halves for an unrevealed
+   * session, so every player silently lost the label R2 exists to preserve - and export -> import -> export
+   * was no longer stable.
+   *
+   * The last two assertions are the ones that would have caught it: the phantom, and the player's label.
+   */
+  it("keeps R2's bare session label through a round trip, and mints no phantom session for it", () => {
+    const session = store.createSession({ sessionNumber: 4 });
+    store.setSessionRevealed(session.id, true);
+    const entry = store.createEntry({ playerText: "We crossed the bridge.", sessionId: session.id, revealedToPlayers: true });
+    store.deleteSession(session.id);
+    expect(store.getEntry(entry.id), "R2's stamp-back is the state under test").toMatchObject({ sessionId: null, sessionNumber: 4 });
+
+    const before = store.exportBundle();
+    store.importBundle(JSON.parse(JSON.stringify(before)) as unknown);
+
+    expect(store.getEntry(entry.id), "the label came back as a label, not as a join").toMatchObject({ sessionId: null, sessionNumber: 4 });
+    expect(store.listSessions(), "no phantom session was minted for the label").toEqual([]);
+    // The two sections R2 lives in, compared byte for byte: export -> import -> export is stable for them.
+    // (Scoped to those two rather than the whole bundle because a codex whose calendar was never set writes
+    // no `currentDate` key on its first export and a normalized `currentDate: null` on its second - a
+    // pre-existing wrinkle in the calendar default, unrelated to R2 and not this test's subject.)
+    const after = store.exportBundle();
+    expect(JSON.stringify(after.journal)).toBe(JSON.stringify(before.journal));
+    expect(JSON.stringify(after.sessions)).toBe(JSON.stringify(before.sessions));
+    // The half a player actually reads: the label the party was already shown still reaches them.
+    expect(projectPlayerJournalEntry(store.getEntry(entry.id)!, playerSessionNumbers())).toMatchObject({ sessionId: null, sessionNumber: 4 });
+  });
+
   it("restores a PRE-VERSIONING bundle — the backups a GM already has (director ruling R1)", () => {
     // Hand-built in the shape an export produced BEFORE this engagement: no `settings`, no `tags` on
     // sessions or quests, no `layer` on a relationship, a slug `type` rather than a label, and journal
@@ -4870,6 +4906,10 @@ describe("CodexStore import — replace, all-or-nothing (D16)", () => {
 
     // Missing keys DEFAULTED rather than failing: no tags, a `player` layer, and the settings untouched.
     expect(store.listSessions().every((session) => session.tags.length === 0)).toBe(true);
+    // ...and the synthesized placeholder is INDEXED like every other session written by an import. It was
+    // the one arm that skipped `indexSession`, so "Session 9" was findable in the Sessions list and nowhere
+    // else - not in the palette, not in suite search - while "Session 4" from the same file resolved.
+    expect(store.searchAll("gm", "Session 9").hits.map((hit) => hit.id)).toEqual([synthesized.id]);
     const edge = store.listAllConnections().find((row) => row.origin === "declared")!;
     expect(edge.layer).toBe("player");
     // ...and an old SLUG `type` lands as the label v22's relabel would have made it.

@@ -646,6 +646,26 @@ export type CodexPageUpdateInput = Readonly<{
  * bundles must restore (director ruling R1). Everything else has been in the bundle since the milestone
  * that added the record type; a missing key defaults rather than failing, for the same reason.
  */
+/**
+ * A bundle's journal row, plus the one fact about the FILE - rather than about the record - that import
+ * needs: did this row carry a `sessionId` key at all?
+ *
+ * D9 put `sessionId` on every exported journal row and it is written even when null, so its ABSENCE dates
+ * the row to a pre-D9 export. That is the ONLY thing that tells apart the two states which are otherwise
+ * byte-identical on the wire - `{sessionId: null, sessionNumber: 4}`:
+ *   - a PRE-D9 row, whose 4 is a lost join that `importBundle` must resolve or synthesize (the v19 rule);
+ *   - a MODERN row, whose 4 is director ruling R2's bare display LABEL, stamped on when a revealed session
+ *     was deleted, and which must be written straight back.
+ * Treating the second as the first mints a phantom HIDDEN session, nulls the entry's own label, and
+ * `playerSessionLink` then blanks both halves - so every player silently loses a label R2 deliberately kept,
+ * and export -> import -> export stops being stable.
+ *
+ * Deliberately a PER-ROW signal rather than the bundle-level `bundleVersion`, which was the other candidate.
+ * `bundleVersion` is optional on the wire and absence is documented as "pre-versioning", so a modern backup
+ * POSTed with the key stripped would take the legacy path and corrupt exactly the labels this protects. The
+ * question is per row anyway - "is this a lost join or a bare label?" - so it is answered per row.
+ */
+export type CodexBundleJournalRow = CodexJournalRow & Readonly<{ declaredSessionId: boolean }>;
 export type CodexBundle = Readonly<{
   pages: readonly CodexPageRow[]; maps: readonly CodexMapRow[]; markers: readonly CodexMarkerRow[];
   journal: readonly CodexJournalRow[]; relationships: readonly CodexRelationshipRow[];
@@ -654,6 +674,12 @@ export type CodexBundle = Readonly<{
   calendar: CodexCalendar; folders: readonly string[]; revisions: readonly CodexPageRevisionExportRow[];
   settings?: CodexSettingsInput;
 }>;
+/**
+ * What `normalizeBundle` hands `importBundle`: the bundle, plus the per-row provenance flag above. Kept
+ * separate from `CodexBundle` on purpose - `exportBundle` returns a `CodexBundle` and it is serialized
+ * verbatim, so a key that exists only to describe the INPUT file must never be able to reach the output.
+ */
+export type CodexImportBundle = Omit<CodexBundle, "journal"> & Readonly<{ journal: readonly CodexBundleJournalRow[] }>;
 /** What the database actually holds after a restore - its own row counts, never the bundle's claims. */
 export type CodexImportCounts = Readonly<{ pages: number; folders: number; maps: number; markers: number; journal: number; connections: number; sessions: number; quests: number; standing: number; revisions: number }>;
 /** The bundle FORMAT version. A fact about the file, so the export route stamps it beside `codex`, not inside it. */
@@ -2382,7 +2408,7 @@ const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, .
  *   - referential closure for every FK the schema declares: a marker's map, a map's parent, both ends of a
  *     declared connection, a standing row's faction page, a revision's page.
  */
-function normalizeBundle(raw: unknown): CodexBundle {
+function normalizeBundle(raw: unknown): CodexImportBundle {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new CodexValidationError("That backup file is not a codex bundle.");
   const bundle = raw as Record<string, unknown>;
   const unrecognised = Object.keys(bundle).find((key) => !BUNDLE_KEYS.has(key));
@@ -2472,6 +2498,9 @@ function normalizeBundle(raw: unknown): CodexBundle {
       revealedToPlayers: flag(row.revealedToPlayers), attachMarkerId: optionalId(nullableText(row.attachMarkerId)),
       attachPageId: optionalId(nullableText(row.attachPageId)), kind, sourceEncounterId: typeof row.sourceEncounterId === "number" ? Math.trunc(row.sourceEncounterId) : null,
       sessionId: typeof row.sessionId === "string" ? optionalId(row.sessionId) : null,
+      // See `CodexBundleJournalRow`: the KEY's presence, not its value, is what dates the row to D9 or later
+      // and so tells a lost join apart from R2's bare display label.
+      declaredSessionId: "sessionId" in row,
       sessionNumber: typeof row.sessionNumber === "number" ? sessionNo(row.sessionNumber) : null,
       realDate: shortLabel(nullableText(row.realDate), 40, "date"), inWorldLabel: nullableText(row.inWorldLabel),
       calendarInstant: null, inWorldDate: date(row.inWorldDate), sortKey: count(row.sortKey),
@@ -2480,7 +2509,7 @@ function normalizeBundle(raw: unknown): CodexBundle {
       // it would on read rather than being written back verbatim.
       payload: payloadOf(kind, row.payload === undefined || row.payload === null ? null : JSON.stringify(row.payload)),
       createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
-    } satisfies CodexJournalRow;
+    } satisfies CodexBundleJournalRow;
   });
   const quests = rows("quests", (row) => {
     return {
@@ -3124,24 +3153,40 @@ export class CodexStore {
       }
       const sessionIds = new Set(parsed.sessions.map((session) => session.id));
 
-      // 5. Journal. An OLD bundle's entries carry only `sessionNumber`, so they resolve by number - and an
+      // 5. Journal. A PRE-D9 bundle's entries carry only `sessionNumber`, so they resolve by number - and an
       //    orphan number synthesizes a played+hidden session, the v19 rule re-applied so ONE rule governs
       //    both paths into this state.
+      //
+      //    That arm fires ONLY for a pre-D9 row (`declaredSessionId === false`), and the guard is the whole
+      //    point. A modern row with no join and a number is director ruling R2's bare display LABEL - what
+      //    `deleteSession` stamps back when a REVEALED session is deleted - and synthesizing for it turned a
+      //    label the party could already read into a join to a freshly minted HIDDEN session, which
+      //    `playerSessionLink` then blanks on both halves. The GM's Sessions list gained a phantom that was
+      //    never in the exported codex, and export -> import -> export stopped being stable. See
+      //    `CodexBundleJournalRow` for why the discriminator is per row rather than `bundleVersion`.
       const insertEntry = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, session_id, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       for (const entry of parsed.journal) {
         let sessionId = entry.sessionId !== null && sessionIds.has(entry.sessionId) ? entry.sessionId : null;
+        let bareNumber: number | null = null;
         if (sessionId === null && entry.sessionNumber !== null) {
-          let resolved = sessionByNumber.get(entry.sessionNumber);
-          if (resolved === undefined) {
-            resolved = this.freshId();
-            const stamp = this.stamp();
-            insertSession.run(resolved, entry.sessionNumber, null, "[]", "", "", 0, "played", 1, stamp, stamp, "[]");
-            sessionByNumber.set(entry.sessionNumber, resolved);
+          if (entry.declaredSessionId) bareNumber = entry.sessionNumber;   // R2's label, written straight back
+          else {
+            let resolved = sessionByNumber.get(entry.sessionNumber);
+            if (resolved === undefined) {
+              resolved = this.freshId();
+              const stamp = this.stamp();
+              insertSession.run(resolved, entry.sessionNumber, null, "[]", "", "", 0, "played", 1, stamp, stamp, "[]");
+              // Indexed like every other session written here. The bundled-session loop above does it; this
+              // arm did not, so a synthesized placeholder was the one session in the codex that could not be
+              // found by typing "Session 9" into the palette - and nothing repairs a search row at read time.
+              this.indexSession({ id: resolved, session_number: entry.sessionNumber, real_date: null, attendees_json: "[]", prep_body: "", recap_body: "", revealed: 0, status: "played", rev: 1, created_at: stamp, updated_at: stamp, tags_json: "[]" });
+              sessionByNumber.set(entry.sessionNumber, resolved);
+            }
+            sessionId = resolved;
           }
-          sessionId = resolved;
         }
         const dated = this.resolveDate(entry.inWorldDate, entry.inWorldLabel);
-        insertEntry.run(entry.id, entry.playerText, entry.gmText, entry.revealedToPlayers ? 1 : 0, entry.attachMarkerId, entry.attachPageId, entry.kind, entry.sourceEncounterId, null, sessionId, entry.realDate, dated.label, dated.instant, dated.date?.year ?? null, dated.date?.month ?? null, dated.date?.day ?? null, entry.sortKey, JSON.stringify(entry.tags), entry.payload === null ? null : JSON.stringify(entry.payload), entry.createdAt, entry.updatedAt);
+        insertEntry.run(entry.id, entry.playerText, entry.gmText, entry.revealedToPlayers ? 1 : 0, entry.attachMarkerId, entry.attachPageId, entry.kind, entry.sourceEncounterId, bareNumber, sessionId, entry.realDate, dated.label, dated.instant, dated.date?.year ?? null, dated.date?.month ?? null, dated.date?.day ?? null, entry.sortKey, JSON.stringify(entry.tags), entry.payload === null ? null : JSON.stringify(entry.payload), entry.createdAt, entry.updatedAt);
         this.indexEntry(entry.id, entry.playerText, entry.gmText, JSON.stringify(entry.tags));
         this.rebuildLinksFor("journal", entry.id, entry.playerText, entry.gmText ?? "");
       }
