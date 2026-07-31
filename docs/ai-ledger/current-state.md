@@ -35,9 +35,15 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     pattern, `Input variant="title"`, `Badge tone="violet"`, `IconX`/`IconPlay`, the pin palette).
   - **Deleted outright:** `CodexWorkspace`, `RelationshipsPanel`, `EntityPicker`, `RELATIONSHIP_TYPES`,
     and `findMarkerMap`'s O(maps) scan (now `GET /codex/markers/{id}`).
-  - **Touch floor, measured not asserted:** 805 interactive controls across 17 surfaces, **0 below 44px
-    at 375px and at 320px**, except the graph canvas — an accepted exception now recorded in
-    `design-language.md` §4 with its reasoning. `scripts/tap-audit.mjs` is route-driven.
+  - **Touch floor, measured not asserted:** **1,112 interactive controls across 35 surfaces — 22 GM and
+    13 player, the latter on a real player session — with 16 below 44px at 375px and 16 at 320px, every
+    one of them a graph node**, the accepted exception recorded in `design-language.md` §4 with its
+    reasoning. Corrected 2026-07-31: the earlier "805 controls across 17 surfaces, 0 below the floor"
+    was measured by a GM-only script whose pin and palette openers silently re-measured the previous
+    surface, and the two real sub-floor controls it could not see (`.codex-list-item` at 43.6px on the
+    player's Pages rail, `.codex-marker-link-open` at 35.6px in both shells) are now fixed.
+    `scripts/tap-audit.mjs` is route-driven, walks both roles, and exits non-zero if any surface goes
+    unmeasured.
 
 
 - **The Codex speaks one connection language, records its own history, and restores from backup

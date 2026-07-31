@@ -125,8 +125,17 @@ Mood and combat
 The whole system moves along one axis: magenta to violet to cyan, over a lifted
 indigo/purple ground, with cool white text. Magenta leads and cyan supports (~60/40):
 magenta is the primary brand and action color, cyan is selection, focus, and
-positive. No green-teal. No yellow/orange. Red is permitted only as a
-magenta-adjacent rose for damage and destruction.
+positive. No green-teal. Red is permitted only as a magenta-adjacent rose for damage
+and destruction.
+
+**One deliberate exception, ruling R8 (D21): `--caution` is a warm orange.** It used to
+alias `--violet`, which invariant 8 reserves exclusively for GM-only content — so a
+warning badge and a GM-secret block were the same hue, and the one colour that must mean
+exactly one thing meant two. Orange is the only direction left that is neither loss-red,
+brand magenta/cyan, nor GM-violet, so the "no yellow/orange" restraint yields to the
+invariant rather than the other way round. It is scoped to the caution pair and nothing
+else: `--caution: #FF9E4A` / `--caution-hi: #FFB877` on dark and dusk, `#B4560A` /
+`#8F4406` on light, all measured against WCAG 2.1 in `design-tokens.css`.
 
 Semantic map (hue is a hint, never the only signal):
 
@@ -134,16 +143,16 @@ Semantic map (hue is a hint, never the only signal):
 |---|---|---|
 | Primary action / attention | `--magenta` | filled buttons, active tabs |
 | Positive / heal / confirm | `--success` (cyan) | a check or plus icon |
-| Caution / magic / special | `--caution` (violet) | a warning icon |
+| Caution / magic / special | `--caution` (warm orange, R8) | a warning icon |
 | Damage / destroy / critical | `--danger` (rose-red) | a distinct icon and label |
 | Info / neutral highlight | `--info` (indigo) | plain, low urgency |
 
 **"Not finished" is caution, not danger.** Rose-red is reserved for damage and
 destruction — an actual loss. A blocked Next, an incomplete review section, a locked
 choice card: nothing has gone wrong, the flow is simply not done, so those use
-`--caution`. Both violet and rose have a text-safe partner (`--caution-hi`,
-`--danger-hi`) because the fill hue does not meet AA as small type — use the `-hi`
-token for the words and the base token for edges and fills.
+`--caution`. Both the caution orange and the danger rose have a text-safe partner
+(`--caution-hi`, `--danger-hi`) because the fill hue does not meet AA as small type —
+use the `-hi` token for the words and the base token for edges and fills.
 
 Text: primary `--text`, secondary `--text-dim`, muted/placeholder `--text-muted`,
 and `--text-on-neon` for ink on bright fills (its value flips per theme).
@@ -211,12 +220,26 @@ the *hit area*, never the paint.
   whole `/styleguide` page: **0 controls below the floor**. New UI composed from
   `@vtt/ui` inherits it for free, which is the main reason to compose rather than
   hand-roll.
-- **The whole Codex.** Measured 2026-07-31 in Chromium against a populated database,
-  17 surfaces including the page editor, the pin inspector, the command palette, the
-  nav drawer and the session-prep drawer: **805 interactive controls, 0 below the
-  floor at 375px and at 320px**, excluding the graph canvas in the table below.
-  Reproduce with `node scripts/tap-audit.mjs 375` (it is route-driven, so a new
-  address is covered by adding one line).
+- **The whole Codex, both roles.** Measured 2026-07-31 in Chromium against a populated
+  database, **35 surfaces**: the GM's twenty-two (every sidebar address plus the page
+  editor, the session editor, the quest editor, the pin inspector *with its Appearance
+  disclosure open*, the cross-type tag view, the quick-create dialog, the command
+  palette, the nav drawer and the session-prep drawer) and the player's thirteen, on a
+  real player session rather than the GM's preview modal. **1,112 interactive controls,
+  16 below the floor at 375px and 16 at 320px — every one of them a graph node**, the
+  accepted exception in the table below. Reproduce with `node scripts/tap-audit.mjs 375`
+  (route-driven: a new address is one line) — the run exits non-zero if anything is
+  sub-floor *or* any surface goes unmeasured, and it prints the per-surface counts that
+  add up to the total.
+
+  **The previous figure in this file — "17 surfaces, 805 controls, 0 below the floor" —
+  was wrong in three ways and is corrected here rather than quietly restated.** The
+  script was GM-only, so the player Codex (its own root, drawer, reader and pin sheet)
+  contributed nothing; two of its openers fell through a `count() > 0` guard with no
+  else and silently measured the previous surface a second time; and the total was never
+  0 — `.codex-list-item` on the player's Pages rail measured 43.6px (ten rows) and
+  `.codex-marker-link-open`, in both shells, measured 35.6px. Both now carry
+  `min-height: var(--tap-min)` and both measure 44.
 - **The named app controls that carry it themselves** (they are not primitives, and
   each states its route in a comment): `.encounter-map-icon` (map tools),
   `.combatant-choice` / `.encounter-players-roll-init` / `.manual-nat20` (the
@@ -230,7 +253,7 @@ the *hit area*, never the paint.
 | `DicePanel`'s two `<summary>` disclosures | 39px and 19.5px tall | Unclassed `<summary>` in `apps/client/src/dice/`; needs a scoped rule there. |
 | `.encounter-map-swatches button` (color picker) | 24×24 | Inside a popover grid; 44px areas would overlap at the current 4.8px gap. |
 | Raw `<input type="checkbox">` outside the named labels above | 13–20px | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
-| `.codex-graph-node` (Connection graph) | 11–33px @375, 41–43px @320 | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. Measured 2026-07-31 by `scripts/tap-audit.mjs`. |
+| `.codex-graph-node` (Connection graph) | **@375: 14.7–18.0 wide × 12.4–49.5 tall, 16 of 16 rendered nodes. @320: 12.5–15.3 wide × 10.4–41.7 tall, 16 of 16.** | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. **The narrowest supported width is the WORST case, not the best**: this row previously read "41–43px @320", which is the opposite of what the tool prints — at 320px the typical node is about 14×20px and the smallest is 12.5×10.4. Re-measured 2026-07-31 by `scripts/tap-audit.mjs` at both widths, GM and player. |
 
 Two ways to meet it — pick by whether growing the paint hurts:
 

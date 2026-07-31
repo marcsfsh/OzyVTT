@@ -152,10 +152,24 @@ const litItem = (page) => page.evaluate(() => {
   return lit.map((node) => node.textContent.trim());
 });
 
-/** Mobile parity's hardest rule: the document must never scroll sideways. */
-const sidewaysOverflow = (page) => page.evaluate(() =>
-  Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth
-);
+/**
+ * Mobile parity's hardest rule: the document must never scroll sideways.
+ *
+ * Measured by TRYING TO SCROLL IT, not by subtracting `clientWidth` from `scrollWidth`. Those are not
+ * the same number: the session-prep drawer is `position: fixed` and parked off-canvas to the right, and
+ * a fixed element inflates `scrollWidth` by its whole width while contributing nothing a user can reach.
+ * At every width this pass runs, `scrollWidth - clientWidth` is 303–404px and `scrollTo(9999, y)` moves
+ * the page by exactly 0. The old metric was passing only because the injected `transition: none` snaps
+ * that drawer to precisely the viewport edge; without the stylesheet it reported a 404px "overflow" that
+ * does not exist. A rule stated as "the page must never scroll sideways" should be tested by scrolling.
+ */
+const sidewaysOverflow = (page) => page.evaluate(() => {
+  const from = window.scrollX;
+  window.scrollTo(9999, window.scrollY);
+  const reached = window.scrollX;
+  window.scrollTo(from, window.scrollY);
+  return reached;
+});
 
 const SECTIONS = [
   ["Home", "/codex"], ["Pages", "/codex/pages"], ["Atlas", "/codex/atlas"], ["Graph", "/codex/graph"],
@@ -513,8 +527,16 @@ async function runViewport(browser, label, width, height) {
     }
     if (!/Pages|Atlas|Journal/.test(home)) throw new Error("the preview rendered nothing recognisable");
 
-    /** Drive the preview's OWN local route (it must not touch the browser address) and read the body. */
+    /**
+     * Drive the preview's OWN local route (it must not touch the browser address) and read the body.
+     * Below 761px the preview's sidebar is a drawer exactly as the real player's is, so it has to be
+     * opened first — the check timed out at 375px because there was no visible nav to click.
+     */
     const openInPreview = async (section, recordText) => {
+      if (await dialog.locator('nav[aria-label="Codex sections"]:visible').count() === 0) {
+        await navClick(dialog.locator('button[aria-label="Codex sections"]').first());
+        await page.waitForTimeout(500);
+      }
       const previewNav = dialog.locator('nav[aria-label="Codex sections"]:visible').first();
       await navClick(previewNav.getByRole("button", { name: section, exact: true }).first());
       await page.waitForTimeout(700);
@@ -547,6 +569,8 @@ async function runViewport(browser, label, width, height) {
         await tab.goto(`${BASE}/codex`, NAV);
         await loginHere(tab);
         await tab.waitForSelector(".codex-shell-content", { timeout: 15_000 });
+        // The same settling every other check gets — a control mid-transition reports a transitional box.
+        await tab.addStyleTag({ content: "html, * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }" });
         await tab.waitForTimeout(700);
         const nav = tab.locator('nav[aria-label="Codex sections"]:visible').first();
         if (await nav.count() === 0) throw new Error("no sidebar visible at 800px — and the hamburger is hidden in this band");
@@ -559,7 +583,7 @@ async function runViewport(browser, label, width, height) {
         // The eyebrows have no ellipsis rule of their own, so they were the widest thing overflowing.
         const eyebrows = await nav.locator(".codex-sidebar-grouplabel:visible").count();
         if (eyebrows > 0) throw new Error(`${eyebrows} group eyebrows still painted`);
-        const overflow = await tab.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
+        const overflow = await sidewaysOverflow(tab);
         if (overflow > 1) throw new Error(`document scrolls sideways by ${overflow}px`);
         // And the sidebar's painted box must actually be inside the 56px track it was given.
         const box = await nav.boundingBox();

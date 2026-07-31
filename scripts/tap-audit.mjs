@@ -180,6 +180,37 @@ const MEASURE = `((rootSelector) => {
  * how a printed total can be both larger than the surface it names and missing the surface it claims —
  * an `open` that cannot reach its target now throws, and the runner reports the surface as not measured.
  */
+/**
+ * Select a pin whose panel carries a linked-page row, trying each pin in turn.
+ *
+ * The old openers took `.first()`, and the seed's first pin has no linked page — so
+ * `.codex-marker-link-open` (a class that renders in BOTH shells and had no `min-height`) was never on
+ * screen when the measurement ran, and "the pin inspector: 0 below the floor" was a statement about a
+ * pin inspector missing its densest row.
+ */
+async function openPinWithLinks(page) {
+  const count = await page.locator("[data-marker-id]").count();
+  if (count === 0) throw new Error("no pins painted on the map");
+  for (let index = 0; index < count; index++) {
+    // The pointer sequence is DISPATCHED on the marker rather than clicked at its bounding-box centre.
+    // A marker's `<g>` contains its wide `<text>` label, so the centre of that box is usually not on the
+    // glyph at all and the topmost element there is a neighbouring pin's label — every coordinate click
+    // at 375px resolved to the same wrong marker. MapSurface listens on the `<svg>` and reads
+    // `event.target.closest("[data-marker-id]")`, so a bubbling dispatch is exactly the real path minus
+    // the hit-test. Whether a finger can hit a pin is browser-verify's job; this script MEASURES panels.
+    await page.evaluate((idx) => {
+      const marker = document.querySelectorAll("[data-marker-id]")[idx];
+      const box = marker.getBoundingClientRect();
+      const options = { bubbles: true, cancelable: true, composed: true, pointerId: 1, pointerType: "touch", isPrimary: true, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+      marker.dispatchEvent(new PointerEvent("pointerdown", options));
+      marker.dispatchEvent(new PointerEvent("pointerup", options));
+    }, index);
+    await page.waitForTimeout(900);
+    if (await page.locator(".codex-marker-link-open").count() > 0) return true;
+  }
+  return false;
+}
+
 const SURFACES = [
   { name: "home", path: "/codex" },
   { name: "pages", path: "/codex/pages" },
@@ -192,10 +223,11 @@ const SURFACES = [
   { name: "atlas", path: "/codex/atlas" },
   { name: "pin-inspector", path: "/codex/atlas", open: async (page) => {
       await page.waitForTimeout(1200);
-      const pin = page.locator("[data-marker-id], .codex-map-marker, .codex-marker").first();
-      if (await pin.count() === 0) throw new Error("no pin on the map to open the inspector with");
-      await pin.click({ force: true, timeout: 10_000 });
-      await page.waitForTimeout(1200);
+      // A pin with a LINKED PAGE, not just the first pin: `.codex-marker-link-open` only renders for one,
+      // and it is the row this surface most needs measured. Walking until the row appears is what makes
+      // "the pin inspector is clean" a statement about the pin inspector a GM actually opens.
+      if (!(await openPinWithLinks(page))) throw new Error("no pin on this map opens an inspector with a linked page");
+      await page.waitForTimeout(600);
       // The icon-and-colour grid lives inside a CLOSED <details> (D25/G16 put it there), so its swatch
       // and ~60 icon buttons have zero rendered boxes until it is opened — the densest cluster of small
       // controls in the Codex, and every previous run skipped all of it.
@@ -286,9 +318,7 @@ const PLAYER_SURFACES = [
   // nowhere in the GM shell.
   { name: "player-pin", path: "/codex/atlas", open: async (page) => {
       await page.waitForTimeout(1400);
-      const pin = page.locator("[data-marker-id], .codex-map-marker, .codex-marker").first();
-      if (await pin.count() === 0) throw new Error("no revealed pin on the player's map");
-      await pin.click({ force: true, timeout: 10_000 });
+      if (!(await openPinWithLinks(page))) throw new Error("no revealed pin opens a sheet with a linked page");
       await page.waitForSelector(".codex-pindetails", { timeout: 8_000 });
       await page.waitForTimeout(600);
     } },
@@ -325,7 +355,9 @@ async function walk(page, surfaces, rootSelector) {
       try { await surface.open(page); }
       catch (error) { report.push(`### ${surface.name}: could not open - NOT MEASURED - ${String(error).split("\n")[0].slice(0, 90)}`); unmeasured += 1; continue; }
     }
-    const { out, error } = await page.evaluate(MEASURE, rootSelector);
+    // A string `pageFunction` is evaluated as an EXPRESSION and never receives `arg`, so the call is
+    // built into the expression instead of passed alongside it.
+    const { out, error } = await page.evaluate(`${MEASURE}(${JSON.stringify(rootSelector)})`);
     if (error) { report.push(`### ${surface.name}: ${error} - NOT MEASURED`); unmeasured += 1; continue; }
     const bad = out.filter((c) => c.h < 44 || c.w < 44);
     const stolen = out.filter((c) => c.h >= 44 && c.w >= 44 && c.reach > 0 && c.reach < c.h - 2);

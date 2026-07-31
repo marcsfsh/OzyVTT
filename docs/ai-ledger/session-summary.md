@@ -73,6 +73,10 @@ document 117px sideways on Downtime at 375px.
 
 **Tap audit is route-driven now** and reaches 17 surfaces instead of 5 tab-driven ones: 805 controls,
 0 below 44px at 375 and 320, except the graph canvas (accepted exception, documented).
+**Superseded 2026-07-31 by the QA client fix pass — this figure was not sound.** The script was GM-only,
+and two of its openers fell through a `count() > 0` guard with no else and re-measured the previous
+surface. Re-measured across 35 surfaces in both roles: **1,112 controls, 16 sub-floor at each width, all
+graph nodes.** See `current-state.md` and `design-language.md` §4.
 
 Follow-up: the app shell stacks the roster dock above the Codex at 375px, so the Codex starts ~1500px
 down. Not Lane C's to fix; logged in `known-bugs.md`.

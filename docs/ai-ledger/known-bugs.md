@@ -30,8 +30,11 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   because bounding it would have removed the only failure mode the new rollback test could use, and the
   test was the higher-value change. Bound `date()` and keep the rollback test's probe index.
 
-- **[codex/graph] Graph nodes are below the 44px touch floor and will stay there.** Measured 11–33px at
-  375px and 41–43px at 320px. Node size is data-driven and positions are force-laid, so a 44px area per
+- **[codex/graph] Graph nodes are below the 44px touch floor and will stay there.** Re-measured
+  2026-07-31 in both shells: at 375px 14.7–18.0px wide × 12.4–49.5px tall, at 320px 12.5–15.3 × 10.4–41.7
+  — **16 of 16 rendered nodes sub-floor at both widths**. (The earlier entry read "11–33px at 375px and
+  41–43px at 320px", which recorded the narrowest supported width as the closest to compliant when it is
+  the furthest from it.) Node size is data-driven and positions are force-laid, so a 44px area per
   node overlaps its neighbours at any realistic density: the floor and the layout are in direct conflict
   and enforcing the floor destroys the thing being tapped. Recorded as an accepted exception in
   `design-language.md` §4 with its three mitigations (pan/zoom, every node also reachable from Pages and
@@ -39,7 +42,11 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   with `node scripts/tap-audit.mjs 375`.
 
 - **[app-shell/mobile] At 375px the GM's Codex starts roughly 1500px down the document,** below the
-  character-roster dock and the eight-tab strip. Observed while capturing browser evidence: a viewport
+  character-roster dock and the eight-tab strip. **The PLAYER half of this is fixed** (2026-07-31, Codex
+  QA client pass): D4 moved the player Codex out of a top-layer `<dialog>.showModal()` into document
+  flow under the same dock, which was a new regression rather than the shell's inherited problem, so the
+  roster and the YouArePlaying bar are now hidden while the player's Codex view is open. The GM's Codex
+  was already `GM_TABS[3]` before this engagement and that half stands as written below. Observed while capturing browser evidence: a viewport
   screenshot at scroll 0 on any Codex address is a picture of the roster. **Not the Codex's doing** —
   the dock is the app shell's and the stacking affects every GM tab equally — so it was left untouched
   rather than worked around inside one tab. It is nonetheless the single worst thing about using the
@@ -349,10 +356,13 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   `reference.test.ts`'s *independent* obligation walker widened with it, so a renderer change cannot
   silently reopen the hole. `docs/api-reference.md` went from 91 to **241** rendered shared shapes
   (+1,777 lines), the large mechanical diff this entry predicted.
-- **[ui] `--caution-hi` IS `--violet-hi` in all three themes**, and in light `--caution` is literally
+- ~~**[ui] `--caution-hi` IS `--violet-hi` in all three themes**, and in light `--caution` is literally
   `--violet` (`#7A3FD0`). The "violet is reserved for GM-only" rule is violated by the caution token
-  itself. Harmless today only because the team held the every-state-is-a-word rule, so colour
-  carries no signal rather than the wrong one. Worth resolving before anything relies on hue.
+  itself.~~ **FIXED 2026-07-31** by D21 / director ruling R8, Codex overhaul. `--caution` is a warm
+  orange in all three themes (`#FF9E4A` / `#FFB877` on dark and dusk, `#B4560A` / `#8F4406` on light,
+  each measured against WCAG 2.1 in `design-tokens.css`), so violet again means GM-only and nothing
+  else. `design-language.md` §2 records the exception to the "no yellow/orange" restraint rather than
+  leaving the doc forbidding the colour that shipped.
 - **[homebrew] Packs have no UI** — export and import are 2 of the 13 operations, HTTP-only,
   deliberately deferred.
 - **[homebrew] Magic-item riders are not authorable yet.** `EquipmentReferenceSchema` is `.strict()`
