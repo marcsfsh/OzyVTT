@@ -71,8 +71,13 @@ export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/Sa
    richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx. */
 export {
   IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil, IconWarning, IconInfo,
-  IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff
+  IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff, IconX, IconPlay
 } from "./primitives/icons";
+export { Combobox, type ComboboxProps, type ComboboxOption } from "./primitives/Combobox";
+// `applyMarkdownFormat` / `wikiLinkContext` are the editor's two pure rules — what a toolbar mark does to
+// a selection, and when the caret is inside an unclosed `[[`. Exported so they can be tested directly
+// rather than only through six keystrokes of a textarea; nothing in the app calls them on their own.
+export { MarkdownEditor, applyMarkdownFormat, wikiLinkContext, type MarkdownEditorProps, type MarkdownSuggestion } from "./primitives/MarkdownEditor";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";

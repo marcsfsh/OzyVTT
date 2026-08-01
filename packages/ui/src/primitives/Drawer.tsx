@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import { useId } from "react";
 import { cx } from "./util";
+import { IconX } from "./icons";
 import "./Drawer.css";
 
 export interface DrawerProps {
@@ -57,11 +58,16 @@ export function Drawer({ open, onClose, title, children, side = "right", ariaLab
       aria-label={ariaLabel}
       aria-labelledby={ariaLabel ? undefined : titleId}
       inert={!open}
+      /* Belt and braces with `inert`, which is what actually removes the closed panel from the tab order
+         and the accessibility tree — but only in engines that implement it. `aria-hidden` says the same
+         thing to everything else, and it is safe to pair here precisely BECAUSE `inert` has already made
+         the subtree unfocusable: the usual "never aria-hidden a focusable subtree" hazard cannot arise. */
+      aria-hidden={!open || undefined}
       onKeyDown={onKeyDown}
     >
       <header className="nh-drawer-head">
         <h2 className="nh-drawer-title" id={titleId}>{title}</h2>
-        <button type="button" className="nh-drawer-close tap-target interactive" aria-label="Close" onClick={onClose}>✕</button>
+        <button type="button" className="nh-drawer-close tap-target interactive" aria-label="Close" onClick={onClose}><IconX /></button>
       </header>
       <div className="nh-drawer-body scroll-y">{children}</div>
     </aside>

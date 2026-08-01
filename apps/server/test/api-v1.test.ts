@@ -95,6 +95,10 @@ describe("API v1 system router", () => {
     const capabilities = SystemCapabilitiesResponseSchema.parse(await allowed.json());
     expect(capabilities.data.supportedScopes).toContain("system:read");
     expect(capabilities.data.features.webhooks).toBe(false);
+    // Discovery has to advertise the codex now that a credential can reach it - a consumer should be able
+    // to ask "is the worldbuilding surface here?" before it asks for a scope it may not have been granted.
+    expect(capabilities.data.features.codex).toBe(true);
+    expect(capabilities.data.supportedScopes).toEqual(expect.arrayContaining(["codex:read", "codex:write"]));
   });
 
   it("connects capability discovery to a durable integration credential requiring system:read", async () => {

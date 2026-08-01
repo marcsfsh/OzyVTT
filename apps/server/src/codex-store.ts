@@ -55,25 +55,65 @@ export type CodexPageRow = Readonly<{
 
 export type CodexPageSummaryRow = Omit<CodexPageRow, "playerBody" | "gmBody" | "gmFields">;
 
-/** A directional typed relationship between two pages (Strahd --rules--> Barovia). */
-export type CodexRelationshipRow = Readonly<{ id: string; fromPageId: string; toPageId: string; type: string; createdAt: string }>;
-/** A relationship as listed against one page: the OTHER endpoint resolved, with the edge direction. */
-export type CodexRelationshipView = Readonly<{ id: string; type: string; direction: "out" | "in"; otherPageId: string; otherTitle: string; otherType: CodexEntityType; otherRevealed: boolean }>;
+/**
+ * D8: which RECORD a connection comes from. D13 puts session, quest and journal bodies in the graph, so a
+ * source is a (kind, id) pair rather than a page id. Connections v1 always point INTO a page.
+ */
+export type CodexConnectionSourceKind = "page" | "session" | "quest" | "journal";
+/**
+ * D8: ONE edge in the codex graph. A connection the GM DECLARED and one derived from `[[wiki link]]` text
+ * differ by an `origin` attribute, not by being two systems with two panels and two edge kinds.
+ *
+ * `id` and `createdAt` are null exactly when `origin` is `mention`: a derived edge has no row of its own,
+ * so it is not addressable and is "deleted" by editing the text that produced it.
+ *
+ * `layer` decides whether a player may see it, for BOTH origins: a mention inherits the body it was
+ * written in (D13 - GM-layer text yields GM-only edges), a declared one carries the column v22 adds.
+ */
+export type CodexConnectionRow = Readonly<{
+  id: string | null;
+  fromKind: CodexConnectionSourceKind;
+  fromId: string;
+  toPageId: string;
+  /** The out-label ("ally of", "located in"). Null for an unlabelled connection - `''` stored, null read. */
+  label: string | null;
+  origin: "declared" | "mention";
+  layer: "player" | "gm";
+  createdAt: string | null;
+}>;
+/**
+ * D8: one row of a page's Connections panel - the OTHER endpoint resolved, plus which way the edge
+ * points. Folds in what used to be two separate views (backlinks and typed relationships).
+ */
+export type CodexPageConnectionRow = Readonly<{
+  id: string | null;
+  direction: "out" | "in";
+  otherKind: CodexConnectionSourceKind;
+  otherId: string;
+  /** A page title, "Session 4", a quest title, or a bounded excerpt of a journal entry's player text. */
+  otherTitle: string;
+  otherEntityType: CodexEntityType | null;
+  /** The other record's own reveal state. GM-only on the wire; the player projection drops it. */
+  otherRevealed: boolean;
+  label: string | null;
+  origin: "declared" | "mention";
+  layer: "player" | "gm";
+  /** The heading a MENTION sits under; null for a declared connection. */
+  section: string | null;
+}>;
+
+/** One DECLARED connection as the store keeps it. The graph's wire shape is `CodexConnectionRow`. */
+export type CodexRelationshipRow = Readonly<{ id: string; fromPageId: string; toPageId: string; label: string | null; layer: "player" | "gm"; createdAt: string }>;
 
 export type CodexLinkRow = Readonly<{
-  sourcePageId: string;
+  sourceKind: CodexConnectionSourceKind;
+  sourceId: string;
   layer: "player" | "gm";
   targetKind: CodexLinkTargetKind;
   targetRef: string;
   section: string | null;
 }>;
 export type CodexLinkTargetKind = "page" | "actor" | "monster" | "spell" | "map" | "marker";
-
-/**
- * CI-8: one `[[wiki link]]` edge between two PAGES, for the whole-graph feed. Carries `layer` because a
- * player edge may only come from a page's player-facing body - the projection decides, not this row.
- */
-export type CodexLinkEdgeRow = Readonly<{ fromPageId: string; toPageId: string; layer: "player" | "gm" }>;
 
 export type CodexPageRevisionRow = Readonly<{
   id: number;
@@ -129,17 +169,34 @@ export type CodexRevisionHistoryUsage = Readonly<{ versionCount: number; version
 /** The revision-history section as a READER sees it: the two settable knobs plus what the history costs. */
 export type CodexRevisionHistory = CodexRevisionSettings & CodexRevisionHistoryUsage;
 /**
+ * D6: "the Codex always keeps your work" made configurable. Two knobs, and the split is the same one
+ * `CodexRevisionSettings` makes: `enabled` is whether the editors autosave at all, `intervalSeconds` is how
+ * often they do it when they do.
+ *
+ * **The unit is SECONDS because the wire says seconds** (director ruling R4) - the column, this type and the
+ * request body all agree, so nothing converts at a boundary and nothing can convert twice. The floor of 1 is
+ * what today's 800 ms page-editor debounce maps onto, so an upgraded codex keeps effectively today's cadence.
+ *
+ * The server stores a PREFERENCE and nothing more. Autosave is editor behaviour: enforcement (explicit Save
+ * and unsaved-changes warnings when it is off) lives in the client, because there is no server-side draft to
+ * save. Storing it here is what makes the preference follow the GM from phone to laptop.
+ */
+export type CodexAutosaveSettings = Readonly<{ enabled: boolean; intervalSeconds: number }>;
+/**
  * Every codex-wide setting, nested by area. `codex_meta` is the codex's singleton settings row, so this is
  * the shape of that row as a caller sees it; the `revisionHistory` nesting is what gives a later codex-wide
  * setting a home without inventing fields for it today.
  */
-export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistory }>;
+export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistory; autosave: CodexAutosaveSettings }>;
 /**
  * The WRITABLE half, and the reason the read and write shapes are two types rather than one: `versionCount` /
  * `versionBytes` are facts about a table the caller cannot see, so a body that could carry them would be a
  * client asserting them. They are absent here by construction, not filtered out later.
+ *
+ * `autosave` has no read-only half at all, so it is the SAME type on both sides - stated rather than mirrored,
+ * because a second identical type is the one that drifts.
  */
-export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionSettings }>;
+export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionSettings; autosave: CodexAutosaveSettings }>;
 
 export type CodexBacklinkRow = Readonly<{
   sourcePageId: string;
@@ -166,10 +223,19 @@ export type CodexBacklinkRow = Readonly<{
  * is why each needs a test at ITS OWN layer - see the CI-1 describe blocks in `codex-store.test.ts`.
  * Gate 1 has no second line of defence at all.
  */
-export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest";
-export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest"];
+export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest" | "session";
+export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest", "session"];
 /** One search hit as the store returns it: what kind of record matched, and which one. */
 export type CodexSearchRef = Readonly<{ kind: CodexRecordKind; id: string }>;
+/**
+ * D19: a bounded search answer that SAYS it is bounded. The codex is unpaginated by design at LAN scale,
+ * which is honest only while the caller can tell a complete list from a truncated one - `truncated` is that
+ * difference, and it is measured by asking the database for one row more than the cap rather than by
+ * comparing the returned length against it (which can never distinguish "exactly 50" from "50 and more").
+ */
+export type CodexSearchResult = Readonly<{ hits: readonly CodexSearchRef[]; truncated: boolean }>;
+/** The one shared cap for every kind on the ONE search index. See `searchOrderBySql` for what it costs. */
+const SEARCH_LIMIT = 50;
 
 export type CodexMapKind = "battlemap" | "regional" | "world";
 export type CodexMapRow = Readonly<{
@@ -242,7 +308,7 @@ const DEFAULT_CALENDAR: CodexCalendar = {
  * being more permissive than this union is still the safe direction, and `journalKind` still fails closed,
  * so a seventh kind written by a future build reads back as `note` rather than throwing.
  */
-export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing";
+export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 /**
  * CT-10's downtime activity: WHO spent WHICH days doing WHAT, and whether the GM has confirmed the clock
  * move it proposes (O-3).
@@ -258,7 +324,25 @@ export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "mi
  * else, and it is what makes `applyDowntime` idempotent. It is GM workflow state and must never be
  * projected to a player (D11-E).
  */
-export type CodexDowntimePayload = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
+export type CodexDowntimePayload = Readonly<{
+  who: string;
+  activity: string;
+  days: number;
+  applied: boolean;
+  /**
+   * D12: WHICH character page this downtime belongs to, so the tracker can total a character's days and
+   * link to their sheet rather than grouping on a free-text name that two GMs spell two ways.
+   *
+   * `who` is NOT replaced by it and both may coexist: the free-text name is the fallback for a character
+   * with no page, and it is what an old row shows after this field arrives null. Nothing is required to
+   * have a page - a GM tracking downtime for a hireling should not have to make one first.
+   *
+   * A plain id with no foreign key behind it, the `factionPageId` precedent: history must survive the page.
+   * `deletePage` scrubs it to null so it cannot render as an unfollowable link, and `who` survives as the
+   * display fallback - which is strictly more than the marker-scrub precedent requires.
+   */
+  characterPageId: string | null;
+}>;
 /**
  * CT-8's progression record: the party reached LEVEL n, and WHY.
  *
@@ -297,7 +381,20 @@ export type CodexStandingPayload = Readonly<{ factionPageId: string; delta: numb
  * and those appear in the projection layer and its tests, which M12 does not own. Use `payloadFor*` below
  * to narrow; they are the type-safe form of the same question and they cannot get the kind wrong.
  */
-export type CodexEntryPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload;
+/**
+ * D11 (ruling R5): a quest CHANGED STATE. The `codex_quests` table says where a quest stands; this says
+ * what happened, exactly as a `standing` record does beside `codex_standing`.
+ *
+ * **No cached quest title**, matching standing's explicit no-cached-title rule: readers resolve `questId`
+ * against the live quest, and a deleted quest is a name they cannot show rather than an error. The id has
+ * no foreign key behind it, so history SURVIVES the quest - "we abandoned the Sunsword hunt in Marpenoth"
+ * stays true after the record is gone.
+ *
+ * `status` is the status REACHED, not a delta - the milestone rule rather than the standing one, and for
+ * the milestone's reason: it is the fact a GM states and the one a reader wants.
+ */
+export type CodexQuestEventPayload = Readonly<{ questId: string; status: CodexQuestStatus }>;
+export type CodexEntryPayload = CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload | CodexQuestEventPayload;
 export type CodexJournalRow = Readonly<{
   id: string;
   playerText: string;
@@ -307,6 +404,20 @@ export type CodexJournalRow = Readonly<{
   attachPageId: string | null;
   kind: CodexJournalKind;
   sourceEncounterId: number | null;
+  /**
+   * D9: the session this entry belongs to, BY IDENTITY. Null when the entry is filed under no session.
+   * This is what a writer sets; `sessionNumber` below is what a reader displays.
+   */
+  sessionId: string | null;
+  /**
+   * The session's number as a DISPLAY value, resolved live from the joined session - so renumbering a
+   * session updates every one of its entries with no journal write at all (the whole point of D9).
+   *
+   * It falls back to the bare label stored on the row, which after migration v19 exists in exactly one
+   * circumstance: `deleteSession` stamped a REVEALED session's number back onto its entries when the record
+   * went (director ruling R2). A hidden session's delete stamps nothing, so no label a player can see ever
+   * names a record they have not been shown.
+   */
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
@@ -321,10 +432,28 @@ export type CodexJournalRow = Readonly<{
   createdAt: string;
   updatedAt: string;
 }>;
-export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null; tags?: readonly string[] }>;
-export type CodexJournalUpdateInput = CodexJournalCreateInput;
+/**
+ * D9: writers name a session by ID, never by number. `sessionId` OMITTED on a create auto-files the entry
+ * under the active session; an explicit `null` files it under none; an id that names no session is a
+ * not-found. There is no bare-number write arm at all - the number is a display value the server resolves.
+ */
+export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionId?: string | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null; tags?: readonly string[] }>;
+/**
+ * D12's narrow payload edit. `downtime` is the ONLY payload group a PATCH may touch, and its members are
+ * the only three that are safe to change after the fact:
+ *
+ *  - `who` / `activity` are prose corrections.
+ *  - `characterPageId` is the ADOPTION PATH: it is what lets a GM link the free-text downtime rows that
+ *    already exist to real character pages, so the tracker can total a person instead of a spelling.
+ *    Without it D12 would only work for downtime recorded after the upgrade.
+ *
+ * `days` is IMMUTABLE, and not by omission: it is not a member of this group, so `.strict()` 400s it. The
+ * number is what `applyDowntime` moved the campaign clock by, and editing it after the fact would leave
+ * the clock disagreeing with the record that justified it. A typo in `days` is a delete-and-recreate.
+ */
+export type CodexJournalUpdateInput = CodexJournalCreateInput & Readonly<{ downtime?: Readonly<{ who?: string; activity?: string; characterPageId?: string | null }> }>;
 /** CT-10: what `createDowntime` needs beyond an ordinary entry. `applied` is not an input - it starts false. */
-export type CodexDowntimeCreateInput = CodexJournalCreateInput & Readonly<{ downtime: Readonly<{ who: string; activity: string; days: number }> }>;
+export type CodexDowntimeCreateInput = CodexJournalCreateInput & Readonly<{ downtime: Readonly<{ who: string; activity: string; days: number; characterPageId?: string | null }> }>;
 /** CT-8: what `createMilestone` needs beyond an ordinary entry - `CodexDowntimeCreateInput`'s shape verbatim. */
 export type CodexMilestoneCreateInput = CodexJournalCreateInput & Readonly<{ milestone: Readonly<{ level: number; reason: string }> }>;
 
@@ -392,6 +521,8 @@ export type CodexSessionRow = Readonly<{
   recapBody: string;
   revealedToPlayers: boolean;
   status: CodexSessionStatus;
+  /** D10 / CI-2: the same single-layer tag vocabulary every other codex record carries. */
+  tags: readonly string[];
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -405,6 +536,7 @@ export type CodexSessionCreateInput = Readonly<{
   recapBody?: string;
   revealedToPlayers?: boolean;
   status?: CodexSessionStatus;
+  tags?: readonly string[];
 }>;
 /** No `revealedToPlayers`: reveal has its own endpoint and its own recency rule, exactly as `CodexPageUpdateInput` omits it. */
 export type CodexSessionUpdateInput = Readonly<{
@@ -414,6 +546,7 @@ export type CodexSessionUpdateInput = Readonly<{
   prepBody?: string;
   recapBody?: string;
   status?: CodexSessionStatus;
+  tags?: readonly string[];
 }>;
 
 /**
@@ -450,6 +583,8 @@ export type CodexQuestRow = Readonly<{
   /** Codex PAGE ids this quest concerns (via the client's `EntityPicker`), filtered on the way to a player. */
   entityIds: readonly string[];
   revealedToPlayers: boolean;
+  /** D10 / CI-2: the same single-layer tag vocabulary every other codex record carries. */
+  tags: readonly string[];
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -463,6 +598,7 @@ export type CodexQuestCreateInput = Readonly<{
   objectives?: readonly CodexQuestObjective[];
   entityIds?: readonly string[];
   revealedToPlayers?: boolean;
+  tags?: readonly string[];
 }>;
 /** No `revealedToPlayers`: reveal has its own endpoint and its own recency rule, exactly as `CodexSessionUpdateInput` omits it. */
 export type CodexQuestUpdateInput = Readonly<{
@@ -472,6 +608,7 @@ export type CodexQuestUpdateInput = Readonly<{
   gmBody?: string;
   objectives?: readonly CodexQuestObjective[];
   entityIds?: readonly string[];
+  tags?: readonly string[];
 }>;
 
 export type CodexPageCreateInput = Readonly<{
@@ -502,10 +639,73 @@ export type CodexPageUpdateInput = Readonly<{
   inWorldDate?: CodexInWorldDate | null;
 }>;
 
+/**
+ * D16: the shape of a backup bundle - `GET /codex/export`'s `codex` object, and `POST /codex/import`'s.
+ *
+ * `settings` is OPTIONAL because bundles taken before this feature existed do not carry it, and those
+ * bundles must restore (director ruling R1). Everything else has been in the bundle since the milestone
+ * that added the record type; a missing key defaults rather than failing, for the same reason.
+ */
+/**
+ * A bundle's journal row, plus the one fact about the FILE - rather than about the record - that import
+ * needs: did this row carry a `sessionId` key at all?
+ *
+ * D9 put `sessionId` on every exported journal row and it is written even when null, so its ABSENCE dates
+ * the row to a pre-D9 export. That is the ONLY thing that tells apart the two states which are otherwise
+ * byte-identical on the wire - `{sessionId: null, sessionNumber: 4}`:
+ *   - a PRE-D9 row, whose 4 is a lost join that `importBundle` must resolve or synthesize (the v19 rule);
+ *   - a MODERN row, whose 4 is director ruling R2's bare display LABEL, stamped on when a revealed session
+ *     was deleted, and which must be written straight back.
+ * Treating the second as the first mints a phantom HIDDEN session, nulls the entry's own label, and
+ * `playerSessionLink` then blanks both halves - so every player silently loses a label R2 deliberately kept,
+ * and export -> import -> export stops being stable.
+ *
+ * Deliberately a PER-ROW signal rather than the bundle-level `bundleVersion`, which was the other candidate.
+ * `bundleVersion` is optional on the wire and absence is documented as "pre-versioning", so a modern backup
+ * POSTed with the key stripped would take the legacy path and corrupt exactly the labels this protects. The
+ * question is per row anyway - "is this a lost join or a bare label?" - so it is answered per row.
+ */
+export type CodexBundleJournalRow = CodexJournalRow & Readonly<{ declaredSessionId: boolean }>;
+export type CodexBundle = Readonly<{
+  pages: readonly CodexPageRow[]; maps: readonly CodexMapRow[]; markers: readonly CodexMarkerRow[];
+  journal: readonly CodexJournalRow[]; relationships: readonly CodexRelationshipRow[];
+  sessions: readonly CodexSessionRow[]; activeSessionId: string | null; quests: readonly CodexQuestRow[];
+  publishedDate: CodexInWorldDate | null; standing: readonly CodexStandingRow[]; partyMarkerId: string | null;
+  calendar: CodexCalendar; folders: readonly string[]; revisions: readonly CodexPageRevisionExportRow[];
+  settings?: CodexSettingsInput;
+}>;
+/**
+ * What `normalizeBundle` hands `importBundle`: the bundle, plus the per-row provenance flag above. Kept
+ * separate from `CodexBundle` on purpose - `exportBundle` returns a `CodexBundle` and it is serialized
+ * verbatim, so a key that exists only to describe the INPUT file must never be able to reach the output.
+ */
+export type CodexImportBundle = Omit<CodexBundle, "journal"> & Readonly<{ journal: readonly CodexBundleJournalRow[] }>;
+/** What the database actually holds after a restore - its own row counts, never the bundle's claims. */
+export type CodexImportCounts = Readonly<{ pages: number; folders: number; maps: number; markers: number; journal: number; connections: number; sessions: number; quests: number; standing: number; revisions: number }>;
+/** The bundle FORMAT version. A fact about the file, so the export route stamps it beside `codex`, not inside it. */
+export const CODEX_BUNDLE_VERSION = 1;
+
 /** Thrown when an update's `expectedRev` does not match the stored row - the client's page is stale. */
 export class CodexRevisionConflictError extends Error {}
 /** Thrown when a referenced page/map/marker does not exist. */
 export class CodexNotFoundError extends Error {}
+/**
+ * Thrown when the CALLER's input is refused - every validator in this file, and every cross-record check
+ * `normalizeBundle` makes. Its `message` is written for a GM to read and is the one thing in this file that
+ * is deliberately forwarded to an API caller verbatim (`malformed` in `codex-http.ts`).
+ *
+ * **It exists so that forwarding is an ALLOW-LIST rather than a default.** These refusals used to be bare
+ * `Error`s, indistinguishable at the HTTP boundary from anything else that can escape a store call - and
+ * what actually escaped was the SQLite driver: an import with a duplicate page id answered
+ * `400 validation_failed` with "UNIQUE constraint failed: codex_pages.id", handing an integration credential
+ * internal table and column names, and reporting an internal failure as the caller's mistake. A denylist of
+ * driver errors would have to be extended for every new error type; this way the default for anything
+ * unrecognised is the sanitized 500, which is the right default.
+ *
+ * `CodexStore has not been initialized.` is deliberately NOT one of these: it is a programming error, not a
+ * caller's, and it must reach the 500 arm.
+ */
+export class CodexValidationError extends Error {}
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONTROL_CHARS = /\p{Cc}/u;
@@ -1069,6 +1269,306 @@ export const MIGRATIONS = [{
     ALTER TABLE codex_meta ADD COLUMN revision_history_enabled INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE codex_meta ADD COLUMN revision_window_minutes INTEGER NOT NULL DEFAULT 90;
   `
+}, {
+  version: 18,
+  // D6 (client decision, 2026-07-31): autosave becomes GM-configurable - on/off plus an interval.
+  //
+  // v17's shape VERBATIM, for the same reasons and with the same upgrade story: two columns on
+  // `codex_meta`, the codex's singleton settings row, both carrying DEFAULTs so an existing codex reads
+  // `{enabled: true, intervalSeconds: 1}` without a backfill pass and a fresh database takes the defaults
+  // through `initialize()`'s named-column seed. INTEGER for the boolean, the encoding `revealed`,
+  // `is_party` and `revision_history_enabled` already use.
+  //
+  // **SECONDS, not milliseconds** (director ruling R4). The wire unit is seconds, so the column is seconds:
+  // a stored millisecond value converted at the boundary is a value that can be converted twice, and the
+  // one thing worse than a wrong interval is an interval nobody can read off the row.
+  //
+  // The DEFAULT of 1 is not a new cadence - today's page editor debounces at 800 ms, which is below the
+  // wire's 1 s floor, so 1 is the honest expression of "what this codex already did". D6's promise is that
+  // the codex always keeps your work; an upgrade that quietly slowed saving down would break it.
+  //
+  // No CHECK on either column, the v16/v17 decision applied a third time: 1..600 is a PRODUCT bound on a
+  // number, not an ENUM whose legal set is structural, and baking it in would cost a full table rebuild to
+  // widen later. The clamp lives in `autosaveIntervalSeconds` on the way in and `autosaveSettings`
+  // re-validates on the way OUT, because the write is not the only way into an INTEGER column.
+  sql: `
+    ALTER TABLE codex_meta ADD COLUMN autosave_enabled INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE codex_meta ADD COLUMN autosave_interval_seconds INTEGER NOT NULL DEFAULT 1;
+  `
+}, {
+  version: 19,
+  // D9 (client decision, 2026-07-31): journal entries join their session BY IDENTITY, and D11's `quest`
+  // kind rides along. The second table rebuild in this file's history, and v15's discipline is copied
+  // point for point rather than remembered.
+  //
+  // WHY A REBUILD. Two reasons, and each alone would be enough:
+  //  - `kind` carries `CHECK (kind IN (...six...))` and SQLite cannot widen a CHECK in place. D11's quest
+  //    history is a seventh kind. v15 already paid this cost once and said in as many words that paying it
+  //    "twice four weeks apart for one word each would be silly" - so `quest` is admitted HERE, in Phase 2,
+  //    even though the history flow itself ships in Phase 3. The DB being more permissive than
+  //    `CodexJournalKind` is the established safe direction (`journalKind` fails closed to `note`).
+  //  - `session_id` needs to be a real column, and appending it is the cheap half; the CHECK is the
+  //    expensive half, so they land together.
+  //
+  // WHY THE JOIN AT ALL. `session_number` was a bare INTEGER copied onto the entry, which made renumbering a
+  // session a lie: the entries kept the old number (`known-bugs.md:111-122`, OPEN). Joining by id makes the
+  // display number LIVE - renumber the session and every entry follows, with no journal write at all.
+  //
+  // NO FOREIGN KEY on `session_id`, deliberately, and it is the same call v13 made for `active_session_id`:
+  // `deleteSession` scrubs the column itself (with director ruling R2's conditional stamp-back), which a
+  // cascade could not express - a revealed session's number must survive its record as a bare label, and a
+  // hidden one's must not.
+  //
+  // Rebuild discipline, verbatim from v15:
+  //  - The new table is the CURRENT table in the SAME physical column order, read from live `sqlite_master`,
+  //    with `session_id` appended LAST so no existing column moves. STRICT kept.
+  //  - The INSERT names its columns on BOTH sides.
+  //  - All three indexes recreated verbatim, plus `codex_journal_session` for the new join.
+  //  - FK situation re-verified at head: nothing references `codex_journal` and it references nothing.
+  //
+  // THE BACKFILL, in two steps and in this order:
+  //
+  //  1. SYNTHESIZE a session record for every number that names none. v13 deliberately did NOT backfill,
+  //     on the grounds that fabricating session records would invent facts. The client's D9 consciously
+  //     supersedes that decision (recorded in `decision-log.md` with this migration), and the objection is
+  //     honoured rather than overridden: the synthesized rows carry EMPTY prep, recap and attendees - nothing
+  //     is invented - and are `played` + `revealed = 0`, so they are invisible to players and nothing
+  //     changes on any screen but the GM's session list, where a number that already existed now has a
+  //     record to hang on. The alternative was orphaning those entries' numbers, which is data loss.
+  //
+  //     The UUID recipe emits a lowercase v4-shaped id: version nibble forced to `4`, variant to one of
+  //     `[89ab]`, so it satisfies the store's `ID` regex and round-trips through every route that validates
+  //     an id. `strftime('%Y-%m-%dT%H:%M:%fZ','now')` is fixed-width and compatible with the store's own
+  //     `toISOString()` stamps.
+  //
+  //  2. RESOLVE the numbers into ids and NULL the column. After step 1 every number resolves, so the
+  //     post-migration invariant is exact and testable: no journal row keeps a bare `session_number`. The
+  //     column is RETAINED physically - it becomes the bare-LABEL store, written again by exactly one
+  //     writer (`deleteSession`'s R2 stamp-back) and read by `toEntry` only as the no-join fallback.
+  sql: `
+    CREATE TABLE codex_journal_new (
+      id TEXT PRIMARY KEY,
+      player_text TEXT NOT NULL,
+      gm_text TEXT,
+      revealed INTEGER NOT NULL,
+      attach_marker_id TEXT,
+      attach_page_id TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('note', 'combat', 'deadline', 'downtime', 'milestone', 'standing', 'quest')),
+      source_encounter_id INTEGER,
+      session_number INTEGER,
+      real_date TEXT,
+      in_world_label TEXT,
+      calendar_instant INTEGER,
+      sort_key INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      in_world_year INTEGER,
+      in_world_month INTEGER,
+      in_world_day INTEGER,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      payload_json TEXT,
+      session_id TEXT
+    ) STRICT;
+    INSERT INTO codex_journal_new
+      (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at, in_world_year, in_world_month, in_world_day, tags_json, payload_json)
+      SELECT
+       id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at, in_world_year, in_world_month, in_world_day, tags_json, payload_json
+      FROM codex_journal;
+    DROP TABLE codex_journal;
+    ALTER TABLE codex_journal_new RENAME TO codex_journal;
+    CREATE INDEX codex_journal_order ON codex_journal (calendar_instant, session_number, created_at);
+    CREATE INDEX codex_journal_marker ON codex_journal (attach_marker_id);
+    CREATE INDEX codex_journal_page ON codex_journal (attach_page_id);
+    CREATE INDEX codex_journal_session ON codex_journal (session_id);
+
+    INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at)
+      SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' ||
+                   substr(hex(randomblob(2)), 2) || '-' ||
+                   substr('89ab', (abs(random()) % 4) + 1, 1) || substr(hex(randomblob(2)), 2) ||
+                   '-' || hex(randomblob(6))),
+             j.session_number, NULL, '[]', '', '', 0, 'played', 1,
+             strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      FROM (SELECT DISTINCT session_number FROM codex_journal
+            WHERE session_number IS NOT NULL
+              AND session_number NOT IN (SELECT session_number FROM codex_sessions WHERE session_number IS NOT NULL)) j;
+
+    UPDATE codex_journal SET
+      session_id = (SELECT s.id FROM codex_sessions s WHERE s.session_number = codex_journal.session_number),
+      session_number = NULL
+    WHERE session_number IS NOT NULL;
+  `
+}, {
+  version: 20,
+  // D10 (client decision, 2026-07-31): sessions and quests become taggable, so every list in the Codex can
+  // be filtered the same way and a tag click can open one cross-type view.
+  //
+  // v10's shape VERBATIM (`tags_json TEXT NOT NULL DEFAULT '[]'`), which is the whole upgrade story: an
+  // existing row reads `[]` without a backfill pass, and `parseTags` already degrades a malformed blob to
+  // an empty list rather than throwing. Tags are SINGLE-LAYER by CI-2 - there is no GM-only tag - so they
+  // are indexed into both audience tables and need no reveal reasoning of their own.
+  sql: `
+    ALTER TABLE codex_sessions ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE codex_quests ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+  `
+}, {
+  version: 21,
+  // D10: sessions join the ONE suite-wide search index. This is a three-gate viewer-safety change
+  // (`CodexRecordKind`'s comment enumerates them); this migration is GATE 1 for every EXISTING session, and
+  // gate 1 is the one with no second line of defence.
+  //
+  // The two audience rows are built by DIFFERENT expressions, and the difference is the gate:
+  //  - PLAYER: recap, real date and tags. Every one of those is already in `projectPlayerSession`, so a
+  //    player's query can only match text they could already read on a revealed session.
+  //  - GM: the same plus `prep_body` and the attendee names. Prep is "the single most important secret on
+  //    this record" and attendees are real-world personal data; a `prep_body` in the player table would make
+  //    a player's query on a GM-only phrase MATCH, and the hit's existence is the leak even though the body
+  //    is never returned.
+  //
+  // Reveal is NOT part of this: gates 2 (`PLAYER_VISIBLE_SQL`) and 3 (`projectPlayerSearchHit`) resolve it at
+  // READ time, which is why `setSessionRevealed` needs no reindex - the `setQuestRevealed` rule verbatim.
+  //
+  // The title is `Session N` for a numbered session and empty for an unnumbered one; the number is already
+  // player-visible on a revealed session, so it may sit in the player table. A hit with an empty title falls
+  // back to a recap excerpt at projection time, never to a blank row.
+  //
+  // JSON1 guards match v11's and v15's: `json_valid` FIRST as a nested CASE (SQLite's AND short-circuits only
+  // sometimes; CASE is documented as evaluating in order), so one hand-edited `tags_json` cannot abort the
+  // migration and leave a codex unopenable.
+  sql: `
+    INSERT INTO codex_search_player (kind, record_id, title, body)
+      SELECT 'session', id,
+             CASE WHEN session_number IS NULL THEN '' ELSE 'Session ' || session_number END,
+             recap_body || char(10) || COALESCE(real_date, '') || char(10) ||
+             CASE WHEN json_valid(tags_json)
+               THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_sessions.tags_json)), '')
+               ELSE '' END
+      FROM codex_sessions;
+    INSERT INTO codex_search_gm (kind, record_id, title, body)
+      SELECT 'session', id,
+             CASE WHEN session_number IS NULL THEN '' ELSE 'Session ' || session_number END,
+             prep_body || char(10) || recap_body || char(10) || COALESCE(real_date, '') || char(10) ||
+             CASE WHEN json_valid(attendees_json)
+               THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_sessions.attendees_json)), '')
+               ELSE '' END || char(10) ||
+             CASE WHEN json_valid(tags_json)
+               THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_sessions.tags_json)), '')
+               ELSE '' END
+      FROM codex_sessions;
+  `
+}, {
+  version: 22,
+  // D8 + D13 (client decisions, 2026-07-31): ONE connection system. The substrate for it, in four parts.
+  //
+  // WHAT D8 ACTUALLY ASKS FOR, and what it does not. Typed relationships and `[[wiki links]]` become one
+  // CONCEPT with one panel and one edge in the Graph - but D8 says in as many words that
+  // "mention-vs-declared may remain as an ORIGIN attribute". So the two tables STAY, with their existing
+  // and genuinely different semantics, and "connection" becomes a read model over both:
+  //   - `codex_relationships` rows are DECLARED: id-keyed, created and deleted by a route, symmetric-dedupe.
+  //   - `codex_links` rows are MENTIONS: title-keyed, id-less, REBUILT WHOLESALE from body text on every
+  //     save. Materializing those as declared rows would force a sync protocol ("what does deleting a
+  //     connection whose source is a sentence mean?") and make every page save a relationships write.
+  // Nothing moves, so this migration cannot lose data in either direction.
+  //
+  // 1. `codex_links` REBUILD - the only destructive part, and it is what D13 needs. Today the table can
+  //    only hold PAGE sources: `source_page_id` FK-cascades on `codex_pages`. D13 puts session, quest and
+  //    journal bodies in the graph, so the source becomes a (kind, id) pair. A multi-table FK is not
+  //    expressible, so the FK is DROPPED and scrubbing becomes explicit - `deletePage`, `deleteSession`,
+  //    `deleteQuest` and `deleteEntry` each delete their own rows, joining the documented deletion-scrub
+  //    inventory. v15's rebuild discipline: named columns on both sides, both indexes recreated, STRICT
+  //    kept. Existing rows carry over as `source_kind = 'page'`, which is what every one of them is.
+  //
+  // 2. `codex_relationships.layer` - D13's layer semantics extended to DECLARED edges. A connection
+  //    declared from a GM-only context should be a GM-only connection, and the player gate keys on this
+  //    column for BOTH origins. DEFAULT 'player' is exactly today's behaviour (a declared relationship was
+  //    visible whenever both endpoints were), so no existing edge changes meaning. `ADD COLUMN` with a
+  //    CHECK is legal in SQLite when the DEFAULT satisfies it.
+  //
+  // 3. THE RELABEL. `type` stops being a slug and becomes the out-LABEL the reader sees: "ally" -> "ally
+  //    of", "rules" -> "rules", "located-in" -> "located in". The twelve-row vocabulary is copied from
+  //    `apps/client/src/codex/entities.ts`, which is where it has always lived; an unknown slug falls back
+  //    to dashes-into-spaces, the client's own fallback rule. After this there is no display mapping left
+  //    on either side - the stored value IS the label, which is what makes a free-text label and a legacy
+  //    type the same thing. `SYMMETRIC_RELATIONSHIPS` is re-keyed to the migrated spellings in the same
+  //    change; missing that would silently kill symmetric dedupe for every existing edge.
+  //
+  //    WHAT IS LOST, stated rather than buried: the INVERSE wording ("ruled by" on the inbound end). A
+  //    free-text label cannot be inverted generically, so a reader renders `direction` plus the label.
+  //    "Barovia - rules - Strahd" now reads by its arrow rather than by a second phrase.
+  //
+  // 4. `links_backfilled` on `codex_meta` - the flag for the one-time re-extraction of session, quest and
+  //    journal bodies. That backfill CANNOT live here: migrations are SQL-only strings and SQL cannot
+  //    parse `[[...]]`. It runs once in `initialize()`, guarded by this flag, where the parser lives.
+  sql: `
+    CREATE TABLE codex_links_new (
+      source_kind TEXT NOT NULL CHECK (source_kind IN ('page', 'session', 'quest', 'journal')),
+      source_id   TEXT NOT NULL,
+      layer       TEXT NOT NULL CHECK (layer IN ('player', 'gm')),
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('page', 'actor', 'monster', 'spell', 'map', 'marker')),
+      target_ref  TEXT NOT NULL,
+      section     TEXT
+    ) STRICT;
+    INSERT INTO codex_links_new (source_kind, source_id, layer, target_kind, target_ref, section)
+      SELECT 'page', source_page_id, layer, target_kind, target_ref, section FROM codex_links;
+    DROP TABLE codex_links;
+    ALTER TABLE codex_links_new RENAME TO codex_links;
+    CREATE INDEX codex_links_target ON codex_links (target_kind, target_ref);
+    CREATE INDEX codex_links_source ON codex_links (source_kind, source_id);
+
+    ALTER TABLE codex_relationships ADD COLUMN layer TEXT NOT NULL DEFAULT 'player' CHECK (layer IN ('player', 'gm'));
+
+    UPDATE codex_relationships SET type = CASE type
+      WHEN 'ally' THEN 'ally of'
+      WHEN 'enemy' THEN 'enemy of'
+      WHEN 'rival' THEN 'rival of'
+      WHEN 'rules' THEN 'rules'
+      WHEN 'member' THEN 'member of'
+      WHEN 'leader' THEN 'leads'
+      WHEN 'located-in' THEN 'located in'
+      WHEN 'owns' THEN 'owns'
+      WHEN 'parent' THEN 'parent of'
+      WHEN 'serves' THEN 'serves'
+      WHEN 'created' THEN 'created'
+      WHEN 'related' THEN 'related to'
+      ELSE replace(type, '-', ' ')
+    END;
+
+    ALTER TABLE codex_meta ADD COLUMN links_backfilled INTEGER NOT NULL DEFAULT 0;
+  `
+}, {
+  version: 23,
+  // D19: `commandId` idempotency receipts, so a codex write can be retried safely across a dropped
+  // connection instead of the caller having to guess whether it landed.
+  //
+  // `status` is a real column, not a derived one: a replay must reproduce a 201 as a 201, and inferring
+  // it from the body would be a second rule about the same answer. `body_json` is the SERIALIZED
+  // response, so a replay is byte-identical to the original rather than a re-render that could drift.
+  //
+  // Rows are pruned lazily on write, not by a background sweep: this is a LAN-scale single-GM codex with
+  // no scheduler, and a table nobody prunes is the shape `codex_page_revisions` already got wrong once.
+  sql: `
+    CREATE TABLE codex_command_receipts (
+      command_id TEXT PRIMARY KEY,
+      status     INTEGER NOT NULL,
+      body_json  TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    ) STRICT;
+  `
+}, {
+  version: 24,
+  // WHAT the receipt was for, so a replay cannot answer a question nobody asked.
+  //
+  // A receipt used to be keyed on the `commandId` alone, so a caller that reused one id across two
+  // DIFFERENT writes got the first response replayed verbatim and the second write silently never ran -
+  // with a 2xx saying it had. That is the one failure mode idempotency exists to prevent, arriving through
+  // the mechanism meant to prevent it, and it is a caller mistake nothing in the surface could tell them
+  // about.
+  //
+  // NULLABLE, and that is the compatibility story: a receipt written before this column existed carries
+  // NULL and is still replayed, because it is genuinely the outcome of some earlier request and refusing it
+  // would break retries in flight across the upgrade. Receipts are pruned after seven days anyway, so the
+  // nulls age out on their own. No backfill: there is no way to recover a fingerprint from a stored body,
+  // and inventing one would be worse than admitting it is unknown.
+  sql: `ALTER TABLE codex_command_receipts ADD COLUMN fingerprint TEXT;`
 }];
 
 /**
@@ -1086,6 +1586,10 @@ export const MIGRATIONS = [{
  *   marker  - `revealed = 1` AND ITS MAP'S `revealed = 1`. The marker's own flag is NOT sufficient:
  *             `GET /codex/maps/:id/markers` 404s a player on an unrevealed map before projecting a
  *             single pin (CD-6), so a revealed pin on a secret map is invisible and search must agree.
+ *   session - `revealed = 1`. Same as `projectPlayerSession` / `GET /codex/sessions`. A session's own flag
+ *             is the WHOLE predicate, exactly as the player list route computes it. Gate 1 does the heavy
+ *             lifting for this kind: `prep_body` and the attendee names never enter the player index at
+ *             all, so even a revealed session cannot be found by its secrets.
  *   quest   - `revealed = 1`. Same as `projectPlayerQuest` / `GET /codex/quests`. A quest's own flag is
  *             the WHOLE predicate: its `entityIds` are a LINK to pages, not a gate on the quest, and the
  *             player list already drops the unrevealed ones from that array (the `projectPlayerMarker`
@@ -1102,6 +1606,7 @@ const PLAYER_VISIBLE_SQL = `(CASE codex_search_player.kind
   WHEN 'marker' THEN EXISTS (SELECT 1 FROM codex_markers JOIN codex_maps ON codex_maps.id = codex_markers.map_id
     WHERE codex_markers.id = codex_search_player.record_id AND codex_markers.revealed = 1 AND codex_maps.revealed = 1)
   WHEN 'quest' THEN EXISTS (SELECT 1 FROM codex_quests WHERE codex_quests.id = codex_search_player.record_id AND codex_quests.revealed = 1)
+  WHEN 'session' THEN EXISTS (SELECT 1 FROM codex_sessions WHERE codex_sessions.id = codex_search_player.record_id AND codex_sessions.revealed = 1)
   ELSE 0 END)`;
 
 /**
@@ -1173,7 +1678,9 @@ function pageDateOf(row: Pick<PageRow, "in_world_year" | "in_world_month" | "in_
     ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day }
     : null;
 }
-type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
+type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; layer: string; created_at: string };
+/** D8: `type` is the stored out-LABEL after v22's relabel, and `layer` is v22's new column. */
+const REL_COLUMNS = "id, from_page_id, to_page_id, type, layer, created_at";
 /**
  * The revision columns `CodexPageRevisionRow` is made of, named once for the same reason PAGE_COLUMNS is:
  * two reads share them (`listRevisions` per page, `listAllRevisions` for the backup) and a column added to
@@ -1191,14 +1698,26 @@ type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id:
 const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, is_party, created_at, updated_at";
 type StandingRowRaw = { id: string; faction_page_id: string; value: number; revealed: number; created_at: string; updated_at: string };
 const STANDING_COLUMNS = "id, faction_page_id, value, revealed, created_at, updated_at";
-type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string };
+type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string; tags_json: string };
 /** One column list per session read, the same discipline PAGE_COLUMNS / JOURNAL_COLUMNS follow. */
-const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at";
-type QuestRowRaw = { id: string; title: string; status: string; player_body: string; gm_body: string; objectives_json: string; entity_ids_json: string; revealed: number; rev: number; created_at: string; updated_at: string };
+const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at, tags_json";
+type QuestRowRaw = { id: string; title: string; status: string; player_body: string; gm_body: string; objectives_json: string; entity_ids_json: string; revealed: number; rev: number; created_at: string; updated_at: string; tags_json: string };
 /** One column list per quest read, and the INSERT's value order is bound to it - the SESSION_COLUMNS discipline. */
-const QUEST_COLUMNS = "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at";
-type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; payload_json: string | null; created_at: string; updated_at: string };
-const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at";
+const QUEST_COLUMNS = "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json";
+type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; session_id: string | null; live_session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; payload_json: string | null; created_at: string; updated_at: string };
+/**
+ * D9: every journal read is now a LEFT JOIN onto `codex_sessions`, because the display number is LIVE.
+ *
+ * The column list is prefixed `j.` and paired with `JOURNAL_FROM` below so the two cannot be used apart -
+ * a SELECT that took the columns without the join would read `live_session_number` as undefined and quietly
+ * fall back to the bare label on every row, which is the exact bug D9 exists to remove.
+ *
+ * `session_number` is still SELECTed beside `live_session_number`: after v19 it is the bare-LABEL store,
+ * NULL on every row, written again only by `deleteSession`'s conditional stamp-back (director ruling R2)
+ * and read by `toEntry` only when there is no join to resolve.
+ */
+const JOURNAL_COLUMNS = "j.id, j.player_text, j.gm_text, j.revealed, j.attach_marker_id, j.attach_page_id, j.kind, j.source_encounter_id, j.session_number, j.session_id, s.session_number AS live_session_number, j.real_date, j.in_world_label, j.calendar_instant, j.in_world_year, j.in_world_month, j.in_world_day, j.sort_key, j.tags_json, j.payload_json, j.created_at, j.updated_at";
+const JOURNAL_FROM = "codex_journal j LEFT JOIN codex_sessions s ON s.id = j.session_id";
 
 /** Read a stored tag array defensively — a malformed value degrades to no tags rather than throwing. */
 function parseTags(raw: string | null | undefined): readonly string[] {
@@ -1209,7 +1728,7 @@ function parseTags(raw: string | null | undefined): readonly string[] {
   } catch { return []; }
 }
 function id(value: string): string {
-  if (!ID.test(value)) throw new Error("Codex id is malformed.");
+  if (!ID.test(value)) throw new CodexValidationError("Codex id is malformed.");
   return value;
 }
 /**
@@ -1218,7 +1737,7 @@ function id(value: string): string {
  */
 function title(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 160 || CONTROL_CHARS.test(trimmed)) throw new Error("A title must be 1 to 160 printable characters.");
+  if (!trimmed || trimmed.length > 160 || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError("A title must be 1 to 160 printable characters.");
   return trimmed;
 }
 /** A nested notebook folder PATH ("NPCs/Villains"): "/"-separated segments, normalized and bounded. */
@@ -1226,41 +1745,41 @@ function folder(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const segments = value.split("/").map((segment) => segment.trim()).filter(Boolean);
   if (segments.length === 0) return null;
-  if (segments.length > 6) throw new Error("A folder path can be at most 6 levels deep.");
-  for (const segment of segments) if (segment.length > 40 || CONTROL_CHARS.test(segment)) throw new Error("Each folder name is up to 40 printable characters.");
+  if (segments.length > 6) throw new CodexValidationError("A folder path can be at most 6 levels deep.");
+  for (const segment of segments) if (segment.length > 40 || CONTROL_CHARS.test(segment)) throw new CodexValidationError("Each folder name is up to 40 printable characters.");
   const path = segments.join("/");
-  if (path.length > 160) throw new Error("That folder path is too long.");
+  if (path.length > 160) throw new CodexValidationError("That folder path is too long.");
   return path;
 }
 function tags(value: readonly string[] | undefined): string[] {
   if (!value) return [];
   const cleaned = [...new Set(value.map((tag) => tag.trim().toLowerCase()).filter(Boolean))];
-  if (cleaned.length > MAX_TAGS) throw new Error(`A record may carry at most ${MAX_TAGS} tags.`);
-  for (const tag of cleaned) if (tag.length > 40 || !/^[a-z0-9][a-z0-9-]*$/.test(tag)) throw new Error("Tags use lowercase letters, numbers, and hyphens.");
+  if (cleaned.length > MAX_TAGS) throw new CodexValidationError(`A record may carry at most ${MAX_TAGS} tags.`);
+  for (const tag of cleaned) if (tag.length > 40 || !/^[a-z0-9][a-z0-9-]*$/.test(tag)) throw new CodexValidationError("Tags use lowercase letters, numbers, and hyphens.");
   return cleaned;
 }
 function body(value: string | undefined): string {
   const text = value ?? "";
-  if (text.length > MAX_BODY) throw new Error("A page body is limited to 100000 characters.");
+  if (text.length > MAX_BODY) throw new CodexValidationError("A page body is limited to 100000 characters.");
   return text;
 }
 function entityType(value: string | undefined): CodexEntityType {
   if (value === undefined) return "note";
-  if (!ENTITY_TYPES.includes(value as CodexEntityType)) throw new Error("Unknown entity type.");
+  if (!ENTITY_TYPES.includes(value as CodexEntityType)) throw new CodexValidationError("Unknown entity type.");
   return value as CodexEntityType;
 }
 /** Structured entity attributes: a flat {slug: string} map, empties dropped, bounded in size. */
 function entityFields(value: Readonly<Record<string, string>> | undefined): Record<string, string> {
   if (value === undefined) return {};
   const entries = Object.entries(value);
-  if (entries.length > 40) throw new Error("An entity may carry at most 40 fields.");
+  if (entries.length > 40) throw new CodexValidationError("An entity may carry at most 40 fields.");
   const out: Record<string, string> = {};
   for (const [key, raw] of entries) {
-    if (!/^[a-z0-9][a-z0-9-]*$/.test(key) || key.length > 40) throw new Error("A field key must be a lowercase slug.");
-    if (typeof raw !== "string" || raw.length > 2000 || CONTROL_CHARS.test(raw.replace(/[\n\r\t]/g, ""))) throw new Error("A field value is up to 2000 printable characters.");
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(key) || key.length > 40) throw new CodexValidationError("A field key must be a lowercase slug.");
+    if (typeof raw !== "string" || raw.length > 2000 || CONTROL_CHARS.test(raw.replace(/[\n\r\t]/g, ""))) throw new CodexValidationError("A field value is up to 2000 printable characters.");
     if (raw.trim() !== "") out[key] = raw;
   }
-  if (JSON.stringify(out).length > 10_000) throw new Error("Entity fields are too large.");
+  if (JSON.stringify(out).length > 10_000) throw new CodexValidationError("Entity fields are too large.");
   return out;
 }
 /**
@@ -1280,13 +1799,46 @@ function sealSecretFields(fields: Record<string, string>, gmFields: Record<strin
   }
   return { fields: outFields, gmFields: outGm };
 }
-const REL_TYPE = /^[a-z0-9][a-z0-9-]*$/;
-/** Relationship types that read the same both ways (label === inverse) - A->B and B->A are the SAME edge. */
-const SYMMETRIC_RELATIONSHIPS = new Set(["ally", "enemy", "rival", "related"]);
-function relationshipType(value: string): string {
-  const trimmed = value.trim().toLowerCase();
-  if (!REL_TYPE.test(trimmed) || trimmed.length > 40) throw new Error("A relationship type must be a lowercase slug.");
+/**
+ * D8: the labels whose edge means the same thing read from either end, so declaring one twice in opposite
+ * directions is ONE connection rather than two.
+ *
+ * **Re-keyed to the MIGRATED spellings** by v22's relabel, and that is load-bearing rather than cosmetic:
+ * leaving the old slugs here would silently kill symmetric dedupe for every existing edge and every new
+ * one, and nothing would fail loudly - the codex would simply start accumulating duplicate "ally of"
+ * edges in both directions.
+ *
+ * Free-text and UNLABELLED connections are directional. A GM who types "guards" means an arrow, and an
+ * unlabelled edge is "A relates to B" in the direction they drew it.
+ */
+const SYMMETRIC_RELATIONSHIPS = new Set(["ally of", "enemy of", "rival of", "related to"]);
+const MAX_CONNECTION_LABEL = 40;
+/**
+ * D8: a connection's optional out-LABEL, on the way in. This replaces the old slug rule, and every
+ * difference is deliberate:
+ *
+ *  - SPACES ARE LEGAL and case is not forced. The stored value is what a reader sees ("ally of",
+ *    "located in", "owes a debt to"), because after v22's relabel there is no display mapping left on
+ *    either side. A slug plus a lookup table is two representations of one fact, and the lookup is the one
+ *    that goes stale the first time a GM invents a label the table has never heard of.
+ *  - EMPTY IS LEGAL, and it is the whole of "an OPTIONAL label": an unlabelled connection stores `''` and
+ *    reads back `null`. A sentinel beats a nullable column here for one concrete reason - the dedupe key
+ *    includes the label, and SQL's `NULL != NULL` would make every unlabelled edge distinct from every
+ *    other, so re-declaring one would pile up rows.
+ *  - 40 characters is the repo's short-label family (a marker label, a tag).
+ */
+function connectionLabel(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.length > MAX_CONNECTION_LABEL || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError(`A connection label is up to ${MAX_CONNECTION_LABEL} printable characters.`);
   return trimmed;
+}
+/** Which layer a DECLARED connection sits on. Defaults to `player`, which is what every migrated edge is. */
+function connectionLayer(value: string | null | undefined): "player" | "gm" {
+  if (value === null || value === undefined) return "player";
+  if (value !== "player" && value !== "gm") throw new CodexValidationError("A connection sits on the player layer or the GM layer.");
+  return value;
 }
 function parseFields(json: string | null | undefined): Record<string, string> {
   if (!json) return {};
@@ -1295,7 +1847,7 @@ function parseFields(json: string | null | undefined): Record<string, string> {
 }
 function normalizeCalendar(input: CodexCalendar): CodexCalendar {
   const months = (input.months ?? []).map((month) => ({ name: shortLabel(month.name, 40, "month name") ?? "Month", days: Number.isFinite(month.days) ? Math.max(1, Math.min(Math.trunc(month.days), 400)) : 30 }));
-  if (months.length < 1 || months.length > 24) throw new Error("A calendar needs 1 to 24 months.");
+  if (months.length < 1 || months.length > 24) throw new CodexValidationError("A calendar needs 1 to 24 months.");
   const weekdays = (input.weekdays ?? []).slice(0, 20).map((day) => shortLabel(day, 40, "weekday") ?? "Day");
   const current = input.currentDate;
   const currentDate = current && Number.isFinite(current.year) && Number.isFinite(current.month) && Number.isFinite(current.day)
@@ -1358,30 +1910,30 @@ function formatInWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): str
 const MAP_KINDS = new Set<CodexMapKind>(["battlemap", "regional", "world"]);
 function mapName(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new Error("A map name must be 1 to 120 printable characters.");
+  if (!trimmed || trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError("A map name must be 1 to 120 printable characters.");
   return trimmed;
 }
 function mapKind(value: string): CodexMapKind {
-  if (!MAP_KINDS.has(value as CodexMapKind)) throw new Error("Map kind must be battlemap, regional, or world.");
+  if (!MAP_KINDS.has(value as CodexMapKind)) throw new CodexValidationError("Map kind must be battlemap, regional, or world.");
   return value as CodexMapKind;
 }
 function iconId(value: string): string {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(value) || value.length > 60) throw new Error("An icon id must be a lowercase slug.");
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(value) || value.length > 60) throw new CodexValidationError("An icon id must be a lowercase slug.");
   return value;
 }
 function hexColor(value: string): string {
-  if (!/^#[0-9a-fA-F]{6}$/.test(value)) throw new Error("A color must be a #rrggbb hex value.");
+  if (!/^#[0-9a-fA-F]{6}$/.test(value)) throw new CodexValidationError("A color must be a #rrggbb hex value.");
   return value;
 }
 function coord(value: number): number {
-  if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error("A marker position must sit within the map.");
+  if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new CodexValidationError("A marker position must sit within the map.");
   return value;
 }
 function markerLabel(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   if (trimmed === "") return null;
-  if (trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new Error("A marker label is up to 120 printable characters.");
+  if (trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError("A marker label is up to 120 printable characters.");
   return trimmed;
 }
 function optionalId(value: string | null | undefined): string | null {
@@ -1402,24 +1954,24 @@ function parseIdArray(json: string | null | undefined): string[] {
 const MAX_ENTRY = 20_000;
 function entryText(value: string | undefined): string {
   const text = value ?? "";
-  if (text.length > MAX_ENTRY) throw new Error("A journal entry is limited to 20000 characters.");
+  if (text.length > MAX_ENTRY) throw new CodexValidationError("A journal entry is limited to 20000 characters.");
   return text;
 }
 function entryGmText(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
-  if (value.length > MAX_ENTRY) throw new Error("A journal entry is limited to 20000 characters.");
+  if (value.length > MAX_ENTRY) throw new CodexValidationError("A journal entry is limited to 20000 characters.");
   return value === "" ? null : value;
 }
 function shortLabel(value: string | null | undefined, max: number, what: string): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   if (trimmed === "") return null;
-  if (trimmed.length > max || CONTROL_CHARS.test(trimmed)) throw new Error(`A ${what} is up to ${max} printable characters.`);
+  if (trimmed.length > max || CONTROL_CHARS.test(trimmed)) throw new CodexValidationError(`A ${what} is up to ${max} printable characters.`);
   return trimmed;
 }
 function sessionNo(value: number | null | undefined): number | null {
   if (value === null || value === undefined) return null;
-  if (!Number.isInteger(value) || value < 0 || value > 100_000) throw new Error("A session number must be a non-negative integer.");
+  if (!Number.isInteger(value) || value < 0 || value > 100_000) throw new CodexValidationError("A session number must be a non-negative integer.");
   return value;
 }
 const MAX_ATTENDEES = 24;
@@ -1436,7 +1988,7 @@ function attendees(value: readonly string[] | undefined): string[] {
     const name = shortLabel(raw, 40, "attendee name");
     if (name && !out.includes(name)) out.push(name);
   }
-  if (out.length > MAX_ATTENDEES) throw new Error(`A session may list at most ${MAX_ATTENDEES} attendees.`);
+  if (out.length > MAX_ATTENDEES) throw new CodexValidationError(`A session may list at most ${MAX_ATTENDEES} attendees.`);
   return out;
 }
 const SESSION_STATUSES = new Set<CodexSessionStatus>(["planned", "played"]);
@@ -1447,10 +1999,10 @@ const SESSION_STATUSES = new Set<CodexSessionStatus>(["planned", "played"]);
  */
 function sessionStatus(value: string | undefined): CodexSessionStatus {
   if (value === undefined) return "planned";
-  if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new Error("A session is either planned or played.");
+  if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new CodexValidationError("A session is either planned or played.");
   return value as CodexSessionStatus;
 }
-const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime", "milestone", "standing"]);
+const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"]);
 /**
  * A stored `kind` PARSED, not coerced. Before M11 this was inlined in `toEntry` as
  * `row.kind === "combat" ? "combat" : "note"`, which is fine for two kinds and actively dangerous for four:
@@ -1482,13 +2034,14 @@ const MAX_DOWNTIME_DAYS = 3650;
  * `applied` is not an input. Downtime is always created unapplied (O-3): only `applyDowntime` sets it, and
  * only once. Accepting it here would let a caller pre-apply a record and skip the clock move entirely.
  */
-function downtimePayload(input: Readonly<{ who: string; activity: string; days: number }>): CodexDowntimePayload {
+function downtimePayload(input: Readonly<{ who: string; activity: string; days: number; characterPageId?: string | null }>): CodexDowntimePayload {
   const days = input?.days;
-  if (!Number.isInteger(days) || days < 0 || days > MAX_DOWNTIME_DAYS) throw new Error(`Downtime days must be a whole number from 0 to ${MAX_DOWNTIME_DAYS}.`);
+  if (!Number.isInteger(days) || days < 0 || days > MAX_DOWNTIME_DAYS) throw new CodexValidationError(`Downtime days must be a whole number from 0 to ${MAX_DOWNTIME_DAYS}.`);
   return {
     who: shortLabel(input.who, 120, "downtime participant") ?? "",
     activity: shortLabel(input.activity, 120, "downtime activity") ?? "",
-    days, applied: false
+    days, applied: false,
+    characterPageId: optionalId(input.characterPageId)
   };
 }
 /** Read a stored payload defensively - malformed JSON degrades to `null`, never a throw (`parseObjectives`' rule). */
@@ -1497,14 +2050,19 @@ function parseDowntimePayload(raw: string | null | undefined): CodexDowntimePayl
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const value = parsed as { who?: unknown; activity?: unknown; days?: unknown; applied?: unknown };
+    const value = parsed as { who?: unknown; activity?: unknown; days?: unknown; applied?: unknown; characterPageId?: unknown };
     return {
       who: typeof value.who === "string" ? value.who : "",
       activity: typeof value.activity === "string" ? value.activity : "",
       days: typeof value.days === "number" && Number.isFinite(value.days) ? Math.max(0, Math.trunc(value.days)) : 0,
       // Coerced, not trusted, exactly as `questObjectives` treats `done`: anything but exactly `true` is
       // false, so a malformed value can never mark downtime as already applied and suppress the clock move.
-      applied: value.applied === true
+      applied: value.applied === true,
+      // D12: THE PARSER IS THE MIGRATION. Every payload written before this field existed lacks the key,
+      // and this default supplies it as `null` on read - so the wire's "always present" guarantee holds
+      // for old rows with no `json_set` sweep over `payload_json` at all. The same fail-closed reader
+      // discipline every other field here follows: a non-string is null, never a dangling half-value.
+      characterPageId: typeof value.characterPageId === "string" && ID.test(value.characterPageId) ? value.characterPageId : null
     };
   } catch { return null; }
 }
@@ -1524,7 +2082,7 @@ const MAX_LEVEL = 20;
  */
 function milestonePayload(input: Readonly<{ level: number; reason: string }>): CodexMilestonePayload {
   const level = input?.level;
-  if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL) throw new Error(`A milestone's level must be a whole number from 1 to ${MAX_LEVEL}.`);
+  if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL) throw new CodexValidationError(`A milestone's level must be a whole number from 1 to ${MAX_LEVEL}.`);
   return { level, reason: shortLabel(input.reason, 120, "milestone reason") ?? "" };
 }
 /** Read a stored milestone payload defensively - malformed JSON degrades to `null` (`parseDowntimePayload`'s rule). */
@@ -1556,7 +2114,7 @@ const MAX_STANDING = 100;
  * clamping that would write NaN into a STRICT INTEGER column.
  */
 function standingValue(value: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("A standing value must be a number from -100 to 100.");
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new CodexValidationError("A standing value must be a number from -100 to 100.");
   return Math.min(MAX_STANDING, Math.max(MIN_STANDING, Math.trunc(value)));
 }
 
@@ -1592,8 +2150,33 @@ const MAX_PRUNE_DAYS = 36_500;
  * into a STRICT INTEGER column.
  */
 function revisionWindowMinutes(value: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`A revision window must be a number of minutes from ${MIN_REVISION_WINDOW_MINUTES} to ${MAX_REVISION_WINDOW_MINUTES}.`);
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new CodexValidationError(`A revision window must be a number of minutes from ${MIN_REVISION_WINDOW_MINUTES} to ${MAX_REVISION_WINDOW_MINUTES}.`);
   return Math.min(MAX_REVISION_WINDOW_MINUTES, Math.max(MIN_REVISION_WINDOW_MINUTES, Math.trunc(value)));
+}
+/**
+ * D6 / director ruling R4: the autosave interval's bounds and default, in SECONDS - the wire's unit, so no
+ * conversion happens anywhere between the request body and the column.
+ *
+ * `1` is the FLOOR rather than a special value: today's page editor debounces at 800 ms, so one second is the
+ * nearest honest expression of "what this codex already did", and it is also the default. Unlike
+ * `windowMinutes`, `0` is not in range - a zero-second autosave is a save on every keystroke, which is not a
+ * cadence anyone means; a GM who wants no autosave says `enabled: false`.
+ *
+ * `600` is ten minutes: past that the setting stops meaning "save while I work" and starts meaning "I will
+ * save it myself", which `enabled: false` says more honestly - v17's ceiling reasoning applied to this scale.
+ */
+const MIN_AUTOSAVE_INTERVAL_SECONDS = 1;
+const MAX_AUTOSAVE_INTERVAL_SECONDS = 600;
+const DEFAULT_AUTOSAVE_SETTINGS: CodexAutosaveSettings = { enabled: true, intervalSeconds: 1 };
+/**
+ * The interval on the way in: CLAMPED and TRUNCATED, `revisionWindowMinutes`' arrangement verbatim and for
+ * the same reason - the GM is picking from a scale, so an overshoot asks for the end of it, and a fractional
+ * second is a control artefact rather than an intent. The HTTP router still REJECTS out-of-range values with
+ * a 400; this clamp stands behind it for every non-HTTP writer (import, tests, a repair script).
+ */
+function autosaveIntervalSeconds(value: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new CodexValidationError(`An autosave interval must be a number of seconds from ${MIN_AUTOSAVE_INTERVAL_SECONDS} to ${MAX_AUTOSAVE_INTERVAL_SECONDS}.`);
+  return Math.min(MAX_AUTOSAVE_INTERVAL_SECONDS, Math.max(MIN_AUTOSAVE_INTERVAL_SECONDS, Math.trunc(value)));
 }
 /**
  * CT-6's payload on the way IN. `delta` is passed in already computed by `setStanding` (it is the difference
@@ -1601,6 +2184,25 @@ function revisionWindowMinutes(value: number): number {
  */
 function standingPayload(input: Readonly<{ factionPageId: string; delta: number; reason: string }>): CodexStandingPayload {
   return { factionPageId: input.factionPageId, delta: Math.trunc(input.delta), reason: shortLabel(input.reason, 120, "standing reason") ?? "" };
+}
+/** D11's payload on the way IN. `status` is already validated by `questStatus` at the call site. */
+function questEventPayload(input: Readonly<{ questId: string; status: CodexQuestStatus }>): CodexQuestEventPayload {
+  return { questId: input.questId, status: input.status };
+}
+/** Read a stored quest-event payload defensively - `parseStandingPayload`'s rule, one kind later. */
+function parseQuestEventPayload(raw: string | null | undefined): CodexQuestEventPayload | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const value = parsed as { questId?: unknown; status?: unknown };
+    return {
+      questId: typeof value.questId === "string" ? value.questId : "",
+      // Fails CLOSED to `active`, the `toQuest` coercion rule verbatim: an unrecognised status reads as
+      // the harmless one rather than throwing and making one bad row an unopenable codex.
+      status: value.status === "completed" || value.status === "failed" ? value.status : "active"
+    };
+  } catch { return null; }
 }
 /** Read a stored standing payload defensively - malformed JSON degrades to `null` (`parseDowntimePayload`'s rule). */
 function parseStandingPayload(raw: string | null | undefined): CodexStandingPayload | null {
@@ -1639,6 +2241,9 @@ export function milestonePayloadOf(entry: PayloadBearing): CodexMilestonePayload
 export function standingPayloadOf(entry: PayloadBearing): CodexStandingPayload | null {
   return entry.kind === "standing" ? (entry.payload as CodexStandingPayload | null) : null;
 }
+export function questEventPayloadOf(entry: PayloadBearing): CodexQuestEventPayload | null {
+  return entry.kind === "quest" ? (entry.payload as CodexQuestEventPayload | null) : null;
+}
 /**
  * The kind -> payload-parser mapping, written ONCE (`toEntry` is its only caller). An EXHAUSTIVE switch with
  * no `default`, deliberately: adding a seventh kind to `CodexJournalKind` is then a compile error here, and
@@ -1650,6 +2255,7 @@ function payloadOf(kind: CodexJournalKind, raw: string | null): CodexEntryPayloa
     case "downtime": return parseDowntimePayload(raw);
     case "milestone": return parseMilestonePayload(raw);
     case "standing": return parseStandingPayload(raw);
+    case "quest": return parseQuestEventPayload(raw);
     case "note": case "combat": case "deadline": return null;
   }
 }
@@ -1658,7 +2264,7 @@ function payloadOf(kind: CodexJournalKind, raw: string | null): CodexEntryPayloa
  * to say what it carries. Three of the six say `null`, and that is the point: an optional field would let a
  * seventh kind be added that silently stores nothing.
  */
-type EntryFields = Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[]; payload: CodexEntryPayload | null }>;
+type EntryFields = Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionId: string | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[]; payload: CodexEntryPayload | null }>;
 /**
  * CT-5's "fires when the campaign date passes it", and **the only place that comparison is written**
  * (D11-C). Every reader - the store, the projections, any dashboard count - goes through this one function,
@@ -1687,7 +2293,7 @@ const QUEST_STATUSES = new Set<CodexQuestStatus>(["active", "completed", "failed
 /** The TS half of the quest status gate; migration v14's CHECK is the other half (see `sessionStatus`). */
 function questStatus(value: string | undefined): CodexQuestStatus {
   if (value === undefined) return "active";
-  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new Error("A quest is active, completed, or failed.");
+  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new CodexValidationError("A quest is active, completed, or failed.");
   return value as CodexQuestStatus;
 }
 const MAX_OBJECTIVES = 24;
@@ -1720,11 +2326,11 @@ const MAX_OBJECTIVE_TEXT = 120;
  */
 function questObjectives(value: readonly CodexQuestObjective[] | undefined): CodexQuestObjective[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new Error("Objectives must be a list.");
-  if (value.length > MAX_OBJECTIVES) throw new Error(`A quest may carry at most ${MAX_OBJECTIVES} objectives.`);
+  if (!Array.isArray(value)) throw new CodexValidationError("Objectives must be a list.");
+  if (value.length > MAX_OBJECTIVES) throw new CodexValidationError(`A quest may carry at most ${MAX_OBJECTIVES} objectives.`);
   return value.map((objective) => {
     const text = typeof objective?.text === "string" ? objective.text.trim() : "";
-    if (text.length > MAX_OBJECTIVE_TEXT || CONTROL_CHARS.test(text)) throw new Error(`An objective is up to ${MAX_OBJECTIVE_TEXT} printable characters.`);
+    if (text.length > MAX_OBJECTIVE_TEXT || CONTROL_CHARS.test(text)) throw new CodexValidationError(`An objective is up to ${MAX_OBJECTIVE_TEXT} printable characters.`);
     return { text, done: objective?.done === true };
   });
 }
@@ -1770,9 +2376,245 @@ export function parseWikiLinks(text: string, layer: "player" | "gm"): CodexLinkR
     const dedupe = `${layer}|${targetKind}|${key}|${section ?? ""}`;
     if (seen.has(dedupe)) continue;
     seen.add(dedupe);
-    links.push({ sourcePageId: "", layer, targetKind, targetRef: key, section });
+    links.push({ sourceKind: "page", sourceId: "", layer, targetKind, targetRef: key, section });
   }
   return links;
+}
+
+/**
+ * Every top-level key a codex bundle may carry, list-valued and single-valued. It is the UNION over every
+ * shape `exportBundle` has ever produced (checked against the file's own history), which is what lets an
+ * unrecognised key be refused without breaking director ruling R1: a pre-versioning backup is a strict
+ * SUBSET of these, never a superset.
+ */
+const BUNDLE_LIST_KEYS = ["pages", "maps", "markers", "journal", "relationships", "sessions", "quests", "standing", "revisions", "folders"] as const;
+const BUNDLE_VALUE_KEYS = ["activeSessionId", "publishedDate", "partyMarkerId", "calendar", "settings"] as const;
+const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, ...BUNDLE_VALUE_KEYS]);
+
+/**
+ * D16: turn an untrusted bundle into a validated one, or throw - BEFORE any transaction opens.
+ *
+ * Every value goes through the SAME validator an ordinary write uses (`title`, `tags`, `body`,
+ * `attendees`, `questObjectives`, `sessionNo`, `id`, the payload parsers), so an import cannot write a
+ * row a POST could not. It is deliberately not a second, laxer door into the store.
+ *
+ * Missing keys DEFAULT rather than failing: a bundle taken before a record type existed simply has no
+ * rows of it, and refusing such a bundle would break the one promise D16 makes - that the backups a GM
+ * already has restore cleanly (director ruling R1).
+ *
+ * **A bundle carrying NO recognised key at all is refused, and that is a different thing from an empty
+ * campaign.** This route REPLACES the codex, so "I could not find any records in this file" and "this
+ * campaign genuinely has no records" must not take the same branch. They are distinguishable on the wire
+ * and always have been: an export writes every key unconditionally, so an empty campaign posts
+ * `{"pages": [], "maps": [], …}` and a truncated or hand-edited file posts `{}` or a bag of keys the codex
+ * does not know. The second used to wipe the whole codex and answer 200 - QA destroyed 22 real pages
+ * through the UI doing exactly that. An unrecognised key is refused BY NAME for the same reason: a bundle
+ * whose `pages` key is mistyped is a bundle whose pages would be silently deleted, and the GM needs to be
+ * told which key is wrong rather than told nothing.
+ *
+ * CROSS-RECORD checks the per-row validators cannot see. Each one MIRRORS a database constraint the insert
+ * loop would otherwise hit mid-transaction, where the only text available is the driver's ("UNIQUE
+ * constraint failed: codex_pages.id", "FOREIGN KEY constraint failed") - which names internal tables to
+ * whoever asked and tells a GM nothing they can act on. They add no refusal the database was not already
+ * going to make; they move it earlier and give it words:
+ *   - at most one `isParty` marker (v16's partial unique index),
+ *   - no duplicate session numbers (v13's partial unique index),
+ *   - one standing row per faction (v16's `codex_standing_faction`),
+ *   - unique ids within each collection (every table's PRIMARY KEY),
+ *   - referential closure for every FK the schema declares: a marker's map, a map's parent, both ends of a
+ *     declared connection, a standing row's faction page, a revision's page.
+ */
+function normalizeBundle(raw: unknown): CodexImportBundle {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new CodexValidationError("That backup file is not a codex bundle.");
+  const bundle = raw as Record<string, unknown>;
+  const unrecognised = Object.keys(bundle).find((key) => !BUNDLE_KEYS.has(key));
+  if (unrecognised !== undefined) {
+    throw new CodexValidationError(`That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export - a mistyped section name means those records would be dropped rather than restored.`);
+  }
+  if (!Object.keys(bundle).some((key) => BUNDLE_KEYS.has(key))) {
+    throw new CodexValidationError("That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section (\"pages\": [], and so on) - restoring this would erase the codex rather than replace it.");
+  }
+  const list = (key: string): unknown[] => {
+    const value = bundle[key];
+    if (value === undefined || value === null) return [];   // R1: a bundle from before this record type existed
+    if (!Array.isArray(value)) throw new CodexValidationError(`That backup's "${key}" section is not a list of records.`);
+    return value;
+  };
+  /**
+   * One collection, row by row, with the collection NAME and the row's position carried into every message
+   * a per-field validator raises. "Codex id is malformed." is unactionable in a 4 MB file; "That backup's
+   * "pages" entry 37 is not valid: Codex id is malformed." is a line a GM can go and look at.
+   */
+  const rows = <T>(key: string, map: (row: Record<string, unknown>) => T): T[] => list(key).map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new CodexValidationError(`That backup's "${key}" entry ${index + 1} is not a record.`);
+    try { return map(value as Record<string, unknown>); }
+    catch (error) {
+      if (error instanceof CodexValidationError) throw new CodexValidationError(`That backup's "${key}" entry ${index + 1} is not valid: ${error.message}`);
+      throw error;
+    }
+  });
+  const text = (value: unknown): string => (typeof value === "string" ? value : "");
+  const nullableText = (value: unknown): string | null => (typeof value === "string" ? value : null);
+  const flag = (value: unknown): boolean => value === true;
+  const count = (value: unknown, fallback = 0): number => (typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : fallback);
+  // A REAL, not an integer. Marker coordinates are fractions of the map, so truncating one moves the pin
+  // to the corner - which is exactly the silent data loss the round-trip byte comparison caught.
+  const real = (value: unknown, fallback = 0): number => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
+  const stamp = (value: unknown): string => (typeof value === "string" ? value : "");
+  const date = (value: unknown): CodexInWorldDate | null => {
+    if (!value || typeof value !== "object") return null;
+    const parts = value as { year?: unknown; month?: unknown; day?: unknown };
+    if (typeof parts.year !== "number" || typeof parts.month !== "number" || typeof parts.day !== "number") return null;
+    return { year: Math.trunc(parts.year), month: Math.trunc(parts.month), day: Math.trunc(parts.day) };
+  };
+
+  const pages = rows("pages", (row) => {
+    return {
+      id: id(text(row.id)), title: title(text(row.title)), entityType: entityType(typeof row.entityType === "string" ? row.entityType : undefined),
+      fields: entityFields(row.fields as Record<string, string> | undefined), gmFields: entityFields(row.gmFields as Record<string, string> | undefined),
+      folder: folder(nullableText(row.folder)), tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []),
+      playerBody: body(text(row.playerBody)), gmBody: body(text(row.gmBody)), revealedToPlayers: flag(row.revealedToPlayers),
+      bannerAssetId: optionalId(nullableText(row.bannerAssetId)), inWorldLabel: null, calendarInstant: null, inWorldDate: date(row.inWorldDate),
+      rev: Math.max(1, count(row.rev, 1)), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
+    } satisfies CodexPageRow;
+  });
+  const maps = rows("maps", (row) => {
+    return {
+      id: id(text(row.id)), assetId: id(text(row.assetId)), name: mapName(text(row.name)), kind: mapKind(text(row.kind)),
+      parentMapId: optionalId(nullableText(row.parentMapId)), revealedToPlayers: flag(row.revealedToPlayers),
+      sortKey: count(row.sortKey), tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []),
+      createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
+    } satisfies CodexMapRow;
+  });
+  const markers = rows("markers", (row) => {
+    return {
+      id: id(text(row.id)), mapId: id(text(row.mapId)), x: coord(real(row.x)), y: coord(real(row.y)),
+      iconId: iconId(text(row.iconId)), iconColor: hexColor(text(row.iconColor)), label: markerLabel(nullableText(row.label)),
+      revealedToPlayers: flag(row.revealedToPlayers), pageIds: idArray(row.pageIds as string[] | undefined),
+      subMapId: optionalId(nullableText(row.subMapId)), sceneIds: idArray(row.sceneIds as string[] | undefined),
+      actorId: optionalId(nullableText(row.actorId)), tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []),
+      isParty: flag(row.isParty), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
+    } satisfies CodexMarkerRow;
+  });
+
+  const sessions = rows("sessions", (row) => {
+    return {
+      id: id(text(row.id)), sessionNumber: sessionNo(typeof row.sessionNumber === "number" ? row.sessionNumber : null),
+      realDate: shortLabel(nullableText(row.realDate), 40, "date"), attendees: attendees(Array.isArray(row.attendees) ? (row.attendees as string[]) : []),
+      prepBody: body(text(row.prepBody)), recapBody: body(text(row.recapBody)), revealedToPlayers: flag(row.revealedToPlayers),
+      status: sessionStatus(typeof row.status === "string" ? row.status : undefined), tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []),
+      rev: Math.max(1, count(row.rev, 1)), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
+    } satisfies CodexSessionRow;
+  });
+
+  const journal = rows("journal", (row) => {
+    const kind = journalKind(text(row.kind));
+    return {
+      id: id(text(row.id)), playerText: entryText(text(row.playerText)), gmText: entryGmText(nullableText(row.gmText)),
+      revealedToPlayers: flag(row.revealedToPlayers), attachMarkerId: optionalId(nullableText(row.attachMarkerId)),
+      attachPageId: optionalId(nullableText(row.attachPageId)), kind, sourceEncounterId: typeof row.sourceEncounterId === "number" ? Math.trunc(row.sourceEncounterId) : null,
+      sessionId: typeof row.sessionId === "string" ? optionalId(row.sessionId) : null,
+      // See `CodexBundleJournalRow`: the KEY's presence, not its value, is what dates the row to D9 or later
+      // and so tells a lost join apart from R2's bare display label.
+      declaredSessionId: "sessionId" in row,
+      sessionNumber: typeof row.sessionNumber === "number" ? sessionNo(row.sessionNumber) : null,
+      realDate: shortLabel(nullableText(row.realDate), 40, "date"), inWorldLabel: nullableText(row.inWorldLabel),
+      calendarInstant: null, inWorldDate: date(row.inWorldDate), sortKey: count(row.sortKey),
+      tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []),
+      // Through the SAME defensive parser a stored row uses, so a hand-edited payload degrades exactly as
+      // it would on read rather than being written back verbatim.
+      payload: payloadOf(kind, row.payload === undefined || row.payload === null ? null : JSON.stringify(row.payload)),
+      createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
+    } satisfies CodexBundleJournalRow;
+  });
+  const quests = rows("quests", (row) => {
+    return {
+      id: id(text(row.id)), title: title(text(row.title)), status: questStatus(typeof row.status === "string" ? row.status : undefined),
+      playerBody: body(text(row.playerBody)), gmBody: body(text(row.gmBody)),
+      objectives: questObjectives(Array.isArray(row.objectives) ? (row.objectives as CodexQuestObjective[]) : []),
+      entityIds: idArray(row.entityIds as string[] | undefined), revealedToPlayers: flag(row.revealedToPlayers),
+      tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []),
+      rev: Math.max(1, count(row.rev, 1)), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
+    } satisfies CodexQuestRow;
+  });
+  const standing = rows("standing", (row) => {
+    return {
+      id: id(text(row.id)), factionPageId: id(text(row.factionPageId)), value: standingValue(count(row.value)),
+      revealedToPlayers: flag(row.revealedToPlayers), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
+    } satisfies CodexStandingRow;
+  });
+  const relationships = rows("relationships", (row) => {
+    return {
+      id: id(text(row.id)), fromPageId: id(text(row.fromPageId)), toPageId: id(text(row.toPageId)),
+      // An OLD bundle carries a slug `type` where a new one carries a `label`; both land as the label,
+      // which is what v22's relabel made them. `layer` defaults to `player`, which every migrated edge is.
+      label: connectionLabel(typeof row.label === "string" ? row.label : (typeof row.type === "string" ? row.type.replace(/-/g, " ") : null)) || null,
+      layer: connectionLayer(typeof row.layer === "string" ? row.layer : null), createdAt: stamp(row.createdAt)
+    } satisfies CodexRelationshipRow;
+  });
+  const revisions = rows("revisions", (row) => {
+    return {
+      id: count(row.id), pageId: id(text(row.pageId)), rev: count(row.rev, 1), title: title(text(row.title)),
+      entityType: entityType(typeof row.entityType === "string" ? row.entityType : undefined),
+      fields: entityFields(row.fields as Record<string, string> | undefined), gmFields: entityFields(row.gmFields as Record<string, string> | undefined),
+      playerBody: body(text(row.playerBody)), gmBody: body(text(row.gmBody)), bannerAssetId: optionalId(nullableText(row.bannerAssetId)),
+      tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []), authoredAt: stamp(row.authoredAt), authorTag: text(row.authorTag)
+    } satisfies CodexPageRevisionExportRow;
+  });
+
+  // ---- CROSS-RECORD checks. See the header: each one mirrors a constraint the insert loop would hit
+  // mid-transaction, so none of them refuses a bundle the database would have accepted - they only replace
+  // the driver's text with a sentence naming the section and the offending value.
+  const unique = (key: string, ids: readonly (string | number)[]) => {
+    const seen = new Set<string | number>();
+    for (const value of ids) {
+      if (seen.has(value)) throw new CodexValidationError(`That backup lists two "${key}" records with the same id (${value}).`);
+      seen.add(value);
+    }
+  };
+  const closed = (key: string, what: string, refs: readonly (string | null)[], known: ReadonlySet<string>) => {
+    for (const ref of refs) {
+      if (ref !== null && !known.has(ref)) throw new CodexValidationError(`That backup's "${key}" section names a ${what} the file does not contain (${ref}).`);
+    }
+  };
+  unique("pages", pages.map((row) => row.id));
+  unique("maps", maps.map((row) => row.id));
+  unique("markers", markers.map((row) => row.id));
+  unique("journal", journal.map((row) => row.id));
+  unique("sessions", sessions.map((row) => row.id));
+  unique("quests", quests.map((row) => row.id));
+  unique("standing", standing.map((row) => row.id));
+  unique("relationships", relationships.map((row) => row.id));
+  unique("revisions", revisions.map((row) => row.id));
+  const pageIds = new Set(pages.map((row) => row.id));
+  const mapIds = new Set(maps.map((row) => row.id));
+  closed("maps", "parent map", maps.map((row) => row.parentMapId), mapIds);
+  closed("markers", "map", markers.map((row) => row.mapId), mapIds);
+  closed("relationships", "page", relationships.flatMap((row) => [row.fromPageId, row.toPageId]), pageIds);
+  closed("standing", "faction page", standing.map((row) => row.factionPageId), pageIds);
+  closed("revisions", "page", revisions.map((row) => row.pageId), pageIds);
+  const factions = standing.map((row) => row.factionPageId);
+  if (new Set(factions).size !== factions.length) throw new CodexValidationError("That backup has two standing rows for the same faction - a faction holds one standing.");
+  if (markers.filter((marker) => marker.isParty).length > 1) throw new CodexValidationError("That backup marks more than one pin as the party's - only one pin can be.");
+  const numbers = sessions.map((session) => session.sessionNumber).filter((value): value is number => value !== null);
+  if (new Set(numbers).size !== numbers.length) throw new CodexValidationError("That backup has two sessions with the same number.");
+
+  const settingsRaw = bundle.settings as { revisionHistory?: { enabled?: unknown; windowMinutes?: unknown }; autosave?: { enabled?: unknown; intervalSeconds?: unknown } } | undefined;
+  const settings: CodexSettingsInput | undefined = settingsRaw
+    ? {
+      revisionHistory: { enabled: settingsRaw.revisionHistory?.enabled !== false, windowMinutes: count(settingsRaw.revisionHistory?.windowMinutes, DEFAULT_REVISION_SETTINGS.windowMinutes) },
+      autosave: { enabled: settingsRaw.autosave?.enabled !== false, intervalSeconds: count(settingsRaw.autosave?.intervalSeconds, DEFAULT_AUTOSAVE_SETTINGS.intervalSeconds) }
+    }
+    : undefined;
+
+  return {
+    pages, maps, markers, journal, relationships, sessions, quests, standing, revisions, settings,
+    activeSessionId: typeof bundle.activeSessionId === "string" ? optionalId(bundle.activeSessionId) : null,
+    publishedDate: date(bundle.publishedDate),
+    partyMarkerId: typeof bundle.partyMarkerId === "string" ? optionalId(bundle.partyMarkerId) : null,
+    calendar: normalizeCalendar((bundle.calendar ?? DEFAULT_CALENDAR) as CodexCalendar),
+    folders: list("folders").map((path) => folder(text(path))).filter((path): path is string => path !== null)
+  };
 }
 
 export class CodexStore {
@@ -1790,7 +2632,12 @@ export class CodexStore {
       this.database = database;
       this.migrate();
       const meta = database.prepare("SELECT codex_revision FROM codex_meta WHERE id = 1").get() as { codex_revision: number } | undefined;
-      if (!meta) database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
+      // `links_backfilled = 1` in the SEED, not left to the column default: a database being created right
+      // now has no pre-D13 session, quest or journal body to re-extract, so it must not run the sweep. The
+      // default alone meant every brand-new codex swept three empty tables and bumped its revision to 1
+      // before its first write - which `reconcileLinks`' own comment claimed it avoided.
+      if (!meta) database.prepare("INSERT INTO codex_meta (id, codex_revision, links_backfilled) VALUES (1, 0, 1)").run();
+      this.reconcileLinks();
     } catch (error) {
       database.close();
       this.database = undefined;
@@ -1798,7 +2645,78 @@ export class CodexStore {
     }
   }
 
+  /**
+   * D13's ONE-TIME backfill: extract `[[wiki links]]` from every session, quest and journal body that
+   * existed before those kinds joined the graph.
+   *
+   * **Why this is not in migration v22.** Migrations in this file are SQL-only strings
+   * (`database.exec(migration.sql)`) and SQL cannot parse `[[...]]`. A post-migration code hook inside
+   * the runner would break that discipline for one case. So the flag lives in the schema (v22's
+   * `links_backfilled`) and the work lives in code, where the parser lives - which is also the only place
+   * that can guarantee the backfill and the steady-state rebuild use the SAME parser and the same layer
+   * mapping. `initialize()` already seeds `codex_meta` after migrating, so this is the established seam.
+   *
+   * Runs ONCE, guarded by the flag, inside one transaction, and bumps the revision so every client
+   * refetches the connection feeds that just gained rows. Idempotent by flag; safe to call on every open.
+   *
+   * A codex created TODAY never runs it at all: `initialize` seeds the meta row with `links_backfilled = 1`
+   * before calling this, because a database with no pre-D13 rows has nothing to re-extract. That used to be
+   * handled by a branch here on the meta row being absent - which could never fire, since `initialize`
+   * inserts the row two lines above the call. The result was that every new codex swept three empty tables
+   * and reported revision 1 before its first write.
+   *
+   * Pages are deliberately NOT re-extracted: their rows have been maintained by every save since v1, and
+   * v22 carried them across verbatim as `source_kind = 'page'`.
+   */
+  private reconcileLinks(): void {
+    const database = this.requireDatabase();
+    const flag = database.prepare("SELECT links_backfilled FROM codex_meta WHERE id = 1").get() as { links_backfilled: number } | undefined;
+    if (!flag || flag.links_backfilled === 1) return;
+    this.transaction(() => {
+      for (const row of database.prepare("SELECT id, recap_body, prep_body FROM codex_sessions").all() as Array<{ id: string; recap_body: string; prep_body: string }>) {
+        this.rebuildLinksFor("session", row.id, row.recap_body, row.prep_body);
+      }
+      for (const row of database.prepare("SELECT id, player_body, gm_body FROM codex_quests").all() as Array<{ id: string; player_body: string; gm_body: string }>) {
+        this.rebuildLinksFor("quest", row.id, row.player_body, row.gm_body);
+      }
+      for (const row of database.prepare("SELECT id, player_text, gm_text FROM codex_journal").all() as Array<{ id: string; player_text: string; gm_text: string | null }>) {
+        this.rebuildLinksFor("journal", row.id, row.player_text, row.gm_text ?? "");
+      }
+      database.prepare("UPDATE codex_meta SET links_backfilled = 1 WHERE id = 1").run();
+      this.bumpRevision();
+    });
+  }
+
   close() { this.database?.close(); this.database = undefined; }
+
+  /**
+   * D19: the stored outcome of a `commandId`, or null.
+   *
+   * **Recorded AFTER the store call commits, never before**, and the crash window that leaves is stated
+   * honestly rather than hidden: a process that dies between the write committing and the receipt being
+   * written will re-execute ONE identical retry. That is a strictly better failure than the alternative -
+   * a receipt written first can record an outcome that never committed, and a replay would then report
+   * success for a write that did not happen. Re-executing once is recoverable; lying is not.
+   *
+   * Pruned lazily on write: a receipt older than seven days is answering a retry nobody is still making.
+   */
+  recallCommand(commandId: string): Readonly<{ status: number; body: unknown; fingerprint: string | null }> | null {
+    if (!ID.test(commandId)) return null;
+    const row = this.requireDatabase().prepare("SELECT status, body_json, fingerprint FROM codex_command_receipts WHERE command_id = ?").get(commandId) as { status: number; body_json: string; fingerprint: string | null } | undefined;
+    if (!row) return null;
+    try { return { status: row.status, body: JSON.parse(row.body_json) as unknown, fingerprint: row.fingerprint }; } catch { return null; }
+  }
+
+  recordCommand(commandId: string, status: number, responseBody: unknown, fingerprint: string): void {
+    if (!ID.test(commandId)) return;
+    const database = this.requireDatabase();
+    const cutoff = new Date(this.now() - 7 * 86_400_000).toISOString();
+    // NOT inside `this.transaction`: bumping the coarse revision here would invalidate every client's
+    // ETag for a write that already bumped it once, and a receipt is bookkeeping rather than content.
+    database.prepare("INSERT OR REPLACE INTO codex_command_receipts (command_id, status, body_json, created_at, fingerprint) VALUES (?, ?, ?, ?, ?)")
+      .run(commandId, status, JSON.stringify(responseBody ?? null), this.stamp(), fingerprint);
+    database.prepare("DELETE FROM codex_command_receipts WHERE created_at <= ?").run(cutoff);
+  }
 
   /** The coarse counter bumped on every write - drives the `codex:changed` ping and list ETags. */
   get revision(): number {
@@ -1833,7 +2751,7 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.in_world_label, row.calendar_instant, row.in_world_year, row.in_world_month, row.in_world_day, row.rev, row.created_at, row.updated_at);
-      this.rebuildLinks(pageId, row.player_body, row.gm_body);
+      this.rebuildLinksFor("page", pageId, row.player_body, row.gm_body);
       this.indexPage(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json, row.tags_json);
       this.registerFolderPath(row.folder, stamp);
       // NEVER throttled, unlike `updatePage`'s (owner decision, 2026-07-30). Two reasons, and the first is the
@@ -1908,7 +2826,7 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, rev = ?, updated_at = ? WHERE id = ?")
         .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.rev, next.updated_at, pageId);
-      this.rebuildLinks(pageId, next.player_body, next.gm_body);
+      this.rebuildLinksFor("page", pageId, next.player_body, next.gm_body);
       this.indexPage(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json, next.tags_json);
       this.registerFolderPath(next.folder, next.updated_at);
       /**
@@ -1944,8 +2862,19 @@ export class CodexStore {
        * throws the current text away, which makes it the one that most needs the state it throws away kept.
        *
        * `revisionExistsAt` still applies, so this cannot write a duplicate of a state already captured.
+       *
+       * D7 / director ruling R7 adds the SECOND forcing condition, and it is the same argument one case
+       * further along: a TYPE-CHANGING save is the other save that deliberately throws content away. The
+       * pruning a few lines above drops every field the new type does not declare, and the client's confirm
+       * dialog promises "you can restore them from History" - a promise the coalescing window would break
+       * roughly half the time, because a GM who types a page and then fixes its kind is inside the window by
+       * construction. Forcing here turns that copy into a guarantee instead of a probability.
+       *
+       * It is computed here rather than passed in: no caller should be able to ask for it or forget it, and
+       * "the type changed" is a fact about this save that `updatePage` already knows.
        */
-      if (this.revisionDue(pageId, forceRevision) && !this.revisionExistsAt(pageId, existing.rev)) {
+      const typeChanged = nextEntityType !== existing.entity_type;
+      if (this.revisionDue(pageId, forceRevision || typeChanged) && !this.revisionExistsAt(pageId, existing.rev)) {
         this.snapshotRevision(pageId, existing, authorTag);
       }
       this.bumpRevision();
@@ -1981,9 +2910,9 @@ export class CodexStore {
   moveFolder(fromPath: string, toPath: string): number {
     const database = this.requireDatabase();
     const from = folder(fromPath);
-    if (!from) throw new Error("Choose a folder to move.");
+    if (!from) throw new CodexValidationError("Choose a folder to move.");
     const to = folder(toPath); // null => top level
-    if (to !== null && (to === from || to.startsWith(`${from}/`))) throw new Error("Can't move a folder into itself.");
+    if (to !== null && (to === from || to.startsWith(`${from}/`))) throw new CodexValidationError("Can't move a folder into itself.");
     // Re-path a folder value under `from` onto `to` (used for both pages and folder records).
     const repath = (value: string): string | null => folder(value === from ? (to ?? "") : to === null ? value.slice(from.length + 1) : to + value.slice(from.length));
     let moved = 0;
@@ -2010,7 +2939,7 @@ export class CodexStore {
   createFolder(path: string): string {
     const database = this.requireDatabase();
     const clean = folder(path);
-    if (!clean) throw new Error("Name the folder.");
+    if (!clean) throw new CodexValidationError("Name the folder.");
     this.transaction(() => {
       database.prepare("INSERT OR IGNORE INTO codex_folders (path, created_at) VALUES (?, ?)").run(clean, this.stamp());
       this.bumpRevision();
@@ -2061,7 +2990,21 @@ export class CodexStore {
        * no FK to cascade through, which is precisely why it needs saying here.
        */
       database.prepare("UPDATE codex_quests SET entity_ids_json = COALESCE((SELECT json_group_array(value) FROM json_each(codex_quests.entity_ids_json) WHERE value != ?), '[]'), updated_at = ? WHERE EXISTS (SELECT 1 FROM json_each(codex_quests.entity_ids_json) WHERE value = ?)").run(pageId, this.stamp(), pageId);
-      database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades links + revisions
+      /**
+       * D12: downtime records are the FOURTH referrer to a page, and the only one that keeps its id inside
+       * a JSON blob rather than a column or an array. Scrubbing it to null is what stops the tracker
+       * rendering an unfollowable link; `who` survives as the display fallback, so the row still says whose
+       * week it was. The chronicle RECORD survives the page, exactly as a `standing` record does - "Ireena
+       * spent a month forging" stays true after her page is gone.
+       *
+       * `json_valid` first, as everywhere else in this file: `json_set` THROWS on a malformed blob rather
+       * than returning null, and one hand-edited payload must not make a page undeletable.
+       */
+      database.prepare("UPDATE codex_journal SET payload_json = json_set(payload_json, '$.characterPageId', json('null')), updated_at = ? WHERE kind = 'downtime' AND json_valid(payload_json) AND json_extract(payload_json, '$.characterPageId') = ?").run(this.stamp(), pageId);
+      // v22 dropped `codex_links`' foreign key (a multi-table FK is not expressible), so a page's own
+      // outgoing link rows no longer cascade away with it. Explicit, and part of the delete.
+      this.scrubLinks("page", pageId);
+      database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades revisions
       this.bumpRevision();
     });
   }
@@ -2088,7 +3031,7 @@ export class CodexStore {
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
-  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[]; publishedDate: CodexInWorldDate | null; standing: CodexStandingRow[]; partyMarkerId: string | null; calendar: CodexCalendar; folders: string[]; revisions: CodexPageRevisionExportRow[] }> {
+  exportBundle(): CodexBundle {
     const pages = (this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
@@ -2151,75 +3094,409 @@ export class CodexStore {
     //    history would be a backup that lies about being one, and a codex whose history stopped growing is
     //    still a codex whose whole history must round-trip.
     return {
-      pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
+      pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllDeclaredConnections(),
       sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests(),
       publishedDate: this.getPublishedDate(), standing: this.listStanding(), partyMarkerId: this.partyMarker()?.id ?? null,
-      calendar: this.getCalendar(), folders: this.listFolders(), revisions: this.listAllRevisions()
+      calendar: this.getCalendar(), folders: this.listFolders(), revisions: this.listAllRevisions(),
+      // D16: the settings knobs exist NOWHERE else - not on a page, not on a record - so a bundle without
+      // them restores a codex whose autosave and revision-history preferences have silently reverted.
+      // The bundle's own inclusion principle, applied a fourth time. Appended LAST, so no key moves.
+      settings: { revisionHistory: this.revisionSettings(), autosave: this.autosaveSettings() }
     };
   }
 
-  // ----- Relationships (typed entity edges) -----
+  /**
+   * D16: REPLACE the entire codex with a bundle, in ONE transaction. All-or-nothing.
+   *
+   * **Why replace rather than merge**, argued once so it is not re-litigated: a restore's contract is
+   * "make the codex be what the bundle says". Merge is undefinable for the singleton, invariant-bearing
+   * state a bundle carries - one calendar, one published date, one active-session pointer, at most one
+   * party pin (a partial unique index), UNIQUE session numbers, one standing row per faction, integer
+   * revision ids. Every merge rule would be a new reconciliation policy with its own silent-corruption
+   * mode; replace has none. D16 itself keeps the merge use-case elsewhere: the markdown "bring in notes"
+   * import is a separate, clearly-labelled tool.
+   *
+   * **Validation happens BEFORE `BEGIN`** (the `setCalendar` arrangement): every value goes through the
+   * same validators an ordinary write uses, so a malformed bundle is refused without ever opening a
+   * transaction. Anything that throws after `BEGIN` rolls the whole thing back and the codex is untouched.
+   *
+   * **Rows are written RAW**, not through `createPage` / `createQuest` / `createSession`. Those mint fresh
+   * ids, stamp new timestamps, auto-file under the active session, snapshot revisions, and - since D11 -
+   * write quest-history records. A restore must reproduce a past state, not perform a hundred authoring
+   * events: importing a backup must not fabricate a quest history the GM never lived.
+   *
+   * **Derived dates are RECOMPUTED, not trusted** (K3: the raw date is truth, one reflow). The bundle's
+   * `calendarInstant` and `inWorldLabel` were computed against whatever calendar was live when it was
+   * exported; they are re-derived here against the calendar being imported, so a bundle edited by hand or
+   * carrying a reshaped calendar lands consistently rather than half-stale.
+   */
+  importBundle(bundle: unknown): CodexImportCounts {
+    const database = this.requireDatabase();
+    const parsed = normalizeBundle(bundle);
 
-  createRelationship(fromPageId: string, toPageId: string, type: string): CodexRelationshipRow {
+    this.transaction(() => {
+      // 1. WIPE, children first. Explicit rather than leaning on cascades: `codex_links` lost its foreign
+      //    key in v22, and relying on a cascade that a later migration removes is how an import starts
+      //    silently keeping half the old codex.
+      for (const table of ["codex_page_revisions", "codex_links", "codex_relationships", "codex_journal", "codex_markers", "codex_maps", "codex_standing", "codex_quests", "codex_sessions", "codex_folders", "codex_pages", "codex_search_player", "codex_search_gm"]) {
+        database.prepare(`DELETE FROM ${table}`).run();
+      }
+
+      // 2. The singleton meta row. The calendar goes in FIRST, because every date below is re-derived
+      //    against it (`resolveDate` reads `getCalendar`).
+      this.writeCalendar(normalizeCalendar(parsed.calendar));
+      this.writePublishedDate(parsed.publishedDate);
+      if (parsed.settings) {
+        database.prepare("UPDATE codex_meta SET revision_history_enabled = ?, revision_window_minutes = ?, autosave_enabled = ?, autosave_interval_seconds = ? WHERE id = 1")
+          .run(parsed.settings.revisionHistory.enabled ? 1 : 0, revisionWindowMinutes(parsed.settings.revisionHistory.windowMinutes), parsed.settings.autosave.enabled ? 1 : 0, autosaveIntervalSeconds(parsed.settings.autosave.intervalSeconds));
+      }
+
+      // 3. Pages, folders.
+      const insertPage = database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      for (const page of parsed.pages) {
+        const dated = this.resolveDate(page.inWorldDate, null);
+        const sealed = sealSecretFields(pruneCodexFields(page.entityType, { ...page.fields }), pruneCodexFields(page.entityType, { ...page.gmFields }));
+        insertPage.run(page.id, page.title, page.entityType, JSON.stringify(sealed.fields), JSON.stringify(sealed.gmFields), page.folder, JSON.stringify(page.tags), page.playerBody, page.gmBody, page.revealedToPlayers ? 1 : 0, page.bannerAssetId, dated.label, dated.instant, dated.date?.year ?? null, dated.date?.month ?? null, dated.date?.day ?? null, page.rev, page.createdAt, page.updatedAt);
+        this.registerFolderPath(page.folder, page.createdAt);
+        this.rebuildLinksFor("page", page.id, page.playerBody, page.gmBody);
+        this.indexPage(page.id, page.title, page.playerBody, page.gmBody, JSON.stringify(sealed.fields), JSON.stringify(sealed.gmFields), JSON.stringify(page.tags));
+      }
+      for (const path of parsed.folders) this.registerFolderPath(path, this.stamp());
+
+      // 4. Sessions BEFORE journal, so the entries' session ids resolve against rows that exist.
+      const insertSession = database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const sessionByNumber = new Map<number, string>();
+      for (const session of parsed.sessions) {
+        insertSession.run(session.id, session.sessionNumber, session.realDate, JSON.stringify(session.attendees), session.prepBody, session.recapBody, session.revealedToPlayers ? 1 : 0, session.status, session.rev, session.createdAt, session.updatedAt, JSON.stringify(session.tags));
+        if (session.sessionNumber !== null) sessionByNumber.set(session.sessionNumber, session.id);
+        this.indexSession({ id: session.id, session_number: session.sessionNumber, real_date: session.realDate, attendees_json: JSON.stringify(session.attendees), prep_body: session.prepBody, recap_body: session.recapBody, revealed: session.revealedToPlayers ? 1 : 0, status: session.status, rev: session.rev, created_at: session.createdAt, updated_at: session.updatedAt, tags_json: JSON.stringify(session.tags) });
+        this.rebuildLinksFor("session", session.id, session.recapBody, session.prepBody);
+      }
+      const sessionIds = new Set(parsed.sessions.map((session) => session.id));
+
+      // 5. Journal. A PRE-D9 bundle's entries carry only `sessionNumber`, so they resolve by number - and an
+      //    orphan number synthesizes a played+hidden session, the v19 rule re-applied so ONE rule governs
+      //    both paths into this state.
+      //
+      //    That arm fires ONLY for a pre-D9 row (`declaredSessionId === false`), and the guard is the whole
+      //    point. A modern row with no join and a number is director ruling R2's bare display LABEL - what
+      //    `deleteSession` stamps back when a REVEALED session is deleted - and synthesizing for it turned a
+      //    label the party could already read into a join to a freshly minted HIDDEN session, which
+      //    `playerSessionLink` then blanks on both halves. The GM's Sessions list gained a phantom that was
+      //    never in the exported codex, and export -> import -> export stopped being stable. See
+      //    `CodexBundleJournalRow` for why the discriminator is per row rather than `bundleVersion`.
+      const insertEntry = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, session_id, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      for (const entry of parsed.journal) {
+        let sessionId = entry.sessionId !== null && sessionIds.has(entry.sessionId) ? entry.sessionId : null;
+        let bareNumber: number | null = null;
+        if (sessionId === null && entry.sessionNumber !== null) {
+          if (entry.declaredSessionId) bareNumber = entry.sessionNumber;   // R2's label, written straight back
+          else {
+            let resolved = sessionByNumber.get(entry.sessionNumber);
+            if (resolved === undefined) {
+              resolved = this.freshId();
+              const stamp = this.stamp();
+              insertSession.run(resolved, entry.sessionNumber, null, "[]", "", "", 0, "played", 1, stamp, stamp, "[]");
+              // Indexed like every other session written here. The bundled-session loop above does it; this
+              // arm did not, so a synthesized placeholder was the one session in the codex that could not be
+              // found by typing "Session 9" into the palette - and nothing repairs a search row at read time.
+              this.indexSession({ id: resolved, session_number: entry.sessionNumber, real_date: null, attendees_json: "[]", prep_body: "", recap_body: "", revealed: 0, status: "played", rev: 1, created_at: stamp, updated_at: stamp, tags_json: "[]" });
+              sessionByNumber.set(entry.sessionNumber, resolved);
+            }
+            sessionId = resolved;
+          }
+        }
+        const dated = this.resolveDate(entry.inWorldDate, entry.inWorldLabel);
+        insertEntry.run(entry.id, entry.playerText, entry.gmText, entry.revealedToPlayers ? 1 : 0, entry.attachMarkerId, entry.attachPageId, entry.kind, entry.sourceEncounterId, bareNumber, sessionId, entry.realDate, dated.label, dated.instant, dated.date?.year ?? null, dated.date?.month ?? null, dated.date?.day ?? null, entry.sortKey, JSON.stringify(entry.tags), entry.payload === null ? null : JSON.stringify(entry.payload), entry.createdAt, entry.updatedAt);
+        this.indexEntry(entry.id, entry.playerText, entry.gmText, JSON.stringify(entry.tags));
+        this.rebuildLinksFor("journal", entry.id, entry.playerText, entry.gmText ?? "");
+      }
+
+      // 6. Maps and markers.
+      const insertMap = database.prepare(`INSERT INTO codex_maps (${MAP_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const map of parsed.maps) {
+        insertMap.run(map.id, map.assetId, map.name, map.kind, map.parentMapId, map.revealedToPlayers ? 1 : 0, map.sortKey, JSON.stringify(map.tags), map.createdAt, map.updatedAt);
+        this.indexMap(map.id, map.name, JSON.stringify(map.tags));
+      }
+      const insertMarker = database.prepare(`INSERT INTO codex_markers (${MARKER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const marker of parsed.markers) {
+        insertMarker.run(marker.id, marker.mapId, marker.x, marker.y, marker.iconId, marker.iconColor, marker.label, marker.revealedToPlayers ? 1 : 0, JSON.stringify(marker.pageIds), marker.subMapId, JSON.stringify(marker.sceneIds), marker.actorId, JSON.stringify(marker.tags), marker.isParty ? 1 : 0, marker.createdAt, marker.updatedAt);
+        this.indexMarker(marker.id, marker.label, JSON.stringify(marker.tags));
+      }
+
+      // 7. Quests, standing, declared connections.
+      const insertQuest = database.prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const quest of parsed.quests) {
+        insertQuest.run(quest.id, quest.title, quest.status, quest.playerBody, quest.gmBody, JSON.stringify(quest.objectives), JSON.stringify(quest.entityIds), quest.revealedToPlayers ? 1 : 0, quest.rev, quest.createdAt, quest.updatedAt, JSON.stringify(quest.tags));
+        this.indexQuest(quest.id, quest.title, quest.playerBody, quest.gmBody, JSON.stringify(quest.objectives), JSON.stringify(quest.tags));
+        this.rebuildLinksFor("quest", quest.id, quest.playerBody, quest.gmBody);
+      }
+      const insertStanding = database.prepare(`INSERT INTO codex_standing (${STANDING_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`);
+      for (const row of parsed.standing) insertStanding.run(row.id, row.factionPageId, row.value, row.revealedToPlayers ? 1 : 0, row.createdAt, row.updatedAt);
+      const insertRel = database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, layer, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+      for (const edge of parsed.relationships) insertRel.run(edge.id, edge.fromPageId, edge.toPageId, edge.label ?? "", edge.layer, edge.createdAt);
+
+      // 8. Revisions, PRESERVING their integer ids so `.../revisions/{revisionId}/restore` URLs survive a
+      //    restore. An explicit-id INSERT under AUTOINCREMENT is legal and `sqlite_sequence` follows max.
+      const insertRevision = database.prepare("INSERT INTO codex_page_revisions (id, page_id, rev, title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      for (const revision of parsed.revisions) {
+        insertRevision.run(revision.id, revision.pageId, revision.rev, revision.title, revision.entityType, JSON.stringify(revision.fields), JSON.stringify(revision.gmFields), revision.playerBody, revision.gmBody, revision.bannerAssetId, JSON.stringify(revision.tags), revision.authoredAt, revision.authorTag);
+      }
+
+      // 9. The two pointers, last, because both reference rows written above.
+      database.prepare("UPDATE codex_meta SET active_session_id = ? WHERE id = 1").run(parsed.activeSessionId !== null && sessionIds.has(parsed.activeSessionId) ? parsed.activeSessionId : null);
+      // The link re-extraction above already ran per record, so the reconcile has nothing left to do.
+      database.prepare("UPDATE codex_meta SET links_backfilled = 1 WHERE id = 1").run();
+      this.bumpRevision();
+    });
+
+    // The DATABASE's own row counts, not the bundle's claims: a restore reports what it really holds.
+    const count = (table: string) => (database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+    return {
+      pages: count("codex_pages"), folders: count("codex_folders"), maps: count("codex_maps"), markers: count("codex_markers"),
+      journal: count("codex_journal"), connections: count("codex_relationships"), sessions: count("codex_sessions"),
+      quests: count("codex_quests"), standing: count("codex_standing"), revisions: count("codex_page_revisions")
+    };
+  }
+
+  // ----- Connections (D8: ONE edge concept over two storages) -----
+  //
+  // The read model is the point. `codex_relationships` holds DECLARED edges (id-keyed, CRUD-able,
+  // symmetric-dedupe); `codex_links` holds MENTIONS (title-keyed, id-less, rebuilt wholesale from body
+  // text on every save). They are genuinely different things to STORE, and one thing to READ - which is
+  // exactly what D8 asks for, and what its own words permit ("mention-vs-declared may remain as an
+  // ORIGIN attribute"). Every method below composes both; none of them gates. `codex-projections.ts` is
+  // still the single audited place that decides what a player may see.
+
+  /**
+   * Declare a connection from one page to another. Idempotent on `(from, to, label)` - and on the reverse
+   * pair too when the label is symmetric, because "Strahd is an ally of Ireena" and the reverse are one
+   * edge, not two.
+   *
+   * `layer` is NOT part of the dedupe key, deliberately: re-declaring an edge that already exists returns
+   * the existing row unchanged, and changing which layer it sits on is what PATCH is for. Folding layer
+   * into the key would make "declare it again, but GM-only" silently create a second parallel edge.
+   */
+  createConnection(fromPageId: string, input: Readonly<{ toPageId: string; label?: string | null; layer?: "player" | "gm" | null }>): CodexRelationshipRow {
     const database = this.requireDatabase();
     const from = id(fromPageId);
-    const to = id(toPageId);
-    if (from === to) throw new Error("An entity can't relate to itself.");
+    const to = id(input.toPageId);
+    if (from === to) throw new CodexValidationError("A page can't connect to itself.");
     if (!this.pageRow(from) || !this.pageRow(to)) throw new CodexNotFoundError("One of those pages no longer exists.");
-    const relType = relationshipType(type);
-    // Same from/to/type is idempotent. For symmetric types (ally/enemy/...) the reverse direction is the SAME edge.
-    const existing = (SYMMETRIC_RELATIONSHIPS.has(relType)
-      ? database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE ((from_page_id = ? AND to_page_id = ?) OR (from_page_id = ? AND to_page_id = ?)) AND type = ?").get(from, to, to, from, relType)
-      : database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?").get(from, to, relType)) as RelationshipRowRaw | undefined;
+    const label = connectionLabel(input.label);
+    const layer = connectionLayer(input.layer);
+    const existing = (SYMMETRIC_RELATIONSHIPS.has(label)
+      ? database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE ((from_page_id = ? AND to_page_id = ?) OR (from_page_id = ? AND to_page_id = ?)) AND type = ?`).get(from, to, to, from, label)
+      : database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?`).get(from, to, label)) as RelationshipRowRaw | undefined;
     // An idempotent no-op is not an edit: the early return leaves both pages' recency alone on purpose.
     if (existing) return this.toRel(existing);
     const relId = this.freshId();
     this.transaction(() => {
       const stamp = this.stamp();
-      database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, ?)").run(relId, from, to, relType, stamp);
+      database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, layer, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(relId, from, to, label, layer, stamp);
       this.touchPages([from, to], stamp);
       this.bumpRevision();
     });
-    return this.toRel(database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE id = ?").get(relId) as RelationshipRowRaw);
+    return this.toRel(database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE id = ?`).get(relId) as RelationshipRowRaw);
   }
 
-  deleteRelationship(relId: string): void {
-    if (!ID.test(relId)) return;
+  /**
+   * Relabel a declared connection, or move it between layers. An omitted field is left alone - the
+   * update contract every other record in this store follows.
+   *
+   * There is no `updateMention`, and there cannot be: a mention has no row and no id. It is edited by
+   * editing the sentence that produced it, which is why `CodexConnectionRow.id` is null for one.
+   */
+  updateConnection(connectionId: string, input: Readonly<{ label?: string | null; layer?: "player" | "gm" }>): CodexRelationshipRow {
+    const database = this.requireDatabase();
+    if (!ID.test(connectionId)) throw new CodexNotFoundError("That connection no longer exists.");
+    const existing = database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE id = ?`).get(connectionId) as RelationshipRowRaw | undefined;
+    if (!existing) throw new CodexNotFoundError("That connection no longer exists.");
+    const label = input.label === undefined ? existing.type : connectionLabel(input.label);
+    const layer = input.layer === undefined ? (existing.layer as "player" | "gm") : connectionLayer(input.layer);
+    this.transaction(() => {
+      database.prepare("UPDATE codex_relationships SET type = ?, layer = ? WHERE id = ?").run(label, layer, connectionId);
+      this.touchPages([existing.from_page_id, existing.to_page_id], this.stamp());
+      this.bumpRevision();
+    });
+    return this.toRel(database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships WHERE id = ?`).get(connectionId) as RelationshipRowRaw);
+  }
+
+  /** Remove one declared connection; idempotent, and an early return on a malformed id. */
+  deleteConnection(connectionId: string): void {
+    if (!ID.test(connectionId)) return;
     const database = this.requireDatabase();
     // Read the endpoints BEFORE the row goes, so both pages' recency can move with the edit (CI-9).
-    const existing = database.prepare("SELECT from_page_id, to_page_id FROM codex_relationships WHERE id = ?").get(relId) as { from_page_id: string; to_page_id: string } | undefined;
+    const existing = database.prepare("SELECT from_page_id, to_page_id FROM codex_relationships WHERE id = ?").get(connectionId) as { from_page_id: string; to_page_id: string } | undefined;
     this.transaction(() => {
-      database.prepare("DELETE FROM codex_relationships WHERE id = ?").run(relId);
+      database.prepare("DELETE FROM codex_relationships WHERE id = ?").run(connectionId);
       if (existing) this.touchPages([existing.from_page_id, existing.to_page_id], this.stamp());
       this.bumpRevision();
     });
   }
 
-  /** Every relationship touching this page, the OTHER endpoint resolved (title/type/reveal) with direction. */
-  listRelationshipsFor(pageId: string): CodexRelationshipView[] {
-    if (!ID.test(pageId)) return [];
-    const database = this.requireDatabase();
-    const view = (rows: Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>, direction: "out" | "in"): CodexRelationshipView[] =>
-      rows.map((row) => ({ id: row.id, type: row.type, direction, otherPageId: row.other_id, otherTitle: row.other_title, otherType: (row.other_type as CodexEntityType) ?? "note", otherRevealed: row.other_revealed === 1 }));
-    const outgoing = database.prepare(
-      "SELECT r.id, r.type, r.to_page_id AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed FROM codex_relationships r JOIN codex_pages p ON p.id = r.to_page_id WHERE r.from_page_id = ? ORDER BY r.type, p.title COLLATE NOCASE"
-    ).all(pageId) as Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
-    const incoming = database.prepare(
-      "SELECT r.id, r.type, r.from_page_id AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed FROM codex_relationships r JOIN codex_pages p ON p.id = r.from_page_id WHERE r.to_page_id = ? ORDER BY r.type, p.title COLLATE NOCASE"
-    ).all(pageId) as Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
-    return [...view(outgoing, "out"), ...view(incoming, "in")];
-  }
-
-  /** All relationship edges (for the graph). */
-  listAllRelationships(): CodexRelationshipRow[] {
-    return (this.requireDatabase().prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships").all() as RelationshipRowRaw[]).map((row) => this.toRel(row));
+  /** Every DECLARED connection row, for the backup bundle. Mentions are derived and rebuilt on import. */
+  listAllDeclaredConnections(): CodexRelationshipRow[] {
+    return (this.requireDatabase().prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships`).all() as RelationshipRowRaw[]).map((row) => this.toRel(row));
   }
 
   /**
-   * CI-9: a relationship edit IS an edit of both pages it connects - the Connections section is part of
-   * the page - so it moves their recency. It deliberately does NOT bump `rev`: `rev` is the editor's
-   * conflict token, and bumping it would 409 a GM mid-sentence on a page whose body nobody touched.
-   * Recency and conflict detection are separate concerns and this is the seam between them.
+   * ONE page's Connections panel: every declared edge touching it, plus every mention INTO it, plus its
+   * own outgoing mentions - the other endpoint resolved in each case.
+   *
+   * RAW and UNGATED, both layers and every reveal state, exactly as `backlinksToPage` was:
+   * `projectPlayerPageConnections` is the single visibility gate, and a second predicate down here would
+   * be a lower layer no HTTP test can distinguish from the projection.
+   *
+   * `otherRevealed` on each row is therefore a GM-FACING FACT - "is the record at the other end revealed" -
+   * and NOT the player gate. It reads a record's own flag, which for a journal entry is weaker than
+   * `projectPlayerJournalEntry`; the player projection resolves visibility from caller-supplied context
+   * instead and never consults this field. Do not reintroduce it as a filter.
+   *
+   * The DEDUPE at the end is the one piece of judgement in this method. A GM who both writes
+   * "[[Barovia]]" in a page's body AND declares an unlabelled connection to Barovia has made one
+   * connection twice, and a panel showing it twice reads as a bug. The DECLARED row wins, because it is
+   * the one carrying a deletable id; the mention is folded away silently. A LABELLED declared edge is
+   * never folded against a mention - "ally of" and "mentions" are different statements.
+   */
+  connectionsForPage(pageId: string): CodexPageConnectionRow[] {
+    if (!ID.test(pageId)) return [];
+    const page = this.pageRow(pageId);
+    if (!page) return [];
+    const database = this.requireDatabase();
+    const rows: CodexPageConnectionRow[] = [];
+
+    // 1. Declared edges, both directions. The other end is always a PAGE (connections v1 point into pages
+    //    and are declared from pages), so the join resolves title, type and reveal in one query.
+    const declared = (direction: "out" | "in") => {
+      const mine = direction === "out" ? "from_page_id" : "to_page_id";
+      const theirs = direction === "out" ? "to_page_id" : "from_page_id";
+      return database.prepare(
+        `SELECT r.id, r.type, r.layer, r.created_at, r.${theirs} AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed
+         FROM codex_relationships r JOIN codex_pages p ON p.id = r.${theirs} WHERE r.${mine} = ? ORDER BY r.type, p.title COLLATE NOCASE`
+      ).all(pageId) as Array<{ id: string; type: string; layer: string; created_at: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
+    };
+    for (const direction of ["out", "in"] as const) {
+      for (const row of declared(direction)) {
+        rows.push({
+          id: row.id, direction, otherKind: "page", otherId: row.other_id, otherTitle: row.other_title,
+          otherEntityType: (row.other_type as CodexEntityType) ?? "note", otherRevealed: row.other_revealed === 1,
+          label: row.type === "" ? null : row.type, origin: "declared", layer: row.layer === "gm" ? "gm" : "player", section: null
+        });
+      }
+    }
+
+    // 2. INCOMING mentions - every record whose body names this page's title. Generalized from
+    //    `backlinksToPage`: the source is now a (kind, id) pair, so the title and reveal state of a
+    //    session, quest or journal source are resolved per kind rather than by one page join.
+    const incoming = database.prepare(
+      "SELECT source_kind, source_id, layer, section FROM codex_links WHERE target_kind = 'page' AND target_ref = ? AND NOT (source_kind = 'page' AND source_id = ?)"
+    ).all(pageLinkKey(page.title), pageId) as Array<{ source_kind: CodexConnectionSourceKind; source_id: string; layer: "player" | "gm"; section: string | null }>;
+    for (const row of incoming) {
+      const other = this.resolveConnectionEndpoint(row.source_kind, row.source_id);
+      if (!other) continue;   // the source record has gone; a dangling edge has no node to draw
+      rows.push({ id: null, direction: "in", otherKind: row.source_kind, otherId: row.source_id, otherTitle: other.title, otherEntityType: other.entityType, otherRevealed: other.revealed, label: null, origin: "mention", layer: row.layer, section: row.section });
+    }
+
+    // 3. This page's OWN outgoing mentions, resolved from title key to id. A link to a title no page
+    //    carries has no node to draw and is dropped, exactly as `listAllLinks` drops it.
+    //
+    //    Resolved through ONE index built up front, the pattern `listAllConnections` uses fifty lines below,
+    //    rather than a lookup per row. The per-row version ran `SELECT * FROM codex_pages` - both 100 KB
+    //    body columns of every page, materialised into JS objects - and then a linear `.find()`, once per
+    //    stored link, on every GM and player page-document read. A page with thirty links in a three-hundred
+    //    page codex was tens of megabytes of row materialisation and thousands of `pageLinkKey()` calls,
+    //    synchronously, on the event loop that owns GameState, to open one page. Four columns, once.
+    const outgoing = database.prepare(
+      "SELECT layer, target_ref, section FROM codex_links WHERE source_kind = 'page' AND source_id = ? AND target_kind = 'page'"
+    ).all(pageId) as Array<{ layer: "player" | "gm"; target_ref: string; section: string | null }>;
+    if (outgoing.length > 0) {
+      const byLinkKey = new Map<string, { id: string; title: string; entity_type: string; revealed: number }>();
+      for (const page of database.prepare("SELECT id, title, entity_type, revealed FROM codex_pages").all() as Array<{ id: string; title: string; entity_type: string; revealed: number }>) {
+        byLinkKey.set(pageLinkKey(page.title), page);
+      }
+      for (const row of outgoing) {
+        const target = byLinkKey.get(row.target_ref);
+        if (!target || target.id === pageId) continue;
+        rows.push({ id: null, direction: "out", otherKind: "page", otherId: target.id, otherTitle: target.title, otherEntityType: (target.entity_type as CodexEntityType) ?? "note", otherRevealed: target.revealed === 1, label: null, origin: "mention", layer: row.layer, section: row.section });
+      }
+    }
+
+    // 4. Fold an UNLABELLED declared edge and a mention over the same pair into one row, declared winning.
+    const declaredPairs = new Set(rows.filter((row) => row.origin === "declared" && row.label === null).map((row) => `${row.direction}|${row.otherKind}|${row.otherId}`));
+    return rows.filter((row) => row.origin === "declared" || !declaredPairs.has(`${row.direction}|${row.otherKind}|${row.otherId}`));
+  }
+
+  /**
+   * The WHOLE graph, as one edge list. Declared rows and mention rows in one shape, discriminated by
+   * `origin` - which is what makes the Graph draw one kind of edge instead of two.
+   *
+   * Mentions are collapsed to ONE edge per `(fromKind, fromId, toPageId)` with a layer UPGRADE: a record
+   * that names the same page from both of its bodies counts as a PLAYER edge, because the player-facing
+   * body genuinely carries it. That is `listAllLinks`' rule, generalized to non-page sources.
+   */
+  listAllConnections(): CodexConnectionRow[] {
+    const database = this.requireDatabase();
+    const edges: CodexConnectionRow[] = [];
+    for (const row of database.prepare(`SELECT ${REL_COLUMNS} FROM codex_relationships`).all() as RelationshipRowRaw[]) {
+      edges.push({ id: row.id, fromKind: "page", fromId: row.from_page_id, toPageId: row.to_page_id, label: row.type === "" ? null : row.type, origin: "declared", layer: row.layer === "gm" ? "gm" : "player", createdAt: row.created_at });
+    }
+    const idByLinkKey = new Map<string, string>();
+    for (const page of database.prepare("SELECT id, title FROM codex_pages").all() as Array<{ id: string; title: string }>) idByLinkKey.set(pageLinkKey(page.title), page.id);
+    // `layer` in the ORDER BY makes the collapse DETERMINISTIC rather than a bet on insertion order:
+    // 'gm' sorts before 'player', so a pair present in both bodies always arrives gm-first and is upgraded.
+    const mentions = new Map<string, CodexConnectionRow>();
+    const rows = database.prepare("SELECT source_kind, source_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY source_kind, source_id, target_ref, layer").all() as Array<{ source_kind: CodexConnectionSourceKind; source_id: string; layer: "player" | "gm"; target_ref: string }>;
+    for (const row of rows) {
+      const toPageId = idByLinkKey.get(row.target_ref);
+      if (!toPageId || (row.source_kind === "page" && toPageId === row.source_id)) continue;
+      const key = `${row.source_kind}|${row.source_id}|${toPageId}`;
+      const seen = mentions.get(key);
+      if (!seen) mentions.set(key, { id: null, fromKind: row.source_kind, fromId: row.source_id, toPageId, label: null, origin: "mention", layer: row.layer, createdAt: null });
+      else if (row.layer === "player" && seen.layer !== "player") mentions.set(key, { ...seen, layer: "player" });
+    }
+    return [...edges, ...mentions.values()];
+  }
+
+  /**
+   * What a non-page connection endpoint is CALLED, and whether it is revealed - resolved per kind, since
+   * the four kinds keep their names in four different columns (and a journal entry has no name at all,
+   * so it borrows the reveal audit's excerpt-or-fallback rule).
+   *
+   * Returns null when the record has gone, which drops the edge: a connection to a record that no longer
+   * exists has no node to draw, exactly as a wiki link to a missing title does.
+   */
+  private resolveConnectionEndpoint(kind: CodexConnectionSourceKind, recordId: string): Readonly<{ title: string; entityType: CodexEntityType | null; revealed: boolean }> | null {
+    switch (kind) {
+      case "page": {
+        const page = this.pageRow(recordId);
+        return page ? { title: page.title, entityType: (page.entity_type as CodexEntityType) ?? "note", revealed: page.revealed === 1 } : null;
+      }
+      case "session": {
+        const session = this.getSession(recordId);
+        if (!session) return null;
+        const title = session.sessionNumber !== null ? `Session ${session.sessionNumber}` : (session.recapBody.trim().slice(0, 80) || "Untitled session");
+        return { title, entityType: null, revealed: session.revealedToPlayers };
+      }
+      case "quest": {
+        const quest = this.getQuest(recordId);
+        return quest ? { title: quest.title, entityType: null, revealed: quest.revealedToPlayers } : null;
+      }
+      case "journal": {
+        const entry = this.getEntry(recordId);
+        if (!entry) return null;
+        // The PLAYER text for both audiences, never the GM text: this string is a row TITLE, and one title
+        // per row is what keeps the panel from needing per-audience title plumbing. The GM opens the
+        // record to read the rest.
+        return { title: entry.playerText.trim().slice(0, 80) || "Journal entry", entityType: null, revealed: entry.revealedToPlayers };
+      }
+    }
+  }
+
+  /**
+   * CI-9: a connection edit IS an edit of both pages it connects - the Connections panel is part of the
+   * page - so it moves their recency. It deliberately does NOT bump `rev`: `rev` is the editor's conflict
+   * token, and bumping it would 409 a GM mid-sentence on a page whose body nobody touched.
    */
   private touchPages(pageIds: readonly string[], stamp: string) {
     const update = this.requireDatabase().prepare("UPDATE codex_pages SET updated_at = ? WHERE id = ?");
@@ -2227,8 +3504,9 @@ export class CodexStore {
   }
 
   private toRel(row: RelationshipRowRaw): CodexRelationshipRow {
-    return { id: row.id, fromPageId: row.from_page_id, toPageId: row.to_page_id, type: row.type, createdAt: row.created_at };
+    return { id: row.id, fromPageId: row.from_page_id, toPageId: row.to_page_id, label: row.type === "" ? null : row.type, layer: row.layer === "gm" ? "gm" : "player", createdAt: row.created_at };
   }
+
 
   // ----- Codex-wide settings -----
 
@@ -2241,7 +3519,7 @@ export class CodexStore {
    * for the settings screen.
    */
   getSettings(): CodexSettings {
-    return { revisionHistory: { ...this.revisionSettings(), ...this.revisionHistoryUsage() } };
+    return { revisionHistory: { ...this.revisionSettings(), ...this.revisionHistoryUsage() }, autosave: this.autosaveSettings() };
   }
 
   /**
@@ -2325,6 +3603,32 @@ export class CodexStore {
    * nothing composes a settings write today. The read side is a plain SELECT and is therefore safe to call from
    * inside `updatePage`'s transaction, which is exactly where the throttle calls it.
    */
+  /**
+   * D6's autosave preference, read with the SAME discipline `revisionSettings` above uses and for the same
+   * measured reason: the write is not the only way into an INTEGER column, and a stored value JavaScript
+   * cannot represent makes `node:sqlite` throw on the WHOLE row read rather than on its own column - hence
+   * one try/catch and one shared fallback rather than a guard per field.
+   *
+   * `enabled` accepts exactly 0 or 1 and reads anything else as the default (ON). Fail-OPEN, deliberately, and
+   * for the same reason revision history does: a garbled value must not silently stop the editors saving the
+   * GM's work, which is the one outcome here that loses data. An out-of-range interval reads as the default
+   * rather than propagating - an interval outside the scale is not an interval.
+   */
+  private autosaveSettings(): CodexAutosaveSettings {
+    let row: { autosave_enabled: number; autosave_interval_seconds: number } | undefined;
+    try {
+      row = this.requireDatabase().prepare("SELECT autosave_enabled, autosave_interval_seconds FROM codex_meta WHERE id = 1")
+        .get() as { autosave_enabled: number; autosave_interval_seconds: number } | undefined;
+    } catch { return DEFAULT_AUTOSAVE_SETTINGS; }
+    if (!row) return DEFAULT_AUTOSAVE_SETTINGS;
+    const stored = row.autosave_interval_seconds;
+    const inRange = Number.isSafeInteger(stored) && stored >= MIN_AUTOSAVE_INTERVAL_SECONDS && stored <= MAX_AUTOSAVE_INTERVAL_SECONDS;
+    return {
+      enabled: row.autosave_enabled === 0 || row.autosave_enabled === 1 ? row.autosave_enabled === 1 : DEFAULT_AUTOSAVE_SETTINGS.enabled,
+      intervalSeconds: inRange ? stored : DEFAULT_AUTOSAVE_SETTINGS.intervalSeconds
+    };
+  }
+
   setSettings(input: CodexSettingsInput): CodexSettings {
     const database = this.requireDatabase();
     // Normalized OUTSIDE the transaction: both of these throw on a value they cannot make sense of, and a
@@ -2335,11 +3639,16 @@ export class CodexStore {
     // field would land on `false` and silently switch the GM's undo history off - the one outcome here that
     // loses data. A caller that means "off" can say so.
     const enabled = input?.revisionHistory?.enabled;
-    if (typeof enabled !== "boolean") throw new Error("Revision history must be switched on or off explicitly.");
+    if (typeof enabled !== "boolean") throw new CodexValidationError("Revision history must be switched on or off explicitly.");
     const windowMinutes = revisionWindowMinutes(input?.revisionHistory?.windowMinutes);
+    // D6: the same explicit-boolean rule, for the same reason one step further along - a coerced missing
+    // field would land on `false` and switch AUTOSAVE off, which is the outcome that loses the GM's work.
+    const autosaveEnabled = input?.autosave?.enabled;
+    if (typeof autosaveEnabled !== "boolean") throw new CodexValidationError("Autosave must be switched on or off explicitly.");
+    const intervalSeconds = autosaveIntervalSeconds(input?.autosave?.intervalSeconds);
     this.transaction(() => {
-      database.prepare("UPDATE codex_meta SET revision_history_enabled = ?, revision_window_minutes = ? WHERE id = 1")
-        .run(enabled ? 1 : 0, windowMinutes);
+      database.prepare("UPDATE codex_meta SET revision_history_enabled = ?, revision_window_minutes = ?, autosave_enabled = ?, autosave_interval_seconds = ? WHERE id = 1")
+        .run(enabled ? 1 : 0, windowMinutes, autosaveEnabled ? 1 : 0, intervalSeconds);
       this.bumpRevision();
     });
     return this.getSettings();
@@ -2385,7 +3694,7 @@ export class CodexStore {
   deleteRevisionsOlderThan(olderThanDays: number): number {
     const database = this.requireDatabase();
     if (!Number.isInteger(olderThanDays) || olderThanDays < 0 || olderThanDays > MAX_PRUNE_DAYS) {
-      throw new Error(`Choose a whole number of days from 0 to ${MAX_PRUNE_DAYS}.`);
+      throw new CodexValidationError(`Choose a whole number of days from 0 to ${MAX_PRUNE_DAYS}.`);
     }
     const cutoff = new Date(this.now() - olderThanDays * 86_400_000).toISOString();
     let deleted = 0;
@@ -2461,53 +3770,10 @@ export class CodexStore {
 
   // ----- Links / backlinks -----
 
-  /** Backlinks to a page: every page whose body references this page's title. Includes both layers + reveal state; the projection filters for players. */
-  backlinksToPage(pageId: string): CodexBacklinkRow[] {
-    const page = this.pageRow(pageId);
-    if (!page) return [];
-    return (this.requireDatabase().prepare(
-      `SELECT l.source_page_id, l.layer, l.section, p.title AS source_title, p.revealed AS source_revealed
-       FROM codex_links l JOIN codex_pages p ON p.id = l.source_page_id
-       WHERE l.target_kind = 'page' AND l.target_ref = ? AND l.source_page_id != ?
-       ORDER BY p.title COLLATE NOCASE`
-    ).all(pageLinkKey(page.title), pageId) as Array<{ source_page_id: string; layer: "player" | "gm"; section: string | null; source_title: string; source_revealed: number }>)
-      .map((row) => ({ sourcePageId: row.source_page_id, sourceTitle: row.source_title, sourceRevealed: row.source_revealed === 1, layer: row.layer, section: row.section }));
-  }
-
-  /**
-   * CI-8: every `[[wiki link]]` edge BETWEEN TWO PAGES, for the whole-graph feed - the second edge kind
-   * the Graph draws, beside the typed relationships.
-   *
-   * Deliberately RAW and UNGATED, both layers and every reveal state, exactly as `backlinksToPage` hands
-   * both layers to `projectPlayerBacklinks`: `projectPlayerLinkEdges` is the single visibility gate. A
-   * second predicate down here would be a lower layer that an HTTP test cannot distinguish from the
-   * projection (the blind spot the CI-1 SQL tests exist to cover).
-   *
-   * A wiki link stores its target's TITLE key, not an id, so targets resolve through `pageLinkKey` here
-   * rather than in SQL - the same function that wrote the key, so the two cannot drift. A link to a title
-   * no page carries has no node to draw and is dropped; so is a page's link to itself, which
-   * `backlinksToPage` drops too. ONE edge per ordered pair: when a page links the same target from both
-   * of its bodies the edge counts as player-layer, because the player-facing body genuinely carries it.
-   */
-  listAllLinks(): CodexLinkEdgeRow[] {
-    const database = this.requireDatabase();
-    const idByLinkKey = new Map<string, string>();
-    for (const page of database.prepare("SELECT id, title FROM codex_pages").all() as Array<{ id: string; title: string }>) idByLinkKey.set(pageLinkKey(page.title), page.id);
-    const edges = new Map<string, CodexLinkEdgeRow>();
-    // `layer` is in the ORDER BY so the collapse below is DETERMINISTIC rather than a bet on insertion
-    // order: 'gm' sorts before 'player', so a pair present in both bodies always arrives gm-first and is
-    // then upgraded. Without it the merge silently depended on which row SQLite happened to return first.
-    const rows = database.prepare("SELECT source_page_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY source_page_id, target_ref, layer").all() as Array<{ source_page_id: string; layer: "player" | "gm"; target_ref: string }>;
-    for (const row of rows) {
-      const toPageId = idByLinkKey.get(row.target_ref);
-      if (!toPageId || toPageId === row.source_page_id) continue;
-      const key = `${row.source_page_id}|${toPageId}`;
-      const seen = edges.get(key);
-      if (!seen) edges.set(key, { fromPageId: row.source_page_id, toPageId, layer: row.layer });
-      else if (row.layer === "player" && seen.layer !== "player") edges.set(key, { ...seen, layer: "player" });
-    }
-    return [...edges.values()];
-  }
+  // Backlinks and the whole-graph link feed used to live here as two separate reads with two separate
+  // projections. D8 folded both into `connectionsForPage` / `listAllConnections` above: they answered the
+  // same question about the same edges in two shapes, which is what made "relationships" and "mentions"
+  // read as two features. Nothing was lost - a mention is a connection with `origin: "mention"`.
 
   // ----- Search -----
 
@@ -2529,9 +3795,9 @@ export class CodexStore {
    * It is ORDER BY only: nothing about WHICH records match changed, so the reveal gates above and the
    * recall of every existing query are untouched.
    */
-  searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRef[] {
+  searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchResult {
     const match = ftsQuery(query);
-    if (!match) return [];
+    if (!match) return { hits: [], truncated: false };
     // Tier 1's comparison value. `ftsQuery` already returned non-null, so the query holds at least one
     // letter or digit and this is never "" - which is what keeps journal entries and unlabelled markers
     // (both indexed with an EMPTY title) from sweeping into tier 1 on some punctuation-only query.
@@ -2539,19 +3805,25 @@ export class CodexStore {
     const table = audience === "gm" ? "codex_search_gm" : "codex_search_player";
     const kindFilter = kinds && kinds.length > 0 ? ` AND ${table}.kind IN (${kinds.map(() => "?").join(", ")})` : "";
     const visibility = audience === "gm" ? "" : ` AND ${PLAYER_VISIBLE_SQL}`;
-    const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility} ORDER BY ${searchOrderBySql(table)} LIMIT 50`;
+    // `LIMIT 51` for a cap of 50: the 51st row is not returned, it is the SIGNAL. Asking for exactly the
+    // cap can never distinguish "50 results" from "50 results and more you cannot see", and D19 requires
+    // the truncation to be visible rather than silently swallowed - a search that quietly hides matches is
+    // a search that reads as broken.
+    const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility} ORDER BY ${searchOrderBySql(table)} LIMIT ${SEARCH_LIMIT + 1}`;
     try {
       // Bind order follows the ?s in SQL TEXT order: MATCH, then the kind filter, then tier 1's title
       // in the ORDER BY. Any new parameterised clause must be inserted at its textual position here.
-      return (this.requireDatabase().prepare(sql).all(match, ...(kinds ?? []), exactTitle) as Array<{ kind: string; record_id: string }>)
-        .filter((row): row is { kind: CodexRecordKind; record_id: string } => (CODEX_RECORD_KINDS as readonly string[]).includes(row.kind))
-        .map((row) => ({ kind: row.kind, id: row.record_id }));
-    } catch { return []; }
+      const rows = (this.requireDatabase().prepare(sql).all(match, ...(kinds ?? []), exactTitle) as Array<{ kind: string; record_id: string }>)
+        .filter((row): row is { kind: CodexRecordKind; record_id: string } => (CODEX_RECORD_KINDS as readonly string[]).includes(row.kind));
+      // The flag is measured BEFORE the slice and against the unfiltered row count, so a probe row dropped
+      // by the unknown-kind filter above still counts as "there was more".
+      return { hits: rows.slice(0, SEARCH_LIMIT).map((row) => ({ kind: row.kind, id: row.record_id })), truncated: rows.length > SEARCH_LIMIT };
+    } catch { return { hits: [], truncated: false } }
   }
 
   /** The pages-only view of the same one index - kept so the page-search contract is provably unchanged. */
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
-    return this.searchAll(audience, query, ["page"]).map((hit) => ({ pageId: hit.id }));
+    return this.searchAll(audience, query, ["page"]).hits.map((hit) => ({ pageId: hit.id }));
   }
 
   // ----- Maps (the atlas tree) -----
@@ -2595,11 +3867,11 @@ export class CodexStore {
     if (!this.mapRowRaw(mapId)) throw new CodexNotFoundError("That map no longer exists.");
     const parent = optionalId(parentMapId);
     if (parent !== null) {
-      if (parent === mapId) throw new Error("A map cannot be its own parent.");
+      if (parent === mapId) throw new CodexValidationError("A map cannot be its own parent.");
       let cursor: string | null = parent;
       const seen = new Set<string>([mapId]);
       while (cursor !== null) {
-        if (seen.has(cursor)) throw new Error("That would create a loop in the map tree.");
+        if (seen.has(cursor)) throw new CodexValidationError("That would create a loop in the map tree.");
         seen.add(cursor);
         const row: MapRowRaw | undefined = this.mapRowRaw(cursor);
         if (!row) throw new CodexNotFoundError("The parent map no longer exists.");
@@ -3027,7 +4299,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId), realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload: null
     });
   }
@@ -3049,7 +4321,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
-      sourceEncounterId: input.sourceEncounterId, sessionNumber: this.activeSessionNumber(), realDate: null,
+      sourceEncounterId: input.sourceEncounterId, sessionId: this.activeSessionId, realDate: null,
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, payload: null
     });
   }
@@ -3075,11 +4347,11 @@ export class CodexStore {
    */
   createDeadline(input: CodexJournalCreateInput): CodexJournalRow {
     const dated = this.resolveDate(input.inWorldDate, input.inWorldLabel);
-    if (!dated.date) throw new Error("A deadline needs an in-world date - the date is when it fires.");
+    if (!dated.date) throw new CodexValidationError("A deadline needs an in-world date - the date is when it fires.");
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "deadline",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId),
       realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload: null
     });
@@ -3104,11 +4376,16 @@ export class CodexStore {
    */
   createDowntime(input: CodexDowntimeCreateInput): CodexJournalRow {
     const payload = downtimePayload(input.downtime);
+    // D12: an id must name a live page, or the tracker renders a link nobody can follow. The TYPE is not
+    // enforced - a GM may legitimately track downtime for an NPC or a hireling page - which is the
+    // standing rule's opposite half, and deliberately so: standing is *about* a faction, downtime is
+    // about a person the GM has some record for.
+    if (payload.characterPageId !== null && !this.pageRow(payload.characterPageId)) throw new CodexNotFoundError("That page no longer exists.");
     const dated = this.resolveDate(input.inWorldDate ?? this.getCalendar().currentDate ?? null, input.inWorldLabel);
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "downtime",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId),
       realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload
     });
@@ -3138,7 +4415,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "milestone",
-      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      sourceEncounterId: null, sessionId: this.resolveEntrySession(input.sessionId),
       realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload
     });
@@ -3182,12 +4459,12 @@ export class CodexStore {
     const database = this.requireDatabase();
     const existing = this.getEntry(entryId);
     if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
-    if (existing.kind !== "downtime") throw new Error("Only a downtime record can pass time.");
+    if (existing.kind !== "downtime") throw new CodexValidationError("Only a downtime record can pass time.");
     const payload = downtimePayloadOf(existing);
-    if (!payload) throw new Error("That downtime record has no activity to apply.");
+    if (!payload) throw new CodexValidationError("That downtime record has no activity to apply.");
     if (payload.applied) throw new CodexRevisionConflictError("That downtime has already passed - the clock has already moved.");
     const target = this.proposedDateFor(existing);
-    if (!target) throw new Error("Set the campaign's current date before passing time.");
+    if (!target) throw new CodexValidationError("Set the campaign's current date before passing time.");
     const calendar = this.getCalendar();
     const applied: CodexDowntimePayload = { ...payload, applied: true };
     this.transaction(() => {
@@ -3218,29 +4495,60 @@ export class CodexStore {
      * optional. The composer disables Save and says so, so this is the second line, not the first.
      */
     if (existing.kind === "deadline" && dated && dated.instant === null) {
-      throw new Error("A deadline needs an in-world date - that is what makes it a deadline. Change its date, or delete it and write a note instead.");
+      throw new CodexValidationError("A deadline needs an in-world date - that is what makes it a deadline. Change its date, or delete it and write a note instead.");
     }
     const next = {
       player_text: input.playerText === undefined ? existing.player_text : entryText(input.playerText),
       gm_text: input.gmText === undefined ? existing.gm_text : entryGmText(input.gmText),
       attach_marker_id: input.attachMarkerId === undefined ? existing.attach_marker_id : optionalId(input.attachMarkerId),
       attach_page_id: input.attachPageId === undefined ? existing.attach_page_id : optionalId(input.attachPageId),
-      session_number: input.sessionNumber === undefined ? existing.session_number : sessionNo(input.sessionNumber),
+      // D9: an OMITTED `sessionId` leaves the filing alone (the journal's existing update contract); an
+      // explicit `null` files the entry under no session; an id must name a live session. Unlike a CREATE,
+      // an omitted value does NOT auto-file - editing an entry's text must not silently move it into
+      // whatever session happens to be active now.
+      session_id: input.sessionId === undefined ? existing.session_id : (input.sessionId === null ? null : this.requireSession(input.sessionId)),
       real_date: input.realDate === undefined ? existing.real_date : shortLabel(input.realDate, 40, "date"),
       in_world_label: dated ? dated.label : existing.in_world_label,
       calendar_instant: dated ? dated.instant : existing.calendar_instant,
       in_world_year: dated ? (dated.date ? dated.date.year : null) : existing.in_world_year,
       in_world_month: dated ? (dated.date ? dated.date.month : null) : existing.in_world_month,
       in_world_day: dated ? (dated.date ? dated.date.day : null) : existing.in_world_day,
-      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags))
+      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
+      payload_json: this.editedDowntimePayload(existing, input.downtime)
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, tags_json = ?, updated_at = ? WHERE id = ?")
-        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.tags_json, this.stamp(), entryId);
+      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_id = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, tags_json = ?, payload_json = ?, updated_at = ? WHERE id = ?")
+        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_id, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.tags_json, next.payload_json, this.stamp(), entryId);
       this.indexEntry(entryId, next.player_text, next.gm_text, next.tags_json);
+      this.rebuildLinksFor("journal", entryId, next.player_text, next.gm_text ?? "");
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
+  }
+
+  /**
+   * D12: merge a narrow `downtime` edit into a stored payload, leaving every other kind's blob untouched.
+   *
+   * A group on a NON-downtime record is a validation error the router maps to 400, not a silent no-op: a
+   * caller sending downtime details to a milestone has misunderstood something, and hearing so beats
+   * being quietly overruled.
+   *
+   * `applied` and `days` are copied through from the stored payload rather than accepted - `applied` is
+   * `applyDowntime`'s alone, and `days` is what the clock already moved by.
+   */
+  private editedDowntimePayload(existing: JournalRowRaw, edit: CodexJournalUpdateInput["downtime"]): string | null {
+    if (edit === undefined) return existing.payload_json;
+    if (existing.kind !== "downtime") throw new CodexValidationError("Only downtime entries carry downtime details.");
+    const current = parseDowntimePayload(existing.payload_json) ?? { who: "", activity: "", days: 0, applied: false, characterPageId: null };
+    const characterPageId = edit.characterPageId === undefined ? current.characterPageId : optionalId(edit.characterPageId);
+    if (characterPageId !== null && !this.pageRow(characterPageId)) throw new CodexNotFoundError("That page no longer exists.");
+    return JSON.stringify({
+      who: edit.who === undefined ? current.who : (shortLabel(edit.who, 120, "downtime participant") ?? ""),
+      activity: edit.activity === undefined ? current.activity : (shortLabel(edit.activity, 120, "downtime activity") ?? ""),
+      days: current.days,
+      applied: current.applied,
+      characterPageId
+    });
   }
 
   setEntryRevealed(entryId: string, revealed: boolean): CodexJournalRow {
@@ -3257,6 +4565,7 @@ export class CodexStore {
     if (!ID.test(entryId)) return;
     this.transaction(() => {
       this.unindex("journal", entryId);
+      this.scrubLinks("journal", entryId);
       this.requireDatabase().prepare("DELETE FROM codex_journal WHERE id = ?").run(entryId);
       this.bumpRevision();
     });
@@ -3270,8 +4579,26 @@ export class CodexStore {
   /** The global campaign timeline, ordered by in-world instant (later), then session number, then time. */
   listTimeline(): CodexJournalRow[] {
     return (this.requireDatabase().prepare(
-      `SELECT ${JOURNAL_COLUMNS} FROM codex_journal ORDER BY (calendar_instant IS NULL), calendar_instant, (session_number IS NULL), session_number, created_at`
+      `SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} ORDER BY (j.calendar_instant IS NULL), j.calendar_instant, (live_session_number IS NULL), live_session_number, j.created_at`
     ).all() as JournalRowRaw[]).map((row) => this.toEntry(row));
+  }
+
+  /**
+   * D12: every character page a downtime record names, deduplicated. The candidate set
+   * `projectPlayerJournalEntry` gates a downtime payload's `characterPageId` against.
+   *
+   * A targeted read rather than `listTimeline()` filtered in JS, and the difference is the point: this runs
+   * on EVERY player journal read (the journal, the timeline, per-page and per-marker mini-timelines, search
+   * and the reveal audit), and the JS version made each of those pull every journal row through the session
+   * join and `JSON.parse` two columns per row just to reach one id. The nested CASE, not `AND`, for the
+   * reason migration v15 measured and recorded: whether `json_valid` runs before `json_extract` under an
+   * `AND` is an optimizer decision, and `json_extract` THROWS on a malformed blob rather than returning null.
+   */
+  downtimeCharacterPageIds(): string[] {
+    const rows = this.requireDatabase().prepare(
+      "SELECT DISTINCT (CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.characterPageId') END) AS page_id FROM codex_journal WHERE kind = 'downtime'"
+    ).all() as Array<{ page_id: string | null }>;
+    return rows.map((row) => row.page_id).filter((pageId): pageId is string => typeof pageId === "string");
   }
 
   /**
@@ -3309,8 +4636,8 @@ export class CodexStore {
   /** Entries pinned to a specific marker or page (the per-entity mini-timeline). */
   listEntriesFor(attach: Readonly<{ markerId?: string; pageId?: string }>): CodexJournalRow[] {
     const database = this.requireDatabase();
-    if (attach.markerId && ID.test(attach.markerId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE attach_marker_id = ? ORDER BY created_at`).all(attach.markerId) as JournalRowRaw[]).map((row) => this.toEntry(row));
-    if (attach.pageId && ID.test(attach.pageId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE attach_page_id = ? ORDER BY created_at`).all(attach.pageId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    if (attach.markerId && ID.test(attach.markerId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} WHERE j.attach_marker_id = ? ORDER BY j.created_at`).all(attach.markerId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    if (attach.pageId && ID.test(attach.pageId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} WHERE j.attach_page_id = ? ORDER BY j.created_at`).all(attach.pageId) as JournalRowRaw[]).map((row) => this.toEntry(row));
     return [];
   }
 
@@ -3345,9 +4672,12 @@ export class CodexStore {
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
     const date = fields.inWorldDate;
     const tagsJson = JSON.stringify(tags(fields.tags));
-    database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
+    database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_id, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionId, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
     this.indexEntry(entryId, fields.playerText, fields.gmText, tagsJson);
+    // D13, at the LEAF: every journal creator composes through here, so a standing record's prose and an
+    // auto-logged battle's join the graph on exactly the terms a hand-written note's does.
+    this.rebuildLinksFor("journal", entryId, fields.playerText, fields.gmText ?? "");
     this.bumpRevision();
     return entryId;
   }
@@ -3361,7 +4691,12 @@ export class CodexStore {
     return {
       id: row.id, playerText: row.player_text, gmText: row.gm_text, revealedToPlayers: row.revealed === 1,
       attachMarkerId: row.attach_marker_id, attachPageId: row.attach_page_id, kind,
-      sourceEncounterId: row.source_encounter_id, sessionNumber: row.session_number, realDate: row.real_date,
+      sourceEncounterId: row.source_encounter_id, sessionId: row.session_id,
+      // D9: the LIVE number from the joined session, falling back to the bare label the row stores. After
+      // v19 that fallback fires for exactly one thing: a revealed session that was deleted and stamped its
+      // number back onto its entries (director ruling R2).
+      sessionNumber: row.live_session_number ?? row.session_number,
+      realDate: row.real_date,
       inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant,
       inWorldDate: row.in_world_year !== null && row.in_world_month !== null && row.in_world_day !== null ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day } : null,
       sortKey: row.sort_key, tags: parseTags(row.tags_json),
@@ -3376,7 +4711,7 @@ export class CodexStore {
   }
   private journalRowRaw(entryId: string): JournalRowRaw | undefined {
     if (!ID.test(entryId)) return undefined;
-    return this.requireDatabase().prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE id = ?`).get(entryId) as JournalRowRaw | undefined;
+    return this.requireDatabase().prepare(`SELECT ${JOURNAL_COLUMNS} FROM ${JOURNAL_FROM} WHERE j.id = ?`).get(entryId) as JournalRowRaw | undefined;
   }
 
   private toMap(row: MapRowRaw): CodexMapRow {
@@ -3415,12 +4750,17 @@ export class CodexStore {
       recap_body: body(input.recapBody),
       revealed: input.revealedToPlayers ? 1 : 0,
       status: sessionStatus(input.status),
-      rev: 1, created_at: stamp, updated_at: stamp
+      rev: 1, created_at: stamp, updated_at: stamp,
+      tags_json: JSON.stringify(tags(input.tags))
     };
     this.guardSessionNumber(row.session_number, () => {
       this.transaction(() => {
-        database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at);
+        database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at, row.tags_json);
+        this.indexSession(row);
+        // D13: recap is the PLAYER layer, prep is the GM layer - the session's own two-layer split, so a
+        // page named only in prep yields a GM-only connection.
+        this.rebuildLinksFor("session", row.id, row.recap_body, row.prep_body);
         this.bumpRevision();
       });
     });
@@ -3449,6 +4789,7 @@ export class CodexStore {
       prep_body: input.prepBody === undefined ? existing.prep_body : body(input.prepBody),
       recap_body: input.recapBody === undefined ? existing.recap_body : body(input.recapBody),
       status: input.status === undefined ? existing.status : sessionStatus(input.status),
+      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
       // `rev` and `updated_at` move TOGETHER on an edit: the conflict token and the recency stamp both
       // describe "this record was written", and splitting them is what CI-9's exceptions below are for.
       rev: existing.rev + 1,
@@ -3456,8 +4797,10 @@ export class CodexStore {
     };
     this.guardSessionNumber(next.session_number, () => {
       this.transaction(() => {
-        database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, rev = ?, updated_at = ? WHERE id = ?")
-          .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.rev, next.updated_at, sessionId);
+        database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, tags_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+          .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.tags_json, next.rev, next.updated_at, sessionId);
+        this.indexSession(next);
+        this.rebuildLinksFor("session", sessionId, next.recap_body, next.prep_body);
         this.bumpRevision();
       });
     });
@@ -3485,12 +4828,32 @@ export class CodexStore {
     return this.getSession(sessionId)!;
   }
 
-  /** Idempotent, and an early return on a malformed id - every other codex delete behaves this way. */
+  /**
+   * Idempotent, and an early return on a malformed id - every other codex delete behaves this way.
+   *
+   * **The entries it leaves behind (director ruling R2).** `session_id` has no foreign key, so this scrubs
+   * the join itself - and what it writes in the number's place is CONDITIONAL, because the two cases have
+   * opposite right answers:
+   *
+   *  - The deleted session was REVEALED and numbered: its number is stamped back onto its entries as a bare
+   *    display label. Behaviour-preserving - the players were already reading "Session 4" on those entries,
+   *    and deleting the record must not silently erase the history's own numbering.
+   *  - The deleted session was HIDDEN (or unnumbered): the entries get NO label. A bare label passes through
+   *    the player projection by construction - there is no record left to gate on - so stamping a hidden
+   *    session's number back would tell the table that a session they were never shown existed. Secret by
+   *    default wins, and losing a label the players never saw costs nothing.
+   */
   deleteSession(sessionId: string): void {
     const database = this.requireDatabase();
     if (!ID.test(sessionId)) return;
+    const existing = this.sessionRowRaw(sessionId);
+    const stampBack = existing && existing.revealed === 1 ? existing.session_number : null;
     this.transaction(() => {
+      if (stampBack !== null) database.prepare("UPDATE codex_journal SET session_id = NULL, session_number = ? WHERE session_id = ?").run(stampBack, sessionId);
+      else database.prepare("UPDATE codex_journal SET session_id = NULL WHERE session_id = ?").run(sessionId);
       database.prepare("DELETE FROM codex_sessions WHERE id = ?").run(sessionId);
+      this.unindex("session", sessionId);
+      this.scrubLinks("session", sessionId);
       // Clearing the pointer is PART of the delete, not a separate tidy-up: there is no FK doing it (see
       // migration v13), and a dangling `active_session_id` would have `activeSessionId` name a record that
       // no longer exists - which the sessions list hands straight to the GM.
@@ -3517,25 +4880,25 @@ export class CodexStore {
   }
 
   /**
-   * The `session_number`s that name a session record the players have NOT been shown. The resolution the
-   * player journal reads need before they may hand a player an entry's `sessionNumber` - a session's very
-   * EXISTENCE is GM information (`GET /codex/sessions/:id` 404s a player on an unrevealed one rather than
-   * 403ing, and the list omits it), so a number that resolves to a hidden record announces it.
+   * The session IDS the players have NOT been shown. The resolution every player journal read needs before
+   * it may hand a player an entry's session link OR its number - a session's very EXISTENCE is GM
+   * information (`GET /codex/sessions/:id` 404s a player on an unrevealed one rather than 403ing, and the
+   * list omits it), so either half of the link would announce it.
    *
-   * Deliberately the UNREVEALED set rather than the revealed one, and that asymmetry IS the rule: a number
-   * with no session record at all - every entry from before M9, which shipped with no backfill - is in
-   * NEITHER set, and must keep travelling exactly as it does today, because there is no record whose
-   * existence it could give away. The mirror-image question ("which numbers are revealed?") would answer no
-   * for those too and blank a label that has always been correct.
+   * D9 changed the KEY from number to id, and that is what closes the gap the number version could not: an
+   * unnumbered hidden session could not appear in a set of numbers at all, so an entry filed under one had
+   * nothing to gate on. Now the gate is the join, which every filed entry has.
    *
-   * Rows with `session_number IS NULL` are excluded: they name no number, and a set that could contain a
-   * null would only be a value every caller has to remember not to look up.
+   * Deliberately the UNREVEALED set rather than the revealed one, and the asymmetry is still the rule: an
+   * entry with a bare LABEL and no join (director ruling R2's stamp-back, the only writer left) is in
+   * neither set and keeps travelling, because there is no record left whose existence it could give away -
+   * and R2 only ever stamps a number the players had already been shown.
    */
-  unrevealedSessionNumbers(): ReadonlySet<number> {
+  unrevealedSessionIds(): ReadonlySet<string> {
     const rows = this.requireDatabase()
-      .prepare("SELECT session_number FROM codex_sessions WHERE revealed = 0 AND session_number IS NOT NULL")
-      .all() as Array<{ session_number: number }>;
-    return new Set(rows.map((row) => row.session_number));
+      .prepare("SELECT id FROM codex_sessions WHERE revealed = 0")
+      .all() as Array<{ id: string }>;
+    return new Set(rows.map((row) => row.id));
   }
 
   /** The session the table is currently playing, or null. One meta row, therefore one pointer (v13). */
@@ -3561,18 +4924,27 @@ export class CodexStore {
   }
 
   /**
-   * The active session's NUMBER, or null - the one resolution both auto-linking call sites share, so a
-   * hand-written note and an auto-logged battle can never disagree about which session "now" is.
+   * D9's write-resolution rule, in one place so every journal creator obeys it identically.
    *
-   * Degrades to null in every gap: nothing active, or an active session the GM has not numbered yet. Both
-   * are exactly the pre-M9 behaviour at those call sites, so auto-linking can only ever ADD a number where
-   * there would have been none - it never borrows some other session's. (The `?? null` on a pointer whose
-   * record has gone is belt and braces: `deleteSession` clears the pointer with the row, so that state is
-   * unreachable and consequently untested - it is here so a torn database cannot make this throw.)
+   *  - OMITTED (`undefined`) -> auto-file under the ACTIVE session, by id.
+   *  - explicit `null`       -> no session.
+   *  - an id                 -> that session, which must exist.
+   *
+   * This is strictly better than the number-stamping it replaces. Auto-linking used to resolve the active
+   * session's NUMBER, so an UNNUMBERED active session could not auto-link at all; now the entry joins the
+   * record and its number appears on every entry the moment the GM numbers it.
    */
-  private activeSessionNumber(): number | null {
-    const active = this.activeSessionId;
-    return active === null ? null : (this.getSession(active)?.sessionNumber ?? null);
+  private resolveEntrySession(sessionId: string | null | undefined): string | null {
+    if (sessionId === undefined) return this.activeSessionId;
+    if (sessionId === null) return null;
+    return this.requireSession(sessionId);
+  }
+
+  /** The id of a session that must exist. Not-found rather than a silent null: a write naming a session that is gone is a mistake worth hearing about. */
+  private requireSession(sessionId: string): string {
+    const resolved = id(sessionId);
+    if (!this.sessionRowRaw(resolved)) throw new CodexNotFoundError("That session no longer exists.");
+    return resolved;
   }
 
   /**
@@ -3590,7 +4962,7 @@ export class CodexStore {
     try { work(); }
     catch (error) {
       if (sessionNumber !== null && error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
-        throw new Error(`Session ${sessionNumber} already exists. Give this one a different number.`);
+        throw new CodexValidationError(`Session ${sessionNumber} already exists. Give this one a different number.`);
       }
       throw error;
     }
@@ -3608,6 +4980,7 @@ export class CodexStore {
       // Anything unrecognised reads as `planned`, the harmless half of the enum - the same fail-safe
       // `toEntry` applies to a journal row's `kind`.
       status: row.status === "played" ? "played" : "planned",
+      tags: parseTags(row.tags_json),
       rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
@@ -3644,12 +5017,18 @@ export class CodexStore {
       // means nothing), while two objectives may legitimately read the same and still be two steps.
       entity_ids_json: JSON.stringify(idArray(input.entityIds)),
       revealed: input.revealedToPlayers ? 1 : 0,
-      rev: 1, created_at: stamp, updated_at: stamp
+      rev: 1, created_at: stamp, updated_at: stamp,
+      tags_json: JSON.stringify(tags(input.tags))
     };
     this.transaction(() => {
-      database.prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(row.id, row.title, row.status, row.player_body, row.gm_body, row.objectives_json, row.entity_ids_json, row.revealed, row.rev, row.created_at, row.updated_at);
-      this.indexQuest(row.id, row.title, row.player_body, row.gm_body, row.objectives_json);
+      database.prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(row.id, row.title, row.status, row.player_body, row.gm_body, row.objectives_json, row.entity_ids_json, row.revealed, row.rev, row.created_at, row.updated_at, row.tags_json);
+      this.indexQuest(row.id, row.title, row.player_body, row.gm_body, row.objectives_json, row.tags_json);
+      this.rebuildLinksFor("quest", row.id, row.player_body, row.gm_body);
+      // D11 / ruling R5: a quest STARTING is an event, and quests start at creation - so the history
+      // record is written here as well as on a status change, in the SAME transaction as the quest row.
+      // Half of that would be worse than neither: a quest with no start, or a start with no quest.
+      this.writeQuestEvent(row.id, questStatus(row.status));
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -3677,6 +5056,7 @@ export class CodexStore {
       gm_body: input.gmBody === undefined ? existing.gm_body : body(input.gmBody),
       objectives_json: input.objectives === undefined ? existing.objectives_json : JSON.stringify(questObjectives(input.objectives)),
       entity_ids_json: input.entityIds === undefined ? existing.entity_ids_json : JSON.stringify(idArray(input.entityIds)),
+      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
       // `rev` and `updated_at` move TOGETHER on an edit, exactly as `updateSession` does - the conflict
       // token and the recency stamp both mean "this record was written". `setQuestRevealed` is the
       // documented exception (CI-9).
@@ -3684,11 +5064,15 @@ export class CodexStore {
       updated_at: this.stamp()
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_quests SET title = ?, status = ?, player_body = ?, gm_body = ?, objectives_json = ?, entity_ids_json = ?, rev = ?, updated_at = ? WHERE id = ?")
-        .run(next.title, next.status, next.player_body, next.gm_body, next.objectives_json, next.entity_ids_json, next.rev, next.updated_at, questId);
+      database.prepare("UPDATE codex_quests SET title = ?, status = ?, player_body = ?, gm_body = ?, objectives_json = ?, entity_ids_json = ?, tags_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+        .run(next.title, next.status, next.player_body, next.gm_body, next.objectives_json, next.entity_ids_json, next.tags_json, next.rev, next.updated_at, questId);
       // The indexed TEXT really can change here (title, player body, objective text), so this write has an
       // index twin; `setQuestRevealed` below deliberately does not, because reveal is resolved at read time.
-      this.indexQuest(questId, next.title, next.player_body, next.gm_body, next.objectives_json);
+      this.indexQuest(questId, next.title, next.player_body, next.gm_body, next.objectives_json, next.tags_json);
+      this.rebuildLinksFor("quest", questId, next.player_body, next.gm_body);
+      // Only a STATUS CHANGE is an event. Editing a quest's prose is not something that happened in the
+      // world, and a history that recorded every keystroke of an autosaving editor would be noise.
+      if (input.status !== undefined && next.status !== existing.status) this.writeQuestEvent(questId, questStatus(next.status));
       this.bumpRevision();
     });
     return this.getQuest(questId)!;
@@ -3712,6 +5096,29 @@ export class CodexStore {
     return this.getQuest(questId)!;
   }
 
+  /**
+   * D11 / R5: append the hidden `quest` history record for a quest's start or state change.
+   *
+   * Leaf-level, like `writeEntry` itself: it assumes it is already inside the quest write's transaction,
+   * so the table and the timeline can never disagree - the `setStanding` arrangement verbatim.
+   *
+   * HIDDEN, with EMPTY player text. That combination is deliberate and it is why the projection hides the
+   * whole row rather than nulling a field: a `quest` record has no prose to stand on, exactly like a
+   * `standing` record, and the standing CORRECTION records what happens when a row with nothing but a
+   * structured payload is allowed through. Dated at the GM's clock, the rule an auto-logged battle, a
+   * downtime and a standing record already follow, and filed under the active session by id.
+   */
+  private writeQuestEvent(questId: string, status: CodexQuestStatus): void {
+    const dated = this.resolveDate(this.getCalendar().currentDate ?? null, null);
+    this.writeEntry({
+      playerText: "", gmText: null, revealed: 0,
+      attachMarkerId: null, attachPageId: null, kind: "quest",
+      sourceEncounterId: null, sessionId: this.activeSessionId, realDate: null,
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date,
+      payload: questEventPayload({ questId, status })
+    });
+  }
+
   /** Idempotent, and an early return on a malformed id - every other codex delete behaves this way. */
   deleteQuest(questId: string): void {
     const database = this.requireDatabase();
@@ -3722,6 +5129,7 @@ export class CodexStore {
       // left for `PLAYER_VISIBLE_SQL` to gate it on - and `ELSE 0`-style safety does not apply, because
       // the row's `kind` is still a recognised one. The map-delete cascade taught this the hard way.
       this.unindex("quest", questId);
+      this.scrubLinks("quest", questId);
       this.bumpRevision();
     });
   }
@@ -3757,7 +5165,7 @@ export class CodexStore {
       objectives: parseObjectives(row.objectives_json),
       entityIds: parseIdArray(row.entity_ids_json),
       revealedToPlayers: row.revealed === 1,
-      rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
+      tags: parseTags(row.tags_json), rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
 
@@ -3844,7 +5252,7 @@ export class CodexStore {
      * tidily: the GM can always zero it, unreveal it, or delete the page. Creating a new row still requires
      * a faction, so the rule holds where it is actually doing work.
      */
-    if (!existing && page.entity_type !== "faction") throw new Error("Standing is tracked against a faction - pick a faction page.");
+    if (!existing && page.entity_type !== "faction") throw new CodexValidationError("Standing is tracked against a faction - pick a faction page.");
     const next = standingValue(value);
     // Measured against the CLAMPED previous value (`toStanding`'s), not the raw column, so the deltas on the
     // timeline always sum to the number the bar shows. A hand-edited row holding 500 reads as 100
@@ -3864,7 +5272,7 @@ export class CodexStore {
         // around a standing change writes an ordinary note; this record is the structured fact.
         playerText: "", gmText: null, revealed: 0,
         attachMarkerId: null, attachPageId: null, kind: "standing",
-        sourceEncounterId: null, sessionNumber: this.activeSessionNumber(), realDate: null,
+        sourceEncounterId: null, sessionId: this.activeSessionId, realDate: null,
         inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, payload
       });
     });
@@ -3937,12 +5345,35 @@ export class CodexStore {
     };
   }
 
-  private rebuildLinks(pageId: string, playerBody: string, gmBody: string) {
+  /**
+   * D13: re-extract one record's `[[wiki links]]`, for ANY of the four source kinds.
+   *
+   * **The layer mapping is the viewer-safety decision here**, and it is one rule with four instances:
+   * text written on the GM's layer yields GM-layer edges, text written on the player's layer yields
+   * player-layer edges.
+   *
+   *   page    -> `player_body` / `gm_body`      (unchanged)
+   *   session -> `recap_body`  / `prep_body`    (prep is the session's secret half)
+   *   quest   -> `player_body` / `gm_body`
+   *   journal -> `player_text` / `gm_text`
+   *
+   * The caller passes the two strings, so this function cannot get the mapping wrong for a kind it has
+   * never heard of - it never reads a record.
+   *
+   * Leaf-level: it assumes it is already inside a transaction, exactly as `writeEntry` and `writeCalendar`
+   * do, so a record write and its link rebuild are one atomic act.
+   */
+  private rebuildLinksFor(sourceKind: CodexConnectionSourceKind, sourceId: string, playerText: string, gmText: string) {
     const database = this.requireDatabase();
-    database.prepare("DELETE FROM codex_links WHERE source_page_id = ?").run(pageId);
-    const links = [...parseWikiLinks(playerBody, "player"), ...parseWikiLinks(gmBody, "gm")];
-    const insert = database.prepare("INSERT INTO codex_links (source_page_id, layer, target_kind, target_ref, section) VALUES (?, ?, ?, ?, ?)");
-    for (const link of links) insert.run(pageId, link.layer, link.targetKind, link.targetRef, link.section);
+    database.prepare("DELETE FROM codex_links WHERE source_kind = ? AND source_id = ?").run(sourceKind, sourceId);
+    const links = [...parseWikiLinks(playerText, "player"), ...parseWikiLinks(gmText, "gm")];
+    const insert = database.prepare("INSERT INTO codex_links (source_kind, source_id, layer, target_kind, target_ref, section) VALUES (?, ?, ?, ?, ?, ?)");
+    for (const link of links) insert.run(sourceKind, sourceId, link.layer, link.targetKind, link.targetRef, link.section);
+  }
+
+  /** Every record kind scrubs its own link rows on delete - v22 dropped the FK, so nothing cascades. */
+  private scrubLinks(sourceKind: CodexConnectionSourceKind, sourceId: string) {
+    this.requireDatabase().prepare("DELETE FROM codex_links WHERE source_kind = ? AND source_id = ?").run(sourceKind, sourceId);
   }
 
   // ----- Search index upkeep (the ONE index, both audiences) -----
@@ -4005,14 +5436,40 @@ export class CodexStore {
    * indexing it for players matches what they already receive. The GM row carries it too, or the GM's
    * search would be strictly weaker than the player's on the same record.
    *
-   * Quests carry NO tags (they are not in the spec's column list), so unlike every other kind here there
-   * is no tag text to append.
+   * D10 gives quests tags, so the tag text is appended to BOTH audience rows. Tags are single-layer by
+   * CI-2 - there is no GM-only tag - and every other kind already indexes theirs, so leaving quests out
+   * would make ONE search box answer a tag query differently depending on what carried the tag.
    */
-  private indexQuest(questId: string, questTitle: string, playerBody: string, gmBody: string, objectivesJson: string) {
+  private indexQuest(questId: string, questTitle: string, playerBody: string, gmBody: string, objectivesJson: string, tagsJson: string) {
     const objectiveText = parseObjectives(objectivesJson).map((objective) => objective.text).join(" ");
+    const tagText = parseTags(tagsJson).join(" ");
     this.indexRecord("quest", questId,
-      { title: questTitle, body: `${playerBody}\n${objectiveText}` },
-      { title: questTitle, body: `${playerBody}\n${gmBody}\n${objectiveText}` });
+      { title: questTitle, body: `${playerBody}\n${objectiveText}\n${tagText}` },
+      { title: questTitle, body: `${playerBody}\n${gmBody}\n${objectiveText}\n${tagText}` });
+  }
+
+  /**
+   * D10: a session in the ONE search index. GATE 1 (see `CodexRecordKind`), and the gate with no second
+   * line of defence - so the split between the two audience rows is the whole safety argument here:
+   *
+   *  - PLAYER: recap, real date, tags. Every one of those is already emitted by `projectPlayerSession` on a
+   *    revealed session, so a player's query can only match text they could already read.
+   *  - GM: the same PLUS `prep_body` and the attendee names. Prep is the single most important secret this
+   *    record carries and attendees are real-world personal data. Either in the player row would make a
+   *    player's query on a GM-only phrase MATCH, and the hit's EXISTENCE is the leak even though the body
+   *    is never returned - gates 2 and 3 would both pass it, because the session really is revealed and
+   *    really did match.
+   *
+   * The title is the number, which is player-visible on a revealed session. Reveal itself is resolved at
+   * READ time, so `setSessionRevealed` deliberately does not reindex - `setQuestRevealed`'s rule verbatim.
+   */
+  private indexSession(row: SessionRowRaw) {
+    const title = row.session_number === null ? "" : `Session ${row.session_number}`;
+    const tagText = parseTags(row.tags_json).join(" ");
+    const attendeeText = parseTags(row.attendees_json).join(" ");
+    this.indexRecord("session", row.id,
+      { title, body: `${row.recap_body}\n${row.real_date ?? ""}\n${tagText}` },
+      { title, body: `${row.prep_body}\n${row.recap_body}\n${row.real_date ?? ""}\n${attendeeText}\n${tagText}` });
   }
 
   /** A journal entry is two-layer like a page: `gmText` goes ONLY into the GM index. */

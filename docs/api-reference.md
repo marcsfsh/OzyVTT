@@ -4,7 +4,7 @@
 <!-- Rendered from packages/api-contract (the same document served at /api/v1/openapi.json). -->
 <!-- Regenerate: npm run docs:generate -w @vtt/api-contract -->
 
-Versioned, recipient-safe integration contract for a self-hosted VTT. Every write accepts an optional `commandId` (UUID): supply your own and resend it to retry safely - the server executes a commandId exactly once and replays the stored outcome with `duplicate: true`. Omitting it mints one server-side (echoed in the response), which is convenient but gives a lost response no safe retry. `expectedRevision` rejects stale writes with 409 + `error.currentRevision`.
+Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once - supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too - a replay carries `x-idempotent-replay: true` - while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). Role denials are 403, a missing credential is 401, and the existence of a secret record always reads as 404.
 
 - **Base path:** `/api/v1` on the LAN host (default port 3001).
 - **Machine-readable contract:** `GET /api/v1/openapi.json` serves the OpenAPI 3.1 document this reference is generated from, byte-identical to `@vtt/api-contract`.
@@ -13,13 +13,14 @@ Versioned, recipient-safe integration contract for a self-hosted VTT. Every writ
 
 ## Authentication
 
-Every request authenticates with `Authorization: Bearer <token>` (the viewer's cookie is the one exception). Three principal kinds exist:
+Every request authenticates with `Authorization: Bearer <token>` (the viewer's cookie is the one exception). Four principal kinds exist, and **which surfaces each one reaches** is the part worth reading twice:
 
-| Principal | Token | Authority |
-| --- | --- | --- |
-| **GM session** | from `POST /api/gm/login` (GM password; same-origin only) | Everything, including credential management. |
-| **Player session** | issued when a player joins the table | Exactly the table's player limits: player-safe projections, own claimed character only. |
-| **Integration credential** | `vtt_int_…`, minted by the GM (below) | GM authority, filtered by the credential's scopes. Rotatable, revocable, audited. |
+| Principal | Token | Reaches | Authority |
+| --- | --- | --- | --- |
+| **GM session** | `POST /api/gm/login` (GM password; same-origin only) | Everything. | Full, including credential management. |
+| **Player session** | issued when a player joins the table, or `POST /api/v1/sessions/player` | Live game, the public reference catalogs, codex **reads**. Never homebrew, never credential management, never a codex write. | The table's player limits: player-safe projections, own claimed character only. |
+| **Integration credential** | `vtt_int_…`, minted by the GM (below) | Live game, encounter archives, and the codex - scope by scope. Never credential management, never homebrew, never `POST /codex/preview-session`. | GM authority, filtered by the credential's scopes. Rotatable, revocable, audited. |
+| **Paired viewer** | HttpOnly cookie exchanged from a pairing code | The second-screen viewer surface and the map-asset bytes it needs. | Read-only, player-safe presentation. It is not a game credential and never becomes one. |
 
 ### Scopes
 
@@ -34,6 +35,8 @@ Every request authenticates with `Authorization: Bearer <token>` (the viewer's c
 | `combat:read` | The combat log and encounter archives. |
 | `combat:write` | Encounter lifecycle, initiative/timeline, turns, tokens, actions, saves, annotations. |
 | `roll:create` | Dice rolls into the shared history. |
+| `codex:read` | Every codex read at GM grade: pages (both layers), the atlas, the journal and chronicle, sessions, quests, standing, the calendar (both clocks), folders, revision history, settings, the reveal audit, export, and page images. |
+| `codex:write` | Every codex write: pages, atlas, pins, journal, sessions, quests, standing, calendar and publish, settings, revision trim, and page-image upload. Does NOT imply `codex:read` - mint both for a read-write tool. |
 | `events:read` | Reserved for the future event stream. |
 | `webhooks:manage` | Reserved for future webhooks. |
 | `admin` | Every scope, including destructive operations (archive deletion). Grant sparingly. |
@@ -41,11 +44,14 @@ Every request authenticates with `Authorization: Bearer <token>` (the viewer's c
 ## Conventions
 
 - **Envelopes.** Success: `{ "ok": true, "apiVersion": "1", "data": … }`. Failure: `{ "ok": false, "apiVersion": "1", "error": { "code", "message", "requestId", "details"?, "currentRevision"?, "retryAfterSeconds"? } }`.
-- **Request IDs.** Send `X-Request-Id` (UUID) to correlate; the server echoes it (minting one otherwise) on the response header and in error bodies.
-- **Idempotency.** Every write accepts `commandId` (UUID). The server executes each commandId exactly once; retries replay the stored outcome with `duplicate: true`. Omitted ids are minted server-side and echoed - supply your own whenever you might need to retry.
-- **Optimistic concurrency.** Pass `expectedRevision` to reject writes against a state you haven't seen; a stale value returns `409` with `error.currentRevision`.
-- **Error statuses.** `400 validation_failed` (malformed request, `details.issues`), `401 unauthenticated` (no token), `403 forbidden` (invalid/revoked/underscoped token, or a role denial), `404 not_found`, `409 conflict` for everything the game itself refuses - rule rejections, stale revisions, and timeline confirmations (`details.needsConfirm`: resend with `confirmRewrite`/`confirmDiscard`), `413` oversized body (limit 512kb).
-- **Polling.** `GET /game` sends a weak ETag derived from the revision; send `If-None-Match` to get free `304`s. Presence and timed-annotation expiry don't bump the revision - re-fetch when you need those fresh.
+- **Request IDs.** Send `X-Request-Id` (UUID v4) to correlate; every `/api/v1` router echoes it on the response header and in error bodies, minting one when you don't. A value that isn't a UUID v4 is replaced rather than echoed.
+- **Idempotency, per surface.** *Game* writes accept `commandId` (UUID), executed exactly once; a retry replays the stored outcome with `duplicate: true`, and an omitted id is minted server-side and echoed. D19: codex JSON-body writes accept an optional `commandId` (UUID), unique to one request; resend the same id to retry THAT request safely and the stored outcome is replayed verbatim - same status, same bytes - with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. Reusing an id on a different route is a `400`, never a replay: answering the first request's response would silently skip the second write. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none - they are naturally idempotent already. *Homebrew* writes still carry none and rely on `expectedRev`.
+- **Optimistic concurrency, two vocabularies.** `expectedRevision` (game) targets the **global** GameState revision. `expectedRev` (codex pages/sessions/quests, homebrew rows) targets **one record's** revision. Both reject a stale write with `409` and `error.currentRevision`. Codex maps, pins, journal entries, calendar, settings and standing are deliberately last-write-wins - a single-GM surface does not need a conflict token on every row, and spreading one costs more than it prevents.
+- **Error statuses.** `400 validation_failed` - malformed request; a schema failure carries every problem in `details.issues` as `{ path, message }`, not just the first. `401 unauthenticated` - **no credential, or an `Authorization` header that isn't parseable**, and nothing else. `403 forbidden` - you presented something and were refused: a role denial, or a token that is invalid, revoked, or missing the required scope. `404 not_found` - absent **or secret**: the existence of a record you may not see is never distinguishable from its absence. `409 conflict` - a domain refusal or a stale revision (`details.needsConfirm` on a timeline navigation: resend with `confirmRewrite`/`confirmDiscard`). `413` - oversized body. The global limit is 512kb; three routes raise their own and each states it on the operation - `POST /homebrew/packs/import` (about 4mb), `POST /codex/import` (64mb, because a backup bundle carries every revision), and `POST /codex-assets` (11mb, one page image).
+- **One stated exception to the 404 rule.** Binary asset-content routes (`/map-assets/{id}/content`, `/codex-assets/{id}/content`) answer `403` **before** any existence check. Media URLs are guessable and get embedded in pages, so answering 404-vs-403 there would turn the route into an existence oracle for ids you were never given.
+- **Polling.** `GET /game` and **every codex `GET`** send a weak ETag derived from the relevant revision; send `If-None-Match` for a free `304`. Presence and timed-annotation expiry don't bump the game revision - re-fetch when you need those fresh. A conditional request is checked *after* authorization and existence, so a `304` never leaks that a record you can't see is unchanged.
+- **Change observation.** Socket.IO emits a `codex:changed` / `homebrew:changed` ping whenever that surface moves. Treat a ping as "re-read", not as data - it exists so integrations don't have to poll tightly, and the payload is not part of this contract.
+- **Bounds are a design decision, not an omission.** This is a single-group LAN product. Codex list reads are **unpaginated** and will stay that way inside v1; suite search returns at most 50 hits; homebrew lists use keyset cursors (`cursor` is opaque). Do not build a consumer that waits for codex pagination to appear.
 - **CORS.** Wide open on `/api/v1` (bearer-only surface), so browser-based overlays can call it directly. The legacy same-origin endpoints (`/api/gm/login` etc.) deliberately have no CORS.
 
 ## Command catalog
@@ -131,7 +137,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `fog.paint` | `scene:write` |
 | `fog.reset` | `scene:write` |
 
-## Encounter archive document (`archiveSchemaVersion` 2)
+## Encounter archive document (`archiveSchemaVersion` 3)
 
 `GET /encounters/{id}` returns `data.document`, the permanent Time Machine record of one ended fight, stored verbatim at `encounter.end` in the same transaction that closes the encounter:
 
@@ -215,7 +221,7 @@ Minting, rotating, revoking, and auditing the scoped bearer tokens integrations 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `name` | string | yes |  |
-| `scopes` | `system:read` \| `game:read` \| `actor:read` \| `actor:write` \| `scene:read` \| `scene:write` \| `combat:read` \| `combat:write` \| `roll:create` \| `events:read` \| `webhooks:manage` \| `admin`[] | yes |  |
+| `scopes` | `system:read` \| `game:read` \| `actor:read` \| `actor:write` \| `scene:read` \| `scene:write` \| `combat:read` \| `combat:write` \| `roll:create` \| `codex:read` \| `codex:write` \| `events:read` \| `webhooks:manage` \| `admin`[] | yes |  |
 | `gameId` | string \| null | no |  |
 | `expiresAt` | string \| null | no |  |
 
@@ -2033,7 +2039,7 @@ Imports a pack. Everything lands as `state: "draft"`, `visibleToPlayers: false`,
 
 ## Encounter archives (Time Machine)
 
-Permanent, machine-readable records of ended encounters - see the archive document section above for the full v2 shape. GM-grade principals only.
+Permanent, machine-readable records of ended encounters - see the archive document section above for the full v3 shape. GM-grade principals only.
 
 ### `GET /api/v1/encounters`
 
@@ -2225,25 +2231,25 @@ Server-Sent Events stream of presentation updates for a paired viewer session; n
 
 **Responses:** `200` text/event-stream of `presentation` events · errors `401`
 
-## Codex (worldbuilding wiki, atlas, journal & calendar)
+## Codex (pages, atlas, journal & calendar)
 
-The GM-authored worldbuilding surface: typed wiki pages (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its markers, the campaign journal/timeline, and the fantasy calendar - plus page media. Reads accept a GM or a player session; a player receives the revealed-only projection (GM bodies, GM fields, and unrevealed pages/maps/markers/entries are stripped server-side). Every write is GM-only.
+The GM-authored worldbuilding surface: typed wiki **pages** (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its **pins** (`marker` on the wire), the campaign **journal**, and the fantasy **calendar** - plus page media. Reads accept a GM session, a player session, or an integration credential scoped `codex:read`; writes accept a GM session or `codex:write`. A credential acts at GM grade (it is the GM's own automation); a player session receives the revealed-only projection - GM bodies, GM fields, and unrevealed pages/maps/pins/entries are stripped server-side, and the two shapes are published separately as `X` / `XPlayer` joined by `XProjected`. Every codex GET sends a weak `ETag`; send `If-None-Match` for a free `304`.
 
 ### `GET /api/v1/codex/pages`
 
 Every page's summary (a player sees only revealed pages). Optional `folder` (empty string = top level) and `tag` filters.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `folder` (query, optional) - string · `tag` (query, optional) - string
 
-**Responses:** `200` Success - envelope of `CodexPageListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexPageListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `POST /api/v1/codex/pages`
 
 Creates a page.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2260,34 +2266,35 @@ Creates a page.
 | `revealedToPlayers` | boolean | no |  |
 | `bannerAssetId` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date that places an `event` page on the chronicle. Omit for undated. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexPageData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexPageData` · errors `400` `401` `403`
 
 ### `GET /api/v1/codex/search`
 
 Suite-wide full-text search across pages, journal entries, maps and markers, role-scoped. `q` is the query. Deliberately ONE search route rather than one per record type: `hits` is a single ranked list discriminated by `kind`.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `q` (query, optional) - string
 
-**Responses:** `200` Success - envelope of `CodexSearchData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexSearchData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `GET /api/v1/codex/pages/{id}`
 
-One page with its backlinks and typed relationships, projected for the caller.
+One page with its connections - one list where backlinks and typed relationships used to be two, projected for the caller.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexPageDocumentData` · errors `401` `404`
+**Responses:** `200` Success - envelope of `CodexPageDocumentData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `PATCH /api/v1/codex/pages/{id}`
 
 Edits a page. `expectedRev` rejects a stale write with 409.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2306,24 +2313,25 @@ Edits a page. `expectedRev` rejects a stale write with 409.
 | `bannerAssetId` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no | CT-11: the in-world date. Omitted leaves the stored date alone; `null` clears it. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the page moved on. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404` `409`
+**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `403` `404` `409`
 
 ### `DELETE /api/v1/codex/pages/{id}`
 
 Deletes a page; idempotent.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
 
 ### `POST /api/v1/codex/pages/{id}/reveal`
 
 Shows/hides a page to players.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2332,14 +2340,15 @@ Shows/hides a page to players.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `403` `404`
 
-### `POST /api/v1/codex/pages/{id}/relationships`
+### `POST /api/v1/codex/pages/{id}/connections`
 
-Adds a typed relationship edge from this page to another. Counts as an edit of BOTH pages, so both move in "recently updated" - but neither page's `rev` changes, so an open editor is not forced into a conflict.
+Declares a connection from this page to another. Counts as an edit of BOTH pages for "recently updated" - but neither page's `rev` changes, so an open editor is not forced into a conflict. Idempotent on `(from, to, label)`, and on the reverse pair too for a symmetric label ("ally of", "enemy of", "rival of", "related to"), so declaring the same edge twice returns the existing one rather than doubling it.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2348,39 +2357,41 @@ Adds a typed relationship edge from this page to another. Counts as an edit of B
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `toPageId` | string (uuid) | yes |  |
-| `type` | string | yes |  |
+| `label` | string \| null | no | Optional. An unlabelled connection is a legitimate "these two are related" - the same thing a `[[wiki link]]` already expresses - so forcing a word would make the declared half of one concept stricter than the derived half. |
+| `layer` | `player` \| `gm` | no | Default: `"player"`. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexRelationshipData` · errors `400` `401` `404`
+**Responses:** `201` Success - envelope of `CodexConnectionData` · errors `400` `401` `403` `404`
 
 ### `GET /api/v1/codex/pages/{id}/markers`
 
 The reverse of `/codex/maps/{id}/markers`: every atlas marker that links THIS page, so an open page can point back at the map. Role-scoped by exactly the forward route's predicate - a player must be able to see the page itself (an unrevealed page 404s), and then receives only revealed pins whose MAP is also revealed, with each pin's links filtered to the revealed subset and scene/actor ids stripped.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexMarkerListData` · errors `401` `404`
+**Responses:** `200` Success - envelope of `CodexMarkerListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `GET /api/v1/codex/pages/{id}/revisions`
 
 Autosaved revision history for a page.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:read` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexRevisionListData` · errors `401` `404`
+**Responses:** `200` Success - envelope of `CodexRevisionListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `POST /api/v1/codex/pages/{id}/revisions/{revisionId}/restore`
 
 Restores a page to a prior revision.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid) · `revisionId` (path) - integer (≥ 1)
 
-**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/preview-session`
 
@@ -2388,35 +2399,36 @@ Mints a short-lived PLAYER session token so the GM can preview the player Codex 
 
 **Auth:** GM session
 
-**Responses:** `201` Success - envelope of `CodexPreviewSessionData` · errors `401`
+**Responses:** `201` Success - envelope of `CodexPreviewSessionData` · errors `401` `403`
 
 ### `GET /api/v1/codex/folders`
 
 Every explicitly-created folder path; lets an empty folder persist.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:read` · GM session
 
-**Responses:** `200` Success - envelope of `CodexFolderListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexFolderListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `POST /api/v1/codex/folders`
 
 Creates (or keeps) an empty folder.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `path` | string | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexFolderCreatedData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexFolderCreatedData` · errors `400` `401` `403`
 
 ### `POST /api/v1/codex/folders/move`
 
 Renames/moves a folder subtree, re-pathing every page under it. Returns how many pages moved.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2424,62 +2436,74 @@ Renames/moves a folder subtree, re-pathing every page under it. Returns how many
 | --- | --- | --- | --- |
 | `from` | string | yes |  |
 | `to` | string | yes | Empty string moves the folder to the top level. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexFolderMovedData` · errors `400` `401`
+**Responses:** `200` Success - envelope of `CodexFolderMovedData` · errors `400` `401` `403`
 
 ### `POST /api/v1/codex/folders/delete`
 
 Deletes a folder and its subfolders; every page under it drops to the top level - never deleted.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `path` | string | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `400` `401`
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `400` `401` `403`
 
-### `GET /api/v1/codex/relationships`
+### `GET /api/v1/codex/connections`
 
-Every relationship edge for the graph, role-scoped (a player sees only edges whose BOTH endpoints are revealed).
+Every connection in the codex - ONE edge kind for the whole graph. A typed relationship and a `[[wiki link]]` are the same thing with a different `origin`; a connection may carry an optional `label`. Role-scoped by three gates, all of which must hold for a player: the target page is revealed, the SOURCE record is revealed by its own kind's player rule, and the connection sits on the `player` layer (a link written in a GM body is a GM note about a connection, not a connection the party has been shown).
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexRelationshipEdgeListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexConnectionListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
-### `DELETE /api/v1/codex/relationships/{id}`
+### `PATCH /api/v1/codex/connections/{id}`
 
-Removes one relationship edge; idempotent. Like adding one, it counts as an edit of both endpoint pages for "recently updated" without changing either page's `rev`.
+Relabels a DECLARED connection or moves it between layers. A `mention` connection has no id - it is derived from a body's text - and is edited by editing that text.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+**Request body** (JSON):
 
-### `GET /api/v1/codex/links`
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `label` | string \| null | no |  |
+| `layer` | `player` \| `gm` | no |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-Every `[[wiki link]]` edge between two pages - the Graph's second edge kind, beside the typed relationships. Role-scoped by both rules the existing feeds enforce: a player sees an edge only when BOTH endpoints are revealed pages (never a dangling edge to a page they cannot see) AND only when it was written in a page's PLAYER-facing body, never its GM body. Links to a title no page carries, and a page's link to itself, carry no edge.
+**Responses:** `200` Success - envelope of `CodexConnectionData` · errors `400` `401` `403` `404`
 
-**Auth:** GM session · Player session (own-character limits apply)
+### `DELETE /api/v1/codex/connections/{id}`
 
-**Responses:** `200` Success - envelope of `CodexLinkEdgeListData` · errors `401`
+Removes one declared connection; idempotent. Counts as an edit of both endpoints for "recently updated" without moving either record's `rev`.
+
+**Auth:** Integration credential with `codex:write` · GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
 
 ### `GET /api/v1/codex/maps`
 
 The atlas map tree, role-scoped (a player sees only revealed maps; a revealed map keeps its parent link only when that parent is itself revealed).
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexMapListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexMapListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `POST /api/v1/codex/maps`
 
 Turns an uploaded map asset into an atlas map node.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2491,14 +2515,15 @@ Turns an uploaded map asset into an atlas map node.
 | `kind` | `battlemap` \| `regional` \| `world` | yes |  |
 | `parentMapId` | string \| null | no |  |
 | `revealedToPlayers` | boolean | no |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+**Responses:** `201` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
 ### `PATCH /api/v1/codex/maps/{id}`
 
 Renames/retypes a map.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2509,24 +2534,25 @@ Renames/retypes a map.
 | `tags` | string[] | no |  |
 | `name` | string | no |  |
 | `kind` | `battlemap` \| `regional` \| `world` | no |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
 ### `DELETE /api/v1/codex/maps/{id}`
 
 Deletes a map and its markers; idempotent.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
 
 ### `POST /api/v1/codex/maps/{id}/parent`
 
 Re-parents a map in the atlas tree (null = a root map).
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2535,14 +2561,15 @@ Re-parents a map in the atlas tree (null = a root map).
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `parentMapId` | string \| null | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/maps/{id}/reveal`
 
 Shows/hides a map to players.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2551,24 +2578,25 @@ Shows/hides a map to players.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `403` `404`
 
 ### `GET /api/v1/codex/maps/{id}/markers`
 
 Markers on a map, role-scoped (a player only for a revealed map, and each pin's links filtered to the revealed subset).
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexMarkerListData` · errors `401` `404`
+**Responses:** `200` Success - envelope of `CodexMarkerListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `POST /api/v1/codex/maps/{id}/markers`
 
 Drops a marker on a map.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2587,14 +2615,33 @@ Drops a marker on a map.
 | `subMapId` | string \| null | no |  |
 | `sceneIds` | string (uuid)[] | no |  |
 | `actorId` | string \| null | no |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+**Responses:** `201` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
+
+### `GET /api/v1/codex/party`
+
+Where the party pin is, and the name of the map it sits on - one read for the dashboard's "party is here" card and the atlas jump, replacing a client-side scan of every map. `party` is null when no pin carries the flag. For a player it is ALSO null when the party pin fails the ordinary compound reveal gate (the pin revealed AND its map revealed) - null rather than 404, so a hidden party pin is indistinguishable from no party pin at all. `isParty` grants no visibility and never enters a reveal predicate.
+
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexPartyLocationData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
+
+### `GET /api/v1/codex/markers/{id}`
+
+One pin, projected for the caller. A player receives it only when the pin is revealed AND its map is revealed - the CD-6 compound gate, the same predicate `GET /codex/maps/{id}/markers` applies before it projects anything - with `pageIds` filtered to the revealed subset and scene/actor links stripped. Either half failing is a 404, never a 403: a pin id must not become a probe for "is there something here?". This is what lets a reader resolve a pin without walking every map.
+
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexMarkerProjectedData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `PATCH /api/v1/codex/markers/{id}`
 
 Edits a marker's icon/label/links.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2613,24 +2660,25 @@ Edits a marker's icon/label/links.
 | `subMapId` | string \| null | no |  |
 | `sceneIds` | string (uuid)[] | no |  |
 | `actorId` | string \| null | no |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
 ### `DELETE /api/v1/codex/markers/{id}`
 
 Deletes a marker; idempotent.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
 
 ### `POST /api/v1/codex/markers/{id}/move`
 
 Repositions a marker in normalized map coordinates.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2640,14 +2688,15 @@ Repositions a marker in normalized map coordinates.
 | --- | --- | --- | --- |
 | `x` | number (0–1000000) | yes |  |
 | `y` | number (0–1000000) | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/markers/{id}/reveal`
 
 Shows/hides a marker to players.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2656,14 +2705,15 @@ Shows/hides a marker to players.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
 ### `PUT /api/v1/codex/markers/{id}/party`
 
 CT-7: marks this pin as where the party is, or clears the flag from it. **Exactly one marker in the whole atlas** carries it, so setting a new one clears the old in a single step - the party is in exactly one place, and one-pin-per-map would leave "which pin is real?" unanswerable. `isParty: false` clears the flag from THIS marker only and never disturbs a different party pin. The flag is the pin's ONLY party-specific surface: it is moved, relabelled, linked, revealed and deleted through the ordinary marker routes, because the party marker is an ordinary marker with a flag rather than a marker type of its own. It is player-facing - the party pin is for the players - but it grants no visibility: a hidden party pin, or one on a hidden map, stays hidden exactly like any other pin.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2672,32 +2722,33 @@ CT-7: marks this pin as where the party is, or clears the flag from it. **Exactl
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `isParty` | boolean | yes | `true` makes this the party's pin and clears the flag from whichever pin held it before, anywhere in the atlas. `false` clears it from THIS pin only and never disturbs a different party pin. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `403` `404`
 
 ### `GET /api/v1/codex/timeline`
 
 The ONE chronicle: every journal entry and every dated `event` page, interleaved in one in-world chronological order and returned in one row shape (`kind` discriminates - `entry`, `combat`, `event`). The client's "by session" lens is a regrouping of these same records, never a second fetch. Role-scoped: a player receives only revealed entries and revealed event pages, with GM-only text (`gmText`, an event's GM body), the replay linkage and the raw sort key stripped - the projection delegates to the journal and page player projections rather than restating them, so this read can never be weaker than either.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexChronicleListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexChronicleListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `GET /api/v1/codex/journal`
 
 The campaign timeline, or a location's mini-timeline via `markerId`/`pageId`, role-scoped (a player only for a revealed marker/page, and only revealed entries).
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `markerId` (query, optional) - string (uuid) · `pageId` (query, optional) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexJournalListData` · errors `401` `404`
+**Responses:** `200` Success - envelope of `CodexJournalListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `POST /api/v1/codex/journal`
 
-Adds a journal/timeline entry.
+Adds a journal/timeline entry. A `sessionId` naming no session is a **404**, not a 400 - the body is well-formed and the record it points at is gone.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2709,18 +2760,19 @@ Adds a journal/timeline entry.
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/journal/deadline`
 
 CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the campaign clock can reach. Its own text is the "what" and its own `inWorldDate` is the "when", so a deadline stores no extra payload at all; `fired` is DERIVED from that date against the clock on every read and never stored, which is why rewinding the clock correctly un-fires one. `inWorldDate` is REQUIRED and may not be null - an undated deadline can never fire, so it is a note, not a deadline. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`: there is no kind-specific reveal and no kind-based visibility rule anywhere.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2732,18 +2784,19 @@ CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the 
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate | yes | WHEN it happens - the date the campaign clock has to reach for this to fire. Required, and never null. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/journal/downtime`
 
 CT-10: records DOWNTIME - who spent how many days doing what between adventures. Creating it NEVER moves the campaign clock; it answers with `proposedDate`, the date the clock WOULD move to, so the GM's confirm affordance can state what it will do before it does it. `POST /codex/journal/{id}/apply-downtime` is the only thing that moves the clock. Dated at the GM's current campaign date when no `inWorldDate` is given, the same rule an auto-logged battle follows, so the record lands where it happened.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2755,19 +2808,20 @@ CT-10: records DOWNTIME - who spent how many days doing what between adventures.
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
 | `downtime` | CodexDowntimeInput | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexDowntimeCreatedData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexDowntimeCreatedData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/journal/milestone`
 
 CT-8: records a MILESTONE - the party reached a level, and why. `level` is the level REACHED, not a step, so a deleted record cannot silently change what level the party is on (a delta would make the current level a sum over the whole timeline). There is no XP: progression here is milestone-based by design and the record carries no arithmetic. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal` - there is no kind-specific reveal. Dated at the GM's current campaign date when no `inWorldDate` is given, the rule an auto-logged battle and a downtime record already follow.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2779,19 +2833,20 @@ CT-8: records a MILESTONE - the party reached a level, and why. `level` is the l
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
 | `milestone` | CodexMilestoneInput | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `PATCH /api/v1/codex/journal/{id}`
 
-Edits a journal entry.
+Edits a journal entry; an omitted field is left alone. A `downtime` group edits a downtime record's own `who`/`activity`/`characterPageId` - **400** on any other kind of entry, and `days` is immutable (sending it is a 400, because it is what the campaign clock already moved by).
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2805,28 +2860,33 @@ Edits a journal entry.
 | `revealedToPlayers` | boolean | no |  |
 | `attachMarkerId` | string \| null | no |  |
 | `attachPageId` | string \| null | no |  |
-| `sessionNumber` | integer \| null | no |  |
+| `sessionId` | string \| null | no | D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`. |
 | `realDate` | string \| null | no |  |
 | `inWorldLabel` | string \| null | no |  |
 | `inWorldDate` | CodexInWorldDate \| null | no |  |
+| `downtime` | object | no | D12: edits a DOWNTIME record's own facts. **400 when the entry is not a downtime record** - a caller sending downtime details to a milestone has misunderstood something, and hearing so beats being quietly overruled. This is the adoption path the tracker needs: it is what lets a GM link the free-text rows that already exist to real character pages, so D12 works for downtime recorded before the upgrade as well as after it. `days` is deliberately NOT a member and sending it is a 400: it is what `apply-downtime` moved the campaign clock by, so editing it afterwards would leave the clock disagreeing with the record that justified it. A typo in `days` is a delete-and-recreate. `applied` is likewise absent - confirming the clock move is its own explicit act. |
+| `downtime.who` | string | no |  |
+| `downtime.activity` | string | no |  |
+| `downtime.characterPageId` | string \| null | no | An id naming no page is a 404; `null` clears the link and leaves `who` as the display fallback. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `DELETE /api/v1/codex/journal/{id}`
 
 Deletes a journal entry; idempotent.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
 
 ### `POST /api/v1/codex/journal/{id}/reveal`
 
 Shows/hides a journal entry to players. Works on EVERY journal kind, deadlines and downtime included - there is deliberately no kind-specific reveal route, because a second gate is a second thing to keep in step with the first.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2835,32 +2895,33 @@ Shows/hides a journal entry to players. Works on EVERY journal kind, deadlines a
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/journal/{id}/apply-downtime`
 
 Confirms a downtime record's time cost and ADVANCES the campaign clock by its `days`. The GM's explicit yes - the owner asked to be asked rather than have the clock move itself. Entry and calendar move together in one transaction and are returned together, so a client cannot render a moved clock beside an unapplied record. Applying an already-applied downtime, or any entry that is not downtime, is refused and moves nothing. Advancing the clock does NOT publish it: players keep seeing the published date until `POST /codex/calendar/publish`.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDowntimeAppliedData` · errors `400` `401` `404` `409`
+**Responses:** `200` Success - envelope of `CodexDowntimeAppliedData` · errors `400` `401` `403` `404` `409`
 
 ### `GET /api/v1/codex/sessions`
 
 Every play session - the GM's prep-and-recap record of one evening at the table. Numbered sessions first in number order, then the unnumbered ones oldest-first (the same tier-separator idiom the chronicle uses for undated records). Role-scoped: a GM receives the whole record for every session plus `activeSessionId`; a player receives only REVEALED sessions, reduced to the recap layer (`id`, `sessionNumber`, `realDate`, `recap`), and `activeSessionId` is always null for a player because it can name a session they cannot see.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexSessionListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexSessionListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `POST /api/v1/codex/sessions`
 
 Creates a session. Every field is optional - an empty POST opens a blank `planned` session to prep into. A `sessionNumber` another session already carries is refused with 400: the journal's by-session lens resolves a number to at most one session, so numbers are unique.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2873,24 +2934,26 @@ Creates a session. Every field is optional - an empty POST opens a blank `planne
 | `recapBody` | string | no |  |
 | `status` | `planned` \| `played` | no |  |
 | `revealedToPlayers` | boolean | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401` `403`
 
 ### `GET /api/v1/codex/sessions/{id}`
 
 One session, projected for the caller. An unrevealed session is **404** to a player - the same 404 an absent session gets, and never 403, because a 403 would confirm the record exists and its very existence ("session 14 is being prepped") is GM information.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexSessionData` · errors `401` `404`
+**Responses:** `200` Success - envelope of `CodexSessionProjectedData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `PATCH /api/v1/codex/sessions/{id}`
 
 Edits a session; an omitted field is left alone. `expectedRev` rejects a stale write with 409. A `sessionNumber` another session already carries is a 400, not a 409 - it is a bad value, not a lost race.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2904,25 +2967,27 @@ Edits a session; an omitted field is left alone. `expectedRev` rejects a stale w
 | `prepBody` | string | no |  |
 | `recapBody` | string | no |  |
 | `status` | `planned` \| `played` | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the session moved on. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `404` `409`
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `403` `404` `409`
 
 ### `DELETE /api/v1/codex/sessions/{id}`
 
 Deletes a session; idempotent. If it was the active session the pointer is cleared in the same transaction, so `activeSessionId` can never name a record that is gone. Journal entries that carry its `sessionNumber` are NOT deleted or renumbered - the number on an entry is a label, not a foreign key.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
 
 ### `POST /api/v1/codex/sessions/{id}/reveal`
 
 Publishes/retracts a session's recap to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot light the players' recap badge for text nobody changed.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -2931,32 +2996,33 @@ Publishes/retracts a session's recap to players. Revealing is not an edit: it mo
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexSessionData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/sessions/{id}/activate`
 
 Marks this session the ACTIVE one - the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, not as a flag on each session, so "two active sessions" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE, not an edit of the record, and it moves neither `rev` nor `updatedAt` - returning the row would imply otherwise.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexSessionActiveData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexSessionActiveData` · errors `400` `401` `403` `404`
 
 ### `GET /api/v1/codex/quests`
 
 Every quest - what the party is chasing, and whether it is still open. Role-scoped: a GM receives the whole record for every quest; a player receives only REVEALED quests, reduced to the player layer (`id`, `title`, `status`, `body`, `objectives`, `entityIds`). `status` IS player-facing here, unlike a session's: "what is still open" is the point of the feature, and a revealed quest whose state the player cannot see is useless. `entityIds` is filtered to the revealed subset, exactly as a marker's `pageIds` is.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexQuestListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexQuestListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `POST /api/v1/codex/quests`
 
-Creates a quest. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later.
+Creates a quest, and appends its first history record in the SAME transaction - a quest starting is an event (D11), so its initial status is recorded exactly as a later change would be. That record is a hidden `quest` journal entry with empty player text, dated at the GM's clock and filed under the active session; revealing it publishes nothing unless the quest itself is revealed. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -2969,24 +3035,26 @@ Creates a quest. Only `title` is required - everything else opens empty, so the 
 | `objectives` | CodexQuestObjective[] | no |  |
 | `entityIds` | string (uuid)[] | no |  |
 | `revealedToPlayers` | boolean | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `201` Success - envelope of `CodexQuestData` · errors `400` `401`
+**Responses:** `201` Success - envelope of `CodexQuestData` · errors `400` `401` `403`
 
 ### `GET /api/v1/codex/quests/{id}`
 
 One quest, projected for the caller. An unrevealed quest is **404** to a player - the same 404 an absent quest gets, and never 403, because a 403 would confirm the record exists and its very existence ("there is a quest about the duke") is GM information.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexQuestData` · errors `401` `404`
+**Responses:** `200` Success - envelope of `CodexQuestProjectedData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403` `404`
 
 ### `PATCH /api/v1/codex/quests/{id}`
 
-Edits a quest; an omitted field is left alone. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position.
+Edits a quest; an omitted field is left alone. **A status change also appends a hidden `quest` history record** in the same transaction (D11) - editing prose does not, because that is not something that happened in the world. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -3000,25 +3068,27 @@ Edits a quest; an omitted field is left alone. `expectedRev` rejects a stale wri
 | `gmBody` | string | no |  |
 | `objectives` | CodexQuestObjective[] | no |  |
 | `entityIds` | string (uuid)[] | no |  |
+| `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the quest moved on. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `404` `409`
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `403` `404` `409`
 
 ### `DELETE /api/v1/codex/quests/{id}`
 
 Deletes a quest; idempotent. The pages named by `entityIds` are untouched - the link is a reference, not ownership.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
-**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401` `403`
 
 ### `POST /api/v1/codex/quests/{id}/reveal`
 
 Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot make an untouched quest look freshly changed.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
@@ -3027,22 +3097,23 @@ Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev`
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexQuestData` · errors `400` `401` `403` `404`
 
 ### `GET /api/v1/codex/standing`
 
 CT-6: where the party stands with each faction, ROLE-SCOPED. A GM receives every standing; a player receives only those that are BOTH revealed themselves AND whose faction page is itself revealed, reduced to `factionPageId` and `value`. The second gate is not belt-and-braces: a standing row carries no title of its own (the faction's live page is the one name, so a rename cannot go stale), so a reader NAMES it by resolving `factionPageId` - and a standing published for a secret faction would hand the party a page id they cannot open beside a bar they cannot label. `value` is SIGNED, -100 (hostile) to +100 (allied), because a faction can be actively against the party and an unsigned favour scale cannot say so; a reader shows the word beside the bar, never the bar alone.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexStandingListData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexStandingListData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `PUT /api/v1/codex/standing/{factionPageId}`
 
 Sets where the party stands with one faction, and appends the `standing` chronicle record for the change - in ONE transaction, so the table (where things stand) and the timeline (what happened) can never disagree. Creates the standing on first use: `faction_page_id` is unique, so there is exactly one row per faction and nothing to create separately. `value` is the RESULTING value and is clamped to -100..100; the chronicle record carries the DELTA, because the record says what happened while the table says where things stand. 404 when no page with that id exists. **400** when the page exists but is not a `faction`: standing is tracked against factions, and the store enforces the entity type that the spec asks for as a foreign key (SQLite cannot express it - a CHECK may not subquery). The GM Codex only offers faction pages, so this is reachable mainly by a direct API caller, or by a page whose type was changed to something else after it had a standing row.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `factionPageId` (path) - string (uuid)
 
@@ -3052,14 +3123,15 @@ Sets where the party stands with one faction, and appends the `standing` chronic
 | --- | --- | --- | --- |
 | `value` | integer (-100–100) | yes | The new standing, SIGNED. Rejected outside -100..100 here (the client's control cannot produce a 150, so one is a malformed caller) and clamped to the same range by the store, which is the router-rejects / store-enforces arrangement every bounded field in this surface uses. |
 | `reason` | string | no | Why it moved, in one line - it lands on the `standing` chronicle record. Optional and may be empty: adjusting a standing mid-session should not be blocked on typing a sentence, and the change is recorded either way. Defaults to an empty string. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `403` `404`
 
 ### `POST /api/v1/codex/standing/{factionPageId}/reveal`
 
 Shows/hides a faction's standing to players. The ordinary reveal shape every codex record uses; revealing a standing does NOT reveal the faction page, and a player sees the standing only once both are revealed.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `factionPageId` (path) - string (uuid)
 
@@ -3068,30 +3140,31 @@ Shows/hides a faction's standing to players. The ordinary reveal shape every cod
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revealed` | boolean | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `404`
+**Responses:** `200` Success - envelope of `CodexStandingData` · errors `400` `401` `403` `404`
 
 ### `GET /api/v1/codex/reveal-audit`
 
 CT-9: one GM view of everything the party can currently see, across every reveal surface in the Codex - pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return - a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind's EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope - that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:read` · GM session
 
-**Responses:** `200` Success - envelope of `CodexRevealAuditData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexRevealAuditData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `GET /api/v1/codex/calendar`
 
 The world's calendar (months, weekdays, era, current date), ROLE-PROJECTED. The campaign has two clocks: the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. A GM receives their own clock as `currentDate` plus `publishedDate` so they can tell whether the table is behind them; a player receives `currentDate` sourced ONLY from the published date, and never `publishedDate` (for a player the two are the same value) and never the GM's clock by any path. Months, weekdays and era are the world's own and are player-facing on both.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
-**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexCalendarProjectedData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `PUT /api/v1/codex/calendar`
 
 Replaces the world calendar and reflows every dated record's sort instant and label from the raw dates. Moves the GM's clock only: advancing NEVER publishes, so the party's `currentDate` does not move until `POST /codex/calendar/publish`. `publishedDate` is deliberately not settable here - this body replaces the whole calendar, and a player-facing value inside a wholesale replacement is one careless PUT from being cleared.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -3101,44 +3174,47 @@ Replaces the world calendar and reflows every dated record's sort instant and la
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | no |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401`
+**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401` `403`
 
 ### `POST /api/v1/codex/calendar/publish`
 
 Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - "publish" means exactly "the table now sees where I am", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one. The 400 is not reachable through any input today - the handler routes every failure through the shared codex error mapper, and documenting only the statuses currently reachable would make the document wrong the moment that changes.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
-**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401`
+**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401` `403`
 
 ### `GET /api/v1/codex/settings`
 
 Every codex-WIDE setting, plus what the kept revision history COSTS (`versionCount` / `versionBytes`, both server-computed and read-only). GM-only on the read as well as the write, unlike the calendar: nothing here is player-facing - these values describe how the GM's own authoring history is kept, they gate no content, and they put nothing on a player's screen. An out-of-range or unrepresentable stored value reads back as the default rather than propagating, so this route always answers with a usable setting.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:read` · GM session
 
-**Responses:** `200` Success - envelope of `CodexSettingsData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexSettingsData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
 
 ### `PUT /api/v1/codex/settings`
 
 Replaces the codex-wide settings and answers with the full READ shape (usage figures included), never with what was sent - so a caller whose `windowMinutes` was clamped or truncated sees the real value rather than believing its own number took, and needs no second request to refresh the screen. The body carries the two SETTABLE fields only: `versionCount` / `versionBytes` are facts about a table the caller cannot see, so sending either is a **400** rather than a silently ignored key, and no path stores them. `windowMinutes` outside 0..10080 is likewise a **400** (the GM's control cannot produce one, so a caller that does is malformed, which is the router-rejects / store-clamps arrangement every bounded field in this surface uses); a fractional value INSIDE the range is truncated rather than rejected, because that is a slider artefact and not a mistake about what was meant. Changing these settings never deletes a revision: switching history off stops new checkpoints being written and nothing else, and the existing history stays listable and restorable.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `revisionHistory` | CodexRevisionHistoryInput | yes |  |
+| `autosave` | CodexAutosaveSettings | yes |  |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
-**Responses:** `200` Success - envelope of `CodexSettingsData` · errors `400` `401`
+**Responses:** `200` Success - envelope of `CodexSettingsData` · errors `400` `401` `403`
 
 ### `DELETE /api/v1/codex/page-revisions`
 
 Deletes every page revision authored more than `olderThanDays` ago, and answers with how many rows really went. The ONE destructive route in the Codex surface, and deliberately unforgiving: `olderThanDays` must be a whole number from 0 to 36500, and a negative or fractional value is a **400** rather than a clamp - the exact opposite of `windowMinutes`, because that is a slider the GM drags while this destroys data, and a malformed destructive request must not be interpreted generously. **`0` deletes EVERY revision**, which is arithmetic rather than a magic value: nothing is younger than zero days old. "Old" is measured against `authoredAt` - when the checkpointed content was authored - which is the same clock the write-side throttle uses, so age means one thing in this store. It works regardless of the `enabled` setting, because a GM who switched history off is exactly the GM reclaiming the space. It touches the revision table and NOTHING else: no page, no body and no `rev` moves, because a page as it stands now is not a version of itself.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Request body** (JSON):
 
@@ -3146,39 +3222,92 @@ Deletes every page revision authored more than `olderThanDays` ago, and answers 
 | --- | --- | --- | --- |
 | `olderThanDays` | integer (0–36500) | yes | Delete every revision authored more than this many days ago. **`0` deletes them all** - arithmetic, not a magic value, since nothing is younger than zero days old. A negative or fractional value is a 400 rather than a clamp, because this destroys data. The 36500 ceiling (100 years) is a guard, not a policy: a larger value pushes the cutoff date out of the representable range, which would turn a silly request into a 500. |
 
-**Responses:** `200` Success - envelope of `CodexRevisionsDeletedData` · errors `400` `401`
+**Responses:** `200` Success - envelope of `CodexRevisionsDeletedData` · errors `400` `401` `403`
 
 ### `GET /api/v1/codex/export`
 
-A full codex backup bundle for round-trip. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds.
+A full codex backup bundle. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds. Round-trips through `POST /codex/import`.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:read` · GM session
 
-**Responses:** `200` Success - envelope of `CodexExportData` · errors `401`
+**Responses:** `200` Success - envelope of `CodexExportData` · `304` Not modified - the weak `ETag` you sent as `If-None-Match` is still current. · errors `401` `403`
+
+### `POST /api/v1/codex/import`
+
+Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim - `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the same v1 shape (every backup taken before this feature existed lacks the key and MUST restore), and a value other than 1 is a 400. This is the one genuinely destructive route in the Codex - the guardrails are GM/`codex:write` authorization and the caller's own confirmation, and the honest advice is to export first.
+
+**Auth:** Integration credential with `codex:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `codex` | object (free-form) | yes | The export's `codex` bundle, verbatim. |
+| `bundleVersion` | integer (≥ 1) | no | Optional. Absent = a pre-versioning v1 bundle. Anything but 1 is refused: "This backup was made by a newer version of the app. Update, then restore." |
+| `exportedAt` | string (date-time) | no | Accepted and IGNORED, so a saved export file can be POSTed without editing. |
+| `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
+
+**Responses:** `200` Success - envelope of `CodexImportedData` · errors `400` `401` `403` `413`
 
 ### `POST /api/v1/codex-assets`
 
-Uploads a page image (banner or inline) as raw bytes in the request body; `filename` is a query parameter. Content-addressed: identical bytes return the existing asset with 200 instead of 201.
+Uploads a page image (banner or inline) as raw bytes in the request body; `filename` is a query parameter. Content-addressed: identical bytes return the existing asset with 200 instead of 201. The body limit on this route is 11 MB and an oversized upload is a **413**.
 
-**Auth:** GM session
+**Auth:** Integration credential with `codex:write` · GM session
 
 **Parameters:** `filename` (query, optional) - string
 
 **Request body:** raw `image/*` bytes.
 
-**Responses:** `200` Identical bytes already stored; the existing asset is returned - envelope of `CodexAssetUploadData` · `201` New image stored - envelope of `CodexAssetUploadData` · errors `400` `401`
+**Responses:** `200` Identical bytes already stored; the existing asset is returned - envelope of `CodexAssetUploadData` · `201` New image stored - envelope of `CodexAssetUploadData` · errors `400` `401` `403` `413`
 
 ### `GET /api/v1/codex-assets/{id}/content`
 
 Original image bytes for a page banner/inline image. GM always; a player only when the asset is used by a revealed page. Supports ETag/If-None-Match (304); sent with `Cache-Control: private, no-store`.
 
-**Auth:** GM session · Player session (own-character limits apply)
+**Auth:** Integration credential with `codex:read` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `id` (path) - string (uuid)
 
 **Responses:** `200` Full image bytes · `304` Not modified · errors `403` `404`
 
 ## Shared shapes
+
+### `ActorAvailableActionsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `rulesMode` | `strict` \| `assisted` \| `freeform` | yes |  |
+| `derived` | object | yes | DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts - a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST rather than the broadcast game-state projection on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see. |
+| `derived.proficiencyBonus` | integer | yes |  |
+| `derived.armorClass` | integer | yes | Live AC, already reconciled against worn armour and item riders |
+| `derived.initiative` | integer | yes | Live initiative bonus including item riders |
+| `derived.abilities` | object[] | yes |  |
+| `derived.skills` | object[] | yes |  |
+| `actions` | object[] | yes |  |
+| `actions[].id` | string | yes |  |
+| `actions[].name` | string | yes |  |
+| `actions[].activation` | `action` \| `bonus-action` \| `reaction` \| `other` | yes |  |
+| `actions[].available` | boolean | yes | Whether strict mode would allow resolving this action right now |
+| `actions[].violations` | object[] | yes |  |
+| `actions[].usesRemaining` | integer \| null | yes | Limited-use spending left; null when the action has no use limit |
+| `actions[].componentsRemaining` | integer \| null | yes | Rolls left in the open compound-action instance; null when no instance applies |
+| `actions[].builtin` | boolean | no | True for the SRD generic actions (Dodge, Dash, Help, Unarmed Strike, ...) every combatant can take |
+| `actions[].description` | string | yes | DISPLAY ONLY. Every field from here down is read off the actor's EFFECTIVE action list, so it already carries the standing riders of what is equipped and attuned - which is what lets a client render an item-derived action (an amulet's cast, a +1 sword's swing) that is absent from the stat block entirely. None of it is what gets rolled: resolution takes `id` and recomputes through the same function, so a preview cannot disagree with the roll. |
+| `actions[].attackBonus` | integer \| null | yes | To-hit including item riders; null when the action has no attack roll |
+| `actions[].reachFeet` | integer \| null | yes |  |
+| `actions[].rangeFeet` | integer \| null | yes |  |
+| `actions[].rangeNormalFeet` | integer \| null | yes | Normal range band; shots beyond it up to rangeFeet roll at disadvantage |
+| `actions[].attackCount` | integer \| null | yes |  |
+| `actions[].saveAbility` | string \| null | yes |  |
+| `actions[].saveDc` | integer \| null | yes | Save DC including item riders |
+| `actions[].damage` | object[] | yes |  |
+| `actions[].usesLimit` | integer \| null | yes | Total limited uses including any item that raised the pool; null when unlimited |
+| `actions[].usesPer` | `turn` \| `encounter` \| `long-rest` \| `short-rest` \| `recharge` \| `null` | yes |  |
+| `actions[].usesPool` | string \| null | yes | Shared pool key; actions naming one pool spend one counter |
+| `actions[].requiresEffectTag` | string \| null | yes |  |
+| `actions[].multiattack` | object[] \| null | yes |  |
+| `actions[].reaction` | object \| null | yes |  |
 
 ### `AnnotationGeometryInput`
 
@@ -3187,12 +3316,214 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | `origin` | ImagePoint | yes |  |
 | `target` | ImagePoint | yes |  |
 
+### `CodexAsset`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `width` | integer (≥ 1) | yes |  |
+| `height` | integer (≥ 1) | yes |  |
+| `mediaType` | string | yes |  |
+
+### `CodexAssetUploadData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `asset` | CodexAsset | yes |  |
+
+### `CodexAutosaveSettings`
+
+Whether the Codex's editors save your work as you type, and how often. The server stores a PREFERENCE and nothing else - there is no server-side draft, so the behaviour (and the explicit Save plus unsaved-changes warning when it is off) is the editor's. Storing it here is what makes the setting follow the GM from a phone to a laptop.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `enabled` | boolean | yes | Default `true`. `false` does not slow autosave down, it stops it: the editors then require an explicit Save and warn about unsaved changes. |
+| `intervalSeconds` | integer (1–600) | yes | How long the editors wait after you stop typing before saving. SECONDS, and the unit is the same everywhere - wire, column, and store - so nothing converts at a boundary. Default `1`, which is what the shipping editors already did (an 800 ms debounce) expressed on this scale, so an upgraded codex saves exactly as often as it used to. `0` is not in range: a zero-second autosave is a save per keystroke, which is not a cadence anyone means - a GM who wants none says `enabled: false`. The 600 ceiling is ten minutes, past which the setting stops meaning "save while I work". |
+
+### `CodexCalendar`
+
+The world's calendar as the **GM** receives it. The campaign has two clocks (M11/O-1): the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. The player's calendar is the separate `CodexCalendarPlayer`, where `currentDate` is sourced from the published date and `publishedDate` is not declared at all; the two are joined by `CodexCalendarProjected`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `yearName` | string | yes |  |
+| `months` | CodexCalendarMonth[] | yes |  |
+| `weekdays` | string[] | yes |  |
+| `currentDate` | CodexInWorldDate \| null | yes | The GM's own clock - where the campaign is now. Null until a date is set. Never reaches a player by any path. |
+| `publishedDate` | CodexInWorldDate \| null | yes | What the party currently sees as 'now'. Equal to `currentDate` until the GM runs ahead while prepping, and moved only by `POST /codex/calendar/publish`. Not declared on `CodexCalendarPlayer`, where `currentDate` already IS this value. |
+
+### `CodexCalendarData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `calendar` | CodexCalendar | yes |  |
+
 ### `CodexCalendarMonth`
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `name` | string | yes |  |
 | `days` | integer (1–400) | yes |  |
+
+### `CodexCalendarPlayer`
+
+The world calendar as a PLAYER receives it. `currentDate` keeps its name and its meaning ("where the campaign is now, as far as this reader is concerned") and only its SOURCE changes: it is read from the published date, and the GM's clock is not reachable from this payload at all. `publishedDate` is deliberately not echoed - for a player `currentDate` already IS it, so a second key could only duplicate it or lie.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `yearName` | string | yes |  |
+| `months` | CodexCalendarMonth[] | yes |  |
+| `weekdays` | string[] | yes |  |
+| `currentDate` | CodexInWorldDate \| null | yes | The PUBLISHED date. Null until the GM publishes one. |
+
+### `CodexCalendarProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexCalendar`; a player session receives `CodexCalendarPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexCalendar`
+- `CodexCalendarPlayer`
+
+### `CodexCalendarProjectedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `calendar` | CodexCalendarProjected | yes |  |
+
+### `CodexChronicleListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `records` | CodexChronicleRecordProjected[] | yes |  |
+
+### `CodexChronicleRecord`
+
+One row on the ONE chronicle (CT-11/CT-12) as the **GM** receives it, in the single row shape every timeline record uses. `kind` says what it is and therefore what opening it means: `entry`/`combat`/`deadline`/`downtime` carry a journal-entry id, `event` carries a PAGE id. Every key is present on every kind (null where it does not apply), so no reader branches on key presence. The player's row is the separate `CodexChronicleRecordPlayer`; the two are joined by `CodexChronicleRecordProjected`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | `entry` \| `combat` \| `event` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes | What the row IS, read by icon AND word - never by colour alone. A discriminator for DISPLAY only: it never decides visibility, which is `revealedToPlayers` and nothing else. |
+| `id` | string (uuid) | yes | The record's own id - a journal entry's for `entry`/`combat`, a page's for `event`. |
+| `title` | string \| null | yes | An event page's title; null for a journal entry, which has no name. |
+| `text` | string | yes | The player-facing layer: a journal entry's full text, or a bounded excerpt of an event page's player body. |
+| `gmText` | string \| null | yes | GM-only: an entry's GM note, or an excerpt of an event page's GM body. Not declared at all on `CodexChronicleRecordPlayer`. |
+| `revealedToPlayers` | boolean | yes | GM-only field; not declared on `CodexChronicleRecordPlayer` (a player only ever receives revealed records). |
+| `sessionId` | string \| null | yes | D9: the session this row belongs to, by identity. Null for an `event` page and for an unfiled entry. |
+| `sessionNumber` | integer \| null | yes | The linked session's number, resolved live from that record. |
+| `realDate` | string \| null | yes |  |
+| `inWorldLabel` | string \| null | yes | The in-world date as text - what the row is grouped under in the by-date lens. |
+| `calendarInstant` | number \| null | yes | Sortable absolute day index derived from the calendar. |
+| `inWorldDate` | CodexInWorldDate \| null | yes | The raw in-world date the GM typed; the instant and the label are derived from it. |
+| `tags` | string[] | yes |  |
+| `attachPageId` | string \| null | yes | GM-only; not declared on `CodexChronicleRecordPlayer`. |
+| `attachMarkerId` | string \| null | yes | GM-only; not declared on `CodexChronicleRecordPlayer`. |
+| `sourceEncounterId` | integer \| null | yes | GM-only replay linkage (K2); not declared on `CodexChronicleRecordPlayer`. |
+| `fired` | boolean | yes | CT-5: has the campaign clock reached this deadline's own date? DERIVED on every read from `inWorldDate` against the clock, never stored - so rewinding the clock correctly un-fires a deadline. `false` for every kind that is not a dated deadline. Measured against WHOSE clock is a viewer-safety decision: the GM's row uses the GM's clock, a player's row uses the PUBLISHED date, so this boolean can never tell the party that a date they have not been shown has already gone by. |
+| `payload` | CodexDowntimePayload \| CodexMilestonePayload \| CodexStandingPayload \| CodexQuestHistoryPayload \| null | yes | The kind's structured facts, discriminated by `kind`; null for the kinds that carry none. Allow-listed per kind, never a spread of the stored blob: the GM receives the full downtime payload including `applied` (CT-10), a milestone's `{ level, reason }` (CT-8), and a standing change's `delta`/`reason` (CT-6). |
+| `proposedDate` | CodexInWorldDate \| null | yes | GM-only (not declared on `CodexChronicleRecordPlayer`): for an unapplied downtime, the date `apply-downtime` would move the clock to. Null once applied, and for every other kind. A clock move the GM has not confirmed - and may never confirm - is prep. |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes | GM-only; not declared on `CodexChronicleRecordPlayer`. |
+
+### `CodexChronicleRecordPlayer`
+
+One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `revealedToPlayers`, `attachPageId`, `attachMarkerId`, `sourceEncounterId`, `proposedDate` and `updatedAt`. `fired` is measured against the PUBLISHED date, never the GM's clock, so it can never tell the party that a date they have not been shown has gone by.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | `entry` \| `combat` \| `event` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes |  |
+| `id` | string (uuid) | yes |  |
+| `title` | string \| null | yes |  |
+| `text` | string | yes |  |
+| `sessionId` | string \| null | yes | Present only when the linked session is revealed; nulled together with `sessionNumber` otherwise. |
+| `sessionNumber` | integer \| null | yes |  |
+| `realDate` | string \| null | yes |  |
+| `inWorldLabel` | string \| null | yes |  |
+| `inWorldDate` | CodexInWorldDate \| null | yes | D17: the row's raw in-world date, so a calendar view can place it on a day without re-parsing prose. Information-equivalent to `inWorldLabel` beside it, which already spells out weekday, day, month and year - the structured parts add no bits and remove a client parse. Not the campaign's "now": the GM's clock is `CodexCalendarPlayer.currentDate`, which is the PUBLISHED date. |
+| `calendarInstant` | number \| null | yes | D17: the sortable day index for `inWorldDate` against the calendar the player already holds - a pure function of two things they have, computed once on the server. It is here so the client never re-derives it: the two derivations disagreed on a day that overflows its month, and one authority for one number is the fix. Null exactly when `inWorldDate` is. |
+| `tags` | string[] | yes |  |
+| `fired` | boolean | yes | Derived against the PUBLISHED date. |
+| `payload` | CodexDowntimePlayerPayload \| CodexMilestonePayload \| CodexStandingPlayerPayload \| CodexQuestHistoryPlayerPayload \| null | yes | The player half of the kind's structured facts: downtime without `applied` (CT-10), a milestone's `{ level, reason }` unchanged (CT-8), a standing change with `factionPageId` nulled unless that faction page is revealed (CT-6). |
+| `createdAt` | string (date-time) | yes |  |
+
+### `CodexChronicleRecordProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexChronicleRecord`; a player session receives `CodexChronicleRecordPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexChronicleRecord`
+- `CodexChronicleRecordPlayer`
+
+### `CodexConnection`
+
+One edge in the codex graph, GM view. ONE shape for both origins: a connection the GM declared and a connection derived from `[[wiki link]]` text differ by an `origin` attribute, not by being two systems with two panels and two edge kinds.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string \| null | yes | Null exactly when `origin` is `mention`: a derived edge has no row of its own, so it is deleted by editing the text that produced it. |
+| `fromKind` | `page` \| `session` \| `quest` \| `journal` | yes | Which record the connection comes FROM. Session, quest and journal bodies join the graph (D13). |
+| `fromId` | string (uuid) | yes |  |
+| `toPageId` | string (uuid) | yes | Connections v1 are edges INTO pages. `[[map:...]]`/`[[marker:...]]` targets still parse and persist but get no graph exposure. |
+| `label` | string \| null | yes | The out-label ("ally of", "located in"). Null for an unlabelled connection. |
+| `origin` | `declared` \| `mention` | yes |  |
+| `layer` | `player` \| `gm` | yes | Which layer the connection lives on. A `mention` inherits the body it was written in; a `declared` one is chosen at create (default `player`). |
+| `createdAt` | string \| null | yes | Null for a mention row. |
+
+### `CodexConnectionData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `connection` | CodexConnection | yes |  |
+
+### `CodexConnectionListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `connections` | CodexConnectionProjected[] | yes |  |
+
+### `CodexConnectionPlayer`
+
+A connection as a PLAYER receives it. No `id` (a player never addresses one), no `layer` (every connection they receive is on the player layer, so the key could only be a constant), no `createdAt`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `fromKind` | `page` \| `session` \| `quest` \| `journal` | yes |  |
+| `fromId` | string (uuid) | yes |  |
+| `toPageId` | string (uuid) | yes |  |
+| `label` | string \| null | yes |  |
+| `origin` | `declared` \| `mention` | yes |  |
+
+### `CodexConnectionProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexConnection`; a player session receives `CodexConnectionPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexConnection`
+- `CodexConnectionPlayer`
+
+### `CodexDeletedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `deleted` | const `true` | yes |  |
+
+### `CodexDowntimeAppliedData`
+
+The confirmed downtime and the moved calendar, together - they changed in one transaction and are returned in one payload so a reader cannot hold one without the other. The calendar is the GM projection; the party's published date has NOT moved.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `entry` | CodexJournalEntry | yes |  |
+| `calendar` | CodexCalendar | yes |  |
+
+### `CodexDowntimeCreatedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `entry` | CodexJournalEntry | yes |  |
+| `proposedDate` | CodexInWorldDate \| null | yes | Where the campaign clock WOULD land if the GM confirms. Null when there is no current date to advance from. Nothing has moved yet. |
 
 ### `CodexDowntimeInput`
 
@@ -3203,6 +3534,80 @@ The downtime facts themselves. `applied` is deliberately not an input: confirmin
 | `who` | string | yes | Who spent the time. May be empty: downtime is often party-wide with nobody in particular to name. |
 | `activity` | string | yes | What they did. May be empty, for the same reason as `who` - the record's prose carries it when the fields do not. |
 | `days` | integer (0–3650) | yes | The time cost in in-world days. Ten years is already well past the point where a GM would set a date instead of counting days. |
+| `characterPageId` | string \| null | no | D12: which character PAGE this downtime belongs to, so the tracker totals a person rather than a spelling of their name. Optional; `who` remains the free-text fallback for anyone with no page, and both may coexist. An id naming no page is a **404**. The page's TYPE is deliberately NOT enforced - a GM may track downtime for an NPC or a hireling - which is the opposite of the standing rule, because standing is *about* a faction while downtime is about someone the GM happens to have a record for. |
+
+### `CodexDowntimePayload`
+
+CT-10: what a downtime record stores beyond its prose - who spent how many days doing what, and whether the GM has confirmed the clock move it proposes. The GM's shape. Deliberately NOT here: an `outcome`, which is prose, and this record already has two prose layers with the reveal split between them (`playerText`/`gmText`) - a third prose channel inside a JSON blob would sit outside that split.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `who` | string | yes | Who spent the time. Free text - a character, the whole party, an NPC. |
+| `activity` | string | yes | What they did with it. |
+| `days` | integer (≥ 0) | yes | The time cost in in-world days - what the clock moves by when the GM confirms. |
+| `applied` | boolean | yes | GM workflow state: has the clock move been confirmed? NEVER present in a player projection - it is a fact about the GM's prep, not about the party's week off. |
+| `characterPageId` | string \| null | yes | D12: the character page this downtime belongs to, or null. Always present, including on records written before the field existed - the stored-payload reader supplies the null, so no consumer branches on key presence. A plain id with no foreign key: the record outlives the page, and deleting the page nulls this while `who` survives as the display fallback. |
+
+### `CodexDowntimePlayerPayload`
+
+A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied` allow-listed away (D11-E).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `who` | string | yes |  |
+| `activity` | string | yes |  |
+| `days` | integer (≥ 0) | yes |  |
+| `characterPageId` | string \| null | yes | D12: carried ONLY when that character page is itself revealed, else null - the `factionPageId` rule on a standing payload verbatim. Unlike a standing record the ROW is not hidden when the link is nulled: a downtime row stands on its own player-visible content (`who`, `activity`, `days`, and usually prose), so a nulled link leaves a row that still means something. |
+
+### `CodexExportData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `codex` | object (free-form) | yes | Opaque backup bundle; round-trips through `POST /codex/import`. |
+| `exportedAt` | string (date-time) | yes |  |
+| `bundleVersion` | const `1` | yes | The bundle FORMAT version - a fact about the file, not about the world, which is why it sits beside `codex` rather than inside it. `POST /codex/import` refuses anything else. |
+
+### `CodexFolderCreatedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `path` | string | yes |  |
+
+### `CodexFolderListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `folders` | string[] | yes |  |
+
+### `CodexFolderMovedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `moved` | integer (≥ 0) | yes |  |
+
+### `CodexImportCounts`
+
+What the database actually holds after the restore - its own row counts, not what the bundle claimed.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `pages` | integer (≥ 0) | yes |  |
+| `folders` | integer (≥ 0) | yes |  |
+| `maps` | integer (≥ 0) | yes |  |
+| `markers` | integer (≥ 0) | yes |  |
+| `journal` | integer (≥ 0) | yes |  |
+| `connections` | integer (≥ 0) | yes | DECLARED connections. Mention edges are derived from body text and are rebuilt by the restore, so counting them would double-count the rebuild's own output. |
+| `sessions` | integer (≥ 0) | yes |  |
+| `quests` | integer (≥ 0) | yes |  |
+| `standing` | integer (≥ 0) | yes |  |
+| `revisions` | integer (≥ 0) | yes |  |
+
+### `CodexImportedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `replaced` | const `true` | yes |  |
+| `counts` | CodexImportCounts | yes |  |
 
 ### `CodexInWorldDate`
 
@@ -3211,6 +3616,182 @@ The downtime facts themselves. `applied` is deliberately not an input: confirmin
 | `year` | integer | yes |  |
 | `month` | integer (0–23) | yes |  |
 | `day` | integer (1–400) | yes |  |
+
+### `CodexJournalEntry`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | yes |  |
+| `id` | string (uuid) | yes |  |
+| `playerText` | string | yes |  |
+| `gmText` | string \| null | yes | GM-only note; stripped from a player projection. |
+| `revealedToPlayers` | boolean | yes |  |
+| `attachMarkerId` | string \| null | yes |  |
+| `attachPageId` | string \| null | yes |  |
+| `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes | What the row IS. `deadline` (CT-5) and `downtime` (CT-10) are M11; `milestone` (CT-8) and `standing` (CT-6) are M12, and the database has permitted all six since M11's migration so neither needed a table rebuild. Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
+| `sourceEncounterId` | integer \| null | yes |  |
+| `sessionId` | string \| null | yes | D9: the session this entry belongs to, BY IDENTITY. Null when it is filed under no session. This is what a WRITE sets; `sessionNumber` beside it is what a reader displays. |
+| `sessionNumber` | integer \| null | yes | The linked session's number, resolved LIVE from that record - so renumbering a session updates every one of its entries with no journal write. Server-owned display data: a write body that carries it is a 400. It survives its session in exactly one case: deleting a REVEALED numbered session stamps its number back onto its entries as a bare label, because the players were already reading it. |
+| `realDate` | string \| null | yes |  |
+| `inWorldLabel` | string \| null | yes |  |
+| `calendarInstant` | number \| null | yes | Sortable absolute day index derived from the calendar. |
+| `inWorldDate` | CodexInWorldDate \| null | yes |  |
+| `sortKey` | number | yes |  |
+| `payload` | CodexDowntimePayload \| CodexMilestonePayload \| CodexStandingPayload \| CodexQuestHistoryPayload \| null | yes | Kind-specific structured data, discriminated by `kind`: the downtime payload, the milestone payload, the standing payload, and null for the other three kinds. GM-only - the player journal projection carries no payload at all (a revealed record's facts are read on the chronicle). A DEADLINE deliberately has none: its text is the "what" and its `inWorldDate` is the "when". |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `CodexJournalEntryData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `entry` | CodexJournalEntry | yes |  |
+
+### `CodexJournalEntryPlayer`
+
+A journal entry as a PLAYER receives it - the mini-timeline row on a page or a pin. The player text (renamed `text`), and no `gmText`, `revealedToPlayers`, attachments, `sourceEncounterId`, `payload`, `sortKey`, dating internals or `updatedAt`. A downtime's facts and a deadline's fired state are read on the CHRONICLE, which carries them; a player-facing field the player Codex does not read is a field with no reason to travel.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `text` | string | yes | The entry's `playerText`. |
+| `kind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` | yes | Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone. |
+| `sessionId` | string \| null | yes | D9/D14: the session this entry belongs to, so a player can navigate from an entry to its recap. Present ONLY when that session is revealed - in which case the player can already list and open it, so this adds no information. Nulled TOGETHER with `sessionNumber` when the session is hidden: either half of the link would announce that a session they have not been shown exists. |
+| `sessionNumber` | integer \| null | yes | Nulled together with `sessionId` when the linked session has not been revealed - a session's very existence is GM information. A bare label with no link survives only where the number was already player-visible. |
+| `realDate` | string \| null | yes |  |
+| `inWorldLabel` | string \| null | yes |  |
+| `tags` | string[] | yes |  |
+| `createdAt` | string (date-time) | yes |  |
+
+### `CodexJournalEntryProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexJournalEntry`; a player session receives `CodexJournalEntryPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexJournalEntry`
+- `CodexJournalEntryPlayer`
+
+### `CodexJournalListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `entries` | CodexJournalEntryProjected[] | yes |  |
+
+### `CodexMap`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | yes |  |
+| `id` | string (uuid) | yes |  |
+| `assetId` | string (uuid) | yes |  |
+| `name` | string | yes |  |
+| `kind` | `battlemap` \| `regional` \| `world` | yes |  |
+| `parentMapId` | string \| null | yes | Parent map in the atlas tree; for a player, nulled when the parent is not itself revealed. |
+| `revealedToPlayers` | boolean | yes |  |
+| `sortKey` | number | yes |  |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `CodexMapData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `map` | CodexMap | yes |  |
+
+### `CodexMapListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `maps` | CodexMapProjected[] | yes |  |
+
+### `CodexMapPlayer`
+
+An atlas map as a PLAYER receives it. `parentMapId` survives only when the parent is itself revealed - otherwise a revealed child would leak the id of a still-secret ancestor.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `assetId` | string (uuid) | yes |  |
+| `name` | string | yes |  |
+| `kind` | `battlemap` \| `regional` \| `world` | yes |  |
+| `parentMapId` | string \| null | yes | Nulled when the parent map is not itself revealed. |
+| `tags` | string[] | yes |  |
+
+### `CodexMapProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexMap`; a player session receives `CodexMapPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexMap`
+- `CodexMapPlayer`
+
+### `CodexMarker`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `tags` | string[] | yes |  |
+| `id` | string (uuid) | yes |  |
+| `mapId` | string (uuid) | yes |  |
+| `x` | number | yes |  |
+| `y` | number | yes |  |
+| `iconId` | string | yes |  |
+| `iconColor` | string (pattern) | yes |  |
+| `label` | string \| null | yes |  |
+| `revealedToPlayers` | boolean | yes |  |
+| `pageIds` | string (uuid)[] | yes | Linked pages; for a player, filtered to the revealed subset. |
+| `subMapId` | string \| null | yes | Drill-down sub-map; nulled for a player when that map is not revealed. |
+| `sceneIds` | string (uuid)[] | yes | Linked prepared scenes; GM-only, stripped from a player projection. |
+| `actorId` | string \| null | yes |  |
+| `isParty` | boolean | yes | CT-7: is this the party's pin? At most one marker in the whole atlas carries it. PLAYER-FACING - the party pin is for the players, and it is the ONE key M12 adds to the player marker projection - but it grants no visibility of its own: a hidden party pin, or one on a hidden map, is exactly as hidden as any other pin, because `isParty` is not part of any reveal predicate anywhere. |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `CodexMarkerData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `marker` | CodexMarker | yes |  |
+
+### `CodexMarkerListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `markers` | CodexMarkerProjected[] | yes |  |
+
+### `CodexMarkerPlayer`
+
+A pin as a PLAYER receives it: no `sceneIds`, no `actorId`, no `revealedToPlayers`, no timestamps, and page/sub-map links only when those targets are themselves revealed. `isParty` IS here - the party pin is for the players - but it grants no visibility: a hidden party pin, or one on a hidden map, is exactly as hidden as any other.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `mapId` | string (uuid) | yes |  |
+| `x` | number | yes |  |
+| `y` | number | yes |  |
+| `iconId` | string | yes |  |
+| `iconColor` | string (pattern) | yes |  |
+| `label` | string \| null | yes |  |
+| `pageIds` | string (uuid)[] | yes | Filtered to the revealed subset. |
+| `subMapId` | string \| null | yes | Nulled when that map is not revealed. |
+| `tags` | string[] | yes |  |
+| `isParty` | boolean | yes |  |
+
+### `CodexMarkerProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexMarker`; a player session receives `CodexMarkerPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexMarker`
+- `CodexMarkerPlayer`
+
+### `CodexMarkerProjectedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `marker` | CodexMarkerProjected | yes |  |
 
 ### `CodexMilestoneInput`
 
@@ -3221,6 +3802,250 @@ CT-8: the milestone facts themselves. Exactly two - the spec says "milestone / l
 | `level` | integer (1–20) | yes | The level the party REACHED. 1-20, the repo's existing character-level bound. |
 | `reason` | string | no | Why, in one line. Optional and may be empty: "we hit 5" with the why in the record's own prose is a legitimate body, and a minimum here would reject a state the composer can reach. Defaults to an empty string. |
 
+### `CodexMilestonePayload`
+
+CT-8: what a MILESTONE record carries beyond its prose - the level the party reached, and why. Identical for both audiences: a party knows its own level, and a revealed milestone with its two facts removed would be a dated row that says nothing. There is no GM-only half here at all; a milestone needing one writes it in the record's `gmText`, like every other journal row. No XP: progression is milestone-based by design and this record carries no arithmetic.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `level` | integer (1–20) | yes | The level REACHED, not a step. A delta would make the party's current level a sum over the whole timeline that a single deleted record silently changes. |
+| `reason` | string | yes | Why, in one line ("cleared the crypt"). May be empty - the record's own prose carries it when this does not. |
+
+### `CodexPage`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `title` | string | yes |  |
+| `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` | yes |  |
+| `fields` | object (free-form) | yes |  |
+| `gmFields` | object (free-form) | yes | GM-only fields; never present in a player projection. |
+| `folder` | string \| null | yes |  |
+| `tags` | string[] | yes |  |
+| `revealedToPlayers` | boolean | yes |  |
+| `bannerAssetId` | string \| null | yes |  |
+| `playerBody` | string | yes | Player-facing markdown body. |
+| `gmBody` | string | yes | GM-only markdown body; stripped from a player projection. |
+| `inWorldLabel` | string \| null | yes | Display form of the in-world date, derived from the calendar. |
+| `calendarInstant` | number \| null | yes | Sortable absolute day index derived from the calendar. |
+| `inWorldDate` | CodexInWorldDate \| null | yes | The raw in-world date; the source of truth the other two are derived from. |
+| `rev` | integer (≥ 0) | yes |  |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `CodexPageConnection`
+
+One row of a page's Connections panel: the OTHER endpoint resolved, plus which way the edge points. Folds in what used to be two separate views (backlinks and typed relationships).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string \| null | yes |  |
+| `direction` | `out` \| `in` | yes |  |
+| `otherKind` | `page` \| `session` \| `quest` \| `journal` | yes |  |
+| `otherId` | string (uuid) | yes |  |
+| `otherTitle` | string | yes | A page title, "Session 4", a quest title, or a bounded excerpt of a journal entry's player text - the reveal-audit naming rule. |
+| `otherEntityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` \| null | yes | Pages only; null for every other kind. |
+| `otherRevealed` | boolean | yes | GM-only; not declared on `CodexPageConnectionPlayer` (a player only ever receives connections to records they can see). |
+| `label` | string \| null | yes |  |
+| `origin` | `declared` \| `mention` | yes |  |
+| `layer` | `player` \| `gm` | yes |  |
+| `section` | string \| null | yes | The heading the mention sits under; null for a declared connection. |
+
+### `CodexPageConnectionPlayer`
+
+A page's Connections panel as a PLAYER receives it: revealed others only, so `otherRevealed` would be a constant, and no `id` or `layer`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `direction` | `out` \| `in` | yes |  |
+| `otherKind` | `page` \| `session` \| `quest` \| `journal` | yes |  |
+| `otherId` | string (uuid) | yes |  |
+| `otherTitle` | string | yes |  |
+| `otherEntityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` \| null | yes |  |
+| `label` | string \| null | yes |  |
+| `origin` | `declared` \| `mention` | yes |  |
+| `section` | string \| null | yes |  |
+
+### `CodexPageConnectionProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexPageConnection`; a player session receives `CodexPageConnectionPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexPageConnection`
+- `CodexPageConnectionPlayer`
+
+### `CodexPageData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `page` | CodexPage | yes |  |
+
+### `CodexPageDocumentData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `page` | CodexPageProjected | yes |  |
+| `connections` | CodexPageConnectionProjected[] | yes |  |
+
+### `CodexPageListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `pages` | CodexPageSummaryProjected[] | yes |  |
+
+### `CodexPagePlayer`
+
+A page as a PLAYER receives it: the player body (renamed `body` - the layer prefix only means something when there are two layers), the player-facing `fields`, and no `gmBody`, `gmFields`, `rev`, `revealedToPlayers` or `createdAt`. An unrevealed page is never projected at all - it 404s.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `title` | string | yes |  |
+| `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` | yes |  |
+| `fields` | object (free-form) | yes | The player-facing typed entity fields. `gmFields` has no player form. |
+| `folder` | string \| null | yes |  |
+| `tags` | string[] | yes |  |
+| `body` | string | yes | The page's `playerBody`. |
+| `bannerAssetId` | string \| null | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `CodexPageProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexPage`; a player session receives `CodexPagePlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexPage`
+- `CodexPagePlayer`
+
+### `CodexPageRevision`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `pageId` | string (uuid) | yes |  |
+| `rev` | integer (≥ 0) | yes |  |
+| `title` | string | yes |  |
+| `playerBody` | string | yes |  |
+| `gmBody` | string | yes |  |
+| `bannerAssetId` | string \| null | yes |  |
+| `tags` | string[] | yes |  |
+| `authoredAt` | string (date-time) | yes |  |
+| `authorTag` | string | yes |  |
+
+### `CodexPageSummary`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `title` | string | yes |  |
+| `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` | yes |  |
+| `fields` | object (free-form) | yes | Player-facing typed entity fields (free-form key/value). |
+| `folder` | string \| null | yes |  |
+| `tags` | string[] | yes |  |
+| `revealedToPlayers` | boolean | yes |  |
+| `bannerAssetId` | string \| null | yes |  |
+| `inWorldLabel` | string \| null | yes | Display form of the in-world date, derived from the calendar. |
+| `calendarInstant` | number \| null | yes | Sortable absolute day index derived from the calendar. |
+| `inWorldDate` | CodexInWorldDate \| null | yes | The raw in-world date; the source of truth the other two are derived from. |
+| `rev` | integer (≥ 0) | yes |  |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `CodexPageSummaryPlayer`
+
+A page summary as a PLAYER receives it. A strict subset of the GM summary: no `fields`, no dating trio, no `rev`, no `revealedToPlayers`, no `createdAt`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `title` | string | yes |  |
+| `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` | yes |  |
+| `folder` | string \| null | yes |  |
+| `tags` | string[] | yes |  |
+| `bannerAssetId` | string \| null | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `CodexPageSummaryProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexPageSummary`; a player session receives `CodexPageSummaryPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexPageSummary`
+- `CodexPageSummaryPlayer`
+
+### `CodexPartyLocation`
+
+The party pin and the map it is on. `marker.mapId` is the jump target; `mapName` rides along so a caller needs no second fetch to label the card.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `marker` | CodexMarkerProjected | yes |  |
+| `mapName` | string | yes |  |
+
+### `CodexPartyLocationData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `party` | CodexPartyLocation \| null | yes | Null when there is no party pin - or, for a player, when the party pin is not visible to them. |
+
+### `CodexPreviewSessionData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `token` | string | yes |  |
+
+### `CodexQuest`
+
+One quest: a thread the party is pulling on, and whether it is still open. Two layers in one record, like a page's `playerBody`/`gmBody` - `playerBody` is what the table may read and `gmBody` is the GM's own half (who is really behind it, what happens if they fail). A player projection of a REVEALED quest is exactly `id`, `title`, `status`, `body` (the player body, renamed the way a page's `playerBody` becomes `body`), `objectives`, and `entityIds`; everything else here is GM-only. `status` is the one field that is player-facing here but GM-only on a session: "what is still open" is the whole point of the feature, and a revealed quest whose state the player cannot see is useless. Objectives are the Codex's first ORDERED mutable list - the array is stored and returned exactly as given, never sorted, deduped, or keyed by position across a write.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `title` | string | yes | The quest's name - the line that appears on the dashboard's open-quests card. |
+| `status` | `active` \| `completed` \| `failed` | yes | Player-facing (unlike a session's `status`). Queryable server-side: the dashboard counts the `active` ones. |
+| `playerBody` | string | yes | The player-facing description (markdown). Reaches a revealed quest's player projection as `body`. |
+| `gmBody` | string | yes | GM-only notes (markdown). NEVER present in a player projection, revealed or not - revealing a quest publishes its player body, never its GM body. It is also kept out of the player search index, because a HIT on a GM-only phrase leaks the phrase even when the body itself is never returned. |
+| `objectives` | CodexQuestObjective[] | yes | The ordered checklist. Player-facing in full - order is content, not incidental. |
+| `entityIds` | string (uuid)[] | yes | Codex pages this quest involves (the NPC who gave it, the location it points at). Player-facing, but filtered to the revealed subset - the same rule a marker's `pageIds` follows, so a quest can never name a page the player cannot open. |
+| `revealedToPlayers` | boolean | yes | GM-only field; absent from a player projection (a player only ever receives revealed quests). |
+| `tags` | string[] | yes | D10: the codex-wide tag vocabulary, so quests filter and cross-link like every other record. Single-layer, and player-facing on a revealed quest. |
+| `rev` | integer (≥ 0) | yes | GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit. |
+| `createdAt` | string (date-time) | yes | GM-only; absent from a player projection. |
+| `updatedAt` | string (date-time) | yes | GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal - a reveal is not an edit. |
+
+### `CodexQuestData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `quest` | CodexQuest | yes |  |
+
+### `CodexQuestHistoryPayload`
+
+D11: a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest starting is an event) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `questId` | string (uuid) | yes |  |
+| `status` | `active` \| `completed` \| `failed` | yes | The status REACHED, not a delta - the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened". |
+
+### `CodexQuestHistoryPlayerPayload`
+
+A quest-history record as a PLAYER sees it. The whole ROW is hidden unless the quest itself is revealed - a quest record carries empty player text, so it cannot stand on its own prose, and a row reading "Quest - completed" for a quest the party has never heard of would announce both its existence and its ending. When it does travel, `status` is the record's only content and the reader can already read it on the quest itself.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `questId` | string \| null | yes | Nulled unless that quest is revealed - a second line of defence behind the whole-row gate, the same arrangement a standing payload's `factionPageId` uses. |
+| `status` | `active` \| `completed` \| `failed` | yes |  |
+
+### `CodexQuestListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `quests` | CodexQuestProjected[] | yes |  |
+
 ### `CodexQuestObjective`
 
 One tickable step of a quest. Deliberately exactly two keys - a shape richer than `{ text, done }` (assignees, due dates, sub-objectives) is unapproved scope. The text is PLAYER-FACING: it lives beside `playerBody`, never beside `gmBody`, so a GM-only detail belongs in the quest's GM body and never in an objective.
@@ -3230,6 +4055,73 @@ One tickable step of a quest. Deliberately exactly two keys - a shape richer tha
 | `text` | string | yes | What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after "Add item" — and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state, not a malformed one. The server accepts it; this says so rather than publishing a rule it does not enforce. |
 | `done` | boolean | yes |  |
 
+### `CodexQuestPlayer`
+
+A quest as a PLAYER receives it. `status` is KEPT - this is the one place a quest differs from a session, because "what is still open" is the entire point of the feature. `gmBody` and `rev` never travel, and `entityIds` is filtered to the revealed subset so a quest can never name a page the player cannot open.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `title` | string | yes |  |
+| `status` | `active` \| `completed` \| `failed` | yes |  |
+| `body` | string | yes | The quest's `playerBody`. |
+| `objectives` | CodexQuestObjective[] | yes |  |
+| `entityIds` | string (uuid)[] | yes | Filtered to the revealed subset. |
+| `tags` | string[] | yes | D10: the `CodexSessionPlayer.tags` rule verbatim - tags are single-layer, and the quest's own reveal flag remains the whole predicate. |
+
+### `CodexQuestProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexQuest`; a player session receives `CodexQuestPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexQuest`
+- `CodexQuestPlayer`
+
+### `CodexQuestProjectedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `quest` | CodexQuestProjected | yes |  |
+
+### `CodexRevealAudit`
+
+CT-9: everything the party can currently see across every reveal surface in the Codex. A READ-ONLY AGGREGATION of the existing player projections - it restates no visibility rule and writes nothing, which is why it agrees with the player-facing endpoints exactly rather than approximately.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `sections` | CodexRevealAuditSection[] | yes | All seven surfaces, in a fixed order, always all present. |
+| `revealed` | integer (≥ 0) | yes | Total records the party can see, across every surface. |
+| `total` | integer (≥ 0) | yes | Total records that exist, across every surface. |
+
+### `CodexRevealAuditData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `audit` | CodexRevealAudit | yes |  |
+
+### `CodexRevealAuditRow`
+
+One record the party can currently see.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | `page` \| `map` \| `marker` \| `journal` \| `session` \| `quest` \| `standing` | yes | Which reveal surface this row belongs to - and therefore which existing reveal route un-reveals it. |
+| `id` | string (uuid) | yes | The record's OWN id, which is exactly the id that kind's existing reveal route takes. For a `standing` row this is the FACTION PAGE id, because `POST /codex/standing/{factionPageId}/reveal` is addressed that way. |
+| `title` | string | yes | One line naming the record, taken from the record's own PLAYER projection - a page title, a map name, a marker label, a bounded excerpt of a journal entry's player text, "Session 4", a quest title, a faction name. Empty string when the record has no name (an unlabelled pin). |
+| `journalKind` | `note` \| `combat` \| `deadline` \| `downtime` \| `milestone` \| `standing` \| `quest` \| null | yes | WHICH kind of journal record this is - the same six-value vocabulary `CodexJournalEntry.kind` uses. Set on every `kind: "journal"` row and `null` on all six other kinds, present either way so no consumer branches on key presence. Render it as a badge beside `title`, never by parsing `title`: the title is the record's own prose whenever it has any, and only names the kind when the record is silent. |
+
+### `CodexRevealAuditSection`
+
+One reveal surface's report. ALWAYS present, empty ones included with `revealed: 0` and `rows: []` - "nothing is revealed here" and "this did not load" must not look the same.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | `page` \| `map` \| `marker` \| `journal` \| `session` \| `quest` \| `standing` | yes |  |
+| `revealed` | integer (≥ 0) | yes | How many records of this kind the party can CURRENTLY SEE - which is not always the same as how many carry a reveal flag. A marker flagged revealed on a hidden map is not counted, because the player-facing marker read does not return it either. |
+| `total` | integer (≥ 0) | yes | How many exist at all, so "3 of 40" reads as deliberate rather than as an empty screen. |
+| `rows` | CodexRevealAuditRow[] | yes |  |
+
 ### `CodexRevisionHistoryInput`
 
 The two SETTABLE revision-history knobs, and the difference between them is load-bearing: `enabled: false` writes NO new revisions at all, while `windowMinutes: 0` writes one for EVERY save. `0` is therefore not "off" - it is the behaviour every codex had before this setting existed - and the two are separate fields so nothing has to guess which a zero meant. Neither setting ever DELETES a revision: switching history off stops new checkpoints and nothing else, and the existing history stays listable and restorable, because disabling a feature must not destroy the GM's only undo. Deleting is a separate, explicit act (`DELETE /codex/page-revisions`).
@@ -3238,6 +4130,527 @@ The two SETTABLE revision-history knobs, and the difference between them is load
 | --- | --- | --- | --- |
 | `enabled` | boolean | yes | Whether a page save may write a new revision at all. Default `true` - every existing codex upgrades with history on, exactly as it was. |
 | `windowMinutes` | integer (0–10080) | yes | Coalescing window. A save whose page already has a checkpoint younger than this writes no new one, so at most this much authoring can be lost. Measured against WHEN THE CHECKPOINTED CONTENT WAS AUTHORED, not when its row was written, which is what makes the guarantee hold across an idle gap as well as during continuous work. `0` keeps every save; the 10080 ceiling is one week of minutes, past which the window stops coalescing a work session and starts meaning "keep almost nothing" - which `enabled: false` already says more honestly. The owner's default is 90. |
+
+### `CodexRevisionHistorySettings`
+
+How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they are a superset here rather than a second object because a settings screen wants the cost beside the control that changes it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `enabled` | boolean | yes | Whether a page save may write a new revision at all. |
+| `windowMinutes` | integer (0–10080) | yes | Coalescing window in minutes; `0` keeps every save. See `CodexRevisionHistoryInput.windowMinutes`. |
+| `versionCount` | integer (≥ 0) | yes | How many revision rows exist, across the WHOLE codex rather than one page - the same set `DELETE /codex/page-revisions` operates on. Read-only: it is a fact about the table, so it is never accepted on a write. |
+| `versionBytes` | integer (≥ 0) | yes | Roughly how much TEXT that history holds: the summed length of the content columns a revision duplicates from its page (both bodies, both field maps, the title and the tags). Deliberately APPROXIMATE and deliberately not disk usage or the export's serialized size - it exists to be compared against itself before and after a trim, and a figure precise enough to invite comparison against the sqlite file's size would be a figure that disagrees with it. Render it as "about 8.0 MB of text". Read-only, like `versionCount`. |
+
+### `CodexRevisionListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revisions` | CodexPageRevision[] | yes |  |
+
+### `CodexRevisionsDeletedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `deleted` | integer (≥ 0) | yes | How many revision rows were actually removed - the database's own count, not what was requested. |
+
+### `CodexSearchData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `hits` | CodexSearchHit[] | yes | The one ranked result list, all record kinds. |
+| `truncated` | boolean | yes | The result list was CUT at the cap - narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference. Measured by asking the index for one row past the cap, so it can distinguish "exactly 50 matches" from "50 and more". For a player it reports whether the SEARCH was cut, before their own reveal gates removed anything - so it stays true rather than becoming a count of what they may see. |
+
+### `CodexSearchHit`
+
+One row of the single suite-wide result list. Uniform across record types - every key is present on every kind, null where it does not apply, so a consumer never branches on key presence. Deliberately narrow: enough to render a row and open the record, and nothing more. A player's hit list is gated by exactly the reveal predicate that kind's LIST endpoint applies (a marker additionally requires ITS MAP to be revealed), and a journal `title` is excerpted from the player text alone.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | `page` \| `journal` \| `map` \| `marker` \| `quest` \| `session` | yes | Which record matched; decides where the client navigates. |
+| `id` | string (uuid) | yes |  |
+| `title` | string | yes | Page title, map name, marker label, or quest title; for a journal entry, a bounded one-line excerpt of its text; for a SESSION, `Session {n}`, else a recap excerpt, else `Untitled session` - never an empty string. |
+| `tags` | string[] | yes | Always present, so no consumer branches on key presence. |
+| `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` \| null | yes | The page's entity type; null for every other kind. |
+| `mapId` | string \| null | yes | The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed. |
+
+### `CodexSession`
+
+One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody` - `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on - so it is unique across sessions, and a number already in use is refused rather than silently making a group ambiguous.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `sessionNumber` | integer \| null | yes | "Session 12" - the session's DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID (D9) and resolve this live, so renumbering a session relabels every one of its entries with no journal write. |
+| `realDate` | string \| null | yes | The real-world date the group played, as the GM typed it. Free text, not a calendar instant - a session sits on the real calendar, never the world's, which is why sessions are their own route and not rows on `/codex/timeline`. |
+| `attendees` | string[] | yes | Who was at the table. GM-only; absent from a player projection. |
+| `prepBody` | string | yes | GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not - revealing a session publishes its recap, never its prep. |
+| `recapBody` | string | yes | The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`. |
+| `revealedToPlayers` | boolean | yes | GM-only field; absent from a player projection (a player only ever receives revealed sessions). |
+| `status` | `planned` \| `played` | yes | GM-only; absent from a player projection. |
+| `tags` | string[] | yes | D10: the codex-wide tag vocabulary, so sessions filter and cross-link like every other record. Single-layer - there is no GM-only tag - and player-facing on a revealed session. |
+| `rev` | integer (≥ 0) | yes | GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit. |
+| `createdAt` | string (date-time) | yes | GM-only; absent from a player projection. |
+| `updatedAt` | string (date-time) | yes | GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal or an activate - neither is an edit. |
+
+### `CodexSessionActiveData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `activeSessionId` | string \| null | yes |  |
+
+### `CodexSessionData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `session` | CodexSession | yes |  |
+
+### `CodexSessionListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `sessions` | CodexSessionProjected[] | yes |  |
+| `activeSessionId` | string \| null | yes | The session new journal entries are stamped from. GM-only: always `null` for a player, because the active session is frequently the unrevealed one being prepped and naming it would leak that it exists. |
+
+### `CodexSessionPlayer`
+
+A session as a PLAYER receives it - the tightest projection in the Codex, and every omission is a decision. `prepBody` is the GM's plan for the evening and has no player form; `attendees` is real-world personal data; `status` is the GM's own scheduling state; `rev` is the editor's conflict token. `recapBody` arrives renamed `recap`, because with only one layer left the prefix means nothing.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `sessionNumber` | integer \| null | yes |  |
+| `realDate` | string \| null | yes |  |
+| `recap` | string | yes | The session's `recapBody`. |
+| `tags` | string[] | yes | D10: tags are SINGLE-LAYER in this codex - there is no GM-only tag - and every other record kind already ships its tags to players. A revealed session's tags are its player-facing categorization, and they are already in the player search index by the same rule. |
+
+### `CodexSessionProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexSession`; a player session receives `CodexSessionPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexSession`
+- `CodexSessionPlayer`
+
+### `CodexSessionProjectedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `session` | CodexSessionProjected | yes |  |
+
+### `CodexSettings`
+
+Every codex-WIDE setting as a READER sees it, nested by area, including the read-only usage figures. The nesting by area is what gives a later codex-wide setting a home without inventing fields for it today: `codex_meta` is the codex's singleton settings row, and this is that row as a caller sees it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revisionHistory` | CodexRevisionHistorySettings | yes |  |
+| `autosave` | CodexAutosaveSettings | yes |  |
+
+### `CodexSettingsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `settings` | CodexSettings | yes |  |
+
+### `CodexStanding`
+
+CT-6: where the party stands with ONE faction, GM view. Four facts, and what is absent is the point: no HISTORY (every change writes a `kind='standing'` chronicle record instead, so the timeline is the one history in this codex rather than a second one), no `rev` (a standing is a number set in one action - there is no draft to go stale), and no cached faction TITLE (the live page is the one name, so a rename cannot leave a stale copy behind). A player projection of a revealed standing is exactly `factionPageId` and `value`, and only when the faction page is revealed too.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `factionPageId` | string (uuid) | yes | The faction page. UNIQUE across standings - one row per faction - which is why every standing route is addressed by this id rather than by `id`. |
+| `value` | integer (-100–100) | yes | SIGNED: -100 hostile, 0 neutral, +100 allied. Signed because a faction can be actively against the party, which an unsigned favour scale cannot say. The WORD a reader shows beside the bar is a presentation of this number and is deliberately not stored. |
+| `revealedToPlayers` | boolean | yes | GM-only field; absent from a player projection (a player only ever receives revealed standings). |
+| `createdAt` | string (date-time) | yes | GM-only; absent from a player projection. |
+| `updatedAt` | string (date-time) | yes | GM-only; absent from a player projection. "When did this move" is a question the chronicle answers, with the reason attached. |
+
+### `CodexStandingData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `standing` | CodexStanding | yes |  |
+
+### `CodexStandingListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `standing` | CodexStandingProjected[] | yes |  |
+
+### `CodexStandingPayload`
+
+CT-6: what a STANDING record carries - which faction, how much it MOVED, and why. The GM's shape. `delta` and not the resulting value, deliberately: the `codex_standing` table says where things stand and this says what happened, so a deleted record cannot leave a history that no longer adds up to the table.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `factionPageId` | string (uuid) | yes | The faction page this record is about. A plain id with no foreign key behind it: deleting a faction page removes its standing ROW but must leave its history standing, so a reader resolves this defensively - a missing page is a name it cannot show, not an error. |
+| `delta` | integer | yes | How far the standing moved, signed. `-15` reads "fell fifteen". |
+| `reason` | string | yes | Why, in one line. May be empty. |
+
+### `CodexStandingPlayer`
+
+A standing as a PLAYER receives it: two keys. The row's own `id` is noise (a player never addresses a standing, and `factionPageId` is unique), and "when did this last move" is a question the chronicle answers with the reason attached. A standing reaches a player only when the standing AND its faction page are both revealed.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `factionPageId` | string (uuid) | yes |  |
+| `value` | integer (-100–100) | yes | Signed -100..100. It travels unchanged: a revealed standing whose number the player cannot see would say nothing. |
+
+### `CodexStandingPlayerPayload`
+
+A revealed standing record as a PLAYER sees it. `delta` and `reason` travel WHOLE: the delta is the entire point of a record the GM chose to publish ("the Harpers fell fifteen"), and a published record with its number stripped would say that something changed with someone. `factionPageId` is the one field that is conditional - it is nulled unless that page is itself revealed, the same filter a quest's `entityIds` and a map's `parentMapId` pass, so a published record can never advertise a faction the party has never met. A record whose faction page is NOT revealed is not projected to a player at all - it is hidden whole, exactly as the standing TABLE row is: a standing record carries no prose of its own (the store writes an empty player text), so a row with the id stripped would still tell the party that an unnamed faction moved and why.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `factionPageId` | string \| null | yes | The faction page, or NULL when that page is not revealed to players. |
+| `delta` | integer | yes |  |
+| `reason` | string | yes |  |
+
+### `CodexStandingProjected`
+
+Role-projected. A GM session or a `codex:read` credential receives `CodexStanding`; a player session receives `CodexStandingPlayer`, the revealed-only projection. Exactly one branch matches any response body.
+
+One of the following:
+
+- `CodexStanding`
+- `CodexStandingPlayer`
+
+### `ContentBackgroundsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `backgrounds` | object[] | yes |  |
+| `backgrounds[].id` | string (pattern) | yes |  |
+| `backgrounds[].name` | string | yes |  |
+| `backgrounds[].source` | `srd` \| `homebrew` | yes |  |
+| `backgrounds[].summary` | string \| null | yes |  |
+| `backgrounds[].description` | string \| null | yes |  |
+| `backgrounds[].abilityOptions` | object \| null | yes | SRD 5.2.1 ability increases: which abilities, and the legal distributions (+2/+1 or +1/+1/+1) as data |
+| `backgrounds[].originFeatId` | string \| null | yes | The origin feat this background grants, keyed into the feat catalog |
+| `backgrounds[].skillProficiencies` | string (pattern)[] | yes |  |
+| `backgrounds[].skillChoices` | object \| null | yes | "Choose N skills" where the background offers one; null otherwise (fixed grants stay in skillProficiencies) |
+| `backgrounds[].toolProficiencies` | string (pattern)[] | yes |  |
+| `backgrounds[].toolChoices` | object \| null | yes | "Choose N tools" where the background offers one; null otherwise |
+| `backgrounds[].languages` | string (pattern)[] | yes |  |
+| `backgrounds[].languageChoices` | object \| null | yes | "Choose N languages" where the background offers one; null otherwise |
+| `backgrounds[].startingEquipmentOptions` | object[] | yes | Starting-equipment bundles with their items and the "or take N gp" alternative; the chosen option's id is recorded in the character's choice ledger |
+| `backgrounds[].features` | ContentFeature[] | yes |  |
+| `attribution` | string | yes |  |
+
+### `ContentClassesData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `classes` | object[] | yes |  |
+| `classes[].id` | string (pattern) | yes |  |
+| `classes[].name` | string | yes |  |
+| `classes[].source` | `srd` \| `homebrew` | yes |  |
+| `classes[].summary` | string \| null | yes |  |
+| `classes[].description` | string \| null | yes |  |
+| `classes[].hitDie` | `d4` \| `d6` \| `d8` \| `d10` \| `d12` | yes | The multiclass hit-dice pool keys on this |
+| `classes[].statPriority` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes | All six abilities, best first - the random generator's core input, as data rather than a hardcoded table |
+| `classes[].primaryAbilities` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes |  |
+| `classes[].savingThrows` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes |  |
+| `classes[].skillChoiceCount` | integer (0–10) | yes | How many entries of skillChoices the character picks at level 1 |
+| `classes[].skillChoices` | string (pattern)[] | yes |  |
+| `classes[].armorProficiencies` | string (pattern)[] | yes | Granted armor training, as open slugs (light, medium, heavy, shields) |
+| `classes[].weaponProficiencies` | string (pattern)[] | yes | Granted weapon training - a group (simple, martial) or a single weapon id |
+| `classes[].toolProficiencies` | string (pattern)[] | yes |  |
+| `classes[].toolChoices` | object \| null | yes | "Choose N tools" where the class offers one; null otherwise |
+| `classes[].multiclassProficiencies` | object \| null | yes | Proficiencies gained when this class is taken as a MULTICLASS (narrower than the level-1 set); null when the record declares none |
+| `classes[].multiclassPrerequisites` | object \| null | yes | Ability minimums for multiclassing INTO this class; mode "any" covers "STR 13 or DEX 13". null = always allowed. Display data - the server re-validates |
+| `classes[].subclassLevel` | integer (1–20) | yes |  |
+| `classes[].subclassLabel` | string \| null | yes | What this class calls its subclass ("Martial Archetype") |
+| `classes[].asiLevels` | integer (1–20)[] | yes | Levels granting an Ability Score Improvement, or a feat instead |
+| `classes[].spellcastingAbility` | string \| null | yes | Ability slug for this class's spellcasting; null for a non-caster. Per class, so Paladin CHA + Wizard INT is expressible |
+| `classes[].spellcastingProgression` | `full` \| `half` \| `third` \| `pact` \| `null` | yes | How this class's levels count toward the shared multiclass caster level |
+| `classes[].spellcasting` | object \| null | yes | The full spellcasting header (ability, known/prepared, ritual, focus, progression, spell-list id); null for a non-caster. The flat spellcastingAbility/spellcastingProgression mirror it for existing readers |
+| `classes[].levelTable` | object[] | yes | The class's full 20-row printed progression: slot columns, cantrips/spells known, the prepared-spell formula, and the named resources that grow with level (Second Wind 2 to 4, Rage 3, Sneak Attack 3d6) |
+| `classes[].startingEquipmentOptions` | object[] | yes | Starting-equipment bundles with their items and the "or take N gp" alternative; the chosen option's id is recorded in the character's choice ledger |
+| `classes[].features` | ContentFeature[] | yes |  |
+| `attribution` | string | yes |  |
+
+### `ContentConditionsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `conditions` | object[] | yes |  |
+| `conditions[].id` | string | yes |  |
+| `conditions[].name` | string | yes |  |
+| `conditions[].description` | string | yes |  |
+| `attribution` | string | yes | The bundle's canonical CC BY 4.0 statement - ADR-0015 requires it on any surface that displays this content |
+
+### `ContentEquipmentData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `equipment` | object[] | yes |  |
+| `equipment[].id` | string | yes |  |
+| `equipment[].name` | string | yes |  |
+| `equipment[].category` | string | yes | Open slug: weapon, armor, shield, ammunition, adventuring-gear, tool, equipment-pack, consumable, focus, wondrous, or any homebrew kind. Not a closed set - derive groupings from the data. |
+| `equipment[].costGp` | number \| null | yes |  |
+| `equipment[].weightLb` | number \| null | yes |  |
+| `equipment[].description` | string \| null | yes |  |
+| `equipment[].weapon` | object \| null | yes | Populated for weapons only |
+| `equipment[].armor` | object \| null | yes | Populated for armor and shields only |
+| `attribution` | string | yes |  |
+
+### `ContentFeatsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `feats` | object[] | yes |  |
+| `feats[].id` | string (pattern) | yes |  |
+| `feats[].name` | string | yes |  |
+| `feats[].source` | `srd` \| `homebrew` | yes |  |
+| `feats[].summary` | string \| null | yes |  |
+| `feats[].description` | string \| null | yes |  |
+| `feats[].category` | string (pattern) | yes | Open slug (origin / general / fighting-style / epic-boon) |
+| `feats[].repeatable` | boolean | yes |  |
+| `feats[].prerequisiteLevel` | integer \| null | yes |  |
+| `feats[].prerequisiteAbilities` | object[] | yes |  |
+| `feats[].prerequisiteRequires` | string (pattern)[] | yes | Proficiency or feature slugs the character must already have |
+| `feats[].prerequisiteText` | string \| null | yes | Anything not modeled above, printed for the player. The SERVER decides whether a prerequisite is met - never the client |
+| `feats[].feature` | ContentFeature | yes | A feat IS a feature plus catalog metadata - hence one record, not a list |
+| `attribution` | string | yes |  |
+
+### `ContentFeature`
+
+The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `name` | string | yes |  |
+| `level` | integer \| null | yes | The class/subclass level the feature lands at; null when it is not level-gated (species traits, feats) |
+| `description` | string | yes |  |
+| `tags` | string (pattern)[] | yes | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
+| `choice` | ContentFeatureChoice \| null | yes | The pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking. |
+| `grantedAtLevels` | integer (1–20)[] | yes | Every level at which the owning class's table grants this feature - the authoritative repeat count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times and the server's capacity is choose x grants, so a client that ignores this offers too few picks and the build is rejected at creation. Empty when no class level table grants the feature (species traits, feats, subclass features). |
+
+### `ContentFeatureChoice`
+
+One pick a feature asks for. Options arrive either as plain ids in `from`, as an open catalog slug in `fromCatalog`, or as inline `options` carrying their own name and any second-order pick.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | string (pattern) | yes |  |
+| `choose` | integer (1–10) | yes |  |
+| `from` | string (pattern)[] | yes | Explicit option ids; empty when fromCatalog names an open list instead |
+| `fromCatalog` | string \| null | yes | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
+| `maxSpellLevel` | integer \| null | yes | Ceiling on a spell pick's level (Evocation Savant: 2; Magic Initiate: 0, i.e. cantrips only). null when the pick has no ceiling — a picker that ignores it offers spells the server then rejects |
+| `options` | ContentFeatureOption[] | yes | Inline options with their authored names and any nested pick; empty when the options are plain ids or come from a catalog |
+
+### `ContentFeatureOption`
+
+One inline option of a feature's pick. Carries its authored name (an id alone would force the client to titleize) and any SECOND-ORDER pick it owes - Cleric Divine Order's Thaumaturge grants an extra cantrip, so choosing it opens another choice. Riders stay server-side.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `name` | string | yes |  |
+| `description` | string | yes |  |
+| `choice` | ContentFeatureChoice \| null | yes | A nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
+
+### `ContentMonsterActionsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `actions` | object (free-form)[] | yes |  |
+
+### `ContentMonsterSheetData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `definition` | object (free-form) | yes | The full canonical ActorDefinition |
+
+### `ContentMonstersData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `monsters` | object[] | yes |  |
+| `monsters[].id` | string | yes |  |
+| `monsters[].name` | string | yes |  |
+| `monsters[].challengeRating` | number | yes |  |
+| `monsters[].type` | string | yes |  |
+| `monsters[].size` | string | yes |  |
+| `monsters[].armorClass` | integer | yes |  |
+| `monsters[].hitPoints` | integer | yes |  |
+| `attribution` | string | yes |  |
+
+### `ContentNamesData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `names` | object[] | yes |  |
+| `names[].speciesId` | string (pattern) | yes |  |
+| `names[].source` | `srd` \| `homebrew` | yes |  |
+| `names[].pools` | object[] | yes | Ordered by the data, never by a hardcoded client list |
+| `attribution` | string | yes |  |
+
+### `ContentSkillsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `skills` | object[] | yes |  |
+| `skills[].id` | string | yes |  |
+| `skills[].name` | string | yes |  |
+| `skills[].description` | string | yes |  |
+| `skills[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` \| `null` | yes | The ability this skill's check uses; null only for a record that has not declared one yet |
+| `attribution` | string | yes | The bundle's canonical CC BY 4.0 statement - ADR-0015 requires it on any surface that displays this content |
+
+### `ContentSpeciesData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `species` | object[] | yes |  |
+| `species[].id` | string (pattern) | yes |  |
+| `species[].name` | string | yes |  |
+| `species[].source` | `srd` \| `homebrew` | yes |  |
+| `species[].summary` | string \| null | yes |  |
+| `species[].description` | string \| null | yes |  |
+| `species[].sizes` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan`[] | yes | A list because several 2024 species let the player pick Small or Medium |
+| `species[].speedFeet` | integer (0–120) | yes |  |
+| `species[].darkvisionFeet` | integer \| null | yes |  |
+| `species[].creatureType` | string (pattern) | yes |  |
+| `species[].abilityBonuses` | object[] | yes | Fixed ability increases, as data. Empty for every SRD 5.2.1 species (increases live on the background); a 2014-style or homebrew record populates it and the builder applies whatever is declared |
+| `species[].abilityBonusChoice` | object \| null | yes | "Choose N abilities to raise by M" (the 2014 variant-human pattern); null when the species has none |
+| `species[].languages` | string (pattern)[] | yes |  |
+| `species[].languageChoices` | object \| null | yes | "Choose N languages" where the species offers one; null otherwise |
+| `species[].lineages` | object[] | yes | Lineages/subraces; each one's traits are also folded into features |
+| `species[].features` | ContentFeature[] | yes | Species traits plus every lineage's traits. NOTE: SRD 5.2.1 puts ability increases on the BACKGROUND, not the species |
+| `attribution` | string | yes |  |
+
+### `ContentSpellsData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `spells` | object[] | yes |  |
+| `spells[].id` | string | yes |  |
+| `spells[].name` | string | yes |  |
+| `spells[].level` | integer (0–9) | yes | 0 is a cantrip |
+| `spells[].school` | string | yes |  |
+| `spells[].castingTime` | string | yes |  |
+| `spells[].rangeText` | string \| null | yes |  |
+| `spells[].componentsText` | string | yes | "V, S, M (a pinch of soot)", or "None" |
+| `spells[].duration` | string | yes |  |
+| `spells[].concentration` | boolean | yes |  |
+| `spells[].ritual` | boolean | yes |  |
+| `spells[].description` | string | yes |  |
+| `spells[].higherLevel` | string \| null | yes |  |
+| `spells[].classes` | string[] | yes | Spell-list ids this spell belongs to ("wizard", a homebrew list slug) - the builder filters a class's spell step on these, paired with the class record's spellcasting.spellListId |
+| `spells[].damageRoll` | string \| null | yes | Base damage/healing roll ("8d6"), or null when the spell rolls nothing |
+| `spells[].damageTypes` | string[] | yes |  |
+| `spells[].castingOptions` | object[] | yes | Per-slot-level upcast scaling; the sheet applies the row matching the chosen cast level |
+| `attribution` | string | yes | The bundle's canonical CC BY 4.0 statement - ADR-0015 requires it on any surface that displays this content |
+
+### `ContentSubclassesData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `subclasses` | object[] | yes |  |
+| `subclasses[].id` | string (pattern) | yes |  |
+| `subclasses[].name` | string | yes |  |
+| `subclasses[].source` | `srd` \| `homebrew` | yes |  |
+| `subclasses[].classId` | string (pattern) | yes |  |
+| `subclasses[].summary` | string \| null | yes |  |
+| `subclasses[].description` | string \| null | yes |  |
+| `subclasses[].subclassLevel` | integer \| null | yes | The class level this subclass is taken at; null inherits the parent class's subclassLevel |
+| `subclasses[].spellcastingAbility` | string \| null | yes | Set by third-caster subclasses (Eldritch Knight, Arcane Trickster) |
+| `subclasses[].spellcastingProgression` | `full` \| `half` \| `third` \| `pact` \| `null` | yes |  |
+| `subclasses[].spellcasting` | object \| null | yes | A third-caster subclass's full spellcasting header, same shape as a class's; null otherwise |
+| `subclasses[].features` | ContentFeature[] | yes |  |
+| `attribution` | string | yes |  |
+
+### `CredentialAuditEvent`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `type` | `created` \| `used` \| `verification_failed` \| `rotated` \| `revoked` | yes |  |
+| `occurredAt` | string (date-time) | yes |  |
+| `detail` | object (free-form) | yes |  |
+
+### `EncounterArchiveDeletedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `deleted` | const `true` | yes |  |
+
+### `EncounterArchiveDocumentData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `document` | object (free-form) | yes | archiveSchemaVersion 3 (additive over 1 and 2): { archiveSchemaVersion, startedAt, endedAt, turnCount, turns[{index,kind,label,revision,at,state}], log[], journal[{seq,commandId,type,actorId,principal,payload,revision,at}], finalState, postEncounterState, rolls[], definitions[{id,source,definition}], attribution } |
+
+### `EncounterArchiveListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `encounters` | EncounterArchiveSummary[] | yes |  |
+
+### `EncounterArchiveSummary`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `archivedAt` | string (date-time) | yes |  |
+| `startedAt` | string \| null | yes |  |
+| `endedAt` | string (date-time) | yes |  |
+| `turnCount` | integer (≥ 0) | yes |  |
+
+### `GameCommandCatalogData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commands` | GameCommandDescriptor[] | yes |  |
+
+### `GameCommandDescriptor`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | string | yes |  |
+| `scope` | `system:read` \| `game:read` \| `actor:read` \| `actor:write` \| `scene:read` \| `scene:write` \| `combat:read` \| `combat:write` \| `roll:create` \| `codex:read` \| `codex:write` \| `events:read` \| `webhooks:manage` \| `admin` | yes |  |
+| `summary` | string | yes |  |
+
+### `GameLogData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `entries` | GameLogEntry[] | yes |  |
+
+### `GameLogEntry`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `at` | string (date-time) | yes |  |
+| `kind` | string | yes | damage, heal, save, action, condition, reaction, turn, encounter, scene, history, roll - additive over time |
+| `text` | string | yes |  |
+| `gmOnly` | boolean | yes |  |
+| `revision` | integer (≥ 0) | yes |  |
+
+### `GameMutationAccepted`
+
+Commands append extras: rollId/hiddenFromRoller (dice), actorId (adds/imports), annotationId, resolution (action.resolve), outcome (save.answer), type (tunnel).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | yes |  |
+| `revision` | integer (≥ 0) | yes |  |
+| `duplicate` | boolean | yes | True when this commandId was already processed; the stored outcome's revision is returned and nothing re-executed. |
+
+### `GameSnapshotData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `view` | `gm` \| `player` | yes |  |
+| `revision` | integer (≥ 0) | yes |  |
+| `game` | object (free-form) | yes | GmView (full state + presence + turnHistory) or PlayerView (visibility-filtered actors with banded monster HP, filtered rolls/annotations/saves) - exactly what the same principal receives over Socket.IO. |
 
 ### `HomebrewActionOnHit`
 
@@ -3354,6 +4767,28 @@ A character class. The heaviest of the nine: a full 20-row printed table plus ev
 | `spellcasting` | HomebrewSpellcasting | no |  |
 | `levelTable` | HomebrewClassLevelRow[] | yes | Exactly 20 rows, row N at level N. Each row's `features` must resolve against this record's own `features[]` - the server refuses the record otherwise, which is why re-minting an id on import never rewrites intra-record ids |
 | `features` | HomebrewFeature[] | no |  |
+
+### `HomebrewContentData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `record` | HomebrewRecordDocument | yes |  |
+
+### `HomebrewContentListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `records` | HomebrewRecordSummary[] | yes |  |
+| `nextCursor` | string \| null | yes | Opaque keyset cursor - never construct or parse one. null means this was the last page |
+| `total` | integer (≥ 0) | yes | Rows matching the filter, ignoring limit/cursor |
+
+### `HomebrewDeletedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `deleted` | const `true` | yes |  |
+| `deletedAt` | string (date-time) | yes |  |
 
 ### `HomebrewEffectAttackAdvantage`
 
@@ -4067,6 +5502,36 @@ The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One
 | `exportedAt` | string (date-time) | yes |  |
 | `records` | HomebrewRecord[] | yes | Authored bodies only - no state, visibility, deletion, or revision |
 
+### `HomebrewPackExportData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `pack` | HomebrewPack | yes |  |
+
+### `HomebrewPackImportData`
+
+The import plan or its result - byte-for-byte the same report either way, which is what makes `dryRun` trustworthy.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `imported` | object[] | yes |  |
+| `imported[].id` | string (pattern) | yes |  |
+| `imported[].type` | `class` \| `subclass` \| `species` \| `background` \| `feat` \| `spell` \| `equipment` \| `monster` \| `spell-list` | yes |  |
+| `imported[].name` | string | yes |  |
+| `imported[].originalId` | string (pattern) | yes |  |
+| `reminted` | object[] | yes |  |
+| `reminted[].originalId` | string (pattern) | yes |  |
+| `reminted[].id` | string (pattern) | yes |  |
+| `reminted[].reason` | `srd-collision` \| `homebrew-collision` | yes | An SRD collision is ALWAYS re-minted; a homebrew collision follows onIdCollision |
+| `overwritten` | object[] | yes |  |
+| `overwritten[].id` | string (pattern) | yes |  |
+| `overwritten[].type` | `class` \| `subclass` \| `species` \| `background` \| `feat` \| `spell` \| `equipment` \| `monster` \| `spell-list` | yes |  |
+| `overwritten[].name` | string | yes |  |
+| `rejected` | object[] | yes |  |
+| `rejected[].originalId` | string (pattern) | yes |  |
+| `rejected[].issues` | HomebrewValidationIssue[] | yes |  |
+| `dryRun` | boolean | yes |  |
+
 ### `HomebrewRecord`
 
 The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. Every branch mirrors the Zod schema the server actually parses the body with, so `required` here is exactly that schema's non-optional keys: a field with a server-side default is OPTIONAL on the wire, and an optional field is ABSENT rather than null (an authoring body is an input, and a Zod `.optional()` rejects an explicit null).
@@ -4082,6 +5547,41 @@ One of the following, discriminated by `type`:
 - `HomebrewEquipmentRecord`
 - `HomebrewMonsterRecord`
 - `HomebrewSpellListRecord`
+
+### `HomebrewRecordDocument`
+
+One stored row: the authored body plus the three orthogonal row-state fields. `state` is set only by /publish and /unpublish, `visibleToPlayers` only by /visibility, `deletedAt` only by DELETE and /restore. A player sees a record only when it is published AND visible AND not deleted - and even then only through the merged CONTENT_PATHS catalogs, never through this component.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `type` | `class` \| `subclass` \| `species` \| `background` \| `feat` \| `spell` \| `equipment` \| `monster` \| `spell-list` | yes |  |
+| `state` | `draft` \| `published` | yes |  |
+| `visibleToPlayers` | boolean | yes | Publishing does not reveal: this is the separate, deliberate second step |
+| `deletedAt` | string \| null | yes | Soft delete; a deleted row leaves every merged catalog at once and is restorable |
+| `rev` | integer (≥ 0) | yes |  |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+| `validity` | HomebrewValidity | yes |  |
+| `record` | HomebrewRecord | yes |  |
+
+### `HomebrewRecordSummary`
+
+The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `valid` alone - the issue list costs a GET - so listing a 300-record library never ships a 20-row level table.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `type` | `class` \| `subclass` \| `species` \| `background` \| `feat` \| `spell` \| `equipment` \| `monster` \| `spell-list` | yes |  |
+| `name` | string | yes |  |
+| `source` | const `"homebrew"` | yes | Always "homebrew" on this surface; the field exists so a summary and a merged-catalog row read the same |
+| `state` | `draft` \| `published` | yes |  |
+| `visibleToPlayers` | boolean | yes |  |
+| `deletedAt` | string \| null | yes |  |
+| `rev` | integer (≥ 0) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+| `valid` | boolean | yes |  |
+| `usageCount` | integer (≥ 0) | yes | How many characters took this record; 0 is the common case |
 
 ### `HomebrewRiderAttackBonus`
 
@@ -4516,6 +6016,23 @@ STATIC GATE. The bearer is wearing no armor; `allowShield` decides whether a shi
 | `type` | const `"while-unarmored"` | yes |  |
 | `allowShield` | boolean | no | Default: `false`. |
 
+### `HomebrewUsage`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `actorId` | string (uuid) | yes |  |
+| `actorName` | string | yes |  |
+| `kind` | string (pattern) | yes | How the record is used - open slug (character-choice, class, species, ...), never a closed enum |
+| `detail` | string \| null | yes |  |
+
+### `HomebrewUsagesData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `usages` | HomebrewUsage[] | yes |  |
+| `safeToDelete` | boolean | yes | Always true: a built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record never breaks an existing character. The usage list is context, not a blocker |
+
 ### `HomebrewUsesByAbility`
 
 Uses equal to an ability modifier, floored at `minimum`.
@@ -4545,12 +6062,166 @@ Uses equal to the character's proficiency bonus.
 | --- | --- | --- | --- |
 | `type` | const `"proficiency-bonus"` | yes |  |
 
+### `HomebrewValidationIssue`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `path` | string \| integer[] | yes | Field path into the authored record, e.g. ["levelTable", 3, "spellSlots"] - the offending field, machine-addressable, so a form editor can point at it instead of parsing prose |
+| `message` | string | yes |  |
+| `recordId` | string \| null | yes | Which record in a pack the issue belongs to; null for a single-record publish. Present-but-null, so a consumer never branches on key presence |
+
+### `HomebrewValidity`
+
+Whether a record may be published, and why not. Carried on every single-record read so the GM's library can say "3 drafts can't publish yet" without a round-trip per record.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `valid` | boolean | yes |  |
+| `issues` | HomebrewValidationIssue[] | yes |  |
+
 ### `ImagePoint`
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `x` | number | yes |  |
 | `y` | number | yes |  |
+
+### `IntegrationCredentialAudit`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `events` | CredentialAuditEvent[] | yes |  |
+
+### `IntegrationCredentialIssued`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `credential` | IntegrationCredentialMetadata | yes |  |
+| `token` | string | yes | Shown exactly once; the server stores only a salted hash and cannot redisplay it. |
+
+### `IntegrationCredentialList`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `credentials` | IntegrationCredentialMetadata[] | yes |  |
+
+### `IntegrationCredentialMetadata`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `name` | string | yes |  |
+| `scopes` | `system:read` \| `game:read` \| `actor:read` \| `actor:write` \| `scene:read` \| `scene:write` \| `combat:read` \| `combat:write` \| `roll:create` \| `codex:read` \| `codex:write` \| `events:read` \| `webhooks:manage` \| `admin`[] | yes |  |
+| `gameId` | string \| null | yes |  |
+| `createdAt` | string (date-time) | yes |  |
+| `expiresAt` | string \| null | yes |  |
+| `lastUsedAt` | string \| null | yes |  |
+| `revokedAt` | string \| null | yes |  |
+
+### `MapAssetData`
+
+GET responses use `asset` (full asset metadata); PATCH/scale/calibration-complete responses use `map` (catalog entry only).
+
+One of the following:
+
+- object
+- object
+
+### `MapAssetListData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `assets` | MapAssetMetadata[] | yes |  |
+
+### `MapAssetMetadata`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (uuid) | yes |  |
+| `name` | string | yes |  |
+| `kind` | `battlemap` \| `regional` \| `world` | yes |  |
+| `originalName` | string | yes |  |
+| `format` | string | yes |  |
+| `mediaType` | string | yes |  |
+| `width` | integer (≥ 1) | yes |  |
+| `height` | integer (≥ 1) | yes |  |
+| `byteLength` | integer (≥ 1) | yes |  |
+| `importedAt` | string (date-time) | yes |  |
+| `calibration` | object \| null | yes |  |
+| `scale` | object \| null | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `MapAssetUploadData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `asset` | MapAssetMetadata | yes |  |
+| `duplicate` | boolean | yes |  |
+
+### `MapCalibrationWizardData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `wizardId` | string (uuid) | yes |  |
+| `state` | object (free-form) | yes |  |
+| `overlay` | object (free-form)[] | yes |  |
+| `overlayWarning` | string \| null | yes |  |
+
+### `MapCatalogEntry`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `assetId` | string (uuid) | yes |  |
+| `name` | string | yes |  |
+| `kind` | `battlemap` \| `regional` \| `world` | yes |  |
+| `calibration` | object \| null | yes |  |
+| `scale` | object \| null | yes |  |
+| `createdAt` | string (date-time) | yes |  |
+| `updatedAt` | string (date-time) | yes |  |
+
+### `PlayerSessionIssuedData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `token` | string | yes | Bearer token for player-limited calls; long-lived, not individually revocable (LAN trust). |
+| `sessionId` | string (uuid) | yes |  |
+
+### `SystemCapabilities`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `api` | object | yes |  |
+| `api.version` | const `"1"` | yes |  |
+| `api.namespace` | const `"/api/v1"` | yes |  |
+| `realtime` | object | yes |  |
+| `realtime.protocolVersion` | const `"1"` | yes |  |
+| `realtime.transport` | const `"socket.io"` | yes |  |
+| `supportedScopes` | `system:read` \| `game:read` \| `actor:read` \| `actor:write` \| `scene:read` \| `scene:write` \| `combat:read` \| `combat:write` \| `roll:create` \| `codex:read` \| `codex:write` \| `events:read` \| `webhooks:manage` \| `admin`[] | yes |  |
+| `features` | object | yes |  |
+| `features.webhooks` | boolean | yes |  |
+| `features.viewer` | boolean | yes |  |
+| `features.battlemapGridCalibration` | boolean | yes |  |
+| `features.gameApi` | boolean | yes |  |
+| `features.commandTunnel` | boolean | yes |  |
+| `features.encounterArchives` | boolean | yes |  |
+| `features.rulesEngine` | boolean | yes |  |
+
+### `SystemHealth`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `status` | const `"ok"` | yes |  |
+| `serverTime` | string (date-time) | yes |  |
+
+### `SystemVersion`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `applicationVersion` | string | yes |  |
+| `apiVersion` | const `"1"` | yes |  |
+| `realtimeProtocolVersion` | const `"1"` | yes |  |
+| `schemaVersions` | object | yes |  |
+| `schemaVersions.actorDefinition` | integer (≥ 1) | yes |  |
 
 ---
 

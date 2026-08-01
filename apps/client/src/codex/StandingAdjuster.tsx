@@ -79,7 +79,7 @@ export function StandingAdjuster({ gmToken, factionPageId, factionName, standing
   };
 
   return (
-    <Modal open onClose={onClose} title={`Standing — ${factionName}`} size="sm" ariaLabel={`Standing with ${factionName}`}>
+    <Modal open onClose={onClose} title={`Standing with ${factionName}`} size="sm" ariaLabel={`Standing with ${factionName}`}>
       <div className="codex-standing-adjuster">
         {/* R2: the tier is a WORD and the value carries its sign. The bar is decoration — `aria-hidden`
             for the reason the dashboard card's is: its meaning is already in the two lines above it, and
@@ -97,7 +97,7 @@ export function StandingAdjuster({ gmToken, factionPageId, factionName, standing
           <Input id="standing-value" type="number" inputMode="numeric" min={STANDING_MIN} max={STANDING_MAX} disabled={busy}
             value={value} onChange={(event) => setValue(event.target.value)} />
         </Field>
-        <Field label="Why it moved" htmlFor="standing-reason" help="Recorded on the chronicle with the change. Required — a standing that moved for no stated reason is a number nobody can explain later.">
+        <Field label="Why it moved" htmlFor="standing-reason" help="Optional. Players never see the reason. It is recorded on the Journal alongside the change.">
           <Input id="standing-reason" maxLength={STANDING_REASON_MAX} value={reason} disabled={busy} placeholder="Returned the Duke's signet"
             onChange={(event) => setReason(event.target.value)} />
         </Field>
@@ -109,9 +109,9 @@ export function StandingAdjuster({ gmToken, factionPageId, factionName, standing
               uses. Disabled until the row exists — there is nothing to reveal before the first change. */}
           {standing
             ? <RevealSwitch revealed={standing.revealedToPlayers} onChange={reveal} ariaLabel="Show this standing to players" />
-            : <span className="codex-inspector-hint">Record a change first — there is nothing to show players yet.</span>}
+            : <span className="codex-inspector-hint">Record a change first. There is nothing to show players yet.</span>}
           {/* R: a disabled control must say why. The deadline composer's hint is the precedent. */}
-          {delta === 0 && <p className="codex-composer-hint">Move the slider or the number to record a change — a change of zero would say nothing happened.</p>}
+          {delta === 0 && <p className="codex-composer-hint">Type a different number to record a change. A change of zero records nothing.</p>}
           <Button variant="primary" disabled={busy || !canSave} onClick={save}>{busy ? "Saving…" : "Record change"}</Button>
         </div>
       </div>

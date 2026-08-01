@@ -44,8 +44,8 @@ const page: CodexPage = {
 
 function renderEditor() {
   return render(
-    <PageEditor gmToken="gm" page={page} pages={[page]} backlinks={[]} relationships={[]}
-      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onRelationshipsChanged={() => {}} />
+    <PageEditor gmToken="gm" page={page} pages={[page]} connections={[]} autosave={{ enabled: true, intervalSeconds: 1 }}
+      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onOpenConnection={vi.fn()} onConnectionsChanged={() => {}} />
   );
 }
 
@@ -54,7 +54,7 @@ describe("PageEditor save/conflict path", () => {
     updatePage.mockReset();
     getPage.mockReset();
     updatePage.mockResolvedValue({ ...page, rev: 4 });
-    getPage.mockResolvedValue({ page: { ...page, rev: 9 }, backlinks: [], relationships: [] });
+    getPage.mockResolvedValue({ page: { ...page, rev: 9 }, connections: [] });
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
   });

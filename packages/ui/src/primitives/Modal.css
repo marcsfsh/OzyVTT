@@ -114,3 +114,9 @@
   .nh-modal--full .nh-modal-body { padding: var(--space-4); }
   .nh-modal--full .nh-modal-foot { padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
 }
+
+/* Top-aligned dialog — the command-palette shape. A palette is a jump-to control, so it
+   belongs under the eye rather than centred in the viewport; the same primitive, one flag,
+   instead of the bespoke scrim + panel it replaces (D25). */
+.nh-modal--top { margin-block: 10vh auto; }
+@media (max-width: 650px) { .nh-modal--top { margin-block: var(--space-4) auto; } }

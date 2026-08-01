@@ -65,8 +65,11 @@ The combat commands are also available over a REST API at `/api/v1`. The referen
 - Read game state with `GET /api/v1/game` (add `?view=player` for the player-safe projection); poll with the returned `ETag`.
 - Send commands with typed routes such as `POST /api/v1/game/encounter/start`, or the generic `POST /api/v1/game/commands`. Writes use the same validation and authorization as the UI, are idempotent by `commandId`, and honor `expectedRevision`.
 - List and read archived encounters under `GET /api/v1/encounters`.
+- Poll cheaply: `GET /game` and every codex `GET` send a weak `ETag`; send `If-None-Match` for a `304`.
 
-The Codex has its own routes under `/api/v1/codex/*`, authorized by a GM or player session rather than an integration credential.
+The Codex has its own routes under `/api/v1/codex/*`, accepting a GM session, a player session (reads only, revealed content only), **or an integration credential scoped `codex:read` / `codex:write`** — external tools no longer need to borrow the GM's session token. A credential acts at GM grade; the one exception is `POST /codex/preview-session`, which mints a player session and stays GM-session-only. Player and GM response shapes are documented separately (`CodexPage` / `CodexPagePlayer`, joined by `CodexPageProjected`), so a generated client gets the shape its own credential actually receives.
+
+Conventions across the whole surface — envelopes, request-id echo, which writes accept `commandId`, the 401-vs-403 rule, and why codex lists are unpaginated — are stated normatively in [ADR-0016](docs/adr/0016-public-integration-api.md#v1-conventions-normative).
 
 ## Not in scope
 

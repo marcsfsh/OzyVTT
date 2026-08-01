@@ -11,10 +11,13 @@ import "./forms.css";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
+  /** `title` is the borderless display-face field a record's own name is typed into (Codex page,
+      session recap heading). It keeps the well only on hover/focus, so a heading reads as a heading. */
+  variant?: "default" | "title";
   ref?: Ref<HTMLInputElement>;
 }
-export function Input({ invalid, className, ...rest }: InputProps) {
-  return <input className={cx("nh-input", invalid && "nh-input--invalid", className)} aria-invalid={invalid || undefined} {...rest} />;
+export function Input({ invalid, variant = "default", className, ...rest }: InputProps) {
+  return <input className={cx("nh-input", variant !== "default" && `nh-input--${variant}`, invalid && "nh-input--invalid", className)} aria-invalid={invalid || undefined} {...rest} />;
 }
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {

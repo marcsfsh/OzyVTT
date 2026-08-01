@@ -140,3 +140,18 @@ export function IconEyeOff({ className }: Readonly<{ className?: string }>) {
     </Glyph>
   );
 }
+
+/* ---- Chrome glyphs a primitive must not render as text (design-language §0).
+   `✕` and `▶` were literal characters in Modal, Drawer and the app's atlas: Manrope
+   has no glyph for either at UI weight, so they fell back to a system face at the
+   wrong size and got emoji presentation on iOS/Android. ---- */
+
+/** Dismiss. Always paired with an accessible name on the control that holds it. */
+export function IconX({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M18.3 7.1 16.9 5.7 12 10.6 7.1 5.7 5.7 7.1l4.9 4.9-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z" /></Glyph>;
+}
+
+/** Go live / play. The one "start this" mark. */
+export function IconPlay({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M8 5.2 19 12 8 18.8z" /></Glyph>;
+}

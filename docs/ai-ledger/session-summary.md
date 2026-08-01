@@ -8,6 +8,228 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-08-01 — Codex overhaul, final polish pass
+
+Eight commits (`1807c22` … this ledger). **1,861 tests passing (+1 skipped), up from 1,783.** check 0, build 0.
+Browser pass **67/67** in Chromium against a populated database at 1280x900 and 375x780 (60 before;
+seven new checks). Tap audit re-run at both widths: **1,160 controls across 34 surfaces, 0 surfaces
+unmeasured, 16 sub-floor at 375px and 24 at 320px — every one a graph node.**
+
+Closing the gap between "the client approved X" and "X is true", plus one bug the client found.
+
+1. **The sidebar collapse was a one-way door** (client-reported, highest priority). The toggle was
+   gated on `collapsed`, so it hid itself the moment it was used, and the preference persists — the
+   GM was trapped in the rail until they cleared site storage. Gated on `railBand` now; the player
+   gained the same affordance. **The blind spot matters more than the line:** every check we owned
+   verified that things are reachable and not one collapsed a control and tried to get back. Both
+   the unit tests and the browser pass now drive toggles in both directions.
+2. **The pin regression** (D3/D6). Selecting a pin is a navigation now, so the autosave-off leave
+   guard sees it; it is also addressable and Back-able, which `?pin=` always promised.
+3. **Decision fidelity.** D7/D20 — the palette's "New session"/"New quest" create, through one
+   shared `creates.ts` the rails call too. D13 — the Downtime note is the shared editor, the last
+   bare `Textarea` in the suite. D3 — Sessions and Quests filters live in the URL like the other
+   three lists. D10 — the player's five lists gained the GM's filters, in the GM's words.
+4. **Coverage for what had none.** `MarkdownEditor` (D13's headline capability) and `Combobox` — 20
+   tests, checked against eight mutants. The three owed view tests: `calendar-view`,
+   `downtime-view`, `tag-view`.
+5. **ADR-0016 §2 made true.** The viewer router echoed any `[A-Za-z0-9._:-]{1,128}` request id and
+   the token router any 36 hex-and-hyphen characters; both now enforce UUID v4 like the other five,
+   so the ADR's clause and the generated reference are true of the whole surface. Behaviour changed
+   rather than the ADR: it states a security property five routers already kept, and nothing in the
+   app sends the header.
+
+**Numbers corrected, not restated.** `design-language.md` §4 claimed "1,119 controls, 16 sub-floor at
+each width". Re-measured: 1,160, and **24 at 320px** — the graph's sub-floor count is data- and
+width-dependent, so one number for both widths could only ever be right for one of them.
+
+New findings, all in `known-bugs.md`: the prep drawer covers the control that opens it (closable by
+its own Close and by Escape, so not a trap); a synthesized pin click is unreliable at 375px and the
+false-failure cascade it causes; `MarkdownEditor` and `Combobox` disagree on where `role="option"`
+sits; `.codex-modetabs` is dead CSS. Still owed and untouched: the palette's empty-query gate.
+
+---
+
+## 2026-07-31 — Codex overhaul, QA fix pass (CLIENT lane)
+
+Ten commits (`99dff3e` … this ledger). **1783 tests, up from 1725.** check 0, build 0.
+Browser pass **60/60** in Chromium against a populated database at 1280x900 and 375x780, plus a new
+800px check. Tap audit re-run at 375 and 320: **1,119 controls across 35 surfaces, 16 sub-floor at each
+width (all graph nodes), 0 surfaces unmeasured.**
+
+Fixing what the 47-agent adversarial pass found in `apps/client`, `packages/ui`, `scripts` and the
+context docs. **47 of 59 fixed, 3 fixed in part, 8 deferred with reasons, 1 out of scope** (a viewer-
+router change in `apps/server` + an ADR). One sub-claim was verified NOT real and skipped:
+`browser-verify.mjs`'s screenshots were already gitignored — only the tap audit's were not. The
+per-finding disposition table went to the director with this pass.
+
+The five that mattered:
+
+1. **The Back gesture destroyed unsaved work** (the blocker, RUNTIME-OBSERVED at both viewports). The
+   D6 autosave-off guard was wired into `navigate()` and nowhere else, so a popstate walked out of a
+   dirty editor with no prompt. `popstate` consults the guards now and undoes a vetoed pop by pushing
+   the address back; `navigate()` returns whether it moved so the phone nav drawer can take back the
+   history entry it released. Re-verified by pressing Back in Chromium with a dirty draft at 1280 and
+   375: one prompt, dismiss keeps the address AND the draft, accept leaves.
+2. **761–849px rendered an expanded sidebar in a 56px track.** Only the CSS half of "icon rail by
+   default" ever shipped; CSS alone could not fix it, because `SidebarNav` withholds each item's
+   tooltip unless `collapsed`. Both shells read one matchMedia query now, and the player — who has no
+   collapse control at all — gains the rail too.
+3. **Verification evidence was not sound.** The recorded "805 controls, 0 below the floor" came from a
+   GM-only script whose pin and palette openers silently re-measured the previous surface. It also
+   could not select a pin at 375px. Two genuinely sub-floor controls it could not see are fixed
+   (`.codex-list-item` 43.6px, `.codex-marker-link-open` 35.6px). The graph exception's "41–43px @320"
+   was the opposite of the measurement and is corrected.
+4. **A player at `/codex/audit` read "Reveal audit"** above the not-found view, while an unknown
+   address read "Codex" — three GM surfaces named by address alone. And `resumeTarget` sent a player
+   back to a GM-only address on every sign-in.
+5. **One vocabulary.** Five retired "marker" strings shipped, including a dialog whose button read
+   "Delete pin" and whose confirm read "Delete marker"; the Reveal audit headed a section "Chronicle
+   records"; StandingAdjuster claimed a required field that is optional and named a slider that does
+   not exist. The glossary lock could see none of it — it matched `prop="…"` only, so every
+   `useConfirm` title/body and every `help=` was invisible. Widened to 892 strings; its four
+   exemptions were all inert from birth and two are deleted.
+
+Follow-up, all recorded in the fix report: the Sessions/Quests filters still live in component state
+while the other three lists put theirs in the URL; the palette's four "New …" verbs still only
+navigate; the player's lists have no in-place filters; `calendar-view` / `downtime-view` / `tag-view`
+tests and coverage for `MarkdownEditor`/`Combobox` are still owed.
+
+---
+
+## 2026-07-31 — Codex overhaul, QA fix pass (server lane)
+
+Seven commits (`e4073c6`, `bede1eb`, `273d7e4`, `edc68cf`, `6d5bfe7`, `6339188`, `ec5bf93` + this
+ledger). **1725 tests, up from 1662.** check 0, build 0.
+
+Fixing what a 47-agent adversarial QA pass found in `apps/server` and `packages/api-contract`.
+21 of 24 findings fixed, 1 verified not real and skipped, 2 deferred with reasons.
+
+The three that mattered:
+
+- **Viewer safety.** Both connection surfaces gated a journal source on the entry's raw
+  `revealedToPlayers` instead of `projectPlayerJournalEntry`, which is stronger for two kinds
+  (a `standing` record is also gated on its faction page, a `quest` history row on its quest).
+  Set standing on a hidden faction, type a `[[link]]` into the record's player text, reveal the
+  row — and the record's existence AND its excerpt reached the party on the linked page's
+  Connections panel and in the graph feed, while the journal, the timeline, search and the reveal
+  audit all correctly called it hidden. One predicate now serves both surfaces.
+
+- **Data loss (reproduced through the UI by QA — 22 real pages destroyed).** A backup file that
+  parsed but carried no recognised section wiped the codex and answered 200. "No records in this
+  FILE" and "no records in this CAMPAIGN" are distinguishable on the wire and now take different
+  branches; R1 (a pre-versioning bundle with no `bundleVersion` restores) is intact and pinned.
+
+- **Information disclosure.** `malformed()` forwarded any non-Zod error's message, so a duplicate
+  page id answered 400 with "UNIQUE constraint failed: codex_pages.id". Forwarding is an allow-list
+  now (`ZodError` or the new `CodexValidationError`); everything else takes the sanitized 500.
+
+Also: R2's bare session label survived export→import as a phantom hidden session (fixed, per-row
+discriminator); a `codex:read` credential could not fetch page images the contract promised it
+(fixed); the ETag carried no resource identity, so one endpoint's validator 304'd another (fixed);
+`POST /codex/import` buffered and parsed 64 MB before authorization on the GameState event loop
+(guarded); a reused `commandId` replayed the wrong response and silently skipped a write
+(migration v24 binds the receipt to its route).
+
+Two vacuous tests replaced with real ones and both mutants confirmed: the D16 atomicity test never
+entered the transaction (it now forces a failure after the wipe), and the D22 test claimed the
+socket ping carries nothing while only watching the injected notifier (now split into a router half
+and a real socket half that pins the emitted key set).
+
+Follow-ups logged in `known-bugs.md`: a fresh codex's calendar round-trip is not byte-stable
+(`currentDate` appears on the second export), and the Backup screen's pre-restore inventory is
+client-side work handed to the client fixer.
+
+
+## 2026-07-31 — Codex overhaul, Lane C: the client recut
+
+Five commits (`2781793`, `dcff52a`, `a1f3dea`, `32d18af`, `ed546fe`, `41e7d08` + this ledger).
+**1626 tests, up from 1546.** check 0, build 0.
+
+The Codex client is now one sidebar (D1) over real addresses (D3), in one vocabulary (D5), with the
+player Codex as a first-class surface rather than a modal (D4/D14). `CodexWorkspace`,
+`RelationshipsPanel`, `EntityPicker`, `RELATIONSHIP_TYPES` and `findMarkerMap`'s O(maps) scan are
+deleted outright. Autosave (D6), quick-create (D7), one connections list (D8), tags (D10), the calendar
+lens (D17), the downtime tracker (D12), backup/restore (D16), the dashboard (D18), the Codex-scoped
+palette (D20), measured D21 tokens, the session-prep drawer (D24) and the D25 styleguide sweep all land.
+
+**Verified in Chromium against a populated database** at 1280x900 and 375x780 — 59/59 checks, 0 console
+errors, 26 screenshots (`scripts/browser-verify.mjs` + `scripts/seed-codex.mjs`, both new). The browser
+pass found two bugs jsdom could not: every tap in the phone nav drawer navigated nowhere (a
+`history.back()`-vs-microtask-push race, fixed with `discardTransient`), and the shared row chassis
+crushed its own title to "Esc…" while non-shrinking chips kept their pixels — which also scrolled the
+document 117px sideways on Downtime at 375px.
+
+**Tap audit is route-driven now** and reaches 17 surfaces instead of 5 tab-driven ones: 805 controls,
+0 below 44px at 375 and 320, except the graph canvas (accepted exception, documented).
+**Superseded 2026-07-31 by the QA client fix pass — this figure was not sound.** The script was GM-only,
+and two of its openers fell through a `count() > 0` guard with no else and re-measured the previous
+surface. Re-measured across 35 surfaces in both roles: **1,119 controls, 16 sub-floor at each width, all
+graph nodes.** See `current-state.md` and `design-language.md` §4.
+
+Follow-up: the app shell stacks the roster dock above the Codex at 375px, so the Codex starts ~1500px
+down. Not Lane C's to fix; logged in `known-bugs.md`.
+
+## 2026-07-31 — Codex overhaul, Lane B (continued): connections, history, restore
+
+Five more commits (`c6e9e73`, `73482d7`, `16cf126`, `d97683e` + ledger). 1546 tests, up from 1523.
+
+D8/D13 unify typed relationships and wiki-links into one connection concept over two storages
+(migration v22: generalized link sources, a `layer` on declared edges, the twelve slugs relabelled, a
+startup reconcile for the one-time re-extraction). D11 writes quest history on create and on status
+change, hidden whole until the quest is revealed. D16 lands `POST /codex/import` - transactional
+replace, `bundleVersion` optional per R1. D12's narrow journal PATCH gives existing downtime rows an
+adoption path. D19's `commandId` idempotency lands with migration v23 and the four-document conventions
+sync.
+
+**Two real bugs were caught by the new tests rather than by review**: the import validator truncated
+marker coordinates to integers (every pin to the corner on restore), and the idempotency middleware
+originally ran before the write guard, which made a receipt into a bearer token.
+
+## 2026-07-31 — Codex overhaul, Lane B: the server half (`claude/ozyvtt-codex-ux-4pl7ib`)
+
+Four commits (`b829168`, `d1a695c`, `8a93aab`, `13e3974`) on top of Lane A. 1523 tests, up from 1499.
+
+Migrations v18-v21. D9 gives journal entries a real `session_id` and makes the number a live display
+value (renumber bug closed; v13's no-backfill decision consciously superseded, written into the decision
+log with the migration per R11). D10 tags sessions and quests and puts sessions in the one search index,
+with gate 1 keeping prep and attendees out of the player table. D6 autosave setting (seconds, default 1s).
+D15 adds `GET /codex/party` and `GET /codex/markers/{id}`. D12 links downtime to a character page. D22
+empties the `codex:changed` payload; D7/R7 forces a revision snapshot on a type change; D17/R3 puts both
+date forms on a player chronicle row. A new store test walks every public write and asserts the coarse
+revision strictly increases - the invariant every ETag rests on.
+
+The full migration up-path is tested against a real legacy database assembled from the shipped SQL, not a
+fresh one: synthesis, join backfill, the widened CHECK, index survival, the tags default and the FTS
+backfill's two-audience split are all asserted on real rows.
+
+**Follow-up (`handoff/B-to-C.md` §7):** D8/D13 connections, D16 import, `commandId` receipts, D11 quest
+history and the narrow downtime PATCH are not landed. The v19 CHECK already admits the `quest` kind, so
+D11 needs no second table rebuild.
+
+## 2026-07-31 — Codex overhaul, Lane A: API truth (`claude/ozyvtt-codex-ux-4pl7ib`)
+
+The API lane of the Codex overhaul. Two commits: the published contract (`c7fc8aa`) and the router that
+now honours it (`5f78d87`). 1499 tests, up from 1474.
+
+The Codex became credential-reachable (`codex:read` / `codex:write`, GM grade, `preview-session`
+excepted); 401 was narrowed to "no parseable credential" and everything presented-and-refused became
+403; the ten player response shapes were published as `*Player` components joined to their GM twin by a
+`*Projected` `oneOf`, guarded by a disjointness contract test **and** an Ajv cross-check over real GM and
+player bodies for the whole read surface. Router plumbing: request-id echo (now reaching the error body),
+`details.issues`, `error.currentRevision` on stale-`expectedRev` 409s, weak ETags + 304 on all 21 codex
+GETs, sanitized 500s. Docs: the reference generator's request-only seed was the ~84-ghost-component bug —
+fixed, 91 → 241 rendered shared shapes; `archiveSchemaVersion` interpolated; `info.description` and the
+Conventions section stopped promising an API-wide `commandId`; **ADR-0016 accepted** with its normative
+v1 conventions statement, pinned against the generated reference by a five-phrase agreement test.
+
+Two latent contract bugs surfaced while making `oneOf` sound: `CodexChronicleRecord` was a merged
+GM/player shape (a player body matched both branches), and `CodexCalendar` left two keys optional that
+the GM projection always emits.
+
+**Follow-up (handed to the back-end lane, in writing):** every NEW codex route — import/restore,
+pin-by-id, party location, the connections family — plus the `commandId` receipts machinery. A contract
+entry for an unmounted route fails route-table parity immediately, so each must land with its route.
+
 ## 2026-07-29 — Codex Phase 4 M9–M11 (`claude/codex-phase-4-m9-54sebz`)
 
 Sessions/prep/recap (M9), quests (M10), and deadlines/downtime with a private prep clock (M11).

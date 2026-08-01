@@ -84,22 +84,25 @@ export function splitEntityFields(type: EntityType | undefined, values: Readonly
   return { fields, gmFields };
 }
 
-/** Relationship vocabulary: a slug, plus how it reads from each end (Strahd *rules* Barovia / Barovia *ruled by* Strahd). */
-export const RELATIONSHIP_TYPES: ReadonlyArray<Readonly<{ type: string; label: string; inverse: string }>> = [
-  { type: "ally", label: "ally of", inverse: "ally of" },
-  { type: "enemy", label: "enemy of", inverse: "enemy of" },
-  { type: "rival", label: "rival of", inverse: "rival of" },
-  { type: "rules", label: "rules", inverse: "ruled by" },
-  { type: "member", label: "member of", inverse: "has member" },
-  { type: "leader", label: "leads", inverse: "led by" },
-  { type: "located-in", label: "located in", inverse: "contains" },
-  { type: "owns", label: "owns", inverse: "owned by" },
-  { type: "parent", label: "parent of", inverse: "child of" },
-  { type: "serves", label: "serves", inverse: "served by" },
-  { type: "created", label: "created", inverse: "created by" },
-  { type: "related", label: "related to", inverse: "related to" }
+/**
+ * D8 — connection label **suggestions**, and deliberately nothing more.
+ *
+ * This was `RELATIONSHIP_TYPES`: a slug plus how it read from each end ("rules" / "ruled by"), and a
+ * `relationshipLabel(type, direction)` that translated the stored slug into a word. Migration v22
+ * rewrote those twelve slugs into the labels a reader sees, so **the stored value IS the label** — a
+ * translation table would now be a second vocabulary sitting on top of free text, and the one thing it
+ * could reliably do is disagree with what the GM typed.
+ *
+ * The **inverse column is gone with it**, and that is a recorded, accepted loss: a free-text label
+ * cannot be inverted generically ("smuggles goods for" has no automatic other end). Connection rows
+ * render `direction` + `label`, so an edge reads by its arrow instead.
+ *
+ * What survives is this list, as a datalist seed — the twelve phrasings a GM most often wants, offered
+ * so the common cases stay consistent without becoming a closed set. Four of them are **symmetric**,
+ * which the server uses for its create-idempotency (declaring the same alliance from both ends is one
+ * edge): "ally of", "enemy of", "rival of", "related to".
+ */
+export const CONNECTION_LABEL_SUGGESTIONS: readonly string[] = [
+  "ally of", "enemy of", "rival of", "rules", "member of", "leads",
+  "located in", "owns", "parent of", "serves", "created", "related to"
 ];
-export function relationshipLabel(type: string, direction: "out" | "in"): string {
-  const def = RELATIONSHIP_TYPES.find((entry) => entry.type === type);
-  return def ? (direction === "out" ? def.label : def.inverse) : type.replace(/-/g, " ");
-}

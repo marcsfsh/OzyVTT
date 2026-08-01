@@ -77,7 +77,7 @@ export function PageTimeline({ gmToken, pageId, onOpenReplay, onOpenEntry }: Rea
         </ul>
       )}
       <div className="codex-page-timeline-add">
-        <Input value={note} placeholder="Add a journal note…" aria-label="Add a journal note to this page" onChange={(event) => setNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void add(); }} />
+        <Input value={note} placeholder="Add a journal note" aria-label="Add a journal note to this page" onChange={(event) => setNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void add(); }} />
         <Button variant="secondary" size="sm" disabled={busy || !note.trim()} onClick={add}>Add</Button>
       </div>
       {error && <Alert tone="danger">{error}</Alert>}

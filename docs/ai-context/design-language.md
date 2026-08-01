@@ -125,8 +125,17 @@ Mood and combat
 The whole system moves along one axis: magenta to violet to cyan, over a lifted
 indigo/purple ground, with cool white text. Magenta leads and cyan supports (~60/40):
 magenta is the primary brand and action color, cyan is selection, focus, and
-positive. No green-teal. No yellow/orange. Red is permitted only as a
-magenta-adjacent rose for damage and destruction.
+positive. No green-teal. Red is permitted only as a magenta-adjacent rose for damage
+and destruction.
+
+**One deliberate exception, ruling R8 (D21): `--caution` is a warm orange.** It used to
+alias `--violet`, which invariant 8 reserves exclusively for GM-only content — so a
+warning badge and a GM-secret block were the same hue, and the one colour that must mean
+exactly one thing meant two. Orange is the only direction left that is neither loss-red,
+brand magenta/cyan, nor GM-violet, so the "no yellow/orange" restraint yields to the
+invariant rather than the other way round. It is scoped to the caution pair and nothing
+else: `--caution: #FF9E4A` / `--caution-hi: #FFB877` on dark and dusk, `#B4560A` /
+`#8F4406` on light, all measured against WCAG 2.1 in `design-tokens.css`.
 
 Semantic map (hue is a hint, never the only signal):
 
@@ -134,16 +143,16 @@ Semantic map (hue is a hint, never the only signal):
 |---|---|---|
 | Primary action / attention | `--magenta` | filled buttons, active tabs |
 | Positive / heal / confirm | `--success` (cyan) | a check or plus icon |
-| Caution / magic / special | `--caution` (violet) | a warning icon |
+| Caution / magic / special | `--caution` (warm orange, R8) | a warning icon |
 | Damage / destroy / critical | `--danger` (rose-red) | a distinct icon and label |
 | Info / neutral highlight | `--info` (indigo) | plain, low urgency |
 
 **"Not finished" is caution, not danger.** Rose-red is reserved for damage and
 destruction — an actual loss. A blocked Next, an incomplete review section, a locked
 choice card: nothing has gone wrong, the flow is simply not done, so those use
-`--caution`. Both violet and rose have a text-safe partner (`--caution-hi`,
-`--danger-hi`) because the fill hue does not meet AA as small type — use the `-hi`
-token for the words and the base token for edges and fills.
+`--caution`. Both the caution orange and the danger rose have a text-safe partner
+(`--caution-hi`, `--danger-hi`) because the fill hue does not meet AA as small type —
+use the `-hi` token for the words and the base token for edges and fills.
 
 Text: primary `--text`, secondary `--text-dim`, muted/placeholder `--text-muted`,
 and `--text-on-neon` for ink on bright fills (its value flips per theme).
@@ -211,6 +220,33 @@ the *hit area*, never the paint.
   whole `/styleguide` page: **0 controls below the floor**. New UI composed from
   `@vtt/ui` inherits it for free, which is the main reason to compose rather than
   hand-roll.
+- **The whole Codex, both roles.** Re-measured 2026-08-01 in Chromium against a populated
+  database, **34 surfaces**: the GM's twenty-one (every sidebar address plus the page
+  editor, the session editor, the quest editor, the pin inspector *with its Appearance
+  disclosure open*, the cross-type tag view, the quick-create dialog, the command
+  palette, the nav drawer and the session-prep drawer) and the player's thirteen, on a
+  real player session rather than the GM's preview modal. **1,160 interactive controls;
+  16 below the floor at 375px and 24 at 320px — every one of them a graph node**, the
+  accepted exception in the table below. Reproduce with `node scripts/tap-audit.mjs 375`
+  (route-driven: a new address is one line) — the run exits non-zero if anything is
+  sub-floor *or* any surface goes unmeasured, and it prints the per-surface counts that
+  add up to the total.
+
+  **The two widths do not agree, and that is the honest result rather than a rounding of
+  it.** The graph's node sizes are data-driven and its layout is force-fitted to the
+  canvas, so a narrower canvas pushes more nodes under the floor: 10 of the GM graph's
+  nodes at 375px and 18 at 320px, plus 6 of the player's at both. A single number for
+  both widths — which this file carried until today — could only ever be right for one
+  of them. **Nothing outside the graph is sub-floor at either width.**
+
+  **The figure before that — "17 surfaces, 805 controls, 0 below the floor" —
+  was wrong in three ways and is corrected rather than quietly restated.** The
+  script was GM-only, so the player Codex (its own root, drawer, reader and pin sheet)
+  contributed nothing; two of its openers fell through a `count() > 0` guard with no
+  else and silently measured the previous surface a second time; and the total was never
+  0 — `.codex-list-item` on the player's Pages rail measured 43.6px (ten rows) and
+  `.codex-marker-link-open`, in both shells, measured 35.6px. Both now carry
+  `min-height: var(--tap-min)` and both measure 44.
 - **The named app controls that carry it themselves** (they are not primitives, and
   each states its route in a comment): `.encounter-map-icon` (map tools),
   `.combatant-choice` / `.encounter-players-roll-init` / `.manual-nat20` (the
@@ -224,6 +260,7 @@ the *hit area*, never the paint.
 | `DicePanel`'s two `<summary>` disclosures | 39px and 19.5px tall | Unclassed `<summary>` in `apps/client/src/dice/`; needs a scoped rule there. |
 | `.encounter-map-swatches button` (color picker) | 24×24 | Inside a popover grid; 44px areas would overlap at the current 4.8px gap. |
 | Raw `<input type="checkbox">` outside the named labels above | 13–20px | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
+| `.codex-graph-node` (Connection graph) | **@375: 14.2–18.4 wide × 11.2–49.5 tall, 16 nodes (GM 10, player 6). @320: 12.1–43.4 wide × 9.4–43.4 tall, 24 nodes (GM 18, player 6).** | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. **The count is data-dependent and width-dependent — do not quote it as a constant.** It scales with the campaign (`known-bugs.md` records the same lesson from "the Graph's 3"), and the narrower width is the WORSE case, not the better one: an earlier row here read "41–43px @320", which is the opposite of what the tool prints. Re-measured 2026-08-01 by `scripts/tap-audit.mjs` at both widths, GM and player. |
 
 Two ways to meet it — pick by whether growing the paint hurts:
 
@@ -330,7 +367,13 @@ off screens that hold dense text.
   on every interactive element; never remove focus outlines without replacing them.
 - Depth through blur on sticky/floating surfaces; reduced-transparency replaces
   blur with a solid surface.
-- A Cmd/Ctrl-K command palette is the intended global search/jump/run surface.
+- A Cmd/Ctrl-K command palette is the search/jump/run surface. **Shipped
+  Codex-scoped, deliberately not global** (D20, 2026-07-31): it is mounted only by
+  `CodexShell` and the player shell, so ⌘K means nothing on the Encounter tab, and a
+  test locks that — "make it global" is the obvious next step and is a separate
+  decision, not an oversight. Its chrome is `Modal align="top"`, which is the only
+  primitive change it needed; see `/styleguide#palette`, documented there as a
+  composition rather than a component.
 - Honor `prefers-reduced-motion` globally: neutralize entrances/drift/smooth
   scroll and present end states statically. Never gate information behind motion.
 
@@ -358,9 +401,68 @@ off screens that hold dense text.
 
 Speak plainly, second person, about actions the player controls. Actions name
 their result ("Roll initiative", "End turn", "Apply damage") and keep their name
-through the flow ("Save encounter" → "Encounter saved"). Empty states invite
-action; errors say what happened and how to fix it. Sentence case throughout;
-all-caps only for small eyebrow labels.
+through the flow ("Save encounter" → "Encounter saved"). Errors say what happened
+and how to fix it. Sentence case throughout; all-caps only for small eyebrow
+labels.
+
+### The rule
+
+**Say what the control does, or what belongs in the field. Nothing else.**
+
+Copy describes the software, not the fiction. The Codex is a worldbuilding tool,
+which makes it the surface most likely to start narrating; it may not. A GM
+reading a hint wants to know what a control affects, what is required, what
+players can see, and what cannot be changed later.
+
+1. **No scene-setting or roleplay voice.** Not "the table", "the party's own
+   words", "the hook", "tonight", "the truth behind…". Empty states name the
+   record they lack, not a mood.
+2. **No em-dashes in anything a user reads.** Not as an aside, not as a
+   connector, not in place of a colon. One clause, or two short sentences. An
+   aside that carries a real constraint earns its own sentence. This covers
+   assembled labels and "no value" glyphs too: the Codex uses `·` between label
+   fragments and the word "None" for an absent value. (Em-dashes in code
+   comments are fine — the rule is about what reaches the screen.)
+3. **No ellipsis placeholders.** A placeholder is a plain noun phrase naming the
+   content, or a concrete example value. `…` survives only where it carries
+   information: "New page…" means the action opens a dialog, "Saving…" means
+   work in progress.
+4. **No rhetorical framing, no invitations, no cleverness.** No questions except
+   in a confirm dialog, which has to ask. No exclamation marks.
+5. **A hint carries information or it is deleted.** If removing the banned
+   constructions leaves a sentence that only restates the field name, delete the
+   hint. Padding it back to look deliberate is worse than the silence.
+6. **No LLM register.** No "simply", "just", "easily", "powerful", "seamlessly",
+   "leverage", "note that", "keep in mind", "lets you", "allows you to". No
+   throat-clearing before the sentence that matters, and no summary sentence
+   restating what was just said.
+
+### Calibration
+
+| Instead of | Write |
+| --- | --- |
+| "The hook as the table heard it…" | "What players have been told about this quest" |
+| "The truth behind the hook, who is really behind it, how it ends…" | "Details players cannot see" |
+| "Beats, encounters, the questions you want answered tonight…" | "Prep notes for this session" |
+| "Search what you know…" | "Search pages" |
+| "Its kind brings the fields it needs. You can change it later." | "The kind determines which fields appear. You can change it later." |
+| "Move this map elsewhere in the atlas. Everything under it travels along." | "Move this map elsewhere in the atlas. Any maps nested under it move with it." |
+| "Days can't be edited — they're what the clock already moved by. A typo is a delete and re-log." | "Days cannot be changed after logging. Delete the entry and log it again to correct it." |
+| "Longer pauses mean fewer saved versions, and more work at risk if the tab closes." | "Longer intervals save fewer versions and risk losing more unsaved work." |
+| "Nothing bearing down on the party." | "No deadlines yet." |
+| "Couldn't load the Codex — check your connection to the table." | "Couldn't load the Codex. Check your connection and try again." |
+
+Already correct, and left alone: "Shown after the year, e.g. DR or AE" ·
+"Use / to nest, e.g. NPCs/Villains".
+
+**Plainer never means vaguer.** Destructive and disclosure copy keeps every
+number and consequence it had: the restore confirm states its record counts, the
+reveal-ahead warning names both dates, the kind-change confirm names each field
+at risk and softens its recovery promise when version history is off. Cut the
+flourish, keep the fact.
+
+The glossary in `apps/client/src/codex/vocabulary.test.ts` fails the build on
+retired words. Reaching for a plainer phrase is exactly when one slips back in.
 
 ---
 

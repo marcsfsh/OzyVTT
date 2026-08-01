@@ -270,3 +270,39 @@ describe("realtime presence, reconnect, and convergence", () => {
     } finally { await server.close(); }
   });
 });
+
+/**
+ * D22, the SOCKET half. `codex-http.test.ts` asserts that the codex router hands its notifier no arguments,
+ * which is the only thing a router-level test can see - but the thing the table actually receives is
+ * `server.ts`'s emit, and that emit does carry a payload.
+ *
+ * What D22 requires of it is that the payload is a bare revision counter and NOTHING else. It used to carry
+ * a `scope` word - "pages", "journal" - to every connected socket, players included, telling the table
+ * which part of the codex the GM was working in. So this pins the key SET, not just the absence of `scope`:
+ * a seventh field added tomorrow fails here rather than shipping to every player socket.
+ *
+ * Observed on a PLAYER's socket deliberately - that is the recipient the rule exists for.
+ */
+describe("codex:changed on the wire (D22, socket half)", () => {
+  it("emits a bare revision counter to every socket, players included, and nothing else", async () => {
+    const server = await startTestServer();
+    try {
+      await bootstrapGm(server.url);
+      const gmToken = await loginGm(server.url);
+      const player = await connectAndJoin(server.url);
+      const pings: unknown[] = [];
+      player.socket.on("codex:changed", (event: unknown) => { pings.push(event); });
+
+      const created = await fetch(`${server.url}/api/v1/codex/pages`, {
+        method: "POST", headers: { authorization: `Bearer ${gmToken}`, "content-type": "application/json" }, body: JSON.stringify({ title: "Vallaki" })
+      });
+      expect(created.status).toBe(201);
+
+      await waitFor(() => pings, (received) => received.length > 0);
+      for (const event of pings) {
+        expect(Object.keys(event as Record<string, unknown>), "the ping's key set is exactly one revision counter").toEqual(["codexRevision"]);
+        expect(typeof (event as { codexRevision: unknown }).codexRevision).toBe("number");
+      }
+    } finally { await server.close(); }
+  });
+});

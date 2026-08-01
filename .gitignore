@@ -9,3 +9,8 @@ data/
 .claude/settings.local.json
 # Uncommitted (local-scope) subagent memory; project-scope .claude/agent-memory/ IS committed
 .claude/agent-memory-local/
+
+# Browser-verification output (`scripts/browser-verify.mjs`). Evidence for one run, not a fixture:
+# it is regenerated from a seeded throwaway database every time and would otherwise add ~26 PNGs
+# per pass to the history.
+verify-shots/

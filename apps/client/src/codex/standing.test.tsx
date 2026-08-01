@@ -240,7 +240,7 @@ describe("Adjusting standing writes the reason with it (CT-6)", () => {
   it("explains why it will not arm when nothing has moved", async () => {
     renderAdjuster(STANDING(10));
     expect(screen.getByRole("button", { name: "Record change" })).toBeDisabled();
-    expect(screen.getByText(/a change of zero would say nothing happened/)).toBeInTheDocument();
+    expect(screen.getByText("Type a different number to record a change. A change of zero records nothing.")).toBeInTheDocument();
   });
 
   it("will not arm when nothing actually moved", async () => {
@@ -301,7 +301,7 @@ describe("M12's two new chronicle kinds read by icon AND word (R2)", () => {
     // `delta` as a level, or a milestone's `level` as a faction's id — silently, and in a sentence.
     const record = (over: Partial<CodexChronicleRecord>): CodexChronicleRecord => ({
       kind: "entry", id: "x", title: null, text: "", gmText: null, revealedToPlayers: false,
-      sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+      sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
       tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null,
       fired: false, proposedDate: null, createdAt: "", updatedAt: "", ...over
     });
@@ -320,12 +320,12 @@ describe("M12's two new chronicle kinds read by icon AND word (R2)", () => {
   });
 
   it("says what each record was, in one line", () => {
-    expect(milestoneSummaryLabel({ level: 5, reason: "Cleared the citadel" })).toBe("Reached level 5 — Cleared the citadel");
+    expect(milestoneSummaryLabel({ level: 5, reason: "Cleared the citadel" })).toBe("Reached level 5 · Cleared the citadel");
     expect(milestoneSummaryLabel({ level: 5, reason: "  " })).toBe("Reached level 5");
     expect(standingChangeLabel({ factionPageId: "f1", delta: -20, reason: "Burned the caravan" }, "The Zhentarim"))
-      .toBe("The Zhentarim — down 20 · Burned the caravan");
-    expect(standingChangeLabel({ factionPageId: "f1", delta: 15, reason: "" }, "Harpers")).toBe("Harpers — up 15");
+      .toBe("The Zhentarim · down 20 · Burned the caravan");
+    expect(standingChangeLabel({ factionPageId: "f1", delta: 15, reason: "" }, "Harpers")).toBe("Harpers · up 15");
     // A faction the reader cannot name is never given an invented one.
-    expect(standingChangeLabel({ factionPageId: "f1", delta: 15, reason: "" }, null)).toBe("A faction — up 15");
+    expect(standingChangeLabel({ factionPageId: "f1", delta: 15, reason: "" }, null)).toBe("A faction · up 15");
   });
 });

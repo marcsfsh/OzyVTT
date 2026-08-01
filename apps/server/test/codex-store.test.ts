@@ -1,10 +1,14 @@
 import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
+import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, downtimePayloadOf, questEventPayloadOf, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
+import { projectGmConnections, projectPlayerConnections, projectGmPageConnections, projectPlayerPageConnections, projectRevealAudit, projectGmChronicleRecord, projectGmJournalEntry, projectGmMarker, projectGmQuest, projectGmSearchHit, projectGmSession, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
+
+/** D6/R4's shipped default, spelled once so the settings tests below say what they are actually about. */
+const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
 
 let directory: string;
 let store: CodexStore;
@@ -24,7 +28,21 @@ afterEach(async () => {
  * store exactly as `codex-http.ts` resolves it per request. A CALL, not a constant: a session's reveal
  * state changes mid-test, and a context captured once would go stale and quietly make the gate look broken.
  */
-const playerSessionNumbers = (from: CodexStore = store) => ({ unrevealedSessionNumbers: from.unrevealedSessionNumbers() });
+const playerSessionNumbers = (from: CodexStore = store) => ({ unrevealedSessionIds: from.unrevealedSessionIds() });
+
+/**
+ * The `PlayerConnectionContext` `codex-http.ts` resolves once per request, in the shape the router builds
+ * it. Every connection fixture in this file has PAGE sources, so `revealedSourceIds` is empty by
+ * construction and says so; the session/quest/journal arms - and specifically the journal arm's gate on
+ * `projectPlayerJournalEntry` rather than on a raw reveal flag - are proven at the HTTP boundary, where the
+ * router's own resolution is the thing under test rather than a copy of it.
+ *
+ * A CALL, not a constant, for the reason `playerSessionNumbers` is: reveal state changes mid-test.
+ */
+const playerConnectionContext = (from: CodexStore = store) => ({
+  revealedPageIds: new Set(from.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id)),
+  revealedSourceIds: new Set<string>()
+});
 
 describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", () => {
   /**
@@ -37,14 +55,14 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
    */
   it("does not return an unrevealed MAP to a player", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Castle Ravenloft", kind: "regional" });
-    expect(store.searchAll("gm", "Ravenloft").some((hit) => hit.kind === "map" && hit.id === map.id)).toBe(true);
-    expect(store.searchAll("player", "Ravenloft").some((hit) => hit.id === map.id)).toBe(false);
+    expect(store.searchAll("gm", "Ravenloft").hits.some((hit) => hit.kind === "map" && hit.id === map.id)).toBe(true);
+    expect(store.searchAll("player", "Ravenloft").hits.some((hit) => hit.id === map.id)).toBe(false);
   });
 
   it("does not return an unrevealed JOURNAL entry to a player", () => {
     const entry = store.createEntry({ playerText: "The vistani warned us" });
-    expect(store.searchAll("gm", "vistani").some((hit) => hit.kind === "journal" && hit.id === entry.id)).toBe(true);
-    expect(store.searchAll("player", "vistani").some((hit) => hit.id === entry.id)).toBe(false);
+    expect(store.searchAll("gm", "vistani").hits.some((hit) => hit.kind === "journal" && hit.id === entry.id)).toBe(true);
+    expect(store.searchAll("player", "vistani").hits.some((hit) => hit.id === entry.id)).toBe(false);
   });
 
   /**
@@ -61,12 +79,12 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
     const quest = store.createQuest({ title: "The Wyrmwood Contract", playerBody: "Recover the ledger." });
     expect(quest.revealedToPlayers).toBe(false);
     // The GM finds it, so the player's miss below is the visibility arm and not a quest that never indexed.
-    expect(store.searchAll("gm", "ledger").some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
-    expect(store.searchAll("player", "ledger").some((hit) => hit.id === quest.id)).toBe(false);
+    expect(store.searchAll("gm", "ledger").hits.some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
+    expect(store.searchAll("player", "ledger").hits.some((hit) => hit.id === quest.id)).toBe(false);
 
     // ...and revealing it makes it findable, so the miss above is the reveal gate and not a missing arm.
     store.setQuestRevealed(quest.id, true);
-    expect(store.searchAll("player", "ledger").some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
+    expect(store.searchAll("player", "ledger").hits.some((hit) => hit.kind === "quest" && hit.id === quest.id)).toBe(true);
   });
 
   it("does not return a REVEALED marker sitting on a SECRET map to a player (CD-6, at the SQL layer)", () => {
@@ -76,12 +94,12 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
     const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Crypt of Strahd" });
     store.setMarkerRevealed(marker.id, true);                    // pin shown...
     expect(store.getMap(map.id)!.revealedToPlayers).toBe(false);  // ...map still secret
-    expect(store.searchAll("gm", "Crypt").some((hit) => hit.kind === "marker" && hit.id === marker.id)).toBe(true);
-    expect(store.searchAll("player", "Crypt").some((hit) => hit.id === marker.id)).toBe(false);
+    expect(store.searchAll("gm", "Crypt").hits.some((hit) => hit.kind === "marker" && hit.id === marker.id)).toBe(true);
+    expect(store.searchAll("player", "Crypt").hits.some((hit) => hit.id === marker.id)).toBe(false);
 
     // ...and revealing the map makes it findable, so the miss above is the map gate and not a bad query.
     store.setMapRevealed(map.id, true);
-    expect(store.searchAll("player", "Crypt").some((hit) => hit.id === marker.id)).toBe(true);
+    expect(store.searchAll("player", "Crypt").hits.some((hit) => hit.id === marker.id)).toBe(true);
   });
 });
 
@@ -91,23 +109,23 @@ describe("CodexStore search matches tags on every kind (CI-1 + CI-2)", () => {
     // box answered a tag query differently depending on which record happened to carry the tag.
     const page = store.createPage({ title: "Strahd", tags: ["villain"] });
     store.setPageRevealed(page.id, true);
-    const gmHits = store.searchAll("gm", "villain");
+    const gmHits = store.searchAll("gm", "villain").hits;
     expect(gmHits.some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
     // ...and a player can find it too, because a revealed page's tags are already player-visible.
-    expect(store.searchAll("player", "villain").some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
+    expect(store.searchAll("player", "villain").hits.some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
   });
 
   it("does not surface an UNREVEALED page by its tag to a player", () => {
     const page = store.createPage({ title: "Secret", tags: ["villain"] });
-    expect(store.searchAll("gm", "villain").some((hit) => hit.id === page.id)).toBe(true);
-    expect(store.searchAll("player", "villain").some((hit) => hit.id === page.id)).toBe(false);
+    expect(store.searchAll("gm", "villain").hits.some((hit) => hit.id === page.id)).toBe(true);
+    expect(store.searchAll("player", "villain").hits.some((hit) => hit.id === page.id)).toBe(false);
   });
 
   it("keeps a page's indexed tags in step when they change", () => {
     const page = store.createPage({ title: "Rictavio", tags: ["ally"] });
     store.updatePage(page.id, { tags: ["villain"] }, undefined, "gm");
-    expect(store.searchAll("gm", "ally").some((hit) => hit.id === page.id)).toBe(false);
-    expect(store.searchAll("gm", "villain").some((hit) => hit.id === page.id)).toBe(true);
+    expect(store.searchAll("gm", "ally").hits.some((hit) => hit.id === page.id)).toBe(false);
+    expect(store.searchAll("gm", "villain").hits.some((hit) => hit.id === page.id)).toBe(true);
   });
 });
 
@@ -133,7 +151,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
 
   it("puts the page NAMED Strahd first for a GM, keeping the pages that only mention it", () => {
     const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
-    const hits = store.searchAll("gm", "Strahd");
+    const hits = store.searchAll("gm", "Strahd").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named });
     // Recall is unchanged - the mentions are still found, just below the record named for the query.
     expect(hits.map((hit) => hit.id).sort()).toEqual([named, mentionsA, mentionsB].sort());
@@ -143,7 +161,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     // Both audiences have their own FTS table; weighting one and not the other would give the GM and the
     // player who type the same name different answers.
     const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
-    const hits = store.searchAll("player", "Strahd");
+    const hits = store.searchAll("player", "Strahd").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named });
     expect(hits.map((hit) => hit.id).sort()).toEqual([named, mentionsA, mentionsB].sort());
   });
@@ -164,7 +182,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const named = store.createPage({ title: "Strahd", playerBody: "A vampire lord.", revealedToPlayers: true });
     const spam = store.createPage({ title: "QA Keep 111", playerBody: Array.from({ length: 120 }, () => "Strahd").join(" "), revealedToPlayers: true });
     for (const audience of ["gm", "player"] as const) {
-      const hits = store.searchAll(audience, "Strahd");
+      const hits = store.searchAll(audience, "Strahd").hits;
       expect(hits[0]).toEqual({ kind: "page", id: named.id });
       expect(hits).toContainEqual({ kind: "page", id: spam.id });
     }
@@ -178,7 +196,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const titled = store.createPage({ title: "Castle Ravenloft", playerBody: "the seat of the land", revealedToPlayers: true });
     const bodied = store.createPage({ title: "QA Keep 222", playerBody: "We rode to Ravenloft. Ravenloft loomed. Ravenloft again.", revealedToPlayers: true });
     for (const audience of ["gm", "player"] as const) {
-      const hits = store.searchAll(audience, "Ravenloft");
+      const hits = store.searchAll(audience, "Ravenloft").hits;
       expect(hits[0]).toEqual({ kind: "page", id: titled.id });
       expect(hits).toContainEqual({ kind: "page", id: bodied.id });
     }
@@ -196,7 +214,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const entry = store.createEntry({ playerText: Array.from({ length: 8 }, () => "Vallaki").join(" ") });
     store.setEntryRevealed(entry.id, true);
     for (const audience of ["gm", "player"] as const) {
-      const hits = store.searchAll(audience, "Vallaki");
+      const hits = store.searchAll(audience, "Vallaki").hits;
       expect(hits[0]).toEqual({ kind: "map", id: map.id });
       expect(hits).toContainEqual({ kind: "journal", id: entry.id });
     }
@@ -208,7 +226,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
     const named = store.createPage({ title: "Villain", playerBody: "the archetype", revealedToPlayers: true });
     const tagged = store.createPage({ title: "Rictavio", tags: ["villain"], revealedToPlayers: true });
     const bodied = store.createPage({ title: "Rumours", playerBody: "a villain walks abroad", revealedToPlayers: true });
-    const hits = store.searchAll("player", "Villain");
+    const hits = store.searchAll("player", "Villain").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named.id });
     expect(hits.map((hit) => hit.id).sort()).toEqual([named.id, tagged.id, bodied.id].sort());
   });
@@ -281,20 +299,20 @@ describe("CodexStore suite-wide search (CI-1)", () => {
       await upgraded.initialize();
 
       // Every pre-existing record is now findable, by every kind, in the ONE index.
-      expect(upgraded.searchAll("gm", "Ravenloft")).toEqual([{ kind: "page", id: pageId }]);
-      expect(upgraded.searchAll("player", "Barovia")).toEqual([{ kind: "map", id: mapId }]);
-      expect(upgraded.searchAll("player", "Svalich")).toEqual([{ kind: "marker", id: markerId }]);
-      expect(upgraded.searchAll("player", "mists")).toEqual([{ kind: "journal", id: entryId }]);
+      expect(upgraded.searchAll("gm", "Ravenloft").hits).toEqual([{ kind: "page", id: pageId }]);
+      expect(upgraded.searchAll("player", "Barovia").hits).toEqual([{ kind: "map", id: mapId }]);
+      expect(upgraded.searchAll("player", "Svalich").hits).toEqual([{ kind: "marker", id: markerId }]);
+      expect(upgraded.searchAll("player", "mists").hits).toEqual([{ kind: "journal", id: entryId }]);
       // ...including the tags v10 added to those three kinds.
-      expect(upgraded.searchAll("player", "gloomy")).toEqual([{ kind: "map", id: mapId }]);
-      expect(upgraded.searchAll("player", "waypoint")).toEqual([{ kind: "marker", id: markerId }]);
-      expect(upgraded.searchAll("player", "arrival")).toEqual([{ kind: "journal", id: entryId }]);
+      expect(upgraded.searchAll("player", "gloomy").hits).toEqual([{ kind: "map", id: mapId }]);
+      expect(upgraded.searchAll("player", "waypoint").hits).toEqual([{ kind: "marker", id: markerId }]);
+      expect(upgraded.searchAll("player", "arrival").hits).toEqual([{ kind: "journal", id: entryId }]);
 
       // The backfill kept the layers apart: GM-only text landed in the GM index ONLY.
-      expect(upgraded.searchAll("player", "crypt")).toEqual([]);
-      expect(upgraded.searchAll("gm", "crypt")).toEqual([{ kind: "page", id: pageId }]);
-      expect(upgraded.searchAll("player", "watching")).toEqual([]);
-      expect(upgraded.searchAll("gm", "watching")).toEqual([{ kind: "journal", id: entryId }]);
+      expect(upgraded.searchAll("player", "crypt").hits).toEqual([]);
+      expect(upgraded.searchAll("gm", "crypt").hits).toEqual([{ kind: "page", id: pageId }]);
+      expect(upgraded.searchAll("player", "watching").hits).toEqual([]);
+      expect(upgraded.searchAll("gm", "watching").hits).toEqual([{ kind: "journal", id: entryId }]);
 
       // ...and the superseded pages-only tables are gone, so there is one index and one sync path.
       const reopened = new DatabaseSync(path);
@@ -312,23 +330,23 @@ describe("CodexStore suite-wide search (CI-1)", () => {
   it("keeps the index in step with writes, including markers swept away by a map delete", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Vallaki", kind: "regional", revealedToPlayers: true });
     const marker = store.createMarker(map.id, { x: 0.1, y: 0.1, iconId: "pin", iconColor: "#FF2E9A", label: "Blinsky toys", revealedToPlayers: true });
-    expect(store.searchAll("player", "Blinsky")).toEqual([{ kind: "marker", id: marker.id }]);
+    expect(store.searchAll("player", "Blinsky").hits).toEqual([{ kind: "marker", id: marker.id }]);
 
     // Renaming reindexes: the old text stops matching, the new text starts.
     store.updateMarker(marker.id, { label: "Burgomaster mansion" });
-    expect(store.searchAll("gm", "Blinsky")).toEqual([]);
-    expect(store.searchAll("gm", "Burgomaster")).toEqual([{ kind: "marker", id: marker.id }]);
+    expect(store.searchAll("gm", "Blinsky").hits).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster").hits).toEqual([{ kind: "marker", id: marker.id }]);
 
     // A reveal toggle needs no reindex - visibility is resolved against the live row at read time.
     store.setMarkerRevealed(marker.id, false);
-    expect(store.searchAll("player", "Burgomaster")).toEqual([]);
-    expect(store.searchAll("gm", "Burgomaster")).toEqual([{ kind: "marker", id: marker.id }]);
+    expect(store.searchAll("player", "Burgomaster").hits).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster").hits).toEqual([{ kind: "marker", id: marker.id }]);
 
     // Deleting the MAP cascades its markers away in SQL; their index rows must go with them, or they
     // would keep matching forever with no live row left to gate them.
     store.deleteMap(map.id);
-    expect(store.searchAll("gm", "Burgomaster")).toEqual([]);
-    expect(store.searchAll("gm", "Vallaki")).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster").hits).toEqual([]);
+    expect(store.searchAll("gm", "Vallaki").hits).toEqual([]);
   });
 });
 
@@ -459,20 +477,21 @@ describe("CodexStore links + search", () => {
   it("parses wiki-links across both layers with entity prefixes", () => {
     const links = parseWikiLinks("See [[Bree]] and [[actor:Gandalf]] and [[Keep#Cellar]]", "gm");
     expect(links).toEqual([
-      { sourcePageId: "", layer: "gm", targetKind: "page", targetRef: "bree", section: null },
-      { sourcePageId: "", layer: "gm", targetKind: "actor", targetRef: "Gandalf", section: null },
-      { sourcePageId: "", layer: "gm", targetKind: "page", targetRef: "keep", section: "Cellar" }
+      { sourceKind: "page", sourceId: "", layer: "gm", targetKind: "page", targetRef: "bree", section: null },
+      { sourceKind: "page", sourceId: "", layer: "gm", targetKind: "actor", targetRef: "Gandalf", section: null },
+      { sourceKind: "page", sourceId: "", layer: "gm", targetKind: "page", targetRef: "keep", section: "Cellar" }
     ]);
   });
 
-  it("builds backlinks keyed by title and tags the source layer", () => {
+  it("builds incoming MENTION connections keyed by title, tagged with the source layer", () => {
     const bree = store.createPage({ title: "Bree" });
     store.createPage({ title: "Road", playerBody: "leads to [[Bree]]", revealedToPlayers: true });
     store.createPage({ title: "Cult", gmBody: "meets near [[Bree]]" }); // gm-layer, unrevealed
-    const backlinks = store.backlinksToPage(bree.id);
-    expect(backlinks).toHaveLength(2);
-    expect(backlinks.find((b) => b.sourceTitle === "Road")).toMatchObject({ layer: "player", sourceRevealed: true });
-    expect(backlinks.find((b) => b.sourceTitle === "Cult")).toMatchObject({ layer: "gm", sourceRevealed: false });
+    const incoming = store.connectionsForPage(bree.id).filter((row) => row.direction === "in");
+    expect(incoming).toHaveLength(2);
+    // D8: a mention is a connection with `origin: "mention"` and no id - not a second kind of thing.
+    expect(incoming.find((row) => row.otherTitle === "Road")).toMatchObject({ layer: "player", otherRevealed: true, origin: "mention", id: null, otherKind: "page" });
+    expect(incoming.find((row) => row.otherTitle === "Cult")).toMatchObject({ layer: "gm", otherRevealed: false, origin: "mention", id: null });
     expect(pageLinkKey("  Bree  ")).toBe("bree");
   });
 
@@ -513,13 +532,13 @@ describe("CodexStore viewer safety (the leak matrix)", () => {
     expect(store.searchPages("gm", "smugglers")).toHaveLength(1);     // the GM still finds it
   });
 
-  it("player backlinks exclude gm-layer references and unrevealed sources", () => {
+  it("player connections exclude gm-layer mentions and unrevealed sources", () => {
     const bree = store.createPage({ title: "Bree" });
     store.createPage({ title: "Road", playerBody: "to [[Bree]]", revealedToPlayers: true });   // visible
     store.createPage({ title: "Cult", gmBody: "near [[Bree]]" });                                // gm-layer secret
     store.createPage({ title: "Draft", playerBody: "mentions [[Bree]]", revealedToPlayers: false }); // player-layer but unrevealed
-    const playerBacklinks = projectPlayerBacklinks(store.backlinksToPage(bree.id));
-    expect(playerBacklinks.map((b) => b.sourceTitle)).toEqual(["Road"]);
+    const player = projectPlayerPageConnections(store.connectionsForPage(bree.id), playerConnectionContext());
+    expect(player.map((row) => row.otherTitle)).toEqual(["Road"]);
   });
 });
 
@@ -743,42 +762,107 @@ describe("CodexStore entities + relationships", () => {
     database.close();
   });
 
-  it("creates typed relationships, resolves both directions, dedupes, and cascades on page delete", () => {
+  it("declares connections, resolves both directions, dedupes, and cascades on page delete", () => {
     const strahd = store.createPage({ title: "Strahd", entityType: "character" });
     const barovia = store.createPage({ title: "Barovia", entityType: "location", revealedToPlayers: true });
-    const rel = store.createRelationship(strahd.id, barovia.id, "Rules");
-    expect(rel).toMatchObject({ fromPageId: strahd.id, toPageId: barovia.id, type: "rules" }); // slugged
-    expect(store.createRelationship(strahd.id, barovia.id, "rules").id).toBe(rel.id); // idempotent
-    expect(() => store.createRelationship(strahd.id, strahd.id, "rules")).toThrow(/itself/);
+    const rel = store.createConnection(strahd.id, { toPageId: barovia.id, label: "  rules  " });
+    // D8: the stored value IS the label - trimmed, but neither slugged nor lowercased, because after v22's
+    // relabel there is no display mapping left to translate it back through.
+    expect(rel).toMatchObject({ fromPageId: strahd.id, toPageId: barovia.id, label: "rules", layer: "player" });
+    expect(store.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" }).id, "idempotent on (from, to, label)").toBe(rel.id);
+    // ...and re-declaring with a different LAYER is still the same edge - layer is not in the dedupe key,
+    // because "declare it again, but GM-only" must not silently create a second parallel edge.
+    expect(store.createConnection(strahd.id, { toPageId: barovia.id, label: "rules", layer: "gm" }).id).toBe(rel.id);
+    expect(() => store.createConnection(strahd.id, { toPageId: strahd.id, label: "rules" })).toThrow(/itself/);
 
-    const fromStrahd = store.listRelationshipsFor(strahd.id);
-    expect(fromStrahd).toEqual([{ id: rel.id, type: "rules", direction: "out", otherPageId: barovia.id, otherTitle: "Barovia", otherType: "location", otherRevealed: true }]);
-    expect(store.listRelationshipsFor(barovia.id)[0]).toMatchObject({ direction: "in", otherPageId: strahd.id, otherTitle: "Strahd", otherRevealed: false });
+    const fromStrahd = store.connectionsForPage(strahd.id).filter((row) => row.origin === "declared");
+    expect(fromStrahd).toEqual([{ id: rel.id, label: "rules", direction: "out", otherKind: "page", otherId: barovia.id, otherTitle: "Barovia", otherEntityType: "location", otherRevealed: true, origin: "declared", layer: "player", section: null }]);
+    expect(store.connectionsForPage(barovia.id)[0]).toMatchObject({ direction: "in", otherId: strahd.id, otherTitle: "Strahd", otherRevealed: false });
 
     store.deletePage(strahd.id); // cascades the edge
-    expect(store.listRelationshipsFor(barovia.id)).toHaveLength(0);
+    expect(store.connectionsForPage(barovia.id)).toHaveLength(0);
   });
 
-  it("player relationship projection hides edges to unrevealed entities", () => {
-    const town = store.createPage({ title: "Town", revealedToPlayers: true });
-    const secret = store.createPage({ title: "Secret cult" });
-    const temple = store.createPage({ title: "Temple", revealedToPlayers: true });
-    store.createRelationship(town.id, secret.id, "near");
-    store.createRelationship(town.id, temple.id, "near");
-    const views = store.listRelationshipsFor(town.id);
-    expect(projectGmRelationships(views)).toHaveLength(2);
-    const playerViews = projectPlayerRelationships(views);
-    expect(playerViews).toHaveLength(1);
-    expect(playerViews[0].otherTitle).toBe("Temple");
+  it("treats a SYMMETRIC label as one edge in either direction, and a free-text one as directional", () => {
+    const a = store.createPage({ title: "The Harpers", entityType: "faction" });
+    const b = store.createPage({ title: "The Zhentarim", entityType: "faction" });
+    // v22 relabelled `ally` -> `ally of`, and `SYMMETRIC_RELATIONSHIPS` is re-keyed to match. If it were
+    // not, this would silently create two rows and nothing would fail loudly.
+    const first = store.createConnection(a.id, { toPageId: b.id, label: "ally of" });
+    expect(store.createConnection(b.id, { toPageId: a.id, label: "ally of" }).id).toBe(first.id);
+    expect(store.listAllConnections().filter((edge) => edge.origin === "declared")).toHaveLength(1);
+    // A free-text label is DIRECTIONAL: "guards" one way is not "guards" the other.
+    store.createConnection(a.id, { toPageId: b.id, label: "guards" });
+    store.createConnection(b.id, { toPageId: a.id, label: "guards" });
+    expect(store.listAllConnections().filter((edge) => edge.origin === "declared")).toHaveLength(3);
+  });
+
+  it("relabels and re-layers a declared connection, and refuses a label that is too long", () => {
+    const a = store.createPage({ title: "Strahd", entityType: "character" });
+    const b = store.createPage({ title: "Barovia", entityType: "location" });
+    const edge = store.createConnection(a.id, { toPageId: b.id });
+    expect(edge.label, "an UNLABELLED connection stores '' and reads back null").toBeNull();
+
+    expect(store.updateConnection(edge.id, { label: "rules" }).label).toBe("rules");
+    expect(store.updateConnection(edge.id, { layer: "gm" })).toMatchObject({ label: "rules", layer: "gm" });   // omitted = unchanged
+    expect(store.updateConnection(edge.id, { label: null }).label, "clearing the label is legal").toBeNull();
+    expect(() => store.updateConnection(edge.id, { label: "x".repeat(41) })).toThrow(/40 printable/);
+    expect(() => store.updateConnection(crypto.randomUUID(), { label: "x" })).toThrow(/no longer exists/i);
+
+    store.deleteConnection(edge.id);
+    expect(store.connectionsForPage(a.id)).toHaveLength(0);
+    store.deleteConnection(edge.id);  // idempotent
+  });
+
+  it("folds an unlabelled declared edge and a mention over the same pair into ONE row, declared winning", () => {
+    const bree = store.createPage({ title: "Bree" });
+    const road = store.createPage({ title: "Road", playerBody: "leads to [[Bree]]" });
+    const declared = store.createConnection(road.id, { toPageId: bree.id });
+
+    const outgoing = store.connectionsForPage(road.id).filter((row) => row.direction === "out");
+    expect(outgoing, "one connection stated twice is one row, not two").toHaveLength(1);
+    expect(outgoing[0]).toMatchObject({ id: declared.id, origin: "declared" });   // the deletable one wins
+
+    // A LABELLED declared edge is never folded against a mention: "ally of" and "mentions" are different
+    // statements about the same pair, and a panel that hid one would be lying about the other.
+    store.updateConnection(declared.id, { label: "leads to" });
+    const both = store.connectionsForPage(road.id).filter((row) => row.direction === "out");
+    expect(both).toHaveLength(2);
+    expect(both.map((row) => row.origin).sort()).toEqual(["declared", "mention"]);
+  });
+
+  it("gates a player's page connections on the layer AND the other end's reveal, for BOTH origins", () => {
+    const hub = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const shown = store.createPage({ title: "The Blue Water Inn", revealedToPlayers: true });
+    const secret = store.createPage({ title: "The Cult", revealedToPlayers: false });
+    const gmLayer = store.createConnection(hub.id, { toPageId: shown.id, label: "hides", layer: "gm" });
+    store.createConnection(hub.id, { toPageId: shown.id, label: "contains" });
+    store.createConnection(hub.id, { toPageId: secret.id, label: "watched by" });
+
+    const player = projectPlayerPageConnections(store.connectionsForPage(hub.id), playerConnectionContext());
+    expect(player.map((row) => row.label)).toEqual(["contains"]);
+    // The GM's own panel carries all three, so the filtering above is the gate and not an empty fixture.
+    expect(projectGmPageConnections(store.connectionsForPage(hub.id))).toHaveLength(3);
+    // A GM-LAYER DECLARED edge between two REVEALED pages never travels - the rule that is genuinely new
+    // in D8, and the one a "both endpoints revealed" gate alone would miss.
+    expect(player.some((row) => row.otherId === shown.id && row.label === "hides")).toBe(false);
+    store.updateConnection(gmLayer.id, { layer: "player" });
+    expect(projectPlayerPageConnections(store.connectionsForPage(hub.id), playerConnectionContext()).map((row) => row.label).sort()).toEqual(["contains", "hides"]);
+
+    // The player row's EXACT key set: no `id`, no `layer`, no `otherRevealed`.
+    expect(Object.keys(projectPlayerPageConnections(store.connectionsForPage(hub.id), playerConnectionContext())[0]!).sort())
+      .toEqual(["direction", "label", "origin", "otherEntityType", "otherId", "otherKind", "otherTitle", "section"]);
   });
 });
 
 describe("CodexStore journal", () => {
   it("creates, updates, reveals, and orders a timeline; combat entries auto-tag their kind", () => {
     const page = store.createPage({ title: "Bree" });
-    const first = store.createEntry({ playerText: "We arrived in Bree.", gmText: "The spy watched them.", sessionNumber: 1, attachPageId: page.id });
-    expect(first).toMatchObject({ kind: "note", revealedToPlayers: false, sessionNumber: 1 });
-    store.createEntry({ playerText: "We left at dawn.", sessionNumber: 2 });
+    const one = store.createSession({ sessionNumber: 1 });
+    const two = store.createSession({ sessionNumber: 2 });
+    const first = store.createEntry({ playerText: "We arrived in Bree.", gmText: "The spy watched them.", sessionId: one.id, attachPageId: page.id });
+    expect(first).toMatchObject({ kind: "note", revealedToPlayers: false, sessionId: one.id, sessionNumber: 1 });
+    store.createEntry({ playerText: "We left at dawn.", sessionId: two.id });
     const combat = store.appendCombatEntry({ sourceEncounterId: 7, playerText: "A brawl broke out.", attachPageId: page.id });
     expect(combat.kind).toBe("combat");
 
@@ -1019,7 +1103,7 @@ describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", ()
     // has already reached must READ as passed) and `payload` (a downtime's who/activity/days, and NEVER
     // `applied`, which is GM workflow state). This list is the gate on that pair staying a pair - the next
     // key to appear here has to be argued for, not merely compiled.
-    expect(Object.keys(projected).sort()).toEqual(["createdAt", "fired", "id", "inWorldLabel", "kind", "payload", "realDate", "sessionNumber", "tags", "text", "title"]);
+    expect(Object.keys(projected).sort()).toEqual(["calendarInstant", "createdAt", "fired", "id", "inWorldDate", "inWorldLabel", "kind", "payload", "realDate", "sessionId", "sessionNumber", "tags", "text", "title"]);
     expect(projected.text).toBe("The sky tore open.");
     expect(JSON.stringify(projected)).not.toContain("Strahd engineered it.");
     expect(JSON.stringify(projected)).not.toContain("conceal the cause");
@@ -1124,52 +1208,110 @@ describe("Codex page→marker reverse lookup — the store and projection layers
  * CI-8. Same reasoning: `GET /codex/links` decides visibility in `projectPlayerLinkEdges`, and the store
  * feeding it is ungated on purpose. These prove each rule at the projection, not only end to end.
  */
-describe("Codex whole-graph wiki-link feed — the store and projection layers, on their own (CI-8)", () => {
-  const revealedIds = () => new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
+/**
+ * D8: the WHOLE-GRAPH feed, at the store and projection layers. This describe used to be about wiki-link
+ * edges alone (CI-8); after D8 there is one feed and one edge kind, so it is about connections - and the
+ * mention arm's three rules are unchanged, because D8 folded the concepts rather than loosening a gate.
+ */
+describe("Codex whole-graph connections — the store and projection layers, on their own (D8)", () => {
+  // The shared `playerConnectionContext` above, in the shape the router resolves it.
+  const context = () => playerConnectionContext();
+  const mentions = () => store.listAllConnections().filter((edge) => edge.origin === "mention");
+  const pair = (edge: { fromId: string; toPageId: string }) => ({ fromPageId: edge.fromId, toPageId: edge.toPageId });
 
-  it("the store's link feed is deliberately UNGATED — both layers, every reveal state", () => {
+  it("the store's feed is deliberately UNGATED — both layers, every reveal state, both origins", () => {
     const target = store.createPage({ title: "Vallaki" });                                    // secret
     const source = store.createPage({ title: "Barovia", gmBody: "Answers to [[Vallaki]]." }); // secret, GM-layer link
-    expect(store.listAllLinks()).toEqual([{ fromPageId: source.id, toPageId: target.id, layer: "gm" }]);
+    expect(mentions()).toEqual([{ id: null, fromKind: "page", fromId: source.id, toPageId: target.id, label: null, origin: "mention", layer: "gm", createdAt: null }]);
   });
 
-  it("refuses a GM-BODY link even when both endpoints are revealed", () => {
+  it("refuses a GM-BODY mention even when both endpoints are revealed", () => {
     const target = store.createPage({ title: "Vallaki", revealedToPlayers: true });
     const source = store.createPage({ title: "Barovia", gmBody: "Its burgomaster answers to [[Vallaki]].", revealedToPlayers: true });
-    const edges = store.listAllLinks();
-    expect(projectGmLinkEdges(edges)).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
-    expect(projectPlayerLinkEdges(edges, revealedIds())).toEqual([]);
+    expect(projectGmConnections(store.listAllConnections())).toHaveLength(1);
+    expect(projectPlayerConnections(store.listAllConnections(), context())).toEqual([]);
     // Moving the very same link into the player body lets it through — so the miss is the LAYER rule.
     store.updatePage(source.id, { gmBody: "", playerBody: "Ruled from [[Vallaki]]." }, undefined, "test");
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+    expect(projectPlayerConnections(store.listAllConnections(), context()).map(pair)).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
   });
 
-  it("refuses a player-body link when EITHER endpoint is unrevealed, so no dangling edge names a secret page", () => {
+  it("refuses a player-body mention when EITHER endpoint is unrevealed, so no dangling edge names a secret page", () => {
     const secret = store.createPage({ title: "The Whispered Name" });
     const source = store.createPage({ title: "Barovia", playerBody: "Watched by [[The Whispered Name]].", revealedToPlayers: true });
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([]);   // hidden TARGET
+    expect(projectPlayerConnections(store.listAllConnections(), context())).toEqual([]);   // hidden TARGET
     store.setPageRevealed(secret.id, true);
     store.setPageRevealed(source.id, false);
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([]);   // hidden SOURCE
+    expect(projectPlayerConnections(store.listAllConnections(), context())).toEqual([]);   // hidden SOURCE
     store.setPageRevealed(source.id, true);
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: secret.id }]);
+    expect(projectPlayerConnections(store.listAllConnections(), context()).map(pair)).toEqual([{ fromPageId: source.id, toPageId: secret.id }]);
   });
 
   it("resolves targets by title key, and drops self-links and links to titles no page carries", () => {
     const page = store.createPage({ title: "Barovia", playerBody: "See [[  barovia  ]] and [[A Page Never Written]].", revealedToPlayers: true });
-    expect(store.listAllLinks()).toEqual([]);   // the self-link normalizes to this very page; the other has no node
-    // A link that DOES resolve proves the title-key matching itself works (case/whitespace insensitive).
+    expect(mentions()).toEqual([]);   // the self-link normalizes to this very page; the other has no node
     const other = store.createPage({ title: "Castle  Ravenloft", revealedToPlayers: true });
     store.updatePage(page.id, { playerBody: "Looms over it: [[castle ravenloft]]." }, undefined, "test");
-    expect(store.listAllLinks()).toEqual([{ fromPageId: page.id, toPageId: other.id, layer: "player" }]);
+    expect(mentions().map(pair)).toEqual([{ fromPageId: page.id, toPageId: other.id }]);
   });
 
   it("collapses a target linked from BOTH bodies into ONE player-layer edge", () => {
     const target = store.createPage({ title: "Vallaki", revealedToPlayers: true });
     const source = store.createPage({ title: "Barovia", playerBody: "Ruled from [[Vallaki#Rule]].", gmBody: "[[Vallaki]] hides the coffin.", revealedToPlayers: true });
     // The player body genuinely carries it, so the edge is player-visible - and the graph draws one line.
-    expect(store.listAllLinks()).toEqual([{ fromPageId: source.id, toPageId: target.id, layer: "player" }]);
-    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+    expect(mentions()).toHaveLength(1);
+    expect(mentions()[0]!.layer).toBe("player");
+    expect(projectPlayerConnections(store.listAllConnections(), context()).map(pair)).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+  });
+
+  /**
+   * D13: session, quest and journal bodies join the graph, with the layer mapping their own two-layer
+   * split already implies. Prep is a session's secret half, so a page named only in prep is a GM-only
+   * connection - the exact leak shape the layer rule exists for, one record kind further out.
+   */
+  it("puts session, quest and journal bodies in the graph, on the layer their own split implies", () => {
+    const shown = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const session = store.createSession({ recapBody: "We reached [[Vallaki]].", prepBody: "The ambush waits in [[Vallaki]]." });
+    const quest = store.createQuest({ title: "Find the Sunsword", playerBody: "Look in [[Vallaki]]." });
+    const entry = store.createEntry({ playerText: "Arrived at [[Vallaki]].", revealedToPlayers: true });
+    const gmOnlyEntry = store.createEntry({ playerText: "Nothing happened.", gmText: "Strahd watches [[Vallaki]].", revealedToPlayers: true });
+
+    const bySource = new Map(store.listAllConnections().filter((edge) => edge.origin === "mention").map((edge) => [edge.fromId, edge]));
+    // The session names the page from BOTH bodies, so the collapse upgrades it to the player layer.
+    expect(bySource.get(session.id)).toMatchObject({ fromKind: "session", toPageId: shown.id, layer: "player" });
+    expect(bySource.get(quest.id)).toMatchObject({ fromKind: "quest", layer: "player" });
+    expect(bySource.get(entry.id)).toMatchObject({ fromKind: "journal", layer: "player" });
+    expect(bySource.get(gmOnlyEntry.id), "a page named only in gmText is a GM-layer edge").toMatchObject({ fromKind: "journal", layer: "gm" });
+
+    // A prep-ONLY mention is GM-layer, which is the half a player must never receive.
+    const prepOnly = store.createSession({ prepBody: "Secretly, [[Vallaki]]." });
+    expect(store.listAllConnections().find((edge) => edge.fromId === prepOnly.id)).toMatchObject({ layer: "gm" });
+
+    // THE PLAYER GATE, per source kind: the source record's own reveal flag decides, so a connection can
+    // never be a way around a session/quest/entry's own gate. Nothing is revealed yet -> nothing travels.
+    const ctx = { revealedPageIds: new Set([shown.id]), revealedSourceIds: new Set<string>() };
+    expect(projectPlayerConnections(store.listAllConnections(), ctx).filter((edge) => edge.fromKind !== "page")).toEqual([]);
+    // Reveal the session and the entry; the quest stays hidden, so its edge stays hidden with it.
+    const revealed = { revealedPageIds: new Set([shown.id]), revealedSourceIds: new Set([session.id, entry.id]) };
+    const travelling = projectPlayerConnections(store.listAllConnections(), revealed);
+    expect(travelling.map((edge) => edge.fromId).sort()).toEqual([entry.id, session.id].sort());
+    // The player edge's EXACT key set: no id, no layer, no createdAt.
+    expect(Object.keys(travelling[0]!).sort()).toEqual(["fromId", "fromKind", "label", "origin", "toPageId"]);
+  });
+
+  it("scrubs a record's link rows when it is deleted — v22 dropped the foreign key, so nothing cascades", () => {
+    const shown = store.createPage({ title: "Vallaki" });
+    const session = store.createSession({ recapBody: "[[Vallaki]]" });
+    const quest = store.createQuest({ title: "Q", playerBody: "[[Vallaki]]" });
+    const entry = store.createEntry({ playerText: "[[Vallaki]]" });
+    const page = store.createPage({ title: "Road", playerBody: "[[Vallaki]]" });
+    expect(store.listAllConnections()).toHaveLength(4);
+
+    store.deleteSession(session.id);
+    store.deleteQuest(quest.id);
+    store.deleteEntry(entry.id);
+    store.deletePage(page.id);
+    expect(store.listAllConnections(), "no orphan edge survives its source record").toEqual([]);
+    expect(store.connectionsForPage(shown.id)).toEqual([]);
   });
 });
 
@@ -1246,13 +1388,13 @@ describe("CodexStore recency semantics — what counts as an update (CI-9)", () 
     expect(rev(page.id)).toBe(bornRev + 1);
   });
 
-  it("DOES count adding a relationship, on BOTH endpoints, without forcing either editor into a conflict", () => {
+  it("DOES count adding a connection, on BOTH endpoints, without forcing either editor into a conflict", () => {
     const strahd = recency.createPage({ title: "Strahd", entityType: "character" });
     const barovia = recency.createPage({ title: "Barovia", entityType: "location" });
     const bornStrahd = updatedAt(strahd.id);
     const bornBarovia = updatedAt(barovia.id);
     tick();
-    const edge = recency.createRelationship(strahd.id, barovia.id, "rules");
+    const edge = recency.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" });
     expect(updatedAt(strahd.id) > bornStrahd).toBe(true);
     expect(updatedAt(barovia.id) > bornBarovia).toBe(true);   // the OTHER end gained a connection too
     expect(rev(strahd.id)).toBe(strahd.rev);                  // `rev` is the conflict token, not recency
@@ -1261,19 +1403,19 @@ describe("CodexStore recency semantics — what counts as an update (CI-9)", () 
     // An idempotent re-add changes nothing, so it is not an edit.
     const settled = updatedAt(strahd.id);
     tick();
-    expect(recency.createRelationship(strahd.id, barovia.id, "rules").id).toBe(edge.id);
+    expect(recency.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" }).id).toBe(edge.id);
     expect(updatedAt(strahd.id)).toBe(settled);
   });
 
-  it("DOES count removing a relationship, on both endpoints", () => {
+  it("DOES count removing a connection, on both endpoints", () => {
     const strahd = recency.createPage({ title: "Strahd", entityType: "character" });
     const barovia = recency.createPage({ title: "Barovia", entityType: "location" });
-    const edge = recency.createRelationship(strahd.id, barovia.id, "rules");
+    const edge = recency.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" });
     const afterCreate = updatedAt(strahd.id);
     expect(updatedAt(barovia.id)).toBe(afterCreate);
     tick();
-    recency.deleteRelationship(edge.id);
-    expect(recency.listRelationshipsFor(strahd.id)).toEqual([]);
+    recency.deleteConnection(edge.id);
+    expect(recency.connectionsForPage(strahd.id)).toEqual([]);
     expect(updatedAt(strahd.id) > afterCreate).toBe(true);
     expect(updatedAt(barovia.id) > afterCreate).toBe(true);
     expect(rev(strahd.id)).toBe(strahd.rev);
@@ -1373,24 +1515,23 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.createSession({ sessionNumber: 7 }).sessionNumber).toBe(7);
   });
 
-  it("names exactly the session numbers whose RECORD is still hidden from players", () => {
-    // The resolution the player journal reads gate `sessionNumber` on. It must be the UNREVEALED set, not
-    // the complement of the revealed one: a number with no session record at all is in neither, which is
-    // what keeps every pre-M9 entry's label working.
+  it("names exactly the session IDS still hidden from players, numbered or not", () => {
+    // The resolution every player journal read gates the session link on. D9 keys it by ID, which is what
+    // closes the gap the number version could not: an UNNUMBERED hidden session could never appear in a
+    // set of numbers, so an entry filed under one had nothing to gate on.
     const hidden = sessions.createSession({ sessionNumber: 4 });
     const shown = sessions.createSession({ sessionNumber: 5 });
     sessions.setSessionRevealed(shown.id, true);
-    // Unrevealed, but it names no number — a set that let a null through would be a value every caller has
-    // to remember not to look up, and this is what catches one arriving.
-    sessions.createSession({});
-    expect([...sessions.unrevealedSessionNumbers()]).toEqual([4]);
+    const unnumbered = sessions.createSession({});
+    expect([...sessions.unrevealedSessionIds()].sort()).toEqual([hidden.id, unnumbered.id].sort());
 
-    // Revealing 4 empties the set, so the 4 above is the reveal flag being read and not "every session".
+    // Revealing them empties the set, so the ids above are the reveal flag being read and not "every session".
     sessions.setSessionRevealed(hidden.id, true);
-    expect([...sessions.unrevealedSessionNumbers()]).toEqual([]);
-    // ...and hiding 5 again puts a DIFFERENT number in, so this is a per-row read rather than a constant.
+    sessions.setSessionRevealed(unnumbered.id, true);
+    expect([...sessions.unrevealedSessionIds()]).toEqual([]);
+    // ...and hiding 5 again puts a DIFFERENT id in, so this is a per-row read rather than a constant.
     sessions.setSessionRevealed(shown.id, false);
-    expect([...sessions.unrevealedSessionNumbers()]).toEqual([5]);
+    expect([...sessions.unrevealedSessionIds()]).toEqual([shown.id]);
   });
 
   it("orders numbered sessions by number, with the unnumbered ones below them", () => {
@@ -1434,14 +1575,14 @@ describe("CodexStore sessions (M9)", () => {
   it("treats session number 0 as a real number, not as absent", () => {
     const zero = sessions.createSession({ sessionNumber: 0 });
     expect(zero.sessionNumber).toBe(0);
-    const entry = sessions.createEntry({ playerText: "The session before the first.", sessionNumber: 0, revealedToPlayers: true });
+    const entry = sessions.createEntry({ playerText: "The session before the first.", sessionId: zero.id, revealedToPlayers: true });
     expect(entry.sessionNumber).toBe(0);
 
-    // Unrevealed record -> gated to null, exactly as any other number.
-    expect(projectPlayerJournalEntry(entry, { unrevealedSessionNumbers: sessions.unrevealedSessionNumbers() })!.sessionNumber).toBeNull();
+    // Unrevealed record -> gated to null, exactly as any other session.
+    expect(projectPlayerJournalEntry(entry, { unrevealedSessionIds: sessions.unrevealedSessionIds() })!.sessionNumber).toBeNull();
     // Revealed -> the number survives, and 0 is not mistaken for "no session".
     sessions.setSessionRevealed(zero.id, true);
-    expect(projectPlayerJournalEntry(entry, { unrevealedSessionNumbers: sessions.unrevealedSessionNumbers() })!.sessionNumber).toBe(0);
+    expect(projectPlayerJournalEntry(entry, { unrevealedSessionIds: sessions.unrevealedSessionIds() })!.sessionNumber).toBe(0);
   });
 
   /**
@@ -1452,13 +1593,17 @@ describe("CodexStore sessions (M9)", () => {
   it("editing an entry never re-files it under the ACTIVE session", () => {
     const older = sessions.createSession({ sessionNumber: 2 });
     const running = sessions.createSession({ sessionNumber: 9 });
-    void older;
     sessions.setActiveSession(running.id);
 
-    const entry = sessions.createEntry({ playerText: "Filed under two.", sessionNumber: 2 });
+    const entry = sessions.createEntry({ playerText: "Filed under two.", sessionId: older.id });
     expect(entry.sessionNumber).toBe(2);
     const edited = sessions.updateEntry(entry.id, { playerText: "Filed under two, with a typo fixed." });
     expect(edited.sessionNumber).toBe(2);          // NOT 9
+    expect(edited.sessionId).toBe(older.id);
+    // ...and an EXPLICIT re-file still works, so the line above is the omitted-means-unchanged rule and
+    // not a PATCH that cannot move an entry at all.
+    expect(sessions.updateEntry(entry.id, { sessionId: running.id }).sessionNumber).toBe(9);
+    expect(sessions.updateEntry(entry.id, { sessionId: null })).toMatchObject({ sessionId: null, sessionNumber: null });
   });
 
   it("sets and clears the active session without touching the session record at all", () => {
@@ -1491,8 +1636,9 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.appendCombatEntry({ sourceEncounterId: 3, playerText: "A brawl." }).sessionNumber).toBe(12);
 
     // An EXPLICIT value always wins, including an explicit null — that is a caller saying "no session".
-    expect(sessions.createEntry({ playerText: "A retcon.", sessionNumber: 4 }).sessionNumber).toBe(4);
-    expect(sessions.createEntry({ playerText: "Timeless lore.", sessionNumber: null }).sessionNumber).toBeNull();
+    const other = sessions.createSession({ sessionNumber: 4 });
+    expect(sessions.createEntry({ playerText: "A retcon.", sessionId: other.id }).sessionNumber).toBe(4);
+    expect(sessions.createEntry({ playerText: "Timeless lore.", sessionId: null }).sessionNumber).toBeNull();
   });
 
   it("degrades to today's exact behaviour when there is no active session — and in every gap", () => {
@@ -1506,16 +1652,19 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.createEntry({ playerText: "Between sessions." }).sessionNumber).toBeNull();
     expect(sessions.appendCombatEntry({ sourceEncounterId: 1, playerText: "A brawl." }).sessionNumber).toBeNull();
 
-    // An active session that has NO NUMBER yet is the same gap — there is nothing to file under, and
-    // session 9 sitting right there must not be borrowed.
+    // An active session that has NO NUMBER yet is where D9 is strictly BETTER than the number-stamping it
+    // replaced: the entry joins the RECORD, so it is filed correctly and simply has no number to display
+    // yet. Under M9 it could not link at all. Session 9 sitting right there must still not be borrowed.
     const draft = sessions.createSession({});
     sessions.setActiveSession(draft.id);
-    expect(sessions.createEntry({ playerText: "Mid-draft." }).sessionNumber).toBeNull();
-    expect(sessions.appendCombatEntry({ sourceEncounterId: 2, playerText: "A brawl." }).sessionNumber).toBeNull();
+    const midDraft = sessions.createEntry({ playerText: "Mid-draft." });
+    expect(midDraft).toMatchObject({ sessionId: draft.id, sessionNumber: null });
+    expect(sessions.appendCombatEntry({ sourceEncounterId: 2, playerText: "A brawl." })).toMatchObject({ sessionId: draft.id, sessionNumber: null });
 
-    // ...and numbering that same session starts the linking, so the nulls above are the gap and not a
-    // broken lookup. It resolves to the ACTIVE session's number, not the bystander's.
+    // ...and numbering that same session gives every already-filed entry its label, retroactively - which
+    // is the whole point of joining by identity.
     sessions.updateSession(draft.id, { sessionNumber: 1 }, draft.rev, "gm");
+    expect(sessions.getEntry(midDraft.id)!.sessionNumber).toBe(1);
     expect(sessions.createEntry({ playerText: "Numbered now." }).sessionNumber).toBe(1);
     expect(bystander.sessionNumber).toBe(9);
   });
@@ -1669,7 +1818,7 @@ describe("CodexStore quests (M10)", () => {
     expect(() => quests.deleteQuest("not-a-uuid")).not.toThrow(); // malformed id: early return
     // The index row goes with the record: an orphan would keep matching forever with no live row for
     // `PLAYER_VISIBLE_SQL` to gate it on.
-    expect(quests.searchAll("gm", "First")).toEqual([]);
+    expect(quests.searchAll("gm", "First").hits).toEqual([]);
   });
 
   /**
@@ -1714,23 +1863,23 @@ describe("CodexStore quest search index text — gate 1, with no second line of 
   it("gives a player ZERO hits on a phrase that exists only in `gmBody`", () => {
     const quest = seedRevealed();
     expect(quest.revealedToPlayers).toBe(true);                            // gate 2 would pass this quest
-    expect(store.searchAll("player", "forgery")).toEqual([]);              // ...and yet the phrase is unreachable
-    expect(store.searchAll("player", GM_PHRASE)).toEqual([]);
+    expect(store.searchAll("player", "forgery").hits).toEqual([]);              // ...and yet the phrase is unreachable
+    expect(store.searchAll("player", GM_PHRASE).hits).toEqual([]);
 
     // The GM DOES find it, so the miss above is the two indexes being kept apart, not a quest that never
     // indexed at all.
-    expect(store.searchAll("gm", "forgery")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("gm", "forgery").hits).toEqual([{ kind: "quest", id: quest.id }]);
   });
 
   it("still lets a player find that same quest by its player body and by an objective", () => {
     // This is what makes the assertions above meaningful: the quest IS in the player's index and IS
     // player-visible, so the GM phrase missing is about the TEXT written, not about the record.
     const quest = seedRevealed();
-    expect(store.searchAll("player", "counting")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "counting").hits).toEqual([{ kind: "quest", id: quest.id }]);
     // An objective's text is player-facing — it lives beside `playerBody`, not `gmBody`.
-    expect(store.searchAll("player", "Search")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "Search").hits).toEqual([{ kind: "quest", id: quest.id }]);
     // ...and the title, which is the same string in both indexes.
-    expect(store.searchAll("player", "Wyrmwood")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "Wyrmwood").hits).toEqual([{ kind: "quest", id: quest.id }]);
   });
 
   it("keeps the index in step with an edit and re-splits the layers on the way", () => {
@@ -1740,14 +1889,14 @@ describe("CodexStore quest search index text — gate 1, with no second line of 
       objectives: [{ text: "Reach the gates", done: false }]
     }, undefined);
     // The old player text stops matching — body AND objective, since both feed the same index row.
-    expect(store.searchAll("player", "counting")).toEqual([]);
-    expect(store.searchAll("gm", "counting")).toEqual([]);
-    expect(store.searchAll("player", "Vallaki")).toEqual([{ kind: "quest", id: quest.id }]);
-    expect(store.searchAll("player", "gates")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "counting").hits).toEqual([]);
+    expect(store.searchAll("gm", "counting").hits).toEqual([]);
+    expect(store.searchAll("player", "Vallaki").hits).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "gates").hits).toEqual([{ kind: "quest", id: quest.id }]);
     // ...and the NEW GM half is in the GM index only, so an update cannot be the way a secret phrase
     // sneaks into the player table.
-    expect(store.searchAll("player", "target")).toEqual([]);
-    expect(store.searchAll("gm", "target")).toEqual([{ kind: "quest", id: quest.id }]);
+    expect(store.searchAll("player", "target").hits).toEqual([]);
+    expect(store.searchAll("gm", "target").hits).toEqual([{ kind: "quest", id: quest.id }]);
   });
 });
 
@@ -1783,7 +1932,7 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
     // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
     // ever added to the player projection, not merely if this one leaks. `gmBody` and `rev` are absent;
     // `status` is deliberately PRESENT, unlike a session's, because "what is still open" is the feature.
-    expect(Object.keys(projected).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(Object.keys(projected).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "tags", "title"]);
     expect(projected.body).toBe("Recover the ledger from the counting house.");
     expect(projected.status).toBe("active");
     // Objective order and tick state are the player's copy of the checklist, unchanged.
@@ -1837,65 +1986,153 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
 });
 
 /**
- * The K7 discipline v11/v12 follow: a fresh-database test can never catch a bad upgrade, because every
- * table is empty. This builds a genuine v12 database out of the shipped migration SQL, fills it with the
- * legacy rows that actually matter here (journal entries that already carry a `session_number`), and then
- * opens a `CodexStore` on it — which is exactly the upgrade a GM's existing vtt.sqlite performs.
+ * Migration v19 (D9), on a REAL legacy database rather than a fresh one - the K7 discipline v11/v12/v15
+ * established, because a fresh-database test can never catch a bad upgrade: every table is empty and
+ * every default is trivially satisfied.
+ *
+ * **This describe block used to be called "sessions arrive with NO backfill (M9)", and it asserted the
+ * opposite of what it asserts now.** v13 deliberately refused to synthesize session records for the
+ * numbers legacy journal rows carried, on the grounds that inventing prep, recap and attendance would
+ * fabricate facts. The client's D9 consciously supersedes that decision (see `decision-log.md`), and the
+ * objection is honoured rather than overridden: the synthesized rows carry EMPTY prep, recap and
+ * attendees - nothing is invented - and are `played` + hidden, so they are invisible to players and
+ * change nothing on any screen but the GM's session list, where a number that already existed now has a
+ * record behind it. The alternative was orphaning those numbers, which is data loss.
  */
-describe("CodexStore migration v13 — sessions arrive with NO backfill (M9)", () => {
-  it("fabricates no session records for existing numbered entries, and leaves those entries untouched", async () => {
-    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v12-"));
+describe("CodexStore migration v19 — journal entries join their session by identity (D9)", () => {
+  it("synthesizes a hidden played session per orphan number, joins every entry to it, and keeps the display numbers identical", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v18-"));
     const path = join(legacyDirectory, "vtt.sqlite");
     let upgraded: CodexStore | undefined;
     try {
+      // A genuine v18 database, built from the SHIPPED migration SQL, populated with the legacy row
+      // shapes that actually matter: entries whose number matches an existing session record, entries
+      // whose number matches nothing, an unnumbered entry, and both a numbered and an unnumbered session.
       const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
       database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
-      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 12)) {
+      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 18)) {
         database.exec(migration.sql);
         database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
       }
       database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
-      const one = crypto.randomUUID(), two = crypto.randomUUID(), loose = crypto.randomUUID();
-      const insert = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, session_number, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, NULL, 1, 'note', ?, ?, '[]', '', '')");
-      insert.run(one, "We arrived in Barovia.", 1, 1);
-      insert.run(two, "The wolves came.", 2, 2);
-      insert.run(loose, "Undated lore.", null, 3);
+
+      const existingSession = crypto.randomUUID();
+      const unnumberedSession = crypto.randomUUID();
+      database.prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, 1, '2026-01-01', '[\"Ana\"]', 'Ambush at the bridge.', 'They crossed.', 1, 'played', 1, '', '')").run(existingSession);
+      database.prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', 'Nothing yet.', '', 0, 'planned', 1, '', '')").run(unnumberedSession);
+
+      // v22's fixtures: two pages with a wiki link between them, two relationship rows (one pinned slug,
+      // one unknown), and prose in a session/quest/journal body for the startup reconcile to find.
+      const linkedPage = crypto.randomUUID(), targetPage = crypto.randomUUID(), harpers = crypto.randomUUID(), zhents = crypto.randomUUID();
+      const insertPage = database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, '{}', '{}', NULL, '[]', ?, '', 1, NULL, 1, '', '')");
+      insertPage.run(targetPage, "Vallaki", "location", "A walled town.");
+      insertPage.run(linkedPage, "Barovia", "location", "Ruled from [[Vallaki]].");
+      insertPage.run(harpers, "The Harpers", "faction", "Meddlers.");
+      insertPage.run(zhents, "The Zhentarim", "faction", "Rivals.");
+      database.prepare("INSERT INTO codex_links (source_page_id, layer, target_kind, target_ref, section) VALUES (?, 'player', 'page', 'vallaki', NULL)").run(linkedPage);
+      const insertRel = database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, '')");
+      insertRel.run(crypto.randomUUID(), harpers, zhents, "ally");
+      insertRel.run(crypto.randomUUID(), zhents, harpers, "owes-a-debt-to");
+      database.prepare("UPDATE codex_sessions SET prep_body = ? WHERE id = ?").run("The ambush at [[Vallaki]].", existingSession);
+      database.prepare("INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Find the Sunsword', 'active', 'Search [[Vallaki]].', '', '[]', '[]', 0, 1, '', '')").run(crypto.randomUUID());
+
+      const matched = crypto.randomUUID(), orphanA = crypto.randomUUID(), orphanB = crypto.randomUUID(), loose = crypto.randomUUID();
+      const insert = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, session_number, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, NULL, ?, 'note', ?, ?, '[]', '', '')");
+      insert.run(matched, "We arrived in [[Vallaki]].", 1, 1, 1);
+      insert.run(orphanA, "The wolves came.", 1, 7, 2);      // number 7 names no session record
+      insert.run(orphanB, "And came again.", 0, 7, 3);       // ...twice, so synthesis must not duplicate
+      insert.run(loose, "Undated lore.", 1, null, 4);
       database.close();
 
       upgraded = new CodexStore(path);
       await upgraded.initialize();
 
-      // THE point of "no backfill": three legacy entries carrying numbers 1 and 2 produce ZERO session
-      // records. Inventing one per distinct number would fabricate prep, recap and attendance nobody
-      // wrote, and would guess which numbers were ever real sessions.
-      expect(upgraded.listSessions()).toEqual([]);
-      expect(upgraded.activeSessionId).toBeNull();
+      // ONE synthesized record for the one orphan number - not two, and not one per entry.
+      const sessions = upgraded.listSessions();
+      expect(sessions).toHaveLength(3);
+      const synthesized = sessions.find((session) => session.sessionNumber === 7)!;
+      expect(synthesized, "an orphan number gets a record rather than being dropped").toBeDefined();
+      expect(synthesized.status, "the master plan's ruling: played").toBe("played");
+      expect(synthesized.revealedToPlayers, "...and unrevealed, so nothing changes for players").toBe(false);
+      // Nothing is INVENTED: v13's objection, honoured.
+      expect(synthesized.prepBody).toBe("");
+      expect(synthesized.recapBody).toBe("");
+      expect(synthesized.attendees).toEqual([]);
+      // The id passes the store's own id regex, so it round-trips through every route that validates one.
+      expect(synthesized.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      expect(upgraded.getSession(synthesized.id)).not.toBeNull();
+      // The pre-existing record is untouched, not replaced by a synthesized twin.
+      // (its prep was rewritten above to seed a v22 wiki link, so only the recap is compared verbatim)
+      expect(upgraded.getSession(existingSession)).toMatchObject({ sessionNumber: 1, recapBody: "They crossed." });
 
-      // ...and the legacy entries read exactly as they did before the upgrade, so the by-session lens
-      // renders those groups today the way it rendered them yesterday.
-      expect(upgraded.listTimeline().map((entry) => entry.sessionNumber)).toEqual([1, 2, null]);
-      expect(upgraded.getEntry(one)!.playerText).toBe("We arrived in Barovia.");
+      // Every previously-numbered entry now JOINS the right record, and reads back the SAME display
+      // number it carried yesterday - which is the whole "nothing visibly changes" claim.
+      expect(upgraded.getEntry(matched)).toMatchObject({ sessionId: existingSession, sessionNumber: 1 });
+      expect(upgraded.getEntry(matched)!.playerText).toBe("We arrived in [[Vallaki]].");
+      expect(upgraded.getEntry(orphanA)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
+      expect(upgraded.getEntry(orphanB)).toMatchObject({ sessionId: synthesized.id, sessionNumber: 7 });
+      expect(upgraded.getEntry(loose)).toMatchObject({ sessionId: null, sessionNumber: null });
 
-      // Auto-linking on a REAL upgraded database with real rows: nothing is active, so a new entry is
-      // filed exactly as it was pre-M9 — the legacy numbers do not leak into it.
-      expect(upgraded.createEntry({ playerText: "Written after the upgrade." }).sessionNumber).toBeNull();
-      expect(upgraded.appendCombatEntry({ sourceEncounterId: 9, playerText: "A brawl." }).sessionNumber).toBeNull();
+      // The post-migration invariant, probed in raw SQL below the store: NO row keeps a bare number.
+      const raw = new DatabaseSync(path);
+      const bare = raw.prepare("SELECT COUNT(*) AS n FROM codex_journal WHERE session_number IS NOT NULL").get() as { n: number };
+      expect(bare.n, "the bare-number column is empty after v19 - it is now the LABEL store").toBe(0);
+      // The rebuilt CHECK admits D11's seventh kind and still rejects an eighth.
+      const probe = (kind: string) => raw.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, sort_key, tags_json, created_at, updated_at) VALUES (?, '', NULL, 0, ?, 99, '[]', '', '')").run(crypto.randomUUID(), kind);
+      expect(() => probe("quest"), "v19 widened the CHECK for D11's quest history").not.toThrow();
+      expect(() => probe("bogus"), "...and the CHECK still discriminates").toThrow();
+      // Every index survived the rebuild, plus the new join index. DROP TABLE takes its indexes with it,
+      // so a forgotten CREATE INDEX silently turns the timeline's ORDER BY into a full scan.
+      const indexes = (raw.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_journal'").all() as Array<{ name: string }>).map((row) => row.name);
+      for (const name of ["codex_journal_order", "codex_journal_marker", "codex_journal_page", "codex_journal_session"]) {
+        expect(indexes, `index ${name}`).toContain(name);
+      }
+      // v20's tags default, on real legacy rows rather than fresh ones.
+      const sessionTags = raw.prepare("SELECT tags_json FROM codex_sessions").all() as Array<{ tags_json: string }>;
+      for (const row of sessionTags) expect(row.tags_json).toBe("[]");
+      raw.close();
+      expect(upgraded.listSessions().every((session) => session.tags.length === 0)).toBe(true);
 
-      // Making a session record for a number the legacy entries ALREADY use is allowed (the constraint is
-      // over SESSIONS, not entries). Number 1 on purpose: the entries above carry 1 and 2, so this is the
-      // stated case rather than an adjacent one — the comment used to claim this while creating 3, which
-      // no legacy row used. It matters more since the player gate landed: an UNREVEALED record for a
-      // number legacy entries carry is exactly what blanks those long-correct labels for players.
-      const legacyNumbered = upgraded.createSession({ sessionNumber: 1 });
-      expect(upgraded.unrevealedSessionNumbers().has(1)).toBe(true);
-      expect(projectPlayerJournalEntry(upgraded.setEntryRevealed(one, true), { unrevealedSessionNumbers: upgraded.unrevealedSessionNumbers() })!.sessionNumber).toBeNull();
-      upgraded.setSessionRevealed(legacyNumbered.id, true);
-      expect(projectPlayerJournalEntry(upgraded.getEntry(one)!, { unrevealedSessionNumbers: upgraded.unrevealedSessionNumbers() })!.sessionNumber).toBe(1);
+      // v21's search backfill, with GATE 1 held at the migration layer: the GM finds a legacy session by
+      // its PREP text, and a player never can - even for a session that is revealed.
+      expect(upgraded.searchAll("gm", "ambush").hits.some((hit) => hit.kind === "session" && hit.id === existingSession)).toBe(true);
+      expect(upgraded.searchAll("player", "ambush").hits.some((hit) => hit.id === existingSession)).toBe(false);
+      expect(upgraded.searchAll("player", "crossed").hits.some((hit) => hit.kind === "session" && hit.id === existingSession), "a revealed session's RECAP is findable").toBe(true);
+      expect(upgraded.searchAll("player", "crossed").hits.some((hit) => hit.id === synthesized.id), "...and a hidden one is not").toBe(false);
 
-      const third = upgraded.createSession({ sessionNumber: 3 });
-      upgraded.setActiveSession(third.id);
-      expect(upgraded.createEntry({ playerText: "Session three." }).sessionNumber).toBe(3);
-      expect(upgraded.getEntry(one)!.sessionNumber).toBe(1);   // the legacy row is still untouched
+      // v22 (D8): the links rebuild carried every existing row over as a PAGE source, the relationships
+      // table gained its layer, and the twelve legacy slugs became the labels a reader sees.
+      const raw2 = new DatabaseSync(path);
+      const linkRows = raw2.prepare("SELECT source_kind, source_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY target_ref").all() as Array<{ source_kind: string; source_id: string; layer: string; target_ref: string }>;
+      expect(linkRows.length, "the legacy page links survived the rebuild").toBeGreaterThanOrEqual(2);
+      // The legacy row is still a PAGE source with its layer intact - that is what the rebuild carried.
+      // (The non-page rows beside it are the startup reconcile's, asserted below.)
+      expect(linkRows.find((row) => row.source_id === linkedPage)).toMatchObject({ source_kind: "page", target_ref: "vallaki", layer: "player" });
+      const rels = raw2.prepare("SELECT type, layer FROM codex_relationships ORDER BY type").all() as Array<{ type: string; layer: string }>;
+      // "ally" -> "ally of" from the pinned vocabulary; an unknown slug falls back to dashes-into-spaces.
+      expect(rels.map((row) => row.type)).toEqual(["ally of", "owes a debt to"]);
+      expect(rels.every((row) => row.layer === "player"), "every migrated edge is on the player layer - today's behaviour").toBe(true);
+      raw2.close();
+
+      // D13's STARTUP RECONCILE ran once on open and re-extracted the pre-existing session, quest and
+      // journal bodies - work no SQL migration could do, because SQL cannot parse `[[...]]`.
+      const reconciled = upgraded.listAllConnections().filter((edge) => edge.origin === "mention");
+      expect(reconciled.find((edge) => edge.fromKind === "session"), "a legacy session's PREP link, on the GM layer").toMatchObject({ fromId: existingSession, layer: "gm" });
+      expect(reconciled.find((edge) => edge.fromKind === "journal"), "a legacy entry's player-text link").toMatchObject({ fromId: matched, layer: "player" });
+      // ...and the symmetric-dedupe re-key works against the MIGRATED spelling, which is the silent
+      // failure v22's relabel would otherwise have caused.
+      const allyA = upgraded.listPages().find((page) => page.title === "The Harpers")!;
+      const allyB = upgraded.listPages().find((page) => page.title === "The Zhentarim")!;
+      expect(upgraded.createConnection(allyB.id, { toPageId: allyA.id, label: "ally of" }).fromPageId, "the reverse direction is the SAME edge").toBe(allyA.id);
+
+      // D9's payoff, on the upgraded database: renumbering the session moves every joined entry's
+      // display number in one write, with no journal work at all.
+      upgraded.updateSession(existingSession, { sessionNumber: 42 }, undefined, "gm");
+      expect(upgraded.getEntry(matched)!.sessionNumber).toBe(42);
+
+      // Auto-linking on a REAL upgraded database: nothing is active, so a new entry is filed under none.
+      expect(upgraded.createEntry({ playerText: "Written after the upgrade." }).sessionId).toBeNull();
+      expect(upgraded.appendCombatEntry({ sourceEncounterId: 9, playerText: "A brawl." }).sessionId).toBeNull();
     } finally {
       upgraded?.close();
       await rm(legacyDirectory, { recursive: true, force: true });
@@ -2024,7 +2261,7 @@ describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
     // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
     // ever added to the player projection, not merely if this one leaks. `attendees` and `status` are
     // deliberately absent (P2, secret by default) as well as `prepBody` and `rev`.
-    expect(Object.keys(projected).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(Object.keys(projected).sort()).toEqual(["id", "realDate", "recap", "sessionNumber", "tags"]);
     expect(projected.recap).toBe("The party crossed the bridge.");
     const payload = JSON.stringify(projected);
     expect(payload).not.toContain("Ireena is the real target");   // the GM's prep
@@ -2055,49 +2292,63 @@ describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
  * the last being every entry from before M9, which shipped with no backfill.
  */
 describe("Codex journal — the unrevealed-session number gate, on its own (M9 follow-up, A-8)", () => {
-  /** An entry a player may read, carrying a number the GM never has to retype — the shape M9 auto-linking produces. */
-  const revealedEntry = (sessionNumber: number) => store.createEntry({ playerText: "We reached Vallaki.", sessionNumber, revealedToPlayers: true });
+  /** An entry a player may read, filed under a session by ID - the shape D9 auto-linking produces. */
+  const revealedEntry = (sessionId: string | null) => store.createEntry({ playerText: "We reached Vallaki.", sessionId, revealedToPlayers: true });
 
-  it("blanks the number of an UNREVEALED session, and hands it back the moment that session is revealed", () => {
+  it("blanks BOTH halves of the link for an UNREVEALED session, and hands them back the moment it is revealed", () => {
     const session = store.createSession({ sessionNumber: 4, recapBody: "The party crossed." });
     expect(session.revealedToPlayers).toBe(false);
-    const entry = revealedEntry(4);
-    expect(entry.sessionNumber).toBe(4);                                            // the row really carries it...
+    const entry = revealedEntry(session.id);
+    expect(entry).toMatchObject({ sessionId: session.id, sessionNumber: 4 });        // the row really carries both...
 
-    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())!.sessionNumber).toBeNull();
-    // ...and the GM's own row is untouched, so the null above is the gate and not a number that never arrived.
-    expect(projectGmJournalEntry(entry).sessionNumber).toBe(4);
+    const gated = projectPlayerJournalEntry(entry, playerSessionNumbers())!;
+    // BOTH, together. Either half alone announces that a session they have not been shown exists - the id
+    // is the stronger leak, because it is a handle they could try to fetch.
+    expect(gated.sessionNumber).toBeNull();
+    expect(gated.sessionId).toBeNull();
+    // ...and the GM's own row is untouched, so the nulls above are the gate and not a link that never arrived.
+    expect(projectGmJournalEntry(entry)).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
 
-    // Revealing the SESSION — the entry row is not rewritten, only the context changes — hands the number
-    // straight back, so the null is provably the reveal gate rather than a projection that drops the field.
+    // Revealing the SESSION - the entry row is not rewritten, only the context changes - hands both back,
+    // so the nulls are provably the reveal gate rather than a projection that drops the fields.
     store.setSessionRevealed(session.id, true);
-    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())!.sessionNumber).toBe(4);
+    expect(projectPlayerJournalEntry(entry, playerSessionNumbers())).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
   });
 
-  it("leaves a number with NO session record alone — every entry written before M9, which shipped no backfill", () => {
-    // The case most likely to regress: asking "is 4 revealed?" instead of "is 4 hidden?" would blank this
-    // one too, and nothing about it can leak — there is no record whose existence the number names.
-    const legacy = revealedEntry(4);
-    expect(store.listSessions()).toEqual([]);
-    expect(projectPlayerJournalEntry(legacy, playerSessionNumbers())!.sessionNumber).toBe(4);
+  it("lets a bare LABEL with no session through - director ruling R2's stamp-back, and nothing else reaches this arm", () => {
+    // The only bare labels that exist after migration v19: `deleteSession` stamped a REVEALED session's
+    // number onto its entries when the record went. The number was already player-visible, and there is no
+    // record left whose existence it could name, so it travels.
+    const revealed = store.createSession({ sessionNumber: 4 });
+    store.setSessionRevealed(revealed.id, true);
+    const entry = revealedEntry(revealed.id);
+    store.deleteSession(revealed.id);
 
-    // ...and the gate is live in the same breath: an unrevealed session 5 blanks 5 and still not 4, so the
-    // 4 above is this rule holding rather than the gate being switched off in this fixture.
-    store.createSession({ sessionNumber: 5 });
-    expect(projectPlayerJournalEntry(revealedEntry(5), playerSessionNumbers())!.sessionNumber).toBeNull();
-    expect(projectPlayerJournalEntry(legacy, playerSessionNumbers())!.sessionNumber).toBe(4);
+    const orphan = store.getEntry(entry.id)!;
+    expect(orphan, "SET NULL on the join, number stamped back as a bare label").toMatchObject({ sessionId: null, sessionNumber: 4 });
+    expect(projectPlayerJournalEntry(orphan, playerSessionNumbers())).toMatchObject({ sessionId: null, sessionNumber: 4 });
+
+    // The mirror case is the one that matters: a HIDDEN session's delete stamps NOTHING, so a player can
+    // never learn a hidden session existed by reading a label it left behind.
+    const hidden = store.createSession({ sessionNumber: 5 });
+    const secretEntry = revealedEntry(hidden.id);
+    store.deleteSession(hidden.id);
+    const scrubbed = store.getEntry(secretEntry.id)!;
+    expect(scrubbed).toMatchObject({ sessionId: null, sessionNumber: null });
+    expect(projectPlayerJournalEntry(scrubbed, playerSessionNumbers())).toMatchObject({ sessionId: null, sessionNumber: null });
   });
 
-  it("gates ONLY the number — the rest of a revealed entry travels exactly as it did", () => {
-    store.createSession({ sessionNumber: 4 });
+  it("gates ONLY the link — the rest of a revealed entry travels exactly as it did", () => {
+    const session = store.createSession({ sessionNumber: 4 });
     const entry = store.createEntry({
       playerText: "We reached Vallaki.", gmText: "The burgomaster lied about the wolves.",
-      sessionNumber: 4, realDate: "2026-07-26", tags: ["travel"], revealedToPlayers: true
+      sessionId: session.id, realDate: "2026-07-26", tags: ["travel"], revealedToPlayers: true
     });
     const projected = projectPlayerJournalEntry(entry, playerSessionNumbers())!;
-    // The EXACT key set: the field is NULLED, never dropped, so one response shape still serves both roles.
-    expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text"]);
+    // The EXACT key set: the fields are NULLED, never dropped, so one response shape still serves both roles.
+    expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionId", "sessionNumber", "tags", "text"]);
     expect(projected.sessionNumber).toBeNull();
+    expect(projected.sessionId).toBeNull();
     expect(projected.text).toBe("We reached Vallaki.");                             // the entry is still readable...
     expect(projected.realDate).toBe("2026-07-26");                                  // ...and its neighbours untouched
     expect(projected.tags).toEqual(["travel"]);
@@ -2106,14 +2357,62 @@ describe("Codex journal — the unrevealed-session number gate, on its own (M9 f
 
   it("carries the same gate onto the chronicle by DELEGATION, not a second copy", () => {
     const session = store.createSession({ sessionNumber: 4 });
-    const entry = store.createEntry({ playerText: "We reached Vallaki.", sessionNumber: 4, revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 1 } });
+    const entry = store.createEntry({ playerText: "We reached Vallaki.", sessionId: session.id, revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 1 } });
     const playerRow = () => projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }, playerSessionNumbers())!;
     expect(playerRow().sessionNumber).toBeNull();
+    expect(playerRow().sessionId).toBeNull();
     // The GM's chronicle row still carries it, and revealing the session gives the player's row it back —
     // the same two controls the journal test above uses, at the surface that merely delegates.
-    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }).sessionNumber).toBe(4);
+    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! })).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
     store.setSessionRevealed(session.id, true);
-    expect(playerRow().sessionNumber).toBe(4);
+    expect(playerRow()).toMatchObject({ sessionId: session.id, sessionNumber: 4 });
+  });
+
+  /**
+   * D9's payoff, and the reproduction of `known-bugs.md:111-122` INVERTED: renumbering a session used to
+   * leave every one of its entries carrying the old number, because the number was copied onto the row.
+   * The join makes the display number live, so one `updateSession` moves all of them and no journal row
+   * is written at all.
+   */
+  it("renumbering a session updates every linked entry's display number, with no journal write", () => {
+    const session = store.createSession({ sessionNumber: 4 });
+    const first = store.createEntry({ playerText: "We arrived.", sessionId: session.id });
+    const second = store.createEntry({ playerText: "We left.", sessionId: session.id });
+    const untouchedStamp = store.getEntry(first.id)!.updatedAt;
+    expect([first, second].map((entry) => entry.sessionNumber)).toEqual([4, 4]);
+
+    store.updateSession(session.id, { sessionNumber: 9 }, undefined, "gm");
+
+    expect(store.getEntry(first.id)!.sessionNumber).toBe(9);
+    expect(store.getEntry(second.id)!.sessionNumber).toBe(9);
+    // ...and the entries were not rewritten to do it, which is what makes this cost nothing.
+    expect(store.getEntry(first.id)!.updatedAt).toBe(untouchedStamp);
+    // Clearing the number leaves the JOIN intact - the entry is still filed under that session.
+    store.updateSession(session.id, { sessionNumber: null }, undefined, "gm");
+    expect(store.getEntry(first.id)).toMatchObject({ sessionId: session.id, sessionNumber: null });
+  });
+
+  /** The write-resolution rule, all four arms, in one place. */
+  it("resolves a write's session by id: omitted auto-files, null unfiles, an unknown id is not-found", () => {
+    const session = store.createSession({ sessionNumber: 1 });
+    expect(store.createEntry({ playerText: "nothing active yet" }).sessionId, "no active session -> unfiled").toBeNull();
+
+    store.setActiveSession(session.id);
+    expect(store.createEntry({ playerText: "during play" }).sessionId, "omitted -> the active session").toBe(session.id);
+    expect(store.createEntry({ playerText: "deliberately unfiled", sessionId: null }).sessionId, "explicit null -> none").toBeNull();
+
+    const other = store.createSession({ sessionNumber: 2 });
+    expect(store.createEntry({ playerText: "filed by hand", sessionId: other.id }).sessionId).toBe(other.id);
+    expect(() => store.createEntry({ playerText: "nowhere", sessionId: crypto.randomUUID() })).toThrow(/no longer exists/i);
+
+    // An UNNUMBERED active session auto-links too - strictly better than the number-stamping it replaces,
+    // which could not link at all until the GM had numbered the session.
+    const unnumbered = store.createSession({});
+    store.setActiveSession(unnumbered.id);
+    const filed = store.createEntry({ playerText: "before it was numbered" });
+    expect(filed).toMatchObject({ sessionId: unnumbered.id, sessionNumber: null });
+    store.updateSession(unnumbered.id, { sessionNumber: 12 }, undefined, "gm");
+    expect(store.getEntry(filed.id)!.sessionNumber, "...and the number appears the moment the GM sets one").toBe(12);
   });
 });
 
@@ -2151,7 +2450,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
   it("stores a deadline and a downtime as THEMSELVES — the widened CHECK, and a kind that is parsed rather than collapsed", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
     const deadline = store.createDeadline({ playerText: "The duke's ultimatum expires.", inWorldDate: { year: 1492, month: 2, day: 14 } });
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
 
     expect(deadline.kind).toBe("deadline");
     expect(downtime.kind).toBe("downtime");
@@ -2164,7 +2463,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(deadline.payload).toBeNull();
     expect(deadline.inWorldDate).toEqual({ year: 1492, month: 2, day: 14 });
     // D11-D: downtime carries exactly one, and `applied` starts false (O-3).
-    expect(downtime.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(downtime.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
     // A note still has none, so `payload` is not quietly universal.
     expect(store.createEntry({ playerText: "plain" }).payload).toBeNull();
 
@@ -2176,15 +2475,15 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     // §3.1 says search indexing "should be free" and to VERIFY it rather than assume. It is: `indexEntry`
     // runs from `insertEntry`, so both kinds are findable on their own text on exactly a note's terms —
     // and the unrevealed downtime is hidden from the player index by the reveal gate, not by its kind.
-    expect(store.searchAll("gm", "ultimatum").some((hit) => hit.kind === "journal" && hit.id === deadline.id)).toBe(true);
-    expect(store.searchAll("gm", "poison").some((hit) => hit.kind === "journal" && hit.id === downtime.id)).toBe(true);
-    expect(store.searchAll("player", "ultimatum").some((hit) => hit.id === deadline.id)).toBe(true);   // revealed above
-    expect(store.searchAll("player", "poison").some((hit) => hit.id === downtime.id)).toBe(false);     // still hidden
+    expect(store.searchAll("gm", "ultimatum").hits.some((hit) => hit.kind === "journal" && hit.id === deadline.id)).toBe(true);
+    expect(store.searchAll("gm", "poison").hits.some((hit) => hit.kind === "journal" && hit.id === downtime.id)).toBe(true);
+    expect(store.searchAll("player", "ultimatum").hits.some((hit) => hit.id === deadline.id)).toBe(true);   // revealed above
+    expect(store.searchAll("player", "poison").hits.some((hit) => hit.id === downtime.id)).toBe(false);     // still hidden
 
     // The ordinary journal editor must not eat the payload: `updateEntry` names its columns and
     // `payload_json` is not among them, so an unrelated text edit leaves it intact.
     expect(store.updateEntry(downtime.id, { playerText: "Vex brews something worse." }).payload)
-      .toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+      .toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
 
     // A deadline with no structured date is rejected: prose cannot be compared to a clock.
     expect(() => store.createDeadline({ playerText: "Someday, probably" })).toThrow(/in-world date/);
@@ -2236,15 +2535,22 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
       expect(after).toHaveLength(before.length);                    // nothing dropped, nothing duplicated
       for (const [index, original] of before.entries()) {
-        const { payload_json: payload, ...carried } = after[index];
-        expect(carried).toEqual(original);                          // EVERY pre-existing column, value for value
-        expect(payload).toBeNull();                                 // ...and the new one starts empty
+        const { payload_json: payload, session_id: sessionId, session_number: sessionNumber, ...carried } = after[index];
+        // EVERY pre-existing column, value for value - except the two v15/v19 touched, checked below.
+        const { session_number: originalNumber, ...originalCarried } = original as Record<string, unknown>;
+        expect(carried).toEqual(originalCarried);
+        expect(payload).toBeNull();                                 // v15's new column starts empty
+        // v19 (D9): a numbered row's number moved into the JOIN and the bare column was emptied; an
+        // unnumbered row is untouched on both.
+        if (originalNumber === null) { expect(sessionId).toBeNull(); expect(sessionNumber).toBeNull(); }
+        else { expect(sessionId, "a legacy number resolved to a session record").not.toBeNull(); expect(sessionNumber, "and the bare column is now the LABEL store, empty").toBeNull(); }
       }
-      // The rebuilt table IS the old table plus one column, in the same order with the same types,
-      // NOT-NULLs and defaults — including `tags_json`'s DEFAULT '[]', which v10 added and a
+      // The rebuilt table IS the old table plus v15's and v19's columns, in the same order with the same
+      // types, NOT-NULLs and defaults — including `tags_json`'s DEFAULT '[]', which v10 added and a
       // reconstructed-from-memory DDL would silently drop.
-      expect(afterColumns.slice(0, -1)).toEqual(beforeColumns);
-      expect(afterColumns.at(-1)).toEqual(["payload_json", "TEXT", 0, null]);
+      expect(afterColumns.slice(0, -2)).toEqual(beforeColumns);
+      expect(afterColumns.at(-2)).toEqual(["payload_json", "TEXT", 0, null]);
+      expect(afterColumns.at(-1)).toEqual(["session_id", "TEXT", 0, null]);
 
       // The rows are not merely present, they still READ correctly through the store's own path.
       expect(upgraded.getEntry(fight)!.kind).toBe("combat");
@@ -2331,7 +2637,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
    */
   it("creating downtime does not move the clock, applying it does, and applying it twice is rejected (O-3)", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
 
     // 1. Creating proposes; it does not decide. The clock has not moved.
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
@@ -2344,7 +2650,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     const applied = store.applyDowntime(downtime.id);
     expect(applied.calendar.currentDate).toEqual({ year: 1492, month: 1, day: 10 });
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
-    expect(applied.entry.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+    expect(applied.entry.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null });
     expect(downtimePayloadOf(store.getEntry(downtime.id)!)!.applied).toBe(true);   // re-read, so it is the stored row
     expect(applied.entry.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });  // the record did not re-date itself
     expect(store.proposedDateFor(applied.entry)).toBeNull();            // nothing left to propose
@@ -2379,7 +2685,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
    */
   it("applyDowntime is one transaction: a failed calendar write rolls the entry write back too (D11-F)", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
 
     // Fires on the calendar write specifically, so `bumpRevision` (also an UPDATE on codex_meta) is untouched.
     const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
@@ -2389,7 +2695,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(() => store.applyDowntime(downtime.id)).toThrow();
 
     // BOTH sides unchanged. Re-read from the store, not from the value captured above.
-    expect(store.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(store.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
 
     // ...and with the obstruction gone it still works, so the assertions above are the rollback and not a
@@ -2585,7 +2891,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
 
     // Applying downtime is a clock move like any other, so it must not publish either.
-    const downtime = store.createDowntime({ playerText: "A week off.", downtime: { who: "Vex", activity: "Resting", days: 7 } });
+    const downtime = store.createDowntime({ playerText: "A week off.", downtime: { who: "Vex", activity: "Resting", days: 7, characterPageId: null } });
     store.applyDowntime(downtime.id);
     expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 10 });
 
@@ -2681,12 +2987,12 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 3, day: 8 } });
     store.publishCampaignDate();
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 9, day: 2 } });   // GM runs ahead
-    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30, characterPageId: null } });
     const deadline = store.createDeadline({ playerText: "The ultimatum expires.", inWorldDate: { year: 1492, month: 11, day: 1 } });
 
     const bundle = store.exportBundle();
     expect(bundle.publishedDate).toEqual({ year: 1492, month: 3, day: 8 });                        // NOT the GM's clock
-    expect(bundle.journal.find((entry) => entry.id === downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(bundle.journal.find((entry) => entry.id === downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false, characterPageId: null });
     expect(bundle.journal.find((entry) => entry.id === downtime.id)!.kind).toBe("downtime");
     expect(bundle.journal.find((entry) => entry.id === deadline.id)!.kind).toBe("deadline");
     expect(bundle.journal.find((entry) => entry.id === deadline.id)!.payload).toBeNull();
@@ -2702,7 +3008,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     await reopened.initialize();
     try {
       expect(reopened.getPublishedDate()).toEqual({ year: 1492, month: 3, day: 8 });
-      expect(reopened.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+      expect(reopened.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null });
       expect(reopened.getEntry(deadline.id)!.kind).toBe("deadline");
       expect(reopened.exportBundle().publishedDate).toEqual({ year: 1492, month: 3, day: 8 });
     } finally {
@@ -2770,7 +3076,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
       const insertEntry = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       const note = crypto.randomUUID(), downtime = crypto.randomUUID();
       insertEntry.run(note, "The mists parted.", "Strahd watched.", 1, plain, pageId, "note", null, 2, "2026-01-04", null, null, null, null, null, 1, '["travel"]', null, "2026-01-04T00:00:00.000Z", "2026-01-04T00:00:00.000Z");
-      insertEntry.run(downtime, "Vex brews poison.", null, 0, null, null, "downtime", null, null, null, null, null, null, null, null, 2, '[]', JSON.stringify({ who: "Vex", activity: "Brewing poison", days: 30, applied: true }), "2026-01-05T00:00:00.000Z", "2026-01-05T00:00:00.000Z");
+      insertEntry.run(downtime, "Vex brews poison.", null, 0, null, null, "downtime", null, null, null, null, null, null, null, null, 2, '[]', JSON.stringify({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null }), "2026-01-05T00:00:00.000Z", "2026-01-05T00:00:00.000Z");
 
       const markersBefore = database.prepare("SELECT * FROM codex_markers ORDER BY id").all();
       const journalBefore = database.prepare("SELECT * FROM codex_journal ORDER BY id").all();
@@ -2796,9 +3102,20 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
         expect(carried).toEqual(original);                          // EVERY pre-existing column, value for value
         expect(isParty).toBe(0);                                    // ...and the new one defaults to "not the party"
       }
-      // `codex_journal` is byte-identical, rows AND schema: v16 must not touch it (v15 already did the work).
-      expect(journalAfter).toEqual(journalBefore);
-      expect(journalColumnsAfter).toEqual(journalColumnsBefore);
+      // v16 itself must not touch `codex_journal` (v15 already did the work). What DOES touch it on this
+      // upgrade path is v19 (D9), so the comparison is "old columns and old values, except the two D9
+      // owns" rather than byte-identity - and asserting that explicitly is what would catch v16 quietly
+      // growing a journal write.
+      expect(journalColumnsAfter.slice(0, -1)).toEqual(journalColumnsBefore);
+      expect(journalColumnsAfter.at(-1)).toEqual(["session_id", "TEXT", 0, null]);
+      expect(journalAfter).toHaveLength(journalBefore.length);
+      for (const [index, original] of (journalBefore as Array<Record<string, unknown>>).entries()) {
+        const { session_id: sessionId, session_number: sessionNumber, ...carried } = journalAfter[index] as Record<string, unknown>;
+        const { session_number: originalNumber, ...originalCarried } = original;
+        expect(carried).toEqual(originalCarried);
+        if (originalNumber === null) { expect(sessionId).toBeNull(); expect(sessionNumber).toBeNull(); }
+        else { expect(sessionId).not.toBeNull(); expect(sessionNumber).toBeNull(); }
+      }
 
       // The new column is the LAST one and carries the declared type/NOT NULL/DEFAULT, so an existing
       // codex needs no backfill pass to be correct.
@@ -2811,7 +3128,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
       expect(upgraded.getMarker(hidden)!.revealedToPlayers).toBe(false);
       expect(upgraded.listMarkers(mapId).every((marker) => marker.isParty === false)).toBe(true);
       expect(upgraded.partyMarker()).toBeNull();
-      expect(upgraded.getEntry(downtime)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+      expect(upgraded.getEntry(downtime)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true, characterPageId: null });
       expect(upgraded.getEntry(note)!.tags).toEqual(["travel"]);
       // An empty standing table on every existing codex is the correct and complete upgrade — there has
       // never been a standing to back-fill from (v14's reasoning for quests, verbatim).
@@ -3040,14 +3357,14 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
     expect(store.setEntryRevealed(milestone.id, true).revealedToPlayers).toBe(true);
 
     // Indexed for search exactly as a note is — VERIFIED, not assumed (`writeEntry` calls `indexEntry`).
-    expect(store.searchAll("gm", "crypt").some((hit) => hit.kind === "journal" && hit.id === milestone.id)).toBe(true);
-    expect(store.searchAll("player", "crypt").some((hit) => hit.id === milestone.id)).toBe(true);     // revealed above
+    expect(store.searchAll("gm", "crypt").hits.some((hit) => hit.kind === "journal" && hit.id === milestone.id)).toBe(true);
+    expect(store.searchAll("player", "crypt").hits.some((hit) => hit.id === milestone.id)).toBe(true);     // revealed above
     // ...and PAYLOAD text is NOT indexed, for any kind. A milestone's `reason` and a standing's `reason`
     // are GM-authored prose with no reveal gate of their own; indexing them would put them in the PLAYER
     // index with only the entry's reveal flag between them and a reader. "ossuary" and "caravan" appear
     // only inside a reason and never in a `playerText`, so a hit on either would BE the leak.
-    expect(store.searchAll("gm", "ossuary").some((hit) => hit.id === milestone.id)).toBe(false);
-    expect(store.searchAll("gm", "caravan").some((hit) => hit.id === standing.id)).toBe(false);
+    expect(store.searchAll("gm", "ossuary").hits.some((hit) => hit.id === milestone.id)).toBe(false);
+    expect(store.searchAll("gm", "caravan").hits.some((hit) => hit.id === standing.id)).toBe(false);
 
     // A standing record's prose lives in its payload and NOWHERE else — one sentence, one home, one gate.
     expect(store.getEntry(standing.id)!.playerText).toBe("");
@@ -3187,7 +3504,7 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
      * the BUNDLE carries and therefore needs a history deeper than one entry; the throttle's own behaviour is
      * tested in "CodexStore revision history" below, not here.
      */
-    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT });
     const page = store.createPage({ title: "Strahd", entityType: "character", fields: { race: "Vampire" }, gmFields: { goals: "Reclaim Tatyana" }, playerBody: "A count.", gmBody: "The darklord." });
     store.updatePage(page.id, { title: "Strahd von Zarovich", playerBody: "A count of Barovia." }, undefined, "gm");
     store.updatePage(page.id, { title: "Strahd, Lord of Barovia" }, undefined, "gm");
@@ -3226,11 +3543,14 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
    * consumer reads this bundle by key, so this is not about JSON ordering for its own sake - it is the
    * guard that stops a future fifth-time addition being slipped into the middle of the record.
    */
-  it("appends the three keys LAST, leaving the previous eleven in their established order", () => {
+  it("appends each new key LAST, leaving every previous one in its established order", () => {
     expect(Object.keys(store.exportBundle())).toEqual([
       "pages", "maps", "markers", "journal", "relationships", "sessions", "activeSessionId", "quests",
       "publishedDate", "standing", "partyMarkerId",
-      "calendar", "folders", "revisions"
+      "calendar", "folders", "revisions",
+      // D16: the settings knobs exist nowhere else, so a bundle without them restores a codex whose
+      // preferences have silently reverted. Appended last, like every key before it.
+      "settings"
     ]);
   });
 });
@@ -3268,7 +3588,12 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
   });
 
   it("starts every codex on the owner's defaults: history on, a 90-minute window, nothing stored yet", () => {
-    expect(clock.getSettings()).toEqual({ revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 } });
+    expect(clock.getSettings()).toEqual({
+      revisionHistory: { enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 },
+      // D6 / director ruling R4: autosave ON at the 1-second floor, which is what the shipping editors'
+      // 800 ms debounce already did expressed on the wire's scale - an upgraded codex saves as often as it did.
+      autosave: { enabled: true, intervalSeconds: 1 }
+    });
   });
 
   it("coalesces a save INSIDE the window and checkpoints one OUTSIDE it", () => {
@@ -3294,7 +3619,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
    * between these saves, so nothing here can pass by accident of elapsed time.
    */
   it("checkpoints EVERY save at windowMinutes 0 — the OLD behaviour, not 'never'", () => {
-    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT });
     at(0);
     const page = clock.createPage({ title: "Vallaki", playerBody: "v0" });
     clock.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
@@ -3317,7 +3642,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     const before = clock.listRevisions(page.id);
     expect(before.map((row) => row.playerBody)).toEqual(["second", "the good version"]);
 
-    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     at(1000); clock.updatePage(page.id, { playerBody: "fourth" }, undefined, "gm");
     at(2000); clock.updatePage(page.id, { playerBody: "fifth" }, undefined, "gm");
     // Not one new row - and, just as important, not one row DESTROYED. Disabling a feature must not delete the
@@ -3346,7 +3671,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
    * "Globally disable-able" was the owner's phrase, and a switch that leaves a per-page row behind is not that.
    */
   it("writes NO checkpoint at all with history disabled, not even a page's creation", () => {
-    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     at(0);
     const page = clock.createPage({ title: "Berez", playerBody: "as created" });
     expect(clock.listRevisions(page.id)).toEqual([]);
@@ -3366,7 +3691,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
    * restored away from and "I picked the wrong one" would be unrecoverable.
    */
   it("checkpoints the state a RESTORE discards, even well inside the window", () => {
-    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 } });
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     /**
      * THE TIMING IS THE TEST, and it is fiddly enough to spell out — a first attempt spaced these saves so far
      * apart that the ordinary window fired anyway, and the assertion passed with `force` doing nothing at all
@@ -3402,7 +3727,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
   });
 
   it("never throttles createPage — even with a window nothing could fall outside", () => {
-    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 10_080 } }); // a week
+    clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 10_080 }, autosave: AUTOSAVE_DEFAULT }); // a week
     at(0);
     const first = clock.createPage({ title: "One" });
     at(1);
@@ -3460,14 +3785,14 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
   });
 
   it("clamps and truncates the window on the way in, and answers with what was STORED", () => {
-    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 999_999 } }).revisionHistory.windowMinutes).toBe(10_080);
+    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 999_999 }, autosave: AUTOSAVE_DEFAULT }).revisionHistory.windowMinutes).toBe(10_080);
     expect(clock.getSettings().revisionHistory.windowMinutes).toBe(10_080);
-    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: -12 } }).revisionHistory.windowMinutes).toBe(0);
-    expect(clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 45.7 } }).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
+    expect(clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: -12 }, autosave: AUTOSAVE_DEFAULT }).revisionHistory.windowMinutes).toBe(0);
+    expect(clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 45.7 }, autosave: AUTOSAVE_DEFAULT }).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
     expect(clock.getSettings().revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
     // A non-finite window is an ERROR, not a clamp: `Math.trunc(NaN)` is NaN, and clamping that would write
     // NaN into a STRICT INTEGER column. `standingValue`'s rule, for the same reason.
-    expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: Number.NaN } })).toThrow(/minutes/i);
+    expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: Number.NaN }, autosave: AUTOSAVE_DEFAULT })).toThrow(/minutes/i);
     // ...and `enabled` must be stated rather than coerced from a missing field, because the coercion would land
     // on `false` and silently switch the GM's undo history off.
     expect(() => clock.setSettings({ revisionHistory: { windowMinutes: 90 } } as never)).toThrow(/on or off/i);
@@ -3531,6 +3856,114 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
 
     // Reopened at the end so the fixture's `afterEach` has a live store to close.
     clock = await reopen();
+  });
+
+  /**
+   * D6 / director ruling R4: the autosave knobs, held to `revisionHistory`'s standard because they are stored
+   * in the same row by the same write and read back through the same fail-closed discipline.
+   */
+  it("clamps and truncates the autosave interval on the way in, and answers with what was STORED", () => {
+    const set = (autosave: { enabled: boolean; intervalSeconds: number }) =>
+      clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 }, autosave });
+    // Overshoot in either direction lands on the end of the scale; a fractional second is a picker artefact.
+    expect(set({ enabled: true, intervalSeconds: 5000 }).autosave.intervalSeconds).toBe(600);
+    expect(set({ enabled: true, intervalSeconds: 0 }).autosave.intervalSeconds).toBe(1);
+    expect(set({ enabled: true, intervalSeconds: -30 }).autosave.intervalSeconds).toBe(1);
+    expect(set({ enabled: false, intervalSeconds: 10.9 }).autosave).toEqual({ enabled: false, intervalSeconds: 10 });
+    expect(clock.getSettings().autosave).toEqual({ enabled: false, intervalSeconds: 10 });
+    // A non-finite interval is an ERROR, not a clamp - `Math.trunc(NaN)` is NaN and a STRICT INTEGER column
+    // would take it. `revisionWindowMinutes`' rule, one setting over.
+    expect(() => set({ enabled: true, intervalSeconds: Number.NaN })).toThrow(/seconds/i);
+    // ...and `enabled` must be STATED, because a coerced missing field lands on `false` and switches off the
+    // one thing D6 promises: that the codex keeps your work.
+    expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 } } as never)).toThrow(/on or off/i);
+    expect(clock.getSettings().autosave).toEqual({ enabled: false, intervalSeconds: 10 }); // neither throw wrote
+  });
+
+  /**
+   * The autosave READ guard, `revisionSettings`' for the same measured reason: the write is not the only way
+   * into an INTEGER column, and a stored value JavaScript cannot represent throws on the WHOLE row read.
+   */
+  it("reads a hand-edited autosave value as the default rather than propagating it", async () => {
+    const path = join(clockDirectory, "vtt.sqlite");
+    clock.close();
+    const write = (sql: string, ...values: Array<number | bigint>) => {
+      const database = new DatabaseSync(path);
+      database.prepare(sql).run(...values);
+      database.close();
+    };
+    const reopen = async () => { const reopened = new CodexStore(path, () => now); await reopened.initialize(); return reopened; };
+
+    // Non-vacuity first: an in-range value really does survive, so the assertions below are the guard firing.
+    write("UPDATE codex_meta SET autosave_interval_seconds = ? WHERE id = 1", 45);
+    const inRange = await reopen();
+    expect(inRange.getSettings().autosave.intervalSeconds).toBe(45);
+    inRange.close();
+
+    for (const stored of [0, -1, 601, 2n ** 53n]) {
+      write("UPDATE codex_meta SET autosave_interval_seconds = ? WHERE id = 1", stored);
+      const reopened = await reopen();
+      expect(reopened.getSettings().autosave.intervalSeconds, `stored ${stored}`).toBe(1);
+      reopened.close();
+    }
+    // `enabled` fails OPEN, like revision history and for the same reason: a garbled value must not silently
+    // stop the editors saving. 0 is still honoured, so "reads as on" is a fallback and not the only answer.
+    write("UPDATE codex_meta SET autosave_enabled = 7, autosave_interval_seconds = 30 WHERE id = 1");
+    const garbled = await reopen();
+    expect(garbled.getSettings().autosave).toEqual({ enabled: true, intervalSeconds: 30 });
+    garbled.close();
+    write("UPDATE codex_meta SET autosave_enabled = 0 WHERE id = 1");
+    const off = await reopen();
+    expect(off.getSettings().autosave.enabled).toBe(false);
+    off.close();
+
+    clock = await reopen();
+  });
+
+  /**
+   * D7 / director ruling R7. A type-changing save PRUNES every field the new type does not declare, and the
+   * client's confirm dialog promises the values are recoverable from History. Under the coalescing window
+   * alone that promise held only by luck - a GM who types a page and then fixes its kind is inside the window
+   * by construction - so a type change forces the checkpoint the way a restore does.
+   *
+   * The negative half is the load-bearing one: an ordinary save inside the window still coalesces, so this is
+   * a rule about type changes and not the throttle quietly switched off.
+   */
+  it("forces a checkpoint when a page's TYPE changes, even well inside the coalescing window", () => {
+    at(0);
+    const page = clock.createPage({ title: "Strahd", entityType: "character", fields: { role: "the devil" } });
+    expect(clock.listRevisions(page.id)).toHaveLength(1); // the creation checkpoint
+
+    at(1); // one minute in: far inside the 90-minute window
+    clock.updatePage(page.id, { playerBody: "an ordinary edit" }, undefined, "gm");
+    expect(clock.listRevisions(page.id), "an ordinary save inside the window still coalesces").toHaveLength(1);
+
+    at(2);
+    const changed = clock.updatePage(page.id, { entityType: "faction" }, undefined, "gm");
+    expect(changed.entityType).toBe("faction");
+    expect(changed.fields.role, "the character-only field is pruned by the switch").toBeUndefined();
+    const revisions = clock.listRevisions(page.id);
+    expect(revisions, "the type change forced a checkpoint of the pre-change state").toHaveLength(2);
+
+    // ...and the promise the confirm dialog makes is real: restoring brings the pruned field back.
+    const restored = clock.restoreRevision(page.id, revisions[0]!.id, "gm");
+    expect(restored.entityType).toBe("character");
+    expect(restored.fields.role).toBe("the devil");
+  });
+
+  /**
+   * The switch still wins. `enabled: false` writes NO new revisions at all, and a type change is not an
+   * exception to it - `revisionDue` checks the switch before the force, and that ordering is the promise
+   * "off means off" makes.
+   */
+  it("writes no forced checkpoint for a type change when history is switched off", () => {
+    at(0);
+    const page = clock.createPage({ title: "Ireena", entityType: "character" });
+    clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
+    const before = clock.listRevisions(page.id).length;
+    at(1);
+    clock.updatePage(page.id, { entityType: "location" }, undefined, "gm");
+    expect(clock.listRevisions(page.id)).toHaveLength(before);
   });
 
   /**
@@ -3627,7 +4060,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     pruner = new CodexStore(join(pruneDirectory, "vtt.sqlite"), () => now);
     await pruner.initialize();
     // Every save checkpointed, so a test can build a history of a known depth without moving the clock for it.
-    pruner.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } });
+    pruner.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT });
   });
   afterEach(async () => {
     pruner.close();
@@ -3757,7 +4190,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     pruner.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
     expect(pruner.getSettings().revisionHistory.versionCount).toBe(2);
 
-    pruner.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 } });
+    pruner.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
     expect(pruner.deleteRevisionsOlderThan(0)).toBe(2);
     expect(pruner.getSettings().revisionHistory.versionCount).toBe(0);
   });
@@ -3777,5 +4210,894 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     // unbounded value would push the cutoff date out of range and throw `RangeError: Invalid time value`.
     expect(pruner.deleteRevisionsOlderThan(36_500)).toBe(0);
     expect(pruner.listRevisions(page.id)).toHaveLength(1);
+  });
+});
+
+/**
+ * THE ETAG'S LOAD-BEARING INVARIANT, pinned at the layer that owns it.
+ *
+ * `readEnvelope` serves `W/"codex-r{store.revision}-{grade}"` and answers 304 to a matching
+ * `If-None-Match`. That is only correct while EVERY public write bumps the coarse revision inside its own
+ * transaction - reveals and clock moves included, since those change what a reader sees without moving any
+ * record's `rev`. A single write that forgets `bumpRevision()` does not fail visibly: it serves a stale 304
+ * to every conditional caller, forever, and no existing test would notice.
+ *
+ * So this walks the write surface rather than sampling it, and asserts STRICT increase per call. A new write
+ * method added without a bump does not fail here automatically - nothing can enumerate the class - which is
+ * exactly why the list below is the checklist: a new public write belongs in it.
+ */
+describe("every codex write bumps the coarse revision (the ETag's invariant)", () => {
+  it("strictly increases `revision` across every public write", () => {
+    const seen: string[] = [];
+    let previous = store.revision;
+    const bumps = (what: string, work: () => void) => {
+      work();
+      const now = store.revision;
+      expect(now, `${what} must bump the codex revision - the ETag depends on it`).toBeGreaterThan(previous);
+      previous = now;
+      seen.push(what);
+    };
+
+    // Pages, folders, revisions
+    const faction = store.createPage({ title: "The Keepers of the Feather", entityType: "faction" });
+    let page = store.createPage({ title: "Barovia" });
+    bumps("createPage", () => { page = store.createPage({ title: "Vallaki" }); });
+    bumps("updatePage", () => { store.updatePage(page.id, { playerBody: "a walled town" }, undefined, "gm"); });
+    bumps("setPageRevealed", () => { store.setPageRevealed(page.id, true); });
+    bumps("createFolder", () => { store.createFolder("Places"); });
+    bumps("moveFolder", () => { store.moveFolder("Places", "Locations"); });
+    bumps("deleteFolder", () => { store.deleteFolder("Locations"); });
+    const revisionId = store.listRevisions(page.id)[0]!.id;
+    bumps("restoreRevision", () => { store.restoreRevision(page.id, revisionId, "gm"); });
+    bumps("deleteRevisionsOlderThan", () => { store.deleteRevisionsOlderThan(0); });
+    bumps("setSettings", () => { store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT }); });
+
+    // Connections
+    const other = store.createPage({ title: "Strahd", entityType: "character" });
+    let relationshipId = "";
+    bumps("createConnection", () => { relationshipId = store.createConnection(other.id, { toPageId: page.id, label: "rules" }).id; });
+    bumps("updateConnection", () => { store.updateConnection(relationshipId, { label: "rules over" }); });
+    bumps("deleteConnection", () => { store.deleteConnection(relationshipId); });
+
+    // Maps + markers
+    let map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional" });
+    let marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff0000" });
+    bumps("createMap", () => { map = store.createMap({ assetId: crypto.randomUUID(), name: "Castle Ravenloft", kind: "battlemap" }); });
+    bumps("updateMap", () => { store.updateMap(map.id, { name: "Ravenloft" }); });
+    bumps("setMapParent", () => { store.setMapParent(map.id, null); });
+    bumps("setMapRevealed", () => { store.setMapRevealed(map.id, true); });
+    bumps("createMarker", () => { marker = store.createMarker(map.id, { x: 0.1, y: 0.1, iconId: "pin", iconColor: "#00ff00" }); });
+    bumps("updateMarker", () => { store.updateMarker(marker.id, { label: "the gate" }); });
+    bumps("moveMarker", () => { store.moveMarker(marker.id, 0.2, 0.2); });
+    bumps("setMarkerRevealed", () => { store.setMarkerRevealed(marker.id, true); });
+    bumps("setPartyMarker", () => { store.setPartyMarker(marker.id); });
+    bumps("deleteMarker", () => { store.deleteMarker(marker.id); });
+    bumps("deleteMap", () => { store.deleteMap(map.id); });
+
+    // Calendar + the two clocks
+    bumps("setCalendar", () => { store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 12 } }); });
+    bumps("publishCampaignDate", () => { store.publishCampaignDate(); });
+
+    // Journal, in every flavour it is written
+    let entry = store.createEntry({ playerText: "we arrived" });
+    bumps("createEntry", () => { entry = store.createEntry({ playerText: "we left" }); });
+    bumps("updateEntry", () => { store.updateEntry(entry.id, { playerText: "we left at dawn" }); });
+    bumps("setEntryRevealed", () => { store.setEntryRevealed(entry.id, true); });
+    bumps("appendCombatEntry", () => { store.appendCombatEntry({ sourceEncounterId: 1, playerText: "a battle" }); });
+    bumps("createDeadline", () => { store.createDeadline({ playerText: "the ritual", inWorldDate: { year: 1492, month: 3, day: 1 } }); });
+    let downtime = store.createDowntime({ playerText: "smithing", downtime: { who: "Ireena", activity: "smithing", days: 3, characterPageId: null } });
+    bumps("createDowntime", () => { downtime = store.createDowntime({ playerText: "training", downtime: { who: "Ismark", activity: "training", days: 2, characterPageId: null } }); });
+    bumps("applyDowntime", () => { store.applyDowntime(downtime.id); });
+    bumps("createMilestone", () => { store.createMilestone({ playerText: "level 5", milestone: { level: 5, reason: "cleared the crypt" } }); });
+    bumps("deleteEntry", () => { store.deleteEntry(entry.id); });
+
+    // Sessions
+    let session = store.createSession({ sessionNumber: 1 });
+    bumps("createSession", () => { session = store.createSession({ sessionNumber: 2 }); });
+    bumps("updateSession", () => { store.updateSession(session.id, { recapBody: "we survived" }, undefined, "gm"); });
+    bumps("setSessionRevealed", () => { store.setSessionRevealed(session.id, true); });
+    bumps("setActiveSession", () => { store.setActiveSession(session.id); });
+    bumps("deleteSession", () => { store.deleteSession(session.id); });
+
+    // Quests
+    let quest = store.createQuest({ title: "Find the Sunsword" });
+    bumps("createQuest", () => { quest = store.createQuest({ title: "Free Ireena" }); });
+    bumps("updateQuest", () => { store.updateQuest(quest.id, { status: "completed" }, undefined); });
+    bumps("setQuestRevealed", () => { store.setQuestRevealed(quest.id, true); });
+    bumps("deleteQuest", () => { store.deleteQuest(quest.id); });
+
+    // Standing (against the faction page created at the top)
+    bumps("setStanding", () => { store.setStanding(faction.id, 30, "kind words"); });
+    bumps("setStandingRevealed", () => { store.setStandingRevealed(faction.id, true); });
+
+    bumps("deletePage", () => { store.deletePage(other.id); });
+
+    // Non-vacuity: the walk really covered the surface rather than short-circuiting after two calls.
+    expect(seen.length).toBeGreaterThanOrEqual(40);
+  });
+});
+
+/**
+ * D10: sessions join the ONE suite-wide search index. A new kind in that index is a THREE-gate
+ * viewer-safety change (`CodexRecordKind`'s comment enumerates them), and gate 1 is the one with no
+ * second line of defence - so each gate is asserted at ITS OWN layer here, the CI-1 discipline this file
+ * established after a weakened SQL predicate left every test passing because a projection caught it.
+ */
+describe("CodexStore search — sessions join the one index (D10, three gates)", () => {
+  const seed = () => store.createSession({
+    sessionNumber: 4, realDate: "2026-07-30", tags: ["ravenloft"],
+    prepBody: "The ambush is at the bridge; Ireena is the real target.",
+    recapBody: "The party crossed the bridge.",
+    attendees: ["Ozy", "Mara"]
+  });
+
+  it("GATE 1 — prep and attendees never enter the PLAYER index, even for a revealed session", () => {
+    const session = store.setSessionRevealed(seed().id, true);
+    // The GM can find it by its prep and by who was there.
+    expect(store.searchAll("gm", "ambush").hits.some((hit) => hit.id === session.id)).toBe(true);
+    expect(store.searchAll("gm", "Mara").hits.some((hit) => hit.id === session.id)).toBe(true);
+    // The player cannot, and the session is REVEALED - so gates 2 and 3 both pass it. The hit's very
+    // existence would be the leak, even though no body is ever returned.
+    expect(store.searchAll("player", "ambush").hits).toEqual([]);
+    expect(store.searchAll("player", "Mara").hits).toEqual([]);
+    // Non-vacuity: the player index really does hold this session, by its recap, date and tags.
+    for (const query of ["crossed", "2026-07-30", "ravenloft"]) {
+      expect(store.searchAll("player", query).hits.some((hit) => hit.kind === "session" && hit.id === session.id), query).toBe(true);
+    }
+  });
+
+  it("GATE 2 — the SQL predicate hides an UNREVEALED session from a player, below any projection", () => {
+    const session = seed();
+    // Called directly, with no projection in front of it: this is the layer an HTTP test cannot see.
+    expect(store.searchAll("player", "crossed").hits).toEqual([]);
+    expect(store.searchAll("gm", "crossed").hits.some((hit) => hit.id === session.id)).toBe(true);
+    store.setSessionRevealed(session.id, true);
+    // Revealing needs NO reindex - reveal is resolved at read time, the `setQuestRevealed` rule.
+    expect(store.searchAll("player", "crossed").hits.some((hit) => hit.id === session.id)).toBe(true);
+  });
+
+  it("GATE 3 — the projection arm refuses an unrevealed session even when the SQL layer passes it", () => {
+    const session = seed();
+    // Constructed by hand, exactly as the SQL layer would have handed it over if gate 2 were weakened.
+    expect(projectPlayerSearchHit({ kind: "session", session }, playerSessionNumbers())).toBeNull();
+    // The GM's hit exists for the same record, so the null is the reveal gate and not a missing arm.
+    expect(projectGmSearchHit({ kind: "session", session })).toMatchObject({ kind: "session", id: session.id, title: "Session 4" });
+    const revealed = store.setSessionRevealed(session.id, true);
+    const hit = projectPlayerSearchHit({ kind: "session", session: revealed }, playerSessionNumbers())!;
+    // The same uniform key set every other kind emits - a row renderer must never branch on which kind it got.
+    expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(hit.tags).toEqual(["ravenloft"]);
+    // Nothing from the GM layer rides along on the hit, whatever the title rule does.
+    expect(JSON.stringify(hit)).not.toContain("Ireena");
+    expect(JSON.stringify(hit)).not.toContain("Mara");
+  });
+
+  it("never emits a blank session title: number, else recap excerpt, else \"Untitled session\"", () => {
+    const numbered = store.setSessionRevealed(store.createSession({ sessionNumber: 4 }).id, true);
+    const recapOnly = store.setSessionRevealed(store.createSession({ recapBody: "The party crossed the bridge." }).id, true);
+    const empty = store.setSessionRevealed(store.createSession({}).id, true);
+    const title = (session: typeof numbered) => projectPlayerSearchHit({ kind: "session", session }, playerSessionNumbers())!.title;
+    expect(title(numbered)).toBe("Session 4");
+    expect(title(recapOnly)).toBe("The party crossed the bridge.");
+    // `known-bugs.md:65-68`: this used to be "" on the reveal audit, which renders an unclickable blank row.
+    expect(title(empty)).toBe("Untitled session");
+    // The audit says the same words about the same records - one concept, one name, on both surfaces.
+    const auditTitles = projectRevealAudit([numbered, recapOnly, empty].map((session) => ({ kind: "session" as const, session })))
+      .sections.find((section) => section.kind === "session")!.rows.map((row) => row.title);
+    expect(auditTitles.sort()).toEqual(["Session 4", "The party crossed the bridge.", "Untitled session"]);
+  });
+
+  it("round-trips tags on sessions and quests, and finds both by tag in both audiences", () => {
+    const session = store.setSessionRevealed(store.createSession({ sessionNumber: 1, recapBody: "We began.", tags: ["Ravenloft", " ravenloft ", "arc-one"] }).id, true);
+    // `tags()` slugs, trims and dedupes on the way in, exactly as it does for every other record.
+    expect(session.tags).toEqual(["ravenloft", "arc-one"]);
+    const quest = store.setQuestRevealed(store.createQuest({ title: "Find the Sunsword", tags: ["arc-one"] }).id, true);
+    expect(quest.tags).toEqual(["arc-one"]);
+
+    for (const audience of ["gm", "player"] as const) {
+      const ids = store.searchAll(audience, "arc-one").hits.map((hit) => hit.id);
+      expect(ids, audience).toContain(session.id);
+      expect(ids, audience).toContain(quest.id);
+    }
+    // Editing the tags keeps the index in step - the reindex rides in the same transaction as the write.
+    store.updateSession(session.id, { tags: ["arc-two"] }, undefined, "gm");
+    expect(store.searchAll("gm", "arc-one").hits.map((hit) => hit.id)).not.toContain(session.id);
+    expect(store.searchAll("gm", "arc-two").hits.map((hit) => hit.id)).toContain(session.id);
+    // ...and deleting a session takes its index row with it, or the row matches forever with nothing to gate on.
+    store.deleteSession(session.id);
+    expect(store.searchAll("gm", "arc-two").hits.map((hit) => hit.id)).not.toContain(session.id);
+  });
+
+  /** D19: the cap is SIGNALLED. 51 matches means 50 hits and `truncated: true`; 50 means no flag. */
+  it("reports truncation rather than silently clipping the result list", () => {
+    for (let index = 0; index < 50; index += 1) store.createPage({ title: `Barovia hamlet ${index}`, playerBody: "barovia" });
+    const exact = store.searchAll("gm", "barovia");
+    expect(exact.hits).toHaveLength(50);
+    expect(exact.truncated, "exactly at the cap is NOT truncated - the probe row is what distinguishes them").toBe(false);
+    store.createPage({ title: "Barovia hamlet 50", playerBody: "barovia" });
+    const over = store.searchAll("gm", "barovia");
+    expect(over.hits).toHaveLength(50);
+    expect(over.truncated).toBe(true);
+  });
+});
+
+/**
+ * D17 / director ruling R3: a player chronicle row carries BOTH `inWorldDate` and `calendarInstant`.
+ *
+ * The instant is a pure function of the raw date and the calendar the player already holds, so it adds no
+ * information - but shipping the SERVER's value is what stops the client re-deriving it. The two
+ * derivations disagreed on a day that overflows its month (`known-bugs.md:457-466`), which is the case
+ * seeded below deliberately.
+ */
+describe("Codex chronicle — a player's machine-readable dates (D17, R3)", () => {
+  it("carries both date forms on a revealed dated row, and the instant is the server's own clamped one", () => {
+    // A 30-day month, and a date on day 31 of it - the measured day-clamp divergence.
+    store.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["First", "Second"], currentDate: { year: 1492, month: 1, day: 1 } });
+    const entry = store.createEntry({ playerText: "The siege begins.", revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 31 } });
+    const record = { kind: "entry" as const, entry: store.getEntry(entry.id)! };
+
+    const player = projectPlayerChronicleRecord(record, playerSessionNumbers())!;
+    const gm = projectGmChronicleRecord(record);
+    expect(player.inWorldDate, "the RAW date the GM typed, unclamped - it is the source of truth (K3)").toEqual({ year: 1492, month: 0, day: 31 });
+    // The instant is the SERVER's, identical to the GM's, so the two audiences place the row on the same
+    // day - which is the whole reason the field travels rather than being recomputed client-side.
+    expect(player.calendarInstant).toBe(gm.calendarInstant);
+    expect(typeof player.calendarInstant).toBe("number");
+    // ...and it is information-equivalent to the label the player already had.
+    expect(player.inWorldLabel).toBe(gm.inWorldLabel);
+
+    // Undated rows carry null for both, never an absent key - no reader branches on presence.
+    const undated = store.createEntry({ playerText: "Timeless.", revealedToPlayers: true });
+    const undatedRow = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(undated.id)! }, playerSessionNumbers())!;
+    expect(undatedRow.inWorldDate).toBeNull();
+    expect(undatedRow.calendarInstant).toBeNull();
+
+    // The GM's CLOCK is still not on the player row by any path: the fields describe the RECORD's date,
+    // and `fired` is still measured against the published date. Nothing here names `currentDate`.
+    expect(Object.keys(undatedRow)).not.toContain("proposedDate");
+    expect(Object.keys(undatedRow)).not.toContain("campaignInstant");
+  });
+});
+
+/**
+ * D12: linking downtime to a character PAGE, so the tracker totals a person rather than a spelling of
+ * their name. One payload field, and everything interesting about it is what happens at the edges.
+ */
+describe("CodexStore downtime — the character link (D12)", () => {
+  it("round-trips the link, keeps it through applyDowntime, and refuses an id that names no page", () => {
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: character.id } });
+    expect(downtimePayloadOf(entry)).toEqual({ who: "Ireena", activity: "Forging", days: 30, applied: false, characterPageId: character.id });
+
+    // `applyDowntime` rewrites the payload to flip `applied`; the link must ride through untouched.
+    const applied = store.applyDowntime(entry.id).entry;
+    expect(downtimePayloadOf(applied)).toEqual({ who: "Ireena", activity: "Forging", days: 30, applied: true, characterPageId: character.id });
+
+    // An id naming no page is a not-found, not a dangling link the tracker cannot follow.
+    expect(() => store.createDowntime({ playerText: "Nobody.", downtime: { who: "?", activity: "?", days: 1, characterPageId: crypto.randomUUID() } })).toThrow(/no longer exists/i);
+    // The free-text fallback still works with no link at all - nothing is required to have a page.
+    expect(downtimePayloadOf(store.createDowntime({ playerText: "A hireling.", downtime: { who: "Gustav", activity: "Watching the cart", days: 2 } }))!.characterPageId).toBeNull();
+    // ...and a NON-character page is accepted deliberately: a GM may track downtime for an NPC.
+    const npc = store.createPage({ title: "The Burgomaster", entityType: "note" });
+    expect(downtimePayloadOf(store.createDowntime({ playerText: "Politics.", downtime: { who: "Ismark", activity: "Talking", days: 3, characterPageId: npc.id } }))!.characterPageId).toBe(npc.id);
+  });
+
+  it("reads a payload written before the field existed as `characterPageId: null` — the parser IS the migration", () => {
+    const entry = store.createDowntime({ playerText: "Old row.", downtime: { who: "Vex", activity: "Brewing", days: 5 } });
+    // Rewrite the blob to the pre-D12 shape, exactly as an upgraded database holds it.
+    const database = new DatabaseSync(join(directory, "vtt.sqlite"));
+    database.prepare("UPDATE codex_journal SET payload_json = ? WHERE id = ?")
+      .run(JSON.stringify({ who: "Vex", activity: "Brewing", days: 5, applied: false }), entry.id);
+    database.close();
+
+    // The wire promises the key is ALWAYS present; the defensive reader supplies it, so no `json_set`
+    // sweep over old payloads was needed.
+    expect(downtimePayloadOf(store.getEntry(entry.id)!)).toEqual({ who: "Vex", activity: "Brewing", days: 5, applied: false, characterPageId: null });
+  });
+
+  it("nulls the link when the page is deleted, and keeps the record and its free-text `who`", () => {
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: character.id } });
+    const untouched = store.createDowntime({ playerText: "Someone else.", downtime: { who: "Ismark", activity: "Drilling", days: 4 } });
+
+    store.deletePage(character.id);
+
+    // The record SURVIVES its page - "Ireena spent a month forging" stays true - and the link is nulled
+    // rather than left dangling, so the tracker never renders a link nobody can follow.
+    const after = downtimePayloadOf(store.getEntry(entry.id)!)!;
+    expect(after.characterPageId).toBeNull();
+    expect(after.who, "the free-text fallback is what the row shows now").toBe("Ireena");
+    expect(after.days).toBe(30);
+    // ...and the scrub is targeted: an unrelated downtime row is untouched.
+    expect(downtimePayloadOf(store.getEntry(untouched.id)!)).toEqual({ who: "Ismark", activity: "Drilling", days: 4, applied: false, characterPageId: null });
+  });
+
+  it("carries the link to a player only when that page is revealed, and never hides the row for it", () => {
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", revealedToPlayers: true, downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: character.id } });
+    const record = { kind: "entry" as const, entry: store.getEntry(entry.id)! };
+    const context = (revealed: readonly string[]) => ({ unrevealedSessionIds: new Set<string>(), revealedPageIds: new Set(revealed) });
+
+    // Page hidden: the link is nulled, and the ROW still travels with everything else on it. That is the
+    // difference from a `standing` record, which is hidden whole - a standing has no prose to stand on.
+    const gated = projectPlayerChronicleRecord(record, context([]))!;
+    expect(gated.payload).toEqual({ who: "Ireena", activity: "Forging", days: 30, characterPageId: null });
+    expect(gated.text).toBe("A month at the forge.");
+
+    // Page revealed: the link travels, because the player can already open that page by id.
+    const shown = projectPlayerChronicleRecord(record, context([character.id]))!;
+    expect((shown.payload as { characterPageId: string | null }).characterPageId).toBe(character.id);
+    // Absent context fails CLOSED - a caller that forgets to resolve the set loses a link, never leaks one.
+    expect((projectPlayerChronicleRecord(record, { unrevealedSessionIds: new Set<string>() })!.payload as { characterPageId: string | null }).characterPageId).toBeNull();
+    // `applied` is still never on a player row, whatever this field does.
+    expect(Object.keys(shown.payload!).sort()).toEqual(["activity", "characterPageId", "days", "who"]);
+  });
+});
+
+/**
+ * D11 / director ruling R5: quest state changes write themselves onto the Journal, so "what happened to
+ * that lead?" is answered by the one timeline rather than by remembering.
+ */
+describe("CodexStore quest history (D11, R5)", () => {
+  const questRecords = () => store.listTimeline().filter((entry) => entry.kind === "quest");
+
+  it("records a quest's START on create, and every STATUS CHANGE after it — never a prose edit", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 1, day: 12 } });
+    const session = store.createSession({ sessionNumber: 3 });
+    store.setActiveSession(session.id);
+
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    expect(questRecords(), "R5: a quest STARTING is an event, and quests start at creation").toHaveLength(1);
+    const start = questRecords()[0]!;
+    expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "active" });
+    // Hidden, with EMPTY player text - which is why the projection hides the whole row rather than a field.
+    expect(start.revealedToPlayers).toBe(false);
+    expect(start.playerText).toBe("");
+    // Dated at the GM's clock and filed under the active session, the rule every auto-written record uses.
+    expect(start.inWorldDate).toEqual({ year: 1492, month: 1, day: 12 });
+    expect(start.sessionId).toBe(session.id);
+
+    // A prose edit writes NOTHING: it is not something that happened in the world.
+    store.updateQuest(quest.id, { playerBody: "Search the crypt." }, undefined);
+    store.updateQuest(quest.id, { title: "Find the Sunsword, urgently" }, undefined);
+    expect(questRecords()).toHaveLength(1);
+
+    // A status change writes exactly one, carrying the status REACHED.
+    store.updateQuest(quest.id, { status: "completed" }, undefined);
+    expect(questRecords()).toHaveLength(2);
+    expect(questEventPayloadOf(questRecords()[1]!)).toEqual({ questId: quest.id, status: "completed" });
+    // Re-stating the SAME status is not a change, so it writes nothing.
+    store.updateQuest(quest.id, { status: "completed", playerBody: "Done." }, undefined);
+    expect(questRecords()).toHaveLength(2);
+    // Re-activating records `active`; a reader words it "reopened" from the sequence.
+    store.updateQuest(quest.id, { status: "active" }, undefined);
+    expect(questEventPayloadOf(questRecords()[2]!)!.status).toBe("active");
+
+    // History OUTLIVES the quest - "we abandoned that hunt in Marpenoth" stays true.
+    store.deleteQuest(quest.id);
+    expect(questRecords()).toHaveLength(3);
+    expect(questEventPayloadOf(questRecords()[0]!)!.questId).toBe(quest.id);   // a name they cannot show
+  });
+
+  it("writes the record in the SAME transaction as the quest, so neither can exist without the other", () => {
+    // A forced failure inside the composed write must roll BOTH back. `writeEntry` is leaf-level and the
+    // quest INSERT is in the same `BEGIN IMMEDIATE`, so an oversized title on the entry path is the
+    // cheapest way to make the second half throw after the first half has run.
+    const before = store.listQuests().length;
+    const quest = store.createQuest({ title: "Free Ireena" });
+    expect(store.listQuests()).toHaveLength(before + 1);
+    expect(questRecords()).toHaveLength(1);
+
+    // The crash shape, driven for real: a partial UNIQUE index makes a SECOND quest record impossible, so
+    // the history INSERT throws after the quest UPDATE has already run inside the same transaction.
+    const database = new DatabaseSync(join(directory, "vtt.sqlite"));
+    database.exec("CREATE UNIQUE INDEX probe_one_quest_record ON codex_journal (kind) WHERE kind = 'quest';");
+    database.close();
+
+    expect(() => store.updateQuest(quest.id, { status: "failed" }, undefined)).toThrow();
+    expect(store.getQuest(quest.id)!.status, "the quest UPDATE rolled back with the entry INSERT").toBe("active");
+    expect(questRecords(), "...and no second history record was left behind either").toHaveLength(1);
+    // ...and a quest CREATE rolls back the same way: no quest row survives its own failed start record.
+    const questCount = store.listQuests().length;
+    expect(() => store.createQuest({ title: "Escape Barovia" })).toThrow();
+    expect(store.listQuests()).toHaveLength(questCount);
+  });
+
+  it("hides a quest record WHOLE from a player until the quest itself is revealed", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    const record = questRecords()[0]!;
+    // Even REVEALED, the record must not travel while the quest is secret: it carries no prose, so a
+    // player would receive a dated row announcing that a quest they have never heard of exists.
+    store.setEntryRevealed(record.id, true);
+    const context = (revealedQuestIds: readonly string[]) => ({ unrevealedSessionIds: new Set<string>(), revealedQuestIds: new Set(revealedQuestIds) });
+    expect(projectPlayerJournalEntry(store.getEntry(record.id)!, context([]))).toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([]))).toBeNull();
+    // The GM's own row carries it throughout, so the nulls are the gate and not a missing record.
+    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }).payload).toEqual({ questId: quest.id, status: "active" });
+
+    // Absent context fails CLOSED - a caller that forgets to resolve the set hides history, never leaks it.
+    expect(projectPlayerJournalEntry(store.getEntry(record.id)!, { unrevealedSessionIds: new Set<string>() })).toBeNull();
+
+    // Reveal the QUEST and the row travels, carrying its status - the record's only content.
+    store.setQuestRevealed(quest.id, true);
+    const shown = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))!;
+    expect(shown.kind).toBe("quest");
+    expect(shown.payload).toEqual({ questId: quest.id, status: "active" });
+    // ...and the ENTRY's own reveal flag still gates it, so both must hold.
+    store.setEntryRevealed(record.id, false);
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))).toBeNull();
+  });
+
+  it("keeps quest history out of a player's SEARCH and reveal audit by the same one gate", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    const record = store.setEntryRevealed(questRecords()[0]!.id, true);
+    const context = (revealedQuestIds: readonly string[]) => ({ unrevealedSessionIds: new Set<string>(), revealedQuestIds: new Set(revealedQuestIds) });
+    // The gate lives on `projectPlayerJournalEntry`, so search and the audit inherit it by construction
+    // rather than by each surface remembering - the placement the standing leak taught.
+    const auditRows = (sessionContext: ReturnType<typeof context>) =>
+      projectRevealAudit([{ kind: "journal", entry: store.getEntry(record.id)!, sessionContext }]).sections.find((section) => section.kind === "journal")!.rows;
+    expect(projectPlayerSearchHit({ kind: "journal", entry: record }, context([]))).toBeNull();
+    expect(auditRows(context([]))).toEqual([]);
+    store.setQuestRevealed(quest.id, true);
+    expect(projectPlayerSearchHit({ kind: "journal", entry: store.getEntry(record.id)! }, context([quest.id]))).not.toBeNull();
+    // The compile-forced fallback label: a quest record has no prose, so `excerpt(text)` is "" and the row
+    // would otherwise be blank - `AUDIT_JOURNAL_FALLBACK` names the kind instead.
+    expect(auditRows(context([quest.id]))[0]).toMatchObject({ journalKind: "quest", title: "Quest updated" });
+  });
+
+  it("degrades a malformed stored payload to defaults rather than throwing", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    const record = questRecords()[0]!;
+    const database = new DatabaseSync(join(directory, "vtt.sqlite"));
+    database.prepare("UPDATE codex_journal SET payload_json = ? WHERE id = ?").run('{"questId": 7, "status": "exploded"}', record.id);
+    database.close();
+    // Fails CLOSED on both fields: a non-string id becomes "" (which matches no revealed quest, so the row
+    // stays hidden) and an unrecognised status reads as `active`, the harmless one.
+    expect(questEventPayloadOf(store.getEntry(record.id)!)).toEqual({ questId: "", status: "active" });
+    expect(projectPlayerJournalEntry(store.setEntryRevealed(record.id, true), { unrevealedSessionIds: new Set<string>(), revealedQuestIds: new Set([quest.id]) })).toBeNull();
+  });
+});
+
+/**
+ * D16: true backup AND restore. The contract's round-trip promise finally becomes true.
+ *
+ * The three things worth proving, in order of what would hurt most if they were wrong: a round trip is
+ * lossless, a bad bundle leaves the codex EXACTLY as it was, and a backup taken before this feature
+ * existed still restores (director ruling R1 - honoring the GM's existing backups is the whole point).
+ */
+describe("CodexStore import — replace, all-or-nothing (D16)", () => {
+  /** A codex with one of everything, so a round trip has something to lose. */
+  const populate = () => {
+    store.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["First", "Second"], currentDate: { year: 1492, month: 1, day: 12 } });
+    store.publishCampaignDate();
+    const faction = store.createPage({ title: "The Harpers", entityType: "faction", playerBody: "Meddlers.", gmBody: "Compromised.", tags: ["faction"], folder: "Factions" });
+    const place = store.createPage({ title: "Vallaki", entityType: "location", playerBody: "A walled town. See [[The Harpers]].", revealedToPlayers: true, inWorldDate: null });
+    store.createConnection(place.id, { toPageId: faction.id, label: "watched by", layer: "gm" });
+    store.setStanding(faction.id, -40, "Killed their envoy");
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional", tags: ["realm"] });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label: "Vallaki", pageIds: [place.id], tags: ["stop"] });
+    store.setPartyMarker(marker.id);
+    const session = store.createSession({ sessionNumber: 4, prepBody: "The ambush.", recapBody: "They crossed.", attendees: ["Ozy"], tags: ["arc-one"] });
+    store.setActiveSession(session.id);
+    store.createQuest({ title: "Find the Sunsword", playerBody: "Search the crypt.", gmBody: "It is a fake.", tags: ["main"] });
+    store.createEntry({ playerText: "We arrived in [[Vallaki]].", gmText: "Strahd watched.", tags: ["travel"], revealedToPlayers: true });
+    store.createDowntime({ playerText: "A month forging.", downtime: { who: "Ireena", activity: "Forging", days: 30, characterPageId: faction.id } });
+    store.updatePage(place.id, { playerBody: "A walled town, and a wall." }, undefined, "gm");   // a revision to carry
+    return { faction, place, map, marker, session };
+  };
+
+  it("round-trips a whole codex: export, wipe, import, and the bundle comes back the same", () => {
+    populate();
+    const before = store.exportBundle();
+    const beforeJson = JSON.stringify(before);
+
+    // Wipe by importing an EXPLICITLY empty bundle first, so the restore below is provably doing the work.
+    // Explicitly: `{ pages: [] }` is a campaign that has nothing in it, which is a legitimate thing to
+    // restore. `{}` is a file with no codex sections at all, which is refused - see the test below.
+    store.importBundle({ pages: [] });
+    expect(store.listPages()).toEqual([]);
+    expect(store.listSessions()).toEqual([]);
+
+    const counts = store.importBundle(JSON.parse(beforeJson) as unknown);
+    // 4 journal rows: the note, the downtime, `setStanding`'s standing record and `createQuest`'s
+    // start record - the two auto-written kinds ride in the bundle like any other entry.
+    expect(counts).toEqual({ pages: 2, folders: 1, maps: 1, markers: 1, journal: 4, connections: 1, sessions: 1, quests: 1, standing: 1, revisions: expect.any(Number) });
+    expect(counts.revisions).toBeGreaterThan(0);
+    // The bundle is byte-identical on the way back out, which is the strongest statement of "lossless"
+    // available: every id, every timestamp, every rev, both bodies, the calendar, the two clocks.
+    expect(JSON.stringify(store.exportBundle())).toBe(beforeJson);
+
+    // ...and the codex WORKS afterwards, not merely reads back: revision restore still resolves by the
+    // integer ids the bundle preserved, so a saved `.../revisions/{id}/restore` URL survives a restore.
+    const pageWithHistory = store.listPages().find((page) => page.title === "Vallaki")!;
+    const revision = store.listRevisions(pageWithHistory.id).at(-1)!;
+    expect(store.restoreRevision(pageWithHistory.id, revision.id, "gm").playerBody).toContain("A walled town");
+    // Derived link rows were rebuilt, not restored from a stale copy.
+    expect(store.listAllConnections().some((edge) => edge.origin === "mention")).toBe(true);
+    // The search index was rebuilt too, with gate 1 intact: prep is GM-only.
+    expect(store.searchAll("gm", "ambush").hits.some((hit) => hit.kind === "session")).toBe(true);
+    expect(store.searchAll("player", "ambush").hits).toEqual([]);
+  });
+
+  it("writes NOTHING when a bundle is bad — the codex is exactly as it was", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const revisionBefore = store.revision;
+
+    const bundle = JSON.parse(before) as { pages: Array<Record<string, unknown>>; sessions: Array<Record<string, unknown>> };
+    // A record that fails validation MID-BUNDLE: the pages before it would already have been inserted if
+    // the whole thing were not one transaction, which is exactly what this is here to prove.
+    const corrupt = { ...bundle, pages: [...bundle.pages, { ...bundle.pages[0], id: "not-a-uuid" }] };
+    expect(() => store.importBundle(corrupt)).toThrow();
+    expect(JSON.stringify(store.exportBundle()), "row for row, the codex is untouched").toBe(before);
+    expect(store.revision, "...and nothing bumped the revision, so no client was told to refetch").toBe(revisionBefore);
+
+    // The two CROSS-record invariants are refused up front with copy a GM can act on, rather than
+    // surfacing as a mid-transaction constraint failure.
+    expect(() => store.importBundle({ ...bundle, sessions: [{ ...bundle.sessions[0], id: crypto.randomUUID() }, { ...bundle.sessions[0], id: crypto.randomUUID() }] })).toThrow(/same number/i);
+    expect(JSON.stringify(store.exportBundle())).toBe(before);
+  });
+
+  /**
+   * D16's atomicity, tested where it is actually load-bearing: a failure AFTER the 13-table wipe.
+   *
+   * The test above it does NOT do this, and said it did. Its corrupt id throws inside `normalizeBundle`,
+   * which runs BEFORE `BEGIN` - so no table is ever emptied, no page is ever inserted, and deleting
+   * `this.transaction(...)` from `importBundle` leaves it green. Every other import test is a success or
+   * another pre-BEGIN refusal, so nothing in the repo exercised the ROLLBACK on the one route that empties
+   * the codex before it refills it. That is the single worst place to have a coverage hole: if the rollback
+   * ever breaks, the symptom is a GM's whole campaign gone.
+   *
+   * The failure is forced with a PROBE constraint installed from a second connection on the same file - a
+   * UNIQUE index over `codex_pages(title)`, which the real schema does not have. That is deliberate rather
+   * than convenient: it is a failure the bundle validators cannot pre-empt, so this test keeps proving the
+   * transaction no matter how much validation moves earlier. The assertion on the driver's own message is
+   * what pins that the throw came from an INSERT inside the transaction rather than from a validator
+   * outside it.
+   */
+  it("rolls back a failure that happens AFTER the wipe, not merely one that happens before it", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const revisionBefore = store.revision;
+    const bundle = JSON.parse(before) as { pages: Array<Record<string, unknown>> };
+    expect(bundle.pages.length, "the wipe must have something to destroy for this to mean anything").toBeGreaterThan(1);
+
+    const probe = new DatabaseSync(join(directory, "vtt.sqlite"));
+    probe.exec("CREATE UNIQUE INDEX probe_page_title ON codex_pages (title);");
+    probe.close();
+
+    // Valid to every validator - distinct uuid, closed references - and fatal to the probe index on the
+    // THIRD page insert, by which point `DELETE FROM` has already emptied all thirteen tables.
+    const collide = { ...bundle, pages: [...bundle.pages, { ...bundle.pages[0], id: crypto.randomUUID() }] };
+    expect(() => store.importBundle(collide)).toThrow(/UNIQUE constraint failed: codex_pages\.title/);
+
+    expect(JSON.stringify(store.exportBundle()), "row for row, the codex survived a failure mid-restore").toBe(before);
+    expect(store.revision, "...and nothing bumped the revision, so no client was told to refetch").toBe(revisionBefore);
+  });
+
+  /**
+   * THE DIFFERENCE BETWEEN "NO RECORDS IN THIS FILE" AND "NO RECORDS IN THIS CAMPAIGN".
+   *
+   * A restore REPLACES the codex, so those two must not take the same branch - and they used to. A file
+   * that parsed as an object but carried no key the codex recognises wiped everything and reported success:
+   * QA destroyed 22 real pages through the Backup screen with a hand-edited file, and the counts in the
+   * response said `pages: 0` as though that were the answer.
+   *
+   * They are distinguishable on the wire and always were, because `exportBundle` writes every key
+   * unconditionally. An empty campaign carries `"pages": []`; a truncated or mistyped file carries nothing
+   * the codex knows. Every negative below is followed by a byte-comparison of the export, so "refused"
+   * means "wrote nothing", not merely "returned an error".
+   */
+  it("refuses a bundle with no recognised sections, and still restores a genuinely empty campaign", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const revisionBefore = store.revision;
+
+    for (const bad of [{}, { notes: [] }, { Pages: [] }, { pagez: [{ id: crypto.randomUUID() }] }]) {
+      expect(() => store.importBundle(bad), JSON.stringify(bad)).toThrow(/no codex sections|does not recognise/i);
+      expect(JSON.stringify(store.exportBundle()), `${JSON.stringify(bad)} must write nothing`).toBe(before);
+      expect(store.revision).toBe(revisionBefore);
+    }
+    // A mistyped section is named, so the GM can go and fix it rather than guess.
+    expect(() => store.importBundle({ pagez: [] })).toThrow(/"pagez"/);
+    // A recognised section that is not a LIST is refused by name too, rather than silently counting as zero
+    // records - which is the same wipe wearing a different hat.
+    expect(() => store.importBundle({ pages: { id: "x" } })).toThrow(/"pages" section is not a list/);
+    expect(JSON.stringify(store.exportBundle())).toBe(before);
+
+    // ...and the legitimate empty campaign still restores, which is the whole reason this is not just
+    // "refuse a bundle that produces zero records".
+    expect(store.importBundle({ pages: [] })).toMatchObject({ pages: 0, journal: 0, sessions: 0 });
+    expect(store.listPages()).toEqual([]);
+  });
+
+  /**
+   * Cross-record refusals speak English and name the section. Each of these is a constraint the insert loop
+   * would otherwise hit AFTER the wipe, where the only text available is the driver's - "UNIQUE constraint
+   * failed: codex_pages.id" to whoever asked, which names internal tables and tells a GM nothing.
+   */
+  it("names the section and the value when a bundle breaks a database constraint", () => {
+    populate();
+    const before = JSON.stringify(store.exportBundle());
+    const bundle = JSON.parse(before) as Record<string, Array<Record<string, unknown>>>;
+    const cases: ReadonlyArray<readonly [Record<string, unknown>, RegExp]> = [
+      [{ ...bundle, pages: [...bundle.pages, { ...bundle.pages[0] }] }, /two "pages" records with the same id/],
+      [{ ...bundle, markers: [{ ...bundle.markers[0], mapId: crypto.randomUUID() }] }, /"markers" section names a map the file does not contain/],
+      [{ ...bundle, relationships: [{ ...bundle.relationships[0], toPageId: crypto.randomUUID() }] }, /"relationships" section names a page the file does not contain/],
+      [{ ...bundle, standing: [{ ...bundle.standing[0], factionPageId: crypto.randomUUID() }] }, /"standing" section names a faction page the file does not contain/],
+      [{ ...bundle, revisions: [{ ...bundle.revisions[0], pageId: crypto.randomUUID() }] }, /"revisions" section names a page the file does not contain/],
+      [{ ...bundle, pages: [{ ...bundle.pages[0], id: "not-a-uuid" }] }, /"pages" entry 1 is not valid: Codex id is malformed/]
+    ];
+    for (const [bad, message] of cases) {
+      expect(() => store.importBundle(bad), message.source).toThrow(message);
+      expect(JSON.stringify(store.exportBundle()), `${message.source} must write nothing`).toBe(before);
+    }
+    // Not one of them mentions a table, a column or the driver.
+    for (const [bad] of cases) {
+      try { store.importBundle(bad); } catch (error) { expect((error as Error).message).not.toMatch(/constraint failed|codex_[a-z_]+\./i); }
+    }
+  });
+
+  /**
+   * DIRECTOR RULING R2 SURVIVES A BACKUP AND RESTORE.
+   *
+   * `deleteSession` stamps a REVEALED session's number back onto its entries as a bare display label, on the
+   * ground that the party was already reading it. On the wire that row is `{sessionId: null, sessionNumber:
+   * 4}` - byte-identical to a PRE-D9 row whose 4 is a lost join. Import used to treat every such row as the
+   * second, so a restore minted a HIDDEN "Session 4" that was never in the exported codex, joined the entry
+   * to it, and nulled the entry's own label. `playerSessionLink` then blanks both halves for an unrevealed
+   * session, so every player silently lost the label R2 exists to preserve - and export -> import -> export
+   * was no longer stable.
+   *
+   * The last two assertions are the ones that would have caught it: the phantom, and the player's label.
+   */
+  it("keeps R2's bare session label through a round trip, and mints no phantom session for it", () => {
+    const session = store.createSession({ sessionNumber: 4 });
+    store.setSessionRevealed(session.id, true);
+    const entry = store.createEntry({ playerText: "We crossed the bridge.", sessionId: session.id, revealedToPlayers: true });
+    store.deleteSession(session.id);
+    expect(store.getEntry(entry.id), "R2's stamp-back is the state under test").toMatchObject({ sessionId: null, sessionNumber: 4 });
+
+    const before = store.exportBundle();
+    store.importBundle(JSON.parse(JSON.stringify(before)) as unknown);
+
+    expect(store.getEntry(entry.id), "the label came back as a label, not as a join").toMatchObject({ sessionId: null, sessionNumber: 4 });
+    expect(store.listSessions(), "no phantom session was minted for the label").toEqual([]);
+    // The two sections R2 lives in, compared byte for byte: export -> import -> export is stable for them.
+    // (Scoped to those two rather than the whole bundle because a codex whose calendar was never set writes
+    // no `currentDate` key on its first export and a normalized `currentDate: null` on its second - a
+    // pre-existing wrinkle in the calendar default, unrelated to R2 and not this test's subject.)
+    const after = store.exportBundle();
+    expect(JSON.stringify(after.journal)).toBe(JSON.stringify(before.journal));
+    expect(JSON.stringify(after.sessions)).toBe(JSON.stringify(before.sessions));
+    // The half a player actually reads: the label the party was already shown still reaches them.
+    expect(projectPlayerJournalEntry(store.getEntry(entry.id)!, playerSessionNumbers())).toMatchObject({ sessionId: null, sessionNumber: 4 });
+  });
+
+  it("restores a PRE-VERSIONING bundle — the backups a GM already has (director ruling R1)", () => {
+    // Hand-built in the shape an export produced BEFORE this engagement: no `settings`, no `tags` on
+    // sessions or quests, no `layer` on a relationship, a slug `type` rather than a label, and journal
+    // rows carrying a bare `sessionNumber` instead of a `sessionId`.
+    const pageId = crypto.randomUUID(), otherId = crypto.randomUUID();
+    const legacy = {
+      pages: [
+        { id: pageId, title: "Barovia", entityType: "location", fields: {}, gmFields: {}, folder: null, tags: [], playerBody: "A misty valley.", gmBody: "", revealedToPlayers: true, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 3, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-02T00:00:00.000Z" },
+        { id: otherId, title: "Strahd", entityType: "character", fields: { race: "Vampire" }, gmFields: {}, folder: null, tags: [], playerBody: "", gmBody: "Rules [[Barovia]].", revealedToPlayers: false, bannerAssetId: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, rev: 1, createdAt: "", updatedAt: "" }
+      ],
+      maps: [], markers: [],
+      journal: [
+        { id: crypto.randomUUID(), playerText: "We arrived.", gmText: null, revealedToPlayers: true, attachMarkerId: null, attachPageId: null, kind: "note", sourceEncounterId: null, sessionNumber: 4, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, sortKey: 1, tags: [], payload: null, createdAt: "", updatedAt: "" },
+        { id: crypto.randomUUID(), playerText: "And again.", gmText: null, revealedToPlayers: true, attachMarkerId: null, attachPageId: null, kind: "note", sourceEncounterId: null, sessionNumber: 9, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, sortKey: 2, tags: [], payload: null, createdAt: "", updatedAt: "" }
+      ],
+      relationships: [{ id: crypto.randomUUID(), fromPageId: otherId, toPageId: pageId, type: "located-in", createdAt: "" }],
+      sessions: [{ id: crypto.randomUUID(), sessionNumber: 4, realDate: null, attendees: [], prepBody: "", recapBody: "We crossed.", revealedToPlayers: true, status: "played", rev: 1, createdAt: "", updatedAt: "" }],
+      activeSessionId: null, quests: [], publishedDate: null, standing: [], partyMarkerId: null,
+      calendar: { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: ["First"] }, folders: [], revisions: []
+    };
+
+    const counts = store.importBundle(legacy);
+    // The orphan number 9 SYNTHESIZED a session, the v19 rule re-applied so one rule governs both paths
+    // into this state - rather than orphaning an entry's number, which is data loss.
+    expect(counts.sessions).toBe(2);
+    const synthesized = store.listSessions().find((session) => session.sessionNumber === 9)!;
+    expect(synthesized).toMatchObject({ status: "played", revealedToPlayers: false, prepBody: "", recapBody: "" });
+    expect(store.listTimeline().map((entry) => entry.sessionNumber).sort()).toEqual([4, 9]);
+    expect(store.listTimeline().every((entry) => entry.sessionId !== null), "every legacy number became a real join").toBe(true);
+
+    // Missing keys DEFAULTED rather than failing: no tags, a `player` layer, and the settings untouched.
+    expect(store.listSessions().every((session) => session.tags.length === 0)).toBe(true);
+    // ...and the synthesized placeholder is INDEXED like every other session written by an import. It was
+    // the one arm that skipped `indexSession`, so "Session 9" was findable in the Sessions list and nowhere
+    // else - not in the palette, not in suite search - while "Session 4" from the same file resolved.
+    expect(store.searchAll("gm", "Session 9").hits.map((hit) => hit.id)).toEqual([synthesized.id]);
+    const edge = store.listAllConnections().find((row) => row.origin === "declared")!;
+    expect(edge.layer).toBe("player");
+    // ...and an old SLUG `type` lands as the label v22's relabel would have made it.
+    expect(edge.label).toBe("located in");
+    expect(store.getSettings().autosave).toEqual({ enabled: true, intervalSeconds: 1 });
+    // The mention in Strahd's GM body was re-extracted on the GM layer, from text, not from a stored row.
+    expect(store.listAllConnections().find((row) => row.origin === "mention")).toMatchObject({ fromId: otherId, toPageId: pageId, layer: "gm" });
+  });
+
+  it("fabricates no history: an import writes no quest records and no revision snapshots", () => {
+    const quest = store.createQuest({ title: "Find the Sunsword" });
+    store.updateQuest(quest.id, { status: "completed" }, undefined);
+    const bundle = JSON.parse(JSON.stringify(store.exportBundle())) as unknown;
+    const historyBefore = store.listTimeline().filter((entry) => entry.kind === "quest").length;
+    expect(historyBefore).toBe(2);
+
+    store.importBundle(bundle);
+    // Exactly the two records the bundle carried - NOT two more from re-running create + status change.
+    // A restore reproduces a past state; it does not perform a hundred authoring events.
+    expect(store.listTimeline().filter((entry) => entry.kind === "quest")).toHaveLength(2);
+    // ...and no page revision was snapshotted by the raw page writes either.
+    expect(store.getSettings().revisionHistory.versionCount).toBe(0);
+  });
+});
+
+/**
+ * THE ETAG CORRECTNESS ARGUMENT, MADE CHECKABLE.
+ *
+ * `readEnvelope` serves `W/"codex-r{revision}-{grade}-{resource}"` and answers 304 to a match, so its whole
+ * claim rests on one store guarantee: EVERY write bumps the coarse revision inside its own transaction,
+ * reveals and clock moves included, because those change what a reader sees without changing any record's
+ * `rev`. The router's comment used to say the bump "lives in the store's transaction helper rather than at
+ * call sites" - which was simply false. `transaction()` bumps nothing; `bumpRevision()` is hand-written at
+ * forty-odd call sites, and a forty-first write that forgot it would silently serve stale reads to every
+ * poller and every integration, with no failing test anywhere.
+ *
+ * So the guarantee is checked instead of asserted. Every public method is classified as a WRITE or a READ,
+ * every write is invoked and must move `store.revision`, and a method that is in neither list fails the
+ * suite - which is what makes this hold for code nobody has written yet.
+ */
+/**
+ * A codex created today has nothing to backfill, and must not act as though it does.
+ *
+ * `reconcileLinks` guarded its fresh-database case on the meta row being ABSENT - a branch that could never
+ * fire, because `initialize` inserts that row two lines before calling it. So every new codex swept three
+ * empty tables and bumped its revision to 1 before its first write, while the code's comment said the
+ * opposite ("a codex created today never pays for a sweep"). The seed now sets the flag, and the comment
+ * describes what happens.
+ *
+ * The revision is the observable: it is what every ETag and every `codex:changed` ping is derived from, so
+ * "a fresh codex reports revision 0" is the statement worth pinning.
+ */
+describe("a fresh codex does not run the D13 link backfill", () => {
+  it("reports revision 0 before its first write, and still backfills a database that predates D13", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-codex-fresh-"));
+    const fresh = new CodexStore(join(directory, "vtt.sqlite"));
+    await fresh.initialize();
+    expect(fresh.revision, "nothing has happened yet").toBe(0);
+    // Reopening does not sweep either - the flag is durable, not a per-process guess.
+    fresh.close();
+    const reopened = new CodexStore(join(directory, "vtt.sqlite"));
+    await reopened.initialize();
+    expect(reopened.revision).toBe(0);
+    reopened.close();
+
+    // The half that must still work: a database whose flag is 0 (a real pre-D13 codex) DOES sweep, and the
+    // sweep finds the wiki links in a session recap that no page save ever extracted.
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-legacy-"));
+    const seeded = new CodexStore(join(legacyDirectory, "vtt.sqlite"));
+    await seeded.initialize();
+    const page = seeded.createPage({ title: "Vallaki" });
+    const session = seeded.createSession({ recapBody: "We reached [[Vallaki]]." });
+    seeded.close();
+    const raw = new DatabaseSync(join(legacyDirectory, "vtt.sqlite"));
+    raw.exec("DELETE FROM codex_links; UPDATE codex_meta SET links_backfilled = 0;");
+    raw.close();
+    const migrated = new CodexStore(join(legacyDirectory, "vtt.sqlite"));
+    await migrated.initialize();
+    expect(migrated.listAllConnections().find((edge) => edge.fromId === session.id), "the sweep re-extracted the recap's link").toMatchObject({ toPageId: page.id, origin: "mention" });
+    expect(migrated.revision, "...and it told every client to refetch").toBeGreaterThan(0);
+    migrated.close();
+    await rm(directory, { recursive: true, force: true });
+    await rm(legacyDirectory, { recursive: true, force: true });
+  });
+});
+
+describe("every codex write bumps the coarse revision (the ETag's one premise)", () => {
+  /** Reads, and the three bookkeeping methods that deliberately move nothing. Everything else is a write. */
+  const NOT_WRITES = new Set([
+    "constructor", "initialize", "close", "recallCommand",
+    // A receipt is bookkeeping about a response, not content - bumping here would invalidate every client's
+    // ETag a second time for a write that already bumped it once. Stated in `recordCommand` itself.
+    "recordCommand",
+    "listFolders", "getPage", "listPages", "exportBundle", "listAllDeclaredConnections", "connectionsForPage",
+    "listAllConnections", "getSettings", "listRevisions", "listAllRevisions", "searchAll", "searchPages",
+    "getMap", "listMaps", "getMarker", "listMarkers", "markersForPage", "isAssetRevealedToPlayers",
+    "isPageAssetVisibleToPlayers", "markerForScene", "partyMarker", "getCalendar", "getPublishedDate",
+    "campaignInstant", "publishedInstant", "dateForInstant", "proposedDateFor", "getEntry", "listTimeline",
+    "listDatedEventPages", "listChronicle", "listEntriesFor", "getSession", "listSessions",
+    "unrevealedSessionIds", "getQuest", "listQuests", "listStanding", "getStanding", "revision",
+    "activeSessionId", "downtimeCharacterPageIds"
+  ]);
+
+  /** One invocation per write, each on a store this function has just seeded for it. */
+  const WRITES: Record<string, (from: CodexStore) => void> = {
+    createPage: (s) => { s.createPage({ title: "New" }); },
+    updatePage: (s) => { s.updatePage(s.createPage({ title: "A" }).id, { playerBody: "b" }, undefined, "gm"); },
+    setPageRevealed: (s) => { s.setPageRevealed(s.createPage({ title: "A" }).id, true); },
+    deletePage: (s) => { s.deletePage(s.createPage({ title: "A" }).id); },
+    createFolder: (s) => { s.createFolder("Places"); },
+    moveFolder: (s) => { s.createFolder("Places"); s.moveFolder("Places", "Realms"); },
+    deleteFolder: (s) => { s.createFolder("Places"); s.deleteFolder("Places"); },
+    importBundle: (s) => { s.importBundle({ pages: [] }); },
+    createConnection: (s) => { s.createConnection(s.createPage({ title: "A" }).id, { toPageId: s.createPage({ title: "B" }).id }); },
+    updateConnection: (s) => { s.updateConnection(s.createConnection(s.createPage({ title: "A" }).id, { toPageId: s.createPage({ title: "B" }).id }).id, { label: "ally of" }); },
+    deleteConnection: (s) => { s.deleteConnection(s.createConnection(s.createPage({ title: "A" }).id, { toPageId: s.createPage({ title: "B" }).id }).id); },
+    setSettings: (s) => { s.setSettings({ revisionHistory: { enabled: false, windowMinutes: 30 }, autosave: AUTOSAVE_DEFAULT }); },
+    deleteRevisionsOlderThan: (s) => { s.deleteRevisionsOlderThan(0); },
+    restoreRevision: (s) => {
+      const page = s.createPage({ title: "A", playerBody: "one" });
+      s.updatePage(page.id, { playerBody: "two" }, undefined, "gm");
+      s.restoreRevision(page.id, s.listRevisions(page.id).at(-1)!.id, "gm");
+    },
+    createMap: (s) => { s.createMap({ assetId: ASSET, name: "M", kind: "world" }); },
+    updateMap: (s) => { s.updateMap(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, { name: "N" }); },
+    setMapParent: (s) => { const parent = s.createMap({ assetId: ASSET, name: "P", kind: "world" }); s.setMapParent(s.createMap({ assetId: ASSET, name: "C", kind: "regional" }).id, parent.id); },
+    setMapRevealed: (s) => { s.setMapRevealed(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, true); },
+    deleteMap: (s) => { s.deleteMap(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id); },
+    createMarker: (s) => { s.createMarker(s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, MARKER); },
+    updateMarker: (s) => { s.updateMarker(seedMarker(s).id, { label: "L" }); },
+    moveMarker: (s) => { s.moveMarker(seedMarker(s).id, 0.25, 0.25); },
+    setMarkerRevealed: (s) => { s.setMarkerRevealed(seedMarker(s).id, true); },
+    deleteMarker: (s) => { s.deleteMarker(seedMarker(s).id); },
+    setPartyMarker: (s) => { s.setPartyMarker(seedMarker(s).id); },
+    setCalendar: (s) => { s.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: ["First"], currentDate: { year: 1492, month: 0, day: 1 } }); },
+    publishCampaignDate: (s) => { s.publishCampaignDate(); },
+    createEntry: (s) => { s.createEntry({ playerText: "We arrived." }); },
+    appendCombatEntry: (s) => { s.appendCombatEntry({ playerText: "A battle.", gmText: null, sourceEncounterId: 1 }); },
+    createDeadline: (s) => { s.createDeadline({ playerText: "Dawn.", inWorldDate: { year: 1492, month: 0, day: 2 } }); },
+    createDowntime: (s) => { s.createDowntime({ playerText: "Forging.", downtime: { who: "Ireena", activity: "Forging", days: 3 } }); },
+    createMilestone: (s) => { s.createMilestone({ playerText: "Level 5.", milestone: { level: 5, reason: "the crypt" } }); },
+    applyDowntime: (s) => {
+      s.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: ["First"], currentDate: { year: 1492, month: 0, day: 1 } });
+      s.applyDowntime(s.createDowntime({ playerText: "Forging.", downtime: { who: "Ireena", activity: "Forging", days: 3 } }).id);
+    },
+    updateEntry: (s) => { s.updateEntry(s.createEntry({ playerText: "A" }).id, { playerText: "B" }); },
+    setEntryRevealed: (s) => { s.setEntryRevealed(s.createEntry({ playerText: "A" }).id, true); },
+    deleteEntry: (s) => { s.deleteEntry(s.createEntry({ playerText: "A" }).id); },
+    createSession: (s) => { s.createSession({ sessionNumber: 1 }); },
+    updateSession: (s) => { s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined); },
+    setSessionRevealed: (s) => { s.setSessionRevealed(s.createSession({ sessionNumber: 1 }).id, true); },
+    deleteSession: (s) => { s.deleteSession(s.createSession({ sessionNumber: 1 }).id); },
+    setActiveSession: (s) => { s.setActiveSession(s.createSession({ sessionNumber: 1 }).id); },
+    createQuest: (s) => { s.createQuest({ title: "Q" }); },
+    updateQuest: (s) => { s.updateQuest(s.createQuest({ title: "Q" }).id, { status: "completed" }, undefined); },
+    setQuestRevealed: (s) => { s.setQuestRevealed(s.createQuest({ title: "Q" }).id, true); },
+    deleteQuest: (s) => { s.deleteQuest(s.createQuest({ title: "Q" }).id); },
+    setStanding: (s) => { s.setStanding(s.createPage({ title: "F", entityType: "faction" }).id, 10, "kind words"); },
+    setStandingRevealed: (s) => { const page = s.createPage({ title: "F", entityType: "faction" }).id; s.setStanding(page, 10, "kind words"); s.setStandingRevealed(page, true); }
+  };
+  const MARKER = { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff8800" } as const;
+  const seedMarker = (from: CodexStore) => from.createMarker(from.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, MARKER);
+
+  /**
+   * Read from the SOURCE rather than from the prototype, because `private` is erased at runtime and this
+   * has to be a statement about the public surface. The regex takes members at exactly two spaces of
+   * indent whose first token is an identifier followed by `(` - which `private foo(` is not, and which no
+   * comment line or statement body can be. The floor assertion is there so a regex that stops matching
+   * fails loudly instead of quietly classifying nothing.
+   */
+  it("classifies every public method, so a write added tomorrow cannot slip past this", () => {
+    const source = readFileSync(new URL("../src/codex-store.ts", import.meta.url), "utf8");
+    const classBody = source.slice(source.indexOf("export class CodexStore {"));
+    const surface = [...classBody.matchAll(/^ {2}(?:get |async )?([a-zA-Z][A-Za-z0-9_]*)\s*\(/gm)]
+      .map((match) => match[1]!)
+      .filter((name) => !["if", "for", "while", "switch", "catch", "return"].includes(name));
+    expect(surface.length, "the source scan found nothing - the regex, not the store, is broken").toBeGreaterThan(50);
+
+    const declared = new Set([...NOT_WRITES, ...Object.keys(WRITES)]);
+    expect([...new Set(surface)].filter((name) => !declared.has(name)), "classify each of these as a read (NOT_WRITES) or a write (WRITES)").toEqual([]);
+    // ...and nothing is classified that no longer exists, so the lists cannot rot in the other direction.
+    expect([...declared].filter((name) => name !== "constructor" && !surface.includes(name)), "these are classified but no longer on CodexStore").toEqual([]);
+  });
+
+  it.each(Object.keys(WRITES))("%s moves store.revision", (name) => {
+    const before = store.revision;
+    WRITES[name]!(store);
+    expect(store.revision, `${name} wrote without bumping the coarse revision - every ETag it invalidated stays valid`).toBeGreaterThan(before);
   });
 });

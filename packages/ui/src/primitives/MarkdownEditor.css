@@ -1,0 +1,71 @@
+.nh-mdeditor { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+
+.nh-mdeditor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Route 2 controls in a wrapping row, and the gap budget measured rather than assumed.
+   `IconButton size="sm"` paints **29.6px**, not the 36px this comment used to claim, and its
+   `.tap-target` ::after is 44px — so each hit box overhangs by (44 − 29.6) / 2 = 7.2px per side and two
+   neighbours need 14.4px between them. At `--space-2` (8px) the boxes overlapped by 6.4px and the later
+   sibling took every tap in that band. `--space-4` (16px) clears it in both axes, which is what
+   `flex-wrap` makes necessary — the rows overlap the same way the columns do. */
+.nh-mdeditor-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+
+.nh-mdeditor-letter { font: 800 var(--fs-sm) / 1 var(--font-body); }
+.nh-mdeditor-letter--italic { font-style: italic; font-weight: 600; }
+.nh-mdeditor-letter--strike { text-decoration: line-through; font-weight: 600; }
+
+.nh-mdeditor-frame { position: relative; min-width: 0; }
+.nh-mdeditor-input { width: 100%; min-height: 14rem; resize: vertical; font-family: var(--font-body); line-height: 1.6; }
+
+.nh-mdeditor-preview {
+  position: relative;
+  min-height: 8rem;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.nh-mdeditor-empty { color: var(--text-muted); margin: 0; }
+
+.nh-mdeditor-suggest {
+  position: absolute;
+  z-index: 30;
+  inset-inline-start: var(--space-2);
+  bottom: var(--space-3);
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  min-width: 14rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+}
+/* §4 route 1 (grow the paint): a stacked suggestion list must not use ::after overhang. */
+.nh-mdeditor-suggestitem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: 500 var(--fs-body) / 1.35 var(--font-body);
+  text-align: start;
+  cursor: pointer;
+}
+.nh-mdeditor-suggestitem:hover,
+.nh-mdeditor-suggestitem.is-active { background: var(--surface-3); }
+
+@media (max-width: 560px) {
+  .nh-mdeditor-input { min-height: 11rem; }
+}

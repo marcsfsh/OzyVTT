@@ -48,3 +48,16 @@
   color: var(--danger-hi);
 }
 .nh-field-error-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+
+/* Title variant — the field a record's own NAME is typed into. Display face, no resting
+   well, so a heading reads as a heading; the well returns on hover and focus so it never
+   stops looking editable. Replaces the Codex's bespoke `.codex-title-input` (D25). */
+.nh-input--title {
+  font: 700 var(--fs-h2) / 1.25 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  background: transparent;
+  border-color: transparent;
+  padding-inline: var(--space-2);
+}
+.nh-input--title:hover:not(:disabled) { background: var(--surface-3); border-color: var(--line); }
+.nh-input--title:focus { background: var(--surface-3); }

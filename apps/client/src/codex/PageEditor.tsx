@@ -1,203 +1,121 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Field, IconButton, Input, Modal, SaveState, SegmentedControl, Select, TagInput, Textarea, type SaveStatus } from "@vtt/ui";
-import { calendarApi, codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexCalendar, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship, type CodexSettings } from "./api";
-import { CodexMarkdown } from "./CodexMarkdown";
+import { Alert, Button, Field, Input, Modal, SaveState, SegmentedControl, Select, TagInput, Textarea } from "@vtt/ui";
+import { calendarApi, codexApi, uploadCodexAsset, type CodexAutosaveSettings, type CodexCalendar, type CodexPage, type CodexPageConnection, type CodexPageRevision, type CodexPageSummary, type CodexSettings } from "./api";
 import { CodexImage } from "./CodexImage";
+import { CodexEditor } from "./CodexEditor";
 import { PageTimeline } from "./PageTimeline";
 import { PageMarkers } from "./PageMarkers";
-import { RelationshipsPanel } from "./RelationshipsPanel";
+import { ConnectionsPanel } from "./ConnectionsPanel";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
-import { CodexIcon } from "./icons";
+import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 type BodyTab = "player" | "gm";
 
 /**
- * `dateYear`/`dateMonth`/`dateDay` are CT-11: the in-world date that puts an `event` page on the
- * chronicle. They are STRINGS here, exactly as the journal composer holds them, because a half-typed
- * year is a normal state of an input and coercing it to a number every keystroke is how "1" becomes 1
- * and then a saved date of year 1. The raw date is the source of truth; the sort key and label are the
- * server's to derive.
+ * `dateYear`/`dateMonth`/`dateDay` are the in-world date that puts an `event` page on the chronicle.
+ * They are STRINGS here, exactly as the journal composer holds them, because a half-typed year is a
+ * normal state of an input and coercing it every keystroke is how "1" becomes a saved year of 1.
  */
-type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tagsText: string; playerBody: string; gmBody: string; bannerAssetId: string | null; dateYear: string; dateMonth: string; dateDay: string };
+type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tags: readonly string[]; playerBody: string; gmBody: string; bannerAssetId: string | null; dateYear: string; dateMonth: string; dateDay: string };
 
 function draftOf(page: CodexPage): Draft {
-  // The editor holds one flat value map; public `fields` + GM-only `gmFields` merge for editing and re-split on save.
   const date = page.inWorldDate; // the RAW date the GM typed - correct even if the calendar has since changed
   return {
     title: page.title, entityType: page.entityType, fields: { ...page.fields, ...page.gmFields }, folder: page.folder ?? "",
-    tagsText: page.tags.join(", "), playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId,
+    tags: page.tags, playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId,
     dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : ""
   };
 }
-function serialize(draft: Draft): string { return JSON.stringify(draft); }
-function parseTags(text: string): string[] {
-  return [...new Set(text.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean))];
-}
 
-/** Insert or wrap markdown at the textarea's selection, returning the new value + caret to restore. */
-function applyFormat(value: string, start: number, end: number, kind: string): { value: string; caret: number } {
-  const selected = value.slice(start, end);
-  const wrap = (marker: string) => ({ value: `${value.slice(0, start)}${marker}${selected || ""}${marker}${value.slice(end)}`, caret: start + marker.length + (selected.length || 0) });
-  const linePrefix = (prefix: string) => {
-    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-    return { value: `${value.slice(0, lineStart)}${prefix}${value.slice(lineStart)}`, caret: end + prefix.length };
-  };
-  switch (kind) {
-    case "bold": return wrap("**");
-    case "italic": return wrap("*");
-    case "strike": return wrap("~~");
-    case "code": return wrap("`");
-    case "heading": return linePrefix("## ");
-    case "bullet": return linePrefix("- ");
-    case "numbered": return linePrefix("1. ");
-    case "quote": return linePrefix("> ");
-    case "rule": return { value: `${value.slice(0, start)}\n---\n${value.slice(end)}`, caret: start + 5 };
-    case "wikilink": return { value: `${value.slice(0, start)}[[${selected || ""}]]${value.slice(end)}`, caret: start + 2 + selected.length };
-    default: return { value, caret: end };
-  }
-}
-
-const TOOLBAR: ReadonlyArray<{ kind: string; label: string; glyph?: string; icon?: string }> = [
-  { kind: "bold", label: "Bold", glyph: "B" },
-  { kind: "italic", label: "Italic", glyph: "I" },
-  { kind: "strike", label: "Strikethrough", glyph: "S" },
-  { kind: "code", label: "Inline code", glyph: "‹›" },
-  { kind: "heading", label: "Heading", glyph: "H" },
-  { kind: "bullet", label: "Bullet list", glyph: "•" },
-  { kind: "numbered", label: "Numbered list", glyph: "1." },
-  { kind: "quote", label: "Quote", glyph: "”" },
-  { kind: "rule", label: "Divider", glyph: "―" },
-  { kind: "wikilink", label: "Wiki-link to another page", glyph: "[[ ]]" }
-];
-
-type PageEditorProps = Readonly<{
+export type PageEditorProps = Readonly<{
   gmToken: string;
   page: CodexPage;
   pages: readonly CodexPageSummary[];
-  backlinks: readonly CodexBacklink[];
-  relationships: readonly CodexRelationship[];
+  /** D8: one list, both directions, both origins. Replaces `backlinks` + `relationships`. */
+  connections: readonly CodexPageConnection[];
+  autosave: CodexAutosaveSettings;
   onChange: (page: CodexPage) => void;
   onDeleted: () => void;
+  /** Follow a `[[link]]`. Unresolved targets open quick-create rather than creating silently (D7). */
   onNavigate: (target: string) => void;
   /** Jump to the archived fight an auto-logged battle came from. GM-only: archives carry GM narration. */
   onOpenReplay?: (archiveId: number) => void;
-  /** CI-3: open one of this page's journal entries, on the Journal, with that entry focused. */
-  onOpenEntry?: (entryId: string) => void;
-  /** CI-4: open one of this page's atlas pins — its map first, then the pin (both halves, per R1). */
+  onConnectionsChanged: () => void;
+  onOpenConnection: (kind: CodexPageConnection["otherKind"], id: string) => void;
+  /** Open a pin on the Atlas — the page's "elsewhere" edge. Both halves travel (map, then pin). */
   onOpenMarker?: (markerId: string, mapId: string) => void;
-  /** CI-5: open the Graph focused on this entity's own node. */
+  /** Land the Graph ON this page's own node — the page's fourth return edge. */
   onShowInGraph?: (pageId: string) => void;
-  onRelationshipsChanged: () => void;
+  onPickTag?: (tag: string) => void;
 }>;
 
-/** When the caret sits inside an unclosed `[[…`, return the open bracket's offset + the typed query. */
-function wikiContext(value: string, caret: number): { start: number; query: string } | null {
-  const prefix = value.slice(0, caret);
-  const open = prefix.lastIndexOf("[[");
-  if (open === -1) return null;
-  const query = prefix.slice(open + 2);
-  if (/[[\]\n]/.test(query)) return null; // a bracket or newline since `[[` means it's not an open wiki-link
-  return { start: open, query };
-}
-
-export function PageEditor({ gmToken, page, pages, backlinks, relationships, onChange, onDeleted, onNavigate, onOpenReplay, onOpenEntry, onOpenMarker, onShowInGraph, onRelationshipsChanged }: PageEditorProps) {
+export function PageEditor({ gmToken, page, pages, connections, autosave, onChange, onDeleted, onNavigate, onOpenReplay, onConnectionsChanged, onOpenConnection, onOpenMarker, onShowInGraph, onPickTag }: PageEditorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
   const [tab, setTab] = useState<BodyTab>("player");
-  const [preview, setPreview] = useState(false);
-  const [suggest, setSuggest] = useState<{ start: number; query: string; index: number } | null>(null);
-  const [status, setStatus] = useState<SaveStatus>("idle");
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [revisions, setRevisions] = useState<CodexPageRevision[]>([]);
-  /** `null` = not read yet, or the read failed. The panel then shows the list without claiming a setting. */
   const [settings, setSettings] = useState<CodexSettings | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const revRef = useRef(page.rev);
-  const savedRef = useRef(serialize(draftOf(page)));
-  const draftRef = useRef(draft);
-  const savingRef = useRef(false);
-  const dirtyRef = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { draftRef.current = draft; }, [draft]);
 
-  // Serialized autosave: only ever ONE PATCH in flight. Overlapping saves would race the same expectedRev
-  // and 409 against *themselves*, then wedge the editor (revRef never resyncs). A fresh edit mid-save sets
-  // dirtyRef and re-runs on completion; a genuine 409 resyncs revRef so the next edit saves cleanly.
-  const flush = useCallback(async () => {
-    if (savingRef.current) { dirtyRef.current = true; return; }
-    const snapshot = serialize(draftRef.current);
-    if (snapshot === savedRef.current) return;
-    savingRef.current = true;
-    setStatus("saving");
-    try {
-      const draftNow = draftRef.current;
-      // Split the flat value map back into player-facing `fields` and GM-only `gmFields` (secret motives never reach players).
-      const { fields, gmFields } = splitEntityFields(draftNow.entityType, draftNow.fields);
-      const updated = await codexApi.updatePage(gmToken, page.id, {
-        title: draftNow.title.trim() || "Untitled", entityType: draftNow.entityType, fields, gmFields,
-        folder: draftNow.folder.trim() || null, tags: parseTags(draftNow.tagsText),
-        playerBody: draftNow.playerBody, gmBody: draftNow.gmBody, bannerAssetId: draftNow.bannerAssetId,
-        // CT-11: only an `event` page has a date control, so only an `event` page states a date. On any
-        // other type the key is OMITTED, and an omitted date leaves the stored one alone - which is what
-        // makes switching an event to a note and back lossless rather than a silent erase.
-        ...(draftNow.entityType === "event" ? { inWorldDate: draftNow.dateYear.trim() ? { year: Math.trunc(Number(draftNow.dateYear) || 0), month: Number(draftNow.dateMonth || 0), day: Math.max(1, Math.trunc(Number(draftNow.dateDay) || 1)) } : null } : {}),
-        expectedRev: revRef.current
-      });
-      savedRef.current = snapshot;
-      revRef.current = updated.rev;
-      setStatus("saved");
-      onChange(updated);
-    } catch (error) {
-      if (error instanceof CodexRequestError && error.status === 409) {
-        try { revRef.current = (await codexApi.getPage(gmToken, page.id)).page.rev; } catch { /* keep stale rev; a later flush retries */ }
-        setStatus("conflict");
-      } else { setStatus("error"); }
-    } finally {
-      savingRef.current = false;
-      if (dirtyRef.current) { dirtyRef.current = false; void flush(); }
-    }
+  /**
+   * D6 — one autosave, the GM's cadence. Identical to the old hand-rolled behaviour when the setting is
+   * on; when it is off the same hook drives an explicit Save, an "Unsaved changes" readout, a navigation
+   * guard and a `beforeunload` handler.
+   */
+  const save = useCallback(async (next: Draft) => {
+    const { fields, gmFields } = splitEntityFields(next.entityType, next.fields);
+    const updated = await codexApi.updatePage(gmToken, page.id, {
+      title: next.title.trim() || "Untitled", entityType: next.entityType, fields, gmFields,
+      folder: next.folder.trim() || null, tags: next.tags,
+      playerBody: next.playerBody, gmBody: next.gmBody, bannerAssetId: next.bannerAssetId,
+      // Only an `event` page has a date control, so only an `event` page states a date. On any other
+      // kind the key is OMITTED, and an omitted date leaves the stored one alone — which is what makes
+      // switching an event to a note and back lossless rather than a silent erase.
+      ...(next.entityType === "event"
+        ? { inWorldDate: next.dateYear.trim() ? { year: Math.trunc(Number(next.dateYear) || 0), month: Number(next.dateMonth || 0), day: Math.max(1, Math.trunc(Number(next.dateDay) || 1)) } : null }
+        : {}),
+      expectedRev: revRef.current
+    });
+    revRef.current = updated.rev;
+    setSaveError(null);
+    onChange(updated);
   }, [gmToken, page.id, onChange]);
 
-  // Debounce: ~800ms after the last edit, ask flush() to run (it self-serializes).
-  useEffect(() => {
-    if (serialize(draft) === savedRef.current) return;
-    const timer = setTimeout(() => { void flush(); }, 800);
-    return () => clearTimeout(timer);
-  }, [draft, flush]);
-
-  // Flush any pending edit when the editor unmounts (navigating away / switching Codex tabs) - the debounce
-  // timer alone would silently drop the last edit. flushRef holds the latest flush so this runs only on unmount.
-  const flushRef = useRef(flush);
-  flushRef.current = flush;
-  useEffect(() => () => { if (serialize(draftRef.current) !== savedRef.current) void flushRef.current(); }, []);
-
-  // Adopt an EXTERNAL change to this same page (e.g. a folder move from the tree, which patches folder + rev
-  // out from under us). If we have no unsaved local edits, take the server copy so the editor doesn't keep a
-  // stale folder and then 409 its next autosave. With unsaved edits we leave the draft alone (our save wins).
-  useEffect(() => {
-    const incoming = serialize(draftOf(page));
-    if (incoming !== savedRef.current && serialize(draftRef.current) === savedRef.current) {
-      savedRef.current = incoming;
-      revRef.current = page.rev;
-      setDraft(draftOf(page));
-      setStatus("idle");
+  const { status, dirty, flush, markSaved } = useCodexAutosave<Draft>({
+    settings: autosave,
+    draft,
+    save,
+    onConflict: async () => {
+      try { revRef.current = (await codexApi.getPage(gmToken, page.id)).page.rev; } catch { /* keep stale rev; a later flush retries */ }
     }
-  }, [page]);
+  });
+
+  /**
+   * Adopt an EXTERNAL change to this same page (a folder move from the tree patches folder + rev out
+   * from under us). With no unsaved local edits we take the server copy, so the editor does not keep a
+   * stale folder and then 409 its next save. With unsaved edits the draft wins and our save lands.
+   */
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  useEffect(() => {
+    if (dirtyRef.current) return;
+    revRef.current = page.rev;
+    const next = draftOf(page);
+    setDraft(next);
+    markSaved(next);
+  }, [page, markSaved]);
 
   const body = tab === "player" ? draft.playerBody : draft.gmBody;
   const setBody = (next: string) => setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
   const setField = (key: string, value: string) => setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
   const typeDef = entityDef(draft.entityType);
 
-  /**
-   * CT-11: the world calendar, for the month names of an `event` page's date control. Fetched LAZILY and
-   * once - only an event page has the control, and making every page open pay a calendar round-trip for a
-   * field it does not have would be a cost on the suite's most-opened surface.
-   */
   const isEvent = draft.entityType === "event";
   const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
   useEffect(() => {
@@ -206,79 +124,53 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
     void calendarApi.get(gmToken).then((next) => { if (live) setCalendar(next); }).catch(() => undefined);
     return () => { live = false; };
   }, [isEvent, calendar, gmToken]);
+  // The kind-change copy names the history setting, so read it once when the editor mounts.
+  useEffect(() => { void codexApi.getSettings(gmToken).then(setSettings).catch(() => undefined); }, [gmToken]);
 
-  const format = (kind: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const { value, caret } = applyFormat(body, textarea.selectionStart, textarea.selectionEnd, kind);
-    setBody(value);
-    requestAnimationFrame(() => { textarea.focus(); textarea.setSelectionRange(caret, caret); });
-  };
-  const insertAtCursor = (snippet: string) => {
-    const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? body.length;
-    const end = textarea?.selectionEnd ?? body.length;
-    setBody(`${body.slice(0, start)}${snippet}${body.slice(end)}`);
-    const caret = start + snippet.length;
-    requestAnimationFrame(() => { textarea?.focus(); textarea?.setSelectionRange(caret, caret); });
-  };
-  const uploadBanner = async (file: File | undefined) => { if (!file) return; try { const asset = await uploadCodexAsset(gmToken, file); setDraft((prev) => ({ ...prev, bannerAssetId: asset.id })); } catch { setStatus("error"); } };
-  const insertImage = async (file: File | undefined) => { if (!file) return; try { const asset = await uploadCodexAsset(gmToken, file); insertAtCursor(`\n![${file.name.replace(/\.[^.]+$/, "")}](codex-asset:${asset.id})\n`); } catch { setStatus("error"); } };
-
-  // Wiki-link autocomplete: while the caret sits inside an open `[[`, suggest existing page titles so a
-  // typo can't silently fork a second page for the same place.
-  const suggestions = useMemo(() => {
-    if (!suggest) return [];
-    const query = suggest.query.trim().toLowerCase();
-    return pages.filter((candidate) => candidate.id !== page.id && candidate.title.toLowerCase().includes(query)).slice(0, 6);
-  }, [suggest, pages, page.id]);
-  const syncSuggest = (value: string, caret: number) => {
-    const context = wikiContext(value, caret);
-    setSuggest(context ? { start: context.start, query: context.query, index: 0 } : null);
-  };
-  const insertWiki = (title: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea || !suggest) return;
-    const before = body.slice(0, suggest.start);
-    const after = body.slice(textarea.selectionStart);
-    const closing = after.startsWith("]]") ? "" : "]]";
-    setBody(`${before}[[${title}${closing}${after}`);
-    setSuggest(null);
-    const caret = before.length + 2 + title.length + 2; // land just past the (existing or added) ]]
-    requestAnimationFrame(() => { textarea.focus(); textarea.setSelectionRange(caret, caret); });
-  };
-  const onBodyKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!suggest || suggestions.length === 0) return;
-    if (event.key === "ArrowDown") { event.preventDefault(); setSuggest((prev) => prev && { ...prev, index: Math.min(prev.index + 1, suggestions.length - 1) }); }
-    else if (event.key === "ArrowUp") { event.preventDefault(); setSuggest((prev) => prev && { ...prev, index: Math.max(prev.index - 1, 0) }); }
-    else if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); insertWiki(suggestions[Math.min(suggest.index, suggestions.length - 1)].title); }
-    else if (event.key === "Escape") { event.preventDefault(); setSuggest(null); }
-  };
-
-  // Drop or paste an image straight into the body - how a GM actually collects reference art mid-prep.
-  const onBodyDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    const file = event.dataTransfer?.files?.[0];
-    if (file && file.type.startsWith("image/")) { event.preventDefault(); void insertImage(file); }
-  };
-  const onBodyPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
-    const items = event.clipboardData?.items;
-    for (let i = 0; items && i < items.length; i += 1) {
-      if (items[i].type.startsWith("image/")) { const file = items[i].getAsFile(); if (file) { event.preventDefault(); void insertImage(file); return; } }
-    }
+  /**
+   * D7 / director ruling R7 — **changing a page's kind always confirms.**
+   *
+   * Unconditional, not "only when fields would be lost": the two cases read the same to a GM mid-flow,
+   * and a conditional dialog is exactly the kind you learn to dismiss unread before the destructive one
+   * arrives. What differs is the copy — with populated foreign fields it names them.
+   *
+   * Recovery is a **hard guarantee**: a type-changing save forces a revision snapshot server-side,
+   * bypassing the coalescing window, so "restore them from History" is literally true. Unless the GM has
+   * switched version history off, in which case the copy softens rather than lying.
+   */
+  const changeKind = async (nextType: EntityType) => {
+    if (nextType === draft.entityType) return;
+    const keep = new Set(entityDef(nextType).fields.map((field) => field.key));
+    const lost = entityDef(draft.entityType).fields
+      .filter((field) => !keep.has(field.key) && (draft.fields[field.key] ?? "").trim())
+      .map((field) => field.label);
+    const historyOn = settings?.revisionHistory.enabled ?? true;
+    const recovery = historyOn
+      ? "They will be removed. You can restore them from History."
+      : "They will be removed. Version history is off, so this cannot be undone.";
+    const ok = await confirm({
+      title: `Change kind to ${ENTITY_DEFS[nextType].label}?`,
+      body: lost.length > 0
+        ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use: ${lost.join(", ")}. ${recovery}`
+        : `Its fields become ${ENTITY_DEFS[nextType].label} fields. Nothing you have written is lost.`,
+      confirmLabel: "Change kind"
+    });
+    if (!ok) return;
+    // Client and server prune identically. Leaving stripped values in the draft would show the GM a
+    // field the very next save deletes — the server prunes to the effective kind on every save that
+    // touches fields or the kind (the CD-2 viewer-safety decision), so the draft must agree.
+    setDraft((prev) => ({ ...prev, entityType: nextType, fields: Object.fromEntries(Object.entries(prev.fields).filter(([key]) => keep.has(key))) }));
   };
 
   const toggleReveal = async (next: boolean) => {
     setRevealed(next);
     // Flush any pending edit first, so revealing never briefly publishes the pre-edit body.
     try { await flush(); const updated = await codexApi.revealPage(gmToken, page.id, next); onChange(updated); }
-    catch { setRevealed(!next); setStatus("error"); }
+    catch { setRevealed(!next); setSaveError("Couldn't change who can see this page."); }
   };
 
   const openRevisions = async () => {
     setRevisionsOpen(true);
-    // Both reads, both best-effort: the panel is worth opening with a broken settings read (the list is the
-    // point) and worth opening with a broken list (the settings explain an empty one). Each failure is said
-    // in place rather than collapsed into one alert that would blame the wrong half.
     try { setRevisions(await codexApi.listRevisions(gmToken, page.id)); } catch { setRevisions([]); }
     try { setSettings(await codexApi.getSettings(gmToken)); } catch { setSettings(null); }
   };
@@ -286,97 +178,77 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
     try {
       const updated = await codexApi.restoreRevision(gmToken, page.id, revisionId);
       revRef.current = updated.rev;
-      const nextDraft = draftOf(updated);
-      savedRef.current = serialize(nextDraft);
-      setDraft(nextDraft);
-      setStatus("saved");
+      const next = draftOf(updated);
+      setDraft(next);
+      markSaved(next);
       setRevisionsOpen(false);
       onChange(updated);
-    } catch { setStatus("error"); }
+    } catch { setSaveError("Couldn't restore that version."); }
   };
   const remove = async () => {
     if (!(await confirm({ title: "Delete page", body: `Delete "${draft.title || "this page"}"? This cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    try { await codexApi.deletePage(gmToken, page.id); onDeleted(); } catch { setStatus("error"); }
+    try { await codexApi.deletePage(gmToken, page.id); onDeleted(); } catch { setSaveError("Couldn't delete that page."); }
+  };
+  const uploadBanner = async (file: File | undefined) => {
+    if (!file) return;
+    try { const asset = await uploadCodexAsset(gmToken, file); setDraft((prev) => ({ ...prev, bannerAssetId: asset.id })); }
+    catch { setSaveError("Couldn't upload that image."); }
   };
 
-  // Outline of the current body's markdown headings (Obsidian-style), clickable to jump the editor there.
-  const outline = useMemo(() => {
-    const items: { level: number; text: string; offset: number }[] = [];
-    let offset = 0;
-    for (const line of body.split("\n")) {
-      const match = /^(#{1,3})\s+(.+)$/.exec(line);
-      if (match) items.push({ level: match[1].length, text: match[2].trim(), offset });
-      offset += line.length + 1;
-    }
-    return items;
-  }, [body]);
-  const jumpTo = (offset: number) => {
-    setPreview(false);
-    requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(offset, offset);
-      const lineIndex = body.slice(0, offset).split("\n").length - 1;
-      const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20;
-      textarea.scrollTop = Math.max(0, lineIndex * lineHeight - 48);
-    });
-  };
-  // Datalist hints from tags already used elsewhere in the notebook; free entry stays open.
   const tagSuggestions = useMemo(() => [...new Set(pages.flatMap((summary) => summary.tags))].sort(), [pages]);
   const folderCrumbs = draft.folder.split("/").map((segment) => segment.trim()).filter(Boolean);
-
 
   return (
     <div className="codex-editor">
       <div className="codex-editor-head">
         <div className="codex-editor-titlewrap">
           {folderCrumbs.length > 0 && <nav className="codex-crumbs" aria-label="Folder path">{folderCrumbs.map((crumb, index) => <span key={index} className="codex-crumb-seg">{index > 0 && <span className="codex-crumb-sep">/</span>}{crumb}</span>)}</nav>}
-          <input className="codex-title-input" value={draft.title} placeholder="Untitled page" aria-label="Page title"
+          {/* D25: the bespoke `.codex-title-input` becomes the primitive's title variant. */}
+          <Input variant="title" className="codex-title-input" value={draft.title} placeholder="Untitled page" aria-label="Page title"
             onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} />
         </div>
         <div className="codex-editor-actions">
-          <SaveState status={status} onRetry={() => void flush()} />
+          <SaveState status={status} onRetry={() => void flush()} onReload={() => void flush()} />
+          {/* D6: with autosave off, saving is an explicit act — and this view's one primary action. */}
+          {!autosave.enabled && <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>Save</Button>}
           <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
           <Button variant="ghost" size="sm" onClick={openRevisions}>History</Button>
           <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
         </div>
       </div>
+      {saveError && <Alert tone="danger">{saveError}</Alert>}
 
       <div className="codex-editor-cols">
         <div className="codex-editor-center">
           {draft.bannerAssetId
             ? <div className="codex-banner"><CodexImage assetId={draft.bannerAssetId} token={gmToken} alt="Page banner" className="codex-banner-img" /><div className="codex-banner-actions"><Button variant="ghost" size="sm" onClick={() => bannerInputRef.current?.click()}>Change</Button><Button variant="ghost" size="sm" onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}>Remove banner</Button></div></div>
-            : <button type="button" className="codex-banner-add" onClick={() => bannerInputRef.current?.click()}>+ Add banner image</button>}
+            : <Button variant="ghost" size="sm" className="codex-banner-add" onClick={() => bannerInputRef.current?.click()}>Add banner image</Button>}
           <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadBanner(event.target.files?.[0]); event.target.value = ""; }} />
 
           <div className="codex-meta-row">
-            <Field label="Entity type" htmlFor="codex-type">
-              <Select id="codex-type" value={draft.entityType} onChange={(event) => setDraft((prev) => { const nextType = event.target.value as EntityType; const keep = new Set(entityDef(nextType).fields.map((field) => field.key)); return { ...prev, entityType: nextType, fields: Object.fromEntries(Object.entries(prev.fields).filter(([key]) => keep.has(key))) }; })}>
+            <Field label="Kind" htmlFor="codex-type">
+              <Select id="codex-type" value={draft.entityType} onChange={(event) => void changeKind(event.target.value as EntityType)}>
                 {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].label}</option>)}
               </Select>
             </Field>
             <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
             <Field label="Tags" htmlFor="codex-tags">
-              <TagInput id="codex-tags" ariaLabel="Tags" placeholder="town, npc" values={parseTags(draft.tagsText)}
-                onChange={(next: readonly string[]) => setDraft((prev) => ({ ...prev, tagsText: next.join(", ") }))}
+              <TagInput id="codex-tags" ariaLabel="Tags" placeholder="town, npc" values={draft.tags}
+                onChange={(next: readonly string[]) => setDraft((prev) => ({ ...prev, tags: next }))}
                 max={24} maxReachedReason="A page may carry at most 24 tags."
-        suggestions={tagSuggestions}
-                /* Uses TagInput's DEFAULT slugify on purpose. The server has always required slugs
-                   (`codex-store.ts` tags(): /^[a-z0-9][a-z0-9-]*$/), but the old comma-field only
-                   lowercased — so typing "sword coast" produced a tag the server rejected with a generic
-                   save failure. The primitive's default is the server's contract; adopting it fixes that. */ />
+                suggestions={tagSuggestions} />
             </Field>
           </div>
+          {onPickTag && draft.tags.length > 0 && (
+            /* D10: a tag is a cross-type view, everywhere it appears. */
+            <div className="codex-editor-tagjumps">
+              {draft.tags.map((tag) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}</button>)}
+            </div>
+          )}
 
-          {/* CT-11: what puts this event on the chronicle. Deliberately OUTSIDE `fields`: entity fields are
-              a flat string map, so a date living there could be neither sorted nor reflowed when the world
-              calendar changes. The prose "When" field beside it is colour, not a sort key - the two answer
-              different questions and are labelled to say so. The controls are the journal composer's,
-              control for control, so dating a record works the same way wherever the GM does it. */}
           {isEvent && (
             <div className="codex-meta-row codex-event-date">
-              <Field label="Year" htmlFor="codex-date-year" help="Places this event on the campaign chronicle."><Input id="codex-date-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => setDraft((prev) => ({ ...prev, dateYear: event.target.value }))} /></Field>
+              <Field label="Year" htmlFor="codex-date-year" help="Places this event on the Journal and the Calendar."><Input id="codex-date-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => setDraft((prev) => ({ ...prev, dateYear: event.target.value }))} /></Field>
               <Field label="Month" htmlFor="codex-date-month"><Select id="codex-date-month" value={draft.dateMonth} disabled={!draft.dateYear.trim()} onChange={(event) => setDraft((prev) => ({ ...prev, dateMonth: event.target.value }))}>{(calendar?.months ?? []).map((month, index) => <option key={index} value={String(index)}>{month.name}</option>)}</Select></Field>
               <Field label="Day" htmlFor="codex-date-day"><Input id="codex-date-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => setDraft((prev) => ({ ...prev, dateDay: event.target.value }))} /></Field>
             </div>
@@ -409,108 +281,57 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
           <div className="codex-body-bar">
             <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
               options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM only" }]} />
-            <SegmentedControl ariaLabel="Edit or view the note" value={preview ? "view" : "edit"} onChange={(value) => setPreview(value === "view")}
-              options={[{ value: "edit", label: "Edit" }, { value: "view", label: "View" }]} />
           </div>
 
-          {!preview && (
-            <div className="codex-toolbar" role="toolbar" aria-label="Formatting">
-              {TOOLBAR.map((tool) => <IconButton key={tool.kind} label={tool.label} size="sm" onClick={() => format(tool.kind)}>{tool.icon ? <CodexIcon iconId={tool.icon} className="codex-tool-ic" /> : <span className="codex-tool-glyph">{tool.glyph}</span>}</IconButton>)}
-              <IconButton label="Insert image" size="sm" onClick={() => imageInputRef.current?.click()}><CodexIcon iconId="image" className="codex-tool-ic" /></IconButton>
-              <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(event) => { void insertImage(event.target.files?.[0]); event.target.value = ""; }} />
-            </div>
-          )}
-
-          {preview
-            ? <div className={`codex-preview${tab === "gm" ? " is-gm" : ""}`}>{tab === "gm" && <GmOnlyTag floating />}{body.trim() ? <CodexMarkdown text={body} onNavigate={onNavigate} token={gmToken} /> : <p className="codex-preview-empty">Nothing to preview yet.</p>}</div>
-            : <div className={`codex-editor-body${tab === "gm" ? " is-gm" : ""}`} onDrop={onBodyDrop} onDragOver={(event) => event.preventDefault()} onPaste={onBodyPaste}>
-                <Textarea ref={textareaRef} className="codex-body-input" value={body} aria-label={tab === "player" ? "Player-facing body" : "GM secret body"}
-                  placeholder={tab === "player" ? "Player-facing description…" : "GM-only notes: secrets, hooks, stats…"}
-                  onChange={(event) => { setBody(event.target.value); syncSuggest(event.target.value, event.target.selectionStart ?? 0); }}
-                  onKeyDown={onBodyKeyDown}
-                  onKeyUp={(event) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0); }}
-                  onClick={(event) => syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0)}
-                  onBlur={() => window.setTimeout(() => setSuggest(null), 150)} />
-                {tab === "gm" && <GmOnlyTag floating />}
-                {suggest && suggestions.length > 0 && (
-                  <ul className="codex-wiki-suggest" role="listbox" aria-label="Link to page">
-                    {suggestions.map((candidate, index) => (
-                      <li key={candidate.id} role="option" aria-selected={index === suggest.index}>
-                        <button type="button" className={`codex-wiki-suggest-item${index === suggest.index ? " is-active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => insertWiki(candidate.title)}>{candidate.title}</button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>}
+          {/* D13: the ONE editor. Toolbar, `[[` autocomplete, image drop/paste and the Edit/View switch
+              are the primitive's; the Codex supplies its reader, its page list and its violet chrome. */}
+          <CodexEditor token={gmToken} value={body} onChange={setBody}
+            ariaLabel={tab === "player" ? "Player-facing body" : "GM secret body"}
+            placeholder={tab === "player" ? "Player-facing description…" : "GM-only notes: secrets, hooks, stats…"}
+            pages={pages} excludePageId={page.id} onNavigate={onNavigate} gmLayer={tab === "gm"} />
         </div>
 
-        <aside className="codex-editor-context" aria-label="Note details">
-          {outline.length > 0 && (
-            <div className="codex-outline">
-              <h4 className="codex-backlinks-title">Outline</h4>
-              <ul className="codex-outline-list">
-                {outline.map((heading, index) => (
-                  <li key={index}><button type="button" className="codex-outline-item" style={{ paddingInlineStart: `${(heading.level - 1) * 12}px` }} onClick={() => jumpTo(heading.offset)}>{heading.text}</button></li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <RelationshipsPanel gmToken={gmToken} pageId={page.id} relationships={relationships} pages={pages} onChanged={onRelationshipsChanged} onOpen={onNavigate} />
+        <aside className="codex-editor-context" aria-label="Page details">
+          {/* ≤560 the rail sits below a tall editor, so an anchor row keeps the interconnectivity tools
+              reachable instead of buried under half a viewport of textarea. */}
+          <nav className="codex-context-jump" aria-label="Jump to">
+            <span className="codex-context-jumplabel">Jump to:</span>
+            <a href="#codex-connections-h">Connections</a>
+          </nav>
           {/**
-            * CI-3 / CI-4 / CI-5: the page's return edges, in ONE place.
+            * ONE region answering ONE question — *where else does this entity appear?* — with a
+            * sub-block per place it can: other records, the atlas, the journal, the graph.
             *
-            * The assessment's "star topology" is that every surface points into Pages and nothing points
-            * back out. Three separate buttons scattered down this rail would fix the topology and still
-            * read as three unrelated features; grouped, they read as the answer to a single question a
-            * GM actually asks — *where else does this entity appear?* — with one sub-heading per place
-            * it can appear: other pages, the atlas, the journal, the graph.
-            *
-            * Every row is a jump that prepares its destination (R1); the destinations themselves are
-            * owned by the workspace above, so each edge hands an id up rather than reaching into
-            * another mode. Each block states its own emptiness, so "nothing here" is a fact about the
-            * campaign rather than a gap in the panel.
+            * D8 folded the first two of those together: the separate Relationships panel and the
+            * "Linked from" backlink block below it were the same fact told twice, and are now one list
+            * with an `origin` attribute. The atlas and journal edges keep their own blocks because they
+            * are different relations, not different renderings of one.
             */}
           <section className="codex-connections" aria-labelledby="codex-connections-h">
             <div className="codex-connections-head">
               <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>
-              {/* CI-5. §4: composed from the `@vtt/ui` `Button` primitive, so the 44px floor arrives
-                  with it (route 2, `.nh-btn--sm` + `.tap-target`) — no new floor to argue about. */}
               {onShowInGraph && <Button variant="ghost" size="sm" onClick={() => onShowInGraph(page.id)}>Show in graph</Button>}
             </div>
-            <div className="codex-connections-block">
-              <h5 className="codex-connections-sub">Linked from</h5>
-              {backlinks.length === 0
-                ? <p className="codex-page-timeline-empty">No other page links here yet.</p>
-                : <div className="codex-backlinks-list">
-                    {backlinks.map((link) => <button key={link.sourcePageId} type="button" className="codex-md-link" onClick={() => onNavigate(link.sourceTitle)}>{link.sourceTitle}</button>)}
-                  </div>}
-            </div>
+            <ConnectionsPanel standalone={false} connections={connections} onOpen={onOpenConnection}
+              write={{ gmToken, pageId: page.id, pages, onChanged: onConnectionsChanged }} />
             <PageMarkers gmToken={gmToken} pageId={page.id} onOpenMarker={onOpenMarker} />
-            <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} onOpenEntry={onOpenEntry} />
+            <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} onOpenEntry={(entryId) => onOpenConnection("journal", entryId)} />
           </section>
         </aside>
       </div>
 
       {revisionsOpen && (
-        <Modal open onClose={() => setRevisionsOpen(false)} title="Revision history" size="md" ariaLabel="Revision history">
-          {/*
-            OWNER DECISION (2026-07-30): the controls live on the Codex settings screen; this panel keeps a
-            read-only sentence naming the setting in force.
-
-            That sentence is the whole reason this is not simply nothing. With a window set, the newest saved
-            version is normally BEHIND the page as it stands, and the list being short is the setting working
-            rather than history being lost — which, unexplained, is the one thing here that reads as a bug.
-          */}
+        <Modal open onClose={() => setRevisionsOpen(false)} title="Version history" size="md" ariaLabel="Version history">
           {settings && (
             <p className="codex-composer-hint">
               {!settings.revisionHistory.enabled
-                ? "Version history is off, so nothing new is being saved. These can still be restored. Change it in Codex settings."
+                ? "Version history is off, so nothing new is being saved. These can still be restored. Change it in Settings."
                 : settings.revisionHistory.windowMinutes > 0
-                ? `One version is saved per ${settings.revisionHistory.windowMinutes} minutes, so the newest below can be that far behind the page. Change it in Codex settings.`
-                : "Every save is kept as a version. Change it in Codex settings."}
+                ? `One version is saved per ${settings.revisionHistory.windowMinutes} minutes, so the newest below can be that far behind the page. Change it in Settings.`
+                : "Every save is kept as a version. Change it in Settings."}
             </p>
           )}
-          {revisions.length === 0 ? <p className="codex-preview-empty">No earlier revisions.</p> : (
+          {revisions.length === 0 ? <p className="codex-preview-empty">No earlier versions.</p> : (
             <ul className="codex-revisions">
               {revisions.map((revision) => (
                 <li key={revision.id} className="codex-revision">

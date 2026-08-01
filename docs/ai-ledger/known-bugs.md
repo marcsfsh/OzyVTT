@@ -10,6 +10,146 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[codex/shell] Collapsing the sidebar was a ONE-WAY DOOR — FIXED 2026-08-01.** The collapse toggle
+  was rendered only when `!collapsed`, and `collapsed` is `railBand || sidebarMode === "rail"` — so the
+  control hid itself the moment it was used, and because the preference persists to localStorage a
+  reload did not bring it back. `setSidebarMode` has one call site, so nothing else recovered it: the
+  GM was in the rail until they cleared site storage or resized past 850px. Gated on `railBand` now
+  (which is what the comment beside it always claimed), so the forced 761–849px band still hides it —
+  there is nothing to expand into there. The player gained the same affordance on its own key (D1: the
+  sidebar is collapsible, and the player's mirrors the GM's minus GM *tools*), never inside the GM's
+  embedded preview. **Found by the client, in minutes, by using the app** — after 47 QA agents, two
+  browser passes and a tap audit. **The lesson, which is bigger than the line:** every automated check
+  this repo owned verified that things are REACHABLE, and not one collapsed a control and tried to get
+  back. `sidebar-rail.test.tsx` now drives it both ways (including across a reload) and the browser
+  pass has a both-directions check over three toggles.
+
+- **[codex/atlas] Switching to another PIN did not pass the autosave-off leave guard — FIXED
+  2026-08-01.** The selection is the ADDRESS now (`AtlasView`'s `selectPin` → `onNavigate`), which is
+  what D3 always said `?pin=` was, so it goes through the one guarded path: it prompts with autosave
+  off and a dirty draft, survives a refresh, and Back closes the inspector. Deleting a pin still clears
+  the selection without a prompt (`replaceQuery` — there is nothing left to save), and the pin filters
+  on the same address are carried through a selection rather than dropped. `pin-selection.test.tsx`
+  proves all three arms fail without it; the browser pass proves the real `window.confirm` half at
+  1280px. Original report: the selection lived in `useState`, so nothing navigated, the guard was never
+  consulted, and an unsaved pin label was lost silently where the same act on a page or a quest
+  prompted.
+
+- **[codex/lists] The Sessions and Quests filters lived in component state — FIXED 2026-08-01.** Both
+  read `?q=`/`?status=` and write through the shell's one filter writer (`setListFilter`, which the
+  Journal now shares), so all five GM lists behave alike: a filtered log is linkable and survives a
+  refresh. **What remains, uniformly and by design:** opening a RECORD from a filtered list drops the
+  filter from the address (`navigate(sessionPath(id))` carries no query), exactly as Pages has always
+  done. Back returns to the filtered list, because that address is the previous history entry. Pinned
+  as the current answer in `list-filters.test.tsx` rather than left to be re-discovered — making the
+  filter ride the record address is a change to all five lists and a design call about how long a
+  filter should stick.
+
+- **[codex/palette] "New session" and "New quest" only NAVIGATED — FIXED 2026-08-01.** Both create now,
+  through one shared `creates.ts` that the Sessions and Quests rails call too, and both land on the new
+  record. The two "Log …" rows still navigate and are named for what they are: a journal entry and a
+  downtime record are composed in a form, so their door is the surface holding the form.
+  **Still open, pre-existing:** every verb and goto is gated on an EMPTY query
+  (`CommandPalette.tsx`), so no section can be reached by typing its name, which makes a twelve-item
+  goto list harder to use than it should be. Not touched here — it is a search-ranking change (verbs
+  would have to compete with record hits), not a wiring fix.
+
+- **[codex/player] The player's lists had no in-place filters — FIXED 2026-08-01.** All five now match
+  the GM's, in the same words and on the same parameters, held in the address: Pages gains kind + tag
+  (settable and clearable in place, not only by a dashboard card), Sessions a text filter, Quests text
+  + status, the Journal the GM's kind/text/tag row, and the Atlas the GM's pin filter (dimming, not
+  hiding). Inside the GM's embedded preview they drive the preview's own local address and never the
+  browser's, which `list-filters.test.tsx` and the browser pass both assert.
+
+
+- **[codex/backup] `export -> import -> export` is not byte-stable for a codex whose calendar was never
+  set.** The first export omits `calendar.currentDate` entirely (`DEFAULT_CALENDAR` has no such key); after
+  a restore, `normalizeCalendar` writes it as an explicit `null` and the second export carries it. Content
+  is identical either way and nothing reads the difference, so this is a stability wrinkle rather than data
+  loss — found while writing the R2 round-trip test (2026-07-31 server QA pass), which scopes its
+  byte-comparison to the journal and sessions sections because of it. The one-line fix is
+  `currentDate: null` on `DEFAULT_CALENDAR`, deliberately NOT taken in a server-only pass: it would flip the
+  key from absent to null in every `GET /codex/calendar` response for a codex that never set one, which is
+  a client-visible change.
+
+- **[codex/store] `normalizeBundle`'s `inWorldDate` accepts an unbounded year where the write path caps it
+  at ±100,000.** `date()` only truncates, so a hand-edited bundle can carry `year: 9e15` and reach
+  `resolveDate` INSIDE the import transaction, where a `calendar_instant` beyond `Number.MAX_SAFE_INTEGER`
+  is a STRICT-column write failure. The transaction rolls back and the caller now gets a sanitized 500
+  rather than driver text, so the codex is safe and nothing leaks — but the file's own rule is that "an
+  import cannot write a row a POST could not", and this is the one validator that is laxer than its POST
+  twin. Found during the 2026-07-31 server QA pass while looking for a post-BEGIN failure; not fixed there
+  because bounding it would have removed the only failure mode the new rollback test could use, and the
+  test was the higher-value change. Bound `date()` and keep the rollback test's probe index.
+
+- **[codex/graph] Graph nodes are below the 44px touch floor and will stay there.** Re-measured
+  2026-08-01 in both shells against a populated campaign: at 375px **16 nodes** are sub-floor (GM 10,
+  player 6) at 14.2–18.4px wide × 11.2–49.5px tall; at 320px **24** (GM 18, player 6) at 12.1–43.4 ×
+  9.4–43.4. **The two widths do not agree and the count is not a constant** — node size is data-driven
+  and the layout is force-fitted to the canvas, so a narrower canvas and a bigger campaign both push
+  more nodes under the floor. (Earlier entries here quoted "3", then "16 of 16 at both widths"; the
+  first was a constant that never was, the second was true only of the data it was measured on.) A 44px
+  area per node overlaps its neighbours at any realistic density, so the floor and the layout are in
+  direct conflict and enforcing the floor destroys the thing being tapped. Recorded as an accepted
+  exception in `design-language.md` §4 with its three mitigations (pan/zoom, every node also reachable
+  from Pages and the palette, the graph is a view onto connections rather than the only way to open
+  one). Reproduce with `node scripts/tap-audit.mjs 375`.
+
+- **[codex/ui] The session-prep drawer covers the top-bar control that opens it.** Measured 2026-08-01
+  at 1280px: with the drawer open, a click on "Session prep" is intercepted by the drawer itself, so
+  the control that opened it cannot close it. **Not a trap** — the drawer's own Close is visible and
+  labelled, and Escape closes it with focus inside (both asserted in the browser pass) — but the
+  top-bar button carries `aria-expanded` and reads as a toggle while behaving as an opener. Found by
+  the new both-directions toggle check; left alone because moving or offsetting a shipped drawer is a
+  layout change with no user complaint behind it, at the end of a polish pass.
+
+- **[repo/tooling] A pin cannot be selected reliably by a synthesized click at 375px.** `MapSurface`
+  resolves a tap from `pointerdown`/`pointerup` on the whole `<svg>` (so it can tell tap from drag from
+  pan), so `dispatchEvent("click")` does nothing and a plain Playwright click fails the "receives
+  events" check; `click({ force: true })` works at 1280px. At 375px it is unreliable, and the cause is
+  already in this file: the closed session-console drawer stretches the initial containing block, so
+  `getBoundingClientRect` and pointer coordinates disagree — measured on 2026-08-01 as four consecutive
+  pins reporting the same viewport box. **The failure mode is expensive**: a half-selected pin with
+  autosave off leaves a leave-guard registered, which then refuses every later in-app navigation
+  (Playwright dismisses an unhandled `confirm`, and dismiss means "stay"), so one flaky check produced
+  nine false failures before it was understood. The browser pass therefore runs its two pin checks at
+  desktop only and says why; pin reachability on a phone is the tap audit's job, where it is measured
+  rather than clicked.
+
+- **[ui] `MarkdownEditor`'s suggestion list puts `role="option"` on the `<li>` and the click handler on
+  a `<button>` inside it; `Combobox` puts the role on the button itself.** Two shared primitives, two
+  shapes for one ARIA pattern — and an interactive element inside an `option` is not what the pattern
+  intends. Nothing is broken for a user: the keyboard path is driven by the textarea and the mouse path
+  by the button. Found 2026-08-01 while writing the first behavioural tests for either primitive (the
+  tests click the inner button and say why). Worth one pass over both, together, rather than a change
+  to whichever is edited next.
+
+- **[codex/css] `.codex-modetabs` and its scroll-cue rules survive in `codex.css` with no markup left
+  to match them.** The five-mode tab bar they styled was retired by D1; grep finds the class only in
+  the stylesheet. Dead rather than wrong, so nothing renders differently — but a stylesheet that still
+  describes a retired component is the kind of evidence a later reader trusts. Not deleted here: it
+  wants one sweep over every selector the recut orphaned, with a visual check, not a single-class
+  deletion at the end of a polish pass.
+
+- **[app-shell/mobile] At 375px the GM's Codex starts roughly 1500px down the document,** below the
+  character-roster dock and the eight-tab strip. **The PLAYER half of this is fixed** (2026-07-31, Codex
+  QA client pass): D4 moved the player Codex out of a top-layer `<dialog>.showModal()` into document
+  flow under the same dock, which was a new regression rather than the shell's inherited problem, so the
+  roster and the YouArePlaying bar are now hidden while the player's Codex view is open. The GM's Codex
+  was already `GM_TABS[3]` before this engagement and that half stands as written below. Observed while capturing browser evidence: a viewport
+  screenshot at scroll 0 on any Codex address is a picture of the roster. **Not the Codex's doing** —
+  the dock is the app shell's and the stacking affects every GM tab equally — so it was left untouched
+  rather than worked around inside one tab. It is nonetheless the single worst thing about using the
+  Codex on a phone, and it is a shell-level fix (collapse the dock below the ladder's narrow step, or
+  make the tab strip sticky). Flagged for whoever owns the shell.
+
+- **[codex/verify] `tap-audit.mjs`'s "unresolved" column over-reports at narrow widths.** `reach === 0`
+  means `elementFromPoint` never resolved to the control — for an SVG child, or for anything that could
+  not be scrolled to the viewport centre. Because of the shell-stacking entry above, 25–59 controls per
+  surface report unresolved at 375px while being perfectly reachable. It is a pointer to investigate,
+  never a verdict; the `below 44px` column is the number that means something.
+
+
 - **[codex/ux] Three friction points from the final QA pass still open (2026-07-30).** Seven were raised; the
   owner ruled on four (see `decision-log.md` 2026-07-30) and those are fixed. These three were not ruled on
   and remain design calls rather than defects:
@@ -103,13 +243,28 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   from the bounded number input; documented as intentional in the helper. Recorded because "an overflowing
   control lands on neutral" is a surprising failure direction if it ever becomes reachable.
 
+- **[codex/audit] A session with no number and no recap rendered a BLANK audit row — FIXED 2026-07-31.**
+  The audit's session arm fell back to `excerpt(recap)`, which is `""` for an empty recap, so the row was
+  unreadable and unclickable. It now uses `sessionDisplayTitle` — number, else recap excerpt, else
+  **"Untitled session"** — the `AUDIT_JOURNAL_FALLBACK` rule applied one arm over, and shared verbatim
+  with the new session search hit so the two surfaces call one thing one name.
+
 - **[codex/audit] The published campaign date is not in the reveal audit.** It is a player-visible thing the
   GM publishes (M11's O-1), and the audit lists seven record kinds and not that. Contract-compliant — the
   seven kinds were frozen deliberately — but a GM asking "what can they see?" may reasonably expect the
   party's current date to be on that list. Raised by adversarial review as a scope observation, not a defect.
 
 - **[codex] Renumbering a session orphans its entries and republishes numbers the player gate was
-  hiding — OPEN, awaiting an owner decision (2026-07-29, found by M9's correctness review).** The join
+  hiding — FIXED 2026-07-31 (Codex overhaul, D9, migration v19).** Resolved by an option beyond the three
+  listed below: journal entries now join their session **by id**, so the display number is resolved live
+  from the linked record. Renumbering moves every one of its entries in one `updateSession` with no
+  journal write at all, the by-session lens never loses the group, and the player gate keys on the
+  session's reveal state by identity rather than on a list of numbers — so an unnumbered hidden session
+  is gated too, which the number list structurally could not do. Session **delete** keeps the documented
+  behaviour under director ruling R2: SET NULL on the join, with the number stamped back as a bare label
+  only when the deleted session was revealed (a hidden one leaves no label, because a bare label passes
+  through to players). Original report and the three options considered follow.
+  The join
   between a session record and its journal entries is the **number**, not the id, and `updateSession`
   does not touch `codex_journal`. So: create session #4, leave it unrevealed, play — entries are stamped
   4 and correctly show players nothing. Then correct the record's number to 5. No record now claims 4,
@@ -149,8 +304,17 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   checklist was the first label-wrapped control in the Codex, so the blind spot had never fired before.
   **A false violation is worse than none: it sends the next session to "fix" working code.**
 
-- **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — OPEN,
-  awaiting an owner decision (2026-07-29, M9).** Reproduced live: a GM creates session 4, leaves it
+- **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — FIXED IN
+  CODE (twice over); entry kept for the reasoning. Do not re-solve this.** Option (2) shipped first:
+  `playerSessionNumbers` resolved `store.unrevealedSessionNumbers()` once per request and
+  `projectPlayerJournalEntry` nulled the number when a session record carried it and was not revealed.
+  **Superseded 2026-07-31 by D9** (migration v19): entries join their session by **id**, the context is
+  now `unrevealedSessionIds()`, and `projectPlayerJournalEntry` nulls **both** `sessionId` and
+  `sessionNumber` together for an unrevealed session. That is strictly stronger — the number list could
+  not gate an entry filed under an *unnumbered* hidden session, because such a session has no number to
+  put in the set. Bare labels with no record behind them still travel, and after v19 the only ones that
+  exist are those `deleteSession` stamps back for a session that was already revealed (ruling R2).
+  Original report (2026-07-29, M9): a GM creates session 4, leaves it
   unrevealed and activates it; any revealed journal entry written during play carries `sessionNumber: 4`
   to the player, who sees "Session 4", while their session list shows only `[3]` and a direct fetch of
   session 4 is 404. Content never travels — no prep, attendees or recap — only the ordinal and the fact
@@ -275,17 +439,20 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 - **[homebrew] `reminted.reason` has no honest value for "not our shape"** — the contract enum is
   frozen, so a pack id that is re-minted for shape reasons reports a collision that did not happen.
   Needs a `packages/api-contract` enum addition.
-- **[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
-  components document nowhere — 11 homebrew (`HomebrewRecordDocument`, `HomebrewRecordSummary`,
-  `HomebrewValidity`, `HomebrewValidationIssue`, `HomebrewUsage`, the six `*Data`) and ~73 mostly
-  Codex. Proven by injecting a response-side ghost component: all 32 api-contract tests pass and it
-  renders nowhere. The request side IS genuinely covered — the same injection on a request-reachable
-  path fails the test. Pre-existing seeding choice, not a regression; a one-line change with a large
-  doc diff.
-- **[ui] `--caution-hi` IS `--violet-hi` in all three themes**, and in light `--caution` is literally
+- ~~**[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
+  components document nowhere.~~ **FIXED 2026-07-31** (`c7fc8aa`, Codex overhaul Lane A).
+  `renderOperation` now seeds from success responses too — the envelope's `data` component, with the
+  existing transitive closure pulling the rows, payloads and branches it reaches — and
+  `reference.test.ts`'s *independent* obligation walker widened with it, so a renderer change cannot
+  silently reopen the hole. `docs/api-reference.md` went from 91 to **241** rendered shared shapes
+  (+1,777 lines), the large mechanical diff this entry predicted.
+- ~~**[ui] `--caution-hi` IS `--violet-hi` in all three themes**, and in light `--caution` is literally
   `--violet` (`#7A3FD0`). The "violet is reserved for GM-only" rule is violated by the caution token
-  itself. Harmless today only because the team held the every-state-is-a-word rule, so colour
-  carries no signal rather than the wrong one. Worth resolving before anything relies on hue.
+  itself.~~ **FIXED 2026-07-31** by D21 / director ruling R8, Codex overhaul. `--caution` is a warm
+  orange in all three themes (`#FF9E4A` / `#FFB877` on dark and dusk, `#B4560A` / `#8F4406` on light,
+  each measured against WCAG 2.1 in `design-tokens.css`), so violet again means GM-only and nothing
+  else. `design-language.md` §2 records the exception to the "no yellow/orange" restraint rather than
+  leaving the doc forbidding the colour that shipped.
 - **[homebrew] Packs have no UI** — export and import are 2 of the 13 operations, HTTP-only,
   deliberately deferred.
 - **[homebrew] Magic-item riders are not authorable yet.** `EquipmentReferenceSchema` is `.strict()`
@@ -444,6 +611,11 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   is total rather than partial. The version INSERT is inside the same transaction as the migration, so a
   crash can never record a migration that did not run. Left as-is because making one migration idempotent
   and not the rest would be the worse inconsistency.
+  **2026-07-31:** v18 (`duplicate column name`), **v19** (`CREATE TABLE codex_journal_new` already exists,
+  plus a duplicate synthesized-session number), v20 (`duplicate column name`) and v21 (duplicate FTS rows)
+  join the total-failure class on the same terms. v19 is the one worth naming: it is the file's second
+  table REBUILD, so a re-run aborts before dropping anything and the failure mode is still "the codex will
+  not open, the file is intact". The posture is unchanged, deliberately.
 
 - **[codex/chronicle] A calendar reshape can flip a revealed deadline's state from "Passed" back to
   "Approaching".** `fired` derives from `calendar_instant`, which is recomputed from the raw date on every
@@ -454,8 +626,14 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   rather than storing it (D11-C), which remains the right trade. Recorded because nothing else says so,
   and because a GM who reshapes their calendar mid-campaign will see it.
 
-- **[codex/client] The client's `dateToInstant` does not clamp the day to its month's length; the
-  server's `calendarInstantOf` does.** `normalizeCalendar` stores a `currentDate` day above the month's
+- **[RESOLVED 2026-07-31, Lane C] [codex/client] The client's `dateToInstant` did not clamp the day to
+  its month's length; the server's `calendarInstantOf` does.** Fixed by clamping inside `dateToInstant`
+  at BOTH ends, which is the fix this entry named. The Calendar view (D17) reads it on every cell, so
+  leaving it would have put the disagreement on screen rather than only in the Today marker. Original
+  entry follows.
+
+  > **[codex/client] The client's `dateToInstant` does not clamp the day to its month's length; the
+  > server's `calendarInstantOf` does.** `normalizeCalendar` stores a `currentDate` day above the month's
   length verbatim (it clamps only at the bottom), so the state is reachable, and the two then disagree by
   a day. **Measured, not theorised**: with the clock on day 31 of a 30-day month, a 5-day downtime has the
   server landing on Alturiak 5 while unclamped client arithmetic reaches Alturiak 6. M11 is not exposed —

@@ -84,9 +84,27 @@ const AUDIT: CodexRevealAudit = answer([
     section("standing", [{ id: "f1", title: "The Zhentarim" }], 2)
 ]);
 
+/**
+ * D23's coupling, with the ids that make it REACHABLE.
+ *
+ * The main fixture addresses pages as "p1" and standing by its faction page as "f1", so
+ * `standingFactionIds.has(row.id)` is false on every page row in every test — the guard, the modal and
+ * the whole second half of D23 were dead code under test, and deleting them kept the suite green. A
+ * standing row IS a faction page row: same id, two sections. This fixture says so.
+ */
+const COUPLED: CodexRevealAudit = answer([
+  section("page", [{ id: "f1", title: "The Zhentarim" }, { id: "p1", title: "Strahd" }], 12),
+  section("map", [], 3),
+  section("marker", [], 8),
+  section("journal", [], 40),
+  section("session", [], 4),
+  section("quest", [], 5),
+  section("standing", [{ id: "f1", title: "The Zhentarim" }], 2)
+]);
+
 const renderAudit = async (audit: unknown = AUDIT) => {
   getAudit.mockResolvedValue(audit);
-  render(<RevealAudit gmToken="gm" onClose={vi.fn()} />);
+  render(<RevealAudit gmToken="gm" />);
   await waitFor(() => expect(getAudit).toHaveBeenCalled());
 };
 
@@ -100,7 +118,7 @@ describe("The audit lists every Codex record type (CT-9)", () => {
     expect(within(sectionOf("Pages")).getByText("Strahd")).toBeInTheDocument();
     expect(within(sectionOf("Maps")).getByText("Barovia")).toBeInTheDocument();
     expect(within(sectionOf("Map pins")).getByText("Vallaki")).toBeInTheDocument();
-    expect(within(sectionOf("Chronicle records")).getByText("The party crossed the mists.")).toBeInTheDocument();
+    expect(within(sectionOf("Journal entries")).getByText("The party crossed the mists.")).toBeInTheDocument();
     expect(within(sectionOf("Session recaps")).getByText("Session 4")).toBeInTheDocument();
     expect(within(sectionOf("Quests")).getByText("Find the Sunsword")).toBeInTheDocument();
     // A standing row arrives already NAMED by the server; nothing here resolves an id.
@@ -112,7 +130,7 @@ describe("The audit lists every Codex record type (CT-9)", () => {
     // `revealed of total` is the question a GM actually opens this screen with, and both halves are the
     // server's: `revealed` is what a PLAYER would receive, not how many flags are set.
     expect(within(sectionOf("Pages")).getByText("1 of 12 shared")).toBeInTheDocument();
-    expect(within(sectionOf("Chronicle records")).getByText("1 of 40 shared")).toBeInTheDocument();
+    expect(within(sectionOf("Journal entries")).getByText("1 of 40 shared")).toBeInTheDocument();
     expect(screen.getByText("7 records are shown to players across the Codex.")).toBeInTheDocument();
   });
 
@@ -126,7 +144,7 @@ describe("The audit lists every Codex record type (CT-9)", () => {
 /**
  * A chronicle row on this surface must say WHICH kind of record it is (fixed 2026-07-30).
  *
- * One journal table carries six kinds, so the section is headed "Chronicle records" — and until this, a
+ * One journal table carries six kinds, so the section is headed "Journal entries" — and until this, a
  * revealed deadline and a revealed note read identically the moment either had prose of its own. The
  * server's `AUDIT_JOURNAL_FALLBACK` names the kind only for a record with NO player text, which is the
  * silent minority. "Is that deadline visible?" is the question this whole screen exists to answer.
@@ -135,6 +153,62 @@ describe("The audit lists every Codex record type (CT-9)", () => {
  * reads by icon and label, and a title with "Deadline: " glued on could not be told from a GM who genuinely
  * began a note with that word.
  */
+describe("Hiding a faction page takes the standing with it (D23)", () => {
+  /**
+   * Losing this warning does not leak anything — it OVER-hides, which is the defect D23 was raised to
+   * fix: a GM hides a faction page and the party's standing with them silently vanishes from the
+   * players' view. The switch is one tap and the consequence is two records away.
+   */
+  it("asks first, and hides nothing while the question is open", async () => {
+    const user = userEvent.setup();
+    await renderAudit(COUPLED);
+
+    const pages = within(sectionOf("Pages"));
+    await user.click(pages.getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+
+    expect(await screen.findByRole("dialog", { name: "Hide this faction page" })).toBeInTheDocument();
+    expect(screen.getByText("Your standing with them stops being shown to players as well. A standing is only shown while its faction page is.")).toBeInTheDocument();
+    // Nothing has happened yet — the warning is BEFORE the act, not an explanation after it.
+    expect(revealPage).not.toHaveBeenCalled();
+  });
+
+  it("Cancel leaves the page shown and calls no route", async () => {
+    const user = userEvent.setup();
+    await renderAudit(COUPLED);
+
+    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+    await screen.findByRole("dialog", { name: "Hide this faction page" });
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Hide this faction page" })).not.toBeInTheDocument());
+    expect(revealPage).not.toHaveBeenCalled();
+    expect(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" })).toBeChecked();
+  });
+
+  it("Hide page proceeds through the page's own reveal route", async () => {
+    const user = userEvent.setup();
+    revealPage.mockResolvedValue(undefined);
+    await renderAudit(COUPLED);
+
+    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page The Zhentarim to players" }));
+    await screen.findByRole("dialog", { name: "Hide this faction page" });
+    await user.click(screen.getByRole("button", { name: "Hide page" }));
+
+    await waitFor(() => expect(revealPage).toHaveBeenCalledWith("gm", "f1", false));
+  });
+
+  it("does not ask about a page that carries no standing", async () => {
+    // The control: without it, a guard that fired on every page row would pass all three tests above.
+    const user = userEvent.setup();
+    revealPage.mockResolvedValue(undefined);
+    await renderAudit(COUPLED);
+
+    await user.click(within(sectionOf("Pages")).getByRole("switch", { name: "Show the page Strahd to players" }));
+    await waitFor(() => expect(revealPage).toHaveBeenCalledWith("gm", "p1", false));
+    expect(screen.queryByRole("dialog", { name: "Hide this faction page" })).not.toBeInTheDocument();
+  });
+});
+
 describe("A chronicle row says which kind of record it is", () => {
   it("badges the kind, in the chronicle's own words, beside the record's own prose", async () => {
     await renderAudit(answer([
@@ -145,7 +219,7 @@ describe("A chronicle row says which kind of record it is", () => {
       ], 40)
     ]));
 
-    const chronicle = within(sectionOf("Chronicle records"));
+    const chronicle = within(sectionOf("Journal entries"));
     // "Deadline" and "Entry" — the timeline's own labels, so a row here says what the same record says
     // there. `note` reads as "Entry": the DB's word and the chronicle's differ by exactly that one, and
     // `CHRONICLE_KIND_META["note"]` does not exist, so crossing that gap by hand would throw on the most
@@ -187,27 +261,27 @@ describe("It aggregates; it does not decide (CT-9's stated risk)", () => {
     expect(screen.queryByRole("button", { name: /hide all/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /hide everything/i })).toBeNull();
     // One Hide per row, and there are seven rows.
-    expect(screen.getAllByRole("button", { name: /^Hide the /i })).toHaveLength(7);
+    expect(screen.getAllByRole("switch")).toHaveLength(7);
   });
 });
 
 describe("Un-revealing goes back out through each record's own route", () => {
   const cases: ReadonlyArray<[string, string, () => ReturnType<typeof vi.fn>, unknown[]]> = [
-    ["Pages", "Hide the page Strahd from players", () => revealPage, ["gm", "p1", false]],
-    ["Maps", "Hide the map Barovia from players", () => revealMap, ["gm", "m1", false]],
-    ["Map pins", "Hide the pin Vallaki from players", () => revealMarker, ["gm", "k1", false]],
-    ["Chronicle records", "Hide the record The party crossed the mists. from players", () => revealEntry, ["gm", "j1", false]],
-    ["Session recaps", "Hide the recap for Session 4 from players", () => revealSession, ["gm", "e1", false]],
-    ["Quests", "Hide the quest Find the Sunsword from players", () => revealQuest, ["gm", "q1", false]],
+    ["Pages", "Show the page Strahd to players", () => revealPage, ["gm", "p1", false]],
+    ["Maps", "Show the map Barovia to players", () => revealMap, ["gm", "m1", false]],
+    ["Map pins", "Show the pin Vallaki to players", () => revealMarker, ["gm", "k1", false]],
+    ["Journal entries", "Show the entry The party crossed the mists. to players", () => revealEntry, ["gm", "j1", false]],
+    ["Session recaps", "Show the recap for Session 4 to players", () => revealSession, ["gm", "e1", false]],
+    ["Quests", "Show the quest Find the Sunsword to players", () => revealQuest, ["gm", "q1", false]],
     // Standing reveals by FACTION page id, which is what its route takes — not the standing row's own id.
-    ["Faction standing", "Hide the standing with The Zhentarim from players", () => revealStanding, ["gm", "f1", false]]
+    ["Faction standing", "Show standing with The Zhentarim to players", () => revealStanding, ["gm", "f1", false]]
   ];
 
   for (const [kind, label, route, args] of cases) {
     it(`${kind}`, async () => {
       await renderAudit();
       route().mockResolvedValue({});
-      await userEvent.setup().click(screen.getByRole("button", { name: label }));
+      await userEvent.setup().click(screen.getByRole("switch", { name: label }));
       await waitFor(() => expect(route()).toHaveBeenCalledWith(...args));
       // And it re-reads, so the row it just hid leaves the list.
       await waitFor(() => expect(getAudit).toHaveBeenCalledTimes(2));
@@ -243,7 +317,7 @@ describe("Nothing revealed and not loaded never look the same (CF-2)", () => {
     // CF-2: before the read settles, "nothing is revealed" is not a claim this screen may make.
     let release: (value: CodexRevealAudit) => void = () => {};
     getAudit.mockReturnValue(new Promise<CodexRevealAudit>((resolve) => { release = resolve; }));
-    render(<RevealAudit gmToken="gm" onClose={vi.fn()} />);
+    render(<RevealAudit gmToken="gm" />);
 
     expect(screen.queryByText(/are shown to players across the Codex/)).toBeNull();
     expect(screen.queryByText("No pages are shown to players.")).toBeNull();

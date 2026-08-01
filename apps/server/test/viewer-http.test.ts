@@ -39,10 +39,20 @@ describe("viewer HTTP vertical slice", () => {
     expect(unauthorizedBody.ok).toBe(false);
     expect(unauthorizedBody.error).toMatchObject({ code: "unauthenticated" });
 
-    const pairingResponse = await fetch(`${test.base}/api/v1/viewer/pairings`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": "pair-1" }, body: "{}" });
+    // ADR-0016 §2: a UUID v4 is echoed, and anything else is REPLACED rather than echoed — this router
+    // used to echo any short token ("pair-1"), which put caller-chosen text in the log line and in the
+    // error body. Both arms are asserted here because only the second one is a security property.
+    const correlationId = "8d976bbc-59f4-4e1b-ac00-e198dbf40d9c";
+    const pairingResponse = await fetch(`${test.base}/api/v1/viewer/pairings`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": correlationId }, body: "{}" });
     expect(pairingResponse.status).toBe(201);
-    expect(pairingResponse.headers.get("x-request-id")).toBe("pair-1");
+    expect(pairingResponse.headers.get("x-request-id")).toBe(correlationId);
     const code = (await json(pairingResponse)).pairing.code as string;
+
+    // `pair-1` is what this router used to accept and echo — a caller-chosen token in the log line and
+    // in the error body. It is replaced now, like every other non-UUID the other six routers refuse.
+    const substituted = await fetch(`${test.base}/api/v1/viewer/presentation`, { headers: { authorization: "Bearer gm-secret", "x-request-id": "pair-1" } });
+    expect(substituted.headers.get("x-request-id")).not.toBe("pair-1");
+    expect(substituted.headers.get("x-request-id")).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
 
     const exchange = await fetch(`${test.base}/api/v1/viewer/pairings/exchange`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name: "Table TV" }) });
     const exchangeBody = await json(exchange);
@@ -127,9 +137,12 @@ describe("viewer HTTP vertical slice", () => {
 
   it("returns stable validation and revision-conflict envelopes without secrets", async () => {
     const test = await fixture();
-    const malformed = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": "bad-1" }, body: JSON.stringify({ id: "bad", payload: { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: "huge" } } }) });
+    const callerId = "1f0c6b52-9a4e-4d3f-8f0a-2b6c1d5e7a90";
+    const malformed = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": callerId }, body: JSON.stringify({ id: "bad", payload: { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: "huge" } } }) });
     expect(malformed.status).toBe(400);
-    expect(await json(malformed)).toEqual({ ok: false, apiVersion: "1", error: { code: "validation_failed", message: "Viewer request body is invalid.", requestId: "bad-1" } });
+    // The error BODY carries the correlation id too (ADR-0016 §1), and it is the caller's own only when
+    // the caller sent a UUID v4 — the id used to be echoed here whatever text arrived.
+    expect(await json(malformed)).toEqual({ ok: false, apiVersion: "1", error: { code: "validation_failed", message: "Viewer request body is invalid.", requestId: callerId } });
 
     await test.coordinator.executeGm("gm-secret", { id: "first", payload: { type: "viewer.enabled.set", enabled: true } });
     const conflict = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json" }, body: JSON.stringify({ id: "stale", expectedRevision: 0, payload: { type: "viewer.enabled.set", enabled: false } }) });

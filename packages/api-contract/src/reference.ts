@@ -1,6 +1,7 @@
 import {
   API_NAMESPACE,
   API_VERSION,
+  ENCOUNTER_ARCHIVE_SCHEMA_VERSION,
   GAME_COMMAND_SCOPES,
   IntegrationScopeSchema,
   OPENAPI_DOCUMENT_PATH,
@@ -66,7 +67,7 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
   },
   {
     title: "Encounter archives (Time Machine)",
-    intro: "Permanent, machine-readable records of ended encounters - see the archive document section above for the full v2 shape. GM-grade principals only.",
+    intro: `Permanent, machine-readable records of ended encounters - see the archive document section above for the full v${ENCOUNTER_ARCHIVE_SCHEMA_VERSION} shape. GM-grade principals only.`,
     match: (path) => path.startsWith(`${API_NAMESPACE}/encounters`)
   },
   {
@@ -80,8 +81,8 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
     match: (path) => path.startsWith(`${API_NAMESPACE}/viewer`)
   },
   {
-    title: "Codex (worldbuilding wiki, atlas, journal & calendar)",
-    intro: "The GM-authored worldbuilding surface: typed wiki pages (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its markers, the campaign journal/timeline, and the fantasy calendar - plus page media. Reads accept a GM or a player session; a player receives the revealed-only projection (GM bodies, GM fields, and unrevealed pages/maps/markers/entries are stripped server-side). Every write is GM-only.",
+    title: "Codex (pages, atlas, journal & calendar)",
+    intro: "The GM-authored worldbuilding surface: typed wiki **pages** (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its **pins** (`marker` on the wire), the campaign **journal**, and the fantasy **calendar** - plus page media. Reads accept a GM session, a player session, or an integration credential scoped `codex:read`; writes accept a GM session or `codex:write`. A credential acts at GM grade (it is the GM's own automation); a player session receives the revealed-only projection - GM bodies, GM fields, and unrevealed pages/maps/pins/entries are stripped server-side, and the two shapes are published separately as `X` / `XPlayer` joined by `XProjected`. Every codex GET sends a weak `ETag`; send `If-None-Match` for a free `304`.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/codex`)
   }
 ];
@@ -96,6 +97,8 @@ const SCOPE_NOTES: Record<string, string> = {
   "combat:read": "The combat log and encounter archives.",
   "combat:write": "Encounter lifecycle, initiative/timeline, turns, tokens, actions, saves, annotations.",
   "roll:create": "Dice rolls into the shared history.",
+  "codex:read": "Every codex read at GM grade: pages (both layers), the atlas, the journal and chronicle, sessions, quests, standing, the calendar (both clocks), folders, revision history, settings, the reveal audit, export, and page images.",
+  "codex:write": "Every codex write: pages, atlas, pins, journal, sessions, quests, standing, calendar and publish, settings, revision trim, and page-image upload. Does NOT imply `codex:read` - mint both for a read-write tool.",
   "events:read": "Reserved for the future event stream.",
   "webhooks:manage": "Reserved for future webhooks.",
   "admin": "Every scope, including destructive operations (archive deletion). Grant sparingly."
@@ -294,6 +297,17 @@ function renderOperation(method: string, path: string, operation: Operation, ref
     const isError = schemaRef && typeof schemaRef.$ref === "string" && schemaRef.$ref.endsWith("ApiErrorEnvelope");
     if (code.startsWith("2") || code === "304") {
       const label = responseSchemaLabel(schemaRef);
+      // Collect what a RESPONSE names, not only what a request body does. The seed used to be request
+      // bodies alone, so a shape reachable only from a response - which is most of the read surface -
+      // was printed as a bare type name with its field table rendered nowhere in the document at all
+      // (~84 components; `docs/ai-ledger/known-bugs.md`). The envelope itself is uninteresting (three
+      // keys, the same three every time), so the seed is its `data` component; the transitive closure
+      // below then pulls the row shapes, payloads and `oneOf` branches that component reaches.
+      if (schemaRef && typeof schemaRef.$ref === "string" && !isError) {
+        const { name, schema } = resolveRef(schemaRef.$ref);
+        const dataRef = ((schema.properties as Record<string, Schema> | undefined)?.data as Schema | undefined)?.$ref;
+        referenced.add(typeof dataRef === "string" ? resolveRef(dataRef).name : name);
+      }
       successes.push(`\`${code}\` ${response.description ?? ""}${label ? ` - ${label}` : ""}`);
     } else if (isError || response.$ref || code.startsWith("4") || code.startsWith("5")) {
       errors.push(`\`${code}\``);
@@ -325,13 +339,14 @@ export function renderApiReference(): string {
 
   out.push("## Authentication");
   out.push("");
-  out.push("Every request authenticates with `Authorization: Bearer <token>` (the viewer's cookie is the one exception). Three principal kinds exist:");
+  out.push("Every request authenticates with `Authorization: Bearer <token>` (the viewer's cookie is the one exception). Four principal kinds exist, and **which surfaces each one reaches** is the part worth reading twice:");
   out.push("");
-  out.push("| Principal | Token | Authority |");
-  out.push("| --- | --- | --- |");
-  out.push("| **GM session** | from `POST /api/gm/login` (GM password; same-origin only) | Everything, including credential management. |");
-  out.push("| **Player session** | issued when a player joins the table | Exactly the table's player limits: player-safe projections, own claimed character only. |");
-  out.push("| **Integration credential** | `vtt_int_…`, minted by the GM (below) | GM authority, filtered by the credential's scopes. Rotatable, revocable, audited. |");
+  out.push("| Principal | Token | Reaches | Authority |");
+  out.push("| --- | --- | --- | --- |");
+  out.push("| **GM session** | `POST /api/gm/login` (GM password; same-origin only) | Everything. | Full, including credential management. |");
+  out.push("| **Player session** | issued when a player joins the table, or `POST /api/v1/sessions/player` | Live game, the public reference catalogs, codex **reads**. Never homebrew, never credential management, never a codex write. | The table's player limits: player-safe projections, own claimed character only. |");
+  out.push("| **Integration credential** | `vtt_int_…`, minted by the GM (below) | Live game, encounter archives, and the codex - scope by scope. Never credential management, never homebrew, never `POST /codex/preview-session`. | GM authority, filtered by the credential's scopes. Rotatable, revocable, audited. |");
+  out.push("| **Paired viewer** | HttpOnly cookie exchanged from a pairing code | The second-screen viewer surface and the map-asset bytes it needs. | Read-only, player-safe presentation. It is not a game credential and never becomes one. |");
   out.push("");
   out.push("### Scopes");
   out.push("");
@@ -343,11 +358,14 @@ export function renderApiReference(): string {
   out.push("## Conventions");
   out.push("");
   out.push(`- **Envelopes.** Success: \`{ "ok": true, "apiVersion": "${API_VERSION}", "data": … }\`. Failure: \`{ "ok": false, "apiVersion": "${API_VERSION}", "error": { "code", "message", "requestId", "details"?, "currentRevision"?, "retryAfterSeconds"? } }\`.`);
-  out.push("- **Request IDs.** Send `X-Request-Id` (UUID) to correlate; the server echoes it (minting one otherwise) on the response header and in error bodies.");
-  out.push("- **Idempotency.** Every write accepts `commandId` (UUID). The server executes each commandId exactly once; retries replay the stored outcome with `duplicate: true`. Omitted ids are minted server-side and echoed - supply your own whenever you might need to retry.");
-  out.push("- **Optimistic concurrency.** Pass `expectedRevision` to reject writes against a state you haven't seen; a stale value returns `409` with `error.currentRevision`.");
-  out.push("- **Error statuses.** `400 validation_failed` (malformed request, `details.issues`), `401 unauthenticated` (no token), `403 forbidden` (invalid/revoked/underscoped token, or a role denial), `404 not_found`, `409 conflict` for everything the game itself refuses - rule rejections, stale revisions, and timeline confirmations (`details.needsConfirm`: resend with `confirmRewrite`/`confirmDiscard`), `413` oversized body (limit 512kb).");
-  out.push("- **Polling.** `GET /game` sends a weak ETag derived from the revision; send `If-None-Match` to get free `304`s. Presence and timed-annotation expiry don't bump the revision - re-fetch when you need those fresh.");
+  out.push("- **Request IDs.** Send `X-Request-Id` (UUID v4) to correlate; every `/api/v1` router echoes it on the response header and in error bodies, minting one when you don't. A value that isn't a UUID v4 is replaced rather than echoed.");
+  out.push("- **Idempotency, per surface.** *Game* writes accept `commandId` (UUID), executed exactly once; a retry replays the stored outcome with `duplicate: true`, and an omitted id is minted server-side and echoed. D19: codex JSON-body writes accept an optional `commandId` (UUID), unique to one request; resend the same id to retry THAT request safely and the stored outcome is replayed verbatim - same status, same bytes - with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. Reusing an id on a different route is a `400`, never a replay: answering the first request's response would silently skip the second write. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none - they are naturally idempotent already. *Homebrew* writes still carry none and rely on `expectedRev`.");
+  out.push("- **Optimistic concurrency, two vocabularies.** `expectedRevision` (game) targets the **global** GameState revision. `expectedRev` (codex pages/sessions/quests, homebrew rows) targets **one record's** revision. Both reject a stale write with `409` and `error.currentRevision`. Codex maps, pins, journal entries, calendar, settings and standing are deliberately last-write-wins - a single-GM surface does not need a conflict token on every row, and spreading one costs more than it prevents.");
+  out.push("- **Error statuses.** `400 validation_failed` - malformed request; a schema failure carries every problem in `details.issues` as `{ path, message }`, not just the first. `401 unauthenticated` - **no credential, or an `Authorization` header that isn't parseable**, and nothing else. `403 forbidden` - you presented something and were refused: a role denial, or a token that is invalid, revoked, or missing the required scope. `404 not_found` - absent **or secret**: the existence of a record you may not see is never distinguishable from its absence. `409 conflict` - a domain refusal or a stale revision (`details.needsConfirm` on a timeline navigation: resend with `confirmRewrite`/`confirmDiscard`). `413` - oversized body. The global limit is 512kb; three routes raise their own and each states it on the operation - `POST /homebrew/packs/import` (about 4mb), `POST /codex/import` (64mb, because a backup bundle carries every revision), and `POST /codex-assets` (11mb, one page image).");
+  out.push("- **One stated exception to the 404 rule.** Binary asset-content routes (`/map-assets/{id}/content`, `/codex-assets/{id}/content`) answer `403` **before** any existence check. Media URLs are guessable and get embedded in pages, so answering 404-vs-403 there would turn the route into an existence oracle for ids you were never given.");
+  out.push("- **Polling.** `GET /game` and **every codex `GET`** send a weak ETag derived from the relevant revision; send `If-None-Match` for a free `304`. Presence and timed-annotation expiry don't bump the game revision - re-fetch when you need those fresh. A conditional request is checked *after* authorization and existence, so a `304` never leaks that a record you can't see is unchanged.");
+  out.push("- **Change observation.** Socket.IO emits a `codex:changed` / `homebrew:changed` ping whenever that surface moves. Treat a ping as \"re-read\", not as data - it exists so integrations don't have to poll tightly, and the payload is not part of this contract.");
+  out.push("- **Bounds are a design decision, not an omission.** This is a single-group LAN product. Codex list reads are **unpaginated** and will stay that way inside v1; suite search returns at most 50 hits; homebrew lists use keyset cursors (`cursor` is opaque). Do not build a consumer that waits for codex pagination to appear.");
   out.push("- **CORS.** Wide open on `/api/v1` (bearer-only surface), so browser-based overlays can call it directly. The legacy same-origin endpoints (`/api/gm/login` etc.) deliberately have no CORS.");
   out.push("");
 
@@ -360,7 +378,7 @@ export function renderApiReference(): string {
   for (const [type, scope] of Object.entries(GAME_COMMAND_SCOPES)) out.push(`| \`${type}\` | \`${scope}\` |`);
   out.push("");
 
-  out.push("## Encounter archive document (`archiveSchemaVersion` 2)");
+  out.push(`## Encounter archive document (\`archiveSchemaVersion\` ${ENCOUNTER_ARCHIVE_SCHEMA_VERSION})`);
   out.push("");
   out.push("`GET /encounters/{id}` returns `data.document`, the permanent Time Machine record of one ended fight, stored verbatim at `encounter.end` in the same transaction that closes the encounter:");
   out.push("");

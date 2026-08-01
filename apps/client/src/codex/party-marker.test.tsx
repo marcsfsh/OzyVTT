@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 // The atlas renders a real image-backed surface; this file is about the party FLAG, not the camera.
@@ -37,6 +38,7 @@ vi.mock("./api", async (importOriginal) => {
   };
 });
 
+import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
 import { MapSurface } from "./MapSurface";
 import type { CodexMap, CodexMarker } from "./api";
@@ -67,13 +69,36 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   tags: [], createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z", ...over
 });
 
+/**
+ * The atlas, with the address fed back the way `CodexShell` feeds it.
+ *
+ * Selecting a pin is a NAVIGATION now (`?pin=`), not local state — that is what puts it behind the
+ * autosave-off leave guard, see `pin-selection.test.tsx`. So a harness that swallowed `onNavigate` would
+ * render an atlas in which no pin can ever be opened, and every assertion about the inspector below
+ * would be about a surface the GM cannot reach.
+ */
+function AtlasHarness() {
+  const [href, setHref] = useState("/codex/atlas");
+  const [path, search] = href.split("?");
+  const query = new URLSearchParams(search ?? "");
+  return (
+    <ToastProvider>
+      <AtlasView gmToken="gm" scenes={[]} actors={[]} activeSceneId={null} onActivateScene={vi.fn()}
+        mapId={path.split("/")[3] ?? null} pinId={query.get("pin")}
+        autosave={{ enabled: true, intervalSeconds: 1 }} onQuickCreate={vi.fn()}
+        onNavigate={setHref}
+        onReplaceQuery={(mutate) => { const next = new URLSearchParams(search ?? ""); mutate(next); setHref(next.toString() ? `${path}?${next}` : path); }} />
+    </ToastProvider>
+  );
+}
+
 const renderAtlas = async (markers: CodexMarker[]) => {
   listMaps.mockResolvedValue([MAP]);
   listMarkers.mockResolvedValue(markers);
   listAssets.mockResolvedValue([]);
   listPages.mockResolvedValue([]);
   forMarker.mockResolvedValue([]);
-  render(<AtlasView gmToken="gm" scenes={[]} activeSceneId={null} onOpenPage={vi.fn()} onActivateScene={vi.fn()} />);
+  render(<AtlasHarness />);
   await waitFor(() => expect(listMarkers).toHaveBeenCalled());
 };
 
@@ -85,7 +110,7 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
 
     const pin = document.querySelector('[data-marker-id="k1"]')!;
     expect(pin.textContent).toContain("The party is here");
-    expect(pin.querySelector("title")!.textContent).toBe("Vallaki — the party is here");
+    expect(pin.querySelector("title")!.textContent).toBe("Vallaki, the party is here");
     // The ring is decoration on top of that, never instead of it.
     expect(pin.querySelector(".codex-marker-partyring")).not.toBeNull();
   });
@@ -216,13 +241,13 @@ describe("One party pin for the whole atlas (M12-C)", () => {
     // Asserted by COUNTING, which is the only way to catch a control being added later: exactly ONE
     // control in the inspector is about the party, and it is the flag. A coordinate field or a
     // "move the party here" action would be a second path onto `moveMarker` and would make this two.
-    const inspector = screen.getByRole("complementary", { name: "Marker" });
+    const inspector = screen.getByRole("complementary", { name: "Pin" });
     const partyControls = [...inspector.querySelectorAll("button, input, select, textarea")]
       .filter((element) => /party/i.test(`${element.getAttribute("aria-label") ?? ""} ${element.textContent ?? ""}`));
     expect(partyControls).toHaveLength(1);
     expect(partyControls[0]).toHaveAttribute("role", "switch");
     expect(moveMarker).not.toHaveBeenCalled();
     // And the inspector says out loud how it IS moved.
-    expect(screen.getByText(/Drag it to move the party/)).toBeInTheDocument();
+    expect(screen.getByText("Players see this pin marked as the party. Drag the pin to move the party.")).toBeInTheDocument();
   });
 });

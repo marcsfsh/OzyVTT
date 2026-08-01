@@ -1,18 +1,18 @@
 import { Alert, Badge, Button, Drawer, Skeleton } from "@vtt/ui";
 import { CodexMarkdown } from "./CodexMarkdown";
-import { GmOnlyTag } from "./SecretMarkers";
+import { GmOnlyTag, VisibilityBadge } from "./SecretMarkers";
 import { sessionTitle } from "./sessions";
 import type { CodexSession } from "./api";
 
 /**
  * M9: the session console — tonight's prep, readable from ANY Codex mode.
  *
- * The problem it solves is a running-the-game problem: prep is written in the session log, but it is
+ * The problem it solves is a running-the-game problem: prep is written in Sessions, but it is
  * *needed* while the GM is in the Atlas dropping a pin or in Pages reading an NPC. Before this, consulting
  * it meant leaving whatever surface the game was actually happening on.
  *
  * **It is a view, and that is a hard property, not a description.** It fetches nothing and writes
- * nothing: the session it renders is the very record the session log is editing, handed down from the
+ * nothing: the session it renders is the very record Sessions is editing, handed down from the
  * workspace's single feed, and every action here is either "close" or "go where editing happens". A
  * console that wrote would be a second editor for one record, on screen at the same time as the first.
  *
@@ -20,7 +20,7 @@ import type { CodexSession } from "./api";
  * focus trap, no scroll lock, no swallowing of Escape. A panel you consult *while you keep working*
  * cannot make the thing you are working on unreachable; `Modal` would.
  */
-export function SessionConsole({ open, onClose, gmToken, session, loading, error, onOpenSession }: Readonly<{
+export function SessionConsole({ open, onClose, gmToken, session, loading, error, onOpenSession, onOpenSessions }: Readonly<{
   open: boolean;
   onClose: () => void;
   gmToken: string;
@@ -30,14 +30,13 @@ export function SessionConsole({ open, onClose, gmToken, session, loading, error
   loading: boolean;
   /** R4: the feed's own failure, surfaced here rather than rendering as a blank console. */
   error: string | null;
-  /**
-   * R1: the jump prepares its destination — the session log opens ON this session. `null` is the one
-   * honest exception: with no active session there is nothing to prepare, so the log opens unlatched.
-   */
-  onOpenSession: (sessionId: string | null) => void;
+  /** R1: the jump prepares its destination — Sessions opens ON this session. */
+  onOpenSession: (sessionId: string) => void;
+  /** Reaching Sessions with nothing selected, for the no-active-session empty state. */
+  onOpenSessions: () => void;
 }>) {
   return (
-    <Drawer open={open} onClose={onClose} ariaLabel="Session console" title={session ? sessionTitle(session) : "Session console"}>
+    <Drawer open={open} onClose={onClose} ariaLabel="Session prep" title={session ? sessionTitle(session) : "Session prep"} className="codex-prepdrawer">
       {/* R4: the feed's failure is visible HERE, and gated on `open` — the drawer stays mounted while
           closed so its slide plays both ways, and an `Alert` is an announcement (`role="alert"`). A
           console nobody has opened must not announce a failure over the mode the GM is actually using;
@@ -47,19 +46,23 @@ export function SessionConsole({ open, onClose, gmToken, session, loading, error
 
       {!loading && !error && !session && (
         <div className="codex-console-empty">
-          <p>No session is active. Make one active in the session log and its prep appears here from every Codex mode — and new journal entries and logged battles file themselves under it.</p>
+          <p>No session is active. Make one active in Sessions and its prep appears here from every part of the Codex. New journal entries and logged battles are filed under the active session.</p>
           {/* §4: `Button` is a `@vtt/ui` primitive and carries the 44px floor itself — no new control. */}
-          <Button variant="primary" size="sm" onClick={() => onOpenSession(null)}>Open the session log</Button>
+          <Button variant="primary" size="sm" onClick={onOpenSessions}>Open Sessions</Button>
         </div>
       )}
 
       {session && (
         <div className="codex-console">
           <div className="codex-console-meta">
-            <Badge tone="success">● Active</Badge>
+            <Badge tone="success"><span className="codex-dot" aria-hidden="true" /> Active</Badge>
             <Badge tone={session.status === "played" ? "neutral" : "info"}>{session.status === "played" ? "Played" : "Planned"}</Badge>
             {session.realDate && <span className="codex-entry-when">{session.realDate}</span>}
-            {session.revealedToPlayers ? <Badge tone="info">Recap shown</Badge> : <Badge>Recap hidden</Badge>}
+            {/* The SHARED badge, not a second wording of the same fact. Every list in the Codex states a
+                record's visibility as success + eye / neutral + eye-off; this panel stated it as a
+                bare `tone="info"` with no icon, so the identical fact read two ways depending on which
+                surface the GM happened to be on (intake A6). */}
+            <VisibilityBadge revealed={session.revealedToPlayers} />
           </div>
           {session.attendees.length > 0 && <p className="codex-console-attendees">Playing: {session.attendees.join(", ")}</p>}
 

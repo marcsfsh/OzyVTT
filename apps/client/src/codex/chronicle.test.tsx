@@ -50,13 +50,13 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 
 const ENTRY: CodexChronicleRecord = {
   kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
-  sessionNumber: 3, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", calendarInstant: 1492 * 60, inWorldDate: { year: 1492, month: 0, day: 1 },
+  sessionId: null, sessionNumber: 3, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", calendarInstant: 1492 * 60, inWorldDate: { year: 1492, month: 0, day: 1 },
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 };
 const EVENT: CodexChronicleRecord = {
   kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", gmText: "Strahd engineered it.", revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: "Hammer 2, 1493 DR", calendarInstant: 1493 * 60 + 1, inWorldDate: { year: 1493, month: 0, day: 2 },
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: "Hammer 2, 1493 DR", calendarInstant: 1493 * 60 + 1, inWorldDate: { year: 1493, month: 0, day: 2 },
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 };
@@ -65,7 +65,7 @@ const renderJournal = async (records: CodexChronicleRecord[], onOpenPage = vi.fn
   chronicle.mockResolvedValue(records);
   listPages.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
-  render(<JournalView gmToken="gm" onOpenPage={onOpenPage} />);
+  render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={onOpenPage} />);
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
   return onOpenPage;
 };
@@ -163,7 +163,7 @@ describe("Two lenses over the same records (CT-12)", () => {
   it("groups by year ascending with undated last, and by session with the unsessioned last", () => {
     // The grouping rule on its own, below the component: a UI test can only show one arrangement, and the
     // ordering contract is what the two lenses actually promise.
-    const undated: CodexChronicleRecord = { ...ENTRY, id: "j0", sessionNumber: null, calendarInstant: null, inWorldDate: null, inWorldLabel: null };
+    const undated: CodexChronicleRecord = { ...ENTRY, id: "j0", sessionId: null, sessionNumber: null, calendarInstant: null, inWorldDate: null, inWorldLabel: null };
     const records = [ENTRY, EVENT, undated];
 
     expect(groupChronicle(records, "date", CALENDAR).map((group) => [group.label, group.records.map((record) => record.id)]))
@@ -193,8 +193,8 @@ describe("An event page is dated in the editor (CT-11)", () => {
     playerBody: "The sky tore open.", gmBody: ""
   };
   const renderEditor = (page: CodexPage) => render(
-    <PageEditor gmToken="gm" page={page} pages={[page]} backlinks={[]} relationships={[]}
-      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onRelationshipsChanged={() => {}} />
+    <PageEditor gmToken="gm" page={page} pages={[page]} connections={[]} autosave={{ enabled: true, intervalSeconds: 1 }}
+      onChange={() => {}} onDeleted={() => {}} onNavigate={() => {}} onOpenConnection={vi.fn()} onConnectionsChanged={() => {}} />
   );
 
   beforeEach(() => {

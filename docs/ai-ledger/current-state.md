@@ -8,6 +8,195 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **The Codex copy sweep (2026-08-01, branch `claude/ozyvtt-codex-ux-4pl7ib`).** Every piece of
+  user-facing explanatory prose in `apps/client/src/codex/**` rewritten to one standard, with zero
+  functional change. The client's verdict on the old voice was that it read as cheap and corny.
+  - **The rule, now written down in `docs/ai-context/design-language.md` §9:** say what the control
+    does or what belongs in the field, and nothing else. No scene-setting, no em-dashes on screen, no
+    ellipsis placeholders, no rhetorical framing, no LLM register; a hint carries information or it is
+    deleted. Ten before/after pairs are recorded there as calibration.
+  - **Scope:** 24 source files, ~150 strings. Field help, placeholders, empty states, confirm bodies,
+    errors, toasts and descriptive `title`/`aria-label` text, on the GM side and the player side alike.
+    `PlayerCodex.tsx` held the string the client named worst ("Search what you know…", a search box)
+    and the last seven ellipsis placeholders in the Codex.
+  - **Plainer never meant vaguer.** The restore confirm still states every section count including
+    zeros, the reveal-ahead warning still names both dates, the kind-change confirm still names each
+    field at risk and still softens its recovery promise when version history is off, and the downtime
+    confirm still states the deadline count it will pass.
+  - **One no-value convention.** The Codex says "None" for an absent value, in both downtime tables
+    and all three "no selection" selects. Assembled row labels separate fragments with `·`, not an
+    em-dash ("Reached level 5 · Cleared the citadel"). The one deliberate exception is the party pin's
+    SVG `<title>`, which uses a comma because a screen reader speaks it.
+  - **No assertion was weakened.** Roughly 30 test assertions moved with the copy, several tightened
+    from a loose regex to full-sentence equality. Two dead `ALLOWED` exemptions in `vocabulary.test.ts`
+    were deleted rather than re-pointed, making the retired-word rules strictly stricter. One negative
+    assertion in `suite-search.test.tsx` was repaired after the rename would have left it passing
+    vacuously. A pre-existing stale button name in `scripts/prep-clock-ux-check.mjs` was corrected.
+  - **Verified:** `npm run check` 0 · `npm run test` 1861 passed / 1 skipped / 0 failed · `npm run
+    build` 0 · `node scripts/browser-verify.mjs` 67/67, all matching the pre-sweep baseline.
+
+- **The Codex overhaul's final polish (2026-08-01, branch `claude/ozyvtt-codex-ux-4pl7ib`).** The last
+  pass before presentation: close the gap between "the client approved X" and "X is true", fix one bug
+  the client found in the running app, and make every recorded number match what the tooling prints.
+  - **Collapsing the sidebar is no longer a one-way door.** The toggle was gated on the state it
+    produced, so it hid itself when used, and the persisted preference made that survive a reload. It
+    is gated on the forced 761–849px band now, where a collapse control genuinely means nothing. The
+    player has the same affordance, on its own key, never inside the GM's embedded preview.
+  - **Selecting a pin is a navigation** (`?pin=`), so the D6 autosave-off leave guard sees it, the
+    selection survives a refresh, and Back closes the inspector. It was local state, so a typed pin
+    label was lost silently — the one way left in the app to lose work.
+  - **Decision fidelity closed:** the palette's "New session"/"New quest" create through the same
+    `creates.ts` the rails call (D7/D20); the Downtime note is the shared editor, the last bare
+    `Textarea` in the suite (D13); Sessions and Quests keep their filters in the URL like Pages, Atlas
+    and Journal (D3); and the player's five lists carry the GM's filters in the GM's words (D10).
+  - **ADR-0016 §2 is true of the whole surface.** The viewer router echoed any short token as a request
+    id and the token router any 36 hex-and-hyphen characters; both enforce UUID v4 now, like the other
+    five routers. No contract change — the served OpenAPI document is untouched.
+  - **Coverage where there was none:** `MarkdownEditor` (D13's headline capability, six mounting
+    surfaces) and `Combobox` (8 call sites) have 20 behavioural tests, checked against eight mutants;
+    `calendar-view`, `downtime-view` and `tag-view` are written.
+  - Verified: `npm run check` 0, `npm run test` **1,861 passing / 1 skipped / 0 failing**, `npm run
+    build` 0. Browser pass **67/67** at 1280x900 and 375x780 against a populated database. Tap audit
+    **1,160 controls over 34 surfaces, 0 unmeasured, 16 sub-floor at 375px and 24 at 320px, every one a
+    graph node**.
+  - **A recorded number was wrong and is corrected, not restated:** `design-language.md` §4 claimed
+    "1,119 controls, 16 sub-floor at each width". The graph's sub-floor count is data- and
+    width-dependent, so a single figure for both widths could only ever be right for one of them.
+
+- **The Codex is one sidebar, one vocabulary and real addresses (2026-07-31, Lane C, branch
+  `claude/ozyvtt-codex-ux-4pl7ib`).** Verified in Chromium against a populated database at 1280x900 and
+  375x780: 59/59 checks when this landed, **67/67 as of 2026-08-01** (`node scripts/browser-verify.mjs`),
+  0 uncaught console errors.
+  - **One navigation surface (D1).** A role-blind `SidebarNav` over Home / World (Pages · Atlas · Graph)
+    / Campaign (Sessions · Quests · Journal · Calendar · Downtime) / Tools (Reveal audit · Preview as
+    player · Backup · Settings). The five-mode tab bar, the nine-button ops row and the four unaddressed
+    "destination" overlays are GONE. Exactly one item is ever lit; `/codex` matches exactly, so Home no
+    longer lights on every codex address. The player sidebar is the same component and the same words,
+    minus Tools.
+  - **Real URLs (D3).** A hand-rolled ~230-line history layer (`apps/client/src/router.ts`) — no router
+    dependency; the app has four Vite entries and one of them needs addresses. Every surface and every
+    record is an address, back/forward work, and the server's SPA fallback already existed (verified,
+    not built). The GM's Viewer tab is `/viewer-controls` because the server reserves `GET /viewer`.
+  - **Resume and deep links (D2).** The GM token is memory-only by design, so a cold deep link shows the
+    login screen AT that address and auth lands on what was asked for; only a bare `/` resumes.
+  - **The player Codex is a first-class surface (D4/D14).** Out of the modal, same shell, same sidebar,
+    same section titles. The GM's "Preview as player" mounts the REAL player surface on a real minted
+    player token, inside a modal, on a LOCAL route so it cannot drive the GM's address bar.
+  - **One glossary, enforced by a test (D5).** `vocabulary.test.ts` reads `src/codex/**` and fails the
+    build on the retired words in anything a user reads. It found seven live violations on its first run.
+  - **Also shipped:** autosave + its setting (D6), quick-create (D7), one connections list (D8), tag
+    view (D10), a calendar lens (D17), a downtime tracker (D12), backup/restore UI (D16), a
+    mission-control dashboard (D18), the Codex-scoped ⌘K palette (D20), measured D21 tokens, the
+    session-prep drawer (D24), and the D25 styleguide sweep (Combobox, Markdown editor, the palette
+    pattern, `Input variant="title"`, `Badge tone="violet"`, `IconX`/`IconPlay`, the pin palette).
+  - **Deleted outright:** `CodexWorkspace`, `RelationshipsPanel`, `EntityPicker`, `RELATIONSHIP_TYPES`,
+    and `findMarkerMap`'s O(maps) scan (now `GET /codex/markers/{id}`).
+  - **Back is guarded (D6).** The autosave-off leave prompt fires on browser Back and the Android back
+    gesture, not only on in-app navigation — a vetoed pop is undone by pushing the address back, so the
+    draft survives. Verified in Chromium at 1280x900 and 375x780.
+  - **761–849px is a real icon rail.** Both shells drive `collapsed` from one matchMedia query, so the
+    markup agrees with the 56px grid track the CSS has always set there; the player gets it too.
+  - **Touch floor, measured not asserted.** Latest measurement (2026-08-01, and the one to quote):
+    **1,160 interactive controls across 34 surfaces — 21 GM and 13 player, the latter on a real player
+    session — with 16 below 44px at 375px and 24 at 320px, every one of them a graph node**, the
+    accepted exception recorded in `design-language.md` §4 with its reasoning. The count of sub-floor
+    nodes is data- and width-dependent, so it differs between the two widths and will differ again on a
+    bigger campaign; do not quote it as a constant. (This entry read "1,119 controls across 35 surfaces,
+    16 at each width" when Lane C landed — true of that run's data, and superseded by the re-measure.)
+    Corrected 2026-07-31: the earlier "805 controls across 17 surfaces, 0 below the floor"
+    was measured by a GM-only script whose pin and palette openers silently re-measured the previous
+    surface, and the two real sub-floor controls it could not see (`.codex-list-item` at 43.6px on the
+    player's Pages rail, `.codex-marker-link-open` at 35.6px in both shells) are now fixed.
+    `scripts/tap-audit.mjs` is route-driven, walks both roles, and exits non-zero if any surface goes
+    unmeasured.
+
+
+- **The Codex speaks one connection language, records its own history, and restores from backup
+  (2026-07-31, Lane B Phases 2-4, migrations v22-v23).**
+  - **One connection system (D8/D13).** Typed relationships and `[[wiki-links]]` are one concept with an
+    optional label and an `origin`; session, quest and journal bodies join the graph with their own
+    two-layer split (prep and `gmText` yield GM-only edges). `GET /codex/pages/{id}` answers
+    `{page, connections}`; `GET /codex/relationships`, `GET /codex/links`,
+    `POST /codex/pages/{id}/relationships` and `DELETE /codex/relationships/{id}` are RETIRED. The
+    one-time re-extraction of existing bodies rides a startup reconcile, because SQL cannot parse
+    `[[..]]`.
+  - **Quest history (D11).** Creating a quest and changing its status each append a hidden `quest`
+    journal record in the same transaction. Hidden WHOLE from players until the quest is revealed.
+  - **Backup and restore (D16).** `POST /codex/import` replaces the codex transactionally from an export
+    file POSTed back unedited. `bundleVersion` is optional, so pre-versioning backups restore.
+  - **`commandId` idempotency (D19).** Codex JSON-body writes accept one; a replay carries
+    `x-idempotent-replay: true`. Checked inside the write guard, after authorization.
+  - **The narrow downtime PATCH (D12).** `PATCH /codex/journal/{id}` takes `downtime: {who, activity,
+    characterPageId}` so existing free-text rows can be linked to character pages. `days` is immutable.
+
+- **The Codex's journal, sessions and pins know who they belong to (2026-07-31, branch
+  `claude/ozyvtt-codex-ux-4pl7ib`, Codex overhaul Lane B, Phases 1-3 partial).** Four migrations
+  (v18-v21), all additive or content-preserving, all verified against a real legacy database built from
+  the shipped SQL rather than a fresh one.
+  - **Journal entries join their session by ID (D9, v19).** The display number resolves live from the
+    linked record, so renumbering a session relabels every one of its entries with no journal write -
+    closing the renumber bug open since M9. Writes take `sessionId` only; a bare `sessionNumber` is a 400.
+    The player gate keys on session reveal by identity and nulls BOTH halves of the link, which is
+    strictly stronger than the number-list it replaces (an unnumbered hidden session had no number to put
+    in a set). v13's recorded "no backfill" decision is consciously superseded: orphan numbers get an
+    EMPTY, hidden, played session record so nothing is invented and nothing becomes player-visible.
+  - **Sessions and quests are taggable and sessions are searchable (D10, v20/v21).** A new kind in the
+    one search index is a three-gate change; gate 1 keeps `prep_body` and attendee names out of the
+    player index entirely, so a player cannot find a *revealed* session by the GM's secrets. Search now
+    reports `truncated` rather than silently clipping at 50.
+  - **Autosave is a GM setting (D6, v18)**, in seconds, defaulting to `{enabled: true, intervalSeconds: 1}` -
+    which is what the shipping editors already did. The server stores a preference; enforcement is the
+    editor's.
+  - **`GET /codex/party` and `GET /codex/markers/{id}` (D15)** replace a client-side scan of every map.
+    The party read answers `null` rather than 404 for a hidden pin, so `isParty` still grants nothing.
+  - **Downtime can name a character page (D12)**, gated to revealed pages for players, scrubbed on page
+    delete, and supplied as null for pre-existing rows by the payload reader rather than a data migration.
+  - **`codex:changed` carries only a revision (D22)**; a type-changing page save forces its revision
+    snapshot (D7/R7); every public write is pinned to bump the coarse revision, which is what the ETags
+    rest on.
+
+- **The Codex is a first-class citizen of the public API (2026-07-31, branch
+  `claude/ozyvtt-codex-ux-4pl7ib`, Codex overhaul Lane A).** The published contract described a codex
+  only a GM session could reach, returning shapes only a GM ever receives. Both are fixed, and the
+  fixes are pinned by tests rather than by prose.
+  - **`codex:read` / `codex:write` integration scopes.** Every codex operation accepts a GM session, a
+    scoped credential, or (on role-projected reads) a player session. A credential acts at **GM grade** —
+    the game surface's model verbatim — and `codex:write` does **not** imply `codex:read`.
+    `POST /codex/preview-session` is the one bearer-less operation: it mints a player session token.
+    `features.codex: true` joins capability discovery. The client scope picker needed no change (it
+    derives from `IntegrationScopeSchema.options`). Closes the `integration-API (codex:read/write)
+    scopes` item on the M-series deferred list below.
+  - **401 vs 403 now means something.** 401 is *only* a missing or unparseable `Authorization` header.
+    Everything presented-and-refused — player on a GM surface, junk, revoked, underscoped — is 403.
+  - **Player response shapes are published.** Ten `Codex<X>Player` components mirror
+    `codex-projections.ts` key for key, joined to their GM twin by a `Codex<X>Projected` two-branch
+    `oneOf`. A player body used to *fail validation against its own documented schema*. Two shapes had to
+    be fixed first, and both were latent bugs: `CodexChronicleRecord` was a merged GM/player shape whose
+    optional GM keys let a player body match both branches, and `CodexCalendar` left two keys optional
+    that the GM projection always emits.
+  - **Two tests keep it honest.** A contract test pins the one-sided disjointness rule for every pair
+    (both branches closed and all-required; GM branch requires ≥1 key the player branch does not
+    declare). `apps/server/test/codex-conventions.test.ts` Ajv-validates **real GM and player responses
+    for the whole codex read surface** against the served document, with non-empty-row assertions so no
+    check is vacuous — so a projection change without a contract change fails the build, in either
+    direction.
+  - **Router conventions, surface-wide:** caller-supplied `X-Request-Id` echoed on the header *and in the
+    error body*; `details.issues` carrying every schema issue with its `path`; `error.currentRevision` on
+    the three stale-`expectedRev` 409s (and deliberately absent from the apply-downtime state-machine
+    409); weak `ETag` + `304` on all 21 codex GETs, tagged per grade and checked after every auth and
+    existence gate; sanitized 500s (the catch-all used to forward SQLite's message).
+  - **Docs truth.** The reference generator seeded shared shapes from request bodies only, so ~84
+    response-only components printed their names with their field tables rendered nowhere; it now seeds
+    from success responses too and renders **241** shared shapes. `archiveSchemaVersion` is interpolated
+    from one exported constant (the heading said 2, the document said 3). `info.description` and the
+    Conventions section stop promising an API-wide `commandId` that only the game surface implements.
+    **ADR-0016 is Accepted** with the normative "v1 conventions" statement it always promised; a test
+    pins five load-bearing phrases in both it and the generated reference so the two cannot drift.
+  - Verified: `npm run check`, `npm run test` (1499 passing), `npm run build`, all green.
+  - **Deferred to the back-end lane, with a written handoff:** every NEW codex route (import/restore,
+    pin-by-id, party location, the connections family) and the `commandId` receipts machinery — a
+    contract entry for an unmounted route fails the route-table parity test immediately, so each must
+    land with its route.
 - **Character builder — the wizard screens (2026-07-27, branch
   `claude/dndbeyond-sheet-importer-0k6u2e`). A character can now be created through the UI for the
   first time.** A seven-step guided flow (Species · Background · Class & level · Class features ·
@@ -181,8 +370,9 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     needs the `authorizeViewer` seam); map legend / marker-list panel; atlas reset/fit-view dock;
     `useConfirm` for the 4 codex delete flows (still raw `window.confirm`); tag-chip filtering;
     new-session prefill; `commandId` idempotency on codex creates; `DELETE /codex-assets/:id` + orphan
-    GC; revision-snapshot coalescing; FTS5 boot-resilience; ETag on list reads; integration-API
-    (`codex:read/write`) scopes. Still not built from the original vision: ~~mind-map graph~~ (built,
+    GC; revision-snapshot coalescing; FTS5 boot-resilience; ~~ETag on list reads~~ (built 2026-07-31 —
+    every codex GET); ~~integration-API (`codex:read/write`) scopes~~ (built 2026-07-31). Still not
+    built from the original vision: ~~mind-map graph~~ (built,
     pillar 4 below), ~~fantasy calendar~~ (built, pillar 2 below), page transclusion.
 - **Worldbuilding platform — four pillars (2026-07-25, same branch).** The codex grew from a notebook
   into a World-Anvil-class worldbuilding tool, built + verified pillar by pillar on top of it:
@@ -600,6 +790,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   `/api/v1/encounters` endpoints — players and the shared viewer can never reach it.
 
 ## Active work
+
+- **Codex overhaul, server QA fix pass (2026-07-31).** An adversarial review raised 24 server findings;
+  21 are fixed, 1 was verified not real, 2 are deferred into `known-bugs.md`. The load-bearing outcomes:
+  journal-sourced connections are gated by `projectPlayerJournalEntry` on BOTH surfaces (a revealed
+  standing record about a hidden faction was publishing its text to players while the reveal audit called
+  it hidden); a backup with no recognised section is refused instead of wiping the codex; and what
+  `malformed()` forwards to a caller is an allow-list (`ZodError` or `CodexValidationError`) with a
+  sanitized 500 for everything else, so SQLite's table and column names no longer reach API callers.
+  Import also stopped converting director ruling R2's bare session label into a phantom hidden session,
+  the ETag names its resource, `POST /codex/import` authorizes before its 64 MB parser, and migration v24
+  binds a `commandId` receipt to the route it was issued for. `docs/api-reference.md` is regenerated for
+  the four journal 404s, the asset upload's 403/413, the corrected apply-downtime 409, the body-limit
+  line and the `commandId` uniqueness rule. **1725 tests** (from 1662).
+
 
 - **Codex version history is bounded, switchable and trimmable — owner decisions (2026-07-30).** Completing
   the export bundle exposed `codex_page_revisions` as **unbounded**: every page save wrote a row, nothing

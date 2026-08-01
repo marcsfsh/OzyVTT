@@ -49,7 +49,7 @@ const CALENDAR: GmCodexCalendar = {
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null,
   fired: false, proposedDate: null, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z", ...over
 });
@@ -64,7 +64,7 @@ const renderJournal = async (records: CodexChronicleRecord[] = [], pages: CodexP
   chronicle.mockResolvedValue(records);
   listPages.mockResolvedValue(pages);
   getCalendar.mockResolvedValue(CALENDAR);
-  render(<JournalView gmToken="gm" onOpenPage={vi.fn()} />);
+  render(<JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />);
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 
@@ -152,10 +152,10 @@ describe("A milestone and a standing row read as themselves on the chronicle (R2
 
     // Colour lives entirely in CSS, so the proof is that the TEXT of each row distinguishes them.
     expect(rowOf("m1").textContent).toContain("Milestone");
-    expect(rowOf("m1").textContent).toContain("Reached level 5 — Cleared the citadel");
+    expect(rowOf("m1").textContent).toContain("Reached level 5 · Cleared the citadel");
     expect(rowOf("s1").textContent).toContain("Standing");
     // The faction is NAMED from the page list, and the delta is the change — never the new value.
-    expect(rowOf("s1").textContent).toContain("The Zhentarim — down 20 · Burned the caravan");
+    expect(rowOf("s1").textContent).toContain("The Zhentarim · down 20 · Burned the caravan");
     expect(rowOf("m1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
     expect(rowOf("s1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
   });

@@ -1,7 +1,7 @@
 import { Skeleton } from "@vtt/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
-import { iconChildren } from "./icons";
+import { iconChildren, pinSwatchVar } from "./icons";
 
 /** The minimal marker shape the surface renders - satisfied by both the GM marker and the player projection. */
 export type SurfaceMarker = Readonly<{ id: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; revealedToPlayers?: boolean; isParty?: boolean }>;
@@ -37,6 +37,12 @@ type MapSurfaceProps = Readonly<{
   markers: readonly SurfaceMarker[];
   placing: boolean;
   selectedMarkerId: string | null;
+  /**
+   * D10: pins that do NOT match the Atlas's filter. They dim to 30% rather than disappearing — a map
+   * with pins removed is a different picture of the world, not a filtered list of one. Selection and
+   * hit-testing are unaffected, so a dimmed pin is still tappable.
+   */
+  dimmedMarkerIds?: ReadonlySet<string> | null;
   readOnly?: boolean;
   /**
    * A request to bring ONE pin into view (`ux-principles.md` §9 — actions name their result). The camera
@@ -53,7 +59,7 @@ type MapSurfaceProps = Readonly<{
   onMarkerDragEnd: (markerId: string, point: { x: number; y: number }) => void;
 }>;
 
-export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, readOnly = false, centerOnMarkerId = null, onCentered, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
+export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, dimmedMarkerIds = null, readOnly = false, centerOnMarkerId = null, onCentered, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
   const image = useAuthorizedMapImage(assetId, token);
   const svgRef = useRef<SVGSVGElement>(null);
   const gesture = useRef<Gesture>({ mode: "idle" });
@@ -186,15 +192,21 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
           const s = glyphSize;
           return (
             <g key={marker.id} data-marker-id={marker.id} transform={`translate(${pos.x} ${pos.y})`}
-              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}${marker.isParty ? " is-party" : ""}`}>
+              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}${marker.isParty ? " is-party" : ""}${dimmedMarkerIds?.has(marker.id) ? " is-dimmed" : ""}`}>
               {/* CT-7 / R2, the accessible half: the party pin's meaning reaches a screen reader as a
                   NAME, not as a ring it cannot see. Ordinary pins keep no title, exactly as before. */}
-              {marker.isParty && <title>{marker.label ? `${marker.label} — ${PARTY_LABEL.toLowerCase()}` : PARTY_LABEL}</title>}
+              {marker.isParty && <title>{marker.label ? `${marker.label}, ${PARTY_LABEL.toLowerCase()}` : PARTY_LABEL}</title>}
               {/* The ring. Drawn OUTSIDE the icon's own scale group so it does not inherit the glyph's
                   colour, and behind the glyph so it never obscures it. It is decoration — the words
                   below are what actually say this is the party. */}
               {marker.isParty && <circle className="codex-marker-partyring" r={s * 0.72} />}
-              <g transform={`translate(${-s / 2} ${-s / 2}) scale(${s / 24})`} style={{ color: marker.iconColor }}>
+              {/* `pinSwatchVar`, not the raw stored hex. The picker swatch, the inspector's header glyph
+                  and the player's pin sheet all resolve an on-palette colour through its token, and the
+                  light theme darkens those tokens for contrast — so a pin stored as #FF2E9A painted
+                  #C81D80 in the panel and #FF2E9A on the map beside it, and the swatch advertised a
+                  colour the map would never use. An off-palette hex falls through unchanged, so pins
+                  stored before the palette existed are untouched. */}
+              <g transform={`translate(${-s / 2} ${-s / 2}) scale(${s / 24})`} style={{ color: pinSwatchVar(marker.iconColor) }}>
                 <circle cx={12} cy={12} r={11.5} className="codex-marker-bg" />
                 <g className="codex-marker-ico">{iconChildren(marker.iconId)}</g>
               </g>
@@ -208,7 +220,7 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
           );
         })}
       </svg>
-      {placing && <div className="codex-place-hint" role="status">Tap the map to drop a marker · Esc to cancel</div>}
+      {placing && <div className="codex-place-hint" role="status">Tap the map to drop a pin · Esc to cancel</div>}
     </div>
   );
 }

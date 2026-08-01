@@ -96,7 +96,10 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
         api: { version: API_VERSION, namespace: `/api/v${API_VERSION}` },
         realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" },
         supportedScopes: IntegrationScopeSchema.options,
-        features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true, rulesEngine: true }
+        // Inlined rather than derived from `SystemCapabilitiesSchema`, so a new feature flag has to be
+        // added here as well as there. `codex: true` is what tells a credential-holder the worldbuilding
+        // surface is reachable before it tries a scope it may not have been granted.
+        features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true, rulesEngine: true, codex: true }
       }
     });
   });

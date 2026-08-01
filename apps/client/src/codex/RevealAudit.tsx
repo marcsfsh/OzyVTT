@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert, Badge, Button, Skeleton } from "@vtt/ui";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Badge, Button, Modal, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, codexApi, journalApi, questApi, revealAuditApi, sessionApi, standingApi, type CodexRevealAudit, type CodexRevealAuditKind, type CodexRevealAuditSection } from "./api";
 import { CHRONICLE_KIND_META, chronicleKindOfJournal } from "./chronicle";
 import { CodexIcon } from "./icons";
+import { RevealSwitch } from "./SecretMarkers";
 
 /**
  * M12 / CT-9 — the reveal audit: **one surface answering "what can the players see right now?"**
@@ -43,61 +44,64 @@ const AUDIT_KINDS: Readonly<Record<CodexRevealAuditKind, Readonly<{
   iconId: string;
   /** What "nothing here" means for this kind, in that kind's own words. */
   emptyLabel: string;
-  hide: (token: string, id: string) => Promise<unknown>;
+  /** D23: two-way now. The audit still delegates to each kind's OWN reveal route and adds no rule. */
+  setRevealed: (token: string, id: string, revealed: boolean) => Promise<unknown>;
   hideLabel: (title: string) => string;
 }>>> = {
   page: {
     heading: "Pages", iconId: "scroll", emptyLabel: "No pages are shown to players.",
-    hide: (token, id) => codexApi.revealPage(token, id, false),
-    hideLabel: (title) => `Hide the page ${title} from players`
+    setRevealed: (token, id, revealed) => codexApi.revealPage(token, id, revealed),
+    hideLabel: (title) => `Show the page ${title} to players`
   },
   map: {
     heading: "Maps", iconId: "compass", emptyLabel: "No maps are shown to players.",
-    hide: (token, id) => atlasApi.revealMap(token, id, false),
-    hideLabel: (title) => `Hide the map ${title} from players`
+    setRevealed: (token, id, revealed) => atlasApi.revealMap(token, id, revealed),
+    hideLabel: (title) => `Show the map ${title} to players`
   },
   marker: {
     heading: "Map pins", iconId: "pin", emptyLabel: "No map pins are shown to players.",
-    hide: (token, id) => atlasApi.revealMarker(token, id, false),
-    hideLabel: (title) => `Hide the pin ${title} from players`
+    setRevealed: (token, id, revealed) => atlasApi.revealMarker(token, id, revealed),
+    hideLabel: (title) => `Show the pin ${title} to players`
   },
   journal: {
     // One journal table, six kinds — notes, battles, deadlines, downtime, and M12's milestones and
     // standing changes — so this section is named for the timeline they all live on rather than for
-    // any one of them.
-    heading: "Chronicle records", iconId: "hourglass",
+    // any one of them. D5 retired "chronicle" from UI copy: the timeline is the **Journal** everywhere
+    // a GM reads it, and this heading is also lowercased into the incomplete-audit alert below.
+    heading: "Journal entries", iconId: "hourglass",
     emptyLabel: "No journal entries, deadlines, downtime, milestones or standing changes are shown to players.",
-    hide: (token, id) => journalApi.reveal(token, id, false),
-    hideLabel: (title) => `Hide the record ${title} from players`
+    setRevealed: (token, id, revealed) => journalApi.reveal(token, id, revealed),
+    hideLabel: (title) => `Show the entry ${title} to players`
   },
   session: {
     heading: "Session recaps", iconId: "campfire", emptyLabel: "No session recaps are shown to players.",
-    hide: (token, id) => sessionApi.reveal(token, id, false),
-    hideLabel: (title) => `Hide the recap for ${title} from players`
+    setRevealed: (token, id, revealed) => sessionApi.reveal(token, id, revealed),
+    hideLabel: (title) => `Show the recap for ${title} to players`
   },
   quest: {
     heading: "Quests", iconId: "quest", emptyLabel: "No quests are shown to players.",
-    hide: (token, id) => questApi.reveal(token, id, false),
-    hideLabel: (title) => `Hide the quest ${title} from players`
+    setRevealed: (token, id, revealed) => questApi.reveal(token, id, revealed),
+    hideLabel: (title) => `Show the quest ${title} to players`
   },
   standing: {
     heading: "Faction standing", iconId: CHRONICLE_KIND_META.standing.iconId,
     emptyLabel: "No faction standing is shown to players.",
     // A standing row is addressed by its FACTION PAGE id, which is what its reveal route takes and what
     // the audit puts in `row.id` — the standing row's own id is not an address anything here can use.
-    hide: (token, factionPageId) => standingApi.reveal(token, factionPageId, false),
-    hideLabel: (title) => `Hide the standing with ${title} from players`
+    setRevealed: (token, factionPageId, revealed) => standingApi.reveal(token, factionPageId, revealed),
+    hideLabel: (title) => `Show standing with ${title} to players`
   }
 };
 const KIND_ORDER = Object.keys(AUDIT_KINDS) as readonly CodexRevealAuditKind[];
 
-export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; onClose: () => void }>) {
+export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
   const [audit, setAudit] = useState<CodexRevealAudit | null>(null);
   // CF-2 at the level of the whole surface: before the first read settles, "nothing is revealed" is not
   // a claim this screen is entitled to make.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingFaction, setPendingFaction] = useState<{ id: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
     try { setAudit(await revealAuditApi.get(gmToken)); setError(null); }
@@ -110,13 +114,45 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
   // — an audit that went stale the moment something changed would be the least trustworthy screen here.
   useEffect(() => { const onChanged = () => { void load(); }; socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [load]);
 
-  const hide = async (kind: CodexRevealAuditKind, id: string) => {
-    setBusyId(`${kind}:${id}`);
+  /**
+   * D23 — **hiding from the audit is now two-way.**
+   *
+   * It used to be a one-way "Hide" button: the row then vanished on the next refetch, with no way back
+   * except finding the record in its own section and flipping it there. It is the standard `RevealSwitch`
+   * now, so flipping it off and straight back on is the undo — and the row stays rendered (dimmed, switch
+   * off) until the refetch settles, so there is something to flip back.
+   *
+   * The audit still DELEGATES: every write goes out through the record kind's own reveal route. It adds
+   * no visibility rule of its own, and there is still no bulk operation.
+   */
+  const [justHidden, setJustHidden] = useState<ReadonlySet<string>>(new Set());
+  const setRevealed = async (kind: CodexRevealAuditKind, id: string, title: string, revealed: boolean) => {
+    const key = `${kind}:${id}`;
+    setBusyId(key);
     setError(null);
-    try { await AUDIT_KINDS[kind].hide(gmToken, id); await load(); }
-    catch (hideError) { setError(hideError instanceof Error ? hideError.message : "Couldn't hide that from players."); }
+    try {
+      await AUDIT_KINDS[kind].setRevealed(gmToken, id, revealed);
+      setJustHidden((prev) => { const next = new Set(prev); if (revealed) next.delete(key); else next.add(key); return next; });
+      setAnnouncement(revealed ? `${title} is shown to players again.` : `${title} is hidden from players. Flip to undo.`);
+      await load();
+    }
+    catch (writeError) { setError(writeError instanceof Error ? writeError.message : "Couldn't change who can see that."); }
     finally { setBusyId(null); }
   };
+  const [announcement, setAnnouncement] = useState("");
+
+  /**
+   * D23's second half — **the standing coupling, said out loud.**
+   *
+   * Hiding a FACTION page also removes the party's standing with it from the players' view, because the
+   * standing projection gates on the faction page's own reveal flag. That happened silently. Detection
+   * needs no new field: a standing row's `id` IS its faction page's id, so the warning fires exactly when
+   * this page row's id appears among the standing section's ids.
+   */
+  const standingFactionIds = useMemo(
+    () => new Set((audit?.sections.find((section) => section.kind === "standing")?.rows ?? []).map((row) => row.id)),
+    [audit]
+  );
 
   /**
    * All seven kinds, in this file's order, each resolved against what the server actually sent.
@@ -139,9 +175,8 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
 
   return (
     <>
-      {/* The way out, ABOVE the content — the session and quest logs' exit row verbatim. §4: `Button
-          size="sm"` is a `@vtt/ui` primitive and carries the 44px floor itself; the wrapper is layout. */}
-      <div className="codex-sessions-exit"><Button variant="ghost" size="sm" onClick={onClose}>‹ Back to the Codex</Button></div>
+      {/* No exit row: since D1 the sidebar is always on screen, so every section is one tap from every
+          other one and a per-surface "back" would be a second navigation system. */}
       <div className="codex-audit">
         <header className="codex-audit-head">
           <h3 className="codex-audit-title">Everything shared with players</h3>
@@ -153,6 +188,9 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
         </header>
 
         {error && <Alert tone="danger" title="Couldn't read what players can see">{error}</Alert>}
+        {/* Polite, so the undo affordance is announced to a screen reader rather than only implied by a
+            switch that changed position. */}
+        <span className="nh-sr-only" role="status">{announcement}</span>
         {/* A kind the answer did not carry is called out ONCE at the top and again in place below. An
             audit with a silent hole in it is worse than no audit — the GM would read "nothing revealed"
             for a category nobody actually answered. */}
@@ -188,9 +226,9 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
                          where a `::after` hit box overhangs into the neighbouring row and steals its tap.
                          `.codex-audit-row` carries `min-height`, and the button inside it is `Button` at
                          its DEFAULT size — 44px of real paint and no `::after` at all. */
-                      <div key={`${kind}:${row.id}`} className="codex-audit-row">
+                      <div key={`${kind}:${row.id}`} className={`codex-audit-row${justHidden.has(`${kind}:${row.id}`) ? " is-hidden" : ""}`}>
                         {/* WHICH kind of chronicle record this is — the fix for the one thing this screen
-                            could not say. The section heading is "Chronicle records" because one journal
+                            could not say. The section heading is "Journal entries" because one journal
                             table carries six kinds, so a revealed deadline and a revealed note read
                             identically here the moment either had prose of its own — on the surface whose
                             entire job is answering "is that deadline visible?".
@@ -205,10 +243,12 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
                           return <Badge tone={journalMeta.tone}>{journalMeta.label}</Badge>;
                         })()}
                         <span className="codex-list-title">{row.title}</span>
-                        <Button variant="ghost" disabled={busyId === `${kind}:${row.id}`}
-                          aria-label={meta.hideLabel(row.title)} onClick={() => hide(kind, row.id)}>
-                          {busyId === `${kind}:${row.id}` ? "Hiding…" : "Hide"}
-                        </Button>
+                        <RevealSwitch revealed={!justHidden.has(`${kind}:${row.id}`)}
+                          ariaLabel={meta.hideLabel(row.title)}
+                          onChange={(next) => {
+                            if (!next && kind === "page" && standingFactionIds.has(row.id)) { setPendingFaction({ id: row.id, title: row.title }); return; }
+                            void setRevealed(kind, row.id, row.title, next);
+                          }} />
                       </div>
                     ))}
                   </div>
@@ -217,6 +257,16 @@ export function RevealAudit({ gmToken, onClose }: Readonly<{ gmToken: string; on
           );
         })}
       </div>
+      {/* D23: the coupling, before it happens rather than after. */}
+      {pendingFaction && (
+        <Modal open onClose={() => setPendingFaction(null)} size="sm" title={`Hide ${pendingFaction.title} from players?`} ariaLabel="Hide this faction page"
+          footer={<>
+            <Button variant="ghost" onClick={() => setPendingFaction(null)}>Cancel</Button>
+            <Button variant="primary" onClick={() => { const faction = pendingFaction; setPendingFaction(null); void setRevealed("page", faction.id, faction.title, false); }}>Hide page</Button>
+          </>}>
+          <p>Your standing with them stops being shown to players as well. A standing is only shown while its faction page is.</p>
+        </Modal>
+      )}
     </>
   );
 }

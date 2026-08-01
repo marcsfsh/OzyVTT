@@ -76,23 +76,51 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   hourglass: <path d="M5 2h14v1.9h-1.7L12 9.8 6.7 3.9H5zm1.7 20L12 14.2 17.3 20H19v2H5v-2z" />,
   sun: <path fillRule="evenodd" d="M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM11 1h2v3.4h-2zm0 18.6h2V23h-2zM1 11h3.4v2H1zm18.6 0H23v2h-3.4zM4.2 4.2l2.4 2.4L5.2 8 2.8 5.6zm13.2 13.2 2.4 2.4-1.4 1.4-2.4-2.4zM19.8 4.2 21.2 5.6l-2.4 2.4-1.4-1.4zM6.6 17.4 8 18.8l-2.4 2.4-1.4-1.4z" />,
 
+  // Sidebar navigation (D1). Silhouette style like the rest, on the same 0 0 24 24 grid, so a nav item
+  // and a marker glyph never read as two icon systems.
+  home: <path d="M12 2.6 2.5 11l1.4 1.6L5 11.6V21a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9.4l1.1 1L21.5 11z" />,
+  graph: <><path d="M6 4.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6zm12 0a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6zM12 14.4a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z" /><path d="m7.3 8.6 4.1 6-1.4 1-4.1-6zm9.4 0 1.4 1-4.1 6-1.4-1zM8.6 6.1h6.8v1.8H8.6z" /></>,
+  sessions: <><path d="M4 4h11a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2z" /><path d="M18 6.5h2V22h-2z" /><path d="M7 7.5h6v1.6H7zm0 3.4h6v1.6H7z" /></>,
+  book: <path fillRule="evenodd" d="M4 3.4h6a3 3 0 0 1 2 .8 3 3 0 0 1 2-.8h6a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-6a1.4 1.4 0 0 0-1.2.7h-1.6A1.4 1.4 0 0 0 10 19.4H4a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1zm1 2v12h5a3 3 0 0 1 1 .2V6.9A1.6 1.6 0 0 0 10 5.4zm14 0h-5a1.6 1.6 0 0 0-1 1.5v10.7a3 3 0 0 1 1-.2h5z" />,
+  calendar: <path fillRule="evenodd" d="M7 2h2v2h6V2h2v2h2a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h2zm-1 7v10h12V9zm2 2h3v3H8zm5 0h3v3h-3z" />,
+  archive: <path fillRule="evenodd" d="M3 4h18v4H3zm1.5 5.6h15V20a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1zM9 12h6v1.9H9z" />,
+  gear: <path fillRule="evenodd" d="m10.3 2 -.4 2.4a7.9 7.9 0 0 0-1.8 1L5.8 4.6 4 7.8l1.9 1.5a7.9 7.9 0 0 0 0 2.1L4 12.9l1.8 3.2 2.3-.8a7.9 7.9 0 0 0 1.8 1l.4 2.4h3.4l.4-2.4a7.9 7.9 0 0 0 1.8-1l2.3.8 1.8-3.2-1.9-1.5a7.9 7.9 0 0 0 0-2.1L20 7.8l-1.8-3.2-2.3.8a7.9 7.9 0 0 0-1.8-1L13.7 2zM12 8.6a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8z" />,
+  mask: <path fillRule="evenodd" d="M12 3c4 0 8 1.1 8 2.6 0 5-1.4 9.2-4.3 11.9A5.5 5.5 0 0 1 12 19a5.5 5.5 0 0 1-3.7-1.5C5.4 14.8 4 10.6 4 5.6 4 4.1 8 3 12 3zM8.4 8.4a1.6 1.9 0 1 0 0 3.8 1.6 1.9 0 0 0 0-3.8zm7.2 0a1.6 1.9 0 1 0 0 3.8 1.6 1.9 0 0 0 0-3.8zM9.5 14.6h5a2.6 2.6 0 0 1-5 0z" />,
+  menu: <path d="M3 5.6h18v2.2H3zm0 5.3h18v2.2H3zm0 5.3h18v2.2H3z" />,
+  /* The sidebar's Search entry and the phone top bar's search button both used to draw the EYE — the
+     glyph this product uses for visibility, and the same one "Reveal audit" carries two groups below.
+     The path is `@vtt/ui`'s own `IconSearch`, kept here because this registry is what CodexIcon reads. */
+  search: <path fillRule="evenodd" d="M10.5 3a7.5 7.5 0 1 0 4.55 13.46l4.24 4.25 1.42-1.42-4.25-4.24A7.5 7.5 0 0 0 10.5 3zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z" />,
+
   // Utility (editor toolbar + notebook tree - not in the marker picker)
   image: <path fillRule="evenodd" d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm2 2v7.6l3.6-3.6 3 3 2-2L20 15V6zM8.2 7.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z" />,
   "folder-plus": <path fillRule="evenodd" d="M4 5h4l2 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM11 11.5h2v2h2.5v3H13v2h-2v-2H8.5v-3H11z" />,
   trash: <path fillRule="evenodd" d="M10 3h4a1 1 0 0 1 1 1v1h5v2H4V5h5V4a1 1 0 0 1 1-1zM6.5 8h11l-.9 11.6a1.5 1.5 0 0 1-1.5 1.4H8.9a1.5 1.5 0 0 1-1.5-1.4zm3.5 3v7h1.4v-7zm3 0v7h1.4v-7z" />
 };
 
-/** Marker-picker groupings (a curated subset - the registry holds more, incl. entity glyphs). */
+/** Pin-picker groupings (a curated subset - the registry holds more, incl. entity glyphs). */
 export const ICON_CATEGORIES: ReadonlyArray<{ label: string; ids: readonly string[] }> = [
   { label: "Settlements", ids: ["village", "town", "city", "capital", "castle", "fort", "tower", "watchtower"] },
   { label: "Structures", ids: ["temple", "shrine", "lighthouse", "gate", "bridge", "mine", "ruin", "obelisk"] },
   { label: "Wilds", ids: ["mountain", "hills", "volcano", "forest", "tree", "water", "river", "swamp", "island", "desert", "cave"] },
   { label: "Sites", ids: ["dungeon", "portal", "henge", "statue", "graveyard", "battle", "camp", "campfire", "treasure", "ship", "anchor", "road"] },
-  { label: "Markers", ids: ["pin", "flag", "star", "quest", "danger", "skull", "eye", "compass"] }
+  { label: "Symbols", ids: ["pin", "flag", "star", "quest", "danger", "skull", "eye", "compass"] }
 ];
 
-/** Marker color palette (data values, echoing the design language's neon + support hues). */
+/**
+ * D25: the pin palette the picker OFFERS is tokenized (`--pin-1 … --pin-8` in `design-tokens.css`), so
+ * the light theme can darken them for contrast without eight hex values living in a component.
+ *
+ * Pin colour persistence stays **hex on the wire** — the server stores `#rrggbb` and no API changed — so
+ * `MARKER_COLORS` remains the list of stored values and `pinSwatchVar` is how a swatch paints itself. An
+ * already-stored hex outside this list still renders as itself; only the offered palette is tokenized.
+ */
 export const MARKER_COLORS: readonly string[] = ["#FF2E9A", "#2DE2FF", "#A45CFF", "#FF2D5E", "#FFB020", "#57E39A", "#E8ECF4", "#94A3B8"];
+/** The token that paints a palette colour, or the raw stored value for a colour outside the palette. */
+export function pinSwatchVar(color: string): string {
+  const index = MARKER_COLORS.indexOf(color);
+  return index === -1 ? color : `var(--pin-${index + 1})`;
+}
 
 export const DEFAULT_ICON = "pin";
 export const DEFAULT_COLOR = MARKER_COLORS[0];
@@ -114,9 +142,11 @@ export function EntityIcon({ type, className }: Readonly<{ type: EntityType | un
 export function IconPicker({ iconId, color, onIcon, onColor }: Readonly<{ iconId: string; color: string; onIcon: (id: string) => void; onColor: (color: string) => void }>) {
   return (
     <div className="codex-iconpicker">
-      <div className="codex-swatches" role="group" aria-label="Marker color">
-        {MARKER_COLORS.map((swatch) => (
-          <button key={swatch} type="button" className={`codex-swatch${swatch === color ? " is-active" : ""}`} style={{ color: swatch }} aria-label={`Color ${swatch}`} aria-pressed={swatch === color} onClick={() => onColor(swatch)}>
+      {/* §4 route 2: 32px paint + `.tap-target`, gapped by `--space-3` (6px overhang each side — the
+          budget the design language's worked example uses for exactly this shape). */}
+      <div className="codex-swatches" role="group" aria-label="Pin colour">
+        {MARKER_COLORS.map((swatch, index) => (
+          <button key={swatch} type="button" className={`codex-swatch tap-target${swatch === color ? " is-active" : ""}`} style={{ color: pinSwatchVar(swatch) }} aria-label={`Colour ${index + 1}`} aria-pressed={swatch === color} onClick={() => onColor(swatch)}>
             <span className="codex-swatch-dot" />
           </button>
         ))}

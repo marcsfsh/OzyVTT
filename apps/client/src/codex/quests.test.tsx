@@ -67,7 +67,7 @@ vi.mock("./api", async (importOriginal) => {
       calendar: (...a: unknown[]) => getCalendar(...a),
       listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a), chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listRelationships: (...a: unknown[]) => playerListRelationships(...a), listLinks: (...a: unknown[]) => playerListLinks(...a),
+      listConnections: (...a: unknown[]) => playerListRelationships(...a), party: (...a: unknown[]) => playerListLinks(...a),
       sessions: (...a: unknown[]) => playerSessions(...a), quests: (...a: unknown[]) => playerQuests(...a),
       search: (...a: unknown[]) => playerSearch(...a)
     }
@@ -75,7 +75,8 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { goTo } from "../../test/route";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import { openQuests, questProgress } from "./quests";
 import type { CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from "./api";
@@ -104,7 +105,7 @@ const QUEST = (over: Partial<CodexQuest> = {}): CodexQuest => ({
   playerBody: "The burgomaster wants the crown returned.",
   gmBody: "The crown is a phylactery and the burgomaster knows it.",
   objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
-  entityIds: [], revealedToPlayers: false, rev: 3,
+  entityIds: [], revealedToPlayers: false, tags: [], rev: 3,
   createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-02T00:00:00.000Z", ...over
 });
 const OPEN = QUEST();
@@ -123,10 +124,10 @@ const OTHER = QUEST({
 const gmDefaults = (quests: CodexQuest[] = [OPEN, OTHER, DONE, LOST]) => {
   listPages.mockResolvedValue([]);
   listRelationships.mockResolvedValue([]);
-  listLinks.mockResolvedValue([]);
+  listLinks.mockResolvedValue(null);
   listFolders.mockResolvedValue([]);
-  getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
-  search.mockResolvedValue([]);
+  getPage.mockResolvedValue({ page: null, connections: [] });
+  search.mockResolvedValue({ hits: [], truncated: false });
   markersForPage.mockResolvedValue([]);
   forPage.mockResolvedValue([]);
   timeline.mockResolvedValue([]);
@@ -139,7 +140,7 @@ const gmDefaults = (quests: CodexQuest[] = [OPEN, OTHER, DONE, LOST]) => {
   listQuests.mockResolvedValue(quests);
 };
 const renderWorkspace = async () => {
-  render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+  (goTo("/codex/quests"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
   await waitFor(() => expect(listQuests).toHaveBeenCalled());
 };
 
@@ -171,7 +172,7 @@ describe("The dashboard's open-quests card (M10)", () => {
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await user.click(screen.getByRole("button", { name: "Home" }));
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
     expect(card.getByText("The Sunless Crown")).toBeInTheDocument();
     expect(card.getByText("The Amber Temple")).toBeInTheDocument();
@@ -187,10 +188,10 @@ describe("The dashboard's open-quests card (M10)", () => {
 
     // R1: "prepared" means the record is OPEN, not merely highlighted — the log is on that quest, the
     // other rows are unmarked, and the GM half of the record is on screen and editable.
-    const log = within(await screen.findByRole("navigation", { name: "Quest log" }));
+    const log = within(await screen.findByRole("navigation", { name: "Quests" }));
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("textbox", { name: /Where this is really going/ })).toHaveValue("The vestiges are still bargaining.");
+    expect(screen.getByRole("textbox", { name: /GM notes/ })).toHaveValue("The vestiges are still bargaining.");
 
     // The card is a view: one read for the whole workspace, and no write anywhere on the way here.
     expect(listQuests).toHaveBeenCalledTimes(1);
@@ -208,24 +209,24 @@ describe("The dashboard's open-quests card (M10)", () => {
      * without the clear existing at all.
      */
     gmDefaults();
-    search.mockResolvedValue([{ kind: "quest", id: "q4", title: "The Amber Temple", tags: [], entityType: null, mapId: null } as CodexSearchHit]);
+    search.mockResolvedValue({ hits: [{ kind: "quest", id: "q4", title: "The Amber Temple", tags: [], entityType: null, mapId: null } as CodexSearchHit], truncated: false });
     const user = userEvent.setup();
     await renderWorkspace();
 
     const jumpViaPalette = async () => {
-      await user.click(screen.getByRole("button", { name: "Search" }));
-      const palette = within(screen.getByRole("dialog", { name: "Codex command palette" }));
-      await user.type(palette.getByLabelText("Command palette"), "temple");
+      await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+      const palette = within(await screen.findByRole("dialog", { name: "Codex command palette" }));
+      await user.type(palette.getByLabelText("Search the Codex"), "temple");
       await user.click(await palette.findByText("The Amber Temple"));
     };
 
     await jumpViaPalette();
-    const log = within(await screen.findByRole("navigation", { name: "Quest log" }));
+    const log = within(await screen.findByRole("navigation", { name: "Quests" }));
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
 
     // The GM backs out to the list — `selectedId` becomes an explicit null, so nothing can quietly
     // re-select the quest and the second landing is the latch's work alone.
-    await user.click(screen.getByRole("button", { name: "‹ All quests" }));
+    await user.click(screen.getByRole("button", { name: "All quests" }));
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).not.toHaveAttribute("aria-current"));
 
     await jumpViaPalette();
@@ -242,15 +243,17 @@ describe("The GM's objective checklist (M10)", () => {
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Quests" }));
+    await user.click(screen.getAllByRole("button", { name: "Quests" })[0]);
+    await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
     const list = within(await screen.findByRole("list", { name: "Objectives" }));
     expect(list.getAllByRole("checkbox")).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "Add objective" }));
     expect(within(screen.getByRole("list", { name: "Objectives" })).getAllByRole("checkbox")).toHaveLength(3);
-    await user.click(screen.getByRole("button", { name: "Save quest" }));
 
-    await waitFor(() => expect(updateQuest).toHaveBeenCalled());
+    // D6: no Save button to press — the edit saves itself on the autosave debounce (1s by default,
+    // which is the shipped cadence). The blank row still has to survive the round trip in position.
+    await waitFor(() => expect(updateQuest).toHaveBeenCalled(), { timeout: 3000 });
     const [, , input] = updateQuest.mock.calls[0] as [string, string, { objectives: readonly { text: string; done: boolean }[]; expectedRev: number }];
     expect(input.objectives).toEqual([
       { text: "Find the crypt", done: true },
@@ -267,12 +270,14 @@ describe("The GM's objective checklist (M10)", () => {
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Quests" }));
+    await user.click(screen.getAllByRole("button", { name: "Quests" })[0]);
+    await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
     await screen.findByRole("list", { name: "Objectives" });
+    // G6: THE regression this milestone's autosave exists for — a tick used to be lost unless the GM
+    // also pressed Save, on the one surface where the tick IS the work.
     await user.click(screen.getByRole("checkbox", { name: "Open the sarcophagus done" }));
-    await user.click(screen.getByRole("button", { name: "Save quest" }));
 
-    await waitFor(() => expect(updateQuest).toHaveBeenCalled());
+    await waitFor(() => expect(updateQuest).toHaveBeenCalled(), { timeout: 3000 });
     const [, , input] = updateQuest.mock.calls[0] as [string, string, { objectives: readonly { text: string; done: boolean }[] }];
     // A done item is not promoted, demoted or dropped — the GM's sequence is the meaning.
     expect(input.objectives).toEqual([
@@ -291,14 +296,14 @@ const PLAYER_QUEST: PlayerCodexQuest = {
   id: "q1", title: "The Sunless Crown", status: "active",
   body: "The burgomaster wants the crown returned.",
   objectives: [{ text: "Find the crypt", done: true }, { text: "Open the sarcophagus", done: false }],
-  entityIds: []
+  entityIds: [], tags: []
 };
 /** The quest the reader exists for: finished, so the open-quests card never lists it. */
 const PLAYER_DONE: PlayerCodexQuest = {
   id: "q2", title: "The Bell of Vallaki", status: "completed",
-  body: "The bell was hauled back up the hill.", objectives: [{ text: "Raise the bell", done: true }], entityIds: []
+  body: "The bell was hauled back up the hill.", objectives: [{ text: "Raise the bell", done: true }], entityIds: [], tags: []
 };
-const PLAYER_LOST: PlayerCodexQuest = { id: "q3", title: "The Missing Caravan", status: "failed", body: "", objectives: [], entityIds: [] };
+const PLAYER_LOST: PlayerCodexQuest = { id: "q3", title: "The Missing Caravan", status: "failed", body: "", objectives: [], entityIds: [], tags: [] };
 
 const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
   playerListPages.mockResolvedValue([]);
@@ -306,9 +311,9 @@ const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
   playerListMarkers.mockResolvedValue([]);
   playerChronicle.mockResolvedValue([]);
   playerListRelationships.mockResolvedValue([]);
-  playerListLinks.mockResolvedValue([]);
+  playerListLinks.mockResolvedValue(null);
   playerSessions.mockResolvedValue([]);
-  playerSearch.mockResolvedValue([]);
+  playerSearch.mockResolvedValue({ hits: [], truncated: false });
   getCalendar.mockResolvedValue(CALENDAR);
   playerQuests.mockResolvedValue(quests);
 };
@@ -317,7 +322,7 @@ describe("The player's copy of the card (M10, viewer safety)", () => {
   beforeEach(() => { playerDefaults(); });
 
   it("shows progress and never a tickable box — no checkbox, no field, nothing focusable", async () => {
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
     expect(card.getByText("The Sunless Crown")).toBeInTheDocument();
@@ -354,7 +359,7 @@ describe("The player's copy of the card (M10, viewer safety)", () => {
       playerBody: "a GM-shaped duplicate of the hook",
       revealedToPlayers: true, rev: 3
     }]);
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
     expect(card.getByText("The Sunless Crown")).toBeInTheDocument();          // the legitimate keys render...
@@ -368,9 +373,9 @@ describe("The player's copy of the card (M10, viewer safety)", () => {
     // A player is sent a revealed quest whatever its status, so "open" is decided on this side for both
     // audiences — the player's card must not be the one place a completed quest lingers.
     playerDefaults([PLAYER_DONE]);
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
-    await screen.findByRole("heading", { name: "By type" });
+    await screen.findByRole("heading", { name: "By kind" });
     expect(screen.queryByRole("navigation", { name: "Open quests" })).not.toBeInTheDocument();
     expect(screen.queryByText("The Bell of Vallaki")).not.toBeInTheDocument();
   });
@@ -398,7 +403,7 @@ describe("The player's quest reader", () => {
   it("opens a quest from the dashboard and reads it — title, status, description, objectives", async () => {
     playerDefaults();
     const user = userEvent.setup();
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
     await user.click(card.getByRole("button", { name: /The Sunless Crown/ }));
@@ -419,15 +424,24 @@ describe("The player's quest reader", () => {
     expect(objectives.getByText("Find the crypt")).toBeInTheDocument();
     expect(objectives.getByText("— done")).toBeInTheDocument();
     expect(objectives.getByText("— not done")).toBeInTheDocument();
-    // Read-only, on the same terms as the card: nothing here is operable, anywhere on the surface.
+    /**
+     * Read-only, on the same terms as the card: **nothing on this surface can change a quest.**
+     *
+     * Scoped to the reader for the textbox, and deliberately: D10 gave the player's rail the same
+     * in-place filter the GM's has, so there is now exactly one text input on the screen and it is that
+     * filter. Asserting "no textbox anywhere" would forbid a control that writes nothing — so the claim
+     * is stated as it is meant: no writable control in the reader, no checkbox anywhere (an objective a
+     * player could tick would be a real write), and the one input outside it is the filter by name.
+     */
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
-    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+    expect(reader.queryAllByRole("textbox")).toHaveLength(0);
+    expect(screen.getAllByRole("textbox").map((box) => box.getAttribute("aria-label"))).toEqual(["Filter quests"]);
   });
 
   it("is where the FINISHED quests live — the dashboard card stays open-only", async () => {
     playerDefaults([PLAYER_QUEST, PLAYER_DONE, PLAYER_LOST]);
     const user = userEvent.setup();
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     // The card is untouched by this change: still open-only, both finished states absent, and they are
     // separate assertions because they fail separately.
@@ -456,16 +470,16 @@ describe("The player's quest reader", () => {
      * record they searched for. Nothing about this test can pass by accident on the old behaviour.
      */
     playerDefaults([PLAYER_DONE]);
-    playerSearch.mockResolvedValue([{ kind: "quest", id: "q2", title: "The Bell of Vallaki", tags: [], entityType: null, mapId: null } as CodexSearchHit]);
+    playerSearch.mockResolvedValue({ hits: [{ kind: "quest", id: "q2", title: "The Bell of Vallaki", tags: [], entityType: null, mapId: null } as CodexSearchHit], truncated: false });
     const user = userEvent.setup();
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
-    await screen.findByRole("heading", { name: "By type" });
+    await screen.findByRole("heading", { name: "By kind" });
     expect(screen.queryByRole("navigation", { name: "Open quests" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "Lore" }));
-    await user.type(screen.getByLabelText("Search the codex"), "bell");
-    const results = within(screen.getByRole("navigation", { name: "Revealed pages" }));
+    await user.click(screen.getByRole("button", { name: "Pages" }));
+    await user.type(screen.getAllByLabelText("Search the Codex")[0], "bell");
+    const results = within(screen.getByRole("navigation", { name: "Pages" }));
     // R2: the row names its kind as a word before it is ever tapped.
     expect(await results.findByText("Quest")).toBeInTheDocument();
     await user.click(results.getByText("The Bell of Vallaki"));
@@ -474,9 +488,13 @@ describe("The player's quest reader", () => {
     expect(reader.getByRole("heading", { name: /The Bell of Vallaki/ })).toBeInTheDocument();
     expect(reader.getByText("Completed")).toBeInTheDocument();
     expect(reader.getByText("The bell was hauled back up the hill.")).toBeInTheDocument();
-    // The mode bar stays honest about where the jump landed: a quest is part of the campaign, and
-    // "Campaign" is the tab lit — the reader is a destination over that mode, not a sixth tab.
-    expect(screen.getByRole("tab", { name: "Campaign" })).toHaveAttribute("aria-selected", "true");
+    // D1/D3 replaced the mode bar with the sidebar, and the answer got BETTER: the jump lands on
+    // `/codex/quests/q2`, so the lit item is Quests — the destination the reader actually belongs to —
+    // rather than the old "Campaign" tab that was the nearest available lie. Home must be dark.
+    expect(window.location.pathname).toBe("/codex/quests/q2");
+    const sidebar = within(screen.getByRole("navigation", { name: "Codex sections" }));
+    expect(sidebar.getByRole("button", { name: "Quests" })).toHaveAttribute("aria-current", "page");
+    expect(sidebar.getByRole("button", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
   /**
@@ -494,7 +512,7 @@ describe("The player's quest reader", () => {
       revealedToPlayers: true, rev: 3
     }]);
     const user = userEvent.setup();
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
     await user.click(card.getByRole("button", { name: /The Sunless Crown/ }));
@@ -519,17 +537,19 @@ describe("A quest in suite-wide search (M10)", () => {
 
   it("names its kind in TEXT and opens the quest log ON that quest", async () => {
     gmDefaults();
-    search.mockResolvedValue([HIT]);
+    search.mockResolvedValue({ hits: [HIT], truncated: false });
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.type(screen.getByLabelText("Search the notebook"), "temple");
-    const results = within(await screen.findByRole("navigation", { name: "Campaign notebook" }));
+    // D20 recut: suite-wide search is the palette, not a rail box that happened to search everything.
+    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+    const results = within(await screen.findByRole("dialog", { name: "Codex command palette" }));
+    await user.type(results.getByLabelText("Search the Codex"), "temple");
     // R2: the row says "Quest" as a word — remove every colour and the list still reads correctly.
     expect(await results.findByText("Quest")).toBeInTheDocument();
 
     await user.click(results.getByText("The Amber Temple"));
-    const log = within(await screen.findByRole("navigation", { name: "Quest log" }));
+    const log = within(await screen.findByRole("navigation", { name: "Quests" }));
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
   });

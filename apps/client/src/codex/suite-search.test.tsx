@@ -40,8 +40,8 @@ vi.mock("./api", async (importOriginal) => {
     codexApi: {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
-      listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a),
+      listConnections: (...a: unknown[]) => listRelationships(...a),
+      party: (...a: unknown[]) => listLinks(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
@@ -65,14 +65,15 @@ vi.mock("./api", async (importOriginal) => {
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
       chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listRelationships: (...a: unknown[]) => playerListRelationships(...a),
-      listLinks: (...a: unknown[]) => playerListLinks(...a)
+      listConnections: (...a: unknown[]) => playerListRelationships(...a),
+      party: (...a: unknown[]) => playerListLinks(...a)
     }
   };
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { goTo } from "../../test/route";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker, CodexSearchHit, PlayerCodexMap, PlayerCodexMarker } from "./api";
 
@@ -108,29 +109,29 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 /** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape. */
 const RECORD = (id: string, text: string): CodexChronicleRecord => ({
   kind: "entry", id, title: null, text, gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 
-const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 /** Type into the rail's search box and wait for the result list to settle. */
 const searchInRail = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
-  await user.type(screen.getByLabelText("Search the notebook"), query);
+  await user.type(screen.getAllByLabelText("Search the Codex")[0], query);
 };
-const railResults = () => screen.getByRole("navigation", { name: "Campaign notebook" });
+const railResults = () => screen.getByRole("navigation", { name: "Campaign pages" });
 
 describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
-    search.mockResolvedValue(HITS);
+    getPage.mockResolvedValue({ page: null, connections: [] });
+    search.mockResolvedValue({ hits: HITS, truncated: false });
   });
 
   it("shows all four record kinds in ONE list", async () => {
@@ -138,7 +139,7 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
     renderWorkspace();
     await searchInRail(user, "barovia");
 
-    const results = within(await screen.findByRole("navigation", { name: "Campaign notebook" }));
+    const results = within(await screen.findByRole("navigation", { name: "Campaign pages" }));
     expect(await results.findByText("Strahd von Zarovich")).toBeInTheDocument();
     expect(results.getByText("The party crossed the mists.")).toBeInTheDocument();
     expect(results.getByText("Barovia")).toBeInTheDocument();
@@ -150,12 +151,12 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
     renderWorkspace();
     await searchInRail(user, "barovia");
 
-    const results = within(await screen.findByRole("navigation", { name: "Campaign notebook" }));
+    const results = within(await screen.findByRole("navigation", { name: "Campaign pages" }));
     // A page reads as its entity type — the name the rest of the suite already calls it.
     expect(await results.findByText("Character")).toBeInTheDocument();
     expect(results.getByText("Journal")).toBeInTheDocument();
     expect(results.getByText("Map")).toBeInTheDocument();
-    expect(results.getByText("Marker")).toBeInTheDocument();
+    expect(results.getByText("Pin")).toBeInTheDocument();
   });
 
   it("says the search FAILED rather than claiming nothing matched (R4)", async () => {
@@ -170,12 +171,12 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
   });
 
   it("still reports a genuinely empty result set (the error state must not swallow it)", async () => {
-    search.mockResolvedValue([]);
+    search.mockResolvedValue({ hits: [], truncated: false });
     const user = userEvent.setup();
     renderWorkspace();
     await searchInRail(user, "barovia");
 
-    expect(await screen.findByText("Nothing in the codex matches.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing in the Codex matches.")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
@@ -184,12 +185,12 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
-    search.mockResolvedValue(HITS);
+    getPage.mockResolvedValue({ page: null, connections: [] });
+    search.mockResolvedValue({ hits: HITS, truncated: false });
     listMaps.mockResolvedValue([MAP_OTHER, MAP_TARGET]);
     listAssets.mockResolvedValue([]);
     listMarkers.mockImplementation(async (_token: string, mapId: string) => (mapId === "m1" ? [MARKER] : []));
@@ -204,14 +205,14 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
     await searchInRail(user, "svalich");
     await user.click(await screen.findByText("Old Svalich Road"));
 
-    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     // Half one — the pin's OWN map is open, not the atlas's default first map.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })).toBeInTheDocument();
     // Half two — the pin itself is selected: its inspector is open on the right marker, and the surface
     // has been told which pin to mark.
-    expect(await screen.findByRole("complementary", { name: "Marker" })).toBeInTheDocument();
+    expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
     expect(surface).toHaveAttribute("data-selected", "k1");
   });
@@ -222,11 +223,11 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
     await searchInRail(user, "barovia");
     await user.click(await screen.findByText("Barovia"));
 
-    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(surface).toHaveAttribute("data-selected", "");
-    expect(screen.queryByRole("complementary", { name: "Marker" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Pin" })).not.toBeInTheDocument();
   });
 
   it("a JOURNAL hit lands on the Journal with that entry marked", async () => {
@@ -235,7 +236,7 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
     await searchInRail(user, "mists");
     await user.click(await screen.findByText("The party crossed the mists."));
 
-    expect(screen.getByRole("tab", { name: "Journal" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
     await waitFor(() => expect(document.getElementById("codex-entry-j1")).toHaveAttribute("aria-current", "true"));
     expect(document.getElementById("codex-entry-j0")).not.toHaveAttribute("aria-current");
   });
@@ -243,14 +244,14 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
   it("a PAGE hit stays on Pages and opens the page", async () => {
     getPage.mockResolvedValue({
       page: { id: "p1", title: "Strahd von Zarovich", entityType: "character", fields: {}, gmFields: {}, folder: null, tags: [], revealedToPlayers: false, bannerAssetId: null, rev: 1, playerBody: "", gmBody: "", createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" },
-      backlinks: [], relationships: []
+      connections: []
     });
     const user = userEvent.setup();
     renderWorkspace();
     await searchInRail(user, "strahd");
     await user.click(await screen.findByText("Strahd von Zarovich"));
 
-    expect(screen.getByRole("tab", { name: "Pages" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");
     await waitFor(() => expect(getPage).toHaveBeenCalledWith("gm", "p1"));
   });
 });
@@ -259,12 +260,12 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
-    search.mockResolvedValue(HITS);
+    getPage.mockResolvedValue({ page: null, connections: [] });
+    search.mockResolvedValue({ hits: HITS, truncated: false });
     listMaps.mockResolvedValue([MAP_OTHER, MAP_TARGET]);
     listAssets.mockResolvedValue([]);
     listMarkers.mockImplementation(async (_token: string, mapId: string) => (mapId === "m1" ? [MARKER] : []));
@@ -273,9 +274,12 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
 
   const openPalette = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Search" }));
-    await user.type(screen.getByLabelText("Command palette"), query);
-    return within(screen.getByRole("dialog", { name: "Codex command palette" }));
+    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+    // Two boxes carry the same name — the rail's and the palette's — because they are the same search.
+    // The palette's is the one inside the dialog.
+    const palette = within(await screen.findByRole("dialog", { name: "Codex command palette" }));
+    await user.type(palette.getByLabelText("Search the Codex"), query);
+    return palette;
   };
 
   it("renders all four kinds, with the same kind labels the rail uses", async () => {
@@ -290,7 +294,7 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
     expect(palette.getByText("Character")).toBeInTheDocument();
     expect(palette.getByText("Journal")).toBeInTheDocument();
     expect(palette.getByText("Map")).toBeInTheDocument();
-    expect(palette.getByText("Marker")).toBeInTheDocument();
+    expect(palette.getByText("Pin")).toBeInTheDocument();
   });
 
   it("opens a marker from the palette with the same prepared destination as the rail", async () => {
@@ -299,7 +303,7 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
     const palette = await openPalette(user, "svalich");
     await user.click(await palette.findByText("Old Svalich Road"));
 
-    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(surface).toHaveAttribute("data-selected", "k1");
@@ -327,27 +331,27 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     playerListMaps.mockResolvedValue([PLAYER_OTHER, PLAYER_MAP]);
     playerChronicle.mockResolvedValue([]);
     playerListRelationships.mockResolvedValue([]);
-    playerListLinks.mockResolvedValue([]);
+    playerListLinks.mockResolvedValue(null);
     playerListMarkers.mockResolvedValue([PLAYER_MARKER]);
     // The server has ALREADY dropped everything this player may not see; the client renders what arrives.
-    playerSearch.mockResolvedValue([HIT_MAP, HIT_MARKER]);
+    playerSearch.mockResolvedValue({ hits: [HIT_MAP, HIT_MARKER], truncated: false });
   });
 
   const searchAsPlayer = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Lore" }));
-    await user.type(screen.getByLabelText("Search the codex"), query);
+    await user.click(screen.getByRole("button", { name: "Pages" }));
+    await user.type(screen.getAllByLabelText("Search the Codex")[0], query);
   };
 
   it("renders the non-page kinds the server hands it — the client must not assume page-only", async () => {
     const user = userEvent.setup();
     await searchAsPlayer(user, "barovia");
 
-    const results = within(await screen.findByRole("navigation", { name: "Revealed pages" }));
+    const results = within(await screen.findByRole("navigation", { name: "Pages" }));
     expect(await results.findByText("Old Svalich Road")).toBeInTheDocument();
     expect(results.getByText("Barovia")).toBeInTheDocument();
-    expect(results.getByText("Marker")).toBeInTheDocument();
+    expect(results.getByText("Pin")).toBeInTheDocument();
     expect(results.getByText("Map")).toBeInTheDocument();
   });
 
@@ -356,7 +360,7 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     await searchAsPlayer(user, "svalich");
     await user.click(await screen.findByText("Old Svalich Road"));
 
-    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(surface).toHaveAttribute("data-selected", "k1");
@@ -368,7 +372,7 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     await searchAsPlayer(user, "barovia");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't reach the table.");
-    expect(screen.queryByText("Nothing you know matches that.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No pages match.")).not.toBeInTheDocument();
   });
 });
 
@@ -387,17 +391,17 @@ describe("Suite-wide search — one settled query, one request", () => {
   const gmMocks = () => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
+    getPage.mockResolvedValue({ page: null, connections: [] });
     listMaps.mockResolvedValue([]);
     listAssets.mockResolvedValue([]);
     listMarkers.mockResolvedValue([]);
     chronicle.mockResolvedValue([]);
     getCalendar.mockResolvedValue(CALENDAR);
-    search.mockResolvedValue(HITS);
+    search.mockResolvedValue({ hits: HITS, truncated: false });
   };
 
   it("the rail sends ONE request for a six-character query, not one per keystroke", async () => {
@@ -405,7 +409,7 @@ describe("Suite-wide search — one settled query, one request", () => {
     const user = userEvent.setup({ delay: null });
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.type(screen.getByLabelText("Search the notebook"), "strahd");
+    await user.type(screen.getAllByLabelText("Search the Codex")[0], "strahd");
 
     await waitFor(() => expect(search).toHaveBeenCalledWith("gm", "strahd"));
     expect(search).toHaveBeenCalledTimes(1);
@@ -418,26 +422,26 @@ describe("Suite-wide search — one settled query, one request", () => {
     const user = userEvent.setup({ delay: null });
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Search" }));
-    await user.type(screen.getByLabelText("Command palette"), "strahd");
+    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+    await user.type(within(await screen.findByRole("dialog", { name: "Codex command palette" })).getByLabelText("Search the Codex"), "strahd");
 
     await waitFor(() => expect(search).toHaveBeenCalledWith("gm", "strahd"));
     expect(search).toHaveBeenCalledTimes(1);
   });
 
-  it("the player Lore tab debounces too", async () => {
+  it("the player's Pages rail debounces too", async () => {
     playerListPages.mockResolvedValue([]);
     playerListMaps.mockResolvedValue([]);
     playerListMarkers.mockResolvedValue([]);
     playerChronicle.mockResolvedValue([]);
     playerListRelationships.mockResolvedValue([]);
-    playerListLinks.mockResolvedValue([]);
-    playerSearch.mockResolvedValue([HIT_MAP]);
+    playerListLinks.mockResolvedValue(null);
+    playerSearch.mockResolvedValue({ hits: [HIT_MAP], truncated: false });
     const user = userEvent.setup({ delay: null });
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Lore" }));
-    await user.type(screen.getByLabelText("Search the codex"), "barovia");
+    await user.click(screen.getByRole("button", { name: "Pages" }));
+    await user.type(screen.getAllByLabelText("Search the Codex")[0], "barovia");
 
     await waitFor(() => expect(playerSearch).toHaveBeenCalledWith("player", "barovia"));
     expect(playerSearch).toHaveBeenCalledTimes(1);
@@ -448,7 +452,7 @@ describe("Suite-wide search — one settled query, one request", () => {
     const user = userEvent.setup({ delay: null });
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    const box = screen.getByLabelText("Search the notebook");
+    const box = screen.getAllByLabelText("Search the Codex")[0];
     await user.type(box, "strahd");
     expect(await screen.findByText("Strahd von Zarovich")).toBeInTheDocument();
 

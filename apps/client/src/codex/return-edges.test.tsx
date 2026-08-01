@@ -15,6 +15,8 @@ const listPages = vi.fn();
 const listRelationships = vi.fn();
 const listLinks = vi.fn();
 const markersForPage = vi.fn();
+/** D15: the marker-by-id read that replaced the client-side scan of every map. */
+const markerById = vi.fn();
 const forPage = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
@@ -34,9 +36,10 @@ vi.mock("./api", async (importOriginal) => {
     codexApi: {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
-      listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a),
+      listConnections: (...a: unknown[]) => listRelationships(...a),
+      party: (...a: unknown[]) => listLinks(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a),
+      marker: (...a: unknown[]) => markerById(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
@@ -53,7 +56,8 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { goTo } from "../../test/route";
+import { CodexShell } from "./CodexShell";
 import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker } from "./api";
 
 /**
@@ -81,14 +85,14 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   id: "j1", playerText: "A battle was fought here.", gmText: null, revealedToPlayers: false, kind: "note",
   attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
 /** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape, not as raw entries. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "A battle was fought here.", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -100,12 +104,12 @@ const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Bar
 const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: [], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 
 const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>
-  render(<ToastProvider><CodexWorkspace gmToken="gm" onOpenReplay={onOpenReplay} /></ToastProvider>);
+  (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" onOpenReplay={onOpenReplay} /></ToastProvider>);
 
 /** Land on the Journal the way a GM does — via the mode bar — and wait for the chronicle to arrive. */
 const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
-  await user.click(screen.getByRole("tab", { name: "Journal" }));
+  await user.click(screen.getByRole("button", { name: "Journal" }));
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 
@@ -113,12 +117,14 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
+    // One read answers "which map is this pin on?" — the O(maps) scan is gone.
+    markerById.mockImplementation(async (_token: string, id: string) => (id === MARKER.id ? MARKER : Promise.reject(new Error("not found"))));
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
-    search.mockResolvedValue([]);
+    getPage.mockResolvedValue({ page: null, connections: [] });
+    search.mockResolvedValue({ hits: [], truncated: false });
     getCalendar.mockResolvedValue(CALENDAR);
     forMarker.mockResolvedValue([]);
     listAssets.mockResolvedValue([]);
@@ -132,16 +138,16 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
     renderWorkspace();
     await openJournal(user);
 
-    await user.click(await screen.findByRole("button", { name: "Open marker" }));
+    await user.click(await screen.findByRole("button", { name: "Open pin" }));
 
-    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     // Half one — the pin's map is open, not the atlas's default first map.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })).toBeInTheDocument();
     // Half two — the pin itself is selected: its inspector is open on the right marker, and the surface
     // has been told which pin to mark.
-    expect(await screen.findByRole("complementary", { name: "Marker" })).toBeInTheDocument();
+    expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
     expect(surface).toHaveAttribute("data-selected", "k1");
   });
@@ -149,13 +155,14 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
   it("says the pin is gone rather than silently landing on some other map (R4)", async () => {
     // The entry still names a pin the atlas no longer has — deleted since the battle was logged.
     chronicle.mockResolvedValue([RECORD({ attachMarkerId: "vanished" })]);
+    markerById.mockRejectedValue(new Error("The codex request failed (404)."));
     const user = userEvent.setup();
     renderWorkspace();
     await openJournal(user);
 
-    await user.click(await screen.findByRole("button", { name: "Open marker" }));
+    await user.click(await screen.findByRole("button", { name: "Open pin" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("That pin is no longer on any map in the atlas.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("That pin is no longer in the atlas.");
     expect(await screen.findByTestId("map-surface")).toHaveAttribute("data-selected", "");
   });
 
@@ -166,7 +173,7 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
     await openJournal(user);
 
     expect(await screen.findByText("A battle was fought here.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open marker" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open pin" })).not.toBeInTheDocument();
   });
 });
 
@@ -174,12 +181,12 @@ describe("Journal entry → its combat replay (CI-6)", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
-    listLinks.mockResolvedValue([]);
+    listLinks.mockResolvedValue(null);
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
-    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
-    search.mockResolvedValue([]);
+    getPage.mockResolvedValue({ page: null, connections: [] });
+    search.mockResolvedValue({ hits: [], truncated: false });
     getCalendar.mockResolvedValue(CALENDAR);
     listMaps.mockResolvedValue([]);
     listAssets.mockResolvedValue([]);

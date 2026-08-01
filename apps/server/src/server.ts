@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { API_VERSION } from "@vtt/api-contract";
+import { API_VERSION, CODEX_PATHS } from "@vtt/api-contract";
 import type { ClientToServerEvents, ClientRole, CombatLogEntry, GameState, ServerToClientEvents, TableEvent } from "@vtt/domain";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
@@ -19,7 +19,7 @@ import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
 import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
-import { createCodexRouter } from "./codex-http.js";
+import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
 import { HomebrewStore } from "./homebrew-store.js";
 import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
 import { createHomebrewValidator } from "./homebrew-validate.js";
@@ -85,6 +85,18 @@ export function createServer(options: CreateServerOptions) {
   // both audiences keep sharing the module-level SRD-only catalog - identical cost to before.
   const contentLibrary = new ContentLibrary(homebrewStore);
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
+  /**
+   * The codex's three authorization callbacks, named once. `createCodexRouter` and the
+   * `POST /codex/import` body guard both take these SAME functions, so "who may write the codex" has one
+   * definition however early in the stack the question is asked.
+   */
+  const codexAuth = {
+    authorizeGm,
+    authorizePlayer: (token: string | undefined) => auth.verifyPlayer(token) !== null,
+    // The same credential store the game router gets, so one minted token is checked one way. A codex
+    // credential acts at GM grade; the scope decides read-vs-write, and `admin` implies both.
+    verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => credentials.verify(token, scope)
+  };
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
@@ -122,9 +134,16 @@ export function createServer(options: CreateServerOptions) {
       socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
   }
-  /** Ping every client that the worldbuilding codex changed so it refetches its own projected view. Content-free (scope + revision only), so it carries nothing GM-only - the projection boundary lives in the HTTP reads. */
-  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal" | "sessions" | "quests") {
-    io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
+  /**
+   * Ping every client that the worldbuilding codex changed so it refetches its own projected view.
+   *
+   * CONTENT-FREE BY DESIGN (D22) - a revision counter and nothing else, the same rule the homebrew notifier
+   * below states for itself. It used to carry a `scope`, which went to every socket including the players'
+   * and told the table which part of the codex the GM was touching. That buys nothing at a home group's
+   * scale and is a small leak of GM intent; no listener ever read it.
+   */
+  function notifyCodexChanged() {
+    io.emit("codex:changed", { codexRevision: codexStore.revision });
   }
   /**
    * Ping every client that the GM's homebrew library changed so it refetches its own merged catalog.
@@ -257,7 +276,7 @@ export function createServer(options: CreateServerOptions) {
         const marker = sceneId ? codexStore.markerForScene(sceneId) : null;
         const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
         codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageIds[0] ?? null, playerText: `A battle was fought here${turns}.` });
-        notifyCodexChanged("journal");
+        notifyCodexChanged();
       } catch (error) {
         // Best-effort - a codex hiccup must never affect ending a fight - but don't fail silently.
         console.error("codex combat-history bridge failed to log the encounter:", error instanceof Error ? error.message : error);
@@ -266,29 +285,49 @@ export function createServer(options: CreateServerOptions) {
   });
   const commandRegistry = gameCommandRegistry(operations);
 
-  // A homebrew pack can carry up to 500 authored records, which does not fit the global limit below.
-  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
-  // works when it runs FIRST - hence this one line above the global parser rather than inside the
-  // homebrew router.
-  app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
-  // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
-  // by the operation itself) fit through the HTTP surface too.
-  app.use(express.json({ limit: "512kb" }));
   // Open CORS for the VERSIONED integration surface only: every /api/v1 credential travels as a
   // bearer header (or a SameSite=Strict cookie the browser refuses to send cross-origin anyway),
   // so a wildcard origin grants nothing a token doesn't already grant - and it lets browser-based
   // integrations (overlays, dashboards) call the documented surface directly. The legacy
   // /api/gm/* session endpoints - password login above all - deliberately stay same-origin:
   // wildcard CORS there would let any web page relay password guesses through a LAN browser.
+  //
+  // Mounted ABOVE the body parsers rather than below them, which it used to be. Three things follow, all
+  // of them wanted: an OPTIONS preflight is answered without buffering a body at all; a 413 from a parser
+  // now carries CORS headers, so a browser integration can read the refusal instead of seeing an opaque
+  // failure; and the codex-import guard below - which answers before any parser runs - does too.
   app.use((req, res, next) => {
     if (req.path !== "/api/v1" && !req.path.startsWith("/api/v1/")) return next();
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
     res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after");
+    // `x-idempotent-replay` joins the list the day the header exists: a browser integration cannot read
+    // it otherwise, and dead CORS config for an unshipped header is config nobody can verify.
+    res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after, x-idempotent-replay");
     if (req.method === "OPTIONS") return res.status(204).end();
     next();
   });
+  // A homebrew pack can carry up to 500 authored records, which does not fit the global limit below.
+  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
+  // works when it runs FIRST - hence this one line above the global parser rather than inside the
+  // homebrew router.
+  app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
+  // A codex backup bundle reaches tens of megabytes (two prose layers per page, plus the whole revision
+  // history), which does not fit the global limit below. Same one-line arrangement, same reason:
+  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
+  // works when it runs FIRST.
+  //
+  // AUTHORIZED FIRST, and the guard has to live here for the same reason the parser does. The codex
+  // router's `requireWrite` is a per-route guard and cannot run before an app-level parser, so this body
+  // was buffered, decoded and JSON.parse'd before a 401 could be written: any LAN client with no
+  // Authorization header at all could make the process block on a 64 MB parse, repeatedly, on the event
+  // loop that owns GameState - Socket.IO, turn order and every combat command stall for the duration.
+  // `createCodexImportGuard` is built from the SAME authorization callbacks the router gets and memoizes
+  // its answer on `res.locals`, so this is one policy resolved once, not a second copy of it.
+  app.use(CODEX_PATHS.import, createCodexImportGuard(codexAuth), express.json({ limit: "64mb" }));
+  // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
+  // by the operation itself) fit through the HTTP surface too.
+  app.use(express.json({ limit: "512kb" }));
   // Malformed/oversized JSON bodies die inside express.json before any route runs; give /api/v1
   // callers the stable error envelope instead of Express's HTML default.
   app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -404,8 +443,7 @@ export function createServer(options: CreateServerOptions) {
   app.use(createCodexRouter({
     store: codexStore,
     assets: codexAssets,
-    authorizeGm,
-    authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+    ...codexAuth,
     notifyChanged: notifyCodexChanged,
     issuePreviewSession: () => auth.issuePreviewPlayerSession()
   }));

@@ -7,6 +7,245 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-08-01 — Codex final polish: five durable rules
+
+Settled while closing the decision-fidelity gaps and the client-reported sidebar bug. Each is a
+choice between two defensible options; recorded so the loser is not re-proposed.
+
+- **A control that changes a state must not be gated on the state it changes.** The sidebar's collapse
+  toggle was rendered only when not collapsed, so it hid itself the moment it was used, and the
+  persisted preference made that permanent. The gate belongs on the reason the control is *meaningless*
+  (`railBand` — the forced 761–849px track, where there is nothing to expand into), never on the state
+  it produces. Generalised as a verification rule too: **a toggle is half-verified until the return
+  trip is verified**, which is why `sidebar-rail.test.tsx` and the browser pass now drive toggles both
+  ways. Every check this repo owned tested reachability, and a human found the door in minutes.
+
+- **Selection that can lose work is a NAVIGATION, not local state.** The pin inspector holds a draft
+  with autosave off, so selecting another pin has to travel the one guarded path (`navigate` →
+  `mayLeave`). Choosing `?pin=` as the source of truth rather than adding a second guard call site also
+  bought refresh-proofing and Back — the reason D3 put the pin in the address in the first place.
+  Rejected: registering the guard inside `AtlasView` and keeping local state, which would have made two
+  implementations of "may I leave?" and left the selection unaddressable.
+
+- **A create verb creates; a door to a form is named as a door.** The palette's "New session" and "New
+  quest" now run the same `creates.ts` the rails run and land on the new record. The two "Log …" rows
+  still navigate, because a journal entry and a downtime record need a form — so they are named for the
+  door they are. Rejected: removing the false verbs (D7's point is one create habit everywhere), and
+  naming the form-based rows "New …" for symmetry (which is the original lie, relabelled).
+
+- **When behaviour and a normative ADR clause disagree, change the behaviour if the clause states a
+  property most of the surface already keeps.** ADR-0016 §2's request-id rule was true of five routers;
+  the viewer and token routers were laxer. Both now enforce UUID v4. Changing the ADR instead would
+  have written a carve-out for a log-forgery vector into the standard, and nothing in the app sends the
+  header, so no caller loses a correlation id. The reverse call would be right if the clause were
+  aspirational or if callers depended on the looser behaviour.
+
+- **The player gets an affordance unless it is a GM tool.** D1 says the sidebar is collapsible and the
+  player's mirrors the GM's "minus GM tools"; a collapse control is not one, so the player has it now,
+  on its own storage key and never inside the GM's embedded preview (a modal is not a viewport, and the
+  preference written there would be the GM's). The same reading is why the player's lists got the GM's
+  filters rather than a reduced set.
+
+## 2026-07-31 — Codex server QA pass: five durable rules
+
+Settled while fixing the adversarial QA findings on `apps/server` and `packages/api-contract`. Each was
+a choice between two defensible options; recorded so the loser is not re-proposed.
+
+- **A record's PROJECTION decides whether it may be a connection endpoint, never its reveal flag.**
+  `revealedSourceIds` and `projectPlayerPageConnections` both resolve through the record's own player
+  projection, and `CodexPageConnectionRow.otherRevealed` is documented as a GM-facing fact that is NOT the
+  player gate. A flag test is only equal to a projection until the projection grows a second condition —
+  which `projectPlayerJournalEntry` had already done twice (standing→faction, quest event→quest) before
+  anyone noticed the connection surfaces had not followed.
+
+- **What may be forwarded to an API caller is an ALLOW-LIST.** `CodexValidationError` exists so the store's
+  58 GM-readable refusals can be forwarded by TYPE rather than by default. A denylist of driver errors
+  would need extending for every new error class; this way the default for anything unrecognised is the
+  sanitized 500. `CodexStore has not been initialized.` is deliberately left a bare `Error` so it lands
+  there.
+
+- **"No records in this FILE" and "no records in this CAMPAIGN" are different answers, and the wire already
+  distinguishes them.** `exportBundle` writes every section unconditionally, so an empty campaign carries
+  `"pages": []` and a truncated file carries nothing recognised. A restore refuses the second and performs
+  the first. Rejected: "refuse any bundle that produces zero records", which would break the legitimate
+  empty campaign, and "trust `bundleVersion`", which the caller may strip.
+
+- **A journal row's provenance is read from the KEY's presence, not from `bundleVersion`.** D9 writes
+  `sessionId` on every exported journal row even when null, so its absence dates the row to a pre-D9
+  export — which is what tells a lost join apart from director ruling R2's bare display label. Rejected:
+  the bundle-level `bundleVersion`, which is optional on the wire and documented as absent-means-pre-
+  versioning, so a modern backup POSTed with the key stripped would corrupt exactly those labels. The flag
+  rides on a separate `CodexImportBundle` type so it can never reach `exportBundle`'s output.
+
+- **An idempotency key identifies ONE request, and the receipt remembers which.** Migration v24 binds a
+  receipt to `method + path`; a mismatched reuse is a 400 rather than a replay. Bound to the route and NOT
+  to the body on purpose: a client retrying after fixing a typo is finishing one request, and a body hash
+  would make the key useless to it. Pre-v24 receipts (NULL fingerprint) still replay, because refusing
+  retries in flight across an upgrade is the worse trade and receipts age out in seven days.
+
+## 2026-07-31 — the Codex client: one sidebar, real addresses, one vocabulary
+
+Codex overhaul, Lane C. Durable decisions, plus three OWNER DECISIONS this lane supersedes.
+
+- **A hand-rolled history layer, not react-router.** `apps/client` had zero router dependencies; the app
+  is four separate Vite HTML entries of which only `index.html` needs addresses; the address space is
+  small and fully enumerable; and react-router's data-router idioms (loaders, actions) fight this app's
+  socket-push + ping-and-refetch model. ~230 lines instead of a dependency. Revisit only if the address
+  space stops being enumerable.
+- **The GM's Viewer tab is addressed `/viewer-controls`.** `GET /viewer` is reserved by the server as a
+  307 to the standalone TV viewer in BOTH prod and dev, so the SPA can never receive it — a tab
+  addressed `/viewer` would be a link out of the app. "Viewer controls" is also what the tab is.
+- **An unknown address and a GM-only address render the SAME view.** `NotFoundView` for both, because an
+  address that answered differently would confirm the surface exists. Same family as the 404-not-403
+  rule the record routes keep, one axis up.
+- **The command palette is Codex-scoped, deliberately not global (D20).** Mounted only by `CodexShell`
+  and the player shell, so ⌘K means nothing on the Encounter tab. A test locks it, because "make it
+  global" is the obvious next step and is a separate decision.
+- **Inverse relationship wording is an ACCEPTED LOSS.** `RELATIONSHIP_TYPES` could say "rules" from one
+  end and "ruled by" from the other. A free-text label cannot; a reader now gets direction ("This page
+  points to" / "Points at this page") plus the label. Recorded so it is not rediscovered as a bug.
+- **`discardTransient` exists because `popTransient` cannot serve a caller that is about to navigate.**
+  `history.back()` is a task and `navigate` pushes on a microtask, so close-then-navigate pushed the
+  destination and immediately went back off it. See known-bugs for the bug it caused.
+
+**Superseded owner decisions.** Each was right when made and is wrong now; recorded rather than deleted.
+
+- **D-3 (the Codex is a tab with modes)** → superseded by D1/D3. Modes were unaddressable, so four
+  surfaces had no URL and the tab bar lit "Campaign" over whichever one was open.
+- **D-10 (the player Codex is a modal over the table)** → superseded by D4/D14. A modal cannot be deep
+  linked, cannot be refreshed, and gave players a second, thinner vocabulary.
+- **D-2 (the app always opens on the Encounter tab)** → superseded by D2. It still does when there is
+  nothing to resume; a deep link now always wins, and a bare `/` resumes the last location per role.
+
+## 2026-07-31 — one connection system, quest history, and a restore that honours old backups
+
+Codex overhaul, Lane B (Phases 2-4). Five durable decisions.
+
+- **Typed relationships and `[[wiki-links]]` are ONE concept, over TWO storages (D8/D13, v22).** The
+  Codex had two ways to say two records are related, and a GM had to remember which one they had used.
+  They unify into a CONNECTION with an optional label and an `origin`. The storages stay: a declared
+  edge is id-keyed and CRUD-able, a mention is title-keyed and rebuilt from body text on every save, and
+  materializing mentions as rows would need a sync protocol ("what does deleting a connection whose
+  source is a sentence mean?"). D8 permits this in its own words. Nothing moves, so the unification is
+  lossless in both directions. The twelve legacy slugs become the labels a reader sees, which retires
+  the client display mapping - and costs the inverse wording ("ruled by"), which a free-text label
+  cannot express; a reader renders direction plus label instead.
+- **The connection gate is one predicate with three conditions, for BOTH origins.** Target page
+  revealed, source record revealed by its own kind's rule, and `layer === 'player'`. That is stronger
+  than what it replaces: a GM-layer DECLARED edge between two revealed pages no longer travels, and a
+  connection out of a hidden session's prep body cannot be a way around that session's own gate.
+- **Quest history is written on CREATE and on status change (D11, ruling R5), and hidden WHOLE.** A
+  quest record carries empty player text, so it cannot stand on its own prose - the standing CORRECTION's
+  exact false premise - and nulling `questId` alone would ship "Quest - completed" for a quest the party
+  has never heard of. The whole row is gated on the quest's reveal, on `projectPlayerJournalEntry` so all
+  four player journal surfaces inherit it. Migration v19 widened the CHECK for this in Phase 2, so D11
+  needed no second table rebuild.
+- **Import is REPLACE-only, and `bundleVersion` is OPTIONAL (D16, ruling R1).** Merge is undefinable for
+  the singleton, invariant-bearing state a bundle carries; every merge rule would be a reconciliation
+  policy with its own silent-corruption mode. A bundle with no version is a pre-versioning backup and
+  restores, because honoring the backups a GM already has is the entire point - a required key would keep
+  the promise only for files made after the upgrade. Rows are written RAW: a restore reproduces a state,
+  it does not perform a hundred authoring events, so it fabricates no quest history and no snapshots.
+- **`commandId` idempotency is checked INSIDE the write guard, not before it (D19, v23).** As a plain
+  router middleware the replay ran before authorization, which made a receipt into a bearer token - a
+  player who knew a GM's key got the GM's 201. A replay is a cache of a response, and a cache must never
+  be reachable by a caller who could not have produced the response. The receipt is recorded after the
+  commit, and the one-retry crash window that leaves is documented rather than hidden: a receipt written
+  first can report success for a write that never landed, which is the worse failure.
+
+## 2026-07-31 — journal entries join their session by identity, and the Codex learns to autosave
+
+Codex overhaul, Lane B (Phases 1-2). Five durable decisions; one of them consciously supersedes a
+recorded owner decision, which is the reason this entry exists at all.
+
+- **Journal entries link to a session by ID, not by number (D9, migration v19).** `session_number` on a
+  journal row was a copy, so renumbering a session made every one of its entries lie
+  (`known-bugs.md`, OPEN since 2026-07-29). The number is now a DISPLAY value resolved live from the
+  linked record: renumbering relabels every entry with no journal write, and the by-session lens can
+  never lose a group. Writes accept `sessionId` only; a bare `sessionNumber` in a write body is a 400
+  with the key named in `details.issues`, because a client asserting a display value would be asserting
+  something the server owns. Omitted on a create auto-files under the ACTIVE session — which now works
+  for an *unnumbered* active session, where the old number-stamping could not link at all.
+- **v13's "sessions arrive with NO backfill" is consciously superseded (client decision D9).** v13
+  refused to synthesize session records for the numbers legacy entries carried, on the stated grounds
+  that inventing prep, recap and attendance would fabricate facts. That objection is honoured rather
+  than overridden: migration v19 synthesizes exactly one record per orphan NUMBER, with **empty** prep,
+  recap and attendees, `status: played` and `revealed: 0`. Nothing is invented, nothing becomes visible
+  to a player, and the only screen that changes is the GM's session list — where a number that already
+  existed now has a record behind it. The alternative was orphaning those numbers, which is data loss.
+  The v13 comment in `codex-store.ts` stands as the history; this is the decision that supersedes it.
+- **Session delete stamps the number back CONDITIONALLY (director ruling R2).** A revealed session's
+  number is written onto its entries as a bare label when the record goes — behaviour-preserving, since
+  the players were already reading it. A hidden session's entries get nothing: a bare label has no
+  record left to gate on, so it would pass through to players and announce that a session they were
+  never shown existed. Secret-by-default wins over label continuity.
+- **Autosave is a stored preference, in SECONDS, defaulting to `{enabled: true, intervalSeconds: 1}`
+  (D6, ruling R4, migration v18).** One unit from the wire to the column, so nothing converts at a
+  boundary and nothing can convert twice. The default is what the shipping editors already did (an
+  800 ms debounce) expressed on that scale, so an upgraded codex saves exactly as often as it used to.
+  The server stores a preference only — there is no server-side draft, so enforcement is editor
+  behaviour.
+- **The `codex:changed` ping is content-free (D22).** It carried a `scope` word to every socket,
+  players included, which told the table which part of the codex the GM was working in. No listener
+  ever read it, and the homebrew notifier eight lines away already refused the same thing on principle.
+  Two notifiers, one rule.
+- **A type-changing page save forces its revision snapshot (D7, ruling R7).** The pruning such a save
+  performs is exactly the content the coalescing window would otherwise swallow, and the client's
+  confirm dialog promises it is recoverable from History. The switch still wins: `enabled: false`
+  writes nothing, and a type change is not an exception to it.
+
+## 2026-07-31 — the Codex joins the public API, and the API stops overstating itself
+
+Codex overhaul, Lane A (`c7fc8aa`, `5f78d87`). Six durable decisions, three of which consciously
+supersede something already on the record.
+
+- **The Codex is credential-reachable, at GM grade.** `codex:read` / `codex:write` sit beside the
+  sessions on every codex operation. **This supersedes the pin at `contract.test.ts:139-145`** ("no codex
+  op carries `bearerAuth`") and the README sentence that said so in prose. The pin was not wrong when it
+  was written — it recorded a real decision — but its consequence was that an external tool had to borrow
+  the GM's *session token* to read one page, which is the widest possible credential for the narrowest
+  need. The test is rewritten rather than deleted, and the interesting claim survives in it: exactly one
+  codex operation still refuses a credential, and it is the one that mints a session
+  (`POST /codex/preview-session`). A credential acts at GM grade because that is already the game
+  surface's model; a player-grade bot is expressible today with `POST /api/v1/sessions/player`, so a third
+  scope would be a second way to say the same thing. `codex:write` does not imply `codex:read` — scopes
+  are independent everywhere else, and a write-only automation that could also read the GM's secrets
+  would be a scope that means nothing.
+- **401 means "no credential"; 403 means "you presented one and were refused."** The codex answered 401
+  to an authenticated player, which tells a caller who is signed in to sign in — advice that cannot work,
+  and which a retrying client acts on. Any presented-but-failing token (player on a GM surface, junk,
+  revoked, underscoped) is now 403. This is game-http's split, not homebrew's junk-token-401, and it is
+  the API's own published convention finally being true. **Behaviour break, deliberate**; eight tests
+  asserted the old status and most now assert both arms. The *other* status rule is untouched and must
+  stay: a record a player may not see is **404, never 403** — that is a different axis (existence, not
+  authorization), and conflating the two would turn every id into an existence oracle.
+- **Response schemas are role-truthful: named `*Player` components joined by a `*Projected` `oneOf`.**
+  The alternative — keep GM components and describe the deltas in prose — leaves the machine contract
+  false, and a player response failing validation against its own published schema is the worst kind of
+  documentation bug: checkable and silently wrong. What makes `oneOf` sound is a **one-sided** rule (the
+  GM branch requires ≥1 key the player branch does not declare), asserted mechanically. It is one-sided
+  because six player shapes are strict key-subsets of their GM twin, so the symmetric rule is
+  unsatisfiable for them — and an unsatisfiable assertion is one that gets deleted. The contract now
+  *mirrors* `codex-projections.ts`, which stays the implementation source of truth; an Ajv cross-check
+  over real GM and player bodies is what stops the mirror drifting. **If the two ever disagree, the
+  projection is the fact and the contract is the bug** — never widen a component to make a test pass.
+- **Idempotency is stated per surface, because it was never API-wide.** `info.description` promised that
+  "every write accepts an optional `commandId`"; only the game surface implements it, and a codex or
+  homebrew caller who believed it got a 400 from a `.strict()` body. Withdrawn in favour of the honest
+  three-surface statement. (Codex `commandId` is planned; it will be documented when it exists, not
+  before.)
+- **Every codex GET carries a weak ETag, tagged per grade.** Correctness rests on the store's existing
+  discipline that every write bumps the coarse revision inside its own transaction — reveals and clock
+  moves included, since those change what a reader sees without changing any record's `rev`. **That rule
+  is now load-bearing: a new write that skips the bump serves stale reads.** The tag includes the grade
+  so one cached answer can never be served to the other role, and the conditional check runs at
+  serialization, after every auth and existence gate, so a probe cannot turn a 404 into a 304.
+- **ADR-0016 is Accepted, with the normative conventions statement it always promised**, including a
+  compatibility clause scoped honestly: v1 is stable by intent, but this instance ships client and server
+  in lockstep with no known external consumers, so coherence-buying breaks are permitted inside v1 while
+  the product is pre-1.0 — each recorded here. A public or multi-tenant posture would require a major
+  version. That clause is the single place to revisit if the owner ever wants stronger guarantees.
+
 ## 2026-07-30 — version history: a checkpoint is of the state you are about to LOSE
 
 Throttling `codex_page_revisions` is only safe because the snapshot direction changed with it. `updatePage`

@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { goTo } from "./route";
 
 /**
  * jsdom gaps this app actually hits, filled here in TEST setup only — never in product code.
@@ -50,3 +51,14 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 }
 
 afterEach(() => cleanup());
+
+/**
+ * D3 made every Codex surface an ADDRESS, so a component test has to say which one it is rendering.
+ * Each test file sets its own path (`goTo("/codex/pages")`); this resets the URL between tests so one
+ * test's navigation cannot leak into the next, which is the same isolation `cleanup()` gives the DOM.
+ *
+ * It goes through `goTo` rather than raising a synthetic `popstate`, because the router now lets a dirty
+ * autosave-off editor veto a real history traversal — and a teardown must never be something the code
+ * under test can refuse. See `test/route.ts`.
+ */
+afterEach(() => { goTo("/"); });

@@ -32,7 +32,7 @@ const renderInspector = (markerRevealed: boolean, mapRevealed: boolean, onReveal
   render(
     <MarkerInspector
       gmToken="gm" marker={MARKER(markerRevealed)} maps={[MAP(mapRevealed)]} pages={[]} scenes={[]} actors={[]}
-      activeSceneId={null} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
+      activeSceneId={null} autosave={{ enabled: true, intervalSeconds: 1 }} onUpdated={vi.fn()} onDeleted={vi.fn()} onOpenMap={vi.fn()} onOpenPage={vi.fn()}
       onCreatePage={vi.fn()} onRevealPage={vi.fn()} onRevealMap={onRevealMap} onActivateScene={vi.fn()}
       onOpenReplay={vi.fn()} onClose={vi.fn()}
     />
@@ -41,7 +41,7 @@ const renderInspector = (markerRevealed: boolean, mapRevealed: boolean, onReveal
 describe("MarkerInspector — shown pin on a secret map (CD-6)", () => {
   it("warns when the pin is shown but its map is still secret", () => {
     renderInspector(true, false);
-    expect(screen.getByText(/still secret/i)).toBeInTheDocument();
+    expect(screen.getByText("This pin is shown to players, but the map is hidden from them. Players cannot see either.")).toBeInTheDocument();
     expect(screen.getByText("Barovia")).toBeInTheDocument();   // names the map that needs revealing
   });
 
@@ -55,18 +55,18 @@ describe("MarkerInspector — shown pin on a secret map (CD-6)", () => {
 
   it("still warns without an action when the caller cannot reveal the map", () => {
     renderInspector(true, false);
-    expect(screen.getByText(/still secret/i)).toBeInTheDocument();
+    expect(screen.getByText("This pin is shown to players, but the map is hidden from them. Players cannot see either.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /show the map too/i })).not.toBeInTheDocument();
   });
 
   // The quiet cases. A warning that fires when nothing is wrong is noise the GM learns to ignore.
   it("stays quiet when the map is revealed", () => {
     renderInspector(true, true);
-    expect(screen.queryByText(/still secret/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/is hidden from them/)).not.toBeInTheDocument();
   });
 
   it("stays quiet when the pin itself is secret — nothing is being promised to players", () => {
     renderInspector(false, false);
-    expect(screen.queryByText(/still secret/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/is hidden from them/)).not.toBeInTheDocument();
   });
 });

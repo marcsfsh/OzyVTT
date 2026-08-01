@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Badge, IconPencil, Menu, MenuItem } from "@vtt/ui";
+import { IconChevron, IconDrag, IconPencil, Menu, MenuItem } from "@vtt/ui";
+import { VisibilityBadge } from "./SecretMarkers";
 import { type CodexPageSummary } from "./api";
 import { CodexIcon, EntityIcon } from "./icons";
 
@@ -60,6 +61,11 @@ type Handlers = Readonly<{
   onMovePage: (pageId: string, folderPath: string | null) => void;
   onMoveFolder: (fromPath: string, toParentPath: string | null) => void;
   onRequestMove: (pageId: string) => void;
+  /**
+   * Intake Mobile #5: a folder could only be MOVED by dragging it, which is unreachable with a thumb.
+   * This is the keyboard-and-touch route — the same "Move to folder" modal a page's row menu opens.
+   */
+  onRequestMoveFolder: (path: string) => void;
 }>;
 
 function sortFolders(node: FolderNode, sort: NotebookSort): FolderNode[] {
@@ -99,7 +105,7 @@ function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode
           onDragStart={(event) => { event.stopPropagation(); event.dataTransfer.setData(FOLDER_DRAG_TYPE, folder.path); event.dataTransfer.effectAllowed = "move"; draggedFolderPath = folder.path; }}
           onDragEnd={() => { draggedFolderPath = null; }}
           onClick={() => handlers.onToggle(folder.path)}>
-          <span className="codex-tree-caret" aria-hidden="true">{open ? "▾" : "▸"}</span>
+          <IconChevron className={`codex-tree-caret${open ? " is-open" : ""}`} />
           <span className="codex-tree-folder-name">{folder.name}</span>
           <span className="codex-tree-count">{countPages(folder)}</span>
         </button>
@@ -115,10 +121,11 @@ function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode
           `.codex-tree-folder-actions`' margin in codex.css.
         */}
         <div className="codex-tree-folder-actions">
-          <Menu trigger="⋯" icon align="end" label={`Actions for ${folder.name}`} className="codex-tree-folder-menu">
+          <Menu trigger={<IconDrag />} icon align="end" label={`Actions for ${folder.name}`} className="codex-tree-folder-menu">
             <MenuItem icon={<CodexIcon iconId="folder-plus" className="codex-tree-folder-ic" />} onClick={() => handlers.onNewSubfolder(folder.path)}>New subfolder</MenuItem>
-            <MenuItem icon={<CodexIcon iconId="scroll" className="codex-tree-folder-ic" />} onClick={() => handlers.onNewInFolder(folder.path)}>New note here</MenuItem>
+            <MenuItem icon={<CodexIcon iconId="scroll" className="codex-tree-folder-ic" />} onClick={() => handlers.onNewInFolder(folder.path)}>New page here</MenuItem>
             <MenuItem icon={<IconPencil />} onClick={() => handlers.onRenameFolder(folder.path)}>Rename folder</MenuItem>
+            <MenuItem icon={<CodexIcon iconId="folder-plus" className="codex-tree-folder-ic" />} onClick={() => handlers.onRequestMoveFolder(folder.path)}>Move to top level</MenuItem>
             <MenuItem icon={<CodexIcon iconId="trash" className="codex-tree-folder-ic" />} tone="danger" onClick={() => handlers.onDeleteFolder(folder.path)}>Delete folder</MenuItem>
           </Menu>
         </div>
@@ -159,9 +166,13 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
           >
             {page.entityType !== "note" && <EntityIcon type={page.entityType} className="codex-tree-icon" />}
             <span className="codex-list-title">{page.title}</span>
-            {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
+            {/* D18's one badge — but only on the EXCEPTIONAL state. The Codex is secret by default, so on a
+              dense tree "Hidden from players" on every row would be noise on the majority and would bury
+              the one row that is actually shared. The full phrase still appears wherever the state is the
+              subject: list rows, the editor, the reveal audit. */}
+          {page.revealedToPlayers && <VisibilityBadge revealed />}
           </button>
-          <button type="button" className="codex-tree-page-move tap-target" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}>⋯</button>
+          <button type="button" className="codex-tree-page-move tap-target" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}><IconDrag /></button>
         </div>
       ))}
       {folders.map((folder) => <FolderBranch key={folder.path} folder={folder} depth={depth} handlers={handlers} />)}

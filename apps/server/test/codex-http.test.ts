@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,6 +18,9 @@ import { CODEX_ASSET_PATHS, CODEX_PATHS, openApiDocument } from "@vtt/api-contra
  * journal-by-attachment reveal gates, the media gate, and the envelope shapes).
  */
 
+/** D6/R4's shipped default, spelled once - `PUT /codex/settings` is wholesale, so every body carries it. */
+const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
+
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => { while (cleanups.length) await cleanups.pop()!(); });
 
@@ -27,7 +31,7 @@ function png(width: number, height: number) {
   return buffer;
 }
 
-async function fixture() {
+async function fixture(pings?: unknown[][]) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-codex-http-"));
   const store = new CodexStore(join(directory, "vtt.sqlite"), () => Date.parse("2026-07-16T03:00:00.000Z"));
   const assets = new MapAssetStore(join(directory, "codex-assets"));
@@ -38,24 +42,68 @@ async function fixture() {
     // The preview token is a REAL player principal, exactly as `auth.issuePreviewPlayerSession()` mints
     // one in production - so it authorizes as a player and gets the player projection, nothing else.
     authorizePlayer: (token) => token === "player-token" || token === PREVIEW_TOKEN,
-    notifyChanged: () => {},
+    // Two single-scope credentials and nothing else, so "has codex:read" and "has codex:write" are
+    // genuinely different tokens here - a verifier that ignored the scope would pass a weaker test.
+    verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
+    // Recorded ARGUMENTS, not just calls: D22's whole point is that the ping carries nothing, and a
+    // recorder that only counted could not tell a content-free ping from one carrying a scope word.
+    notifyChanged: (...args: unknown[]) => { pings?.push(args); },
     issuePreviewSession: () => PREVIEW_TOKEN
   }));
   const server = createServer(app); await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); if (!address || typeof address === "string") throw new Error("Codex test server did not bind.");
   cleanups.push(async () => { await new Promise<void>((resolve) => server.close(() => resolve())); store.close(); await rm(directory, { recursive: true, force: true }); });
-  return { base: `http://127.0.0.1:${address.port}`, store, assets };
+  return { base: `http://127.0.0.1:${address.port}`, store, assets, directory };
 }
 
 const PREVIEW_TOKEN = "preview-player-token";
 const GM = { authorization: "Bearer gm-token", "content-type": "application/json" };
 const PLAYER = { authorization: "Bearer player-token", "content-type": "application/json" };
+/** Integration credentials, one per scope: `codex:write` deliberately does NOT imply `codex:read`. */
+const INTEGRATION_READ = { authorization: "Bearer int-codex:read", "content-type": "application/json" };
+const INTEGRATION_WRITE = { authorization: "Bearer int-codex:write", "content-type": "application/json" };
 type Json = Record<string, any>;
 async function body(response: Response) { return response.json() as Promise<Json>; }
 const get = (base: string, path: string, headers: Record<string, string>) => fetch(`${base}${path}`, { headers });
 const post = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(payload) });
 const patch = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
 const put = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PUT", headers, body: JSON.stringify(payload) });
+const del = (base: string, path: string, headers: Record<string, string>, payload?: unknown) => fetch(`${base}${path}`, { method: "DELETE", headers, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
+
+/**
+ * D22: the `codex:changed` ping is CONTENT-FREE. It used to carry a `scope` word - "pages", "journal" - to
+ * every connected socket, players included, which told the table which part of the codex the GM was working
+ * in. The homebrew notifier had already refused exactly that on principle eight lines away in `server.ts`.
+ *
+ * WHAT THIS FILE CAN AND CANNOT SEE, stated plainly because the test used to overclaim it. The router is
+ * given a `notifyChanged` callback and calls it; the SOCKET emit is `server.ts`'s, and that emit does carry
+ * a payload - `{ codexRevision }`, a bare counter with no scope word, which is D22's actual wire shape. So
+ * this asserts the ROUTER half only: that it hands its notifier nothing to put on the wire. The socket half
+ * is `apps/server/test/realtime-presence.test.ts`, which observes the real emit and pins its key set.
+ *
+ * The compile-time half is `notifyChanged: () => void` on `CodexRouterOptions` plus
+ * `CodexChangedEvent = { codexRevision }` in `@vtt/domain`; neither is checked by this suite
+ * (`apps/server/test` is not typechecked), so the argument list is asserted here.
+ */
+describe("codex:changed carries no content (D22, router half)", () => {
+  it("calls its notifier with no arguments at all, whichever surface was written", async () => {
+    const pings: unknown[][] = [];
+    const { base, store } = await fixture(pings);
+    const page = store.createPage({ title: "Vallaki" });
+    const faction = store.createPage({ title: "The Keepers of the Feather", entityType: "faction" });
+
+    await post(base, "/api/v1/codex/pages", GM, { title: "Krezk" });
+    await patch(base, `/api/v1/codex/pages/${page.id}`, GM, { playerBody: "a walled town" });
+    await post(base, `/api/v1/codex/pages/${page.id}/reveal`, GM, { revealed: true });
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "we arrived" });
+    await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1 });
+    await post(base, "/api/v1/codex/quests", GM, { title: "Find the Sunsword" });
+    await put(base, `/api/v1/codex/standing/${faction.id}`, GM, { value: 10, reason: "kind words" });
+
+    expect(pings.length, "every one of those writes pinged").toBeGreaterThanOrEqual(7);
+    for (const args of pings) expect(args).toEqual([]);
+  });
+});
 
 describe("codex HTTP viewer-safety boundary", () => {
   it("never exposes a combat entry's replay linkage to a player, even when the entry is revealed", async () => {
@@ -80,7 +128,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     // has always been player-visible on PAGES, and here it rides the same allow-list, so it is only ever
     // emitted for an entry the player may already see. Any OTHER new key failing this line is a leak.
     expect(Object.keys(playerTimeline.data.entries[0]).sort())
-      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text"]);
+      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionId", "sessionNumber", "tags", "text"]);
   });
 
 
@@ -92,8 +140,10 @@ describe("codex HTTP viewer-safety boundary", () => {
     const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", playerBody: "", gmBody: "Meets under the inn." }));
     const secretId = secret.data.page.id as string;
 
-    // Minting is GM-only.
-    expect((await post(base, "/api/v1/codex/preview-session", PLAYER, {})).status).toBe(401);
+    // Minting is GM-only - and a player is authenticated-and-refused, which is a 403, not a 401.
+    expect((await post(base, "/api/v1/codex/preview-session", PLAYER, {})).status).toBe(403);
+    // Not even a codex:write credential: this route hands out a player SESSION TOKEN.
+    expect((await post(base, "/api/v1/codex/preview-session", INTEGRATION_WRITE, {})).status).toBe(403);
     const minted = await post(base, "/api/v1/codex/preview-session", GM, {});
     expect(minted.status).toBe(201);
     const token = (await body(minted)).data.token as string;
@@ -140,12 +190,25 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(JSON.stringify(playerView)).not.toContain("cultist");
   });
 
-  it("rejects player writes and missing auth with the right envelopes", async () => {
+  /**
+   * The 401/403 split, which is the whole distinction: 401 means "I could not read a credential", 403
+   * means "I read yours and you may not do this". A player who writes used to get 401, which told an
+   * authenticated caller to authenticate - advice that cannot work, and which a retrying client acts on.
+   */
+  it("rejects player writes with 403 and missing auth with 401", async () => {
     const { base } = await fixture();
-    expect((await post(base, "/api/v1/codex/pages", PLAYER, { title: "Nope" })).status).toBe(401);
+    const denied = await post(base, "/api/v1/codex/pages", PLAYER, { title: "Nope" });
+    expect(denied.status).toBe(403);
+    expect((await body(denied)).error.code).toBe("forbidden");
     const noauth = await get(base, "/api/v1/codex/pages", { "content-type": "application/json" });
     expect(noauth.status).toBe(401);
-    expect((await body(noauth)).ok).toBe(false);
+    const noauthBody = await body(noauth);
+    expect(noauthBody.ok).toBe(false);
+    expect(noauthBody.error.code).toBe("unauthenticated");
+    // A token that was PRESENTED and failed is 403 too, never 401 - it is not a missing credential.
+    const junk = await get(base, "/api/v1/codex/pages", { authorization: "Bearer nonsense", "content-type": "application/json" });
+    expect(junk.status).toBe(403);
+    expect((await body(junk)).error.code).toBe("forbidden");
   });
 
   it("returns a 409 conflict envelope on a stale expectedRev", async () => {
@@ -299,24 +362,73 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect((await get(base, contentPath, PLAYER)).status).toBe(200);        // now the banner of a revealed page
   });
 
-  it("exposes entity type + fields on reveal, and hides relationships to unrevealed entities", async () => {
+  /**
+   * A `codex:read` CREDENTIAL reaches page images, which the served OpenAPI, the generated reference and
+   * the scope table have all promised from the start.
+   *
+   * This route hand-rolled its authorization (`authorizeGm || authorizePlayer`) instead of going through
+   * `principalFor`, so it was the one codex route a credential could not reach - and, since the sibling
+   * upload moved to `requireWrite`, `codex:write` could store a banner that `codex:read` could never fetch
+   * back. It fails closed, so it was never a leak; it was the document being false.
+   *
+   * The scope split is asserted in both directions on the SAME asset, so "a credential works" cannot pass
+   * by a verifier that ignores the scope.
+   */
+  it("serves page media to a codex:read credential, and not to a write-only one", async () => {
+    const { base } = await fixture();
+    const upload = await fetch(`${base}/api/v1/codex-assets?filename=a.png`, { method: "POST", headers: { authorization: "Bearer int-codex:write", "content-type": "image/png" }, body: png(8, 8) });
+    expect(upload.status, "a codex:write credential may upload").toBe(201);
+    const contentPath = `/api/v1/codex-assets/${(await body(upload)).data.asset.id as string}/content`;
+
+    expect((await get(base, contentPath, INTEGRATION_READ)).status, "…and codex:read may read it back").toBe(200);
+    expect((await get(base, contentPath, INTEGRATION_WRITE)).status, "write is not read - the scope still decides").toBe(403);
+    // No token at all stays a 403 rather than a 401: this route refuses before it looks anything up, so a
+    // media URL cannot become an existence oracle. That is the contract's one stated exception.
+    expect((await fetch(`${base}${contentPath}`)).status).toBe(403);
+  });
+
+  /**
+   * An oversized page image is the documented 413, not a sanitized 500.
+   *
+   * The upload mounts its own `express.raw` parser at 11 MB, and an error from a route-level parser reaches
+   * the CODEX router's catch-all rather than the app-level body-parser handler in `server.ts` (Express
+   * propagates errors forward, and that handler is registered before this router). So the catch-all
+   * swallowed it as "The codex request failed." and a GM could not tell a too-big image from a broken
+   * server. The limit is asserted with a 12 MB body, one megabyte over.
+   */
+  it("answers 413 for an oversized page image instead of a sanitized 500", async () => {
+    const { base } = await fixture();
+    const tooBig = await fetch(`${base}/api/v1/codex-assets?filename=a.png`, {
+      method: "POST", headers: { authorization: "Bearer gm-token", "content-type": "image/png" }, body: Buffer.alloc(12 * 1024 * 1024)
+    });
+    expect(tooBig.status).toBe(413);
+    const refusal = await body(tooBig);
+    expect(refusal.error.code).toBe("bad_request");
+    expect(refusal.error.message).toBe("The request body is too large.");
+  });
+
+  it("exposes entity type + fields on reveal, and hides connections to unrevealed entities", async () => {
     const { base } = await fixture();
     const strahd = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Strahd", entityType: "character", fields: { race: "Vampire", age: "400" } }));
     const strahdId = strahd.data.page.id as string;
     const cult = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult" })); // stays secret
     const barovia = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Barovia" }));
-    await post(base, `/api/v1/codex/pages/${strahdId}/relationships`, GM, { toPageId: cult.data.page.id, type: "leads" });
-    await post(base, `/api/v1/codex/pages/${strahdId}/relationships`, GM, { toPageId: barovia.data.page.id, type: "rules" });
+    await post(base, `/api/v1/codex/pages/${strahdId}/connections`, GM, { toPageId: cult.data.page.id, label: "leads" });
+    await post(base, `/api/v1/codex/pages/${strahdId}/connections`, GM, { toPageId: barovia.data.page.id, label: "rules" });
     await post(base, `/api/v1/codex/pages/${barovia.data.page.id}/reveal`, GM, { revealed: true });
     await post(base, `/api/v1/codex/pages/${strahdId}/reveal`, GM, { revealed: true });
 
     const view = await body(await get(base, `/api/v1/codex/pages/${strahdId}`, PLAYER));
     expect(view.data.page.entityType).toBe("character");
     expect(view.data.page.fields).toEqual({ race: "Vampire", age: "400" });
-    const rels = view.data.relationships as Json[];
+    // D8: ONE `connections` list where `backlinks` and `relationships` used to be two keys.
+    const rels = view.data.connections as Json[];
+    expect(view.data.backlinks, "the two old keys are GONE, not merely empty").toBeUndefined();
+    expect(view.data.relationships).toBeUndefined();
     expect(rels).toHaveLength(1);                       // only the edge to revealed Barovia
     expect(rels[0].otherTitle).toBe("Barovia");
-    expect(JSON.stringify(view)).not.toContain("Cult"); // the secret entity never leaks via a relationship
+    expect(rels[0].origin).toBe("declared");
+    expect(JSON.stringify(view)).not.toContain("Cult"); // the secret entity never leaks via a connection
   });
 
   it("keeps GM-only structured fields (gmFields) off a revealed page's player projection", async () => {
@@ -368,21 +480,148 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect((gmSecret.data.hits as Json[]).length).toBeGreaterThan(0);       // ...but the GM can find it
   });
 
-  it("GET /relationships returns the whole-graph edge feed, viewer-safe for players", async () => {
+  it("GET /connections returns ONE whole-graph edge feed, viewer-safe for players", async () => {
     const { base } = await fixture();
     const a = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Azalin", entityType: "character" }));
     const b = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Darkon", entityType: "location" }));
     const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Whispered Name" }));
-    await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: b.data.page.id, type: "rules" });
-    await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: secret.data.page.id, type: "serves" });
+    await post(base, `/api/v1/codex/pages/${a.data.page.id}/connections`, GM, { toPageId: b.data.page.id, label: "rules" });
+    await post(base, `/api/v1/codex/pages/${a.data.page.id}/connections`, GM, { toPageId: secret.data.page.id, label: "serves" });
     await post(base, `/api/v1/codex/pages/${a.data.page.id}/reveal`, GM, { revealed: true });
     await post(base, `/api/v1/codex/pages/${b.data.page.id}/reveal`, GM, { revealed: true });
 
-    const gmEdges = (await body(await get(base, "/api/v1/codex/relationships", GM))).data.relationships as Json[];
+    const gmEdges = (await body(await get(base, "/api/v1/codex/connections", GM))).data.connections as Json[];
     expect(gmEdges).toHaveLength(2);
-    const playerEdges = (await body(await get(base, "/api/v1/codex/relationships", PLAYER))).data.relationships as Json[];
+    const playerEdges = (await body(await get(base, "/api/v1/codex/connections", PLAYER))).data.connections as Json[];
     expect(playerEdges).toHaveLength(1); // only the edge whose BOTH endpoints are revealed
-    expect(playerEdges[0].type).toBe("rules");
+    expect(playerEdges[0].label).toBe("rules");
+    // The player edge carries no id, no layer and no createdAt - it is not addressable and every edge it
+    // receives is on the player layer, so both keys could only ever be constants.
+    expect(Object.keys(playerEdges[0]).sort()).toEqual(["fromId", "fromKind", "label", "origin", "toPageId"]);
+    // The four retired routes really are gone from the router, not merely from the contract.
+    for (const path of ["/api/v1/codex/relationships", "/api/v1/codex/links"]) {
+      expect((await get(base, path, GM)).status, path).toBe(404);
+    }
+    expect((await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: b.data.page.id, type: "rules" })).status).toBe(404);
+  });
+
+  /**
+   * THE CONNECTION SURFACES OBEY `projectPlayerJournalEntry`, NOT THE RAW REVEAL FLAG.
+   *
+   * The leak this pins, found by QA and reproduced here through the real routes. `standing` and `quest`
+   * journal records are hidden-by-subject: `projectPlayerJournalEntry` gates a standing record on its
+   * FACTION PAGE and a quest-history row on its QUEST, over and above the record's own reveal flag. Both
+   * connection surfaces used to consult only that flag - `playerConnectionContext` built `revealedSourceIds`
+   * from `entry.revealedToPlayers`, and `projectPlayerPageConnections` filtered on the store's
+   * `row.otherRevealed`, which is the same flag one layer down.
+   *
+   * So: set standing on a HIDDEN faction, type a `[[link]]` into the record's player text (the ordinary
+   * journal PATCH accepts one on any kind), reveal the row, and the record's existence AND its player text
+   * were published to the party on the linked page's Connections panel and in the whole-graph feed - while
+   * `/codex/journal`, `/codex/timeline`, `/codex/search` and `GET /codex/reveal-audit` all correctly called
+   * it hidden. The audit is the one screen whose job is answering "what can the party see?", so the two
+   * surfaces that disagreed with it were the two that were wrong.
+   *
+   * Both halves are asserted on the SERIALIZED body as well as by shape, because the excerpt text is the
+   * part a key-set assertion would miss. Each case then REVEALS the subject and re-reads, so every empty
+   * expectation above is proven to be the gate rather than an empty fixture.
+   */
+  it("gates a journal-sourced connection on the journal PROJECTION, not the entry's reveal flag", async () => {
+    const { base, store } = await fixture();
+    const vallaki = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const faction = store.createPage({ title: "The Zhentarim", entityType: "faction" });   // HIDDEN
+
+    // --- CT-6 standing: a hidden faction's standing record, revealed, carrying a [[link]] in player text.
+    await put(base, `/api/v1/codex/standing/${faction.id}`, GM, { value: 70, reason: "Paid the toll" });
+    const standingRecord = ((await body(await get(base, "/api/v1/codex/journal", GM))).data.entries as Json[])
+      .find((row) => row.kind === "standing")!;
+    expect(standingRecord, "PUT /codex/standing writes the hidden journal record this is about").toBeDefined();
+    await patch(base, `/api/v1/codex/journal/${standingRecord.id}`, GM, { playerText: "They turned on us at [[Vallaki]]." });
+    await post(base, `/api/v1/codex/journal/${standingRecord.id}/reveal`, GM, { revealed: true });
+
+    // The GM's own page panel HAS the edge, so the player's empty list below is the gate, not a missing row.
+    const gmPanel = (await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, GM))).data.connections as Json[];
+    expect(gmPanel.some((row) => row.otherKind === "journal" && row.otherId === standingRecord.id)).toBe(true);
+
+    const playerPage = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((playerPage.data.connections as Json[]).filter((row) => row.otherKind === "journal")).toEqual([]);
+    expect(JSON.stringify(playerPage), "the excerpt is the leak, not just the id").not.toContain("turned on us");
+    expect(JSON.stringify(playerPage)).not.toContain(standingRecord.id);
+
+    const playerGraph = await body(await get(base, "/api/v1/codex/connections", PLAYER));
+    expect((playerGraph.data.connections as Json[]).filter((edge) => edge.fromKind === "journal")).toEqual([]);
+    expect(JSON.stringify(playerGraph)).not.toContain(standingRecord.id);
+
+    // ...and the reveal audit agrees with the two surfaces above rather than with the one that used to leak.
+    const audit = (await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit.sections as Json[];
+    // The audit lists only what the party CAN see, so the record's absence from `rows` is the audit saying
+    // "hidden" - which is what the two surfaces above were contradicting.
+    const journalSection = audit.find((section) => section.kind === "journal")!;
+    expect((journalSection.rows as Json[]).some((row) => row.id === standingRecord.id)).toBe(false);
+
+    // Reveal the FACTION and the very same edge travels - so every emptiness above is the projection.
+    await post(base, `/api/v1/codex/pages/${faction.id}/reveal`, GM, { revealed: true });
+    const opened = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((opened.data.connections as Json[]).some((row) => row.otherKind === "journal" && row.otherId === standingRecord.id)).toBe(true);
+    expect(((await body(await get(base, "/api/v1/codex/connections", PLAYER))).data.connections as Json[])
+      .some((edge) => edge.fromKind === "journal" && edge.fromId === standingRecord.id)).toBe(true);
+
+    // --- D11 quest history: the same hole, one record kind over. R5 writes a hidden `quest` record on create.
+    const quest = store.createQuest({ title: "The Coffin Run" });                            // HIDDEN
+    const questRecord = ((await body(await get(base, "/api/v1/codex/journal", GM))).data.entries as Json[])
+      .find((row) => row.kind === "quest")!;
+    expect(questRecord, "R5 writes a quest-history record on create").toBeDefined();
+    await patch(base, `/api/v1/codex/journal/${questRecord.id}`, GM, { playerText: "It began at [[Vallaki]]." });
+    await post(base, `/api/v1/codex/journal/${questRecord.id}/reveal`, GM, { revealed: true });
+
+    const stillSecret = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((stillSecret.data.connections as Json[]).some((row) => row.otherId === questRecord.id)).toBe(false);
+    expect(JSON.stringify(stillSecret)).not.toContain("It began at");
+
+    await post(base, `/api/v1/codex/quests/${quest.id}/reveal`, GM, { revealed: true });
+    const questOpen = await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, PLAYER));
+    expect((questOpen.data.connections as Json[]).some((row) => row.otherId === questRecord.id)).toBe(true);
+  });
+
+  /**
+   * D8's create/patch/delete cycle at the boundary, plus the one thing a client most needs to know: a
+   * MENTION has no id, so it cannot be patched or deleted through the API. Editing the sentence is the
+   * only way, which is what keeps one sentence and one edge from being two things to keep in step.
+   */
+  it("declares, relabels and deletes a connection, and refuses to address a mention", async () => {
+    const { base } = await fixture();
+    const from = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Strahd", entityType: "character", playerBody: "Rules [[Barovia]]." }));
+    const to = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Barovia", entityType: "location" }));
+    const created = await post(base, `/api/v1/codex/pages/${from.data.page.id}/connections`, GM, { toPageId: to.data.page.id, label: "rules", layer: "gm" });
+    expect(created.status).toBe(201);
+    const connection = (await body(created)).data.connection as Json;
+    expect(connection).toMatchObject({ fromKind: "page", fromId: from.data.page.id, toPageId: to.data.page.id, label: "rules", origin: "declared", layer: "gm" });
+
+    // The MENTION from Strahd's body is in the same list with `id: null` - one panel, two origins. Checked
+    // while the declared edge still carries a LABEL, because an unlabelled declared edge and a mention
+    // over the same pair are deliberately folded into one row (see the store's fold rule).
+    const panel = (await body(await get(base, `/api/v1/codex/pages/${from.data.page.id}`, GM))).data.connections as Json[];
+    const mention = panel.find((row) => row.origin === "mention");
+    expect(mention, "the [[Barovia]] mention rides in the same list").toBeDefined();
+    expect(mention!.id).toBeNull();
+    expect(panel.filter((row) => row.origin === "declared")).toHaveLength(1);
+
+    const patched = (await body(await patch(base, `/api/v1/codex/connections/${connection.id}`, GM, { label: null, layer: "player" }))).data.connection as Json;
+    expect(patched).toMatchObject({ label: null, layer: "player" });
+    // A 41-character label is a 400, and an unknown id is a 404 - not a silent no-op.
+    expect((await patch(base, `/api/v1/codex/connections/${connection.id}`, GM, { label: "x".repeat(41) })).status).toBe(400);
+    expect((await patch(base, `/api/v1/codex/connections/${randomUUID()}`, GM, { label: "x" })).status).toBe(404);
+    // A player may not write any of it.
+    expect((await post(base, `/api/v1/codex/pages/${from.data.page.id}/connections`, PLAYER, { toPageId: to.data.page.id })).status).toBe(403);
+    expect((await del(base, `/api/v1/codex/connections/${connection.id}`, PLAYER)).status).toBe(403);
+
+    // ...and once the declared edge is UNLABELLED it folds with the mention: one connection stated twice
+    // is one row, with the deletable declared one winning.
+    expect(((await body(await get(base, `/api/v1/codex/pages/${from.data.page.id}`, GM))).data.connections as Json[]).filter((row) => row.direction === "out")).toHaveLength(1);
+
+    expect((await del(base, `/api/v1/codex/connections/${connection.id}`, GM)).status).toBe(200);
+    const after = (await body(await get(base, `/api/v1/codex/pages/${from.data.page.id}`, GM))).data.connections as Json[];
+    expect(after.every((row) => row.origin === "mention"), "the declared edge went; the mention stays, because it is prose").toBe(true);
   });
 
   /**
@@ -480,7 +719,7 @@ describe("codex HTTP viewer-safety boundary", () => {
    * `projectPlayerLinkEdges` in `codex-store.test.ts` - an HTTP test shows the pipeline works, never
    * which layer did the work.
    */
-  it("GET /links returns wiki-link edges, and a player sees neither GM-body links nor edges touching a secret page", async () => {
+  it("GET /connections shows mention edges, and a player sees neither GM-body links nor edges touching a secret page", async () => {
     const { base } = await fixture();
     const make = async (title: string, playerBody: string, gmBody: string, revealed: boolean) => {
       const page = await body(await post(base, "/api/v1/codex/pages", GM, { title, playerBody, gmBody }));
@@ -495,7 +734,8 @@ describe("codex HTTP viewer-safety boundary", () => {
     const barovia = await make("Barovia", "Ruled from [[Vallaki]], watched by [[The Whispered Name]].", "", true);
     const vallaki = await make("Vallaki", "A walled town.", "Its burgomaster answers to [[Barovia]].", true);
 
-    const gmLinks = (await body(await get(base, "/api/v1/codex/links", GM))).data.links as Json[];
+    const pair = (edge: Json) => ({ fromPageId: edge.fromId as string, toPageId: edge.toPageId as string });
+    const gmLinks = ((await body(await get(base, "/api/v1/codex/connections", GM))).data.connections as Json[]).map(pair);
     expect(gmLinks).toEqual(expect.arrayContaining([
       { fromPageId: barovia, toPageId: vallaki },
       { fromPageId: barovia, toPageId: secret },
@@ -503,7 +743,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     ]));
     expect(gmLinks).toHaveLength(3);
 
-    const playerLinks = (await body(await get(base, "/api/v1/codex/links", PLAYER))).data.links as Json[];
+    const playerLinks = ((await body(await get(base, "/api/v1/codex/connections", PLAYER))).data.connections as Json[]).map(pair);
     expect(playerLinks).toEqual([{ fromPageId: barovia, toPageId: vallaki }]);
     // The secret page must not be inferable from a dangling edge, and the GM-body edge must not appear
     // even though BOTH of its endpoints are revealed - the two rules are independent.
@@ -511,12 +751,12 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(playerLinks.some((edge) => edge.fromPageId === vallaki)).toBe(false);
   });
 
-  it("GET /links drops a self-link and a link to a title no page carries", async () => {
+  it("GET /connections drops a self-link and a link to a title no page carries", async () => {
     const { base } = await fixture();
     const page = await body(await post(base, "/api/v1/codex/pages", GM, {
       title: "Barovia", playerBody: "See [[Barovia]] and [[A Page That Was Never Written]].", revealedToPlayers: true
     }));
-    const links = (await body(await get(base, "/api/v1/codex/links", GM))).data.links as Json[];
+    const links = (await body(await get(base, "/api/v1/codex/connections", GM))).data.connections as Json[];
     expect(links).toEqual([]);                                     // no node to draw for either
     expect(JSON.stringify(links)).not.toContain(page.data.page.id as string);
   });
@@ -547,7 +787,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(got.data.calendar.yearName).toBe("AE");
     const entry = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Dawn.", inWorldDate: { year: 0, month: 0, day: 1 } }));
     expect(entry.data.entry.inWorldLabel).toBe("Sol, Rise 1, 0 AE"); // weekday now wired into the label
-    expect((await put(base, "/api/v1/codex/calendar", PLAYER, cal)).status).toBe(401); // players cannot edit it (GM only)
+    expect((await put(base, "/api/v1/codex/calendar", PLAYER, cal)).status).toBe(403); // players cannot edit it (authenticated, refused)
   });
 });
 
@@ -690,7 +930,7 @@ describe("codex chronicle HTTP boundary (CT-11, A-8)", () => {
     //               allow-listed away, which the projection test asserts at its own layer.
     // `proposedDate` deliberately did NOT join them: a clock move the GM has not confirmed is prep.
     expect(Object.keys(playerRows[0]).sort())
-      .toEqual(["createdAt", "fired", "id", "inWorldLabel", "kind", "payload", "realDate", "sessionNumber", "tags", "text", "title"]);
+      .toEqual(["calendarInstant", "createdAt", "fired", "id", "inWorldDate", "inWorldLabel", "kind", "payload", "realDate", "sessionId", "sessionNumber", "tags", "text", "title"]);
   });
 
   it("interleaves a dated event with journal entries in one in-world order, for both roles", async () => {
@@ -792,7 +1032,7 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     expect(rows).toHaveLength(1);                                   // the still-secret session 7 is absent
     // The EXACT projected key set, as the journal and chronicle tests above assert for their records:
     // this fails if any new field ever enters the player session projection, not only if this one leaks.
-    expect(Object.keys(rows[0]).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(Object.keys(rows[0]).sort()).toEqual(["id", "realDate", "recap", "sessionNumber", "tags"]);
     expect(rows[0].recap).toBe(RECAP);
 
     const payload = JSON.stringify(playerList);
@@ -804,7 +1044,7 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
 
     // The single read is gated identically, and carries the same key set.
     const single = await body(await get(base, `/api/v1/codex/sessions/${shownId}`, PLAYER));
-    expect(Object.keys(single.data.session).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(Object.keys(single.data.session).sort()).toEqual(["id", "realDate", "recap", "sessionNumber", "tags"]);
     expect(JSON.stringify(single)).not.toContain(PREP);
     expect((await get(base, `/api/v1/codex/sessions/${secretId}`, PLAYER)).status).toBe(404);
     expect((await get(base, `/api/v1/codex/sessions/${secretId}`, GM)).status).toBe(200);
@@ -840,7 +1080,7 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
       await post(base, `/api/v1/codex/sessions/${sessionId}/reveal`, PLAYER, { revealed: true }),
       await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, PLAYER, {}),
       await fetch(`${base}/api/v1/codex/sessions/${sessionId}`, { method: "DELETE", headers: PLAYER })
-    ]) expect(response.status).toBe(401);
+    ]) expect(response.status).toBe(403);
     const noauth = await get(base, "/api/v1/codex/sessions", { "content-type": "application/json" });
     expect(noauth.status).toBe(401);
     expect((await body(noauth)).ok).toBe(false);
@@ -886,9 +1126,66 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     await post(base, `/api/v1/codex/sessions/${created.data.session.id}/activate`, GM, {});
     const during = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "We reached Vallaki." }));
     expect(during.data.entry.sessionNumber).toBe(12);
-    // An explicit value still wins over the active session.
-    const pinned = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "A retcon.", sessionNumber: 4 }));
+    // An explicit ID still wins over the active session.
+    const other = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 4 }));
+    const pinned = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "A retcon.", sessionId: other.data.session.id }));
     expect(pinned.data.entry.sessionNumber).toBe(4);
+    expect(pinned.data.entry.sessionId).toBe(other.data.session.id);
+
+    // D9 / register #4: a bare `sessionNumber` on a WRITE is a 400 with the key named in `details.issues`.
+    // The number is a display value the server resolves; a client asserting one would be asserting
+    // something it does not own, and `.strict()` says so rather than ignoring the key.
+    const refused = await post(base, "/api/v1/codex/journal", GM, { playerText: "By number.", sessionNumber: 12 });
+    expect(refused.status).toBe(400);
+    const refusal = await body(refused);
+    expect(refusal.error.code).toBe("validation_failed");
+    // The key is NAMED, not merely rejected - a caller migrating off `sessionNumber` has to be able to
+    // tell this apart from a generic bad body.
+    expect(JSON.stringify(refusal.error)).toContain("sessionNumber");
+    expect((refusal.error.details.issues as unknown[]).length).toBeGreaterThan(0);
+    // ...and an id naming no session is a 404, not a silently unfiled entry. ALL FOUR journal creators take
+    // `sessionId` (the deadline/downtime/milestone bodies extend the journal one), so all four are walked:
+    // the contract documented 404 on none of them, and a spec-generated client would have thrown on an
+    // undeclared status or retried a write that can never succeed.
+    for (const [path, extra] of [
+      ["/api/v1/codex/journal", {}],
+      ["/api/v1/codex/journal/deadline", { inWorldDate: { year: 1492, month: 0, day: 1 } }],
+      ["/api/v1/codex/journal/downtime", { downtime: { who: "Ireena", activity: "Forging", days: 3 } }],
+      ["/api/v1/codex/journal/milestone", { milestone: { level: 5, reason: "the crypt" } }]
+    ] as const) {
+      expect((await post(base, path, GM, { playerText: "Nowhere.", sessionId: randomUUID(), ...extra })).status, path).toBe(404);
+    }
+    // Downtime has a SECOND 404 of its own: a `characterPageId` naming no page.
+    expect((await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "Nowhere.", downtime: { who: "Ireena", activity: "Forging", days: 3, characterPageId: randomUUID() } })).status).toBe(404);
+  });
+
+  /**
+   * ONE spelling of CD-6, not two seventy lines apart.
+   *
+   * `GET /codex/journal?markerId=` gated a player on the pin's OWN reveal flag, while
+   * `GET /codex/markers/{id}` applies the compound predicate (the pin is revealed AND its map is). So a
+   * revealed pin on a hidden map answered 200 here and 404 there - a 200-vs-404 existence oracle for a pin
+   * on a map the party has never been shown, reachable with nothing but the pin's id.
+   *
+   * The 200 was not itself a content leak (entry-level reveal still applies), which is why this is a small
+   * finding rather than a large one; a probe that distinguishes "exists" from "does not" is still one.
+   */
+  it("answers a player's mini-timeline probe the same way the pin route does (CD-6)", async () => {
+    const { base, store } = await fixture();
+    const map = store.createMap({ assetId: "11111111-1111-4111-8111-111111111111", name: "The Under-dark", kind: "regional" });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff8800" });
+    store.setMarkerRevealed(marker.id, true);   // the pin is revealed; its MAP is not
+
+    const probe = `/api/v1/codex/journal?markerId=${marker.id}`;
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).status, "the pin route hides it").toBe(404);
+    expect((await get(base, probe, PLAYER)).status, "...so the mini-timeline must too").toBe(404);
+    // The GM reads both, so the two 404s are the player gate rather than a missing fixture.
+    expect((await get(base, probe, GM)).status).toBe(200);
+
+    // Reveal the MAP and both routes open together - the predicate, not an unconditional refusal.
+    store.setMapRevealed(map.id, true);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).status).toBe(200);
+    expect((await get(base, probe, PLAYER)).status).toBe(200);
   });
 
   it("never lets an UNREVEALED session's number ride out on a revealed journal entry", async () => {
@@ -904,10 +1201,15 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     const auto = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "We reached Vallaki." }));
     const autoId = auto.data.entry.id as string;
     expect(auto.data.entry.sessionNumber).toBe(4);                        // auto-linked, exactly as M9 intends
-    // A LEGACY-shaped entry beside it: a number no session record claims, which must be unaffected. Without
-    // it a router that simply blanked every number for players would pass this whole test.
-    const legacy = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Undated lore.", sessionNumber: 9 }));
+    // A STAMP-BACK-shaped entry beside it (director ruling R2): an entry carrying a bare number label with
+    // no session behind it, which must be unaffected. Without it a router that simply blanked every number
+    // for players would pass this whole test. It is produced the only way that state can now arise -
+    // by deleting a REVEALED numbered session.
+    const doomed = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 9 }));
+    await post(base, `/api/v1/codex/sessions/${doomed.data.session.id}/reveal`, GM, { revealed: true });
+    const legacy = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Undated lore.", sessionId: doomed.data.session.id }));
     const legacyId = legacy.data.entry.id as string;
+    await del(base, `/api/v1/codex/sessions/${doomed.data.session.id}`, GM, {});
     for (const id of [autoId, legacyId]) await post(base, `/api/v1/codex/journal/${id}/reveal`, GM, { revealed: true });
 
     // The session itself is still hidden - the list omits it, the direct read 404s. That is the fact a
@@ -927,8 +1229,11 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
     expect(pJournal.text).toBe("We reached Vallaki.");                    // the entry itself is readable...
     expect(pJournal.sessionNumber).toBeNull();                            // ...without naming the session
     expect(pTimeline.sessionNumber).toBeNull();
-    expect(pLegacyJournal.sessionNumber).toBe(9);                         // nothing legacy changed
+    expect(pJournal.sessionId).toBeNull();                                // ...and neither half of the link travels
+    expect(pTimeline.sessionId).toBeNull();
+    expect(pLegacyJournal.sessionNumber).toBe(9);                         // R2's stamped-back label still reads
     expect(pLegacyTimeline.sessionNumber).toBe(9);
+    expect(pLegacyJournal.sessionId).toBeNull();                          // ...with no record left to link to
 
     // The GM's copy of both reads still carries 4, so the nulls above are the gate and not a lost field.
     const [gJournal, gTimeline] = await rowsFor(GM);
@@ -993,7 +1298,7 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
     expect(rows).toHaveLength(1);                                   // the still-secret quest is absent
     // The EXACT projected key set: this fails if any new field ever enters the player quest projection,
     // not only if this one leaks. `status` is deliberately PRESENT — "what is still open" is the feature.
-    expect(Object.keys(rows[0]).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(Object.keys(rows[0]).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "tags", "title"]);
     expect(rows[0].body).toBe(PLAYER_BODY);
     expect(rows[0].status).toBe("active");
     expect(rows[0].objectives).toEqual(OBJECTIVES);                 // order and tick state survive the wire
@@ -1006,7 +1311,7 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
 
     // The single read is gated identically, and carries the same key set.
     const single = await body(await get(base, `/api/v1/codex/quests/${shownId}`, PLAYER));
-    expect(Object.keys(single.data.quest).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "title"]);
+    expect(Object.keys(single.data.quest).sort()).toEqual(["body", "entityIds", "id", "objectives", "status", "tags", "title"]);
     expect(JSON.stringify(single)).not.toContain("forgery");
     expect((await get(base, `/api/v1/codex/quests/${secretId}`, PLAYER)).status).toBe(404);
     expect((await get(base, `/api/v1/codex/quests/${secretId}`, GM)).status).toBe(200);
@@ -1062,7 +1367,7 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
       await patch(base, `/api/v1/codex/quests/${questId}`, PLAYER, { gmBody: "mine now" }),
       await post(base, `/api/v1/codex/quests/${questId}/reveal`, PLAYER, { revealed: true }),
       await fetch(`${base}/api/v1/codex/quests/${questId}`, { method: "DELETE", headers: PLAYER })
-    ]) expect(response.status).toBe(401);
+    ]) expect(response.status).toBe(403);
     const noauth = await get(base, "/api/v1/codex/quests", { "content-type": "application/json" });
     expect(noauth.status).toBe(401);
     expect((await body(noauth)).ok).toBe(false);
@@ -1166,7 +1471,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
       playerText: "The duke's tax falls due.", gmText: "He will send the guard.", inWorldDate: { year: 1492, month: 0, day: 20 }
     }))).data.entry as Json;
     const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, {
-      playerText: "A quiet week.", gmText: "The cult moves while they rest.", downtime: { who: "Brannor", activity: "Forging a blade", days: 8 }
+      playerText: "A quiet week.", gmText: "The cult moves while they rest.", downtime: { who: "Brannor", activity: "Forging a blade", days: 8, characterPageId: null }
     }))).data.entry as Json;
 
     // The GM sees both, with both layers - so the player assertions are the gate working, not an empty list.
@@ -1192,7 +1497,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     expect(shownPayload).not.toContain("He will send the guard.");
     expect(shownPayload).not.toContain("applied");
     expect(shownPayload).not.toContain("proposedDate");
-    expect(shown.find((row) => row.kind === "downtime")!.payload).toEqual({ who: "Brannor", activity: "Forging a blade", days: 8 });
+    expect(shown.find((row) => row.kind === "downtime")!.payload).toEqual({ who: "Brannor", activity: "Forging a blade", days: 8, characterPageId: null });
   });
 
   /**
@@ -1222,13 +1527,13 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
   it("refuses apply-downtime, deadline/downtime creation and publish to a player and to an anonymous caller", async () => {
     const { base } = await fixture();
     await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
-    const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8 } }))).data.entry as Json;
+    const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8, characterPageId: null } }))).data.entry as Json;
 
-    for (const headers of [PLAYER, { "content-type": "application/json" }]) {
+    for (const [headers, status, code] of [[PLAYER, 403, "forbidden"], [{ "content-type": "application/json" }, 401, "unauthenticated"]] as const) {
       for (const path of ["/api/v1/codex/journal/deadline", "/api/v1/codex/journal/downtime", "/api/v1/codex/calendar/publish", `/api/v1/codex/journal/${downtime.id}/apply-downtime`]) {
         const response = await post(base, path, headers, { downtime: { who: "x", activity: "y", days: 1 }, inWorldDate: { year: 1492, month: 0, day: 1 } });
-        expect(response.status, `${path}`).toBe(401);
-        expect((await body(response)).error.code).toBe("unauthenticated");
+        expect(response.status, `${path}`).toBe(status);
+        expect((await body(response)).error.code, `${path}`).toBe(code);
       }
     }
     // ...and none of those refusals moved anything.
@@ -1242,7 +1547,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
   it("proposes a date on create, moves the clock only on confirm, and refuses a second confirm", async () => {
     const { base } = await fixture();
     await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
-    const created = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "Forging", days: 8 } }))).data as Json;
+    const created = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "Forging", days: 8, characterPageId: null } }))).data as Json;
     expect(created.proposedDate).toEqual({ year: 1492, month: 0, day: 18 });
     expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 10 });   // nothing moved
 
@@ -1302,8 +1607,8 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     const { base } = await fixture();
     for (const payload of [
       { playerText: "The party rests a week.", downtime: { who: "", activity: "", days: 7 } },   // prose only
-      { playerText: "", downtime: { who: "Brannor", activity: "Forging", days: 8 } },            // fields only
-      { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "", days: 3 } }       // one half blank
+      { playerText: "", downtime: { who: "Brannor", activity: "Forging", days: 8, characterPageId: null } },            // fields only
+      { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "", days: 3, characterPageId: null } }       // one half blank
     ]) {
       const response = await post(base, "/api/v1/codex/journal/downtime", GM, payload);
       expect(response.status, JSON.stringify(payload)).toBe(201);
@@ -1321,7 +1626,7 @@ describe("Codex routes vs the published contract", () => {
     cleanups.push(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
     const router = createCodexRouter({
       store, assets, authorizeGm: (token) => token === "gm-token", authorizePlayer: () => false,
-      notifyChanged: () => {}, issuePreviewSession: () => PREVIEW_TOKEN
+      verifyIntegration: () => null, notifyChanged: () => {}, issuePreviewSession: () => PREVIEW_TOKEN
     }) as unknown as { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };
     const byPath = new Map<string, Set<string>>();
     for (const layer of router.stack) {
@@ -1525,10 +1830,10 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
   /** T-9: the audit is a GM surface. A player is refused, and so is an anonymous caller. */
   it("refuses the reveal audit to a player and to an anonymous caller", async () => {
     const { base } = await fixture();
-    for (const headers of [PLAYER, { "content-type": "application/json" }]) {
+    for (const [headers, status, code] of [[PLAYER, 403, "forbidden"], [{ "content-type": "application/json" }, 401, "unauthenticated"]] as const) {
       const response = await get(base, "/api/v1/codex/reveal-audit", headers);
-      expect(response.status).toBe(401);
-      expect((await body(response)).error.code).toBe("unauthenticated");
+      expect(response.status).toBe(status);
+      expect((await body(response)).error.code).toBe(code);
     }
     expect((await get(base, "/api/v1/codex/reveal-audit", GM)).status).toBe(200);
   });
@@ -1687,13 +1992,17 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
   /** T-11's boundary half: the M12 routes are documented with the security they actually enforce. */
   it("documents the M12 routes with the roles they enforce", async () => {
     const paths = openApiDocument.paths as unknown as Record<string, Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>>;
-    // The one M12 read a player may make; the audit and every write are GM-only.
-    expect(paths[CODEX_PATHS.standing].get.security).toEqual([{ gmAuth: [] }, { playerAuth: [] }]);
+    // The one M12 read a player may make; the audit and every write have NO player branch. The codex
+    // scopes now sit beside the sessions on every one of these (a credential acts at GM grade), so the
+    // claim this test makes is about the PLAYER branch, which is the one that decides what leaks.
+    expect(paths[CODEX_PATHS.standing].get.security).toEqual([{ bearerAuth: ["codex:read"] }, { gmAuth: [] }, { playerAuth: [] }]);
     for (const [path, method] of [
       [CODEX_PATHS.revealAudit, "get"], [CODEX_PATHS.standingByFaction, "put"], [CODEX_PATHS.standingReveal, "post"],
       [CODEX_PATHS.journalMilestone, "post"], [CODEX_PATHS.markerParty, "put"]
     ] as const) {
-      expect(paths[path][method].security, `${method} ${path}`).toEqual([{ gmAuth: [] }]);
+      const security = paths[path][method].security ?? [];
+      expect(security.some((entry) => "playerAuth" in entry), `${method} ${path} must never accept a player session`).toBe(false);
+      expect(security.find((entry) => "bearerAuth" in entry)?.bearerAuth, `${method} ${path} scope`).toEqual([method === "get" ? "codex:read" : "codex:write"]);
     }
   });
 
@@ -1747,45 +2056,67 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
 describe("codex settings and the revision delete, HTTP boundary (owner decision, 2026-07-30)", () => {
   const settings = async (base: string, headers: Record<string, string>) =>
     (await body(await get(base, "/api/v1/codex/settings", headers))).data.settings as Json;
-  const del = (base: string, path: string, headers: Record<string, string>, payload: unknown) =>
-    fetch(`${base}${path}`, { method: "DELETE", headers, body: JSON.stringify(payload) });
-
   it("serves the owner's defaults, with the usage figures, in exactly the shape the client reads", async () => {
     const { base } = await fixture();
     const payload = await settings(base, GM);
     // The whole shape, asserted by key set as well as by value: an extra or renamed key here is a client break.
-    expect(Object.keys(payload)).toEqual(["revisionHistory"]);
+    expect(Object.keys(payload)).toEqual(["revisionHistory", "autosave"]);
     expect(Object.keys(payload.revisionHistory).sort()).toEqual(["enabled", "versionBytes", "versionCount", "windowMinutes"]);
     expect(payload.revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 });
   });
 
-  it("is GM-only on BOTH sides, and on the delete — a player gets 401 and changes nothing", async () => {
+  it("is GM-only on BOTH sides, and on the delete — a player gets 403 and changes nothing", async () => {
     const { base, store } = await fixture();
     store.createPage({ title: "Barovia", playerBody: "a valley" });
 
-    expect((await get(base, "/api/v1/codex/settings", PLAYER)).status).toBe(401);
-    expect((await put(base, "/api/v1/codex/settings", PLAYER, { revisionHistory: { enabled: false, windowMinutes: 0 } })).status).toBe(401);
-    expect((await del(base, "/api/v1/codex/page-revisions", PLAYER, { olderThanDays: 0 })).status).toBe(401);
+    expect((await get(base, "/api/v1/codex/settings", PLAYER)).status).toBe(403);
+    expect((await put(base, "/api/v1/codex/settings", PLAYER, { revisionHistory: { enabled: false, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT })).status).toBe(403);
+    expect((await del(base, "/api/v1/codex/page-revisions", PLAYER, { olderThanDays: 0 })).status).toBe(403);
     // ...and the refusals really refused: the settings are untouched and the history is intact.
     expect((await settings(base, GM)).revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 1, versionBytes: expect.any(Number) });
   });
 
   it("stores the two knobs, answers with the full read shape, and reports them back on the next GET", async () => {
     const { base } = await fixture();
-    const written = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: false, windowMinutes: 240 } }))).data.settings as Json;
+    const written = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: false, windowMinutes: 240 }, autosave: AUTOSAVE_DEFAULT }))).data.settings as Json;
     // The PUT's response IS the read shape, usage figures included - the client puts it straight into state.
     expect(written.revisionHistory).toEqual({ enabled: false, windowMinutes: 240, versionCount: 0, versionBytes: 0 });
     expect((await settings(base, GM)).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 240 });
   });
 
+  /**
+   * D6 / director ruling R4, at the boundary Lane C builds against: the wire unit is SECONDS and the default
+   * is `{enabled: true, intervalSeconds: 1}`. The bounds are REJECTED (the picker cannot produce one, so a
+   * caller that does is malformed) and a fractional value inside them is truncated - `windowMinutes`'
+   * arrangement verbatim, so the two knobs on one screen behave the same way.
+   */
+  it("carries autosave in seconds, defaults to on at one second, and rejects an out-of-range interval", async () => {
+    const { base } = await fixture();
+    expect((await settings(base, GM)).autosave).toEqual({ enabled: true, intervalSeconds: 1 });
+
+    const written = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: { enabled: false, intervalSeconds: 60.4 } }))).data.settings as Json;
+    expect(written.autosave).toEqual({ enabled: false, intervalSeconds: 60 });
+    expect((await settings(base, GM)).autosave).toEqual({ enabled: false, intervalSeconds: 60 });
+
+    for (const intervalSeconds of [0, -1, 601]) {
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: { enabled: true, intervalSeconds } });
+      expect(rejected.status, `intervalSeconds ${intervalSeconds}`).toBe(400);
+      expect((await body(rejected)).error.details.issues.length).toBeGreaterThan(0);
+    }
+    // An unknown key inside the group is a 400 too - `.strict()`, like every other codex body.
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 }, autosave: { enabled: true, intervalSeconds: 5, intervalMs: 5000 } })).status).toBe(400);
+    // ...and nothing the refusals sent was stored.
+    expect((await settings(base, GM)).autosave).toEqual({ enabled: false, intervalSeconds: 60 });
+  });
+
   it("truncates a fractional window but REJECTS one out of range", async () => {
     const { base } = await fixture();
     // In range but unrounded: accepted and truncated, because that is a slider artefact rather than a mistake.
-    const truncated = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45.7 } }))).data.settings as Json;
+    const truncated = (await body(await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45.7 }, autosave: AUTOSAVE_DEFAULT }))).data.settings as Json;
     expect(truncated.revisionHistory.windowMinutes).toBe(45);
     // Out of range either way: a 400, because the GM's control cannot produce one, so a caller that does is malformed.
     for (const windowMinutes of [-1, 10_081]) {
-      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes } });
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes }, autosave: AUTOSAVE_DEFAULT });
       expect(rejected.status, `windowMinutes ${windowMinutes}`).toBe(400);
       expect((await body(rejected)).error.code).toBe("validation_failed");
     }
@@ -1805,11 +2136,13 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     const before = await settings(base, GM);
 
     for (const extra of [{ versionCount: 0 }, { versionBytes: 0 }, { versionCount: 9, versionBytes: 9 }]) {
-      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90, ...extra } });
+      const rejected = await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90, ...extra }, autosave: AUTOSAVE_DEFAULT });
       expect(rejected.status, JSON.stringify(extra)).toBe(400);
     }
     // A missing knob is a 400 too - the PUT replaces the settings wholesale, so a half-body is not a partial edit.
-    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { windowMinutes: 90 } })).status).toBe(400);
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT })).status).toBe(400);
+    // ...and so is a body that forgets the autosave group entirely, for the same wholesale-PUT reason.
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 90 } })).status).toBe(400);
     expect((await put(base, "/api/v1/codex/settings", GM, {})).status).toBe(400);
     // The real figures are unchanged and still the server's own.
     expect(await settings(base, GM)).toEqual(before);
@@ -1818,7 +2151,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
 
   it("deletes every revision at olderThanDays 0 and answers with the real count", async () => {
     const { base, store } = await fixture();
-    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 } }); // keep every save, frozen clock
+    store.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT }); // keep every save, frozen clock
     const page = store.createPage({ title: "Krezk", playerBody: "v0" });
     // Two edits: the first one's prior state is rev 1, which the creation already checkpointed, so the
     // byte-identical duplicate is suppressed. Two pages plus one distinct edit = three rows.
@@ -1851,5 +2184,428 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     // A silent body is a 400 too: the destructive route must not have a meaning when nothing was asked for.
     expect((await del(base, "/api/v1/codex/page-revisions", GM, {})).status).toBe(400);
     expect((await settings(base, GM)).revisionHistory.versionCount).toBe(1);
+  });
+});
+
+/**
+ * D15: resolving a pin without walking the atlas. Two reads, one gate.
+ *
+ * The gate is the CD-6 COMPOUND predicate - the pin revealed AND its map revealed - copied from
+ * `GET /codex/maps/{id}/markers` rather than re-derived, because a second copy of a visibility rule is a
+ * second thing to weaken alone. The two routes answer the failure differently on purpose, and the
+ * difference is the interesting part: the by-id read 404s (a pin id must not become a probe), and the
+ * party read answers `null` (a 404 there would distinguish "there is a party pin you may not see" from
+ * "there is no party pin", which is precisely the bit `isParty` must never grant).
+ */
+describe("codex pin-by-id and party location, HTTP boundary (D15)", () => {
+  const seed = async (base: string, store: CodexStore) => {
+    const page = store.createPage({ title: "Vallaki", playerBody: "a walled town" });
+    const secretPage = store.createPage({ title: "The Ambush", gmBody: "here" });
+    const map = store.createMap({ assetId: randomUUID(), name: "Barovia", kind: "regional" });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label: "Village", pageIds: [page.id, secretPage.id], tags: ["stop"] });
+    store.setPageRevealed(page.id, true);
+    void base;
+    return { page, secretPage, map, marker };
+  };
+
+  it("gives a player a revealed pin on a revealed map, with links filtered and GM linkage stripped", async () => {
+    const { base, store } = await fixture();
+    const { page, map, marker } = await seed(base, store);
+    store.setMapRevealed(map.id, true);
+    store.setMarkerRevealed(marker.id, true);
+
+    const gm = (await body(await get(base, `/api/v1/codex/markers/${marker.id}`, GM))).data.marker as Json;
+    expect(gm.mapId).toBe(map.id);
+    expect(gm.pageIds).toHaveLength(2);
+
+    const player = (await body(await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER))).data.marker as Json;
+    // The EXACT key set: `sceneIds`, `actorId`, `revealedToPlayers` and the timestamps are absent by
+    // construction, and `pageIds` carries only the page the player can actually open.
+    expect(Object.keys(player).sort()).toEqual(["iconColor", "iconId", "id", "isParty", "label", "mapId", "pageIds", "subMapId", "tags", "x", "y"]);
+    expect(player.pageIds).toEqual([page.id]);
+  });
+
+  it("404s a player on a hidden pin, on a pin sitting on a hidden map, and on a bogus id - the same body each time", async () => {
+    const { base, store } = await fixture();
+    const { map, marker } = await seed(base, store);
+
+    const bodies: string[] = [];
+    // Pin hidden, map hidden.
+    let response = await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER);
+    expect(response.status).toBe(404);
+    bodies.push(JSON.stringify((await body(response)).error.message));
+
+    // Pin REVEALED, map still hidden - the compound half that a marker-flag-only gate would miss. The GM
+    // can read it throughout, so these 404s are the gate and not a broken route.
+    store.setMarkerRevealed(marker.id, true);
+    response = await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER);
+    expect(response.status, "a revealed pin on a SECRET map is invisible - CD-6").toBe(404);
+    bodies.push(JSON.stringify((await body(response)).error.message));
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, GM)).status).toBe(200);
+
+    // An id that names nothing at all.
+    response = await get(base, `/api/v1/codex/markers/${randomUUID()}`, PLAYER);
+    expect(response.status).toBe(404);
+    bodies.push(JSON.stringify((await body(response)).error.message));
+    // Identical bodies: a hidden pin must be indistinguishable from one that never existed.
+    expect(new Set(bodies).size, "the three 404s must not be tellable apart").toBe(1);
+
+    // Revealing the MAP lets it through, so all of the above is the gate rather than a route that never works.
+    store.setMapRevealed(map.id, true);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).status).toBe(200);
+  });
+
+  it("answers the party read with null - never a 404 - when there is no party pin or the player may not see it", async () => {
+    const { base, store } = await fixture();
+    const { map, marker } = await seed(base, store);
+
+    // No party pin at all: both roles get exactly `{ party: null }`.
+    for (const headers of [GM, PLAYER]) {
+      const response = await get(base, "/api/v1/codex/party", headers);
+      expect(response.status).toBe(200);
+      expect((await body(response)).data).toEqual({ party: null });
+    }
+
+    store.setPartyMarker(marker.id);
+    // The GM sees it immediately - reveal state is not the GM's gate.
+    const gmParty = (await body(await get(base, "/api/v1/codex/party", GM))).data.party as Json;
+    expect(gmParty.mapName).toBe("Barovia");
+    expect(gmParty.marker.mapId, "the jump target rides on the marker, not as a sibling key").toBe(map.id);
+
+    // The player gets null while the pin is hidden - INDISTINGUISHABLE from "no party pin", which is the
+    // point: `isParty` must never enter a visibility predicate.
+    expect((await body(await get(base, "/api/v1/codex/party", PLAYER))).data).toEqual({ party: null });
+    store.setMarkerRevealed(marker.id, true);
+    expect((await body(await get(base, "/api/v1/codex/party", PLAYER))).data, "a revealed pin on a hidden map is still null").toEqual({ party: null });
+
+    store.setMapRevealed(map.id, true);
+    const shown = (await body(await get(base, "/api/v1/codex/party", PLAYER))).data.party as Json;
+    expect(shown.mapName).toBe("Barovia");
+    expect(shown.marker.isParty).toBe(true);
+    // `mapName` only ever travels with a projected pin, which requires the map to be revealed - so it can
+    // never name a map the player has not been shown.
+    expect(Object.keys(shown).sort()).toEqual(["mapName", "marker"]);
+  });
+
+  it("serves both reads with an ETag that differs per role and answers 304 to a match", async () => {
+    const { base, store } = await fixture();
+    const { map, marker } = await seed(base, store);
+    store.setMapRevealed(map.id, true);
+    store.setMarkerRevealed(marker.id, true);
+
+    const first = await get(base, `/api/v1/codex/markers/${marker.id}`, GM);
+    const tag = first.headers.get("etag")!;
+    expect(tag).toMatch(/^W\/"codex-r\d+-gm-[0-9a-f]{12}"$/);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...GM, "if-none-match": tag })).status).toBe(304);
+    // A player's tag is a DIFFERENT one, so no cache can hand a GM's answer to a player.
+    const playerTag = (await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).headers.get("etag")!;
+    expect(playerTag).not.toBe(tag);
+    // ...and a write moves the revision, so the old tag stops matching.
+    store.updateMarker(marker.id, { label: "The Village" });
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...GM, "if-none-match": tag })).status).toBe(200);
+
+    // A player's conditional probe of a HIDDEN pin still 404s - the gate runs before the tag, so a
+    // conditional request can never turn a 404 into a 304 and confirm the pin exists unchanged.
+    store.setMarkerRevealed(marker.id, false);
+    expect((await get(base, `/api/v1/codex/markers/${marker.id}`, { ...PLAYER, "if-none-match": playerTag })).status).toBe(404);
+  });
+});
+
+/**
+ * D12's ADOPTION PATH: linking downtime rows that already exist to real character pages. Without it the
+ * tracker could only total downtime recorded after the upgrade, which is most of the value gone.
+ */
+describe("codex journal PATCH — the narrow downtime group (D12)", () => {
+  it("edits who/activity/characterPageId, refuses `days`, and refuses the group on any other kind", async () => {
+    const { base, store } = await fixture();
+    const character = store.createPage({ title: "Ireena", entityType: "character" });
+    const entry = store.createDowntime({ playerText: "A month at the forge.", downtime: { who: "Irena", activity: "Forgeing", days: 30 } });
+
+    const patched = (await body(await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, {
+      downtime: { who: "Ireena", activity: "Forging", characterPageId: character.id }
+    }))).data.entry as Json;
+    expect(patched.payload).toEqual({ who: "Ireena", activity: "Forging", days: 30, applied: false, characterPageId: character.id });
+
+    // `days` is IMMUTABLE - it is what `apply-downtime` moves the clock by, so editing it afterwards would
+    // leave the clock disagreeing with the record that justified it. `.strict()` says so rather than
+    // dropping the key silently.
+    const withDays = await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { days: 5 } });
+    expect(withDays.status).toBe(400);
+    expect(JSON.stringify((await body(withDays)).error)).toContain("days");
+    // ...and so is `applied`.
+    expect((await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { applied: true } })).status).toBe(400);
+
+    // An id naming no page is a 404, not a dangling link.
+    expect((await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { characterPageId: randomUUID() } })).status).toBe(404);
+    // `null` clears the link and leaves `who` as the display fallback.
+    const cleared = (await body(await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { characterPageId: null } }))).data.entry as Json;
+    expect(cleared.payload).toMatchObject({ characterPageId: null, who: "Ireena", days: 30 });
+
+    // The group on a NON-downtime record is a 400: a caller sending downtime details to a milestone has
+    // misunderstood something, and hearing so beats being quietly overruled.
+    const milestone = store.createMilestone({ playerText: "Level 5.", milestone: { level: 5, reason: "the crypt" } });
+    const wrongKind = await patch(base, `/api/v1/codex/journal/${milestone.id}`, GM, { downtime: { who: "Ireena" } });
+    expect(wrongKind.status).toBe(400);
+    expect((await body(wrongKind)).error.message).toMatch(/only downtime entries/i);
+    // ...and the milestone's own payload is untouched by the refusal.
+    expect(store.getEntry(milestone.id)!.payload).toEqual({ level: 5, reason: "the crypt" });
+
+    // An ordinary PATCH with no group leaves the payload alone entirely.
+    const prose = (await body(await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { playerText: "A month at the forge, and a week idle." }))).data.entry as Json;
+    expect(prose.payload).toMatchObject({ who: "Ireena", activity: "Forging", days: 30 });
+  });
+});
+
+/**
+ * D16 at the boundary: the export/import round trip a GM actually performs, and the version check.
+ */
+describe("codex export/import, HTTP boundary (D16, R1)", () => {
+  it("round-trips a saved export file POSTed back UNEDITED, and reports the database's own counts", async () => {
+    const { base, store } = await fixture();
+    const page = store.createPage({ title: "Barovia", playerBody: "A misty valley." });
+    store.createSession({ sessionNumber: 4, recapBody: "We crossed." });
+
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    expect(exported.bundleVersion, "the format version is a fact about the FILE, so it sits beside the bundle").toBe(1);
+    expect(Object.keys(exported).sort()).toEqual(["bundleVersion", "codex", "exportedAt"]);
+
+    store.deletePage(page.id);
+    expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(0);
+
+    // The saved file, POSTed back with nothing stripped - `exportedAt` and `bundleVersion` are accepted.
+    const restored = await post(base, "/api/v1/codex/import", GM, exported);
+    expect(restored.status).toBe(200);
+    const result = (await body(restored)).data as Json;
+    expect(result.replaced).toBe(true);
+    expect(result.counts).toMatchObject({ pages: 1, sessions: 1 });
+    expect(Object.keys(result.counts).sort()).toEqual(["connections", "folders", "journal", "maps", "markers", "pages", "quests", "revisions", "sessions", "standing"]);
+    expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(1);
+  });
+
+  it("restores a bundle with NO bundleVersion — every backup taken before this feature existed (R1)", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Barovia" });
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    // The pre-versioning shape: the key simply is not there.
+    const legacy = { codex: exported.codex };
+    expect((await post(base, "/api/v1/codex/import", GM, legacy)).status, "absent = a pre-versioning v1 bundle, and it MUST restore").toBe(200);
+
+    // A version this build does not know is a 400 with structured issues - a bundle from a NEWER build may
+    // carry shapes this one cannot honour, and silently dropping them is the failure a restore must not have.
+    const future = await post(base, "/api/v1/codex/import", GM, { codex: exported.codex, bundleVersion: 2 });
+    expect(future.status).toBe(400);
+    const refusal = await body(future);
+    expect(refusal.error.code).toBe("validation_failed");
+    expect(refusal.error.message).toMatch(/newer version/i);
+    expect((refusal.error.details.issues as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("is GM-only, and refuses a body that is not a bundle without touching the codex", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Barovia" });
+    const before = JSON.stringify(store.exportBundle());
+
+    expect((await post(base, "/api/v1/codex/import", PLAYER, { codex: {} })).status, "a player is authenticated and refused").toBe(403);
+    expect((await fetch(`${base}/api/v1/codex/import`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, "no token at all is a 401").toBe(401);
+    // An integration credential with the WRITE scope may restore; a read-only one may not.
+    expect((await post(base, "/api/v1/codex/import", INTEGRATION_READ, { codex: {} })).status).toBe(403);
+
+    expect((await post(base, "/api/v1/codex/import", GM, {})).status, "`codex` is required").toBe(400);
+    expect((await post(base, "/api/v1/codex/import", GM, { codex: {}, surprise: 1 })).status, "`.strict()`, like every other codex body").toBe(400);
+    expect((await post(base, "/api/v1/codex/import", GM, { codex: { pages: [{ id: "nope" }] } })).status).toBe(400);
+    expect(JSON.stringify(store.exportBundle()), "every refusal left the codex exactly as it was").toBe(before);
+  });
+
+  /**
+   * THE FILE THAT WIPED A REAL CODEX. A bundle that parses as an object but carries no section the codex
+   * recognises used to be indistinguishable from "this campaign is empty": it deleted every page, map, pin,
+   * session, quest and journal entry and answered **200** with `counts.pages: 0`. QA destroyed 22 pages
+   * through the Backup screen doing exactly that.
+   *
+   * The refusal must not cost R1, which is why the last two cases are here: a pre-versioning bundle (no
+   * `bundleVersion` key) still restores, and an explicitly EMPTY campaign - the shape an export of an empty
+   * codex really has - still restores. "Refuse anything that produces zero records" would have broken both.
+   */
+  it("refuses a bundle with no recognised sections instead of wiping the codex, and still honours R1", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Barovia" });
+    store.createSession({ sessionNumber: 1 });
+    const before = JSON.stringify(store.exportBundle());
+
+    for (const codex of [{}, { notes: [] }, { pagez: [{ id: randomUUID() }] }]) {
+      const refused = await post(base, "/api/v1/codex/import", GM, { codex });
+      expect(refused.status, JSON.stringify(codex)).toBe(400);
+      expect((await body(refused)).error.message).toMatch(/no codex sections|does not recognise/i);
+      expect(JSON.stringify(store.exportBundle()), "the codex is untouched").toBe(before);
+    }
+    // The mistyped section is NAMED, so a GM can go and fix the file.
+    expect((await body(await post(base, "/api/v1/codex/import", GM, { codex: { pagez: [] } }))).error.message).toContain('"pagez"');
+
+    // R1 is intact: a pre-versioning bundle (no `bundleVersion`) still restores...
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    expect((await post(base, "/api/v1/codex/import", GM, { codex: exported.codex })).status).toBe(200);
+    // ...and so does a campaign that genuinely holds nothing, which is what makes this a distinction and
+    // not just a refusal.
+    const emptied = await post(base, "/api/v1/codex/import", GM, { codex: { pages: [], journal: [], sessions: [] } });
+    expect(emptied.status).toBe(200);
+    expect((await body(emptied)).data.counts).toMatchObject({ pages: 0, sessions: 0 });
+    expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(0);
+  });
+
+  /**
+   * NO DRIVER TEXT REACHES A CALLER, and an internal failure is not reported as the caller's mistake.
+   *
+   * `malformed()` used to forward `(error as Error).message` for every non-Zod error, so a `codex:write`
+   * integration POSTing a bundle with a duplicate page id got `400 validation_failed` /
+   * "UNIQUE constraint failed: codex_pages.id" - internal table and column names, and a 4xx for a 5xx.
+   *
+   * Most of those cases are now caught before `BEGIN` with copy a GM can read (see the store suite), so the
+   * failure here is forced with a PROBE constraint the real schema does not have - a UNIQUE index over
+   * `codex_pages(title)`, installed from a second connection. That keeps the test pointed at the boundary
+   * behaviour ("what does a caller receive when something unrecognised escapes the store?") rather than at
+   * whichever validation happens to be in place today.
+   */
+  it("answers a sanitized 500 when something unrecognised escapes the store, never the driver's text", async () => {
+    const { base, store, directory } = await fixture();
+    store.createPage({ title: "Barovia" });
+    store.createPage({ title: "Vallaki" });
+    const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
+    const before = JSON.stringify(store.exportBundle());
+
+    const probe = new DatabaseSync(join(directory, "vtt.sqlite"));
+    probe.exec("CREATE UNIQUE INDEX probe_page_title ON codex_pages (title);");
+    probe.close();
+
+    const pages = (exported.codex as Json).pages as Json[];
+    const collide = { ...(exported.codex as Json), pages: [...pages, { ...pages[0], id: randomUUID() }] };
+    const failed = await post(base, "/api/v1/codex/import", GM, { codex: collide });
+
+    expect(failed.status, "a driver failure is this process failing, not the caller's bad request").toBe(500);
+    const envelope = await body(failed);
+    expect(envelope.error.code).toBe("internal_error");
+    expect(envelope.error.message).toBe("The codex request failed.");
+    expect(JSON.stringify(envelope), "no table, no column, no path").not.toMatch(/constraint failed|codex_pages|sqlite/i);
+    expect(envelope.error.requestId, "the sanitized answer still carries the id the caller correlates on").toEqual(expect.any(String));
+    // ...and the transaction still protected the codex, which is the half a 500 must never mean it skipped.
+    expect(JSON.stringify(store.exportBundle())).toBe(before);
+  });
+});
+
+/**
+ * D19: `commandId` idempotency on the codex surface. What a caller needs to be able to rely on is that a
+ * retry across a dropped connection cannot double-create - and that they can tell a replay from a fresh
+ * execution, because otherwise the guarantee is unverifiable from outside.
+ */
+describe("codex commandId idempotency (D19)", () => {
+  it("executes once, replays the identical status and bytes, and says that it replayed", async () => {
+    const { base, store } = await fixture();
+    const commandId = randomUUID();
+    const first = await post(base, "/api/v1/codex/journal", GM, { playerText: "We arrived.", commandId });
+    expect(first.status).toBe(201);
+    expect(first.headers.get("x-idempotent-replay"), "a FIRST execution must not claim to be a replay").toBeNull();
+    const firstBody = await body(first);
+
+    const retry = await post(base, "/api/v1/codex/journal", GM, { playerText: "We arrived.", commandId });
+    expect(retry.status, "a 201 replays as a 201 - the status is stored, not re-derived").toBe(201);
+    expect(retry.headers.get("x-idempotent-replay")).toBe("true");
+    expect(await body(retry), "the same bytes, including the entry's id and timestamps").toEqual(firstBody);
+    // ...and, the point of the whole thing: ONE row.
+    expect(store.listTimeline()).toHaveLength(1);
+
+    // A DIFFERENT id executes again, so the single row above is idempotency and not a broken route.
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "We left.", commandId: randomUUID() });
+    expect(store.listTimeline()).toHaveLength(2);
+    // An omitted id is simply not idempotent - the caller did not ask for it.
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "We left." });
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "We left." });
+    expect(store.listTimeline()).toHaveLength(4);
+  });
+
+  it("records nothing for a FAILED write, so a retry after an error re-executes", async () => {
+    const { base, store } = await fixture();
+    const commandId = randomUUID();
+    // A 404: the session does not exist. Nothing was written, so nothing may be replayed.
+    const failed = await post(base, "/api/v1/codex/journal", GM, { playerText: "Nowhere.", sessionId: randomUUID(), commandId });
+    expect(failed.status).toBe(404);
+
+    // The SAME id now succeeds, because the first attempt stored no outcome - which is the correct
+    // reading of "retry safely": a retry after an error must actually retry.
+    const retried = await post(base, "/api/v1/codex/journal", GM, { playerText: "Somewhere.", commandId });
+    expect(retried.status).toBe(201);
+    expect(retried.headers.get("x-idempotent-replay")).toBeNull();
+    expect(store.listTimeline()).toHaveLength(1);
+  });
+
+  it("works across every JSON-body verb, and is accepted-not-required", async () => {
+    const { base, store } = await fixture();
+    const page = store.createPage({ title: "Barovia" });
+
+    // PATCH
+    const patchId = randomUUID();
+    const patched = await patch(base, `/api/v1/codex/pages/${page.id}`, GM, { playerBody: "A misty valley.", commandId: patchId });
+    expect(patched.status).toBe(200);
+    const revAfterFirst = store.getPage(page.id)!.rev;
+    const patchRetry = await patch(base, `/api/v1/codex/pages/${page.id}`, GM, { playerBody: "A misty valley.", commandId: patchId });
+    expect(patchRetry.headers.get("x-idempotent-replay")).toBe("true");
+    expect(store.getPage(page.id)!.rev, "the replay did not bump the page a second time").toBe(revAfterFirst);
+
+    // PUT
+    const putId = randomUUID();
+    await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45 }, autosave: AUTOSAVE_DEFAULT, commandId: putId });
+    expect((await put(base, "/api/v1/codex/settings", GM, { revisionHistory: { enabled: true, windowMinutes: 45 }, autosave: AUTOSAVE_DEFAULT, commandId: putId })).headers.get("x-idempotent-replay")).toBe("true");
+
+    // A DELETE carries none, and is not replayed: deleting a deleted record already succeeds, so a key
+    // would imply a guarantee the verb already gives. The contract declares no `commandId` on any codex
+    // DELETE body, and the router ignores one rather than treating the second call as a replay.
+    const deleteId = randomUUID();
+    expect((await del(base, `/api/v1/codex/pages/${page.id}`, GM, { commandId: deleteId })).status).toBe(200);
+    expect((await del(base, `/api/v1/codex/pages/${page.id}`, GM, { commandId: deleteId })).headers.get("x-idempotent-replay")).toBeNull();
+    // ...and a malformed key is a 400 like any other bad field, not a silently-ignored one.
+    expect((await post(base, "/api/v1/codex/journal", GM, { playerText: "x", commandId: "not-a-uuid" })).status).toBe(400);
+  });
+
+  /**
+   * A RECEIPT ANSWERS THE REQUEST IT WAS FOR, AND NO OTHER.
+   *
+   * Keyed on the id alone, an idempotency key reused across two different writes replayed the FIRST
+   * response - so the second write never ran and the caller was told 2xx anyway. That is the precise
+   * failure the mechanism exists to prevent, delivered by the mechanism. It is caller error to reuse a key,
+   * but silently discarding a write is not an acceptable answer to caller error, and nothing in the surface
+   * told them: the contract said only "resend the same id to retry safely".
+   *
+   * The last two assertions are what keep the refusal from being a blunt instrument: the ordinary retry
+   * still replays, and a retry with a CORRECTED body on the same route still replays too (that is a client
+   * finishing the request it started, not a new one).
+   */
+  it("refuses a commandId reused for a different request instead of replaying the wrong answer", async () => {
+    const { base, store } = await fixture();
+    const commandId = randomUUID();
+    const created = await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", commandId });
+    expect(created.status).toBe(201);
+
+    const crossed = await post(base, "/api/v1/codex/quests", GM, { title: "The Coffin Run", commandId });
+    expect(crossed.status, "the quest write must not be answered with the page's 201").toBe(400);
+    expect((await body(crossed)).error.message).toMatch(/already used for a different request/i);
+    expect(crossed.headers.get("x-idempotent-replay"), "a refusal is not a replay").toBeNull();
+    expect(store.listQuests(), "...and the refusal really did refuse - nothing was written either way").toEqual([]);
+
+    // The genuine retry still replays, so the guard is the mismatch and not the key.
+    const retry = await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", commandId });
+    expect(retry.headers.get("x-idempotent-replay")).toBe("true");
+    expect((await body(retry)).data.page.id).toBe((await body(created)).data.page.id);
+    // ...as does a retry of the same route with a corrected body: that is one request being finished, not
+    // a new one, and binding to the body would make the key useless to a client fixing a typo.
+    expect((await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki Rebuilt", commandId })).headers.get("x-idempotent-replay")).toBe("true");
+    expect(store.listPages(), "the corrected retry created nothing new").toHaveLength(1);
+  });
+
+  it("never lets a replay skip authorization", async () => {
+    const { base } = await fixture();
+    const commandId = randomUUID();
+    expect((await post(base, "/api/v1/codex/journal", GM, { playerText: "We arrived.", commandId })).status).toBe(201);
+    // A player replaying a GM's key gets the ordinary refusal: the guard runs per route, before the
+    // middleware ever sees the body, so a receipt is not a bearer token.
+    expect((await post(base, "/api/v1/codex/journal", PLAYER, { playerText: "We arrived.", commandId })).status).toBe(403);
+    expect((await fetch(`${base}/api/v1/codex/journal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerText: "x", commandId }) })).status).toBe(401);
   });
 });

@@ -1,7 +1,8 @@
-import { Alert, Badge, Button, Field, IconButton, Input, Select, Switch, TagInput } from "@vtt/ui";
-import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
-import { IconPicker, EntityIcon } from "./icons";
-import { EntityPicker } from "./EntityPicker";
+import { Alert, Badge, Button, Combobox, Field, IconButton, IconPlay, IconPlus, IconX, Input, SaveState, Select, Switch, TagInput } from "@vtt/ui";
+import { atlasApi, journalApi, type CodexAutosaveSettings, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
+import { useCodexAutosave } from "./autosave";
+import { CodexIcon, IconPicker, EntityIcon, pinSwatchVar } from "./icons";
+
 import { RevealSwitch, HiddenFromPlayers } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { socket } from "../socket";
@@ -19,6 +20,8 @@ type MarkerInspectorProps = Readonly<{
   gmToken: string;
   marker: CodexMarker;
   pages: readonly CodexPageSummary[];
+  /** D6's setting, handed down by the shell like every other editor gets it. */
+  autosave: CodexAutosaveSettings;
   maps: readonly CodexMap[];
   scenes: readonly MarkerScene[];
   actors: readonly MarkerActor[];
@@ -43,9 +46,10 @@ type MarkerInspectorProps = Readonly<{
   onClose: () => void;
 }>;
 
-export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onPartyChanged = () => {}, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onRevealMap, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
+export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, autosave, onUpdated, onDeleted, onPartyChanged = () => {}, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onRevealMap, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [label, setLabel] = useState(marker.label ?? "");
+  const [tags, setTags] = useState<readonly string[]>(marker.tags);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // This pin's campaign history — including the battles the combat bridge auto-logs here. Mirrors
@@ -61,6 +65,24 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
     catch { setError("That change didn't save - try again."); }
     finally { setBusy(false); }
   };
+  /**
+   * D6, the arm this panel never had. The inspector wrote through on every control in BOTH modes, so a
+   * GM who turned autosave off — and was told in that very panel that "editors show a Save button and
+   * warn you before you leave with unsaved changes" — got the one editor that behaved the opposite way.
+   *
+   * Scoped to the two fields a GM TYPES. The pickers below (link a page, choose a sub-map, a scene, an
+   * actor, the icon, the colour) stay immediate in both modes, which is D6's own recorded scope call:
+   * choosing from a list is a discrete act, not an edit in progress, exactly like the reveal switch and
+   * the party toggle. Selecting a DIFFERENT pin used to skip the router guard, because the atlas held the
+   * selection in local state and nothing navigated; it is an address now (`AtlasView`'s `selectPin`), so
+   * leaving this draft by any route — another pin, another map, Back, Close — asks first.
+   */
+  const draft = useMemo(() => ({ label: label.trim(), tags }), [label, tags]);
+  const saveDetails = useCallback(async (next: { label: string; tags: readonly string[] }) => {
+    onUpdated(await atlasApi.updateMarker(gmToken, marker.id, { label: next.label || null, tags: [...next.tags] }));
+  }, [gmToken, marker.id, onUpdated]);
+  const details = useCodexAutosave({ settings: autosave, draft, save: saveDetails });
+
   const reveal = async (revealed: boolean) => {
     setError(null);
     try { onUpdated(await atlasApi.revealMarker(gmToken, marker.id, revealed)); }
@@ -74,13 +96,13 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const setParty = async (isParty: boolean) => {
     setBusy(true); setError(null);
     try { onUpdated(await atlasApi.setPartyMarker(gmToken, marker.id, isParty)); await onPartyChanged(); }
-    catch { setError("Couldn't move the party marker."); }
+    catch { setError("Couldn't move the party pin."); }
     finally { setBusy(false); }
   };
   const remove = async () => {
-    if (!(await confirm({ title: "Delete marker", body: "Delete this marker? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
+    if (!(await confirm({ title: "Delete pin", body: "Delete this pin? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     try { await atlasApi.deleteMarker(gmToken, marker.id); onDeleted(marker.id); }
-    catch { setError("Couldn't delete the marker."); }
+    catch { setError("Couldn't delete the pin."); }
   };
 
   // Hint from the tags already in use on pages and on the atlas, so one vocabulary spans the suite.
@@ -99,17 +121,17 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const availableScenes = scenes.filter((scene) => !marker.sceneIds.includes(scene.id));
   const danglingScenes = marker.sceneIds.filter((id) => !scenes.some((scene) => scene.id === id)).length;
   const secretLinkedPages = linkedPages.filter((page) => marker.revealedToPlayers && !page.revealedToPlayers);
-  // A linked actor that has since been removed from the roster would otherwise render as "— none —"
+  // A linked actor that has since been removed from the roster would otherwise render as "None"
   // while the id quietly persists on the marker — same honesty the scene links already get.
   const danglingActor = marker.actorId !== null && !actors.some((actor) => actor.id === marker.actorId);
 
   return (
-    <aside className="codex-inspector" aria-label="Marker">
+    <aside className="codex-inspector" aria-label="Pin">
       <div className="codex-inspector-head">
-        <strong>{marker.label || "Marker"}</strong>
+        <strong>{marker.label || "Unlabelled pin"}</strong>
         <div className="codex-inspector-head-actions">
-          <RevealSwitch revealed={marker.revealedToPlayers} onChange={reveal} ariaLabel="Show this marker to players" />
-          <IconButton label="Close" size="sm" onClick={onClose}>✕</IconButton>
+          <RevealSwitch revealed={marker.revealedToPlayers} onChange={reveal} ariaLabel="Show this pin to players" />
+          <IconButton label="Close" size="sm" onClick={onClose}><IconX /></IconButton>
         </div>
       </div>
 
@@ -117,16 +139,16 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
 
       <Field label="Label" htmlFor="marker-label">
         <Input id="marker-label" value={label} placeholder="Unnamed" disabled={busy}
-          onChange={(event) => setLabel(event.target.value)} onBlur={() => label !== (marker.label ?? "") && patch({ label: label.trim() || null })} />
+          onChange={(event) => setLabel(event.target.value)} />
       </Field>
 
-      {/* Sits with Label because both describe the pin itself, above the link wiring. Each committed tag
-          saves straight away, like the icon/colour/link controls here — the inspector has no Save button,
-          so a staged tag list would be the one thing in this panel that could be lost by closing it. */}
+      {/* Sits with Label because both describe the pin itself, above the link wiring. Both ride the
+          shared autosave hook: with it on they save shortly after the last edit, with it off they wait
+          for the Save button below and say so until it is pressed. */}
       <Field label="Tags" htmlFor="marker-tags">
-        <TagInput id="marker-tags" ariaLabel="Tags" placeholder="dungeon, shop" values={marker.tags}
-          onChange={(next) => patch({ tags: next })}
-          max={24} maxReachedReason="A marker may carry at most 24 tags."
+        <TagInput id="marker-tags" ariaLabel="Tags" placeholder="dungeon, shop" values={tags}
+          onChange={setTags}
+          max={24} maxReachedReason="A pin may carry at most 24 tags."
           suggestions={tagSuggestions}
           /* DEFAULT slugify — it is the server's own contract (`tags()` throws on a non-slug rather
              than cleaning it up), so normalising here is what keeps a typed "Old Mill" saveable. */ />
@@ -143,11 +165,9 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
           aria-label="This pin is the party's position"
           label={marker.isParty ? "The party is here" : "Not the party's position"} />
         <p className="codex-inspector-hint">{marker.isParty
-          ? <>Players see this pin marked as the party. Drag it to move the party — it is an ordinary pin, so its own position is the party's.</>
-          : <>Only one pin in the whole atlas can be the party. Turning this on clears whichever pin held it before, wherever it was.</>}</p>
+          ? <>Players see this pin marked as the party. Drag the pin to move the party.</>
+          : <>Only one pin in the atlas can be the party. Turning this on clears the pin that held it before.</>}</p>
       </div>
-
-      <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
 
       <Field label="Linked pages">
         <div className="codex-marker-links">
@@ -156,25 +176,28 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
               <button type="button" className="codex-marker-link-open" onClick={() => onOpenPage(page.id)}>
                 <EntityIcon type={page.entityType} /> <span className="codex-list-title">{page.title}</span>
               </button>
-              <button type="button" className="codex-marker-link-x" aria-label={`Unlink ${page.title}`} disabled={busy} onClick={() => patch({ pageIds: marker.pageIds.filter((id) => id !== page.id) })}>✕</button>
+              <IconButton label={`Unlink ${page.title}`} size="sm" onClick={() => patch({ pageIds: marker.pageIds.filter((id) => id !== page.id) })}><IconX /></IconButton>
             </div>
           ))}
-          <EntityPicker pages={unlinkedPages} value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page…" />
-          <Button variant="ghost" size="sm" onClick={onCreatePage}>＋ New page{marker.label ? ` “${marker.label}”` : ""}</Button>
+          <Combobox options={unlinkedPages.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
+            value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page" />
+          {/* D7: opens the ONE quick-create dialog, prefilled with the pin's label, and links the new
+              page to this pin on success — it no longer creates an untyped page behind the GM's back. */}
+          <Button variant="ghost" size="sm" onClick={onCreatePage}><IconPlus /> New page{marker.label ? ` “${marker.label}”` : ""}</Button>
         </div>
       </Field>
       {shownOnHiddenMap && (
-        <p className="codex-inspector-hint">This pin is shown, but the map <strong>{markerMap!.name}</strong> is still secret, so players cannot see either{onRevealMap ? <> — <button type="button" className="codex-linklike" onClick={onRevealMap}>show the map too</button>.</> : "."}</p>
+        <p className="codex-inspector-hint">This pin is shown to players, but the map <strong>{markerMap!.name}</strong> is hidden from them. Players cannot see either.{onRevealMap ? <> <button type="button" className="codex-linklike" onClick={onRevealMap}>Show the map too</button>.</> : null}</p>
       )}
       {secretLinkedPages.map((page) => (
-        <p key={page.id} className="codex-inspector-hint">This pin is shown, but <strong>{page.title}</strong> is still secret — <button type="button" className="codex-linklike" onClick={() => onRevealPage(page.id)}>reveal it too</button>.</p>
+        <p key={page.id} className="codex-inspector-hint">This pin is shown to players, but <strong>{page.title}</strong> is hidden from them. <button type="button" className="codex-linklike" onClick={() => onRevealPage(page.id)}>Show it to players too</button>.</p>
       ))}
 
       {subMaps.length > 0 && (
         <Field label="Drills into map" htmlFor="marker-submap">
           <div className="codex-marker-submap">
             <Select id="marker-submap" value={marker.subMapId ?? ""} disabled={busy} onChange={(event) => patch({ subMapId: event.target.value || null })}>
-              <option value="">— none —</option>
+              <option value="">None</option>
               {subMaps.map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
             </Select>
             {marker.subMapId && <Button variant="secondary" size="sm" arrow onClick={() => onOpenMap(marker.subMapId!)}>Enter</Button>}
@@ -188,30 +211,30 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             {linkedScenes.map((scene) => (
               <div key={scene.id} className="codex-marker-link">
                 {activeSceneId === scene.id
-                  ? <Badge tone="success">● Live</Badge>
-                  : <Button variant="primary" size="sm" onClick={() => onActivateScene(scene.id)}>▶ Go live</Button>}
+                  ? <Badge tone="success"><span className="codex-dot" aria-hidden="true" /> Live</Badge>
+                  : <Button variant="secondary" size="sm" onClick={() => onActivateScene(scene.id)}><IconPlay /> Go live</Button>}
                 <span className="codex-marker-link-name codex-list-title">{scene.name}</span>
-                <button type="button" className="codex-marker-link-x" aria-label={`Unlink ${scene.name}`} disabled={busy} onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => id !== scene.id) })}>✕</button>
+                <IconButton label={`Unlink ${scene.name}`} size="sm" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => id !== scene.id) })}><IconX /></IconButton>
               </div>
             ))}
             {availableScenes.length > 0 && (
               <Select aria-label="Link a scene" value="" disabled={busy} onChange={(event) => event.target.value && patch({ sceneIds: [...marker.sceneIds, event.target.value] })}>
-                <option value="">Link a scene…</option>
+                <option value="">Link a scene</option>
                 {availableScenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
               </Select>
             )}
           </div>
         </Field>
       )}
-      {danglingScenes > 0 && <p className="codex-inspector-hint">{danglingScenes} linked scene{danglingScenes === 1 ? "" : "s"} no longer exist — <button type="button" className="codex-linklike" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}>clear</button>.</p>}
+      {danglingScenes > 0 && <p className="codex-inspector-hint">{danglingScenes} linked scene{danglingScenes === 1 ? "" : "s"} no longer exist. <button type="button" className="codex-linklike" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}>Clear them</button>.</p>}
 
       {actors.length > 0 && (
-        <Field label="Linked actor" htmlFor="marker-actor" help="Who or what holds this place — an NPC, a monster, a creature stationed here.">
+        <Field label="Linked actor" htmlFor="marker-actor" help="An actor from the combat roster.">
           <Select id="marker-actor" value={marker.actorId ?? ""} disabled={busy} onChange={(event) => patch({ actorId: event.target.value || null })}>
-            <option value="">— none —</option>
+            <option value="">None</option>
             {actors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
           </Select>
-          {danglingActor && <p className="codex-inspector-hint">The linked actor no longer exists — <button type="button" className="codex-linklike" onClick={() => patch({ actorId: null })}>clear it</button>.</p>}
+          {danglingActor && <p className="codex-inspector-hint">The linked actor no longer exists. <button type="button" className="codex-linklike" onClick={() => patch({ actorId: null })}>Clear it</button>.</p>}
         </Field>
       )}
 
@@ -233,7 +256,23 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             </ul>}
       </div>
 
-      <div className="codex-inspector-foot"><Button variant="ghost" size="sm" onClick={remove}>Delete marker</Button></div>
+      {/* D25 / G16 — the icon-and-colour grid is ~500px tall and used to sit directly under the label,
+          burying every functional control (links, sub-map, scenes, actor, journal) below the fold. It is
+          the least-used half of this panel, so it moves last and starts collapsed, with the current
+          icon in the summary so the GM can see what they have without opening it. */}
+      <details className="codex-marker-appearance">
+        <summary className="codex-marker-appearance-summary">
+          <CodexIcon iconId={marker.iconId} className="codex-ent-icon" style={{ color: pinSwatchVar(marker.iconColor) }} />
+          Appearance
+        </summary>
+        <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
+      </details>
+
+      <div className="codex-inspector-foot">
+        <SaveState status={details.status} />
+        {!autosave.enabled && <Button variant="secondary" size="sm" disabled={!details.dirty} onClick={() => void details.flush()}>Save pin</Button>}
+        <Button variant="ghost" size="sm" onClick={remove}>Delete pin</Button>
+      </div>
       {confirmDialog}
     </aside>
   );

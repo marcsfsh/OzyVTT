@@ -87,8 +87,10 @@
 .encounter-end { width: 100%; margin-top: .6rem; padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .encounter-end:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 .encounter-end:disabled { opacity: .45; cursor: not-allowed; }
-/* Hidden actor's turn = a GM-only caution (violet). */
-.hidden-turn { padding: .7rem; border-left: 4px solid var(--caution); background: var(--surface-2); color: var(--violet-hi) !important; }
+/* Hidden actor's turn = GM-ONLY information, so it is violet — and now says so with the violet
+   token rather than borrowing --caution, which D21 moved to warm orange. Violet is reserved for
+   GM-only (invariant 8); this row is exactly that, so the hue is right and only the token was wrong. */
+.hidden-turn { padding: .7rem; border-left: 4px solid var(--violet); background: var(--surface-2); color: var(--violet-hi) !important; }
 .encounter-feedback { min-height: 1.3rem; color: var(--text-dim) !important; }
 /* HP tracking: GM rows carry an exact chip that expands an inline editor; players see bands. */
 .initiative-list.gm > li { flex-direction: column; align-items: stretch; }

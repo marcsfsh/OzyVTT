@@ -42,8 +42,8 @@ vi.mock("./api", async (importOriginal) => {
     codexApi: {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
-      listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a),
+      listConnections: (...a: unknown[]) => listRelationships(...a),
+      party: (...a: unknown[]) => listLinks(...a),
       markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
@@ -67,15 +67,16 @@ vi.mock("./api", async (importOriginal) => {
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
       chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listRelationships: (...a: unknown[]) => playerListRelationships(...a),
-      listLinks: (...a: unknown[]) => playerListLinks(...a),
+      listConnections: (...a: unknown[]) => playerListRelationships(...a),
+      party: (...a: unknown[]) => playerListLinks(...a),
       standing: (...a: unknown[]) => playerStanding(...a)
     }
   };
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { goTo } from "../../test/route";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexPageSummary, PlayerCodexChronicleRecord, PlayerCodexMap, PlayerCodexPageSummary } from "./api";
 
@@ -105,14 +106,14 @@ const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   id: "j1", playerText: "The party crossed the mists.", gmText: null, revealedToPlayers: false, kind: "note",
   attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
 /** One GM chronicle row — the shape the dashboard's own feed has taken since M11 (see the suite below). */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -120,16 +121,16 @@ const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord 
 const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", revealedToPlayers: true };
 
-const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => (goTo("/codex"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 const gmDefaults = () => {
   listPages.mockResolvedValue(PAGES);
   listRelationships.mockResolvedValue([]);
-  listLinks.mockResolvedValue([]);
+  listLinks.mockResolvedValue(null);
   markersForPage.mockResolvedValue([]);
   forPage.mockResolvedValue([]);
   listFolders.mockResolvedValue([]);
-  getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
-  search.mockResolvedValue([]);
+  getPage.mockResolvedValue({ page: null, connections: [] });
+  search.mockResolvedValue({ hits: [], truncated: false });
   timeline.mockResolvedValue([]);
   chronicle.mockResolvedValue([]);
   listMaps.mockResolvedValue([]);
@@ -145,10 +146,10 @@ const PLAYER_PAGES: PlayerCodexPageSummary[] = [
 ];
 const PLAYER_MAPS: PlayerCodexMap[] = [{ id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", parentMapId: null, tags: [] }];
 // CT-11: the player Journal reads the CHRONICLE, so a player's rows arrive in the unified record shape.
-const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionNumber: 3, realDate: null, inWorldLabel: null, tags: [], payload: null, fired: false, createdAt: "2026-07-20T00:00:00.000Z" };
-const PLAYER_OLDER: PlayerCodexChronicleRecord = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
+const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionId: null, sessionNumber: 3, realDate: null, inWorldLabel: null, inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false, createdAt: "2026-07-20T00:00:00.000Z" };
+const PLAYER_OLDER: PlayerCodexChronicleRecord = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionId: null, sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
 /** A revealed dated `event` page on the same chronicle — the record kind CT-11 added to this feed. */
-const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", tags: [], payload: null, fired: false, createdAt: "2026-07-10T00:00:00.000Z" };
+const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", inWorldDate: null, calendarInstant: null, tags: [], payload: null, fired: false, createdAt: "2026-07-10T00:00:00.000Z" };
 const playerDefaults = () => {
   playerListPages.mockResolvedValue(PLAYER_PAGES);
   playerListMaps.mockResolvedValue(PLAYER_MAPS);
@@ -156,30 +157,33 @@ const playerDefaults = () => {
   // Oldest first, as the server's revealed timeline arrives.
   playerChronicle.mockResolvedValue([PLAYER_OLDER, PLAYER_EVENT, PLAYER_ENTRY]);
   playerListRelationships.mockResolvedValue([]);
-  playerListLinks.mockResolvedValue([]);
+  playerListLinks.mockResolvedValue(null);
   playerStanding.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
 };
 
-describe("The mode is called Campaign — everywhere (CI-7)", () => {
+describe("Home is the section name, and 'World' is not a destination (CI-7 / D1)", () => {
   it("on the GM mode bar, and 'World' is gone from it", async () => {
     gmDefaults();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    expect(screen.getByRole("tab", { name: "Campaign" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "World" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
+    // Queried as a BUTTON inside the sidebar, not as a `role="tab"`: D1 deleted the tab bar outright,
+    // so `queryByRole("tab")` matches nothing in this app whatever the label is — the assertion could
+    // never have failed. "World" is now a group EYEBROW in the nav, which is not a destination.
+    expect(within(screen.getByRole("navigation", { name: "Codex sections" })).queryByRole("button", { name: "World" })).not.toBeInTheDocument();
   });
 
   it("on the PLAYER mode bar too — the split the plan warned about is between these two", async () => {
     playerDefaults();
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
 
-    expect(screen.getByRole("tab", { name: "Campaign" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "World" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
+    expect(within(screen.getAllByRole("navigation", { name: "Codex sections" })[0]).queryByRole("button", { name: "World" })).not.toBeInTheDocument();
     // And it is where a player LANDS (CI-7: "both GM and players land here").
-    expect(screen.getByRole("tab", { name: "Campaign" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
   });
 
   it("as the command palette's goto target — which must still reach the mode, not just be relabelled", async () => {
@@ -188,13 +192,13 @@ describe("The mode is called Campaign — everywhere (CI-7)", () => {
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
     const palette = within(screen.getByRole("dialog", { name: "Codex command palette" }));
     expect(palette.queryByText("Go to World")).not.toBeInTheDocument();
-    await user.click(palette.getByText("Go to Campaign"));
+    await user.click(palette.getByText("Go to Home"));
 
     // The target is the mode, not the label: a renamed action wired to a dead id would leave Pages open.
-    expect(screen.getByRole("tab", { name: "Campaign" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
     expect(await screen.findByRole("navigation", { name: "Recently updated pages" })).toBeInTheDocument();
   });
 });
@@ -220,7 +224,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
 
   const openCampaign = async (user: ReturnType<typeof userEvent.setup>) => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await user.click(screen.getByRole("button", { name: "Home" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
   };
 
@@ -233,7 +237,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     expect(await screen.findByText("Character")).toBeInTheDocument();
     // Recent journal activity, newest first — the feed arrives oldest-first, so the order is the
     // dashboard's own work. "Recent" that lists the oldest thing first is not recent.
-    const journal = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    const journal = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     const rows = journal.getAllByRole("button").map((row) => row.textContent ?? "");
     expect(rows[0]).toContain("A battle was fought here.");
     expect(rows[1]).toContain("The party crossed the mists.");
@@ -244,7 +248,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     expect(atlas.getByText("Barovia map")).toBeInTheDocument();
     expect(atlas.getByText("Castle Ravenloft")).toBeInTheDocument();
     // The campaign's current date, formatted against the campaign's own calendar.
-    expect(screen.getByText("Now: Hammer 3, 1492 DR")).toBeInTheDocument();
+    expect(screen.getByText(/(Your date|Today): Hammer 3, 1492 DR/)).toBeInTheDocument();
   });
 
   it("a journal row jumps to the Journal with THAT entry marked (R1)", async () => {
@@ -252,10 +256,10 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     renderWorkspace();
     await openCampaign(user);
 
-    const journal = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    const journal = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     await user.click(journal.getByText("The party crossed the mists."));
 
-    expect(screen.getByRole("tab", { name: "Journal" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
     // Prepared, not merely "the Journal, somewhere in a year of entries".
     await waitFor(() => expect(document.getElementById("codex-entry-j1")).toHaveAttribute("aria-current", "true"));
     expect(document.getElementById("codex-entry-j2")).not.toHaveAttribute("aria-current");
@@ -270,7 +274,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     // The SECOND map, so landing on the atlas's default first map is a failure rather than a pass.
     await user.click(atlas.getByText("Barovia map"));
 
-    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     await waitFor(() => expect(screen.getByTestId("map-surface")).toHaveAttribute("data-asset", "a1"));
   });
 
@@ -279,7 +283,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await user.click(screen.getByRole("button", { name: "Home" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The codex request failed (500).");
   });
@@ -292,8 +296,12 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     renderWorkspace();
     await openCampaign(user);
 
-    expect(await screen.findByRole("navigation", { name: "Recent journal activity" })).toBeInTheDocument();
-    expect(screen.queryByText(/No entries yet/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole("navigation", { name: "Latest journal activity" })).toBeInTheDocument();
+    // The claim under test is the WHOLE-SURFACE empty state — the `h3` that replaces the dashboard and
+    // says "create your first page" over a live campaign. Individual cards saying "No pages yet." inside
+    // their own frame are telling the truth (the page list really is empty), so the assertion is scoped
+    // to the heading rather than to the string, which the card chassis now also uses.
+    expect(screen.queryByRole("heading", { name: /No pages yet/i })).not.toBeInTheDocument();
   });
 });
 
@@ -318,7 +326,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
   });
   const STANDING = RECORD({ kind: "standing", id: "s1", text: "", payload: { factionPageId: "p1", delta: -2, reason: "the stolen ledger" } });
   const MILESTONE = RECORD({ kind: "milestone", id: "m1", text: "", payload: { level: 5, reason: "Barovia" } });
-  const DOWNTIME = RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging", days: 7, applied: false } });
+  const DOWNTIME = RECORD({ kind: "downtime", id: "w1", text: "A quiet tenday.", payload: { who: "Aldric", activity: "Forging", days: 7, characterPageId: null, applied: false } });
 
   beforeEach(() => {
     gmDefaults();
@@ -327,7 +335,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
 
   const openCampaign = async (user: ReturnType<typeof userEvent.setup>) => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    await user.click(screen.getByRole("button", { name: "Home" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
   };
 
@@ -336,7 +344,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
     renderWorkspace();
     await openCampaign(user);
 
-    const feed = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     expect(feed.queryByText("The duke's ultimatum expires.")).not.toBeInTheDocument();
     // Still on the screen — in the card that exists to carry it, which is the half that makes this a
     // de-duplication rather than a deletion.
@@ -348,21 +356,37 @@ describe("A record with a card of its own does not also sit in the feed (owner d
     renderWorkspace();
     await openCampaign(user);
 
-    const feed = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     expect(feed.queryByText(/the stolen ledger/)).not.toBeInTheDocument();
     expect(feed.getByText("The party crossed the mists.")).toBeInTheDocument();
   });
 
-  it("keeps downtime and milestones IN the feed — the dashboard has no card for either", async () => {
+  it("keeps milestones IN the feed — the dashboard has no card for them", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await openCampaign(user);
 
-    const feed = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
-    expect(feed.getByText("A quiet tenday.")).toBeInTheDocument();
+    const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     // A milestone carries its meaning in its PAYLOAD, not its prose, so the row reads through the shared
     // summary rule rather than through an empty `text`.
     expect(feed.getByText(/Reached level 5/)).toBeInTheDocument();
+  });
+
+  /**
+   * Downtime is the case the rule was written before: `applied: false` gives it a card of its own with
+   * the Confirm affordance on it, so leaving it in the feed rendered one record twice on one dashboard.
+   * De-duplicated by ID rather than by kind, because `DASHBOARD_CARDED_KINDS` is shared with the player,
+   * who has no such card and should still read downtime on their timeline.
+   */
+  it("moves UNCONFIRMED downtime out of the feed and into the card that can act on it", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await openCampaign(user);
+
+    const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
+    expect(feed.queryByText("A quiet tenday.")).not.toBeInTheDocument();
+    // Still on the screen — the half that makes this a de-duplication rather than a deletion.
+    expect(within(screen.getByRole("navigation", { name: "Downtime pending" })).getByText(/Aldric/)).toBeInTheDocument();
   });
 });
 
@@ -370,10 +394,10 @@ describe("The player's Campaign dashboard is the server's projection (CI-7, view
   beforeEach(playerDefaults);
 
   it("renders the entries and maps the SERVER sent, with no reveal state a player was never given", async () => {
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
 
-    const journal = within(await screen.findByRole("navigation", { name: "Recent journal activity" }));
+    const journal = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     expect(journal.getByText("The party crossed the mists.")).toBeInTheDocument();
     // Same notion of "recent" as the GM's dashboard, over the revealed set the server sent.
     expect((journal.getAllByRole("button")[0].textContent ?? "")).toContain("The party crossed the mists.");
@@ -387,12 +411,12 @@ describe("The player's Campaign dashboard is the server's projection (CI-7, view
 
   it("a player's journal row jumps to the revealed timeline with that entry marked (R1)", async () => {
     const user = userEvent.setup();
-    render(<PlayerCodex token="player" />);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
 
-    await user.click(within(await screen.findByRole("navigation", { name: "Recent journal activity" })).getByText("The party crossed the mists."));
+    await user.click(within(await screen.findByRole("navigation", { name: "Latest journal activity" })).getByText("The party crossed the mists."));
 
-    expect(screen.getByRole("tab", { name: "Journal" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
     await waitFor(() => expect(document.getElementById("codex-player-entry-j1")).toHaveAttribute("aria-current", "true"));
   });
 });

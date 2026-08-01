@@ -31,6 +31,27 @@ describe("IntegrationCredentialStore", () => {
     expect((await readFile(databasePath)).includes(Buffer.from(issued.token))).toBe(false);
   }));
 
+  /**
+   * The codex scopes are a plain addition to the enum, so the store needs no change at all - which is
+   * exactly the claim worth pinning, because "no change needed" is how a scope ends up mintable but
+   * unverifiable. Independence is the second claim: `codex:write` must not open a read.
+   */
+  it("mints and verifies the codex scopes, and keeps read and write independent", async () => withStore(async (store) => {
+    const issued = store.create({ name: "Worldbuilding bot", scopes: ["codex:read", "codex:write"], gameId: null });
+    expect(issued.metadata.scopes).toEqual(["codex:read", "codex:write"]);
+    expect(store.verify(issued.token, "codex:read")?.name).toBe("Worldbuilding bot");
+    expect(store.verify(issued.token, "codex:write")?.name).toBe("Worldbuilding bot");
+
+    const readOnly = store.create({ name: "Wiki mirror", scopes: ["codex:read"], gameId: null });
+    expect(store.verify(readOnly.token, "codex:read")).not.toBeNull();
+    expect(store.verify(readOnly.token, "codex:write")).toBeNull();
+    // ...and a codex credential is not a game credential, however convenient that would be.
+    expect(store.verify(readOnly.token, "game:read")).toBeNull();
+    // `admin` still implies everything, including the new pair.
+    const admin = store.create({ name: "Admin tool", scopes: ["admin"], gameId: null });
+    expect(store.verify(admin.token, "codex:write")).not.toBeNull();
+  }));
+
   it("enforces scopes and game binding and records safe use/failure audit events", async () => withStore(async (store) => {
     const gameId = "60a6e172-9ff5-44a3-8a8b-93f836f0d16b";
     const issued = store.create({ name: "Combat bot", scopes: ["combat:read"], gameId });

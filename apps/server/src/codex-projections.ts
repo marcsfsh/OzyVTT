@@ -1,5 +1,5 @@
 import { deadlineFired } from "./codex-store.js";
-import type { CodexBacklinkRow, CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
+import type { CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexConnectionRow, CodexConnectionSourceKind, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexPageConnectionRow, CodexRecordKind, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -36,7 +36,6 @@ export type PlayerCodexPageSummary = Readonly<{
   updatedAt: string;
 }>;
 
-export type CodexBacklink = Readonly<{ sourcePageId: string; sourceTitle: string; section: string | null }>;
 
 export function projectGmPage(row: CodexPageRow): GmCodexPage {
   return row;
@@ -60,44 +59,120 @@ export function projectPlayerPageSummary(row: CodexPageSummaryRow): PlayerCodexP
   return { id: row.id, title: row.title, entityType: row.entityType, folder: row.folder, tags: row.tags, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
 }
 
-// ----- Relationships -----
+// ----- Connections (D8: ONE gate, both origins) -----
 
-export function projectGmRelationships(views: readonly CodexRelationshipView[]): CodexRelationshipView[] {
-  return [...views];
+/**
+ * D8/D13: whether ONE connection may travel to a player. Three conditions, ALL of which must hold, and
+ * each is copied from the feed that already enforced it rather than invented here:
+ *
+ *   1. **The target page is revealed.** An edge to a page a player cannot open tells them that page
+ *      EXISTS and draws them a line to it - the leak `projectPlayerQuest` filters `entityIds` for.
+ *   2. **The SOURCE record is player-visible, per its own kind's PROJECTION.** A page, session or quest by
+ *      its own reveal flag; a journal entry by `projectPlayerJournalEntry`, which is strictly stronger than
+ *      the raw flag (a `standing` record is also gated on its faction page, a `quest` record on its quest).
+ *      "Its own flag" is what this used to say, and it was wrong for exactly one kind - which is how a
+ *      revealed standing record about a secret faction reached a player here while every other journal
+ *      surface hid it. Resolved by the caller and handed in, because a projection that reached back into
+ *      the store would be a second place that decides what a player may see.
+ *   3. **`layer === "player"`.** D13's rule, and it now applies to DECLARED edges too, which is stronger
+ *      than the old relationship gate: a connection the GM declared on the GM layer never travels, even
+ *      between two revealed pages. A link written in a GM body is a GM note ABOUT a connection, not a
+ *      connection the party has been shown - and the revealed player half of the same record may say
+ *      nothing of the sort.
+ *
+ * All three are load-bearing. (1) alone leaks GM-layer edges between two revealed pages; (3) alone leaks
+ * the existence of unrevealed pages named from a revealed body; (2) alone leaks edges into secret pages.
+ */
+export type PlayerConnectionContext = Readonly<{
+  /** Page ids the player may see. Both a connection's target and a page-kind source are checked against it. */
+  revealedPageIds: ReadonlySet<string>;
+  /**
+   * Non-page source records the player may see. The caller builds it by running each record through that
+   * kind's own player projection - NOT by reading its reveal flag - so this set can never be weaker than
+   * the list endpoint for the same kind. Absent ids fail CLOSED: nothing travels.
+   */
+  revealedSourceIds: ReadonlySet<string>;
+}>;
+
+const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
+
+function connectionSourceVisible(kind: CodexConnectionSourceKind, sourceId: string, context: PlayerConnectionContext): boolean {
+  return kind === "page" ? context.revealedPageIds.has(sourceId) : context.revealedSourceIds.has(sourceId);
 }
-/** A player sees an edge only when the OTHER endpoint is revealed (the page they're on already is). */
-export function projectPlayerRelationships(views: readonly CodexRelationshipView[]): CodexRelationshipView[] {
-  return views.filter((view) => view.otherRevealed);
-}
-/** The whole-graph edge feed: a player sees an edge only when BOTH endpoints are revealed pages. */
-export function projectPlayerRelationshipEdges(edges: readonly CodexRelationshipRow[], revealedPageIds: ReadonlySet<string>): CodexRelationshipRow[] {
-  return edges.filter((edge) => revealedPageIds.has(edge.fromPageId) && revealedPageIds.has(edge.toPageId));
-}
 
-// ----- Wiki-link edges (CI-8: the Graph's second edge kind, beside the typed relationships) -----
-
-/** One `[[wiki link]]` edge as either audience receives it. `layer` is store-side bookkeeping and never ships. */
-export type CodexLinkEdge = Readonly<{ fromPageId: string; toPageId: string }>;
-
-export function projectGmLinkEdges(edges: readonly CodexLinkEdgeRow[]): CodexLinkEdge[] {
-  return edges.map((edge) => ({ fromPageId: edge.fromPageId, toPageId: edge.toPageId }));
+/** The whole-graph feed, GM: passthrough. Ids, labels, layers, origins and timestamps are all GM-visible. */
+export function projectGmConnections(edges: readonly CodexConnectionRow[]): CodexConnectionRow[] {
+  return [...edges];
 }
 
 /**
- * The player's wiki-link graph. TWO rules, each copied from the feed that already enforces it rather
- * than invented here:
- *   1. BOTH endpoints revealed - `projectPlayerRelationshipEdges`. An edge with one visible end is worse
- *      than useless: it tells a player a page they cannot see EXISTS, and draws them a line to it.
- *   2. The `player` layer only - `projectPlayerBacklinks`. A link written in a page's GM body is a GM
- *      note about a connection, not a connection the players have been shown; the revealed player body
- *      of the very same page may say nothing of the sort.
- * Both must hold. Rule 1 alone would leak GM-body links between two revealed pages; rule 2 alone would
- * leak the existence of unrevealed pages linked from a revealed player body.
+ * A connection as a PLAYER receives it.
+ *
+ * VIEWER-SAFETY JUSTIFICATION, per dropped key: `id` goes because a player never addresses a connection
+ * (there is no player write route, and an id would be a handle to something they cannot act on);
+ * `layer` goes because every connection they receive is on the player layer, so the key could only ever
+ * be a constant - and a constant that names the OTHER layer's existence; `createdAt` goes because when
+ * the GM drew a line is GM authoring metadata, exactly as `rev` and `updatedAt` are everywhere else here.
  */
-export function projectPlayerLinkEdges(edges: readonly CodexLinkEdgeRow[], revealedPageIds: ReadonlySet<string>): CodexLinkEdge[] {
+export type PlayerCodexConnection = Readonly<{
+  fromKind: CodexConnectionSourceKind;
+  fromId: string;
+  toPageId: string;
+  label: string | null;
+  origin: "declared" | "mention";
+}>;
+
+export function projectPlayerConnections(edges: readonly CodexConnectionRow[], context: PlayerConnectionContext): PlayerCodexConnection[] {
   return edges
-    .filter((edge) => edge.layer === "player" && revealedPageIds.has(edge.fromPageId) && revealedPageIds.has(edge.toPageId))
-    .map((edge) => ({ fromPageId: edge.fromPageId, toPageId: edge.toPageId }));
+    .filter((edge) => edge.layer === "player" && context.revealedPageIds.has(edge.toPageId) && connectionSourceVisible(edge.fromKind, edge.fromId, context))
+    // Explicit allow-list, never a spread-and-delete: a field added to `CodexConnectionRow` must be added
+    // HERE to reach a player, so the default for anything new is secret.
+    .map((edge) => ({ fromKind: edge.fromKind, fromId: edge.fromId, toPageId: edge.toPageId, label: edge.label, origin: edge.origin }));
+}
+
+/** One page's Connections panel, GM: passthrough - the reveal state of the other end is what the GM needs. */
+export function projectGmPageConnections(rows: readonly CodexPageConnectionRow[]): CodexPageConnectionRow[] {
+  return [...rows];
+}
+
+/**
+ * One page's Connections panel as a PLAYER receives it.
+ *
+ * The gate is the SAME predicate the graph feed applies, and it is now literally the same expression:
+ * `connectionSourceVisible` against the caller-resolved `PlayerConnectionContext`. It used to read the
+ * store's own `row.otherRevealed`, and that was the leak: for a JOURNAL source `otherRevealed` is the
+ * entry's raw `revealedToPlayers` flag, which is WEAKER than `projectPlayerJournalEntry` - the projection
+ * every other player journal surface delegates to. A revealed `standing` record about a hidden faction, or
+ * a revealed `quest` history row about a hidden quest, is hidden by the journal, the timeline, search and
+ * the reveal audit, and was published here, excerpt text and all, the moment the GM wrote a `[[link]]` in
+ * its player text. Resolving visibility in ONE place - the caller, through the projections - is what stops
+ * a sixth surface from forgetting again.
+ *
+ * `otherRevealed` therefore DROPS from the row rather than being consulted: a player only ever receives
+ * connections to records they can see, so the key could only be the constant `true`, and shipping a
+ * constant that names a predicate is how a reader learns the predicate exists. `id` and `layer` drop for
+ * the reasons `PlayerCodexConnection` states.
+ *
+ * Both directions go through the one predicate, and the asymmetry is deliberate rather than an oversight:
+ * an OUTgoing row's other end is the connection's TARGET (always a page, checked against `revealedPageIds`,
+ * which is condition 1) and an INcoming row's other end is its SOURCE (checked per kind, condition 2). The
+ * page the panel belongs to is assumed already visible - the route 404s a player before it gets here.
+ */
+export type PlayerCodexPageConnection = Readonly<{
+  direction: "out" | "in";
+  otherKind: CodexConnectionSourceKind;
+  otherId: string;
+  otherTitle: string;
+  otherEntityType: CodexEntityType | null;
+  label: string | null;
+  origin: "declared" | "mention";
+  section: string | null;
+}>;
+
+export function projectPlayerPageConnections(rows: readonly CodexPageConnectionRow[], context: PlayerConnectionContext): PlayerCodexPageConnection[] {
+  return rows
+    .filter((row) => row.layer === "player" && connectionSourceVisible(row.otherKind, row.otherId, context))
+    .map((row) => ({ direction: row.direction, otherKind: row.otherKind, otherId: row.otherId, otherTitle: row.otherTitle, otherEntityType: row.otherEntityType, label: row.label, origin: row.origin, section: row.section }));
 }
 
 // ----- Maps -----
@@ -200,7 +275,17 @@ export type GmCodexJournalEntry = CodexJournalRow;
  * player-facing field the player Codex does not read is a field with no reason to have been widened.
  */
 export type PlayerCodexJournalEntry = Readonly<{
-  id: string; text: string; kind: CodexJournalRow["kind"]; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
+  id: string; text: string; kind: CodexJournalRow["kind"];
+  /**
+   * D9 / D14. VIEWER-SAFETY JUSTIFICATION, individually: this is emitted only when the linked session is
+   * REVEALED, in which case the player can already list that session (`GET /codex/sessions`) and open it by
+   * id (`GET /codex/sessions/{id}`). It therefore adds zero information and buys entry -> session
+   * navigation, which is the reading parity D14 asks for. When the linked session is unrevealed it is null
+   * TOGETHER with `sessionNumber` - both halves of the link, because either half announces that a session
+   * they have not been shown exists.
+   */
+  sessionId: string | null;
+  sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
 }>;
 
 /**
@@ -221,7 +306,18 @@ const EMPTY_PAGE_IDS: ReadonlySet<string> = new Set<string>();
  * alone) when the standing gate moved onto `projectPlayerJournalEntry` — see `playerStandingVisible`.
  */
 export type PlayerSessionNumberContext = Readonly<{
-  unrevealedSessionNumbers: ReadonlySet<number>;
+  /**
+   * D11: which quests the players have been shown. A `quest` history record is gated on the QUEST, not on
+   * itself - see `playerQuestEventVisible`. Optional, and the absent value is the EMPTY set, which fails
+   * closed: a caller that forgets to resolve it hides quest history rather than publishing it.
+   */
+  revealedQuestIds?: ReadonlySet<string>;
+  /**
+   * D9: keyed by session ID, not by number. That is what closes the gap the number version could not - an
+   * UNNUMBERED hidden session could never appear in a set of numbers, so an entry filed under one had
+   * nothing to gate on. The join is now the gate, and every filed entry has one.
+   */
+  unrevealedSessionIds: ReadonlySet<string>;
   revealedPageIds?: ReadonlySet<string>;
 }>;
 
@@ -268,16 +364,55 @@ function playerStandingVisible(row: CodexJournalRow, context: PlayerSessionNumbe
   return faction !== null && (context.revealedPageIds ?? EMPTY_PAGE_IDS).has(faction);
 }
 
-function playerSessionNumber(sessionNumber: number | null, context: PlayerSessionNumberContext): number | null {
-  if (sessionNumber === null) return null;
-  return context.unrevealedSessionNumbers.has(sessionNumber) ? null : sessionNumber;
+/**
+ * A player's copy of an entry's session LINK - both halves, resolved together, because they are one fact.
+ *
+ * Three arms, and the middle one is the whole rule:
+ *   - joined to a session the players have NOT been shown -> both null. A session's very existence is GM
+ *     information (`GET /codex/sessions/{id}` 404s a player on an unrevealed one rather than 403ing, the
+ *     list omits it, `activeSessionId` is nulled), so either half of the link announces it.
+ *   - joined to a REVEALED session -> both pass. The player can already open that session by id.
+ *   - not joined, but carrying a bare LABEL -> `sessionId: null`, label passes. After migration v19 the
+ *     only bare labels in the database are those `deleteSession` stamped back for a REVEALED session
+ *     (director ruling R2), so the number was already player-visible and there is no record left whose
+ *     existence it could give away. A hidden session's delete stamps nothing at all.
+ */
+/**
+ * D11: a `quest` history record is player-visible only when the QUEST it is about is.
+ *
+ * **This applies the standing lesson before it can recur.** A quest record carries `playerText: ""`, so it
+ * cannot "stand on its own prose" - which is the exact false premise the standing CORRECTION documents.
+ * Nulling `questId` alone would ship a dated row reading "Quest - completed" for a quest the party has
+ * never heard of: the existence of a secret quest, and the fact that it just ended.
+ *
+ * It is NOT a kind filter in O-2's sense. It does not ask "is this a quest record?", it asks "is the thing
+ * this record is ABOUT visible?" - the CD-6-family question `projectPlayerMarker` asks about a pin's map.
+ *
+ * It lives on `projectPlayerJournalEntry` rather than on the chronicle, so all four player journal
+ * surfaces - the journal list, the timeline, search and the reveal audit - inherit it by construction.
+ * That placement is the standing gate's, and it is there because the three surfaces that did NOT go
+ * through the chronicle leaked.
+ */
+function playerQuestEventVisible(row: CodexJournalRow, context: PlayerSessionNumberContext): boolean {
+  if (row.kind !== "quest") return true;
+  const payload = row.payload;
+  const questId = payload !== null && "questId" in payload ? payload.questId : null;
+  return questId !== null && (context.revealedQuestIds ?? EMPTY_PAGE_IDS).has(questId);
+}
+
+function playerSessionLink(row: CodexJournalRow, context: PlayerSessionNumberContext): { sessionId: string | null; sessionNumber: number | null } {
+  if (row.sessionId === null) return { sessionId: null, sessionNumber: row.sessionNumber };
+  if (context.unrevealedSessionIds.has(row.sessionId)) return { sessionId: null, sessionNumber: null };
+  return { sessionId: row.sessionId, sessionNumber: row.sessionNumber };
 }
 
 export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry { return row; }
 export function projectPlayerJournalEntry(row: CodexJournalRow, context: PlayerSessionNumberContext): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
   if (!playerStandingVisible(row, context)) return null;
-  return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: playerSessionNumber(row.sessionNumber, context), realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
+  if (!playerQuestEventVisible(row, context)) return null;
+  const session = playerSessionLink(row, context);
+  return { id: row.id, text: row.playerText, kind: row.kind, sessionId: session.sessionId, sessionNumber: session.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
 }
 
 // ----- Sessions (M9: prep is the GM half, recap is the player half) -----
@@ -305,6 +440,15 @@ export type PlayerCodexSession = Readonly<{
   sessionNumber: number | null;
   realDate: string | null;
   recap: string;
+  /**
+   * D10. VIEWER-SAFETY JUSTIFICATION, individually: tags are SINGLE-LAYER by CI-2 - there is no GM-only
+   * tag anywhere in the codex - and every other record kind already ships its tags to players (pages
+   * always; maps, markers and journal entries since v10). A revealed session's tags are its player-facing
+   * categorization, and they are already in the player search index by the same rule, so withholding them
+   * here would make one kind behave differently for no reason a reader could name. Symmetry is the safer
+   * answer: the asymmetric version is the one whose exception someone eventually forgets.
+   */
+  tags: readonly string[];
 }>;
 
 export function projectGmSession(row: CodexSessionRow): GmCodexSession { return row; }
@@ -314,7 +458,7 @@ export function projectPlayerSession(row: CodexSessionRow): PlayerCodexSession |
   if (!row.revealedToPlayers) return null;
   // Explicit allow-list, never a spread-and-delete: a field added to `CodexSessionRow` must be added HERE
   // to reach a player, so the default for anything new is secret.
-  return { id: row.id, sessionNumber: row.sessionNumber, realDate: row.realDate, recap: row.recapBody };
+  return { id: row.id, sessionNumber: row.sessionNumber, realDate: row.realDate, recap: row.recapBody, tags: row.tags };
 }
 
 // ----- Quests (M10: playerBody is what the party was told, gmBody is where it is really going) -----
@@ -344,6 +488,12 @@ export type PlayerCodexQuest = Readonly<{
   body: string;
   objectives: readonly CodexQuestObjective[];
   entityIds: readonly string[];
+  /**
+   * D10. VIEWER-SAFETY JUSTIFICATION, individually: the `PlayerCodexSession.tags` argument verbatim - tags
+   * are single-layer by CI-2, every other kind already ships them, and a revealed quest's tags are its
+   * player-facing categorization. The quest's own reveal flag remains the whole predicate.
+   */
+  tags: readonly string[];
 }>;
 
 export function projectGmQuest(row: CodexQuestRow): GmCodexQuest { return row; }
@@ -366,7 +516,8 @@ export function projectPlayerQuest(row: CodexQuestRow, context: Readonly<{ revea
   return {
     id: row.id, title: row.title, status: row.status, body: row.playerBody,
     objectives: row.objectives,
-    entityIds: row.entityIds.filter((entityId) => context.revealedEntityIds.has(entityId))
+    entityIds: row.entityIds.filter((entityId) => context.revealedEntityIds.has(entityId)),
+    tags: row.tags
   };
 }
 
@@ -442,7 +593,7 @@ function excerpt(text: string): string {
  * `Record<CodexChronicleKind, ...>`, so the compiler, not a reviewer, is what notices a new kind has no
  * icon and no word (F-5: nothing else about a new journal kind produces a single compile error).
  */
-export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing";
+export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 
 /**
  * A journal row's STORE kind mapped to its CHRONICLE kind - a real total function over `CodexJournalKind`,
@@ -466,6 +617,9 @@ function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
     // these two arms existed - which is the design, and it is why no `default` may ever be added here.
     case "milestone": return "milestone";
     case "standing": return "standing";
+    // D11. The same mechanism one milestone later: no `default` may ever be added here, because the
+    // compile error is what forces Lane C's `CHRONICLE_KIND_META` to gain an icon and a word too.
+    case "quest": return "quest";
   }
 }
 
@@ -490,8 +644,19 @@ function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
  * A record that is not downtime carries no payload at all; `null` rather than an omitted key, so no reader
  * branches on key presence (the rule every other chronicle field follows).
  */
-export type GmCodexDowntime = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
-export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days: number }>;
+export type GmCodexDowntime = Readonly<{ who: string; activity: string; days: number; applied: boolean; characterPageId: string | null }>;
+/**
+ * D12 on the player row. VIEWER-SAFETY JUSTIFICATION, individually: `characterPageId` travels only when
+ * that page is itself REVEALED - the `factionPageId` rule on a standing payload verbatim - and in that
+ * case the player can already open the page by id, so it adds no information and buys the same
+ * downtime -> character navigation the GM gets.
+ *
+ * Unlike a `standing` record, the ROW is not hidden when the link is nulled, and the difference is the
+ * test the standing CORRECTION says a row must pass: a downtime row stands on its own player-visible
+ * content (`who`, `activity`, `days`, and usually prose), so a nulled link leaves a row that still means
+ * something. A standing record has `playerText: ""` and means nothing without its faction.
+ */
+export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days: number; characterPageId: string | null }>;
 
 /**
  * M12's two payloads, in the same per-audience allow-listed shape.
@@ -524,11 +689,22 @@ export type GmCodexMilestone = Readonly<{ level: number; reason: string }>;
 export type PlayerCodexMilestone = Readonly<{ level: number; reason: string }>;
 export type GmCodexStandingChange = Readonly<{ factionPageId: string; delta: number; reason: string }>;
 export type PlayerCodexStandingChange = Readonly<{ factionPageId: string | null; delta: number; reason: string }>;
+/**
+ * D11's quest-history payload.
+ *
+ * VIEWER-SAFETY JUSTIFICATION for the PLAYER shape, individually: the whole ROW is hidden unless the quest
+ * itself is revealed (`playerQuestEventVisible`), so when this travels the reader can already open the
+ * quest and read its status on `GET /codex/quests`. `status` is the record's ONLY content - the same
+ * reasoning that keeps `status` on `PlayerCodexQuest` where a session's is GM-only - and `questId` is
+ * additionally nulled unless the quest is in the revealed set, as a second line of defence.
+ */
+export type GmCodexQuestEvent = Readonly<{ questId: string; status: CodexQuestStatus }>;
+export type PlayerCodexQuestEvent = Readonly<{ questId: string | null; status: CodexQuestStatus }>;
 
 /** Every payload shape a GM chronicle row can carry. `null` for the kinds that carry none. */
-export type GmCodexChroniclePayload = GmCodexDowntime | GmCodexMilestone | GmCodexStandingChange;
+export type GmCodexChroniclePayload = GmCodexDowntime | GmCodexMilestone | GmCodexStandingChange | GmCodexQuestEvent;
 /** Every payload shape a PLAYER chronicle row can carry - each one narrower than, or equal to, its GM twin. */
-export type PlayerCodexChroniclePayload = PlayerCodexDowntime | PlayerCodexMilestone | PlayerCodexStandingChange;
+export type PlayerCodexChroniclePayload = PlayerCodexDowntime | PlayerCodexMilestone | PlayerCodexStandingChange | PlayerCodexQuestEvent;
 
 /**
  * One entry's payload, per kind, per audience. Dispatching on the ENTRY's `kind` rather than sniffing the
@@ -542,9 +718,10 @@ function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | nul
   const payload = entry.payload;
   if (payload === null) return null;
   switch (entry.kind) {
-    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied } : null;
+    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied, characterPageId: payload.characterPageId } : null;
     case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
     case "standing": return "delta" in payload ? { factionPageId: payload.factionPageId, delta: payload.delta, reason: payload.reason } : null;
+    case "quest": return "questId" in payload ? { questId: payload.questId, status: payload.status } : null;
     case "note": case "combat": case "deadline": return null;
   }
 }
@@ -554,14 +731,22 @@ function projectGmPayload(entry: CodexJournalRow): GmCodexChroniclePayload | nul
  * standing example - GM workflow state, dropped (D11-E) - and `factionPageId` is the M12 one, carried only
  * when the faction page is itself revealed.
  */
-function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlySet<string>): PlayerCodexChroniclePayload | null {
+function projectPlayerPayload(entry: CodexJournalRow, revealedPageIds: ReadonlySet<string>, revealedQuestIds: ReadonlySet<string>): PlayerCodexChroniclePayload | null {
   const payload = entry.payload;
   if (payload === null) return null;
   switch (entry.kind) {
-    case "downtime": return "who" in payload ? { who: payload.who, activity: payload.activity, days: payload.days } : null;
+    case "downtime": return "who" in payload
+      ? { who: payload.who, activity: payload.activity, days: payload.days, characterPageId: payload.characterPageId !== null && revealedPageIds.has(payload.characterPageId) ? payload.characterPageId : null }
+      : null;
     case "milestone": return "level" in payload ? { level: payload.level, reason: payload.reason } : null;
     case "standing": return "delta" in payload
       ? { factionPageId: revealedPageIds.has(payload.factionPageId) ? payload.factionPageId : null, delta: payload.delta, reason: payload.reason }
+      : null;
+    // D11. The WHOLE ROW is already hidden unless the quest is revealed, so this arm only ever runs for a
+    // quest the player can see; `questId` is nulled anyway when the id is not in the revealed set, as the
+    // second line of defence - standing's arrangement verbatim.
+    case "quest": return "questId" in payload
+      ? { questId: revealedQuestIds.has(payload.questId) ? payload.questId : null, status: payload.status }
       : null;
     case "note": case "combat": case "deadline": return null;
   }
@@ -624,6 +809,8 @@ export type GmCodexChronicleRecord = Readonly<{
   text: string;
   gmText: string | null;
   revealedToPlayers: boolean;
+  /** D9: the session record this row belongs to, by identity. `null` for an `event` page and for an unfiled entry. */
+  sessionId: string | null;
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
@@ -677,9 +864,31 @@ export type PlayerCodexChronicleRecord = Readonly<{
   id: string;
   title: string | null;
   text: string;
+  /** D9: inherited from `projectPlayerJournalEntry`'s session gate rather than restated - see there. */
+  sessionId: string | null;
   sessionNumber: number | null;
   realDate: string | null;
   inWorldLabel: string | null;
+  /**
+   * D17 / director ruling R3, and this is a documented REVERSAL of the "machine-readable dates are GM-only"
+   * line this type used to carry.
+   *
+   * VIEWER-SAFETY JUSTIFICATION, individually: `inWorldDate` is strictly derived from the record's own raw
+   * date, which the GM published by revealing the record, and the `inWorldLabel` one line above already
+   * encodes the identical information as prose ("Third, Melting 12, 1492" - the server's label carries
+   * weekday, day, month and year). The structured parts add ZERO bits; they remove a client re-parse. The
+   * GM's own clock is untouched by this field - a record's date is not the campaign's "now".
+   */
+  inWorldDate: CodexInWorldDate | null;
+  /**
+   * D17 / R3. VIEWER-SAFETY JUSTIFICATION, individually: a pure function of `inWorldDate` above and the
+   * calendar structure the player already holds (`GET /codex/calendar`), so it is derivable client-side and
+   * carries no new information at all. Shipping the SERVER's value is what stops the client re-deriving it
+   * with arithmetic that disagrees - the day-clamp divergence on a day-31-of-a-30-day-month date is a
+   * measured, ledgered bug, and one authority for one number is the fix. Null exactly when `inWorldDate`
+   * is null.
+   */
+  calendarInstant: number | null;
   tags: readonly string[];
   fired: boolean;
   payload: PlayerCodexChroniclePayload | null;
@@ -692,7 +901,7 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord, context: 
     return {
       kind: chronicleKindOf(entry.kind), id: entry.id, title: null,
       text: entry.playerText, gmText: entry.gmText, revealedToPlayers: entry.revealedToPlayers,
-      sessionNumber: entry.sessionNumber, realDate: entry.realDate, inWorldLabel: entry.inWorldLabel,
+      sessionId: entry.sessionId, sessionNumber: entry.sessionNumber, realDate: entry.realDate, inWorldLabel: entry.inWorldLabel,
       calendarInstant: entry.calendarInstant, inWorldDate: entry.inWorldDate, tags: entry.tags,
       attachPageId: entry.attachPageId, attachMarkerId: entry.attachMarkerId, sourceEncounterId: entry.sourceEncounterId,
       // `fired` is asked of every entry, not only a deadline: `deadlineFired` answers `false` for a
@@ -707,7 +916,7 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord, context: 
     kind: "event", id: page.id, title: page.title,
     text: excerpt(page.playerBody), gmText: page.gmBody.trim() ? excerpt(page.gmBody) : null,
     revealedToPlayers: page.revealedToPlayers,
-    sessionNumber: null, realDate: null, inWorldLabel: page.inWorldLabel,
+    sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: page.inWorldLabel,
     calendarInstant: page.calendarInstant, inWorldDate: page.inWorldDate, tags: page.tags,
     attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
     // An `event` PAGE is not a deadline and carries no payload: a page has no `kind` in the journal's
@@ -759,10 +968,15 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
     // exactly as visible as a revealed note. `payload` still rides through the per-kind allow-list.
     return {
       kind: chronicleKindOf(projected.kind), id: projected.id, title: null, text: projected.text,
-      sessionNumber: projected.sessionNumber, realDate: projected.realDate, inWorldLabel: projected.inWorldLabel,
+      sessionId: projected.sessionId, sessionNumber: projected.sessionNumber, realDate: projected.realDate,
+      inWorldLabel: projected.inWorldLabel,
+      // R3: both date forms, taken from the raw row rather than recomputed here - the store already
+      // resolved them against the live calendar (K3's one-reflow rule), and a second derivation in this
+      // file would be the second authority the ruling exists to remove.
+      inWorldDate: record.entry.inWorldDate, calendarInstant: record.entry.calendarInstant,
       tags: projected.tags,
       fired: deadlineFired(record.entry, context.publishedInstant ?? null),
-      payload: projectPlayerPayload(record.entry, context.revealedPageIds ?? EMPTY_PAGE_IDS),
+      payload: projectPlayerPayload(record.entry, context.revealedPageIds ?? EMPTY_PAGE_IDS, context.revealedQuestIds ?? EMPTY_PAGE_IDS),
       createdAt: projected.createdAt
     };
   }
@@ -770,7 +984,10 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
   if (!projected) return null;
   return {
     kind: "event", id: projected.id, title: projected.title, text: excerpt(projected.body),
-    sessionNumber: null, realDate: null, inWorldLabel: record.page.inWorldLabel,
+    sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: record.page.inWorldLabel,
+    // R3, on the event arm too: a revealed `event` page's date is exactly as published as its label, and a
+    // calendar view that could place entries but not events would be a calendar with a hole in it.
+    inWorldDate: record.page.inWorldDate, calendarInstant: record.page.calendarInstant,
     tags: projected.tags, fired: false, payload: null, createdAt: record.page.createdAt
   };
 }
@@ -842,7 +1059,27 @@ export type CodexSearchRecord =
   | Readonly<{ kind: "marker"; marker: CodexMarkerRow; mapRevealed: boolean }>
   // A quest needs NO extra context: its own `revealedToPlayers` is the whole predicate (see
   // `PLAYER_VISIBLE_SQL`), and a hit carries no entity linkage that would need resolving.
-  | Readonly<{ kind: "quest"; quest: CodexQuestRow }>;
+  | Readonly<{ kind: "quest"; quest: CodexQuestRow }>
+  // D10: a session needs NO extra context either - its own `revealedToPlayers` is the whole predicate
+  // (see `PLAYER_VISIBLE_SQL`), exactly as a quest's is. Gate 1 (`indexSession`) is what keeps prep and
+  // attendees out of the player index in the first place.
+  | Readonly<{ kind: "session"; session: CodexSessionRow }>;
+
+/**
+ * D10 / D23: what a session's result row is CALLED, on both the search surface and the reveal audit.
+ *
+ * `"Session {n}"` when it is numbered; a recap excerpt when it is not; `"Untitled session"` when it has
+ * neither. Never an empty string - a blank row is unclickable and unreadable, which is the audit bug
+ * `known-bugs.md:65-68` records. The fallback string is the repo's "Untitled page" / "Untitled quest"
+ * copy family, so the two surfaces speak one language rather than two.
+ *
+ * The number is player-safe on a REVEALED session (`projectPlayerSession` emits it), and this helper is
+ * only ever called with a session the caller has already decided the reader may see.
+ */
+export function sessionDisplayTitle(session: Readonly<{ sessionNumber: number | null; recap: string }>): string {
+  if (session.sessionNumber !== null) return `Session ${session.sessionNumber}`;
+  return excerpt(session.recap) || "Untitled session";
+}
 
 /**
  * One row in the single result list. Uniform on purpose - `kind` tells the client where to navigate,
@@ -862,11 +1099,13 @@ export type CodexSearchRecord =
  * Nothing else is added without re-running this check. No bodies, no reveal flags, no parent links,
  * no scene/actor ids, no `rev`.
  *
- * A QUEST (M10) fits without widening the shape: `title` is the quest's title, and `tags` is `[]` because
- * quests carry no tags at all (not in the spec's column list). The empty array rather than a `null` or a
- * missing key is the point of "every key present on every kind" - a row renderer must not branch on which
- * kind it got. Its `status` and `objectives` are deliberately NOT here: they are read on the record, and a
- * result row exists to navigate, not to summarise.
+ * A QUEST (M10) fits without widening the shape: `title` is the quest's title, and since D10 gave quests
+ * tags, `tags` is theirs. Its `status` and `objectives` are deliberately NOT here: they are read on the
+ * record, and a result row exists to navigate, not to summarise.
+ *
+ * A SESSION (D10) fits the same way. `title` is `sessionDisplayTitle` - "Session 4", else a recap excerpt,
+ * else "Untitled session" - and `tags` is the session's own. Nothing else: a hit exists to navigate, and
+ * `prepBody`, `attendees` and `status` are not in the player session projection at all.
  */
 export type CodexSearchHit = Readonly<{
   kind: CodexRecordKind;
@@ -878,17 +1117,6 @@ export type CodexSearchHit = Readonly<{
 }>;
 
 /* A journal entry has no title, so its result row shows a bounded excerpt of its text - see `excerpt` above. */
-
-export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
-  switch (record.kind) {
-    case "page": return { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null };
-    // The GM may see either layer, so an entry with no player text still shows something useful.
-    case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
-    case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
-    case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
-    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: [], entityType: null, mapId: null };
-  }
-}
 
 /**
  * null when this record is not player-visible - the audited gate. The predicate per kind is COPIED
@@ -927,26 +1155,39 @@ export function projectPlayerSearchHit(record: CodexSearchRecord, context: Playe
       return record.marker.revealedToPlayers && record.mapRevealed
         ? { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId }
         : null;
+    case "session": {
+      // DELEGATES, like the journal arm above and for the same reason: `projectPlayerSession` owns what a
+      // player may see of a session, so this arm cannot drift from `GET /codex/sessions`. Everything the
+      // hit carries - the id, the number-derived title, the recap excerpt, the tags - comes back out of
+      // that projection; nothing is read off the raw row. `prepBody` and `attendees` are not merely
+      // omitted here, they never entered the player search index at all (gate 1, `indexSession`).
+      const projected = projectPlayerSession(record.session);
+      return projected === null
+        ? null
+        : { kind: "session", id: projected.id, title: sessionDisplayTitle(projected), tags: projected.tags, entityType: null, mapId: null };
+    }
     case "quest":
       return record.quest.revealedToPlayers
-        ? { kind: "quest", id: record.quest.id, title: record.quest.title, tags: [], entityType: null, mapId: null }
+        ? { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null }
         : null;
   }
 }
 
-export function projectGmBacklinks(rows: readonly CodexBacklinkRow[]): CodexBacklink[] {
-  return rows.map((row) => ({ sourcePageId: row.sourcePageId, sourceTitle: row.sourceTitle, section: row.section }));
+
+export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
+  switch (record.kind) {
+    case "page": return { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null };
+    // The GM may see either layer, so an entry with no player text still shows something useful.
+    case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
+    case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
+    case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
+    case "quest": return { kind: "quest", id: record.quest.id, title: record.quest.title, tags: record.quest.tags, entityType: null, mapId: null };
+    // The GM sees a session hit whatever its reveal state - reveal is the PLAYER predicate. The title rule
+    // is shared with the player arm and the reveal audit, so one concept has one name everywhere.
+    case "session": return { kind: "session", id: record.session.id, title: sessionDisplayTitle({ sessionNumber: record.session.sessionNumber, recap: record.session.recapBody }), tags: record.session.tags, entityType: null, mapId: null };
+  }
 }
 
-/**
- * A player sees a backlink only when it came from the player-facing body of a page THEY can see - so a
- * GM-body reference, or a reference from a still-secret page, never reveals that a hidden page points here.
- */
-export function projectPlayerBacklinks(rows: readonly CodexBacklinkRow[]): CodexBacklink[] {
-  return rows
-    .filter((row) => row.layer === "player" && row.sourceRevealed)
-    .map((row) => ({ sourcePageId: row.sourcePageId, sourceTitle: row.sourceTitle, section: row.section }));
-}
 
 // ----- The reveal audit (M12 / CT-9: one GM view of everything the party can currently see) -----
 
@@ -1067,7 +1308,8 @@ const AUDIT_JOURNAL_FALLBACK: Readonly<Record<CodexJournalKind, string>> = {
   deadline: "Deadline",
   downtime: "Downtime",
   milestone: "Milestone",
-  standing: "Faction standing changed"
+  standing: "Faction standing changed",
+  quest: "Quest updated"
 };
 
 function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
@@ -1113,9 +1355,14 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
     case "session": {
       const projected = projectPlayerSession(record.session);
       if (projected === null) return null;
-      // A numbered session reads by its number, which is how the party refers to it; an unnumbered one has
-      // only its recap, so the row shows a bounded excerpt of that rather than an empty line.
-      return { kind: "session", id: projected.id, title: projected.sessionNumber === null ? excerpt(projected.recap) : `Session ${projected.sessionNumber}`, journalKind: null };
+      // A numbered session reads by its number, which is how the party refers to it; an unnumbered one
+      // shows a bounded recap excerpt, and one with NEITHER shows "Untitled session".
+      //
+      // That last arm is the fix for `known-bugs.md:65-68`: an unnumbered session with an empty recap
+      // rendered a blank, unreadable, unclickable audit row. It uses `sessionDisplayTitle`, the same helper
+      // the search hit uses, so the two surfaces cannot end up calling one thing two names - the
+      // `AUDIT_JOURNAL_FALLBACK` rule applied one arm over.
+      return { kind: "session", id: projected.id, title: sessionDisplayTitle(projected), journalKind: null };
     }
     case "quest": {
       const projected = projectPlayerQuest(record.quest, { revealedEntityIds: record.revealedEntityIds });

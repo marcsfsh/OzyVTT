@@ -39,8 +39,8 @@ vi.mock("./api", async (importOriginal) => {
     codexApi: {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
-      listRelationships: (...a: unknown[]) => listRelationships(...a),
-      listLinks: (...a: unknown[]) => listLinks(...a),
+      listConnections: (...a: unknown[]) => listRelationships(...a),
+      party: (...a: unknown[]) => listLinks(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a),
@@ -63,14 +63,15 @@ vi.mock("./api", async (importOriginal) => {
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
       chronicle: (...a: unknown[]) => playerChronicle(...a),
-      listRelationships: (...a: unknown[]) => playerListRelationships(...a),
-      listLinks: (...a: unknown[]) => playerListLinks(...a)
+      listConnections: (...a: unknown[]) => playerListRelationships(...a),
+      party: (...a: unknown[]) => playerListLinks(...a)
     }
   };
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { CodexWorkspace } from "./CodexWorkspace";
+import { goTo } from "../../test/route";
+import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexMarker, CodexPage, CodexPageSummary, PlayerCodexPageSummary } from "./api";
 
@@ -106,14 +107,14 @@ const OTHER = summary("p2", "Strahd", "character");
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   id: "j1", playerText: "The mists closed behind them.", gmText: null, revealedToPlayers: false, kind: "note",
   attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null, payload: null,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
 /** CT-11: the Journal reads the CHRONICLE, so its rows arrive in the unified record shape. */
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The mists closed behind them.", gmText: null, revealedToPlayers: false,
-  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  sessionId: null, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   tags: [], attachPageId: "p1", attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false, proposedDate: null,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -124,15 +125,15 @@ const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft",
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia valley", kind: "regional" };
 const MARKER: CodexMarker = { id: "k1", mapId: "m1", x: 0.4, y: 0.6, iconId: "pin", iconColor: "#FF2E9A", label: "Old Svalich Road", revealedToPlayers: false, pageIds: ["p1"], subMapId: null, sceneIds: [], actorId: null, isParty: false, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
 
-const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+const renderWorkspace = () => (goTo("/codex/pages"), render)(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
 
 const gmDefaults = () => {
   listPages.mockResolvedValue([PAGE, OTHER]);
   listRelationships.mockResolvedValue([]);
-  listLinks.mockResolvedValue([]);
+  listLinks.mockResolvedValue(null);
   listFolders.mockResolvedValue([]);
-  getPage.mockResolvedValue({ page: full(PAGE), backlinks: [], relationships: [] });
-  search.mockResolvedValue([]);
+  getPage.mockResolvedValue({ page: full(PAGE), connections: [] });
+  search.mockResolvedValue({ hits: [], truncated: false });
   markersForPage.mockResolvedValue([]);
   forPage.mockResolvedValue([]);
   chronicle.mockResolvedValue([]);
@@ -160,8 +161,10 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
     renderWorkspace();
     const connections = await openPage(user);
 
-    // One area, and every edge inside it — the grouping is the requirement, not three loose buttons.
-    for (const heading of ["Linked from", "On the atlas", "In the journal"]) {
+    // One area, and every edge inside it — the grouping is the requirement, not loose buttons.
+    // D8 folded "Linked from" into the unified connections list, so the sub-blocks are now the two
+    // relations that are genuinely different: the atlas and the journal.
+    for (const heading of ["On the atlas", "In the journal"]) {
       expect(connections.getByText(heading)).toBeInTheDocument();
     }
     expect(await connections.findByRole("button", { name: /Old Svalich Road/ })).toBeInTheDocument();
@@ -180,7 +183,7 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
 
     await user.click(await connections.findByRole("button", { name: /The mists closed behind them/ }));
 
-    expect(screen.getByRole("tab", { name: "Journal" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
     // The selection half: the Journal marks the entry it was sent, not merely "the Journal, somewhere".
     await waitFor(() => expect(document.getElementById("codex-entry-j9")).toHaveAttribute("aria-current", "true"));
     expect(document.getElementById("codex-entry-j0")).not.toHaveAttribute("aria-current");
@@ -194,25 +197,25 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
 
     await user.click(await connections.findByRole("button", { name: /Old Svalich Road/ }));
 
-    expect(screen.getByRole("tab", { name: "Atlas" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     const surface = await screen.findByTestId("map-surface");
     // Half one — the pin's map, not the atlas's default first map.
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     // Half two — the pin itself, with its inspector open on the right marker.
     await waitFor(() => expect(surface).toHaveAttribute("data-selected", "k1"));
-    expect(await screen.findByRole("complementary", { name: "Marker" })).toBeInTheDocument();
+    expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
   });
 
   it("CI-5: Show in graph lands on the Graph WITH this entity's node focused", async () => {
-    listLinks.mockResolvedValue([{ fromPageId: "p1", toPageId: "p2" }]);
+    listRelationships.mockResolvedValue([{ id: null, fromKind: "page", fromId: "p1", toPageId: "p2", label: null, origin: "mention", layer: "player", createdAt: null }]);
     const user = userEvent.setup();
     renderWorkspace();
     const connections = await openPage(user);
 
     await user.click(connections.getByRole("button", { name: "Show in graph" }));
 
-    expect(screen.getByRole("tab", { name: "Graph" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Graph" })).toHaveAttribute("aria-current", "page");
     // The selection half: THIS entity's node carries the landing, and the other one does not — a jump
     // that merely switched mode would leave both unmarked.
     const focused = await screen.findByRole("button", { name: "Location: Barovia" });
@@ -244,50 +247,49 @@ const VIEWBOX = { halfW: 520, halfH: 390 };
 
 const openGraph = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
-  await user.click(screen.getByRole("tab", { name: "Graph" }));
+  await user.click(screen.getByRole("button", { name: "Graph" }));
 };
 
 describe("The Graph tells the truth (CI-8)", () => {
   beforeEach(gmDefaults);
 
-  it("draws wiki-link edges beside typed relationships", async () => {
-    listRelationships.mockResolvedValue([{ id: "r1", fromPageId: "p1", toPageId: "p2", type: "ally", createdAt: "2026-07-28T00:00:00.000Z" }]);
-    listLinks.mockResolvedValue([{ fromPageId: "p2", toPageId: "p1" }]);
+  it("draws every connection, whatever its origin — one feed, one count", async () => {
+    listRelationships.mockResolvedValue([
+      { id: "c1", fromKind: "page", fromId: "p1", toPageId: "p2", label: "ally of", origin: "declared", layer: "player", createdAt: "2026-07-28T00:00:00.000Z" },
+      { id: null, fromKind: "page", fromId: "p2", toPageId: "p1", label: null, origin: "mention", layer: "player", createdAt: null }
+    ]);
     const user = userEvent.setup();
     renderWorkspace();
     await openGraph(user);
 
-    // Both kinds are drawn, and the bar counts them separately — a codex wired with [[links]] used to
-    // report "0 relationships" over a picture of unconnected dots.
+    // D8: ONE count, because there is one kind of connection. The bar used to report the two separately
+    // ("1 relationship · 1 mention"), which is the two-systems framing this overhaul removed.
     await waitFor(() => expect(document.querySelectorAll(".codex-graph-edge")).toHaveLength(2));
-    expect(screen.getByText(/1 relationship · 1 mention/)).toBeInTheDocument();
+    expect(screen.getByText(/2 connections/)).toBeInTheDocument();
   });
 
-  it("R2: a wiki-link is distinguishable from a typed edge WITHOUT colour", async () => {
-    listRelationships.mockResolvedValue([{ id: "r1", fromPageId: "p1", toPageId: "p2", type: "ally", createdAt: "2026-07-28T00:00:00.000Z" }]);
-    listLinks.mockResolvedValue([{ fromPageId: "p2", toPageId: "p1" }]);
+  it("D8: ONE edge style — origin is an attribute on the label, never a second render", async () => {
+    listRelationships.mockResolvedValue([
+      { id: "c1", fromKind: "page", fromId: "p1", toPageId: "p2", label: "ally of", origin: "declared", layer: "player", createdAt: "2026-07-28T00:00:00.000Z" },
+      { id: null, fromKind: "page", fromId: "p2", toPageId: "p1", label: null, origin: "mention", layer: "player", createdAt: null }
+    ]);
     const user = userEvent.setup();
     renderWorkspace();
     await openGraph(user);
 
     await waitFor(() => expect(document.querySelectorAll(".codex-graph-edge")).toHaveLength(2));
-    const typed = document.querySelector('[data-edgekind="typed"]')!;
-    const link = document.querySelector('[data-edgekind="link"]')!;
+    const declared = document.querySelector('[data-edgeorigin="declared"]')!;
+    const mention = document.querySelector('[data-edgeorigin="mention"]')!;
 
-    // 1. Shape: the typed edge carries an arrowhead, the wiki-link deliberately does not — a mention
-    //    claims no direction. This survives greyscale and a colour-blind reader.
-    expect(typed.querySelector("line")).toHaveAttribute("marker-end", "url(#codex-graph-arrow)");
-    expect(link.querySelector("line")).not.toHaveAttribute("marker-end");
-    // 2. Weight/dash: distinct classes, so the dashed lighter stroke is a fact about the markup rather
-    //    than about a stylesheet jsdom never loads.
-    expect(typed).toHaveClass("is-typed");
-    expect(link).toHaveClass("is-link");
-    // 3. Words: each edge labels its own kind, and the bar carries a permanent key for when the
-    //    per-edge labels are zoomed out of view.
-    expect(within(typed as HTMLElement).getByText("ally of")).toBeInTheDocument();
-    expect(within(link as HTMLElement).getByText("mentions")).toBeInTheDocument();
-    expect(screen.getByText("Relationship")).toBeInTheDocument();
-    expect(screen.getByText("Mention")).toBeInTheDocument();
+    // BOTH carry the arrowhead now: a connection has a direction whatever produced it, and the dashed
+    // second style (with the two-row key that explained it) retires with the two-systems model.
+    expect(declared.querySelector("line")).toHaveAttribute("marker-end", "url(#codex-graph-arrow)");
+    expect(mention.querySelector("line")).toHaveAttribute("marker-end", "url(#codex-graph-arrow)");
+    // R2: each edge still says what it is IN WORDS — its own label, or "mentions" when it has none.
+    expect(within(declared as HTMLElement).getByText("ally of")).toBeInTheDocument();
+    expect(within(mention as HTMLElement).getByText("mentions")).toBeInTheDocument();
+    // The old two-row key is gone with the two styles it described.
+    expect(screen.queryByText("Relationship")).not.toBeInTheDocument();
   });
 
   it("frames every node it draws — an orphan is inside the fitted view, not off in the margins", async () => {
@@ -325,23 +327,26 @@ describe("The player Graph reads the PLAYER links feed (CI-8, viewer safety)", (
     playerListMaps.mockResolvedValue([]);
     playerListMarkers.mockResolvedValue([]);
     playerChronicle.mockResolvedValue([]);
-    playerListRelationships.mockResolvedValue([]);
+    playerListLinks.mockResolvedValue(null);
     // What the SERVER chose to send this player: one edge. The GM feed below is a different, larger
     // answer to the same question — if the player surface ever read that one, the extra edge appears.
-    playerListLinks.mockResolvedValue([{ fromPageId: "p1", toPageId: "p2" }]);
-    listLinks.mockResolvedValue([{ fromPageId: "p1", toPageId: "p2" }, { fromPageId: "p2", toPageId: "p1" }]);
+    playerListRelationships.mockResolvedValue([{ fromKind: "page", fromId: "p1", toPageId: "p2", label: null, origin: "mention" }]);
+    listRelationships.mockResolvedValue([
+      { id: null, fromKind: "page", fromId: "p1", toPageId: "p2", label: null, origin: "mention", layer: "player", createdAt: null },
+      { id: null, fromKind: "page", fromId: "p2", toPageId: "p1", label: null, origin: "mention", layer: "player", createdAt: null }
+    ]);
   });
 
   it("draws the player's links, and never asks the GM feed", async () => {
     const user = userEvent.setup();
-    render(<ToastProvider><PlayerCodex token="player" /></ToastProvider>);
+    (goTo("/codex"), render)(<ToastProvider><PlayerCodex token="player" /></ToastProvider>);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "Graph" }));
+    await user.click(screen.getByRole("button", { name: "Graph" }));
 
-    await waitFor(() => expect(screen.getByText(/0 relationships · 1 mention/)).toBeInTheDocument());
-    expect(document.querySelectorAll('[data-edgekind="link"]')).toHaveLength(1);
-    expect(playerListLinks).toHaveBeenCalledWith("player");
+    await waitFor(() => expect(screen.getByText(/1 connection/)).toBeInTheDocument());
+    expect(document.querySelectorAll('[data-edgeorigin="mention"]')).toHaveLength(1);
+    expect(playerListRelationships).toHaveBeenCalledWith("player");
     // The GM feed is never touched from a player session — not fetched-and-filtered, not fetched at all.
-    expect(listLinks).not.toHaveBeenCalled();
+    expect(listRelationships).not.toHaveBeenCalled();
   });
 });
