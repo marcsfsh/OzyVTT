@@ -46,7 +46,7 @@ export function SessionConsole({ open, onClose, gmToken, session, loading, error
 
       {!loading && !error && !session && (
         <div className="codex-console-empty">
-          <p>No session is active. Make one active in Sessions and its prep appears here from every part of the Codex — and new journal entries and logged battles file themselves under it.</p>
+          <p>No session is active. Make one active in Sessions and its prep appears here from every part of the Codex. New journal entries and logged battles are filed under the active session.</p>
           {/* §4: `Button` is a `@vtt/ui` primitive and carries the 44px floor itself — no new control. */}
           <Button variant="primary" size="sm" onClick={onOpenSessions}>Open Sessions</Button>
         </div>

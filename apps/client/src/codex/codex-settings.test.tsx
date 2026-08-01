@@ -174,7 +174,7 @@ describe("Existing history can be deleted (owner decision, 2026-07-30)", () => {
     await user.click(await screen.findByRole("button", { name: /Delete versions older than 30 days/ }));
     // The confirm says what is lost AND what is not — a GM must not have to wonder whether this eats pages.
     expect(await screen.findByText(/older than 30 days, across every page/)).toBeInTheDocument();
-    expect(screen.getByText(/pages themselves are not touched/)).toBeInTheDocument();
+    expect(screen.getByText("Delete saved versions older than 30 days, across every page? Your pages are not changed. Only the earlier versions are deleted. This cannot be undone.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete them" }));
 
     await waitFor(() => expect(deleteRevisions).toHaveBeenCalledWith("gm", 30));

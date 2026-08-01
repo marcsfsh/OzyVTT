@@ -156,7 +156,7 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
                     row. A mention has no row of its own to edit — it is written by the text and unwritten
                     the same way — so this is where that is said. */}
                 {write && !declaredId && row.origin === "mention" && (
-                  <span className="codex-conn-why">Written as a [[link]] in the text — edit the text to change it.</span>
+                  <span className="codex-conn-why">Written as a [[link]] in the text. Edit the text to change it.</span>
                 )}
                 {write && declaredId && editing === declaredId && (
                   <span className="codex-conn-actions">
@@ -177,8 +177,8 @@ export function ConnectionsPanel({ connections, onOpen, write, standalone = true
       {write && !adding && <Button variant="ghost" size="sm" className="codex-conn-add" onClick={() => setAdding(true)}>Add connection</Button>}
       {write && adding && (
         <div className="codex-conn-form">
-          <Combobox options={options} value={target} onChange={setTarget} ariaLabel="Connect to page" placeholder="Search pages…" />
-          <Input aria-label="Label (optional)" placeholder="ally of, located in…" value={label} maxLength={CONNECTION_LABEL_MAX}
+          <Combobox options={options} value={target} onChange={setTarget} ariaLabel="Connect to page" placeholder="Search pages" />
+          <Input aria-label="Label (optional)" placeholder="ally of, located in" value={label} maxLength={CONNECTION_LABEL_MAX}
             list="codex-conn-labels" onChange={(event) => setLabel(event.target.value)} />
           {/* Layer is the D13 semantics made visible: a GM-layer connection never travels to a player,
               so it carries the violet mark that means exactly that everywhere else in the suite. */}

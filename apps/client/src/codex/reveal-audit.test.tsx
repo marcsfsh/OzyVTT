@@ -167,7 +167,7 @@ describe("Hiding a faction page takes the standing with it (D23)", () => {
     await user.click(pages.getByRole("switch", { name: "Show the page The Zhentarim to players" }));
 
     expect(await screen.findByRole("dialog", { name: "Hide this faction page" })).toBeInTheDocument();
-    expect(screen.getByText(/standing with them disappears/)).toBeInTheDocument();
+    expect(screen.getByText("Your standing with them stops being shown to players as well. A standing is only shown while its faction page is.")).toBeInTheDocument();
     // Nothing has happened yet — the warning is BEFORE the act, not an explanation after it.
     expect(revealPage).not.toHaveBeenCalled();
   });

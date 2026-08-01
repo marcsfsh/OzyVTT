@@ -152,10 +152,10 @@ describe("A milestone and a standing row read as themselves on the chronicle (R2
 
     // Colour lives entirely in CSS, so the proof is that the TEXT of each row distinguishes them.
     expect(rowOf("m1").textContent).toContain("Milestone");
-    expect(rowOf("m1").textContent).toContain("Reached level 5 — Cleared the citadel");
+    expect(rowOf("m1").textContent).toContain("Reached level 5 · Cleared the citadel");
     expect(rowOf("s1").textContent).toContain("Standing");
     // The faction is NAMED from the page list, and the delta is the change — never the new value.
-    expect(rowOf("s1").textContent).toContain("The Zhentarim — down 20 · Burned the caravan");
+    expect(rowOf("s1").textContent).toContain("The Zhentarim · down 20 · Burned the caravan");
     expect(rowOf("m1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
     expect(rowOf("s1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
   });

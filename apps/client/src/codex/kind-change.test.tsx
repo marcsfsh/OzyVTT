@@ -84,7 +84,7 @@ describe("Changing a page's kind (R7)", () => {
     const box = within(await dialog());
     expect(box.getByText(/Change kind to Character\?/i)).toBeInTheDocument();
     // ...and it says so, rather than implying a cost that is not there.
-    expect(box.getByText(/Nothing you've written is lost/i)).toBeInTheDocument();
+    expect(box.getByText(/Nothing you have written is lost/i)).toBeInTheDocument();
   });
 
   it("names the fields at risk when text WOULD be dropped", async () => {
@@ -108,7 +108,7 @@ describe("Changing a page's kind (R7)", () => {
     await user.selectOptions(screen.getByLabelText(/kind/i), "item");
 
     const box = within(await dialog());
-    expect(box.getByText(/Nothing you've written is lost/i)).toBeInTheDocument();
+    expect(box.getByText(/Nothing you have written is lost/i)).toBeInTheDocument();
   });
 
   it("SOFTENS the recovery promise when version history is off, rather than repeating it", async () => {
@@ -122,7 +122,7 @@ describe("Changing a page's kind (R7)", () => {
     await user.selectOptions(screen.getByLabelText(/kind/i), "item");
 
     const box = within(await dialog());
-    expect(box.getByText(/version history is off, so this can't be undone/i)).toBeInTheDocument();
+    expect(box.getByText(/Version history is off, so this cannot be undone/i)).toBeInTheDocument();
     expect(box.queryByText(/restore them from History/i)).not.toBeInTheDocument();
   });
 

@@ -117,7 +117,7 @@ export function TagView({ gmToken, tag, pages, maps, records, sessions, quests, 
             ))}
           </nav>
         )}
-        {truncated && <p className="codex-composer-hint">More pins may carry this tag — refine in the Atlas.</p>}
+        {truncated && <p className="codex-composer-hint">More pins may carry this tag. Filter by tag in the Atlas to see all of them.</p>}
       </section>
 
       {taggedRecords.length > 0 && (

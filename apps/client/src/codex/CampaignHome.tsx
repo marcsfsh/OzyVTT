@@ -142,7 +142,7 @@ export function CampaignHome({
       <div className="codex-campaign">
         {error && <Alert tone="danger" title="Couldn't load the campaign">{error}</Alert>}
         {showReveal
-          ? <div className="codex-main-empty"><h3>No pages yet</h3><p>Create characters, locations, factions and more. They'll be organized here by kind and tag.</p>{onCreate && <Button variant="primary" onClick={onCreate}>New page</Button>}</div>
+          ? <div className="codex-main-empty"><h3>No pages yet</h3><p>Create characters, locations, factions and more. They are organized here by kind and tag.</p>{onCreate && <Button variant="primary" onClick={onCreate}>New page</Button>}</div>
           : <div className="codex-main-empty"><h3>Nothing shared yet</h3><p>Pages your GM shares appear here, organized by kind and tag.</p></div>}
       </div>
     );
@@ -208,7 +208,7 @@ export function CampaignHome({
         <DashCard title="Open quests" iconId="quest"
           count={{ shown: openQuestList.length, total: openQuests(quests).length }}
           seeAll={onSeeAll ? { label: "See all quests", onClick: () => onSeeAll("quests") } : undefined}
-          empty="Nothing open right now.">
+          empty="No open quests.">
           {openQuestList.length > 0 ? (
             <nav className="codex-campaign-recent" aria-label="Open quests">
               {openQuestList.map((quest) => {
@@ -240,7 +240,7 @@ export function CampaignHome({
         <DashCard title="Deadlines" iconId={CHRONICLE_KIND_META.deadline.iconId}
           count={{ shown: deadlineList.length, total: deadlines.length }}
           seeAll={onSeeAll ? { label: "See all deadlines", onClick: () => onSeeAll("deadlines") } : undefined}
-          empty="Nothing bearing down on the party.">
+          empty="No deadlines yet.">
           {deadlineList.length > 0 ? (
             <nav className="codex-campaign-recent" aria-label="Deadlines">
               {deadlineList.map((deadline) => (
@@ -261,13 +261,13 @@ export function CampaignHome({
           <DashCard title="Downtime pending" iconId="campfire"
             count={{ shown: downtimeList.length, total: downtimePending.length }}
             seeAll={{ label: "Open the tracker", onClick: onOpenDowntime }}
-            empty="No downtime waiting on you.">
+            empty="No downtime waiting for confirmation.">
             {downtimeList.length > 0 ? (
               <nav className="codex-campaign-recent" aria-label="Downtime pending">
                 {downtimeList.map((row) => (
                   <button key={row.id} type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(row.id)}>
                     <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
-                    <span className="codex-list-title">{row.who || "Someone"} — {row.days} {row.days === 1 ? "day" : "days"}{row.activity ? `: ${row.activity}` : ""}</span>
+                    <span className="codex-list-title">{row.who || "Someone"} · {row.days} {row.days === 1 ? "day" : "days"}{row.activity ? `: ${row.activity}` : ""}</span>
                     {showReveal && row.revealed !== undefined && <VisibilityBadge revealed={row.revealed} />}
                     {row.when && <span className="codex-campaign-recentwhen">{row.when}</span>}
                   </button>
@@ -281,7 +281,7 @@ export function CampaignHome({
         <DashCard title="Latest journal activity" iconId="book"
           count={{ shown: recentEntries.length, total: entries.length }}
           seeAll={onSeeAll ? { label: "Open the Journal", onClick: () => onSeeAll("journal") } : undefined}
-          empty="Nothing written yet.">
+          empty="No journal entries yet.">
           {recentEntries.length > 0 ? (
             <nav className="codex-campaign-recent" aria-label="Latest journal activity">
               {recentEntries.map((entry) => {

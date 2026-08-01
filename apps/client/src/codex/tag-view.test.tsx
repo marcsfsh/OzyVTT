@@ -140,7 +140,7 @@ describe("Pins — the one kind that is not client-enumerable", () => {
     gmSearch.mockResolvedValue({ hits: [PIN_HIT], truncated: true });
     renderTags();
 
-    expect(await screen.findByText(/More pins may carry this tag/)).toBeInTheDocument();
+    expect(await screen.findByText("More pins may carry this tag. Filter by tag in the Atlas to see all of them.")).toBeInTheDocument();
   });
 
   it("says so plainly when the search comes back with none", async () => {

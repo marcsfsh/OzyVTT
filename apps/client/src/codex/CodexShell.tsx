@@ -349,7 +349,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
         </div>
 
         {/* One error surface for the whole shell, whichever section is on screen. */}
-        {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
+        {error && <Alert tone="danger" title="Couldn't load the Codex">{error}</Alert>}
         {previewError && <Alert tone="danger">{previewError}</Alert>}
 
         <div className="codex-shell-content">
@@ -502,7 +502,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
       )}
 
       <Modal open={!!previewToken} onClose={() => setPreviewToken(null)} size="full" title="What players see" ariaLabel="Player Codex preview">
-        <p className="codex-inspector-hint">This is the real player Codex, read through a player session — anything hidden from players is absent here, not just dimmed.</p>
+        <p className="codex-inspector-hint">This is the real player Codex, read through a player session. Anything hidden from players is absent here, not dimmed.</p>
         {previewToken && <PlayerCodex token={previewToken} embedded />}
       </Modal>
 

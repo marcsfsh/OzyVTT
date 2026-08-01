@@ -146,13 +146,13 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
       .map((field) => field.label);
     const historyOn = settings?.revisionHistory.enabled ?? true;
     const recovery = historyOn
-      ? "They'll be removed — you can restore them from History."
-      : "They'll be removed, and version history is off, so this can't be undone.";
+      ? "They will be removed. You can restore them from History."
+      : "They will be removed. Version history is off, so this cannot be undone.";
     const ok = await confirm({
       title: `Change kind to ${ENTITY_DEFS[nextType].label}?`,
       body: lost.length > 0
-        ? `These ${ENTITY_DEFS[draft.entityType].label} fields have text that ${ENTITY_DEFS[nextType].label} doesn't use: ${lost.join(", ")}. ${recovery}`
-        : `Its fields become ${ENTITY_DEFS[nextType].label}'s. Nothing you've written is lost.`,
+        ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use: ${lost.join(", ")}. ${recovery}`
+        : `Its fields become ${ENTITY_DEFS[nextType].label} fields. Nothing you have written is lost.`,
       confirmLabel: "Change kind"
     });
     if (!ok) return;

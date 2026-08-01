@@ -195,7 +195,7 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
               className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}${marker.isParty ? " is-party" : ""}${dimmedMarkerIds?.has(marker.id) ? " is-dimmed" : ""}`}>
               {/* CT-7 / R2, the accessible half: the party pin's meaning reaches a screen reader as a
                   NAME, not as a ring it cannot see. Ordinary pins keep no title, exactly as before. */}
-              {marker.isParty && <title>{marker.label ? `${marker.label} — ${PARTY_LABEL.toLowerCase()}` : PARTY_LABEL}</title>}
+              {marker.isParty && <title>{marker.label ? `${marker.label}, ${PARTY_LABEL.toLowerCase()}` : PARTY_LABEL}</title>}
               {/* The ring. Drawn OUTSIDE the icon's own scale group so it does not inherit the glyph's
                   colour, and behind the glyph so it never obscures it. It is decoration — the words
                   below are what actually say this is the party. */}

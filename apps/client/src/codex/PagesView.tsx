@@ -126,7 +126,7 @@ export function PagesView({
     await movePage(id, name);
   };
   const newFolder = async () => {
-    const name = await prompt({ title: "New folder", body: "Name the folder. It starts empty - add pages to it from its row menu.", placeholder: "e.g. NPCs", confirmLabel: "Create" });
+    const name = await prompt({ title: "New folder", body: "Name the folder. It starts empty. Add pages to it from the folder's row menu.", placeholder: "e.g. NPCs", confirmLabel: "Create" });
     if (!name) return;
     try { await codexApi.createFolder(gmToken, name); await onRefresh(); }
     catch (folderError) { onError(folderError instanceof Error ? folderError.message : "Couldn't create the folder."); }
@@ -172,7 +172,7 @@ export function PagesView({
     <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
-          <Input value={search} placeholder="Search the Codex…" aria-label="Search the Codex"
+          <Input value={search} placeholder="Search the Codex" aria-label="Search the Codex"
             onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setFilter({ type: null, tag: null }); }} />
 {/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
               screen, and the empty state's own create is the primary when there is nothing to select
@@ -199,7 +199,7 @@ export function PagesView({
         {!search.trim() && allTags.length > 0 && (
           <div className="codex-rail-tagfilter">
             <Combobox options={allTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={tagFilter} onChange={(tag) => setFilter({ tag })}
-              ariaLabel="Filter by tag" placeholder="Filter by tag…" />
+              ariaLabel="Filter by tag" placeholder="Filter by tag" />
           </div>
         )}
         <nav className="codex-list" aria-label="Campaign pages">

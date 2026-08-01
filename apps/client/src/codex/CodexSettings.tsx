@@ -91,7 +91,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
       : `Delete saved versions older than ${olderThanDays} day${olderThanDays === 1 ? "" : "s"}, across every page?`;
     if (!(await confirm({
       title: olderThanDays === 0 ? "Delete all version history" : "Delete old versions",
-      body: `${what} Your pages themselves are not touched — only the earlier versions you could go back to. This cannot be undone.`,
+      body: `${what} Your pages are not changed. Only the earlier versions are deleted. This cannot be undone.`,
       confirmLabel: olderThanDays === 0 ? "Delete all versions" : "Delete them",
       danger: true
     }))) return;
@@ -130,7 +130,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
             <p className="codex-settings-lede">The Codex saves your edits as you type. Turn it off to save each record yourself.</p>
             <Switch checked={autosave.enabled} onChange={(enabled) => void save({ autosave: { ...autosave, enabled } })} label="Autosave" />
             {autosave.enabled ? (
-              <Field label="Save after a pause of" htmlFor="autosave-interval" help="Longer pauses mean fewer saved versions, and more work at risk if the tab closes.">
+              <Field label="Save after a pause of" htmlFor="autosave-interval" help="Longer intervals save fewer versions and risk losing more unsaved work.">
                 <Select id="autosave-interval" value={String(autosave.intervalSeconds)}
                   onChange={(event) => {
                     // Clamped here as well as on the server, so the control cannot ask for a value that
@@ -157,8 +157,8 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
           <section className="codex-settings-section">
             <h4 className="codex-audit-h">Version history</h4>
             <p className="codex-settings-lede">
-              Every time a page is saved, the codex can keep the previous version so you can go back to it.
-              Pages autosave as you type, so keeping every one of them adds up fast.
+              Every time a page is saved, the Codex can keep the previous version. Pages autosave as you
+              type, so version history grows quickly.
             </p>
 
             <Switch checked={history.enabled}
@@ -198,7 +198,7 @@ export function CodexSettingsView({ gmToken, onSettingsChanged }: Readonly<{ gmT
 
             <div className="codex-settings-danger">
               <h4 className="codex-audit-h">Delete old versions</h4>
-              <p className="codex-composer-hint">This removes earlier versions only. Your pages, as they stand now, are never touched.</p>
+              <p className="codex-composer-hint">This removes earlier versions only. Your pages are not changed.</p>
               <Field label="Delete versions older than" htmlFor="rev-trim" help="Days.">
                 <Input id="rev-trim" type="number" inputMode="numeric" min={1} value={trimDays} disabled={busy}
                   onChange={(event) => setTrimDays(event.target.value)} />

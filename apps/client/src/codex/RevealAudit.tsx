@@ -264,7 +264,7 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
             <Button variant="ghost" onClick={() => setPendingFaction(null)}>Cancel</Button>
             <Button variant="primary" onClick={() => { const faction = pendingFaction; setPendingFaction(null); void setRevealed("page", faction.id, faction.title, false); }}>Hide page</Button>
           </>}>
-          <p>Your standing with them disappears from the players' view too — a standing is only shown while its faction page is.</p>
+          <p>Your standing with them stops being shown to players as well. A standing is only shown while its faction page is.</p>
         </Modal>
       )}
     </>

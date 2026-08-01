@@ -144,7 +144,7 @@ describe("The canonical glossary (D5)", () => {
     expect(at("MarkerInspector.tsx", "Delete pin")).toBe(true);
     expect(at("MarkerInspector.tsx", "Delete this pin? This cannot be undone.")).toBe(true);
     expect(at("AtlasView.tsx", 'Delete map "${currentMap.name}"? Its pins are removed.')).toBe(true);
-    expect(strings.some((entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional — players never see"))).toBe(true);
+    expect(strings.some((entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional. Players never see"))).toBe(true);
   });
 
   for (const { pattern, use } of RETIRED) {

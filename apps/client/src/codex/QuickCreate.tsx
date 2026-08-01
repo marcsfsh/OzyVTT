@@ -99,11 +99,11 @@ export function QuickCreate({ gmToken, request, onClose, onOpen, onChanged }: Qu
     >
       {request.note && <p className="codex-composer-hint">{request.note}</p>}
       <Field label="Name" htmlFor="codex-quickcreate-name">
-        <Input id="codex-quickcreate-name" value={title} autoFocus placeholder="Name the page…"
+        <Input id="codex-quickcreate-name" value={title} autoFocus placeholder="Name the page"
           onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void create(); } }} />
       </Field>
-      <Field label="Kind" htmlFor="codex-quickcreate-kind" help="Its kind brings the fields it needs. You can change it later.">
+      <Field label="Kind" htmlFor="codex-quickcreate-kind" help="The kind determines which fields appear. You can change it later.">
         <Select id="codex-quickcreate-kind" value={entityType} onChange={(event) => setEntityType(event.target.value as EntityType)}>
           {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].label}</option>)}
         </Select>

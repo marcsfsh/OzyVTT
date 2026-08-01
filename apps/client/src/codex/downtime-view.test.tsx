@@ -192,7 +192,7 @@ describe("Pending confirmations", () => {
 
     const pending = within(document.querySelector(".codex-downtime-pending")!);
     expect(pending.getAllByRole("listitem")).toHaveLength(1);
-    expect(pending.getByText("Vex — Forging · 7 days")).toBeInTheDocument();
+    expect(pending.getByText("Vex · Forging · 7 days")).toBeInTheDocument();
     // The button says what confirming DOES — the date the clock lands on — rather than "Confirm".
     expect(pending.getByRole("button", { name: /^Move your date to Hammer 17, 1491 DR/ })).toBeInTheDocument();
   });

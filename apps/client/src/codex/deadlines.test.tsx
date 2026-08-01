@@ -192,7 +192,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
 
     // Hammer 3 + 7 days = Hammer 10. The sentence is the affordance; the button only agrees with it.
     expect(row.getByText("Move your date to Hammer 10, 1492 DR")).toBeInTheDocument();
-    expect(row.getByText("Aldric — Forging a blade · 7 days")).toBeInTheDocument();
+    expect(row.getByText("Aldric · Forging a blade · 7 days")).toBeInTheDocument();
 
     await user.click(row.getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(applyDowntime).toHaveBeenCalledWith("gm", "w1"));
@@ -309,7 +309,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     expect(row.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
     expect(row.queryByText(/Advance the campaign clock/)).not.toBeInTheDocument();
     // It still says what it was, and that it has been applied — an applied downtime is not a silent row.
-    expect(row.getByText("Aldric — Forging a blade · 7 days")).toBeInTheDocument();
+    expect(row.getByText("Aldric · Forging a blade · 7 days")).toBeInTheDocument();
     expect(row.getByText(/Your date has already been moved/)).toBeInTheDocument();
   });
 });
@@ -402,7 +402,7 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
     // A revealed deadline the campaign has passed reads as passed.
     expect(within(playerRowOf("d1")).getByText("Passed")).toBeInTheDocument();
     expect(playerRowOf("w1").textContent).toContain("Downtime");
-    expect(within(playerRowOf("w1")).getByText("Aldric — Forging a blade · 7 days")).toBeInTheDocument();
+    expect(within(playerRowOf("w1")).getByText("Aldric · Forging a blade · 7 days")).toBeInTheDocument();
   });
 
   it("never asks the GM calendar route, and never offers a Confirm", async () => {
@@ -530,7 +530,7 @@ describe("The shared reading rules themselves", () => {
   });
 
   it("says a downtime in one line without inventing punctuation for the halves it was not given", () => {
-    expect(downtimeSummaryLabel({ who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null })).toBe("Aldric — Forging a blade · 7 days");
+    expect(downtimeSummaryLabel({ who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null })).toBe("Aldric · Forging a blade · 7 days");
     expect(downtimeSummaryLabel({ who: "", activity: "Carousing", days: 1, characterPageId: null })).toBe("Carousing · 1 day");
     expect(downtimeSummaryLabel({ who: "", activity: "", days: 0, characterPageId: null })).toBe("0 days");
   });

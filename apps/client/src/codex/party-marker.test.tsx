@@ -110,7 +110,7 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
 
     const pin = document.querySelector('[data-marker-id="k1"]')!;
     expect(pin.textContent).toContain("The party is here");
-    expect(pin.querySelector("title")!.textContent).toBe("Vallaki — the party is here");
+    expect(pin.querySelector("title")!.textContent).toBe("Vallaki, the party is here");
     // The ring is decoration on top of that, never instead of it.
     expect(pin.querySelector(".codex-marker-partyring")).not.toBeNull();
   });

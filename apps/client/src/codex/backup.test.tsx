@@ -53,7 +53,7 @@ const renderBackup = () => {
   return { onChanged };
 };
 
-/** Choose a file through the hidden input the "Choose a backup file…" button clicks. */
+/** Choose a file through the hidden input the "Choose a backup file" button clicks. */
 async function choose(user: ReturnType<typeof userEvent.setup>, file: File) {
   const input = document.querySelector('input[type="file"][accept="application/json,.json"]') as HTMLInputElement;
   await user.upload(input, file);

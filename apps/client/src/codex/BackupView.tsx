@@ -68,7 +68,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
       const result = await codexApi.importBundle(gmToken, pending.bundle);
       setPending(null);
       // The toast echoes the SERVER's counts — the database's own post-import rows — not our parse.
-      toast(`Codex restored — ${result.counts.pages} pages, ${result.counts.journal} journal entries, ${result.counts.maps} maps.`, { tone: "success" });
+      toast(`Codex restored: ${result.counts.pages} pages, ${result.counts.journal} journal entries, ${result.counts.maps} maps.`, { tone: "success" });
       onChanged();
     } catch (importError) {
       const failure = importError as { message?: string; details?: { issues?: ReadonlyArray<{ path?: string; message?: string }> } };
@@ -137,8 +137,8 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
 
       <Panel>
         <PanelHeader title="Restore backup" />
-        <p className="codex-composer-hint">Download a backup first — restore replaces everything.</p>
-        <Button variant="secondary" onClick={() => restoreInputRef.current?.click()}>Choose a backup file…</Button>
+        <p className="codex-composer-hint">Download a backup first. Restoring replaces everything in the Codex.</p>
+        <Button variant="secondary" onClick={() => restoreInputRef.current?.click()}>Choose a backup file</Button>
         <input ref={restoreInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { void pickRestore(event.target.files?.[0]); event.target.value = ""; }} />
         {/**
           * The shared `Modal`, not the inline panel this used to be and not `useConfirm` either.
@@ -166,12 +166,12 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
 
       <Panel>
         <PanelHeader title="Bring in notes" />
-        <p>Turn Markdown or text files into pages — one page per file. This adds pages; it never replaces anything.</p>
+        <p>Turns Markdown or text files into pages, one page per file. This adds pages and replaces nothing.</p>
         <Field label="Import into" htmlFor="codex-notes-side" help="New pages start hidden from players either way.">
           <SegmentedControl ariaLabel="Which side to import into" value={notesSide} onChange={(value) => setNotesSide(value as "gm" | "player")}
             options={[{ value: "gm", label: "GM-only side" }, { value: "player", label: "Player-facing side" }]} />
         </Field>
-        <Button variant="secondary" onClick={() => notesInputRef.current?.click()}>Choose files…</Button>
+        <Button variant="secondary" onClick={() => notesInputRef.current?.click()}>Choose files</Button>
         <input ref={notesInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importNotes(event.target.files); event.target.value = ""; }} />
       </Panel>
     </div>

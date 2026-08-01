@@ -113,7 +113,7 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSessi
         ref={inputRef}
         className="nh-input codex-palette-input"
         value={query}
-        placeholder="Search pages, entries, maps, pins, quests and sessions…"
+        placeholder="Search pages, entries, maps, pins, quests and sessions"
         aria-label="Search the Codex"
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={(event) => {
@@ -136,7 +136,7 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSessi
                 </button>}
           </li>
         ))}
-        {state.status === "ready" && state.truncated && <li className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} — narrow the search.</li>}
+        {state.status === "ready" && state.truncated && <li className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} matches. Narrow the search.</li>}
       </ul>
     </Modal>
   );

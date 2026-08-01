@@ -168,7 +168,7 @@ export function SearchResultList({ state, onOpen, selectedId = null, emptyLabel 
       ))}
       {/* D19: the Codex is unpaginated by design at LAN scale, which is honest only while a caller can
           tell a complete list from a clipped one. Non-interactive on purpose — there is no page 2. */}
-      {state.truncated && <p className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} — narrow the search.</p>}
+      {state.truncated && <p className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} matches. Narrow the search.</p>}
     </>
   );
 }

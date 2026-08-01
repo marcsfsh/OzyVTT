@@ -266,7 +266,7 @@ export function standingOf(record: ChroniclePayloadRef<CodexJournalPayload | Cod
 export function milestoneSummaryLabel(payload: CodexMilestonePayload): string {
   const reached = `Reached level ${payload.level}`;
   const why = payload.reason.trim();
-  return why ? `${reached} — ${why}` : reached;
+  return why ? `${reached} · ${why}` : reached;
 }
 
 /**
@@ -280,7 +280,7 @@ export function standingChangeLabel(payload: CodexStandingChange, factionName: s
   const moved = delta === 0 ? "unchanged" : `${delta > 0 ? "up" : "down"} ${Math.abs(delta)}`;
   const who = factionName?.trim() || "A faction";
   const why = payload.reason.trim();
-  return why ? `${who} — ${moved} · ${why}` : `${who} — ${moved}`;
+  return why ? `${who} · ${moved} · ${why}` : `${who} · ${moved}`;
 }
 
 // ----- M11 / CT-5: what a deadline SAYS -----
@@ -498,7 +498,7 @@ export function chronicleRowSummary(record: ChroniclePayloadRef<CodexJournalPayl
 
 export function downtimeSummaryLabel(payload: CodexDowntimeSummary): string {
   const span = `${payload.days} ${payload.days === 1 ? "day" : "days"}`;
-  const said = [payload.who.trim(), payload.activity.trim()].filter(Boolean).join(" — ");
+  const said = [payload.who.trim(), payload.activity.trim()].filter(Boolean).join(" · ");
   return said ? `${said} · ${span}` : span;
 }
 
