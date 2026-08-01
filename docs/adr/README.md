@@ -2,8 +2,8 @@
 
 | ADR | Status | Decision |
 | --- | --- | --- |
-| [001](0001-authoritative-lan-server.md) | Accepted | Browser application with responsive phone/desktop parity |
-| [002](0002-gm-bootstrap.md) | Accepted | Single authoritative local-host server over trusted LAN |
+| [001](0001-authoritative-lan-server.md) | Accepted | One Node server is the authority for state, access control and broadcasts; browsers connect over HTTP + Socket.IO on the LAN |
+| [002](0002-gm-bootstrap.md) | Accepted | Loopback-only first-run GM bootstrap; bcrypt hash, then a signed time-limited session token |
 | [003](0003-renderer-choice.md) | Closed — resolved by the code | Renderer choice: the shipped map is DOM/SVG on every surface; the WebGL spike was abandoned, not concluded |
 | [004](0004-application-stack.md) | Accepted | TypeScript end to end with React, Express, Socket.IO, and SQLite target |
 | [005](0005-realtime-protocol.md) | Accepted | Server-authoritative WebSocket command/event flow with reconnect snapshots |

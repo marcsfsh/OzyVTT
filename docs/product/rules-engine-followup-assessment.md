@@ -1,3 +1,21 @@
+> ## ⚠ FROZEN — 2026-08-01
+>
+> **What this is:** the 2026-07-19 review that preceded the rules-engine follow-up milestone.
+> It called itself a "living roadmap"; nothing has updated it since that date, so it is now a
+> **point-in-time assessment**, and it is labelled as one rather than left to look current.
+> Kept in place, not archived, because `docs/adr/0020-combat-rules-engine.md` cites it.
+> **Current through:** 2026-07-19.
+> **Known stale below:** two of the eight items in §4 "Genuinely remaining" have since shipped —
+> item 4's spell slots as a `uses`-like resource (`seedSpellSlots`, `apps/server/src/actor-roster.ts`)
+> and item 7's client adoption of `actor:available-actions` (consumed in
+> `apps/client/src/encounter/CharacterSheet.tsx`). Items 1 and 3 are confirmed still open at HEAD:
+> no `difficultTerrain` or `movement.preview` symbol exists, and the reaction trigger vocabulary is
+> still `["hit-by-attack", "leaves-reach"]` (`packages/domain/src/index.ts`).
+> **Read this for:** the corrected scope and the reasoning that produced it.
+> **Do not read this for:** what remains to be built. That is `docs/ai-ledger/current-state.md`
+> and the Roadmap section of `BUILD_PLAN.md`.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Rules-engine follow-up milestone — implementation assessment and corrected scope
 
 Date: 2026-07-18, updated 2026-07-19 · Baseline: PR #38 (ADR-0020 combat rules

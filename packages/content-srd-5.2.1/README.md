@@ -58,8 +58,9 @@ anything consumes it.
     SRD's own Legal Information page); any surface that displays this content must show it.
   - **Character-builder bundles.**
     - `classes.v1.json` — every SRD 5.2.1 class, each a complete 20-row transcription.
-      Full-caster slot columns are pinned to `FULL_CASTER_SLOTS` row-for-row by
-      `test/character-content.test.ts`.
+      Wizard's and Cleric's slot columns are pinned to `FULL_CASTER_SLOTS` row-for-row by
+      `test/character-content.test.ts`; the other three full casters (Bard, Druid, Sorcerer)
+      are not pinned.
     - `subclasses.v1.json` — one SRD subclass per class. Domain and patron spells are staged
       always-prepared grants; shared resources (e.g. `channel-divinity`) draw on one uses pool.
     - `species.v1.json` — **all nine** SRD 5.2.1 species (Dragonborn, Dwarf, Elf, Gnome,

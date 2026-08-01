@@ -28,10 +28,11 @@ transfers that guarantee onto the *committed file*. Either alone passes forever 
 other's failure mode. If you add a generated document, ship both.
 
 `docs/ai-context/viewer-mode.md` uses a third pattern for prose that cannot be generated: its
-Invariants section is worded to match the test titles that prove each invariant, byte for byte.
-**Do not re-flow that section** — a markdown re-wrap splits a pinned sentence across two lines
-and breaks the comparison without changing a word. After editing it, check every phrase is
-still on one line:
+Invariants section is worded to match the test titles that prove each invariant, **word for
+word, in both directions** — change either side alone and the check fails. Whitespace is
+normalised before comparing, so re-flowing the section is safe and only the words matter. The
+grep loop below still needs each phrase on one line, so keep it as the fast local check and let
+`npx vitest run test/docs-viewer-safety.test.ts --root apps/server` be the authority:
 
 ```
 for p in "hides all presentation content while disabled" "rejects non-GM control" \

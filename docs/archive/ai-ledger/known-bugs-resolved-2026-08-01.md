@@ -9,6 +9,9 @@
 
 ## Resolved entries
 
+*Two passes landed on 2026-08-01. This section is the first, of thirty. A second pass of seven
+follows below under its own heading; the counts in this paragraph describe this section only.*
+
 Thirty entries lifted out of `docs/ai-ledger/known-bugs.md` on 2026-08-01, unchanged. Each was
 either **self-declared fixed** in its own headline, or **verified fixed at `706eab5`** against the
 code while still filed as open, or a **duplicate or a superseded correction** of another entry.
@@ -333,3 +336,47 @@ it was understood.
   clock ahead of the party while prepping, `currentDate` needs a server-side gate**, and no such gate
   exists today. Raised by the M7 implementer rather than decided unilaterally. Not a leak of GM-only
   content as the system is currently specified; revisit if prep-ahead becomes a supported workflow.
+
+---
+
+## Resolved entries — second pass (2026-08-01)
+
+Seven more entries lifted out of `docs/ai-ledger/known-bugs.md` later the same day, after an
+adversarial truth audit re-read the live list against code at `18644bb` and found them refuted.
+They are separate from the thirty above only in when they were caught, not in kind: six were
+filed as open and are false at HEAD, and one had declared its own fix and stayed anyway.
+
+Why a static check did not catch six of them: the freshness check in
+`apps/server/test/docs-ledger.test.ts` asks "does an entry claiming a fix cite a test?" — a
+question about the entry's own headline. "Is this still broken?" is a question about behaviour,
+and no check can answer it. These were read and verified one at a time, with the code that
+refutes each recorded below. The seventh is different and is the more useful lesson: it *did*
+announce its fix, in a struck-through headline, and the check's status-position rule looked only
+inside the bold headline text and never saw the marker. That rule was widened in the same change
+that archived this batch.
+
+| Entry (as it stood live) | Refuted by |
+| --- | --- |
+| `codex:changed` tells every player which KIND of record the GM is working on | The ping is content-free (D22): `CodexChangedEvent = Readonly<{ codexRevision: number }>` (`packages/domain/src/index.ts`), emitted as `{ codexRevision }` and nothing else (`apps/server/src/server.ts`). The `scope` field was removed before this branch started — the entry was already false at the `706eab5` baseline. Two adjacent notifiers, **same** rule. |
+| `.codex-back` is sub-floor — 13px text with no `min-height` | It is the ghost `Button` primitive now, which carries the 44px floor itself via route 2 — `size="sm"` adds `nh-btn--sm tap-target` (`packages/ui/src/primitives/Button.tsx`), and `.tap-target::after` sizes to `max(100%, var(--tap-min))` with `--tap-min: 44px` (`packages/ui/src/styles/design-tokens.css`). `codex.css` says so in the rule's own comment. The "rather than adding a third variant" clause was stale too — an "All quests" variant exists. |
+| `soldier-a` references a dangling `dice-set` id, the cross-reference test cannot see background equipment, and the `statPriority[0]`-only fixture cannot catch multi-ability prerequisites | All three closed. `backgrounds.v1.json` carries `gaming-set-dice` and no `dice-set`; `character-content.test.ts` asserts the real id and names the old one a dangling id in the past tense, adds the symmetric background equipment/tool/skill loop that would have caught it, and uses full six-ability `flatEight` fixtures with a comment saying why a one-ability fixture cannot catch Paladin/Monk/Ranger. |
+| Homebrew discriminator covers 6 of 9 content types: spells, equipment/weapons/armor and monsters carry no `source`, and `EquipmentReferenceSchema.category` is a closed 10-value enum | `category` is an open slug — `z.string().regex(/^[a-z0-9-]+$/).max(40)`, with a comment saying "as an open slug - never a closed enum". `source` is present on every named schema: `SpellReferenceSchema`, `WeaponReferenceSchema`, `ArmorReferenceSchema` and `EquipmentReferenceSchema` (`packages/content-srd-5.2.1/src/index.ts`), and monsters carry one through `ActorDefinitionSchema` (`packages/schemas/src/index.ts`). |
+| Magic-item riders are not authorable — `EquipmentReferenceSchema` is `.strict()` and carries no magic vocabulary, so `isMagic`/`riders`/`casts` would be rejected. "The largest remaining piece of the approved scope" | The schema grew. It now declares `slot`, `rarity`, `isMagic`, `attunement`, `cursed`, `casts` (`z.array(ItemSpellCastSchema).max(8)`), `grantsFeatIds` and the spread `...featureRiders` block, with a `superRefine` requiring attunement for a cursed item. The schema's own comments describe the rejection in the past tense. |
+| A bare `header { max-width: 40rem }` clamps every `<header>`, **and `Modal` and `Panel` heads are still clamped** | The status half is false: `Modal.css`, `Panel.css` and `Drawer.css` all carry `max-width: none` with a comment naming the app global, added in `8a93aab` — an ancestor of the `706eab5` baseline. **Re-scoped rather than deleted:** the app global itself is still unscoped, so the entry survives in the live list on that narrower claim. Deleting it outright would have thrown away a true bug to remove a false sentence. |
+
+---
+
+- ~~**[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
+  components document nowhere.~~ **FIXED 2026-07-31** (`c7fc8aa`, Codex overhaul Lane A).
+  `renderOperation` now seeds from success responses too — the envelope's `data` component, with the
+  existing transitive closure pulling the rows, payloads and branches it reaches — and
+  `reference.test.ts`'s *independent* obligation walker widened with it, so a renderer change cannot
+  silently reopen the hole. `docs/api-reference.md` went from 91 to **241** rendered shared shapes
+  (+1,777 lines), the large mechanical diff this entry predicted.
+
+  *(Archive note: this entry declared its own fix on 2026-07-31 and stayed under `## Known gaps`
+  anyway, contradicting that section's header rule that every entry there is reproducible at HEAD.
+  It survived the sweep that archived eighteen entries on exactly that criterion because the
+  `**FIXED 2026-07-31**` marker sits **outside** the bold headline the status-position rule reads —
+  the strike-through moved it one element to the right. Kept here verbatim as the worked example of
+  how a status rule that reads only the headline gets walked around without anyone intending to.)*

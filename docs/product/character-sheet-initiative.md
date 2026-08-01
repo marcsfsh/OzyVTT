@@ -1,3 +1,18 @@
+> ## ⚠ SUPERSEDED — 2026-08-01
+>
+> **What this is:** the pre-implementation handoff and roadmap for the player character-sheet
+> initiative, written 2026-07-23 when nothing had been built. Kept in place, not archived,
+> because `docs/adr/0021-player-character-sheet.md` cites it as this initiative's orientation.
+> **Current through:** 2026-07-23. **Every status line below is frozen at that date.**
+> **What actually happened:** the play sheet shipped (`apps/client/src/encounter/CharacterSheet.tsx`),
+> and the guided builder that this document defers shipped on 2026-07-28 —
+> see `docs/adr/0021-player-character-sheet-closing-record.md`. So "**Implemented** | Nothing yet"
+> and "**Next action** | **Slice 0**" below are historical, not current.
+> **Read this for:** the reasoning behind the slice ordering, and the codebase orientation that
+> reasoning rests on.
+> **Do not read this for:** what is built. That is `docs/ai-ledger/current-state.md`.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Character Sheets — Initiative Handoff & Roadmap
 
 > **Purpose:** cold-start handoff for the player character-sheet initiative. If you are a

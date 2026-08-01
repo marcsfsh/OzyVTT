@@ -10,7 +10,7 @@
  *   4. The documentation checks themselves are not skipped.
  */
 import { describe, expect, it } from "vitest";
-import { exists, globToRegExp, isDir, ls, read, tracked } from "./docs-support.js";
+import { CHECK_SHAPE, exists, globToRegExp, isDir, ls, read, tracked } from "./docs-support.js";
 
 const readme = read(".claude/README.md");
 
@@ -71,7 +71,16 @@ describe(".claude rule coverage", () => {
   const CHOKE_POINTS = tracked().filter((f) => /^apps\/server\/src\/([a-z0-9-]*projections|[a-z0-9-]*-http)\.ts$/.test(f));
 
   it("auto-loads a hard-invariant rule for every projection / HTTP choke point", () => {
-    expect(CHOKE_POINTS.length, "no projection/HTTP choke points found - the pattern in this test has stopped matching the tree").toBeGreaterThan(0);
+    // A FLOOR, not `> 0`. The old guard caught "the pattern matches nothing" but not "the pattern
+    // matches almost nothing": narrowing the regex to a single file left it passing at length 1,
+    // with every other projection and HTTP surface silently unguarded.
+    expect(
+      CHOKE_POINTS.length,
+      `${CHOKE_POINTS.length} projection/HTTP choke point(s) found; the floor is ${CHECK_SHAPE.chokePointFloor}.\n` +
+        `The pattern in this test has stopped matching most of the tree, so most choke points are no longer covered.\n` +
+        `Measure it: git ls-files 'apps/server/src/*.ts' | grep -E '(projections|-http)\\.ts$'\n` +
+        `Fix: restore the pattern. If files were genuinely consolidated away, lower CHECK_SHAPE.chokePointFloor in apps/server/test/docs-support.ts in the same commit.`
+    ).toBeGreaterThanOrEqual(CHECK_SHAPE.chokePointFloor);
     for (const file of CHOKE_POINTS) {
       expect(
         rules.some((r) => r.globs.some((g) => globToRegExp(g).test(file))),
@@ -119,7 +128,18 @@ describe("the documentation checks themselves", () => {
 
   it("are not skipped", () => {
     const checks = ls("apps/server/test", (n) => /^docs-[a-z-]+\.test\.ts$/.test(n));
-    expect(checks.length, "no apps/server/test/docs-*.test.ts files found - the documentation checks are gone").toBeGreaterThan(0);
+    // THE DETECTOR'S OWN GLOB IS PINNED. It was itself neuterable: narrowing this pattern to
+    // `/^docs-tooling\.test\.ts$/` let a `.skip` in any sibling through, and vitest reports a
+    // skipped test as "1 skipped" and exits 0 — camouflage this file's own comment predicts.
+    // Comparing against an explicit list in another module closes the last hole in the closer.
+    expect(
+      checks,
+      `the documentation check files discovered here do not match the list pinned in docs-support.ts (CHECK_SHAPE.docsCheckFiles).\n` +
+        `  discovered: ${JSON.stringify(checks)}\n` +
+        `  pinned:     ${JSON.stringify(CHECK_SHAPE.docsCheckFiles)}\n` +
+        `Either a check file was added, renamed or deleted, or the glob above was narrowed so this skip-detector stops covering its siblings.\n` +
+        `Fix: if the change is intended, update CHECK_SHAPE.docsCheckFiles in apps/server/test/docs-support.ts in the SAME commit. Never narrow the glob to make this pass.`
+    ).toEqual([...CHECK_SHAPE.docsCheckFiles]);
     for (const file of checks) {
       expect(
         DISABLED.test(read(`apps/server/test/${file}`)),

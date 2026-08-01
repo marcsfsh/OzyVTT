@@ -87,13 +87,13 @@ Workspaces are `apps/*` and `packages/*`: `apps/client` (the React/Vite UI) · `
 
 ## Keeping the docs true
 
-Where a document and the code disagree, **the code is truth and the document is a defect**.
-Fix or delete the claim in the same change; update documents **in place**.
+Where a document and the code disagree, **the code is truth and the document is a defect**. Fix
+or delete the claim in the same change; update documents **in place**.
 
-**Documentation truth is a test.** `apps/server/test/docs-paths.test.ts`,
-`docs-commands.test.ts`, `docs-ledger.test.ts`, `docs-tooling.test.ts` and
-`docs-viewer-safety.test.ts` fail when a claim stops being true, each naming its own fix.
-Fix the claim; never delete or skip a check to make the suite green.
+**Some documentation truth is a test — know which.** `apps/server/test/docs-{paths,commands,ledger,tooling,viewer-safety}.test.ts`
+fail when a claim stops being true, each naming its own fix; fix the claim, never skip one to go green.
+**The guarantee is narrower than "the docs are checked":** every *path* in all 92 live documents resolves,
+but *claims* are checked in six only — `CLAUDE.md`, `current-state.md`, `known-bugs.md`, `viewer-mode.md`, `.claude/README.md`, the router.
 
 `.claude/` holds the skills, subagents, path-scoped rules and hooks that support this workflow
 — see **`.claude/README.md`** for the roster. Use a skill when its trigger matches; don't force

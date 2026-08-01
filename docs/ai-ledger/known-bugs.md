@@ -104,12 +104,6 @@ Format: `[area] — description — suspected cause / status`.
   and the M6 lesson recurring in the mirror direction. (The journal arm now delegates to
   `projectPlayerJournalEntry`, so it is covered — the other three are not.)
 
-- **[codex/realtime] The `codex:changed` ping tells every player which KIND of record the GM is working on.**
-  Measured on a real player socket while the GM created three entirely unrevealed records: `scope: "sessions"`,
-  then `"quests"`, then `"journal"`. No content leaks. But the homebrew notifier eight lines below refuses to
-  do this on stated principle — "telling players which kind of thing the GM is working on … is a small leak of
-  GM intent" — and M9/M10 added `sessions` and `quests` to that union. Two adjacent notifiers, opposite rules.
-
 - **[codex/store] A page that HAD standing and is re-typed away from `faction` keeps its standing row.**
   `setStanding` now requires `entity_type = 'faction'` only to CREATE a row, not to update one, and the
   Campaign card lists any page that already has a row whatever its type is now — otherwise the GM had a
@@ -136,10 +130,6 @@ Format: `[area] — description — suspected cause / status`.
   seven kinds were frozen deliberately — but a GM asking "what can they see?" may reasonably expect the
   party's current date to be on that list. Raised by adversarial review as a scope observation, not a defect.
 
-- **[codex] `.codex-back` ("‹ All pages" / "‹ All sessions") is sub-floor** — 13px text with no
-  `min-height`. Pre-existing; M9 reuses it for the session log rather than adding a third variant.
-  Widening it also unclamps other surfaces, so it wants its own pass.
-
 - **[tooling] `apps/server/test/homebrew-http.test.ts`'s per-path mount probe is vacuous.** It asserts the
   router's own headers prove a path is mounted; because `router.use(...)` is declared with no path and the
   router mounts bare, those headers come back for *any* path — measured, `/completely/unrelated/path`
@@ -161,25 +151,15 @@ Format: `[area] — description — suspected cause / status`.
   auto-roll client-side, but nothing server-side accepts a typed builder result the way
   `initiative.roll-self` accepts `natural`. Without it the client owns the roll (violates server
   authority).
-- **[character-builder] Homebrew discriminator covers 6 of 9 promised content types.** Spells,
-  equipment/weapons/armor, and monsters carry no `source` field, and `EquipmentReferenceSchema.category`
-  is a **closed 10-value enum** — a direct conflict with "all item types". (The `SKILL_ABILITY`
-  hardcode is **fixed** as of 2026-07-27: `content:skills` carries an `ability` column and
-  `CharacterSheet.tsx` drives both the skill list and each governing ability from the catalog, so a
-  homebrew skill is now a bundle row and nothing else.)
-- **[character-builder] Content/test gaps.** `soldier-a` starting equipment references `dice-set` but the
-  catalog id is `gaming-set-dice` — invisible because the cross-reference test checks *class* equipment
-  ids and *background skill* ids but not background equipment ids. And
-  `character-content.test.ts:65-66` sets only `statPriority[0]` to 13, so Paladin/Monk/Ranger
-  (multi-ability prerequisites) will fail the moment they are authored.
 - **[ui] A bare `header { max-width: 40rem }` in `apps/client/src/styles.css` clamps every
-  `<header>` in the app**, including four `@vtt/ui` primitives (`WizardShell`, `ReviewSummary`,
-  `Modal`, `Panel`). It was written for the landing hero. Found 2026-07-27 when it silently clamped
-  the character builder's sticky header to 640px, letting the step body scroll visibly through the
-  uncovered gutter. `WizardShell` and `ReviewSummary` now defend themselves with `max-width: none`;
-  **`Modal` and `Panel` heads are still clamped**. The real fix is to scope the app global (e.g.
-  `main > header`), which would also unclamp `.codex-entry-head` / `.acting-console-head` — a visual
-  change wide enough to want its own pass.
+  `<header>` in the app.** It was written for the landing hero. Found 2026-07-27 when it silently
+  clamped the character builder's sticky header to 640px, letting the step body scroll visibly
+  through the uncovered gutter. Every `@vtt/ui` primitive that owns a `<header>` now defends itself
+  with `max-width: none` (`WizardShell`, `ReviewSummary`, `Modal`, `Panel`, `Drawer`), so the
+  primitives are safe — **the app global itself is still unscoped**, and it still clamps every
+  app-owned `<header>`: `.codex-entry-head`, `.acting-console-head` and anything added later, which
+  inherits the bug by default rather than opting out of it. The real fix is to scope the global
+  (e.g. `main > header`) — a visual change wide enough to want its own pass.
 - **[character-builder] No GM-facing editor for `builder.set-policy`.** The command and the
   `PlayerView.builderPolicy` projection both exist and the wizard honours the policy (it offers only
   the permitted ability methods, and "custom" only when a formula is configured), but nothing in the
@@ -195,20 +175,8 @@ Format: `[area] — description — suspected cause / status`.
 - **[homebrew] `reminted.reason` has no honest value for "not our shape"** — the contract enum is
   frozen, so a pack id that is re-minted for shape reasons reports a collision that did not happen.
   Needs a `packages/api-contract` enum addition.
-- ~~**[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
-  components document nowhere.~~ **FIXED 2026-07-31** (`c7fc8aa`, Codex overhaul Lane A).
-  `renderOperation` now seeds from success responses too — the envelope's `data` component, with the
-  existing transitive closure pulling the rows, payloads and branches it reaches — and
-  `reference.test.ts`'s *independent* obligation walker widened with it, so a renderer change cannot
-  silently reopen the hole. `docs/api-reference.md` went from 91 to **241** rendered shared shapes
-  (+1,777 lines), the large mechanical diff this entry predicted.
 - **[homebrew] Packs have no UI** — export and import are 2 of the 13 operations, HTTP-only,
   deliberately deferred.
-- **[homebrew] Magic-item riders are not authorable yet.** `EquipmentReferenceSchema` is `.strict()`
-  and carries no magic vocabulary, so `isMagic`/`riders`/`casts` would be **rejected**, not ignored.
-  `RiderEditor` ships built and ready (`ITEM_RIDERS`, `uses` relabelled "Charges"); the section is a
-  handful of `FieldDef`s the day the schema grows. **This is the largest remaining piece of the
-  approved scope** — the product decision was full item riders in v1.
 - **[homebrew] A caster subclass still needs its class published first** (the third-caster check
   reads the class's level table). Not a deadlock — the class side now waits for nothing — but an
   ordering a GM can hit.

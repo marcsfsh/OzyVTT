@@ -37,10 +37,14 @@ Every viewer route is under `/api/v1`. Path constants live in `packages/api-cont
 `VIEWER_PATHS`; the reference is `docs/api-reference.md`. `/viewer.html` is a page, not an API
 route, and carries no prefix.
 
-<!-- DO NOT RE-FLOW THE SECTION BELOW. Each of the seven pinned sentences must sit on ONE
-     line: a documentation freshness test compares them byte-for-byte against the test titles
-     that prove them, so a markdown re-wrap breaks the check without changing a word.
-     Verify after any edit with the loop in `docs/ai-context/testing.md`. -->
+<!-- THE SEVEN SENTENCES BELOW ARE PINNED. A documentation freshness test
+     (`apps/server/test/docs-viewer-safety.test.ts`) compares each one against the title of the
+     test that proves it, in BOTH directions. Change the wording here and the check fails; change
+     it in the test title and it fails too. That is the point: the invariant cannot drift on one
+     side only. Re-flowing IS safe — both sides are whitespace-normalised before comparing, so
+     line breaks do not matter and only the words do. -->
+
+<!-- Verify after any edit with the loop in `docs/ai-context/testing.md`. -->
 
 ## Invariants — VIEWER SAFETY (most important)
 
