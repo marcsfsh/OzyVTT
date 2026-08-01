@@ -9,7 +9,7 @@
 | Rules baseline | System Reference Document 5.2.1 (2024 fifth-edition rules) |
 | Primary use | One GM locally hosting a private home game for a small, known group |
 | Distribution direction | Open-source, self-hostable application with a documented public integration API |
-| Primary content path | Canonical player-character and monster JSON, with reviewed player-sheet PDF conversion through MarkItDown planned for Version 1 |
+| Primary content path | Canonical player-character and monster JSON, plus reviewed player-sheet PDF conversion — shipped, client-side via `pdfjs-dist` (ADR-0018, amended 2026-07-26; the MarkItDown/Python approach was abandoned) |
 | Current checkpoint | A server-authoritative token-interaction slice extends the persisted encounter (no-setup tray, direct GM/owner drag, server grid snap, freeform gridless, hidden-token omission, public-token viewer convergence). A shared annotation layer now adds live grid-snapped measurements and AoE shapes with a full visibility model (public/gm-only/owner-only/owner-gm/gm-actor + owner-delegated movement), and these plus Initiative now reach the TV and a real-`/viewer.html` in-tab preview over Channel B. The battle-map refinement round (eye-dropdown visibility, wrench clear-all, per-shape editor, dockable Initiative, inline dice modifier + recent-roll window, configurable grid-wizard crosshair, renamed tabs) is complete and live-verified; physical multi-device validation remains next |
 | Last updated | 2026-07-24 |
 | Last implementation audit | 2026-07-19 (SRD combat-rules gap closure tiers A–D — ADR-0020 second amendment) |
@@ -102,8 +102,8 @@ There are no active hard blockers to the next queued implementation item.
 
 The following are deliberately outside the core promise unless this plan is revised:
 
-- A full character builder or level-up workflow; PDF ingestion transcribes an existing sheet and does not choose abilities, equipment, spells, advancements, or legal build options
-- A general campaign wiki, journal, quest manager, or worldbuilding suite
+**Two former non-goals have been reversed; they are recorded here rather than deleted, because a boundary that turned out to be wrong is exactly what a later reader needs to be able to date.** A *general campaign wiki, journal, quest manager, or worldbuilding suite* was a non-goal until 2026-07-24, when the product owner made the worldbuilding Codex a core pillar (`docs/ai-ledger/decision-log.md`). *A full character builder or level-up workflow* was a non-goal until the guided builder shipped on 2026-07-28 (`docs/adr/0021-player-character-sheet-closing-record.md`). PDF ingestion is still a transcription path and still chooses nothing.
+
 - A public marketplace or commercial content storefront
 - Built-in video conferencing, voice chat, or music streaming
 - Three-dimensional maps or miniatures

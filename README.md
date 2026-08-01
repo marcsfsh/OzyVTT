@@ -73,8 +73,10 @@ Conventions across the whole surface — envelopes, request-id echo, which write
 
 ## Not in scope
 
-Not a guided character builder (a play sheet exists), voice/video, a public or multi-tenant service, a scripting language, or a 3D tabletop.
+Not a voice/video service, a public or multi-tenant service, a scripting language, or a 3D tabletop.
+
+Two boundaries that used to be here have been reversed and are recorded rather than deleted: the worldbuilding Codex is now a core pillar (`docs/ai-ledger/decision-log.md`, 2026-07-24), and the guided character builder has shipped (`docs/adr/0021-player-character-sheet-closing-record.md`).
 
 ## Layout
 
-TypeScript monorepo: `apps/client` (React/Vite) and `apps/server` (Express + Socket.IO, authoritative), with shared packages under `packages/` (`domain`, `rules-5e`, `schemas`, `api-contract`, `ui`, `content-srd-5.2.1`, `test-fixtures`). Game state lives on the server in SQLite. More detail is in [docs/ai-context/](docs/ai-context/), [docs/adr/](docs/adr/), and [BUILD_PLAN.md](BUILD_PLAN.md).
+TypeScript monorepo: `apps/client` (React/Vite) and `apps/server` (Express + Socket.IO, authoritative), with shared packages under `packages/`. The roster is `package.json` `workspaces`; `docs/app-map.md` is the generated orientation index. Game state lives on the server in SQLite. More detail is in [docs/ai-context/](docs/ai-context/), [docs/adr/](docs/adr/), and [BUILD_PLAN.md](BUILD_PLAN.md).

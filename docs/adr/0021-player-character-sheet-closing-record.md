@@ -9,28 +9,38 @@ about the play sheet; this record closes its decision 1 only.
 yet … The full **builder** … is the **next roadmap update**"
 (`docs/adr/0021-player-character-sheet.md`).
 
-> **Skeleton — structure only.** Plan A owns this file's existence and its numbering.
-> **This is the fourth closing record**, added by MASTER-PLAN §9 **O-1 (client default:
-> option (a))**, which overrides Plan A §8 Q1's citation-deletion route: all four stale ADRs
-> get records, because treating one differently is the inconsistency that produced the drift.
-> D13 forbids editing the original, so this is a separate file whose name sorts immediately
-> after it. Plan B §5.3 (Developer 2) writes the prose.
-
 ## What happened
 
-_Awaiting Plan B §5.3 (Developer 2): the guided builder shipped on 2026-07-28 in `3144e58`
-(#50) — `apps/client/src/builder/` (the wizard), `apps/server/src/character-build.ts`
-(server-side assembly and re-validation), `GameState.builderPolicy`
-(`packages/domain/src/index.ts`), and the `packages/content-srd-5.2.1` bundles it offers._
+The next roadmap update arrived. The guided builder shipped on 2026-07-28 in commit `3144e58`
+("Character content, homebrew authoring, and magic items", #50):
+
+- `apps/client/src/builder/` — the full-page wizard (`CharacterBuilder.tsx`,
+  `build-payload.ts`, `draft.ts`, `character-builder.css`), mounted from the GM roster in
+  `apps/client/src/main.tsx`.
+- `apps/server/src/character-build.ts` — server-side assembly for `character.create`: ability
+  method validation, per-level HP, feature-rider interpretation, and re-validation against
+  `ActorDefinitionSchema`.
+- `GameState.builderPolicy` (`packages/domain/src/index.ts`) — a GM-set, player-read table
+  policy for which ability-score methods are allowed, carried verbatim into the player
+  projection.
+- `packages/content-srd-5.2.1` — the classes, subclasses, species, backgrounds and feats the
+  wizard offers.
+
+ADR-0021's decision 2 (the "no-rewrite" data-model contract) held: the builder writes the same
+choice-input schema the play sheet already read, which is why no migration was needed.
 
 ## What this changes elsewhere
 
-_Awaiting Plan B §5.3 (Developer 2): the superseded "not a character builder" boundary is still
-asserted in several documents. `packages/content-srd-5.2.1/README.md` currently holds the only
-correct record of the scope change in the repo — that wording is the model to reuse._
+The scope boundary **"not a character builder" is retired.** It was asserted in `CLAUDE.md`,
+`README.md`, `BUILD_PLAN.md`'s non-goals and `docs/ai-context/product-vision.md`; all of those
+are corrected in the same change as this record. `packages/content-srd-5.2.1/README.md` already
+carried the only correct record of the reversal, and its wording is the model: state the old
+boundary, name what changed it, and date it by naming the decision rather than deleting the
+history.
 
 ## What is still open
 
-_Awaiting Plan B §5.3 (Developer 2): Phase 3 of `docs/task-packets/character-builder.md`
-(`characterDrafts`, resume-anywhere) is genuinely open, and `apps/client/src/builder/draft.ts`
-says so in the same words._
+Server-held drafts (builder "Phase 3"). The wizard parks drafts in `localStorage` behind
+`loadDraft`/`saveDraft`/`clearDraft`, and `apps/client/src/builder/draft.ts` says so in its own
+words: the `GameState.characterDrafts[]` store "is Phase 3 and does not exist yet." The
+builder is also GM-gated; a player-initiated path is not shipped.

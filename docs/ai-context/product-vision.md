@@ -32,9 +32,13 @@ Combat stays combat-first (favour the obvious GM action over another settings kn
 
 ## Scope boundaries (say no to these)
 
-Not a character *builder yet* (an interactive play sheet ships now; the guided builder is a
-roadmap item — ADR-0021), not a voice/video service, not a public or multi-tenant SaaS, not
-a macro/scripting language, not a 3D tabletop.
+Not a voice/video service, not a public or multi-tenant SaaS, not a macro/scripting
+language, not a 3D tabletop.
+
+**"Not a character builder" was a boundary and is no longer one.** A guided character builder
+ships (GM-gated today); ADR-0021 recorded the boundary it replaced, and
+`docs/adr/0021-player-character-sheet-closing-record.md` explains what changed. The original
+ADR is unedited so the change stays datable.
 
 **"Not a campaign wiki" was a boundary and is no longer one.** The owner reversed it on
 2026-07-24 (see `docs/ai-ledger/decision-log.md`) and the worldbuilding Codex is now a core
@@ -57,6 +61,5 @@ local campaign data and is git-ignored.
 
 ## Roadmap pointers
 
-`BUILD_PLAN.md` is the full roadmap; `README.md` describes the current milestone;
-`docs/ai-ledger/current-state.md` tracks near-term work. Phase 2 (testing-MVP vertical slice) is under
-active implementation; no phase exit gate has been claimed yet.
+`BUILD_PLAN.md` is the full roadmap; `docs/ai-ledger/current-state.md` is what ships now,
+what is in flight and what is known broken.

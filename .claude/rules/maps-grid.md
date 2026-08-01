@@ -8,6 +8,7 @@ paths:
   - "apps/client/src/maps/**"
   - "apps/client/src/scene/**"
   - "apps/client/src/scenes/**"
+  - "apps/client/src/codex/MapSurface.tsx"
 ---
 
 # Maps & grid geometry (hard invariant)

@@ -1,7 +1,7 @@
 # UX principles
 
-**Read this when:** doing UI-heavy work — grid setup, map controls, initiative, character
-selection, viewer mode, mobile layouts — or reviewing whether a feature "feels right."
+**Read this when:** doing any UI work — combat surfaces, the Codex, the builder, the
+viewer — or reviewing whether a feature "feels right."
 
 ## The three tests
 

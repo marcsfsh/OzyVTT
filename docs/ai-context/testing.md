@@ -5,58 +5,102 @@
 
 ## Commands (run from repo root; npm workspaces, Node ≥24)
 
-| Command | What it does |
-| --- | --- |
-| `npm run check` | **Typecheck only** — fans `tsc` across every workspace with a `check` script. Fastest full-repo signal. Web uses `tsc -b` (project references); server/packages use `tsc --noEmit`. |
-| `npm test` | `vitest run` (one-shot) in every workspace with tests: `@vtt/web` (14), `@vtt/server` (771), `@vtt/content-srd-5.2.1` (80), `@vtt/rules-5e` (108), `@vtt/api-contract` (36), `@vtt/schemas` (19), `@vtt/dndbeyond-pdf` (12), `@vtt/domain` (11). |
-| `npm run build` | `tsc -b && vite build` for the client; `tsc` for the server. |
-| `npm run dev` | Client (`vite --host 0.0.0.0`, `:5173`) + server (`tsx watch`, `:3001`) concurrently. |
-| `npm start` | Build, then run the single LAN service. |
+The command table is `CLAUDE.md`'s and a test holds it to `package.json`; this file owns what
+counts as *enough*. Scope while iterating with `--workspace=@vtt/server`; run the full suite
+before concluding. `npm run check` is typecheck only — **there is no linter in this repo**, so
+nothing here catches style.
 
-Scope to one package: `npm test --workspace=@vtt/server`.
+## The two documents that cannot go stale
+
+Two documents are generated from code and guarded by tests, and they are the only documents in
+this repo that a change cannot silently falsify:
+
+- `docs/app-map.md` — `apps/server/test/app-map.test.ts` asserts the committed bytes equal a
+  fresh `renderAppMap()`, **and** that every `GameState` field, command type and HTTP path
+  appears in the render. Regenerate with `npm run map`.
+- `docs/api-reference.md` — `packages/api-contract/test/reference.test.ts` does the same for
+  the API, plus a documentation-obligation walk computed independently of the renderer, plus a
+  cross-document phrase pin against ADR-0016. Its regeneration command is in the generated
+  file's own header.
+
+**Both halves are load-bearing.** Coverage proves the *renderer* is complete; byte-equality
+transfers that guarantee onto the *committed file*. Either alone passes forever against the
+other's failure mode. If you add a generated document, ship both.
+
+`docs/ai-context/viewer-mode.md` uses a third pattern for prose that cannot be generated: its
+Invariants section is worded to match the test titles that prove each invariant, byte for byte.
+**Do not re-flow that section** — a markdown re-wrap splits a pinned sentence across two lines
+and breaks the comparison without changing a word. After editing it, check every phrase is
+still on one line:
+
+```
+for p in "hides all presentation content while disabled" "rejects non-GM control" \
+  "omits a gm-only combatant from both the player and the viewer lists" \
+  "projects only public, non-expired annotations onto the shared screen" \
+  "exact HP never reaches others" "keeping the map/fog but no tokens" \
+  "reaches players and the viewer verbatim"; do
+  grep -qF "$p" docs/ai-context/viewer-mode.md || echo "MISSING: $p"; done
+```
 
 ## What CI runs
 
-`.github/workflows/ci.yml` (job "Test, type-check, and build"), on push/PR to `main`,
-Node 24: `npm ci` → `npm test` → `npm run check` → `npm run build`. Read-only contents
-permission, 15-min timeout, cancels superseded runs. `docs/product/continuous-integration.md`
-documents the same local-equivalent sequence.
+`.github/workflows/ci.yml` (job "Test, type-check, and build"), Node 24:
+`npm ci` → `npm test` → `npm run check` → `npm run build`. Read-only contents permission,
+15-min timeout, cancels superseded runs. **CI is the gate for anything reaching `main`, and
+that workflow is the only statement of which refs it fires on — read the `on:` block rather
+than trusting a copy. Whatever it covers, it does not cover the browser pass below; nothing
+automated does.**
 
 ## What "verified" means here
 
-- **Quick:** `npm run check` (typecheck).
+- **Quick:** `npm run check` (typecheck only).
 - **Change-focused:** `npm run check && npm test`.
-- **CI-parity before pushing:** `npm test && npm run check && npm run build` — mirrors CI
-  order exactly.
-- **UI changes also need a real look:** run the app (`npm run dev`) and exercise the
-  affected flow at a desktop width *and* a narrow/touch viewport (see `mobile-ux.md`), and
-  confirm viewer safety when projections/viewer are touched (see `viewer-mode.md`).
-  "Should work now" without running anything is not verification.
+- **CI-parity before pushing:** `npm test && npm run check && npm run build` — CI's exact
+  order.
+- **UI changes additionally need a real browser.** jsdom loads no stylesheet and computes no
+  layout, so nothing above proves layout, pointer geometry, focus behaviour or the touch
+  floor. The repo's browser gate is `scripts/browser-verify.mjs`: seed with
+  `node scripts/seed-codex.mjs` against a throwaway `DATA_DIR`, then run it — every check
+  either passes with the fact it observed or fails with what it saw instead. It drives
+  Playwright, which is **deliberately not a repo dependency**: point `PLAYWRIGHT_PKG` at any
+  install and never run `playwright install`. Because it needs a browser and a live server it
+  is not wired into `npm test`, so it is a thing you run, not a thing that runs.
+- **Projection or viewer changes additionally need a viewer-safety pass:** pair
+  `/viewer.html` and confirm nothing GM-only appears. For Codex changes, use the GM's player
+  preview (`POST /api/v1/codex/preview-session`) rather than reasoning about it.
+- **Touch targets:** `node scripts/tap-audit.mjs 375` measures the 44px floor across GM and
+  player surfaces and exits non-zero if anything is sub-floor *or* any surface goes
+  unmeasured. Quote its output; do not quote a number from a document.
+
+Say what you ran and what you saw. A tier you did not execute is not verification, and
+"should work now" is not a result.
 
 ## Tooling & gotchas
 
 - **Vitest 4** everywhere tests exist; `apps/server/test/` has integration-style tests that
   boot Express/Socket.IO (the highest-signal suite). `rules-5e`/`schemas`/`api-contract`
-  are focused unit tests. No `vitest.config.*` — Vitest defaults.
-- **`@vtt/web` now HAS a test script** (added 2026-07-28, Codex overhaul M3): Vitest + **jsdom** +
-  Testing Library, configured in `apps/client/vitest.config.ts` with shims in `apps/client/test/setup.ts`.
-  **What it does and does not prove.** jsdom omits several APIs this app uses. `setup.ts` shims **six**
-  so components can render: native `<dialog>` `showModal`/`close`, `setPointerCapture`,
-  `scrollIntoView`, `scrollTo`, `ResizeObserver`, `matchMedia`. **`SVGSVGElement.getScreenCTM` is
-  deliberately NOT shimmed** — faking a coordinate matrix would invent geometry rather than test it.
+  are focused unit tests.
+- **`@vtt/web` has a test suite**: Vitest + **jsdom** + Testing Library, configured in
+  `apps/client/vitest.config.ts` with shims in `apps/client/test/setup.ts`.
+  **What it does and does not prove.** jsdom omits several APIs this app uses. `setup.ts` shims
+  native `<dialog>` `showModal`/`close`, `setPointerCapture`, `scrollIntoView`, `scrollTo`,
+  `ResizeObserver` and `matchMedia` so components can render. **`SVGSVGElement.getScreenCTM` is
+  deliberately NOT shimmed** — faking a coordinate matrix would invent geometry rather than
+  test it.
 
-  A test passing under a shim is evidence about *this app's logic*, never about a browser. Concretely,
-  these cannot be verified here and still need a real browser pass:
-  - **Layout and pointer geometry** — `MapSurface` panning/zoom, `RelationshipGraph` hit-testing, and
-    the 44px touch floor (`getScreenCTM` is absent; jsdom reports zero-size boxes anyway).
-  - **Modal behaviour beyond "it rendered"** — the `showModal` shim only sets `.open`, i.e. `show()`
-    semantics. The browser's focus trap, Escape-to-close and click-outside are **not** represented, so a
-    Modal could be broken in those respects while tests pass.
-  - **Anything CSS-dependent** — no stylesheet is loaded, so visibility, breakpoints and theming are
-    invisible to these tests.
-
-  UI work therefore still requires running the app.
+  A test passing under a shim is evidence about *this app's logic*, never about a browser.
+  Concretely, these cannot be verified here and still need a real browser pass:
+  - **Layout and pointer geometry** — `MapSurface` panning/zoom, `RelationshipGraph`
+    hit-testing, and the 44px touch floor (`getScreenCTM` is absent; jsdom reports zero-size
+    boxes anyway).
+  - **Modal behaviour beyond "it rendered"** — the `showModal` shim only sets `.open`, i.e.
+    `show()` semantics. The browser's focus trap, Escape-to-close and click-outside are **not**
+    represented, so a Modal could be broken in those respects while tests pass.
+  - **Anything CSS-dependent** — no stylesheet is loaded, so visibility, breakpoints and
+    theming are invisible to these tests.
 - **No ESLint/Prettier.** "check" is TypeScript-only; don't assume a linter will catch style.
 - Web `check`/`build` are incremental (`tsc -b`); a stale `tsbuildinfo` can mask errors — a
   clean `npm run build` resolves confusing type results.
-- `@vtt/domain` and `@vtt/ui` are typecheck-only; `content-srd-5.2.1` has no scripts.
+- **A green `npm test` does not mean every workspace ran.** The root script is
+  `--if-present`, so a workspace with no `test` script is skipped silently — see
+  `docs/ai-ledger/current-state.md` under *Known broken*.

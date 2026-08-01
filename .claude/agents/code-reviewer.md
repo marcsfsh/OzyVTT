@@ -22,8 +22,10 @@ authority, maps/geometry, public API) — treat a violation as a blocker.
   authorize; the server stays authoritative; client math is preview-only. Match surrounding style.
 - **Safety** — no GM-only data crossing a projection/viewer boundary; no authorization trusting
   client input; no unversioned contract change.
-- **Tests** — is the change covered? Call out missing cases (the client has no unit tests, so
-  client correctness rides on `check` + `build` + a browser pass).
+- **Tests** — is the change covered? Call out missing cases. **The client has a Vitest suite —
+  ask whether it was extended**, and do not accept "the client isn't testable" as a reason it
+  wasn't. Layout, pointer geometry and focus behaviour genuinely are not testable there and need
+  a browser pass instead.
 
 ## Return
 

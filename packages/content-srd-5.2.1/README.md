@@ -56,12 +56,12 @@ anything consumes it.
     Combat, Damage and Healing, ...).
   - `attribution.json` — the required CC BY 4.0 attribution (wording verified against the
     SRD's own Legal Information page); any surface that displays this content must show it.
-  - **Character-builder bundles — PHASE-2 state (vertical slice complete):**
-    - `classes.v1.json` — Fighter, Wizard, **Cleric**, each a complete 20-row transcription
-      (Cleric's slot columns are asserted equal to `FULL_CASTER_SLOTS` row-for-row).
-    - `subclasses.v1.json` — Champion, Evoker, **Life Domain** (domain spells as staged
-      always-prepared grants at Cleric levels 3/5/7/9; Preserve Life draws on the shared
-      `channel-divinity` uses pool).
+  - **Character-builder bundles.**
+    - `classes.v1.json` — every SRD 5.2.1 class, each a complete 20-row transcription.
+      Full-caster slot columns are pinned to `FULL_CASTER_SLOTS` row-for-row by
+      `test/character-content.test.ts`.
+    - `subclasses.v1.json` — one SRD subclass per class. Domain and patron spells are staged
+      always-prepared grants; shared resources (e.g. `channel-divinity`) draw on one uses pool.
     - `species.v1.json` — **all nine** SRD 5.2.1 species (Dragonborn, Dwarf, Elf, Gnome,
       Goliath, Halfling, Human, Orc, Tiefling). Lineage-style choices (Draconic Ancestry,
       Gnomish Lineage, Fiendish Legacy) are `lineages` behind `<speciesId>-lineages`
@@ -79,8 +79,6 @@ anything consumes it.
       was removed: it is PHB-2024-only, not SRD 5.2.1 content (a test pins this).
     - `names.v1.json` — hand-written, original name pools for every species (name lists are
       not SRD text; the seeded Elf pools were replaced for the same reason).
-    Remaining: the other 9 classes and their subclasses (phase 5) — a missing class is a
-    content gap, not a schema gap.
 - `src/character-content.ts` — the character-builder record schemas
   (`ClassReference`, `SubclassReference`, `SpeciesReference`, `BackgroundReference`,
   `FeatReference`, `NamePoolReference`) built on ONE shared `FeatureRecord`: prose plus
@@ -112,8 +110,7 @@ anything consumes it.
 - **`greater-invisibility`** — upstream ships an empty description; restored from the SRD.
 - Classes, species, feats, and backgrounds were previously deferred as "outside this VTT's
   not-a-character-builder scope". That scope changed (ADR-0021 / the character-builder task
-  packet): they are now first-class bundles, transcribed by hand from the SRD 5.2.1 text
-  (phase 2 above; the remaining classes are phase 5).
+  packet): they are now first-class bundles, transcribed by hand from the SRD 5.2.1 text.
 - **Dropped the seeded `tough` feat and Elf's PHB name pools** — Tough is not in the SRD
   5.2.1 feat chapter and the 2014 PHB name lists are not SRD content; both were replaced
   in-license (phase-2 content pass). The seeded Elf's `sizes` was also corrected to

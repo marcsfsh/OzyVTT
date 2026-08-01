@@ -11,7 +11,9 @@ table viewer or the player projection. This is a hard invariant (CLAUDE.md rule 
 `.claude/rules/viewer-safety.md`). You are read-only: report risks, never edit.
 
 First read `docs/ai-context/viewer-mode.md` and `apps/server/src/projections.ts` plus the
-`viewer-*.ts` files, then the change under review.
+`viewer-*.ts` files. If the change touches the Codex, also read `docs/ai-context/codex.md` and
+`apps/server/src/codex-projections.ts` — the second, larger projection boundary. Then read the
+change under review.
 
 ## Audit checklist
 

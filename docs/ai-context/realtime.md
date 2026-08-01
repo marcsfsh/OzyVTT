@@ -8,14 +8,17 @@ reconnection, or idempotency/revision handling.
 - `packages/domain/src/index.ts` — **single source of truth for the wire contract:**
   `ClientToServerEvents`, `ServerToClientEvents`, `GameState`, projection view types.
   Imported by both client and server, so the transport is swappable.
-- `apps/server/src/server.ts` — Socket.IO server, `io.on("connection")`, and every command
-  handler (older ADRs cite `index.ts`; that's now only the listen bootstrap).
+- `apps/server/src/server.ts` — Socket.IO server, `io.on("connection")`, and one thin adapter
+  line per command; the handlers are in `apps/server/src/game-operations.ts` (older ADRs cite
+  `index.ts`; that's now only the listen bootstrap).
 - `apps/server/src/game-store.ts` — transactional command execution, idempotency, revision
   conflict.
 - `apps/server/src/projections.ts` — recipient-specific projections.
 - `apps/server/src/presence.ts` — connection presence + reconnect grace.
-- `apps/client/src/socket.ts` — typed `io({ autoConnect: false })` singleton (the whole
-  client transport). `apps/client/src/main.tsx` — connect/join/reconnect wiring.
+- `apps/client/src/socket.ts` — typed `io({ autoConnect: false })` singleton — **one of two
+  client transports.** The game rides the socket; the Codex and the homebrew library are HTTP,
+  and their sockets carry only a change ping. `apps/client/src/main.tsx` — connect/join/
+  reconnect wiring.
 - `packages/api-contract/src/index.ts` — `REALTIME_PROTOCOL_VERSION="1"`,
   `CommandEnvelope`/`EventEnvelope` — the **public HTTP API** adapter, a *different* wire
   shape from the Socket.IO events.
@@ -29,18 +32,28 @@ server **zod-validates → authorizes by role → `store.execute`** commits rece
 event + new projection in one SQLite transaction and bumps `revision` → broadcast
 `state:updated` to every socket with a **separately computed** GM vs player projection.
 
+Server→client events come in two kinds, and the difference is a safety rule, not a style
+choice. **Projected channels** carry content and are therefore computed per recipient:
+`state:updated`, and also `table:event` and `log:entry`, each of which has a GM-only variant
+gated at the broadcast site. **Ping channels** carry a revision and nothing else —
+`codex:changed`, `homebrew:changed` — because naming *what* changed would tell every player
+which part of the world the GM is working in. The declaration is `ServerToClientEvents` in
+`packages/domain`; read it there.
+
 Reconnection: the connection handler immediately emits a full projected **snapshot**;
 Socket.IO's built-in reconnect plus a token persisted in `localStorage` (carried in
-`socket.auth`) means the first post-reconnect `state:updated` is always a full authorized
-snapshot, never a diff. `PresenceRegistry` holds a dropped session "reconnecting" for ~8s
+`socket.auth`) means the first post-reconnect `state:updated` is always a full snapshot,
+never a diff. Note it is the **player** projection at connect time even for a GM socket; the
+GM view arrives on the next broadcast — under-privileged by construction, which is the safe
+direction. `PresenceRegistry` holds a dropped session "reconnecting" for ~8s
 before "offline".
 
 ## Invariants
 
 - **Server is the sole authority** for `GameState`; there is no client-computed
   authoritative path.
-- **Role is re-verified per command** from the handshake token (`roleFor`,
-  `auth.verify`/`verifyPlayer`), never cached at connect — a revoked GM is downgraded or
+- **Role is re-verified per command** from the handshake token (`auth.verify` /
+  `auth.verifyPlayer`), never cached at connect — a revoked GM is downgraded or
   disconnected on the next broadcast.
 - **All payloads pass strict zod schemas**; no client trust.
 - **The contract lives once in `packages/domain`** — change it there, and keep client and

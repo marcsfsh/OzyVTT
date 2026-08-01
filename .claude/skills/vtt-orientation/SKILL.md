@@ -15,8 +15,8 @@ generated map, then use the checklists below when you touch the command or proje
    **HTTP path**, and a curated "where things live" file index. Regenerate any time with
    `npm run map`; never hand-edit it.
 2. **`CLAUDE.md`** — the constitutional index: product identity, non-negotiable rules, and pointers.
-3. **`docs/ai-ledger/current-state.md`** and **`known-bugs.md`** (both short) — what exists now and
-   what's already broken.
+3. **`docs/ai-ledger/current-state.md`** — capped at 150 lines: what ships today, what's in
+   flight, what's known broken. Open `known-bugs.md` only for the subsystem you are touching.
 4. Then route into `docs/ai-context/` with the **`vtt-context-router`** skill — read only the 2-4
    subsystem briefs the task actually touches.
 
@@ -37,6 +37,22 @@ across both transports:
 Then run `npm run map` (the command/HTTP surface changed) and `npm run check`/`npm run test`.
 Closest copy-me template for a player-allowed, own-character command: `actor.spend-hit-dice`.
 
+## Adding or changing a Codex capability (a different pipeline)
+
+The Codex does **not** go through the game command pipeline. Touch these instead:
+
+1. Store method + migration — `apps/server/src/codex-store.ts` (it owns its own revision).
+2. Player projection — `apps/server/src/codex-projections.ts`. **Required**, even for a GM-only
+   record: an explicit "no player projection, and why" is the audit trail.
+3. Route + authorization + ETag — `apps/server/src/codex-http.ts`.
+4. OpenAPI operation and scope — `packages/api-contract/src/index.ts`, then regenerate
+   `docs/api-reference.md` with the command in its own header.
+5. Client — `apps/client/src/codex/`.
+
+Then `npm run check` / `npm run test`, and preview as a **real player principal**
+(`POST /api/v1/codex/preview-session`) rather than by branching on role. Rules:
+`docs/ai-context/codex.md`.
+
 ## The projection / viewer-safety rule (a hard invariant)
 
 Projection is the security boundary — get it wrong and you leak GM data.
@@ -49,6 +65,9 @@ Projection is the security boundary — get it wrong and you leak GM data.
   allowlist from `actor` and never touches `definitions`. Re-read both files whenever you add a
   projectable field, and add a leak test (a second player + the viewer must never receive another
   character's private data).
+- **The Codex has its own, larger boundary** — `apps/server/src/codex-projections.ts`. Reveal is a
+  graph, a hidden record is a 404 and never a 403, and the ETag is computed after every
+  authorization gate. See `docs/ai-context/codex.md`.
 
 ## Rules
 
