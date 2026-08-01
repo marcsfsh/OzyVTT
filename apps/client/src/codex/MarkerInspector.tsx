@@ -229,7 +229,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
       {danglingScenes > 0 && <p className="codex-inspector-hint">{danglingScenes} linked scene{danglingScenes === 1 ? "" : "s"} no longer exist. <button type="button" className="codex-linklike" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}>Clear them</button>.</p>}
 
       {actors.length > 0 && (
-        <Field label="Linked actor" htmlFor="marker-actor" help="Link an actor to this pin.">
+        <Field label="Linked actor" htmlFor="marker-actor" help="An actor from the combat roster.">
           <Select id="marker-actor" value={marker.actorId ?? ""} disabled={busy} onChange={(event) => patch({ actorId: event.target.value || null })}>
             <option value="">None</option>
             {actors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
