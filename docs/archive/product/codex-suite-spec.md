@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Stage Two product specification for the Codex worldbuilding suite.
+> **Current through:** 2026-07-28  (last commit that kept it true: `066f47a`)
+> **Superseded by:** nothing; the spec was approved and shipped in `706eab5` (#52). Live rules: `docs/ai-context/codex.md`.
+> **Read this for:** the requirements as agreed, and what was deliberately excluded.
+> **Do not read this for:** current status. Its banner says "awaiting owner approval. No product code has been changed" — both clauses stopped being true when the overhaul shipped.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Codex worldbuilding suite — product specification
 
 Date: 2026-07-28 · Baseline: `3144e58` (PR #50) · Status: Stage Two output of the Codex suite

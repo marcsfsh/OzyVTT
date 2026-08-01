@@ -2,7 +2,7 @@
 
 The single source of truth for **what Claude tooling exists here**. This repo drives Claude Code
 with project memory, path-scoped rules, skills, subagents, and hooks — deliberately light (design
-rationale in `docs/claude-code-tooling-outline.md`). Update this file when you add or remove a
+rationale in `docs/archive/claude-code-tooling-outline.md`). Update this file when you add or remove a
 skill / agent / rule / hook.
 
 - **Memory:** root `CLAUDE.md` (constitutional index) → `docs/ai-context/` (how it's built) +

@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Approved specification for the deferred Codex campaign-tracking programme (M8-M12).
+> **Current through:** 2026-07-28  (last commit that kept it true: `066f47a`)
+> **Superseded by:** nothing; M9-M12 shipped in `706eab5` (#52). Live rules: `docs/ai-context/codex.md`.
+> **Read this for:** the full reasoning behind journal, sessions, quests, calendar and standing — it was written to be self-sufficient and that reasoning is still the best record.
+> **Do not read this for:** what is built. Its header says "approved and fully specified; **deliberately not yet built**" — that stopped being true when M9-M12 landed.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Codex campaign tracking — deferred programme (M8–M12)
 
 Date: 2026-07-28 · Status: **approved and fully specified; deliberately not yet built.**

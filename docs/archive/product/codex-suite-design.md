@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Stage Three (design half) experience design for the Codex worldbuilding suite.
+> **Current through:** 2026-07-28  (last commit that kept it true: `066f47a`)
+> **Superseded by:** nothing; the design shipped in `706eab5` (#52). Live rules: `docs/ai-context/codex.md`.
+> **Read this for:** why the navigation, vocabulary and save model took the shape they did, and what was rejected.
+> **Do not read this for:** current status or current UI. Its "awaiting owner approval" banner is spent; the shipped UI is `apps/client/src/codex/`.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Codex worldbuilding suite — experience design
 
 Date: 2026-07-28 · Status: Stage Three (design half) — **awaiting owner approval.** No product code

@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Rolling session history, moved here from `docs/ai-ledger/session-summary.md`. **This is the one file in the archive that is still written to** — prepend a short entry (newest first) after meaningful work.
+> **Current through:** 2026-08-01  (last commit that kept it true: `7b712aa`)
+> **Superseded by:** nothing; this file continues. What it is *not* is the state page — that is `docs/ai-ledger/current-state.md`.
+> **Read this for:** what a past session did, in date order, and the follow-ups it left behind.
+> **Do not read this for:** what is true now. Entries are dated records, never corrected in place. Live answers: `docs/ai-ledger/current-state.md` and `docs/ai-ledger/known-bugs.md`.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Session summary
 
 **Read this when:** you want recent context — what the last few sessions did — without

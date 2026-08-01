@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Task packet for the D&D Beyond character-sheet PDF importer (Phase 1.5).
+> **Current through:** 2026-07-28  (last commit that kept it true: `3144e58`)
+> **Superseded by:** nothing; the importer shipped in `3144e58`. See ADR-0018 and `packages/dndbeyond-pdf/`.
+> **Read this for:** the acceptance criteria as originally scoped, and what was deliberately left out.
+> **Do not read this for:** what is outstanding. All seven acceptance criteria are still written `- [ ]` and all seven are delivered — plus one item from its own "Out of scope" list.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # D&D Beyond character-sheet PDF importer (Phase 1.5)
 
 ## Goal

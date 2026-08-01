@@ -1274,7 +1274,7 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
 - **2026-07-17 — Adopt a small Claude Code skill system** (not a meta-agent) for this repo:
   constitutional `CLAUDE.md` index, modular `docs/ai-context/` briefs, a `docs/ai-ledger/`,
   committed `.claude/loop.md` cadence, and `.claude/skills/`. Rationale and full roadmap in
-  `docs/claude-code-tooling-outline.md`. Scheduling that lives in code = `.claude/loop.md` +
+  `docs/archive/claude-code-tooling-outline.md`. Scheduling that lives in code = `.claude/loop.md` +
   GitHub Actions `schedule:`; session `/loop` and cron tasks are runtime-only.
 - **2026-07-17 — Model-usage policy: minimum necessary model.** Only the most core,
   high-stakes, or unsupervised functions use Opus 4.8 at high effort; everything else uses

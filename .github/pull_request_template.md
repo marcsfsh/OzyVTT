@@ -42,7 +42,7 @@ Notes:
 
 ## Docs / ledger
 
-- [ ] Updated `docs/ai-ledger/` (current-state / known-bugs / decision-log / session-summary) if this was meaningful work.
+- [ ] Updated `docs/ai-ledger/` (current-state / known-bugs / decision-log) and `docs/archive/ai-ledger/session-history.md` if this was meaningful work.
 - [ ] Regenerated `docs/api-reference.md` if the API contract changed.
 
 ## Follow-ups / out of scope

@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Pre-implementation handoff written at the end of the session that delivered M1-M8.
+> **Current through:** 2026-07-29  (last commit that kept it true: `7e6480d`)
+> **Superseded by:** nothing; M9-M12 shipped in `706eab5` (#52). Live rules: `docs/ai-context/codex.md`.
+> **Read this for:** the state of play at the M8/M9 boundary and the constraints the next phase was handed.
+> **Do not read this for:** what to pick up next. Its opening line — "**Read this first** if you are picking up the Codex campaign-tracking programme" — and its "Remaining: M9, M10, M11, M12" list are both spent. All four shipped. Start from `docs/ai-ledger/current-state.md`.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Phase 4 handoff — M9–M12 (campaign tracking)
 
 **Read this first if you are picking up the Codex campaign-tracking programme.**

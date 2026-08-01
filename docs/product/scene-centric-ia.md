@@ -3,7 +3,7 @@
 > **Status:** ✅ IMPLEMENTED 2026-07-22 — 7 verified slices on `claude/scene-prep-gm-notes-c1gcur`.
 > **Ships as:** one PR. **Owner-approved decisions are in §4.** This doc is the design record; the
 > shipped code refines a couple of details (reorder is drag **plus** a keyboard menu path). See
-> `docs/ai-ledger/session-summary.md` (2026-07-22) for the per-slice log.
+> `docs/archive/ai-ledger/session-history.md` (2026-07-22) for the per-slice log.
 >
 > **Post-PR review refinements (2026-07-23).** After the first look the Encounter-tab scene
 > quick-switcher changed from an always-on strip (which overflowed once a table had many scenes)
@@ -447,7 +447,7 @@ From `docs/ai-context/{viewer-mode,auth-roles,realtime,map-grid,mobile-ux}.md`:
 - `docs/ai-ledger/current-state.md` — describe the new scene-centric IA.
 - `docs/ai-ledger/known-bugs.md` — close the "Maps/scenes/encounter IA redesign" item.
 - `docs/ai-ledger/decision-log.md` — record the scene↔TV bridge decision and the Map-Setup-tab retirement.
-- `docs/ai-ledger/session-summary.md` — session entry.
+- `docs/archive/ai-ledger/session-history.md` — session entry.
 - `docs/api-reference.md` — regenerated from the contract.
 - `NEXT-STEPS.md` — retire/refresh the stale "PR E" section.
 
@@ -495,4 +495,4 @@ combat rules engine, dice, or the calibration math.
 `viewer-presentation*.test.ts` · `map-*.test.ts` · `grid-*.test.ts`.
 
 **Context docs:** `docs/ai-context/{architecture,viewer-mode,auth-roles,realtime,map-grid,mobile-ux,design-language,ux-principles}.md`
-· `docs/ai-ledger/{current-state,known-bugs,decision-log,session-summary}.md`.
+· `docs/ai-ledger/{current-state,known-bugs,decision-log}.md` · `docs/archive/ai-ledger/session-history.md`.

@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Architecture overview from the pre-SQLite era, kept as the record of the original shape.
+> **Current through:** 2026-07-24  (last commit that kept it true: `1e158de`)
+> **Superseded by:** `docs/ai-context/architecture.md` for the rules, `docs/app-map.md` (generated) for the shape.
+> **Read this for:** the original component split and the reasoning behind an authoritative LAN server.
+> **Do not read this for:** how persistence works — it says "Local JSON", and the app has used `node:sqlite`/WAL since ADR-0006.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Architecture
 
 ```mermaid

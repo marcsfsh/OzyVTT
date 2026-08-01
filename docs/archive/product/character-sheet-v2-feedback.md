@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Round-2 GM playtest feedback on the character sheet, with the decisions it produced.
+> **Current through:** 2026-07-24  (last commit that kept it true: `1e158de`)
+> **Superseded by:** nothing; the round closed. Later rounds are `character-sheet-v3..v6-feedback.md`.
+> **Read this for:** what the GM actually asked for, in their own words, and why the sheet took its shape.
+> **Do not read this for:** outstanding work. Its "Update the **Status** column as each item lands" instruction is spent — do not act on it.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Character sheet — v2 playtest feedback & decisions
 
 Durable record of the GM's feedback after importing the first full sample character

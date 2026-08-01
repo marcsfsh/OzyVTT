@@ -29,4 +29,4 @@ real work.
 - **Disable one temporarily:** remove its block from `.claude/settings.json` (or the whole
   `hooks` key). Personal-only overrides belong in `.claude/settings.local.json` (git-ignored).
 
-See `docs/claude-code-tooling-outline.md` → *Lightweight QA + hooks system* for the design intent.
+See `docs/archive/claude-code-tooling-outline.md` → *Lightweight QA + hooks system* for the design intent.

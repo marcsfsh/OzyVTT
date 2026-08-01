@@ -68,7 +68,8 @@ Monorepo layout (see `docs/ai-context/architecture.md` for detail):
 `design-language.md`
 
 `docs/ai-ledger/` (living state — read at session start, update after real work):
-`current-state.md` · `decision-log.md` · `known-bugs.md` · `session-summary.md`
+`current-state.md` · `decision-log.md` · `known-bugs.md`
+(session history: `docs/archive/ai-ledger/session-history.md`)
 
 Durable decisions and roadmap: `docs/adr/`, `docs/product/`, `BUILD_PLAN.md`.
 **For a task, read 2-4 relevant files, not the whole tree.**
@@ -86,7 +87,7 @@ Durable decisions and roadmap: `docs/adr/`, `docs/product/`, `BUILD_PLAN.md`.
 The skill system that supports this workflow (task packets, context routing, QA,
 ledger updates, scheduling) lives in `.claude/`. See **`.claude/README.md`** for the current
 roster of skills, subagents, path-scoped rules, and hooks (design rationale in
-`docs/claude-code-tooling-outline.md`). Use a skill when its trigger matches; don't force it.
+`docs/archive/claude-code-tooling-outline.md`). Use a skill when its trigger matches; don't force it.
 
 Lightweight hooks in `.claude/settings.json` enforce a few of these rules
 automatically (destructive-command guard, sensitive-area reminders, a

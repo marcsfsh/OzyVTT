@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Stage Three (plan half) implementation plan for the Codex worldbuilding suite: milestones M1-M12.
+> **Current through:** 2026-07-28  (last commit that kept it true: `066f47a`)
+> **Superseded by:** nothing; M1-M12 all shipped in `706eab5` (#52). Live rules: `docs/ai-context/codex.md`.
+> **Read this for:** how the work was sequenced and why the milestones were cut where they were.
+> **Do not read this for:** what remains to be built. Every milestone here is delivered, and its file references predate the overhaul.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Codex worldbuilding suite — implementation plan
 
 Date: 2026-07-28 · Status: Stage Three (plan half) — **awaiting owner approval.** No product code

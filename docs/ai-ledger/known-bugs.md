@@ -2,7 +2,7 @@
 
 **Read this when:** starting work in an area, or before claiming something is "done" —
 check you're not re-discovering a known issue or tripping a known gap. Add entries as you
-find them; remove them when fixed (note the fix in `session-summary.md`).
+find them; remove them when fixed (note the fix in `docs/archive/ai-ledger/session-history.md`).
 
 Format: `[area] — description — suspected cause / status`.
 
@@ -555,7 +555,7 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   duplicate, drag-reorder, rename, remove); the standalone **Map Setup tab was retired** (its library +
   3×3 calibration fold into the hub via "Manage maps"); **going live also presents the scene's map to
   the shared screen**; and the Encounter tab starts combat on the live scene's map. See
-  `docs/product/scene-centric-ia.md` and `session-summary.md` (2026-07-22). Remaining polish (not
+  `docs/product/scene-centric-ia.md` and `docs/archive/ai-ledger/session-history.md` (2026-07-22). Remaining polish (not
   blocking): persisted server thumbnails; the Encounter quick-switch strip could slim further; a
   physical touch-device pass.
 
@@ -690,6 +690,15 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   M5's transparent hit circle, which is far larger than the painted node. Pre-existing (M5 added the hit
   circle; these rules predate it), spotted during M7. CI-8's new `.is-focus` rule scopes itself off the
   hit circle correctly, so the pattern to copy is already in the file.
+
+## Unverified — needs a browser, a contrast check, or a runtime repro
+
+_Structure only. Plan A §8 Q3 and MASTER-PLAN §9 O-3 (client default: **retain, labelled**):
+the nine entries that could not be confirmed or refuted statically move here, each with the
+reason it cannot be checked without running something. They are open questions, not claims
+that anything works — deleting an unverified bug is the one place D9 destroys information._
+
+_Awaiting Plan B (Developer 2): lift the nine entries in, unchanged, with their reasons._
 
 ## Gotchas that look like bugs (but aren't)
 
