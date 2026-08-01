@@ -22,7 +22,7 @@ import { PinDetails } from "./PinDetails";
 import { PlayerCalendarView } from "./CalendarView";
 import { PlayerDowntimeView } from "./DowntimeView";
 import { CommandPalette } from "./CommandPalette";
-import { SidebarNav } from "./SidebarNav";
+import { SidebarCollapseToggle, SidebarNav } from "./SidebarNav";
 import { useSidebarRailBand } from "./useSidebarRail";
 import { TagView } from "./TagView";
 import { NotFoundView } from "../components/NotFoundView";
@@ -49,6 +49,8 @@ import "./codex.css";
  * re-stated: the two readers are separate implementations, but they must not disagree about what a row
  * *says*.
  */
+const PLAYER_SIDEBAR_KEY = "codex-player-sidebar";
+
 export function PlayerCodex({ token, embedded = false }: Readonly<{ token: string; embedded?: boolean }>) {
   /**
    * The GM's "Preview as player" mounts this component inside a modal, on a real minted player token.
@@ -242,20 +244,43 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
    * out of it at all. The embedded preview is exempt — it renders inside a modal, not at the viewport.
    */
   const railBand = useSidebarRailBand() && !embedded;
+  /**
+   * D1 says the sidebar is **collapsible**, and the player's mirrors the GM's "minus GM tools" — a
+   * collapse control is not a GM tool. The player had none: a laptop player got the full 220px rail with
+   * no way to reclaim the width, which is the same complaint in the opposite direction from the one the
+   * band fix answered. Same control, same words, same preference, its own storage key.
+   *
+   * **Never inside the embedded preview.** That instance renders in the GM's modal rather than at the
+   * viewport, so a rail there would describe nothing the player will see, and the preference it wrote
+   * would be the GM's rather than the player's.
+   */
+  const [sidebarMode, setSidebarMode] = useState<"open" | "rail">(() => {
+    try { return localStorage.getItem(PLAYER_SIDEBAR_KEY) === "rail" ? "rail" : "open"; } catch { return "open"; }
+  });
+  useEffect(() => {
+    if (embedded) return;
+    try { localStorage.setItem(PLAYER_SIDEBAR_KEY, sidebarMode); } catch { /* private mode - fine */ }
+  }, [sidebarMode, embedded]);
+  const collapsed = railBand || (!embedded && sidebarMode === "rail");
   const sidebarHeader = (
     <button type="button" className="codex-sidebar-search" onClick={() => { closeDrawer(); setPaletteOpen(true); }} aria-keyshortcuts="Meta+K Control+K"
-      title={railBand ? "Search" : undefined} aria-label={railBand ? "Search" : undefined}>
+      title={collapsed ? "Search" : undefined} aria-label={collapsed ? "Search" : undefined}>
       <CodexIcon iconId="search" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
-      {!railBand && <span className="codex-navitem-label">Search</span>}
-      {!embedded && !railBand && <Kbd>⌘K</Kbd>}
+      {!collapsed && <span className="codex-navitem-label">Search</span>}
+      {!embedded && !collapsed && <Kbd>⌘K</Kbd>}
     </button>
   );
   /* The aside is the only place the rail applies; the phone drawer (<=760px) is always expanded. */
-  const nav = (collapsed: boolean) => <SidebarNav groups={PLAYER_SIDEBAR} activePath={path} collapsed={collapsed} onNavigate={goto} header={sidebarHeader} />;
+  const nav = (asRail: boolean) => (
+    <SidebarNav groups={PLAYER_SIDEBAR} activePath={path} collapsed={asRail} onNavigate={goto} header={sidebarHeader}
+      /* `railBand`, never `collapsed` — see `CodexShell`: gating this on the collapsed state is what made
+         the GM's collapse a one-way door, because the control that undoes it is the control being hidden. */
+      footer={railBand || drawerOpen || embedded ? undefined : <SidebarCollapseToggle collapsed={sidebarMode === "rail"} onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))} />} />
+  );
 
   return (
-    <div className={`codex-root codex-player codex-shell${embedded ? " is-embedded" : ""}${railBand ? " is-rail" : ""}`}>
-      <aside className="codex-shell-side">{nav(railBand)}</aside>
+    <div className={`codex-root codex-player codex-shell${embedded ? " is-embedded" : ""}${collapsed ? " is-rail" : ""}`}>
+      <aside className="codex-shell-side">{nav(collapsed)}</aside>
       <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">{nav(false)}</Drawer>
 
       <div className="codex-shell-main">

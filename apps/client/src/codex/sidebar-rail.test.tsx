@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 vi.mock("./MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
@@ -175,5 +176,113 @@ describe("The player sidebar in the 761–849 band", () => {
     render(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerPages).toHaveBeenCalled());
     expect(within(asideNav()).getByText("Journal")).toBeInTheDocument();
+  });
+});
+
+/**
+ * **Collapsing the sidebar must not be a one-way door** — the bug a client found in minutes by using
+ * the app, after 47 QA agents and two full browser passes missed it.
+ *
+ * The toggle was gated on `collapsed`, which is `railBand || sidebarMode === "rail"`. So the moment the
+ * GM collapsed the sidebar, the only control that expands it again unmounted; and because the preference
+ * persists to localStorage, a reload did not bring it back either. `setSidebarMode` has exactly one call
+ * site, so nothing else in the app could recover it: the GM was in the rail until they cleared site
+ * storage or resized past 850px.
+ *
+ * The lesson is bigger than the line. **Every check we owned verified that things are reachable; not one
+ * collapsed a control and tried to get back.** So each test below drives the toggle in BOTH directions,
+ * and the last one keeps the 761–849px gate that the fix must not undo.
+ */
+describe("Collapsing the sidebar is reversible (both directions)", () => {
+  const renderGm = async () => {
+    goTo("/codex");
+    render(<ToastProvider><CodexShell gmToken="gm" /></ToastProvider>);
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+  };
+
+  it("collapses, still offers the way back, and expands again", async () => {
+    setViewport(1280);
+    const user = userEvent.setup();
+    await renderGm();
+
+    const nav = () => within(asideNav());
+    await user.click(nav().getByRole("button", { name: "Collapse the sidebar" }));
+
+    // The rail is on…
+    await waitFor(() => expect(nav().getByRole("button", { name: "Quests" })).toHaveAttribute("title", "Quests"));
+    // …and the way back is ON SCREEN and operable. This is the whole bug: it used to be gone.
+    const expand = nav().getByRole("button", { name: "Expand the sidebar" });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(expand);
+    await waitFor(() => expect(nav().getByText("World")).toBeInTheDocument());
+    expect(nav().getByRole("button", { name: "Collapse the sidebar" })).toHaveAttribute("aria-expanded", "true");
+    expect(nav().getByRole("button", { name: "Quests" })).not.toHaveAttribute("title");
+  });
+
+  it("offers the way back after a RELOAD into the stored preference", async () => {
+    setViewport(1280);
+    const user = userEvent.setup();
+    // The preference persists, which is what turned a moment's mistake into a permanent state.
+    localStorage.setItem("codex-sidebar", "rail");
+    await renderGm();
+
+    const nav = () => within(asideNav());
+    expect(nav().getByRole("button", { name: "Quests" })).toHaveAttribute("title", "Quests");
+    await user.click(nav().getByRole("button", { name: "Expand the sidebar" }));
+
+    await waitFor(() => expect(nav().getByText("World")).toBeInTheDocument());
+    expect(localStorage.getItem("codex-sidebar")).toBe("open");
+  });
+
+  it("still hides the toggle in the forced 761-849 band, whatever the preference says", async () => {
+    // The regression guard on the fix: the gate is `railBand`, so a GM whose preference is "rail" gets no
+    // toggle here either — there is nothing to expand INTO at this width, and the button would write a
+    // preference whose effect they cannot see until they resize.
+    setViewport(800);
+    localStorage.setItem("codex-sidebar", "rail");
+    await renderGm();
+
+    const nav = within(asideNav());
+    expect(nav.queryByRole("button", { name: /the sidebar/ })).not.toBeInTheDocument();
+    expect(nav.getByRole("button", { name: "Quests" })).toHaveAttribute("title", "Quests");
+  });
+});
+
+describe("The player gets the same affordance, in the same words (D1)", () => {
+  const renderPlayer = async (props: { embedded?: boolean } = {}) => {
+    goTo("/codex");
+    render(<PlayerCodex token="player" {...props} />);
+    await waitFor(() => expect(playerPages).toHaveBeenCalled());
+  };
+
+  it("collapses and expands again, on its own stored preference", async () => {
+    setViewport(1280);
+    const user = userEvent.setup();
+    await renderPlayer();
+
+    const nav = () => within(asideNav());
+    await user.click(nav().getByRole("button", { name: "Collapse the sidebar" }));
+    await waitFor(() => expect(nav().getByRole("button", { name: "Journal" })).toHaveAttribute("title", "Journal"));
+    // Its own key: a player's choice is not the GM's, and the two shells can be open on one machine.
+    expect(localStorage.getItem("codex-player-sidebar")).toBe("rail");
+    expect(localStorage.getItem("codex-sidebar")).toBeNull();
+
+    await user.click(nav().getByRole("button", { name: "Expand the sidebar" }));
+    await waitFor(() => expect(nav().getByText("Journal")).toBeInTheDocument());
+  });
+
+  it("offers no collapse inside the GM's embedded preview", async () => {
+    setViewport(1280);
+    await renderPlayer({ embedded: true });
+    // The preview is a modal, not a viewport: a rail there would describe nothing the player will see,
+    // and the preference it wrote would be the GM's.
+    expect(within(asideNav()).queryByRole("button", { name: /the sidebar/ })).not.toBeInTheDocument();
+  });
+
+  it("still hides the toggle in the forced band", async () => {
+    setViewport(800);
+    await renderPlayer();
+    expect(within(asideNav()).queryByRole("button", { name: /the sidebar/ })).not.toBeInTheDocument();
   });
 });

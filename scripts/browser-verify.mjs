@@ -624,6 +624,64 @@ async function runViewport(browser, label, width, height) {
       if (count !== 1) throw new Error(`${count} visible sidebars`);
       return "one persistent sidebar";
     });
+
+    /**
+     * ---- 12b. **Every toggle this app owns, driven BOTH ways.** ----
+     *
+     * The blind spot that let a one-way door ship. Sixty checks verified that things are reachable and
+     * not one of them collapsed a control and tried to get back — so the sidebar's collapse, whose own
+     * expand button was the control it hid, passed two full browser passes and 47 QA agents, and a human
+     * found it in minutes. A toggle is only half-verified until the return trip is verified too.
+     */
+    await check("every persistent toggle goes both ways — collapse, session prep, autosave", async () => {
+      await go(page, "/codex");
+      await page.waitForTimeout(700);
+      const sidebar = () => page.locator('nav[aria-label="Codex sections"]:visible').first();
+
+      // 1. The sidebar. Collapse it, and the way back must be ON SCREEN — then take it, and land expanded.
+      await sidebar().getByRole("button", { name: "Collapse the sidebar" }).click({ timeout: 10_000 });
+      await page.waitForTimeout(500);
+      const expand = sidebar().getByRole("button", { name: "Expand the sidebar" });
+      if (await expand.count() === 0) throw new Error("collapsing the sidebar removed the only control that expands it");
+      await expand.click({ timeout: 10_000 });
+      await page.waitForTimeout(500);
+      if (await sidebar().getByRole("button", { name: "Collapse the sidebar" }).count() === 0) throw new Error("expanding did not restore the collapse control");
+
+      // …and the return trip survives the RELOAD, which is what made the door permanent: the preference
+      // persists, so a GM who collapsed and refreshed had no control on any subsequent visit either.
+      await sidebar().getByRole("button", { name: "Collapse the sidebar" }).click({ timeout: 10_000 });
+      await page.waitForTimeout(500);
+      await page.reload(NAV);
+      await loginHere(page);
+      await page.waitForSelector(".codex-shell-content", { timeout: 15_000 });
+      await page.waitForTimeout(900);
+      const afterReload = sidebar().getByRole("button", { name: "Expand the sidebar" });
+      if (await afterReload.count() === 0) throw new Error("after a reload into the stored rail preference there is no way back");
+      await afterReload.click({ timeout: 10_000 });
+      await page.waitForTimeout(500);
+
+      // 2. The session-prep drawer: open from the top bar, close from its own control, and open again.
+      const prep = page.getByRole("button", { name: "Session prep" });
+      await prep.click({ timeout: 10_000 });
+      await page.waitForTimeout(500);
+      const drawer = page.locator("aside.nh-drawer.is-open, aside[class*='drawer'].is-open").first();
+      if (await drawer.count() === 0) throw new Error("Session prep did not open");
+      await prep.click({ timeout: 10_000 });                       // the same control closes it
+      await page.waitForTimeout(600);
+      if (await page.locator("aside.nh-drawer.is-open, aside[class*='drawer'].is-open").count() !== 0) throw new Error("Session prep did not close from the control that opened it");
+
+      // 3. Autosave: off and back on, from the same switch, with the readout following it.
+      await go(page, "/codex/settings");
+      await page.waitForTimeout(700);
+      const autosave = page.locator('[role="switch"]').first();
+      const started = await autosave.getAttribute("aria-checked");
+      await autosave.click(); await page.waitForTimeout(700);
+      if (await autosave.getAttribute("aria-checked") === started) throw new Error("the autosave switch did not change state");
+      await autosave.click(); await page.waitForTimeout(700);
+      if (await autosave.getAttribute("aria-checked") !== started) throw new Error("the autosave switch would not go back");
+
+      return "sidebar collapse (incl. across a reload), session prep, and autosave all reversible";
+    });
   }
 
   // ---- 13. Screenshots, one per section ----

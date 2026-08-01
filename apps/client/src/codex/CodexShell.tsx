@@ -294,17 +294,33 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
     </button>
   );
 
-  const nav = (collapsed: boolean) => (
+  const nav = (asRail: boolean) => (
     <SidebarNav
       groups={GM_SIDEBAR}
       activePath={route.path}
-      collapsed={collapsed}
+      collapsed={asRail}
       onNavigate={goto}
       onAction={() => { closeDrawer(); void openPlayerPreview(); }}
       header={sidebarHeader}
-      /* No collapse control in the forced band: there is nothing to expand INTO, and offering the
-         toggle would write a preference the GM cannot see the effect of until they resize. */
-      footer={collapsed || drawerOpen ? undefined : <SidebarCollapseToggle collapsed={sidebarMode === "rail"} onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))} />}
+      /**
+       * **Gated on `railBand`, never on `collapsed` — collapsing must not be a one-way door.**
+       *
+       * `collapsed` is `railBand || sidebarMode === "rail"`, so gating on it meant the toggle unmounted
+       * the instant the GM used it: collapse, and the only control that expands again is gone. The
+       * preference persists, so a reload did not help either — the GM was in the rail until they cleared
+       * site storage or resized past 850px. Found by the client in minutes, by testing the app.
+       *
+       * The intent behind the gate is still right and still here: in the forced 761–849px band there is
+       * nothing to expand INTO, and offering the toggle would write a preference whose effect the GM
+       * cannot see until they resize. That is `railBand`, and only `railBand`. `SidebarCollapseToggle`
+       * has always rendered both states ("Expand the sidebar", `aria-expanded`, the `is-rail` variant);
+       * it simply never got the chance.
+       *
+       * The phone drawer is excluded on its own terms: it is always expanded and has no rail to collapse
+       * into. Note the parameter above is `asRail`, not `collapsed` — the shadowing is what made this
+       * line read as though it said what it meant.
+       */
+      footer={railBand || drawerOpen ? undefined : <SidebarCollapseToggle collapsed={sidebarMode === "rail"} onToggle={() => setSidebarMode((mode) => (mode === "rail" ? "open" : "rail"))} />}
     />
   );
 
