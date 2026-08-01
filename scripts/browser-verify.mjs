@@ -123,6 +123,27 @@ async function navClick(locator) {
   }
 }
 
+/**
+ * Select the Nth pin on the open map — with REAL pointer events, which is the only thing that works.
+ *
+ * A pin is not a button: `MapSurface` reads `pointerdown`/`pointerup` on the whole `<svg>` and decides
+ * what was hit with `closest("[data-marker-id]")`, so that it can tell a tap from a drag from a pan.
+ * `dispatchEvent("click")` therefore does nothing at all, and a plain `.click()` fails Playwright's
+ * "receives events" check because the hit point resolves to a child of the `<g>`. `force: true` skips
+ * the actionability check and sends genuine mouse events at the element's centre, which is what the
+ * component is listening for.
+ */
+async function selectPin(page, index) {
+  const pins = page.locator("[data-marker-id]");
+  await pins.first().waitFor({ state: "attached", timeout: 15_000 });
+  await page.waitForTimeout(600);
+  const count = await pins.count();
+  if (count <= index) throw new Error(`the open map has ${count} pins; wanted at least ${index + 1}`);
+  await pins.nth(index).scrollIntoViewIfNeeded();
+  await pins.nth(index).click({ force: true, timeout: 10_000 });
+  await page.waitForTimeout(800);
+}
+
 /** The Codex's own content, so a selector can never reach into the roster dock beside it. */
 const inCodex = (page, selector) => page.locator(`.codex-shell-content ${selector}`);
 
@@ -400,6 +421,122 @@ async function runViewport(browser, label, width, height) {
     return `"${stamp.trim()}" persisted through a reload with no Save press`;
   });
 
+  /**
+   * ---- 9b. The pin selection regression (D3/D6) ----
+   *
+   * With autosave off the pin inspector holds label and tags as a draft. Selecting a different pin used
+   * to be local state, so nothing navigated, the router's leave guard was never consulted, and the typed
+   * label was gone without a word. **Only a browser can prove this half**: the guard is a native
+   * `window.confirm`, which jsdom does not implement and a unit test can only stub.
+   */
+  await check("with autosave OFF, choosing another pin asks before it drops the draft", async () => {
+    /**
+     * The autosave switch has to go back ON however this check ends. It did not, the first time this ran,
+     * and the cost is worth recording: a dirty draft with autosave off makes the router refuse every
+     * in-app navigation (Playwright dismisses an unhandled `confirm`, and dismiss means "stay"), so ONE
+     * failure here took nine later checks down with it and none of those failures were real.
+     */
+    const setAutosave = async (on) => {
+      await go(page, "/codex/settings");
+      await page.waitForTimeout(700);
+      const control = page.locator('[role="switch"]').first();
+      if ((await control.getAttribute("aria-checked")) !== String(on)) { await control.click(); await page.waitForTimeout(800); }
+    };
+    await setAutosave(false);
+    try {
+      await go(page, "/codex/atlas");
+      await selectPin(page, 0);
+      const label = inCodex(page, "#marker-label");
+      await label.waitFor({ state: "visible", timeout: 10_000 });
+      const before = new URL(page.url()).search;
+      if (!/pin=/.test(before)) throw new Error(`selecting a pin did not reach the address: "${before}"`);
+
+      await label.click();
+      await label.pressSequentially(" (draft)", { delay: 20 });
+      await page.waitForTimeout(300);
+
+      let prompted = "";
+      const dismiss = async (dialog) => { prompted = dialog.message(); await dialog.dismiss(); };
+      page.on("dialog", dismiss);
+      await selectPin(page, 1);
+      page.off("dialog", dismiss);
+
+      if (!/unsaved/i.test(prompted)) throw new Error(`no leave prompt — the guard was not consulted (saw "${prompted}")`);
+      if (new URL(page.url()).search !== before) throw new Error("dismissing the prompt still changed the pin");
+      const kept = await label.inputValue();
+      if (!kept.includes("(draft)")) throw new Error(`the draft was lost anyway: "${kept}"`);
+
+      // …and accepting moves, which also leaves the surface clean for everything after this.
+      const accept = async (dialog) => dialog.accept();
+      page.on("dialog", accept);
+      await selectPin(page, 1);
+      page.off("dialog", accept);
+      if (new URL(page.url()).search === before) throw new Error("accepting the prompt did not change the pin");
+      return `prompted ("${prompted.slice(0, 40)}…"), dismiss stayed on ${before} with the draft intact, accept moved`;
+    } finally {
+      await setAutosave(true);
+    }
+  });
+
+  await check("a selected pin is an address that survives a reload, and Back closes the inspector", async () => {
+    await go(page, "/codex/atlas");
+    await selectPin(page, 0);
+    await inCodex(page, "#marker-label").waitFor({ state: "visible", timeout: 10_000 });
+    const selected = page.url();
+
+    await page.reload(NAV);
+    await loginHere(page);
+    await page.waitForSelector(".codex-shell-content", { timeout: 15_000 });
+    await page.waitForTimeout(1500);
+    if (page.url() !== selected) throw new Error(`the address changed across the reload: ${page.url()}`);
+    if (await inCodex(page, "#marker-label").count() === 0) throw new Error("the pin was not re-selected from the address");
+
+    await page.goBack();
+    await page.waitForTimeout(900);
+    if (/pin=/.test(new URL(page.url()).search)) throw new Error("Back did not clear the selection");
+    return `${new URL(selected).pathname}${new URL(selected).search} survived F5; Back closed the inspector`;
+  });
+
+  // ---- 9c. The palette's create verbs CREATE (D7/D20) ----
+  await check("the palette's New session creates a session and lands on it", async () => {
+    await go(page, "/codex/sessions");
+    await page.waitForTimeout(900);
+    const before = await inCodex(page, ".codex-session-row").count();
+
+    await page.keyboard.press("Control+k");
+    const palette = page.locator('dialog[open][aria-label="Codex command palette"]');
+    await palette.waitFor({ state: "visible", timeout: 8_000 });
+    await palette.locator(".codex-palette-item").filter({ hasText: /^New session$/ }).first().click({ timeout: 8_000 });
+
+    // A list address would satisfy "something happened"; the RECORD address is the claim.
+    await page.waitForFunction(() => /\/codex\/sessions\/[0-9a-f-]{36}/.test(location.pathname), { timeout: 12_000 });
+    await page.waitForTimeout(900);
+    const after = await inCodex(page, ".codex-session-row").count();
+    if (after !== before + 1) throw new Error(`the rail shows ${after} sessions, expected ${before + 1}`);
+    return `created and opened ${new URL(page.url()).pathname}, rail ${before} → ${after}`;
+  });
+
+  // ---- 9d. A list's filters are part of its address (D3) ----
+  await check("a filtered Sessions list is an address that survives a reload", async () => {
+    await go(page, "/codex/sessions");
+    await page.waitForTimeout(900);
+    const all = await inCodex(page, ".codex-session-row").count();
+    await inCodex(page, 'select[aria-label="Filter by status"]').selectOption("played");
+    await page.waitForTimeout(600);
+    const filtered = await inCodex(page, ".codex-session-row").count();
+    if (filtered >= all) throw new Error(`the filter narrowed nothing (${all} → ${filtered})`);
+    if (!/status=played/.test(page.url())) throw new Error(`the filter is not in the address: ${page.url()}`);
+
+    await page.reload(NAV);
+    await loginHere(page);
+    await page.waitForSelector(".codex-shell-content", { timeout: 15_000 });
+    await page.waitForTimeout(1200);
+    const afterReload = await inCodex(page, ".codex-session-row").count();
+    if (afterReload !== filtered) throw new Error(`after the reload the list shows ${afterReload}, not ${filtered}`);
+    if (await inCodex(page, 'select[aria-label="Filter by status"]').inputValue() !== "played") throw new Error("the control forgot the filter it is applying");
+    return `${all} → ${filtered} sessions, and the same after F5`;
+  });
+
   // ---- 10. Quick-create (D7) ----
   await check("quick-create makes a typed page and lands on it", async () => {
     await go(page, "/codex");
@@ -555,9 +692,30 @@ async function runViewport(browser, label, width, height) {
     if (!questText.includes("St Andral's bones are gone")) throw new Error(`the player quest body did not render: ${questText.slice(0, 160)}`);
     if (questText.includes("Milivoj took them")) throw new Error('GM body leaked onto the player quest: "Milivoj took them"');
 
+    /**
+     * D10 on the PLAYER's side, which had no in-place filter on any list. Driven here rather than in a
+     * separate context because this preview IS the real player Codex on a real minted player token —
+     * and the preview keeps its own local address, which is the case a URL-backed filter could break.
+     */
+    if (await dialog.locator('nav[aria-label="Codex sections"]:visible').count() === 0) {
+      await navClick(dialog.locator('button[aria-label="Codex sections"]').first());
+      await page.waitForTimeout(500);
+    }
+    await navClick(dialog.locator('nav[aria-label="Codex sections"]:visible').first().getByRole("button", { name: "Pages", exact: true }).first());
+    await page.waitForTimeout(800);
+    const kindFilter = dialog.locator('select[aria-label="Filter by kind"]').first();
+    if (await kindFilter.count() === 0) throw new Error("the player's Pages rail has no in-place kind filter");
+    const allRows = await dialog.locator(".codex-list-item").count();
+    await kindFilter.selectOption("location");
+    await page.waitForTimeout(600);
+    const locationRows = await dialog.locator(".codex-list-item").count();
+    if (locationRows === 0 || locationRows >= allRows) throw new Error(`the player's kind filter narrowed nothing (${allRows} → ${locationRows})`);
+    // The preview must never drive the BROWSER's address — the GM is still on their own page.
+    if (/type=location/.test(page.url())) throw new Error("the preview wrote its filter into the GM's address");
+
     await page.screenshot({ path: `${SHOTS}/${label}-preview-as-player.png` });
     await page.keyboard.press("Escape");
-    return "player bodies rendered, GM bodies absent from both, no GM tools";
+    return `player bodies rendered, GM bodies absent from both, no GM tools; player kind filter ${allRows} → ${locationRows} without touching the GM address`;
   });
 
   // ---- 15. The 761–849 band, which neither this script nor the tap audit had ever loaded ----
