@@ -34,8 +34,8 @@ Node.js **24+** required. Run from the repo root.
 | `npm run test` | Vitest, every workspace that has a `test` script. |
 | `npm run build` | Build every workspace that has a `build` script (the client and the server; packages are consumed as TS sources). |
 | `npm run start` | Build, then run the single LAN service on `:3001`. |
-| `npm run map` | Regenerate `docs/app-map.md`. Required after any state/command/HTTP change — a test fails otherwise. |
-| Regenerating `docs/api-reference.md` | The command is in the file's own header — see `docs/api-reference.md`. Required after any OpenAPI change; a test fails otherwise. |
+| `npm run docs` | Regenerate `docs/app-map.md` **and** `docs/api-reference.md`. Required after any state/command/HTTP/OpenAPI change — a test fails otherwise. |
+| `npm run map` | Regenerate `docs/app-map.md` alone — the faster half of `npm run docs`. |
 
 Workspaces are `apps/*` and `packages/*`: `apps/client` (the React/Vite UI) · `apps/server`
 (the authoritative Express + Socket.IO service) ·
@@ -70,8 +70,7 @@ Workspaces are `apps/*` and `packages/*`: `apps/client` (the React/Vite UI) · `
   today, what's in flight, what's broken). Nothing else.
 - **`docs/ai-context/`** — one brief per subsystem: invariants and pointers into code, not
   restated code. Use `vtt-context-router` to pick the 2-4 that apply; don't read the tree.
-- **`docs/ai-ledger/`** — `current-state.md`, `known-bugs.md`, `decision-log.md` on demand.
-  History lives in `docs/archive/`.
+- **`docs/ai-ledger/`** — `known-bugs.md`, `decision-log.md` on demand; history in `docs/archive/`.
 - **`docs/adr/`**, **`docs/product/`**, **`BUILD_PLAN.md`** — durable decisions and roadmap.
 - **`docs/app-map.md`** and **`docs/api-reference.md`** are generated and freshness-tested.
   Never hand-edit either; regenerate with the commands above.
@@ -89,10 +88,13 @@ Workspaces are `apps/*` and `packages/*`: `apps/client` (the React/Vite UI) · `
 ## Keeping the docs true
 
 Where a document and the code disagree, **the code is truth and the document is a defect**.
-Fix or delete the claim in the same change — a stale claim is worse than no claim. Update
-documents **in place**; do not append a dated entry beside a claim you could have corrected.
+Fix or delete the claim in the same change; update documents **in place**.
 
-`.claude/` holds the skills, subagents, path-scoped rules and hooks that support this
-workflow — see **`.claude/README.md`** for the roster. Use a skill when its trigger matches;
-don't force it. The hooks in `.claude/settings.json` fail open and are not a substitute for
-the judgment above.
+**Documentation truth is a test.** `apps/server/test/docs-paths.test.ts`,
+`docs-commands.test.ts`, `docs-ledger.test.ts`, `docs-tooling.test.ts` and
+`docs-viewer-safety.test.ts` fail when a claim stops being true, each naming its own fix.
+Fix the claim; never delete or skip a check to make the suite green.
+
+`.claude/` holds the skills, subagents, path-scoped rules and hooks that support this workflow
+— see **`.claude/README.md`** for the roster. Use a skill when its trigger matches; don't force
+it. The hooks in `.claude/settings.json` fail open and are not a substitute for the judgment above.

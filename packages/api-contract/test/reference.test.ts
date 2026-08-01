@@ -56,14 +56,21 @@ function reachableFromBodies(): Set<string> {
 }
 
 describe("generated API reference", () => {
-  it("matches the committed docs/api-reference.md exactly (regenerate with `npm run docs:generate -w @vtt/api-contract`)", () => {
+  it("matches the committed docs/api-reference.md exactly (regenerate with `npm run docs` from the repo root)", () => {
     const committed = readFileSync(fileURLToPath(new URL("../../../docs/api-reference.md", import.meta.url)), "utf8");
     expect(committed).toBe(renderApiReference());
   });
 
   it("covers every documented path, every command type, and every scope", () => {
     const rendered = renderApiReference();
-    for (const path of Object.keys(openApiDocument.paths)) expect(rendered, `missing path ${path}`).toContain(` ${path}\``);
+    // The remedy is NOT "regenerate": measured, injecting a path under a prefix no GROUPS entry
+    // matches leaves the rendered document BYTE-IDENTICAL, so byte-equality stays green and this
+    // coverage assertion is the only thing that fires. That is why both halves ship together.
+    for (const path of Object.keys(openApiDocument.paths))
+      expect(
+        rendered,
+        `${path} appears nowhere in docs/api-reference.md. GROUPS (packages/api-contract/src/reference.ts) has no catch-all, so a path no group matches renders nowhere and REGENERATING WILL NOT HELP.\nFix: add a GROUPS entry whose \`match\` covers this prefix, then \`npm run docs\`.`
+      ).toContain(` ${path}\``);
     for (const type of Object.keys(GAME_COMMAND_SCOPES)) expect(rendered, `missing command ${type}`).toContain(`\`${type}\``);
     expect(rendered).toContain(GAME_PATHS.commands);
     expect(rendered).toContain("archiveSchemaVersion");

@@ -70,5 +70,5 @@ commands and enables auto memory (required for the subagents' persistent memory)
 ## Scheduling
 
 - `.claude/loop.md` — the default `/loop` operator cadence (committed).
-- `.github/workflows/scheduled-ledger-drift.yml` — an intentional scaffold (cron commented out);
-  the durable home for any future unattended ledger-drift / health job.
+- There is no scheduled workflow. Documentation drift is a `npm test` failure
+  (`apps/server/test/docs-*.test.ts`), not an unattended report nobody is assigned to.

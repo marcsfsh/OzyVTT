@@ -42,8 +42,13 @@ Notes:
 
 ## Docs / ledger
 
-- [ ] Updated `docs/ai-ledger/` (current-state / known-bugs / decision-log) and `docs/archive/ai-ledger/session-history.md` if this was meaningful work.
-- [ ] Regenerated `docs/api-reference.md` if the API contract changed.
+- [ ] Regenerated the generated docs if the contract or command surface changed — `npm run docs`
+      (covers both `docs/app-map.md` and `docs/api-reference.md`).
+- [ ] Updated `docs/ai-ledger/` **in place** if this was meaningful work — replaced what stopped
+      being true rather than appending. Most PRs change nothing here.
+- [ ] Deleted, rather than softened, any documentation claim this PR made false.
+- [ ] If a check under `apps/server/test/docs-*.test.ts` went red, fixed the claim it named —
+      did not delete, skip or weaken the check.
 
 ## Follow-ups / out of scope
 
