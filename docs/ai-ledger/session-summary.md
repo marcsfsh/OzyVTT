@@ -8,6 +8,47 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-08-01 — Codex overhaul, final polish pass
+
+Eight commits (`1807c22` … this ledger). **1,861 tests passing (+1 skipped), up from 1,783.** check 0, build 0.
+Browser pass **67/67** in Chromium against a populated database at 1280x900 and 375x780 (60 before;
+seven new checks). Tap audit re-run at both widths: **1,160 controls across 34 surfaces, 0 surfaces
+unmeasured, 16 sub-floor at 375px and 24 at 320px — every one a graph node.**
+
+Closing the gap between "the client approved X" and "X is true", plus one bug the client found.
+
+1. **The sidebar collapse was a one-way door** (client-reported, highest priority). The toggle was
+   gated on `collapsed`, so it hid itself the moment it was used, and the preference persists — the
+   GM was trapped in the rail until they cleared site storage. Gated on `railBand` now; the player
+   gained the same affordance. **The blind spot matters more than the line:** every check we owned
+   verified that things are reachable and not one collapsed a control and tried to get back. Both
+   the unit tests and the browser pass now drive toggles in both directions.
+2. **The pin regression** (D3/D6). Selecting a pin is a navigation now, so the autosave-off leave
+   guard sees it; it is also addressable and Back-able, which `?pin=` always promised.
+3. **Decision fidelity.** D7/D20 — the palette's "New session"/"New quest" create, through one
+   shared `creates.ts` the rails call too. D13 — the Downtime note is the shared editor, the last
+   bare `Textarea` in the suite. D3 — Sessions and Quests filters live in the URL like the other
+   three lists. D10 — the player's five lists gained the GM's filters, in the GM's words.
+4. **Coverage for what had none.** `MarkdownEditor` (D13's headline capability) and `Combobox` — 20
+   tests, checked against eight mutants. The three owed view tests: `calendar-view`,
+   `downtime-view`, `tag-view`.
+5. **ADR-0016 §2 made true.** The viewer router echoed any `[A-Za-z0-9._:-]{1,128}` request id and
+   the token router any 36 hex-and-hyphen characters; both now enforce UUID v4 like the other five,
+   so the ADR's clause and the generated reference are true of the whole surface. Behaviour changed
+   rather than the ADR: it states a security property five routers already kept, and nothing in the
+   app sends the header.
+
+**Numbers corrected, not restated.** `design-language.md` §4 claimed "1,119 controls, 16 sub-floor at
+each width". Re-measured: 1,160, and **24 at 320px** — the graph's sub-floor count is data- and
+width-dependent, so one number for both widths could only ever be right for one of them.
+
+New findings, all in `known-bugs.md`: the prep drawer covers the control that opens it (closable by
+its own Close and by Escape, so not a trap); a synthesized pin click is unreliable at 375px and the
+false-failure cascade it causes; `MarkdownEditor` and `Combobox` disagree on where `role="option"`
+sits; `.codex-modetabs` is dead CSS. Still owed and untouched: the palette's empty-query gate.
+
+---
+
 ## 2026-07-31 — Codex overhaul, QA fix pass (CLIENT lane)
 
 Ten commits (`99dff3e` … this ledger). **1783 tests, up from 1725.** check 0, build 0.

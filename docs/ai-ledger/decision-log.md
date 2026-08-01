@@ -7,6 +7,45 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-08-01 — Codex final polish: five durable rules
+
+Settled while closing the decision-fidelity gaps and the client-reported sidebar bug. Each is a
+choice between two defensible options; recorded so the loser is not re-proposed.
+
+- **A control that changes a state must not be gated on the state it changes.** The sidebar's collapse
+  toggle was rendered only when not collapsed, so it hid itself the moment it was used, and the
+  persisted preference made that permanent. The gate belongs on the reason the control is *meaningless*
+  (`railBand` — the forced 761–849px track, where there is nothing to expand into), never on the state
+  it produces. Generalised as a verification rule too: **a toggle is half-verified until the return
+  trip is verified**, which is why `sidebar-rail.test.tsx` and the browser pass now drive toggles both
+  ways. Every check this repo owned tested reachability, and a human found the door in minutes.
+
+- **Selection that can lose work is a NAVIGATION, not local state.** The pin inspector holds a draft
+  with autosave off, so selecting another pin has to travel the one guarded path (`navigate` →
+  `mayLeave`). Choosing `?pin=` as the source of truth rather than adding a second guard call site also
+  bought refresh-proofing and Back — the reason D3 put the pin in the address in the first place.
+  Rejected: registering the guard inside `AtlasView` and keeping local state, which would have made two
+  implementations of "may I leave?" and left the selection unaddressable.
+
+- **A create verb creates; a door to a form is named as a door.** The palette's "New session" and "New
+  quest" now run the same `creates.ts` the rails run and land on the new record. The two "Log …" rows
+  still navigate, because a journal entry and a downtime record need a form — so they are named for the
+  door they are. Rejected: removing the false verbs (D7's point is one create habit everywhere), and
+  naming the form-based rows "New …" for symmetry (which is the original lie, relabelled).
+
+- **When behaviour and a normative ADR clause disagree, change the behaviour if the clause states a
+  property most of the surface already keeps.** ADR-0016 §2's request-id rule was true of five routers;
+  the viewer and token routers were laxer. Both now enforce UUID v4. Changing the ADR instead would
+  have written a carve-out for a log-forgery vector into the standard, and nothing in the app sends the
+  header, so no caller loses a correlation id. The reverse call would be right if the clause were
+  aspirational or if callers depended on the looser behaviour.
+
+- **The player gets an affordance unless it is a GM tool.** D1 says the sidebar is collapsible and the
+  player's mirrors the GM's "minus GM tools"; a collapse control is not one, so the player has it now,
+  on its own storage key and never inside the GM's embedded preview (a modal is not a viewport, and the
+  preference written there would be the GM's). The same reading is why the player's lists got the GM's
+  filters rather than a reduced set.
+
 ## 2026-07-31 — Codex server QA pass: five durable rules
 
 Settled while fixing the adversarial QA findings on `apps/server` and `packages/api-contract`. Each was

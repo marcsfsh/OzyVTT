@@ -10,30 +10,56 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
-- **[codex/atlas] Switching to another PIN does not pass the autosave-off leave guard.** With autosave
-  off, the pin inspector now holds label and tags as a draft with a Save button (D6). Selecting a
-  different pin rewrites `?pin=` through `replaceQuery`, which by design creates no history entry and
-  therefore never consults the navigation guard — so an unsaved pin label is lost that way, where the
-  same act on a page or a quest (a real `navigate`) would prompt. The Save button and the "Unsaved
-  changes" readout are what stand between the GM and it. Fixing it properly means making pin selection
-  a navigation, which is a bigger change than this QA pass should make. Found 2026-07-31.
+- **[codex/shell] Collapsing the sidebar was a ONE-WAY DOOR — FIXED 2026-08-01.** The collapse toggle
+  was rendered only when `!collapsed`, and `collapsed` is `railBand || sidebarMode === "rail"` — so the
+  control hid itself the moment it was used, and because the preference persists to localStorage a
+  reload did not bring it back. `setSidebarMode` has one call site, so nothing else recovered it: the
+  GM was in the rail until they cleared site storage or resized past 850px. Gated on `railBand` now
+  (which is what the comment beside it always claimed), so the forced 761–849px band still hides it —
+  there is nothing to expand into there. The player gained the same affordance on its own key (D1: the
+  sidebar is collapsible, and the player's mirrors the GM's minus GM *tools*), never inside the GM's
+  embedded preview. **Found by the client, in minutes, by using the app** — after 47 QA agents, two
+  browser passes and a tap audit. **The lesson, which is bigger than the line:** every automated check
+  this repo owned verified that things are REACHABLE, and not one collapsed a control and tried to get
+  back. `sidebar-rail.test.tsx` now drives it both ways (including across a reload) and the browser
+  pass has a both-directions check over three toggles.
 
-- **[codex/lists] The Sessions and Quests filters live in component state; Pages, Atlas and Journal put
-  theirs in the URL.** So two of the five lists lose their filter on navigation and cannot be linked to
-  a filtered view, against D10's "in-place filters on every list". `CodexShell` already owns
-  `replaceQuery`, so the fix is threading `route.query` through both views. Found 2026-07-31.
+- **[codex/atlas] Switching to another PIN did not pass the autosave-off leave guard — FIXED
+  2026-08-01.** The selection is the ADDRESS now (`AtlasView`'s `selectPin` → `onNavigate`), which is
+  what D3 always said `?pin=` was, so it goes through the one guarded path: it prompts with autosave
+  off and a dirty draft, survives a refresh, and Back closes the inspector. Deleting a pin still clears
+  the selection without a prompt (`replaceQuery` — there is nothing left to save), and the pin filters
+  on the same address are carried through a selection rather than dropped. `pin-selection.test.tsx`
+  proves all three arms fail without it; the browser pass proves the real `window.confirm` half at
+  1280px. Original report: the selection lived in `useState`, so nothing navigated, the guard was never
+  consulted, and an unsaved pin label was lost silently where the same act on a page or a quest
+  prompted.
 
-- **[codex/palette] "New session" and "New quest" only NAVIGATE.** Both are labelled as creates and both
-  run `onNavigate(pathForSection(...))` — the identical target of the "Go to Sessions"/"Go to Quests"
-  rows six lines below them, so four of the palette's seventeen empty-query rows are exact duplicates
-  and the GM still has to find "+ New" on the rail. D20 asked the palette to learn quick-create verbs.
-  Separately, every verb and goto is gated on an EMPTY query (`CommandPalette.tsx:68`), so no section
-  can be reached by typing its name — pre-existing, and it makes a twelve-item goto list hard to use.
-  Found 2026-07-31.
+- **[codex/lists] The Sessions and Quests filters lived in component state — FIXED 2026-08-01.** Both
+  read `?q=`/`?status=` and write through the shell's one filter writer (`setListFilter`, which the
+  Journal now shares), so all five GM lists behave alike: a filtered log is linkable and survives a
+  refresh. **What remains, uniformly and by design:** opening a RECORD from a filtered list drops the
+  filter from the address (`navigate(sessionPath(id))` carries no query), exactly as Pages has always
+  done. Back returns to the filtered list, because that address is the previous history entry. Pinned
+  as the current answer in `list-filters.test.tsx` rather than left to be re-discovered — making the
+  filter ride the record address is a change to all five lists and a design call about how long a
+  filter should stick.
 
-- **[codex/player] The player's lists have no in-place filters.** D10's filters landed on the GM's five
-  lists and none of the player's: their type filter is component state only the dashboard can set, and
-  the player Journal, Sessions and Quests have no filter at all. Found 2026-07-31.
+- **[codex/palette] "New session" and "New quest" only NAVIGATED — FIXED 2026-08-01.** Both create now,
+  through one shared `creates.ts` that the Sessions and Quests rails call too, and both land on the new
+  record. The two "Log …" rows still navigate and are named for what they are: a journal entry and a
+  downtime record are composed in a form, so their door is the surface holding the form.
+  **Still open, pre-existing:** every verb and goto is gated on an EMPTY query
+  (`CommandPalette.tsx`), so no section can be reached by typing its name, which makes a twelve-item
+  goto list harder to use than it should be. Not touched here — it is a search-ranking change (verbs
+  would have to compete with record hits), not a wiring fix.
+
+- **[codex/player] The player's lists had no in-place filters — FIXED 2026-08-01.** All five now match
+  the GM's, in the same words and on the same parameters, held in the address: Pages gains kind + tag
+  (settable and clearable in place, not only by a dashboard card), Sessions a text filter, Quests text
+  + status, the Journal the GM's kind/text/tag row, and the Atlas the GM's pin filter (dimming, not
+  hiding). Inside the GM's embedded preview they drive the preview's own local address and never the
+  browser's, which `list-filters.test.tsx` and the browser pass both assert.
 
 
 - **[codex/backup] `export -> import -> export` is not byte-stable for a codex whose calendar was never
@@ -57,15 +83,53 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   test was the higher-value change. Bound `date()` and keep the rollback test's probe index.
 
 - **[codex/graph] Graph nodes are below the 44px touch floor and will stay there.** Re-measured
-  2026-07-31 in both shells: at 375px 14.7–18.0px wide × 12.4–49.5px tall, at 320px 12.5–15.3 × 10.4–41.7
-  — **16 of 16 rendered nodes sub-floor at both widths**. (The earlier entry read "11–33px at 375px and
-  41–43px at 320px", which recorded the narrowest supported width as the closest to compliant when it is
-  the furthest from it.) Node size is data-driven and positions are force-laid, so a 44px area per
-  node overlaps its neighbours at any realistic density: the floor and the layout are in direct conflict
-  and enforcing the floor destroys the thing being tapped. Recorded as an accepted exception in
-  `design-language.md` §4 with its three mitigations (pan/zoom, every node also reachable from Pages and
-  the palette, the graph is a view onto connections rather than the only way to open one). Reproduce
-  with `node scripts/tap-audit.mjs 375`.
+  2026-08-01 in both shells against a populated campaign: at 375px **16 nodes** are sub-floor (GM 10,
+  player 6) at 14.2–18.4px wide × 11.2–49.5px tall; at 320px **24** (GM 18, player 6) at 12.1–43.4 ×
+  9.4–43.4. **The two widths do not agree and the count is not a constant** — node size is data-driven
+  and the layout is force-fitted to the canvas, so a narrower canvas and a bigger campaign both push
+  more nodes under the floor. (Earlier entries here quoted "3", then "16 of 16 at both widths"; the
+  first was a constant that never was, the second was true only of the data it was measured on.) A 44px
+  area per node overlaps its neighbours at any realistic density, so the floor and the layout are in
+  direct conflict and enforcing the floor destroys the thing being tapped. Recorded as an accepted
+  exception in `design-language.md` §4 with its three mitigations (pan/zoom, every node also reachable
+  from Pages and the palette, the graph is a view onto connections rather than the only way to open
+  one). Reproduce with `node scripts/tap-audit.mjs 375`.
+
+- **[codex/ui] The session-prep drawer covers the top-bar control that opens it.** Measured 2026-08-01
+  at 1280px: with the drawer open, a click on "Session prep" is intercepted by the drawer itself, so
+  the control that opened it cannot close it. **Not a trap** — the drawer's own Close is visible and
+  labelled, and Escape closes it with focus inside (both asserted in the browser pass) — but the
+  top-bar button carries `aria-expanded` and reads as a toggle while behaving as an opener. Found by
+  the new both-directions toggle check; left alone because moving or offsetting a shipped drawer is a
+  layout change with no user complaint behind it, at the end of a polish pass.
+
+- **[repo/tooling] A pin cannot be selected reliably by a synthesized click at 375px.** `MapSurface`
+  resolves a tap from `pointerdown`/`pointerup` on the whole `<svg>` (so it can tell tap from drag from
+  pan), so `dispatchEvent("click")` does nothing and a plain Playwright click fails the "receives
+  events" check; `click({ force: true })` works at 1280px. At 375px it is unreliable, and the cause is
+  already in this file: the closed session-console drawer stretches the initial containing block, so
+  `getBoundingClientRect` and pointer coordinates disagree — measured on 2026-08-01 as four consecutive
+  pins reporting the same viewport box. **The failure mode is expensive**: a half-selected pin with
+  autosave off leaves a leave-guard registered, which then refuses every later in-app navigation
+  (Playwright dismisses an unhandled `confirm`, and dismiss means "stay"), so one flaky check produced
+  nine false failures before it was understood. The browser pass therefore runs its two pin checks at
+  desktop only and says why; pin reachability on a phone is the tap audit's job, where it is measured
+  rather than clicked.
+
+- **[ui] `MarkdownEditor`'s suggestion list puts `role="option"` on the `<li>` and the click handler on
+  a `<button>` inside it; `Combobox` puts the role on the button itself.** Two shared primitives, two
+  shapes for one ARIA pattern — and an interactive element inside an `option` is not what the pattern
+  intends. Nothing is broken for a user: the keyboard path is driven by the textarea and the mouse path
+  by the button. Found 2026-08-01 while writing the first behavioural tests for either primitive (the
+  tests click the inner button and say why). Worth one pass over both, together, rather than a change
+  to whichever is edited next.
+
+- **[codex/css] `.codex-modetabs` and its scroll-cue rules survive in `codex.css` with no markup left
+  to match them.** The five-mode tab bar they styled was retired by D1; grep finds the class only in
+  the stylesheet. Dead rather than wrong, so nothing renders differently — but a stylesheet that still
+  describes a retired component is the kind of evidence a later reader trusts. Not deleted here: it
+  wants one sweep over every selector the recut orphaned, with a visual check, not a single-class
+  deletion at the end of a polish pass.
 
 - **[app-shell/mobile] At 375px the GM's Codex starts roughly 1500px down the document,** below the
   character-roster dock and the eight-tab strip. **The PLAYER half of this is fixed** (2026-07-31, Codex

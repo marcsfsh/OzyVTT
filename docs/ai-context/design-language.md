@@ -220,20 +220,27 @@ the *hit area*, never the paint.
   whole `/styleguide` page: **0 controls below the floor**. New UI composed from
   `@vtt/ui` inherits it for free, which is the main reason to compose rather than
   hand-roll.
-- **The whole Codex, both roles.** Measured 2026-07-31 in Chromium against a populated
-  database, **35 surfaces**: the GM's twenty-two (every sidebar address plus the page
+- **The whole Codex, both roles.** Re-measured 2026-08-01 in Chromium against a populated
+  database, **34 surfaces**: the GM's twenty-one (every sidebar address plus the page
   editor, the session editor, the quest editor, the pin inspector *with its Appearance
   disclosure open*, the cross-type tag view, the quick-create dialog, the command
   palette, the nav drawer and the session-prep drawer) and the player's thirteen, on a
-  real player session rather than the GM's preview modal. **1,119 interactive controls,
-  16 below the floor at 375px and 16 at 320px — every one of them a graph node**, the
+  real player session rather than the GM's preview modal. **1,160 interactive controls;
+  16 below the floor at 375px and 24 at 320px — every one of them a graph node**, the
   accepted exception in the table below. Reproduce with `node scripts/tap-audit.mjs 375`
   (route-driven: a new address is one line) — the run exits non-zero if anything is
   sub-floor *or* any surface goes unmeasured, and it prints the per-surface counts that
   add up to the total.
 
-  **The previous figure in this file — "17 surfaces, 805 controls, 0 below the floor" —
-  was wrong in three ways and is corrected here rather than quietly restated.** The
+  **The two widths do not agree, and that is the honest result rather than a rounding of
+  it.** The graph's node sizes are data-driven and its layout is force-fitted to the
+  canvas, so a narrower canvas pushes more nodes under the floor: 10 of the GM graph's
+  nodes at 375px and 18 at 320px, plus 6 of the player's at both. A single number for
+  both widths — which this file carried until today — could only ever be right for one
+  of them. **Nothing outside the graph is sub-floor at either width.**
+
+  **The figure before that — "17 surfaces, 805 controls, 0 below the floor" —
+  was wrong in three ways and is corrected rather than quietly restated.** The
   script was GM-only, so the player Codex (its own root, drawer, reader and pin sheet)
   contributed nothing; two of its openers fell through a `count() > 0` guard with no
   else and silently measured the previous surface a second time; and the total was never
@@ -253,7 +260,7 @@ the *hit area*, never the paint.
 | `DicePanel`'s two `<summary>` disclosures | 39px and 19.5px tall | Unclassed `<summary>` in `apps/client/src/dice/`; needs a scoped rule there. |
 | `.encounter-map-swatches button` (color picker) | 24×24 | Inside a popover grid; 44px areas would overlap at the current 4.8px gap. |
 | Raw `<input type="checkbox">` outside the named labels above | 13–20px | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
-| `.codex-graph-node` (Connection graph) | **@375: 14.7–18.0 wide × 12.4–49.5 tall, 16 of 16 rendered nodes. @320: 12.5–15.3 wide × 10.4–41.7 tall, 16 of 16.** | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. **The narrowest supported width is the WORST case, not the best**: this row previously read "41–43px @320", which is the opposite of what the tool prints — at 320px the typical node is about 14×20px and the smallest is 12.5×10.4. Re-measured 2026-07-31 by `scripts/tap-audit.mjs` at both widths, GM and player. |
+| `.codex-graph-node` (Connection graph) | **@375: 14.2–18.4 wide × 11.2–49.5 tall, 16 nodes (GM 10, player 6). @320: 12.1–43.4 wide × 9.4–43.4 tall, 24 nodes (GM 18, player 6).** | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. **The count is data-dependent and width-dependent — do not quote it as a constant.** It scales with the campaign (`known-bugs.md` records the same lesson from "the Graph's 3"), and the narrower width is the WORSE case, not the better one: an earlier row here read "41–43px @320", which is the opposite of what the tool prints. Re-measured 2026-08-01 by `scripts/tap-audit.mjs` at both widths, GM and player. |
 
 Two ways to meet it — pick by whether growing the paint hurts:
 

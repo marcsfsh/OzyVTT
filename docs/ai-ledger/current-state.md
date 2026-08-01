@@ -8,9 +8,38 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **The Codex overhaul's final polish (2026-08-01, branch `claude/ozyvtt-codex-ux-4pl7ib`).** The last
+  pass before presentation: close the gap between "the client approved X" and "X is true", fix one bug
+  the client found in the running app, and make every recorded number match what the tooling prints.
+  - **Collapsing the sidebar is no longer a one-way door.** The toggle was gated on the state it
+    produced, so it hid itself when used, and the persisted preference made that survive a reload. It
+    is gated on the forced 761–849px band now, where a collapse control genuinely means nothing. The
+    player has the same affordance, on its own key, never inside the GM's embedded preview.
+  - **Selecting a pin is a navigation** (`?pin=`), so the D6 autosave-off leave guard sees it, the
+    selection survives a refresh, and Back closes the inspector. It was local state, so a typed pin
+    label was lost silently — the one way left in the app to lose work.
+  - **Decision fidelity closed:** the palette's "New session"/"New quest" create through the same
+    `creates.ts` the rails call (D7/D20); the Downtime note is the shared editor, the last bare
+    `Textarea` in the suite (D13); Sessions and Quests keep their filters in the URL like Pages, Atlas
+    and Journal (D3); and the player's five lists carry the GM's filters in the GM's words (D10).
+  - **ADR-0016 §2 is true of the whole surface.** The viewer router echoed any short token as a request
+    id and the token router any 36 hex-and-hyphen characters; both enforce UUID v4 now, like the other
+    five routers. No contract change — the served OpenAPI document is untouched.
+  - **Coverage where there was none:** `MarkdownEditor` (D13's headline capability, six mounting
+    surfaces) and `Combobox` (8 call sites) have 20 behavioural tests, checked against eight mutants;
+    `calendar-view`, `downtime-view` and `tag-view` are written.
+  - Verified: `npm run check` 0, `npm run test` **1,861 passing / 1 skipped / 0 failing**, `npm run
+    build` 0. Browser pass **67/67** at 1280x900 and 375x780 against a populated database. Tap audit
+    **1,160 controls over 34 surfaces, 0 unmeasured, 16 sub-floor at 375px and 24 at 320px, every one a
+    graph node**.
+  - **A recorded number was wrong and is corrected, not restated:** `design-language.md` §4 claimed
+    "1,119 controls, 16 sub-floor at each width". The graph's sub-floor count is data- and
+    width-dependent, so a single figure for both widths could only ever be right for one of them.
+
 - **The Codex is one sidebar, one vocabulary and real addresses (2026-07-31, Lane C, branch
   `claude/ozyvtt-codex-ux-4pl7ib`).** Verified in Chromium against a populated database at 1280x900 and
-  375x780: **59/59 checks, 0 uncaught console errors** (`node scripts/browser-verify.mjs`).
+  375x780: 59/59 checks when this landed, **67/67 as of 2026-08-01** (`node scripts/browser-verify.mjs`),
+  0 uncaught console errors.
   - **One navigation surface (D1).** A role-blind `SidebarNav` over Home / World (Pages · Atlas · Graph)
     / Campaign (Sessions · Quests · Journal · Calendar · Downtime) / Tools (Reveal audit · Preview as
     player · Backup · Settings). The five-mode tab bar, the nine-button ops row and the four unaddressed
@@ -40,10 +69,14 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     draft survives. Verified in Chromium at 1280x900 and 375x780.
   - **761–849px is a real icon rail.** Both shells drive `collapsed` from one matchMedia query, so the
     markup agrees with the 56px grid track the CSS has always set there; the player gets it too.
-  - **Touch floor, measured not asserted:** **1,119 interactive controls across 35 surfaces — 22 GM and
-    13 player, the latter on a real player session — with 16 below 44px at 375px and 16 at 320px, every
-    one of them a graph node**, the accepted exception recorded in `design-language.md` §4 with its
-    reasoning. Corrected 2026-07-31: the earlier "805 controls across 17 surfaces, 0 below the floor"
+  - **Touch floor, measured not asserted.** Latest measurement (2026-08-01, and the one to quote):
+    **1,160 interactive controls across 34 surfaces — 21 GM and 13 player, the latter on a real player
+    session — with 16 below 44px at 375px and 24 at 320px, every one of them a graph node**, the
+    accepted exception recorded in `design-language.md` §4 with its reasoning. The count of sub-floor
+    nodes is data- and width-dependent, so it differs between the two widths and will differ again on a
+    bigger campaign; do not quote it as a constant. (This entry read "1,119 controls across 35 surfaces,
+    16 at each width" when Lane C landed — true of that run's data, and superseded by the re-measure.)
+    Corrected 2026-07-31: the earlier "805 controls across 17 surfaces, 0 below the floor"
     was measured by a GM-only script whose pin and palette openers silently re-measured the previous
     surface, and the two real sub-floor controls it could not see (`.codex-list-item` at 43.6px on the
     player's Pages rail, `.codex-marker-link-open` at 35.6px in both shells) are now fixed.
