@@ -222,13 +222,13 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     ]);
     const row = within(rowOf("w1"));
 
-    expect(row.getByText("Move your date to Hammer 10, 1492 DR — this passes 2 deadlines.")).toBeInTheDocument();
+    expect(row.getByText("Move your date to Hammer 10, 1492 DR. This passes 2 deadlines.")).toBeInTheDocument();
   });
 
   /** One is "1 deadline", not "1 deadlines" — the sentence is read mid-session, at speed. */
   it("counts one deadline in the singular", async () => {
     await renderJournal([DOWNTIME, DEADLINE]);
-    expect(within(rowOf("w1")).getByText("Move your date to Hammer 10, 1492 DR — this passes 1 deadline.")).toBeInTheDocument();
+    expect(within(rowOf("w1")).getByText("Move your date to Hammer 10, 1492 DR. This passes 1 deadline.")).toBeInTheDocument();
   });
 
   /**

@@ -191,7 +191,7 @@ describe("The dashboard's open-quests card (M10)", () => {
     const log = within(await screen.findByRole("navigation", { name: "Quests" }));
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("textbox", { name: /Where this is really going/ })).toHaveValue("The vestiges are still bargaining.");
+    expect(screen.getByRole("textbox", { name: /GM notes/ })).toHaveValue("The vestiges are still bargaining.");
 
     // The card is a view: one read for the whole workspace, and no write anywhere on the way here.
     expect(listQuests).toHaveBeenCalledTimes(1);

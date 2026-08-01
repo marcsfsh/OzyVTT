@@ -49,8 +49,8 @@ export function CalendarEditor({ gmToken, calendar, onSaved, onClose }: Readonly
             </div>
           ))}
         </div>
-        <Field label="Weekday names" htmlFor="cal-week" help="Comma-separated, optional — shown in dates when set"><Input id="cal-week" value={weekdays} placeholder="Sul, Mol, Zor, …" onChange={(event) => setWeekdays(event.target.value)} /></Field>
-        <Field label="Your date" htmlFor="cal-cur-year" help="The GM's own clock — what a new record is dated at. Players only see it once you publish. Clear the year to unset.">
+        <Field label="Weekday names" htmlFor="cal-week" help="Optional, comma-separated. Shown in dates when set."><Input id="cal-week" value={weekdays} placeholder="Sul, Mol, Zor" onChange={(event) => setWeekdays(event.target.value)} /></Field>
+        <Field label="Your date" htmlFor="cal-cur-year" help="The date a new record is given. Players see it only after you publish it. Clear the year to unset the date.">
           <div className="codex-cal-current">
             <Input id="cal-cur-year" aria-label="Current year" type="number" inputMode="numeric" placeholder="Year" value={curYear} onChange={(event) => setCurYear(event.target.value)} />
             <Select aria-label="Current month" value={String(curMonth)} onChange={(event) => setCurMonth(Number(event.target.value))}>

@@ -127,7 +127,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
   const confirmLabel = (target: CodexInWorldDate | null) => {
     if (!calendar || !target) return "Confirm";
     const passes = deadlinesPassedBy(records, calendar, target);
-    return `Confirm — move your date to ${formatWorldDate(calendar, target)}${passes > 0 ? ` (passes ${passes} deadline${passes === 1 ? "" : "s"})` : ""}`;
+    return `Move your date to ${formatWorldDate(calendar, target)}${passes > 0 ? ` (passes ${passes} deadline${passes === 1 ? "" : "s"})` : ""}`;
   };
 
   if (loading && rows.length === 0) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
@@ -144,8 +144,8 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
           <Field label="Who" htmlFor="codex-downtime-who" help="Pick a character page, or type a name.">
             {characterOptions.length > 0
               ? <Combobox id="codex-downtime-who" options={characterOptions} value={whoValue} onChange={setWhoValue} allowFreeText
-                  ariaLabel="Who spent the time" placeholder="Search characters, or type a name…" />
-              : <Input id="codex-downtime-who" value={who} placeholder="Vex, the party…" onChange={(event) => setWhoValue(event.target.value || null)} />}
+                  ariaLabel="Who spent the time" placeholder="Search characters, or type a name" />
+              : <Input id="codex-downtime-who" value={who} placeholder="Vex" onChange={(event) => setWhoValue(event.target.value || null)} />}
           </Field>
           <Field label="Activity" htmlFor="codex-downtime-activity"><Input id="codex-downtime-activity" value={activity} placeholder="Forging a blade" onChange={(event) => setActivity(event.target.value)} /></Field>
           <Field label="Days" htmlFor="codex-downtime-days"><NumberField id="codex-downtime-days" aria-label="Days" value={days} min={0} max={3650} onChange={(next) => setDays(next ?? 0)} /></Field>
@@ -155,7 +155,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
               silently did nothing while the identical write through the Journal linked pages properly. */}
           <Field label="Note" htmlFor="codex-downtime-note" className="codex-field-wide">
             <CodexEditor id="codex-downtime-note" token={gmToken} value={note} onChange={setNote}
-              ariaLabel="Note" placeholder="What came of it…" pages={pages} onNavigate={() => undefined} rows={3} />
+              ariaLabel="Note" placeholder="Notes about this downtime" pages={pages} onNavigate={() => undefined} rows={3} />
           </Field>
         </div>
         {proposed && calendar && <p className="codex-composer-hint">Logging this proposes moving your date to <strong>{formatWorldDate(calendar, proposed)}</strong>. Nothing moves until you confirm it below.</p>}
@@ -194,7 +194,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
                         : row.name}
                     </th>
                     <td>{row.days}</td>
-                    <td>{row.last ?? "—"}</td>
+                    <td>{row.last ?? "None"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -204,7 +204,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
       <section className="codex-downtime-section">
         <h3 className="codex-campaign-h">History</h3>
         {rows.length === 0
-          ? <p className="codex-list-empty">Nothing yet. Log the party's first week off above.</p>
+          ? <p className="codex-list-empty">No downtime logged yet. Use the form above to log some.</p>
           : <ul className="codex-downtime-history">
               {rows.map(({ record, payload }) => (
                 <li key={record.id} className="codex-downtime-historyrow">
@@ -212,8 +212,8 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
                     <div className="codex-downtime-edit">
                       <Field label="Who" htmlFor={`codex-dt-who-${record.id}`}><Input id={`codex-dt-who-${record.id}`} value={editWho} onChange={(event) => setEditWho(event.target.value)} /></Field>
                       <Field label="Activity" htmlFor={`codex-dt-act-${record.id}`}><Input id={`codex-dt-act-${record.id}`} value={editActivity} onChange={(event) => setEditActivity(event.target.value)} /></Field>
-                      <Field label="Character page" htmlFor={`codex-dt-page-${record.id}`} help="Days can't be edited — they're what the clock already moved by. A typo is a delete and re-log.">
-                        <Combobox options={characterOptions} value={editPageId} onChange={setEditPageId} ariaLabel="Link to a character page" placeholder="Search characters…" />
+                      <Field label="Character page" htmlFor={`codex-dt-page-${record.id}`} help="Days cannot be changed after logging. Delete the entry and log it again to correct it.">
+                        <Combobox options={characterOptions} value={editPageId} onChange={setEditPageId} ariaLabel="Link to a character page" placeholder="Search characters" />
                       </Field>
                       <div className="codex-conn-formactions">
                         <Button variant="secondary" size="sm" disabled={busy} onClick={() => void saveEdit(record.id)}>Save</Button>
@@ -274,7 +274,7 @@ export function PlayerDowntimeView({ records, pages, onOpenEntry, onOpenPage }: 
     return [...map.values()].sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
   }, [rows, pages]);
 
-  if (rows.length === 0) return <div className="codex-main-empty"><h3>No downtime yet</h3><p>Weeks the party spends between adventures show up here.</p></div>;
+  if (rows.length === 0) return <div className="codex-main-empty"><h3>No downtime yet</h3><p>Downtime the GM logs for the party appears here.</p></div>;
   return (
     <div className="codex-downtime">
       <section className="codex-downtime-section">
@@ -286,7 +286,7 @@ export function PlayerDowntimeView({ records, pages, onOpenEntry, onOpenPage }: 
               <tr key={row.key}>
                 <th scope="row">{row.pageId ? <button type="button" className="codex-md-link" onClick={() => onOpenPage(row.pageId!)}>{row.name}</button> : row.name}</th>
                 <td>{row.days}</td>
-                <td>{row.last ?? "—"}</td>
+                <td>{row.last ?? "None"}</td>
               </tr>
             ))}
           </tbody>

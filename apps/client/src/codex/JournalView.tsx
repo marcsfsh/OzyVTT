@@ -38,11 +38,11 @@ type ComposerKind = (typeof COMPOSER_KINDS)[number];
 /** The words each shape uses. The KIND labels come from `CHRONICLE_KIND_META`, so the composer's switch
     and the rows it produces can never call the same record two different things. */
 const COMPOSER_COPY: Readonly<Record<ComposerKind, Readonly<{ heading: string; textLabel: string; textPlaceholder: string; submit: string }>>> = {
-  entry: { heading: "New journal entry", textLabel: "Player-facing summary", textPlaceholder: "What the party knows about this…", submit: "Add entry" },
+  entry: { heading: "New journal entry", textLabel: "Player-facing summary", textPlaceholder: "What players know about this", submit: "Add entry" },
   // D11-C: a deadline stores no payload — WHAT will happen is this text, WHEN is the record's own date.
-  deadline: { heading: "New deadline", textLabel: "What will happen", textPlaceholder: "The duke's ultimatum expires…", submit: "Add deadline" },
-  downtime: { heading: "New downtime", textLabel: "What the party knows", textPlaceholder: "How the time was spent…", submit: "Log downtime" },
-  milestone: { heading: "New milestone", textLabel: "What the party knows", textPlaceholder: "The company came back from the Underdark changed…", submit: "Record milestone" }
+  deadline: { heading: "New deadline", textLabel: "What will happen", textPlaceholder: "The duke's ultimatum expires", submit: "Add deadline" },
+  downtime: { heading: "New downtime", textLabel: "What the party knows", textPlaceholder: "How the time was spent", submit: "Log downtime" },
+  milestone: { heading: "New milestone", textLabel: "What the party knows", textPlaceholder: "What players know about this level", submit: "Record milestone" }
 };
 /** The server's bounds, stated here too, so a slip is a disabled field rather than a generic 400. */
 const DOWNTIME_TEXT_MAX = 120;
@@ -202,7 +202,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
       /**
        * D9: entries join their session **by identity**. `sessionNumber` is display data the server
        * resolves from the linked record and is a 400 on any write body, so it is never serialized here.
-       * An empty string means "— none —" and travels as an explicit null; omitting the key on a CREATE
+       * An empty string means "None" and travels as an explicit null; omitting the key on a CREATE
        * would auto-file under the active session, which is a different (and also correct) behaviour, so
        * the composer states its choice rather than relying on the default.
        */
@@ -220,7 +220,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
       else if (draft.kind === "deadline") {
         // Guarded here as well as by the disabled button: `createDeadline` requires a date, and a
         // rejected create is a worse way to learn that than a button that will not arm.
-        if (!inWorldDate) { setError("A deadline needs a date — that is what makes it fire."); return; }
+        if (!inWorldDate) { setError("A deadline needs a date. Set the year, month and day above."); return; }
         await journalApi.createDeadline(gmToken, { ...input, inWorldDate });
       } else if (draft.kind === "downtime") {
         // O-3: this creates a RECORD and nothing else. The clock does not move here, and the response's
@@ -318,7 +318,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
       const seen = calendar?.publishedDate && calendar ? formatWorldDate(calendar, calendar.publishedDate) : "no date yet";
       const proceed = await confirm({
         title: "This is dated ahead of the players",
-        body: `Players' date is still ${seen} — showing this tells them the story has reached ${dated}. Publish the date first if that's not what you want.`,
+        body: `Players' date is still ${seen}. Showing this record tells them the date has reached ${dated}. Publish the date first if you do not want that.`,
         confirmLabel: "Show anyway",
         suppress: { label: "Stop warning me about this", onChange: (suppressed) => { if (suppressed) { setRevealWarn(false); writeRevealWarn(false); } } }
       });
@@ -409,9 +409,9 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
         )}
         <div className="codex-composer-head">
           <strong>{editingId ? "Edit entry" : COMPOSER_COPY[draft.kind].heading}</strong>
-          {editingId && stashedDraft && <span className="codex-entry-when">Your unsaved entry is kept — it returns when you finish here.</span>}
+          {editingId && stashedDraft && <span className="codex-entry-when">Your unsaved entry is kept. It returns when you finish here.</span>}
           <div className="codex-composer-head-actions">
-            {nowLabel && <span className="codex-now-chip" title="Your own clock — what a new record is dated at">Your date: {nowLabel}</span>}
+            {nowLabel && <span className="codex-now-chip" title="The date a new record is given">Your date: {nowLabel}</span>}
             {nowLabel && <GmOnlyTag />}
             <Button variant="ghost" size="sm" onClick={() => (onOpenCalendar ? onOpenCalendar() : setCalendarOpen(true))}>Calendar</Button>
             {editingId && <Button variant="ghost" size="sm" onClick={cancelEdit}>Cancel</Button>}
@@ -452,7 +452,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
         </Field>
         <Field label={<span className="codex-composer-gm-label">GM-only notes <GmOnlyTag /></span>} htmlFor="j-gm">
           <CodexEditor id="j-gm" token={gmToken} value={draft.gmText} onChange={(gmText) => set({ gmText })}
-            ariaLabel="GM-only notes" placeholder="Notes hidden from players…"
+            ariaLabel="GM-only notes" placeholder="Notes hidden from players"
             pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} gmLayer rows={4} />
         </Field>
         <div className="codex-composer-meta">
@@ -460,7 +460,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
               entry with no journal write at all, and a hidden session's number can no longer leak. */}
           <Field label="Session" htmlFor="j-session">
             <Select id="j-session" value={draft.sessionId} onChange={(event) => set({ sessionId: event.target.value })}>
-              <option value="">— none —</option>
+              <option value="">None</option>
               {sessions.map((session) => (
                 <option key={session.id} value={session.id}>{sessionTitle(session)}{session.id === activeSessionId ? " (active)" : ""}</option>
               ))}
@@ -471,13 +471,13 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           <Field label="Day" htmlFor="j-day"><Input id="j-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateDay: event.target.value })} /></Field>
           <Field label="Attach to page" htmlFor="j-page">
             <Combobox id="j-page" options={pages.map((page) => ({ id: page.id, label: page.title }))} value={draft.attachPageId || null}
-              onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Attach to page" placeholder="— none —" />
+              onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Attach to page" placeholder="None" />
           </Field>
         </div>
         {/* A deadline's date is not optional metadata, it is half the record — so say so where the button
             will not arm, rather than letting the GM discover it as a save failure. */}
         {needsDate && !draft.dateYear.trim() && (
-          <p className="codex-composer-hint">A deadline needs a date — that is what makes it fire when the campaign passes it.</p>
+          <p className="codex-composer-hint">A deadline needs a date. It fires when your date passes it.</p>
         )}
         {/* CT-10's payload. Its own row, sharing the meta row's column rules so the composer keeps one
             grid rather than growing a second layout for three more fields. */}
@@ -492,7 +492,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                 changes nothing. Without this the "Confirm" that appears on the row afterwards would be
                 the first the GM heard that the clock was involved at all. */}
             {composerProposal && calendar && (
-              <p className="codex-composer-hint">Logging this proposes moving your date to {formatWorldDate(calendar, composerProposal)} — nothing moves until you confirm it on the record.</p>
+              <p className="codex-composer-hint">Logging this proposes moving your date to {formatWorldDate(calendar, composerProposal)}. Nothing moves until you confirm it on the record.</p>
             )}
           </>
         )}
@@ -513,7 +513,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
             {/* CT-8 is level HISTORY, not a level tracker: nothing here computes XP, and the record does
                 not change anyone's sheet. Said out loud so a GM does not go looking for the half that
                 is deliberately absent. */}
-            <p className="codex-composer-hint">A milestone records that the party reached a level, and when. It changes no character sheet and counts no XP — leave the date blank to record it at the campaign's current date.</p>
+            <p className="codex-composer-hint">A milestone records the level the party reached and when. It changes no character sheet and counts no XP. Leave the date blank to record it at your current date.</p>
           </>
         )}
         {/* Its own full-width row rather than a cell in .codex-composer-meta: that row's `flex: 1 1 130px`
@@ -552,7 +552,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
           <option value="">All kinds</option>
           {CHRONICLE_FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{CHRONICLE_KIND_META[kind].label}</option>)}
         </Select>
-        <Input aria-label="Filter the journal" placeholder="Filter the journal…" value={textFilter}
+        <Input aria-label="Filter the journal" placeholder="Filter the journal" value={textFilter}
           onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
         {allTags.length > 0 && (
           <Select aria-label="Filter by tag" value={tagFilter ?? ""} onChange={(event) => onFilterChange?.({ tag: event.target.value || null })}>
@@ -590,7 +590,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
               : <div className="codex-timeline-year">{group.label}</div>}
             {/* The "Today" marker belongs to the in-world reading; under the session lens a calendar year
                 is not what the groups mean, so placing it there would be an answer to a question nobody asked. */}
-            {lens === "date" && nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today — {nowLabel}</div>}
+            {lens === "date" && nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today: {nowLabel}</div>}
             {group.records.map((record) => {
               // R2: ONE row shape for every record; the kind reads by icon + label, never by colour alone.
               const meta = CHRONICLE_KIND_META[record.kind];
@@ -662,7 +662,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
                       ? <p className="codex-downtime-state">Your date has already been moved for this downtime.</p>
                       : proposed && calendar
                       ? <div className="codex-downtime-apply">
-                          <span className="codex-downtime-proposal">Move your date to {formatWorldDate(calendar, proposed)}{passing > 0 ? ` — this passes ${passing} ${passing === 1 ? "deadline" : "deadlines"}.` : ""}</span>
+                          <span className="codex-downtime-proposal">Move your date to {formatWorldDate(calendar, proposed)}{passing > 0 ? `. This passes ${passing} ${passing === 1 ? "deadline" : "deadlines"}.` : ""}</span>
                           {/* §4 route 1: `Button` at its default size grows its own paint to 44px and
                               has no `::after`, which is what a control stacked above the row's footer
                               buttons needs — a route-2 overhang here would reach into their hit areas.

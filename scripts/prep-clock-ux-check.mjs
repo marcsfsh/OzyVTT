@@ -119,7 +119,7 @@ const proposal = p.locator(".codex-downtime-proposal").first();
 await proposal.waitFor({ state: "visible", timeout: 10_000 });
 const proposalText = (await proposal.textContent()) ?? "";
 log(`  proposal reads: "${proposalText}"`);
-ok(/this passes 2 deadlines\.$/.test(proposalText), "downtime confirm names the deadline count (expects 2)");
+ok(/\. This passes 2 deadlines\.$/.test(proposalText), "downtime confirm names the deadline count (expects 2)");
 await noOverflow("journal with the downtime confirm");
 
 // ---- 2. The record axis says "Hidden from players"; the content pill still says "GM only".
@@ -166,7 +166,7 @@ await p.waitForTimeout(900);
 ok(await p.locator("dialog[open]").count() === 0, "a suppressed warning does not reopen");
 ok(await otherAhead.getByRole("switch").getAttribute("aria-checked") === "true", "and the reveal actually happened");
 // The way back on, where the owner asked for it: on the prep-clock row.
-const backOn = p.getByRole("button", { name: "Warn me again on reveal" });
+const backOn = p.getByRole("button", { name: "Warn me again before showing an entry" });
 ok(await backOn.isVisible(), "the way back on is offered on the prep-clock row");
 const backOnBox = await backOn.evaluate((el) => {
   const r = el.getBoundingClientRect(), a = getComputedStyle(el, "::after");
@@ -179,7 +179,7 @@ ok(backOnBox.paintH >= 44 && !backOnBox.hasAfter, "and takes route 1, so nothing
 await backOn.click();
 await p.waitForTimeout(600);
 ok(await p.evaluate(() => localStorage.getItem("codex.warn-reveal-ahead")) === "on", "turning it back on persists too");
-ok(await p.getByRole("button", { name: "Warn me again on reveal" }).count() === 0, "and the way-back control goes away once used");
+ok(await p.getByRole("button", { name: "Warn me again before showing an entry" }).count() === 0, "and the way-back control goes away once used");
 // Re-armed without a reload. A THIRD record, still hidden: the milestone and the downtime above were both
 // revealed by this point, and clicking their switches now HIDES them — which never warns, by design.
 const thirdAhead = p.locator(".codex-entry").filter({ hasText: "The caravan leaves." }).first();

@@ -107,7 +107,7 @@ export function CalendarView({ gmToken, calendar, records, loading, error, onCha
     return (
       <div className="codex-main-empty">
         <h3>No calendar yet</h3>
-        <p>Give your world its own months and weekdays, and everything dated lands on them.</p>
+        <p>Define the months and weekdays of the world. Dated records are placed on this calendar.</p>
         <Button variant="primary" onClick={() => setEditorOpen(true)}>Edit calendar</Button>
         {editorOpen && <CalendarEditor gmToken={gmToken} calendar={calendar} onSaved={() => { setEditorOpen(false); onChanged(); }} onClose={() => setEditorOpen(false)} />}
       </div>

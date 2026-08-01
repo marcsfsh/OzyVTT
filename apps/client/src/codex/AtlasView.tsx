@@ -43,7 +43,7 @@ export type AtlasTarget = Readonly<{ mapId: string | null; markerId: string | nu
  * the emoji's own name ("locked") never carried.
  */
 function GmOnlyMark() {
-  return <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM-only — players can't see this map yet"><IconEyeOff /></span>;
+  return <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM only. Players cannot see this map."><IconEyeOff /></span>;
 }
 
 export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActivateScene, onOpenReplay, mapId, pinId, filter = "", tagFilter, autosave, onQuickCreate, onNavigate, onReplaceQuery }: Readonly<{
@@ -378,12 +378,12 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
 
       {currentMap && markers.length > 0 && (
         <div className="codex-atlas-filter">
-          <Input aria-label="Filter pins" placeholder="Filter pins…" value={filter}
+          <Input aria-label="Filter pins" placeholder="Filter pins" value={filter}
             onChange={(event) => onReplaceQuery((query) => { if (event.target.value) query.set("q", event.target.value); else query.delete("q"); })} />
           {pinTags.length > 0 && (
             <Combobox options={pinTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={tagFilter ?? null}
               onChange={(tag) => onReplaceQuery((query) => { if (tag) query.set("tag", tag); else query.delete("tag"); })}
-              ariaLabel="Filter pins by tag" placeholder="Filter by tag…" />
+              ariaLabel="Filter pins by tag" placeholder="Filter by tag" />
           )}
           {filtering && <span className="codex-atlas-filtercount" role="status">{matchCount} of {markers.length} pins match</span>}
         </div>
@@ -406,7 +406,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           which grows its own paint to 44px and has no `::after`. */}
       {partyMarker && (
         <div className="codex-atlas-party">
-          <span className="codex-atlas-partytext">The party is on this map{partyMarker.label ? <> — <strong>{partyMarker.label}</strong></> : null}.</span>
+          <span className="codex-atlas-partytext">The party is on this map{partyMarker.label ? <> at <strong>{partyMarker.label}</strong></> : null}.</span>
           <Button variant="ghost" onClick={() => showPin(partyMarker.id)}>Show the pin</Button>
         </div>
       )}
@@ -420,7 +420,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
               centerOnMarkerId={centerOnMarkerId} onCentered={() => setCenterOnMarkerId(null)}
               onBackgroundClick={placeMarker} onMarkerClick={(markerId) => { selectPin(markerId); if (window.innerWidth <= 760) requestAnimationFrame(() => inspectorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} onMarkerDragEnd={moveMarker} />
           : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
-          : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop pins on towns and dungeons, link each to a page or a deeper map, and show them to players as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
+          : <div className="codex-main-empty"><h3>No map yet</h3><p>An atlas is built from uploaded map images. Add a map, drop pins on it, and link each pin to a page or to a map nested underneath.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         <div ref={inspectorRef} />
         {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId} autosave={autosave}
           onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={(pageId) => onNavigate(`/codex/pages/${pageId}`)}
@@ -437,7 +437,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
             <Switch checked={nestNew} onChange={setNestNew} label={`Nest inside “${currentMap.name}”`} />
             <p className="codex-inspector-hint">{nestNew
               ? <>The new map sits inside <strong>{currentMap.name}</strong>, and you can drill into it from here.</>
-              : <>The new map starts its own tree at the top level — for a separate continent, plane, or city.</>}</p>
+              : <>The new map is added at the top level, not inside any other map.</>}</p>
           </div>
         )}
         {/* D15 / G5: upload HERE. The atlas used to send the GM to Scenes → Manage maps and back, which
@@ -449,7 +449,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
           </Button>
           <input ref={uploadInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadAsset(event.target.files?.[0]); event.target.value = ""; }} />
         </div>
-        {assetsEmpty(assets) ? <p className="codex-list-empty">No map images yet. Upload one to start your atlas — Scenes uses the same library.</p> : (
+        {assetsEmpty(assets) ? <p className="codex-list-empty">No map images yet. Upload one to start your atlas. Scenes uses the same image library.</p> : (
           <div className="codex-asset-grid">
             {assets.map((asset) => (
               <button key={asset.id} type="button" className="codex-asset-card" onClick={() => createFromAsset(asset)}>
@@ -470,14 +470,14 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onActiv
               <Input id="map-name" value={settingsName} onChange={(event) => setSettingsName(event.target.value)} onBlur={renameMap}
                 onKeyDown={(event) => { if (event.key === "Enter") void renameMap(); }} />
             </Field>
-            <Field label="Kind" htmlFor="map-kind" help="How this map sits in the atlas — a world, a region within it, or a local place.">
+            <Field label="Kind" htmlFor="map-kind" help="Where this map sits in the atlas: a world, a region within a world, or a local place.">
               <Select id="map-kind" value={currentMap.kind} onChange={(event) => void retypeMap(event.target.value as CodexMapKind)}>
                 {MAP_KINDS.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}
               </Select>
             </Field>
-            <Field label="Sits inside" htmlFor="map-parent" help="Move this map elsewhere in the atlas. Everything under it travels along.">
+            <Field label="Sits inside" htmlFor="map-parent" help="Move this map elsewhere in the atlas. Any maps nested under it move with it.">
               <Select id="map-parent" value={currentMap.parentMapId ?? ""} onChange={(event) => void reparentMap(event.target.value || null)}>
-                <option value="">— top level —</option>
+                <option value="">Top level</option>
                 {maps.filter((map) => map.id !== currentMap.id && !descendantIds.has(map.id)).map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
               </Select>
             </Field>

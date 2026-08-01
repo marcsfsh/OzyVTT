@@ -248,6 +248,6 @@ describe("One party pin for the whole atlas (M12-C)", () => {
     expect(partyControls[0]).toHaveAttribute("role", "switch");
     expect(moveMarker).not.toHaveBeenCalled();
     // And the inspector says out loud how it IS moved.
-    expect(screen.getByText(/Drag it to move the party/)).toBeInTheDocument();
+    expect(screen.getByText("Players see this pin marked as the party. Drag the pin to move the party.")).toBeInTheDocument();
   });
 });

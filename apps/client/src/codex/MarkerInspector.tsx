@@ -165,8 +165,8 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
           aria-label="This pin is the party's position"
           label={marker.isParty ? "The party is here" : "Not the party's position"} />
         <p className="codex-inspector-hint">{marker.isParty
-          ? <>Players see this pin marked as the party. Drag it to move the party — it is an ordinary pin, so its own position is the party's.</>
-          : <>Only one pin in the whole atlas can be the party. Turning this on clears whichever pin held it before, wherever it was.</>}</p>
+          ? <>Players see this pin marked as the party. Drag the pin to move the party.</>
+          : <>Only one pin in the atlas can be the party. Turning this on clears the pin that held it before.</>}</p>
       </div>
 
       <Field label="Linked pages">
@@ -180,24 +180,24 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             </div>
           ))}
           <Combobox options={unlinkedPages.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
-            value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page…" />
+            value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page" />
           {/* D7: opens the ONE quick-create dialog, prefilled with the pin's label, and links the new
               page to this pin on success — it no longer creates an untyped page behind the GM's back. */}
           <Button variant="ghost" size="sm" onClick={onCreatePage}><IconPlus /> New page{marker.label ? ` “${marker.label}”` : ""}</Button>
         </div>
       </Field>
       {shownOnHiddenMap && (
-        <p className="codex-inspector-hint">This pin is shown, but the map <strong>{markerMap!.name}</strong> is still secret, so players cannot see either{onRevealMap ? <> — <button type="button" className="codex-linklike" onClick={onRevealMap}>show the map too</button>.</> : "."}</p>
+        <p className="codex-inspector-hint">This pin is shown to players, but the map <strong>{markerMap!.name}</strong> is hidden from them. Players cannot see either.{onRevealMap ? <> <button type="button" className="codex-linklike" onClick={onRevealMap}>Show the map too</button>.</> : null}</p>
       )}
       {secretLinkedPages.map((page) => (
-        <p key={page.id} className="codex-inspector-hint">This pin is shown, but <strong>{page.title}</strong> is still secret — <button type="button" className="codex-linklike" onClick={() => onRevealPage(page.id)}>show it to players too</button>.</p>
+        <p key={page.id} className="codex-inspector-hint">This pin is shown to players, but <strong>{page.title}</strong> is hidden from them. <button type="button" className="codex-linklike" onClick={() => onRevealPage(page.id)}>Show it to players too</button>.</p>
       ))}
 
       {subMaps.length > 0 && (
         <Field label="Drills into map" htmlFor="marker-submap">
           <div className="codex-marker-submap">
             <Select id="marker-submap" value={marker.subMapId ?? ""} disabled={busy} onChange={(event) => patch({ subMapId: event.target.value || null })}>
-              <option value="">— none —</option>
+              <option value="">None</option>
               {subMaps.map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
             </Select>
             {marker.subMapId && <Button variant="secondary" size="sm" arrow onClick={() => onOpenMap(marker.subMapId!)}>Enter</Button>}
@@ -219,22 +219,22 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             ))}
             {availableScenes.length > 0 && (
               <Select aria-label="Link a scene" value="" disabled={busy} onChange={(event) => event.target.value && patch({ sceneIds: [...marker.sceneIds, event.target.value] })}>
-                <option value="">Link a scene…</option>
+                <option value="">Link a scene</option>
                 {availableScenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
               </Select>
             )}
           </div>
         </Field>
       )}
-      {danglingScenes > 0 && <p className="codex-inspector-hint">{danglingScenes} linked scene{danglingScenes === 1 ? "" : "s"} no longer exist — <button type="button" className="codex-linklike" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}>clear</button>.</p>}
+      {danglingScenes > 0 && <p className="codex-inspector-hint">{danglingScenes} linked scene{danglingScenes === 1 ? "" : "s"} no longer exist. <button type="button" className="codex-linklike" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}>Clear them</button>.</p>}
 
       {actors.length > 0 && (
-        <Field label="Linked actor" htmlFor="marker-actor" help="Who or what holds this place — an NPC, a monster, a creature stationed here.">
+        <Field label="Linked actor" htmlFor="marker-actor" help="Link an actor to this pin.">
           <Select id="marker-actor" value={marker.actorId ?? ""} disabled={busy} onChange={(event) => patch({ actorId: event.target.value || null })}>
-            <option value="">— none —</option>
+            <option value="">None</option>
             {actors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
           </Select>
-          {danglingActor && <p className="codex-inspector-hint">The linked actor no longer exists — <button type="button" className="codex-linklike" onClick={() => patch({ actorId: null })}>clear it</button>.</p>}
+          {danglingActor && <p className="codex-inspector-hint">The linked actor no longer exists. <button type="button" className="codex-linklike" onClick={() => patch({ actorId: null })}>Clear it</button>.</p>}
         </Field>
       )}
 

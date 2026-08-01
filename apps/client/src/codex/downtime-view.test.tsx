@@ -124,7 +124,7 @@ describe("Totals — a person, not a spelling (D12)", () => {
   it("says the log is empty rather than showing a table of nothing", () => {
     renderDowntime();
     expect(screen.getByText("No downtime recorded yet.")).toBeInTheDocument();
-    expect(screen.getByText("Nothing yet. Log the party's first week off above.")).toBeInTheDocument();
+    expect(screen.getByText("No downtime logged yet. Use the form above to log some.")).toBeInTheDocument();
   });
 });
 
@@ -194,7 +194,7 @@ describe("Pending confirmations", () => {
     expect(pending.getAllByRole("listitem")).toHaveLength(1);
     expect(pending.getByText("Vex — Forging · 7 days")).toBeInTheDocument();
     // The button says what confirming DOES — the date the clock lands on — rather than "Confirm".
-    expect(pending.getByRole("button", { name: /Confirm — move your date to Hammer 17, 1491 DR/ })).toBeInTheDocument();
+    expect(pending.getByRole("button", { name: /^Move your date to Hammer 17, 1491 DR/ })).toBeInTheDocument();
   });
 
   it("warns when confirming would step past a deadline the party has not seen fall", () => {
@@ -215,12 +215,12 @@ describe("Pending confirmations", () => {
     const onChanged = vi.fn();
     renderDowntime({ onChanged, records: [downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }) ] });
 
-    await user.click(screen.getByRole("button", { name: /Confirm/ }));
+    await user.click(screen.getByRole("button", { name: /^Move your date to/ }));
     await waitFor(() => expect(applyDowntime).toHaveBeenCalledWith("gm", "d1"));
     expect(onChanged).toHaveBeenCalled();
 
     applyDowntime.mockRejectedValueOnce(new Error("Couldn't move the clock."));
-    await user.click(screen.getByRole("button", { name: /Confirm/ }));
+    await user.click(screen.getByRole("button", { name: /^Move your date to/ }));
     expect(await screen.findByText("Couldn't move the clock.")).toBeInTheDocument();
   });
 });
@@ -240,7 +240,7 @@ describe("Adopting an old row (the Edit path)", () => {
     // from its own history, so the ROW says so instead of offering the field. (The composer above still
     // has its own Days field — this is about the row being edited.)
     expect(history.queryByLabelText("Days")).toBeNull();
-    expect(history.getByText(/Days can't be edited/)).toBeInTheDocument();
+    expect(history.getByText("Days cannot be changed after logging. Delete the entry and log it again to correct it.")).toBeInTheDocument();
 
     await user.click(history.getByRole("combobox", { name: "Link to a character page" }));
     await user.click(await screen.findByRole("option", { name: /Vex/ }));
@@ -272,7 +272,7 @@ describe("The player's Downtime (D12/D14)", () => {
     // `applied` is a GM-payload field with no player equivalent, so this component could not render a
     // pending row even if it tried — and there is no Confirm anywhere on it.
     expect(screen.queryByText("Pending confirmations")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Confirm/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Confirm|Move your date to/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     expect(screen.queryByText("Log downtime")).toBeNull();
     // What they DO get is the same lens: their totals and their history.

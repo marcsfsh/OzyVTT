@@ -110,7 +110,7 @@ describe("Revealing a record dated ahead of the players (owner decision, 2026-07
     await user.click(switchIn("m1"));
 
     // The two dates are the whole point: "ahead" is meaningless without saying ahead of WHAT.
-    expect(await screen.findByText(/story has reached Alturiak 28, 1492 DR/)).toBeInTheDocument();
+    expect(await screen.findByText("Players' date is still Hammer 10, 1492 DR. Showing this record tells them the date has reached Alturiak 28, 1492 DR. Publish the date first if you do not want that.")).toBeInTheDocument();
     expect(screen.getByText(/date is still Hammer 10, 1492 DR/)).toBeInTheDocument();
     // Nothing has been revealed yet. A dialog that paints AFTER the route fires is decoration.
     expect(revealEntry).not.toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
 
     // Still armed: the next ahead-dated reveal is still stopped.
     await user.click(switchIn("m3"));
-    expect(await screen.findByText(/story has reached Alturiak 28, 1492 DR/)).toBeInTheDocument();
+    expect(await screen.findByText(/date has reached Alturiak 28, 1492 DR/)).toBeInTheDocument();
     expect(revealEntry).not.toHaveBeenCalled();
   });
 
@@ -241,7 +241,7 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
 
     // Nothing was suppressed, so the warning is still armed.
     await user.click(switchIn("m1"));
-    expect(await screen.findByText(/story has reached Alturiak 28, 1492 DR/)).toBeInTheDocument();
+    expect(await screen.findByText(/date has reached Alturiak 28, 1492 DR/)).toBeInTheDocument();
   });
 
   /**
@@ -265,7 +265,7 @@ describe("The warning's own switch (owner decision: there must be a way to turn 
     // Re-armed without a reload.
     revealEntry.mockClear();
     await user.click(switchIn("m1"));
-    expect(await screen.findByText(/story has reached Alturiak 28, 1492 DR/)).toBeInTheDocument();
+    expect(await screen.findByText(/date has reached Alturiak 28, 1492 DR/)).toBeInTheDocument();
     expect(revealEntry).not.toHaveBeenCalled();
   });
 });

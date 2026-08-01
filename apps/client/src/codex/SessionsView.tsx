@@ -75,7 +75,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
       <div className={`codex-workspace${selected ? " has-selection" : ""}`}>
         <aside className="codex-rail">
           <div className="codex-rail-head">
-            <Input value={filter} placeholder="Filter sessions…" aria-label="Filter sessions" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
+            <Input value={filter} placeholder="Filter sessions" aria-label="Filter sessions" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
 {/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
                 screen, and the empty state's own create is the primary when there is nothing to select
                 — the rail's create steps down rather than competing with either. Two magenta-filled
@@ -93,7 +93,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
           {listError && <Alert tone="danger">{listError}</Alert>}
           <nav className="codex-list" aria-label="Sessions">
             {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
-            {!loading && sessions.length === 0 && !error && <p className="codex-list-empty">No sessions yet. Create one to prep the next game.</p>}
+            {!loading && sessions.length === 0 && !error && <p className="codex-list-empty">No sessions yet. Create one to prep the next session.</p>}
             {!loading && sessions.length > 0 && shown.length === 0 && <p className="codex-list-empty">No sessions match.</p>}
             {shown.map((session) => (
               /* `aria-current` as well as the class: the accent is the visual cue, but "which session am
@@ -121,7 +121,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
             ? <SessionEditor key={selected.id} gmToken={gmToken} session={selected} isActive={selected.id === activeSessionId}
                 autosave={autosave} pages={pages} onPickTag={onPickTag}
                 onChanged={onChanged} onDeleted={() => { onOpenSession(null); void onChanged(); }} />
-            : !loading && !error && <div className="codex-main-empty"><h3>Prep the next session</h3><p>A session holds your GM-only prep and the recap the table reads afterwards. Make one active and new journal entries and logged battles file themselves under it.</p><Button variant="primary" onClick={create}>New session</Button></div>}
+            : !loading && !error && <div className="codex-main-empty"><h3>No session selected</h3><p>A session holds GM-only prep and a recap for players. While a session is active, new journal entries and logged battles are filed under it.</p><Button variant="primary" onClick={create}>New session</Button></div>}
         </section>
       </div>
     </>
@@ -185,7 +185,7 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
   const activate = async () => {
     setError(null);
     try { await sessionApi.activate(gmToken, session.id); await onChanged(); }
-    catch { setError("Couldn't point the table at this session."); }
+    catch { setError("Couldn't make this session active."); }
   };
   const remove = async () => {
     if (!(await confirm({ title: "Delete session", body: `Delete ${sessionTitle(session).toLowerCase()}? Its prep and recap are lost. Journal entries filed under it are not deleted.`, confirmLabel: "Delete", danger: true }))) return;
@@ -208,11 +208,11 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
       </div>
 
       {error && <Alert tone="danger">{error}</Alert>}
-      {isActive && <p className="codex-inspector-hint">New journal entries and logged battles file themselves under this session automatically.</p>}
+      {isActive && <p className="codex-inspector-hint">New journal entries and logged battles are filed under this session.</p>}
 
       <div className="codex-composer-meta">
         <Field label="Session #" htmlFor="s-number"><Input id="s-number" type="number" inputMode="numeric" value={draft.sessionNumber} onChange={(event) => patch({ sessionNumber: event.target.value })} /></Field>
-        <Field label="Date played" htmlFor="s-date" help="The real-world date — the Calendar is the in-world one."><Input id="s-date" value={draft.realDate} placeholder="2026-07-26" onChange={(event) => patch({ realDate: event.target.value })} /></Field>
+        <Field label="Date played" htmlFor="s-date" help="The real-world date. The Calendar holds in-world dates."><Input id="s-date" value={draft.realDate} placeholder="2026-07-26" onChange={(event) => patch({ realDate: event.target.value })} /></Field>
         <Field label="Status" htmlFor="s-status">
           <Select id="s-status" value={draft.status} onChange={(event) => patch({ status: event.target.value as CodexSessionStatus })}>
             <option value="planned">Planned</option>
@@ -235,7 +235,7 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
       {/* Its own full-width row rather than a cell in `.codex-composer-meta`, whose `flex: 1 1 130px`
           columns would squeeze a wrapping chip cloud into a 130px gutter on a phone. */}
       <Field label="Who played" htmlFor="s-attendees">
-        <TagInput id="s-attendees" ariaLabel="Who played" placeholder="Add a name…" values={draft.attendees}
+        <TagInput id="s-attendees" ariaLabel="Who played" placeholder="Add a name" values={draft.attendees}
           onChange={(attendees: readonly string[]) => patch({ attendees })} max={24} maxReachedReason="A session may list at most 24 people."
           /* The default slugify normalizer is OVERRIDDEN here, and this is the one place in the Codex
              where that is right: these are people's names, not tags. The server takes any trimmed
@@ -250,13 +250,13 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
           this, typing `[[` in a session's prep did nothing at all. GM-layer, so it takes the violet block. */}
       <Field label={<span className="codex-composer-gm-label">Prep for this session <GmOnlyTag /></span>} htmlFor="s-prep">
         <CodexEditor id="s-prep" token={gmToken} value={draft.prepBody} onChange={(prepBody) => patch({ prepBody })}
-          ariaLabel="Prep for this session" placeholder="Beats, encounters, the questions you want answered tonight…"
+          ariaLabel="Prep for this session" placeholder="Prep notes for this session"
           pages={pages} onNavigate={() => undefined} gmLayer rows={8} />
       </Field>
 
-      <Field label="Recap" help="Shown to players once you show this session to them." htmlFor="s-recap">
+      <Field label="Recap" help="Players see this once the session is shown to them." htmlFor="s-recap">
         <CodexEditor id="s-recap" token={gmToken} value={draft.recapBody} onChange={(recapBody) => patch({ recapBody })}
-          ariaLabel="Recap" placeholder="What the table did, in the party's own words…"
+          ariaLabel="Recap" placeholder="Recap of this session"
           pages={pages} onNavigate={() => undefined} rows={8} />
       </Field>
 

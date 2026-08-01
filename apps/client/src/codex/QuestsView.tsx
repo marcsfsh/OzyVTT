@@ -79,7 +79,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
       <div className={`codex-workspace${selected ? " has-selection" : ""}`}>
         <aside className="codex-rail">
           <div className="codex-rail-head">
-            <Input value={filter} placeholder="Filter quests…" aria-label="Filter quests" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
+            <Input value={filter} placeholder="Filter quests" aria-label="Filter quests" onChange={(event) => onFilterChange?.({ q: event.target.value || null })} />
 {/* D25, one primary per view. With autosave OFF the editor's Save is the primary act on this
                 screen, and the empty state's own create is the primary when there is nothing to select
                 — the rail's create steps down rather than competing with either. Two magenta-filled
@@ -98,7 +98,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
           {listError && <Alert tone="danger">{listError}</Alert>}
           <nav className="codex-list" aria-label="Quests">
             {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
-            {!loading && quests.length === 0 && !error && <p className="codex-list-empty">No quests yet. Create one to track what the party is chasing.</p>}
+            {!loading && quests.length === 0 && !error && <p className="codex-list-empty">No quests yet. Create one to start tracking objectives.</p>}
             {!loading && quests.length > 0 && shown.length === 0 && <p className="codex-list-empty">No quests match.</p>}
             {shown.map((quest) => (
               /* `aria-current` as well as the class: the accent is the visual cue, but "which quest am I
@@ -122,7 +122,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
           {selected
             ? <QuestEditor key={selected.id} gmToken={gmToken} quest={selected} pages={pages} autosave={autosave} onPickTag={onPickTag}
                 onChanged={onChanged} onOpenPage={onOpenPage} onDeleted={() => { onOpenQuest(null); void onChanged(); }} />
-            : !loading && !error && <div className="codex-main-empty"><h3>Track what the party is chasing</h3><p>A quest holds the objectives the table is working through, what they were told, and — GM-only — where it is really going. Show it to players and the open ones appear on their dashboard.</p><Button variant="primary" onClick={create}>New quest</Button></div>}
+            : !loading && !error && <div className="codex-main-empty"><h3>No quest selected</h3><p>A quest holds objectives, the text players read, and GM-only notes. Once a quest is shown to players, its active state appears on their dashboard.</p><Button variant="primary" onClick={create}>New quest</Button></div>}
         </section>
       </div>
     </>
@@ -228,7 +228,7 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
           <h4 className="codex-quest-subhead">Objectives</h4>
           {progress.total > 0 && <span className="codex-quest-progress">{progress.label}</span>}
         </div>
-        <p className="codex-inspector-hint">Objectives are player-facing — they are what the party is working through, so they ride with the quest the moment it is shown.</p>
+        <p className="codex-inspector-hint">Objectives are shown to players whenever the quest is.</p>
         <Checklist items={draft.objectives} ariaLabel="Objectives" max={24}
           onChange={(objectives: readonly CodexQuestObjective[]) => patch({ objectives })}
           /* The CALLER appends, because the caller owns what a blank item means here: a fresh row the GM
@@ -250,21 +250,21 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
 
       {/* D13: the SAME writing surface a page body gets, so a quest body renders as markdown for the
           party instead of as the deliberate plain text it used to be. */}
-      <Field label="What the party was told" help="Shown to players once you show this quest to them." htmlFor="q-player">
+      <Field label="What the party was told" help="Players see this once the quest is shown to them." htmlFor="q-player">
         <CodexEditor id="q-player" token={gmToken} value={draft.playerBody} onChange={(playerBody) => patch({ playerBody })}
-          ariaLabel="What the party was told" placeholder="The hook as the table heard it…"
+          ariaLabel="What the party was told" placeholder="What players have been told about this quest"
           pages={pages} onNavigate={() => undefined} rows={7} />
       </Field>
 
       {/* R5: GM-only content is ALWAYS the violet block plus the "GM only" pill — the same pair the
           journal composer, the page editor and the session log use, never a new marking of its own. */}
-      <Field label={<span className="codex-composer-gm-label">Where this is really going <GmOnlyTag /></span>} htmlFor="q-gm">
+      <Field label={<span className="codex-composer-gm-label">GM notes <GmOnlyTag /></span>} htmlFor="q-gm">
         <CodexEditor id="q-gm" token={gmToken} value={draft.gmBody} onChange={(gmBody) => patch({ gmBody })}
-          ariaLabel="Where this is really going" placeholder="The truth behind the hook, who is really behind it, how it ends…"
+          ariaLabel="GM notes" placeholder="Details players cannot see"
           pages={pages} onNavigate={() => undefined} gmLayer rows={7} />
       </Field>
 
-      <Field label="Pages this quest concerns" help="Players only ever see the ones you have already shown them.">
+      <Field label="Pages this quest concerns" help="Players see only the pages already shown to them.">
         <div className="codex-quest-links">
           {linked.map((page) => (
             <div key={page.id} className="codex-quest-link">
@@ -276,7 +276,7 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
           ))}
           <Combobox options={unlinked.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
             value={null} onChange={(id) => id && patch({ entityIds: [...draft.entityIds, id] })}
-            ariaLabel="Link a page" placeholder="Link a page…" />
+            ariaLabel="Link a page" placeholder="Link a page" />
         </div>
       </Field>
 

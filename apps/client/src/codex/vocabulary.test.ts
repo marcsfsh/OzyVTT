@@ -72,11 +72,9 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
 const ALLOWED = new Set<string>([
   // "Reveal audit" is a proper noun — the name of a section in the sidebar and its own heading.
   "Reveal audit",
-  // §3.4 wording the director approved: "secret" as an adjective in prose about the GM layer reads more
-  // naturally than "hidden from players" mid-sentence. These are the two pin-inspector hints, and they
-  // are the only two places it survives.
-  "is still secret —",
-  "is still secret, so players cannot see either",
+  // The two pin-inspector hints used to say "is still secret" under a §3.4 exemption. The copy sweep
+  // rewrote both onto the glossary term ("is hidden from them"), so the exemption rescued nothing and
+  // was deleted rather than left as a comment pretending to be a rule.
   // A faction's in-fiction agenda. This is content vocabulary, not visibility vocabulary — the field
   // holds what the faction is secretly up to, and no reader could mistake it for a reveal state.
   "Secret agenda"
@@ -115,7 +113,7 @@ function userFacingStrings(file: string): readonly Found[] {
     }
     // A JSX text node runs from the `>` that closed a tag up to the next `<` or `{`. The old form
     // required a literal `<` to close it, so any sentence interrupted by an interpolation vanished
-    // whole — including MarkerInspector's "is still secret, so players cannot see either{onRevealMap …".
+    // whole — including MarkerInspector's "is hidden from them. Players cannot see either.{onRevealMap …".
     // `(?<!=)` is what keeps that widening honest: without it every arrow function's `=>` opens a
     // "text node" and the body of the Codex's own code is scanned as copy.
     for (const match of line.matchAll(/(?<!=)>([^<>{}\n]*[A-Za-z][^<>{}\n]*)(?=[<{])/g)) {
