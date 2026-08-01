@@ -121,7 +121,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const availableScenes = scenes.filter((scene) => !marker.sceneIds.includes(scene.id));
   const danglingScenes = marker.sceneIds.filter((id) => !scenes.some((scene) => scene.id === id)).length;
   const secretLinkedPages = linkedPages.filter((page) => marker.revealedToPlayers && !page.revealedToPlayers);
-  // A linked actor that has since been removed from the roster would otherwise render as "— none —"
+  // A linked actor that has since been removed from the roster would otherwise render as "None"
   // while the id quietly persists on the marker — same honesty the scene links already get.
   const danglingActor = marker.actorId !== null && !actors.some((actor) => actor.id === marker.actorId);
 

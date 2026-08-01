@@ -401,9 +401,68 @@ off screens that hold dense text.
 
 Speak plainly, second person, about actions the player controls. Actions name
 their result ("Roll initiative", "End turn", "Apply damage") and keep their name
-through the flow ("Save encounter" → "Encounter saved"). Empty states invite
-action; errors say what happened and how to fix it. Sentence case throughout;
-all-caps only for small eyebrow labels.
+through the flow ("Save encounter" → "Encounter saved"). Errors say what happened
+and how to fix it. Sentence case throughout; all-caps only for small eyebrow
+labels.
+
+### The rule
+
+**Say what the control does, or what belongs in the field. Nothing else.**
+
+Copy describes the software, not the fiction. The Codex is a worldbuilding tool,
+which makes it the surface most likely to start narrating; it may not. A GM
+reading a hint wants to know what a control affects, what is required, what
+players can see, and what cannot be changed later.
+
+1. **No scene-setting or roleplay voice.** Not "the table", "the party's own
+   words", "the hook", "tonight", "the truth behind…". Empty states name the
+   record they lack, not a mood.
+2. **No em-dashes in anything a user reads.** Not as an aside, not as a
+   connector, not in place of a colon. One clause, or two short sentences. An
+   aside that carries a real constraint earns its own sentence. This covers
+   assembled labels and "no value" glyphs too: the Codex uses `·` between label
+   fragments and the word "None" for an absent value. (Em-dashes in code
+   comments are fine — the rule is about what reaches the screen.)
+3. **No ellipsis placeholders.** A placeholder is a plain noun phrase naming the
+   content, or a concrete example value. `…` survives only where it carries
+   information: "New page…" means the action opens a dialog, "Saving…" means
+   work in progress.
+4. **No rhetorical framing, no invitations, no cleverness.** No questions except
+   in a confirm dialog, which has to ask. No exclamation marks.
+5. **A hint carries information or it is deleted.** If removing the banned
+   constructions leaves a sentence that only restates the field name, delete the
+   hint. Padding it back to look deliberate is worse than the silence.
+6. **No LLM register.** No "simply", "just", "easily", "powerful", "seamlessly",
+   "leverage", "note that", "keep in mind", "lets you", "allows you to". No
+   throat-clearing before the sentence that matters, and no summary sentence
+   restating what was just said.
+
+### Calibration
+
+| Instead of | Write |
+| --- | --- |
+| "The hook as the table heard it…" | "What players have been told about this quest" |
+| "The truth behind the hook, who is really behind it, how it ends…" | "Details players cannot see" |
+| "Beats, encounters, the questions you want answered tonight…" | "Prep notes for this session" |
+| "Search what you know…" | "Search pages" |
+| "Its kind brings the fields it needs. You can change it later." | "The kind determines which fields appear. You can change it later." |
+| "Move this map elsewhere in the atlas. Everything under it travels along." | "Move this map elsewhere in the atlas. Any maps nested under it move with it." |
+| "Days can't be edited — they're what the clock already moved by. A typo is a delete and re-log." | "Days cannot be changed after logging. Delete the entry and log it again to correct it." |
+| "Longer pauses mean fewer saved versions, and more work at risk if the tab closes." | "Longer intervals save fewer versions and risk losing more unsaved work." |
+| "Nothing bearing down on the party." | "No deadlines yet." |
+| "Couldn't load the Codex — check your connection to the table." | "Couldn't load the Codex. Check your connection and try again." |
+
+Already correct, and left alone: "Shown after the year, e.g. DR or AE" ·
+"Use / to nest, e.g. NPCs/Villains".
+
+**Plainer never means vaguer.** Destructive and disclosure copy keeps every
+number and consequence it had: the restore confirm states its record counts, the
+reveal-ahead warning names both dates, the kind-change confirm names each field
+at risk and softens its recovery promise when version history is off. Cut the
+flourish, keep the fact.
+
+The glossary in `apps/client/src/codex/vocabulary.test.ts` fails the build on
+retired words. Reaching for a plainer phrase is exactly when one slips back in.
 
 ---
 

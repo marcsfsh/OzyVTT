@@ -138,7 +138,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
       setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setConnections(nextConnections);
       setCalendar(nextCalendar); setSessions(nextSessions); setQuests(nextQuests); setStanding(nextStanding); setParty(nextParty);
       setError(null);
-    } catch { setError("Couldn't load the Codex — check your connection to the table."); }
+    } catch { setError("Couldn't load the Codex. Check your connection and try again."); }
     finally { setLoading(false); }
   }, [token]);
 
@@ -327,7 +327,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
             <div className={`codex-workspace${recordId ? " has-selection" : ""}`}>
               <aside className="codex-rail">
                 <div className="codex-rail-head">
-                  <Input value={search} placeholder="Search what you know…" aria-label="Search the Codex"
+                  <Input value={search} placeholder="Search pages" aria-label="Search the Codex"
                     onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setFilter({ type: null, tag: null }); }} />
                 </div>
                 {/* D10, the same two controls the GM's Pages rail carries, in the same order and words. */}
@@ -342,12 +342,12 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                 {!search.trim() && playerPageTags.length > 0 && (
                   <div className="codex-rail-tagfilter">
                     <Combobox options={playerPageTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={query.get("tag")}
-                      onChange={(tag) => setFilter({ tag })} ariaLabel="Filter by tag" placeholder="Filter by tag…" />
+                      onChange={(tag) => setFilter({ tag })} ariaLabel="Filter by tag" placeholder="Filter by tag" />
                   </div>
                 )}
                 <nav className="codex-list" aria-label="Pages">
                   {search.trim()
-                    ? <SearchResultList state={searchState} selectedId={recordId} onOpen={(hit) => go(pathForHit(hit))} emptyLabel="Nothing you know matches that." />
+                    ? <SearchResultList state={searchState} selectedId={recordId} onOpen={(hit) => go(pathForHit(hit))} emptyLabel="No pages match." />
                     : <>
                         <div className="codex-filter-chips">
                           {typeFilter && <Chip onRemove={() => setFilter({ type: null })} removeLabel="Clear kind filter">{entityDef(typeFilter).label}s</Chip>}
@@ -355,7 +355,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                         </div>
                         {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
                         {!loading && pages.length === 0 && <p className="codex-list-empty">Nothing shared yet.</p>}
-                        {!loading && pages.length > 0 && shownPages.length === 0 && <p className="codex-list-empty">Nothing you know matches these filters.</p>}
+                        {!loading && pages.length > 0 && shownPages.length === 0 && <p className="codex-list-empty">No pages match these filters.</p>}
                         {shownPages.map((summary) => (
                           <button key={summary.id} type="button" className={`codex-list-item${summary.id === recordId ? " is-active" : ""}`} onClick={() => go(pagePath(summary.id))}>
                             {summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}
@@ -393,7 +393,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                         )} />
                       </div>
                     </article>
-                  : <div className="codex-main-empty"><h3>Select a page</h3><p>Choose a page from the list to read it.</p></div>}
+                  : <div className="codex-main-empty"><h3>No page selected</h3><p>Choose a page from the list to read it.</p></div>}
               </section>
             </div>
           )}
@@ -428,11 +428,11 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                   picture of the world, not a filtered list of one. */}
               {currentMap && markers.length > 0 && (
                 <div className="codex-atlas-filter">
-                  <Input aria-label="Filter pins" placeholder="Filter pins…" value={textFilter}
+                  <Input aria-label="Filter pins" placeholder="Filter pins" value={textFilter}
                     onChange={(event) => setFilter({ q: event.target.value || null })} />
                   {pinTags.length > 0 && (
                     <Combobox options={pinTags.map((tag) => ({ id: tag, label: `#${tag}` }))} value={query.get("tag")}
-                      onChange={(tag) => setFilter({ tag })} ariaLabel="Filter pins by tag" placeholder="Filter by tag…" />
+                      onChange={(tag) => setFilter({ tag })} ariaLabel="Filter pins by tag" placeholder="Filter by tag" />
                   )}
                   {dimmedPinIds && <span className="codex-atlas-filtercount" role="status">{markers.length - dimmedPinIds.size} of {markers.length} pins match</span>}
                 </div>
@@ -462,7 +462,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
               nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))}
               connections={connections} onOpen={(pageId) => go(pagePath(pageId))}
               focusPageId={query.get("focus")} onFocused={() => setQuery((params) => params.delete("focus"))}
-              emptyState={<><h3>Nothing connected yet</h3><p>As your GM shares people and places, the links between them appear here.</p></>} />
+              emptyState={<><h3>Nothing connected yet</h3><p>Connections between pages appear here once your GM shows those pages to players.</p></>} />
           )}
 
           {section === "sessions" && (
@@ -542,7 +542,7 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
     <div className={`codex-workspace${open ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
-          <Input value={filter} placeholder="Filter sessions…" aria-label="Filter sessions" onChange={(event) => onFilterChange({ q: event.target.value || null })} />
+          <Input value={filter} placeholder="Filter sessions" aria-label="Filter sessions" onChange={(event) => onFilterChange({ q: event.target.value || null })} />
         </div>
         <nav className="codex-list" aria-label="Sessions">
           {loading && sessions.length === 0 && <div className="codex-list-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</div>}
@@ -566,7 +566,7 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
               {open.tags.length > 0 && <div className="codex-entry-meta">{open.tags.map((tag) => <TagChip key={tag} tag={tag} onPick={onPickTag} />)}</div>}
               <div className="codex-reader-body">{open.recap.trim() ? <CodexMarkdown text={open.recap} onNavigate={onNavigate} token={token} knownTitles={knownTitles} /> : <p className="codex-preview-empty">No recap written yet.</p>}</div>
             </article>
-          : <div className="codex-main-empty"><h3>Pick a session</h3><p>Everything your GM has written up about a game night is here.</p></div>}
+          : <div className="codex-main-empty"><h3>No session selected</h3><p>Session recaps your GM has shown to players appear here.</p></div>}
       </section>
     </div>
   );
@@ -593,7 +593,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
     <div className={`codex-workspace${open ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
-          <Input value={filter} placeholder="Filter quests…" aria-label="Filter quests" onChange={(event) => onFilterChange({ q: event.target.value || null })} />
+          <Input value={filter} placeholder="Filter quests" aria-label="Filter quests" onChange={(event) => onFilterChange({ q: event.target.value || null })} />
         </div>
         <div className="codex-rail-tools">
           <Select aria-label="Filter by status" value={statusFilter ?? ""} onChange={(event) => onFilterChange({ status: event.target.value || null })}>
@@ -647,7 +647,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
                 </div>
               )}
             </article>
-          : <div className="codex-main-empty"><h3>Pick a quest</h3><p>Everything your GM has shared with the party is here — what you are still chasing, and what you have already finished.</p></div>}
+          : <div className="codex-main-empty"><h3>No quest selected</h3><p>Quests your GM has shown to the party appear here, open and finished alike.</p></div>}
       </section>
     </div>
   );
@@ -720,7 +720,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
             <option value="">All kinds</option>
             {CHRONICLE_FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{CHRONICLE_KIND_META[kind].label}</option>)}
           </Select>
-          <Input aria-label="Filter the journal" placeholder="Filter the journal…" value={textFilter}
+          <Input aria-label="Filter the journal" placeholder="Filter the journal" value={textFilter}
             onChange={(event) => onFilterChange({ q: event.target.value || null })} />
           {allTags.length > 0 && (
             <Select aria-label="Filter by tag" value={tagFilter ?? ""} onChange={(event) => onFilterChange({ tag: event.target.value || null })}>
@@ -736,7 +736,7 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
         {groups.map((group) => (
           <section key={group.key} className="codex-timeline-group">
             <div className="codex-timeline-year">{group.label}</div>
-            {todayYear !== null && group.key === String(todayYear) && <div className="codex-timeline-now">Today — {todayLabel}</div>}
+            {todayYear !== null && group.key === String(todayYear) && <div className="codex-timeline-now">Today: {todayLabel}</div>}
             {group.records.map((record) => {
               const meta = CHRONICLE_KIND_META[record.kind];
               const fired = deadlineFired(record);

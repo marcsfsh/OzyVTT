@@ -372,7 +372,7 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     await searchAsPlayer(user, "barovia");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't reach the table.");
-    expect(screen.queryByText("Nothing you know matches that.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No pages match.")).not.toBeInTheDocument();
   });
 });
 
