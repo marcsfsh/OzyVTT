@@ -8,6 +8,33 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **The Codex copy sweep (2026-08-01, branch `claude/ozyvtt-codex-ux-4pl7ib`).** Every piece of
+  user-facing explanatory prose in `apps/client/src/codex/**` rewritten to one standard, with zero
+  functional change. The client's verdict on the old voice was that it read as cheap and corny.
+  - **The rule, now written down in `docs/ai-context/design-language.md` §9:** say what the control
+    does or what belongs in the field, and nothing else. No scene-setting, no em-dashes on screen, no
+    ellipsis placeholders, no rhetorical framing, no LLM register; a hint carries information or it is
+    deleted. Ten before/after pairs are recorded there as calibration.
+  - **Scope:** 24 source files, ~150 strings. Field help, placeholders, empty states, confirm bodies,
+    errors, toasts and descriptive `title`/`aria-label` text, on the GM side and the player side alike.
+    `PlayerCodex.tsx` held the string the client named worst ("Search what you know…", a search box)
+    and the last seven ellipsis placeholders in the Codex.
+  - **Plainer never meant vaguer.** The restore confirm still states every section count including
+    zeros, the reveal-ahead warning still names both dates, the kind-change confirm still names each
+    field at risk and still softens its recovery promise when version history is off, and the downtime
+    confirm still states the deadline count it will pass.
+  - **One no-value convention.** The Codex says "None" for an absent value, in both downtime tables
+    and all three "no selection" selects. Assembled row labels separate fragments with `·`, not an
+    em-dash ("Reached level 5 · Cleared the citadel"). The one deliberate exception is the party pin's
+    SVG `<title>`, which uses a comma because a screen reader speaks it.
+  - **No assertion was weakened.** Roughly 30 test assertions moved with the copy, several tightened
+    from a loose regex to full-sentence equality. Two dead `ALLOWED` exemptions in `vocabulary.test.ts`
+    were deleted rather than re-pointed, making the retired-word rules strictly stricter. One negative
+    assertion in `suite-search.test.tsx` was repaired after the rename would have left it passing
+    vacuously. A pre-existing stale button name in `scripts/prep-clock-ux-check.mjs` was corrected.
+  - **Verified:** `npm run check` 0 · `npm run test` 1861 passed / 1 skipped / 0 failed · `npm run
+    build` 0 · `node scripts/browser-verify.mjs` 67/67, all matching the pre-sweep baseline.
+
 - **The Codex overhaul's final polish (2026-08-01, branch `claude/ozyvtt-codex-ux-4pl7ib`).** The last
   pass before presentation: close the gap between "the client approved X" and "X is true", fix one bug
   the client found in the running app, and make every recorded number match what the tooling prints.
