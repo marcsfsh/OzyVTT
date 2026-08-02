@@ -3,7 +3,7 @@
 > **Status:** ✅ IMPLEMENTED 2026-07-22 — 7 verified slices on `claude/scene-prep-gm-notes-c1gcur`.
 > **Ships as:** one PR. **Owner-approved decisions are in §4.** This doc is the design record; the
 > shipped code refines a couple of details (reorder is drag **plus** a keyboard menu path). See
-> `docs/ai-ledger/session-summary.md` (2026-07-22) for the per-slice log.
+> `docs/archive/ai-ledger/session-history.md` (2026-07-22) for the per-slice log.
 >
 > **Post-PR review refinements (2026-07-23).** After the first look the Encounter-tab scene
 > quick-switcher changed from an always-on strip (which overflowed once a table had many scenes)
@@ -13,6 +13,14 @@
 > correctness fixes rode along: the **live card counts combatants from the top-level combat** (the
 > active scene's own slot is empty by invariant), and **Go live from the hub lands on the Encounter
 > tab** (live-play). See §5.1.
+>
+> **`SceneSwitcher` is gone (noted 2026-08-01).** `scenes/SceneSwitcher.tsx` and
+> `scenes/scene-switcher.css` were **deleted** in the same PR this document plans (`c9f3132`, #44),
+> because the refinement above replaced the always-on strip with the picker popup. Section 3
+> describes the system *as it was before* that PR, so every `SceneSwitcher` reference there is
+> historical. The live scene surfaces are `scenes/SceneGallery.tsx`, `scenes/ScenePanel.tsx`,
+> `scenes/SceneBuilder.tsx`, `scenes/scenePreview.ts`, `scenes/scene-gallery.css` and
+> `scenes/scene-panel.css`.
 >
 > **How to use this doc.** This is the single source of truth for the scene-centric
 > information-architecture (IA) redesign. It is written to be self-contained: a fresh
@@ -79,7 +87,8 @@ upload → browse → prepare → start experience rethought against how other V
 scenes" browser modal noted in `docs/ai-ledger/current-state.md`. The OzyVTT visual overhaul
 (2026-07-21) deliberately kept the current layout IA — this doc is that deferred flow rethink.
 `NEXT-STEPS.md`'s "PR E" describes the *pre-implementation* plan and is largely superseded by what
-shipped (the `scenes` data model, `scene:*` commands, and `SceneSwitcher` all exist).
+shipped (the `scenes` data model and the `scene:*` commands exist; the `SceneSwitcher` strip it
+named was built and then retired in the same PR — see the banner).
 
 ---
 
@@ -189,7 +198,7 @@ The core UX problem: scene lifecycle is spread across four places that the redes
 | Surface | File | Owns |
 |---|---|---|
 | Prep modal | `scenes/ScenePanel.tsx` | **create only** (name + map picker + combatant checkboxes → `scene:create`) |
-| Switch strip | `scenes/SceneSwitcher.tsx` | chips; tap-to-stage, ▶ go-live (`scene:activate`), ✕ remove (`scene:remove`), "+ New scene" |
+| Switch strip | `scenes/SceneSwitcher.tsx` — **deleted in `c9f3132`**; replaced by the picker popup | chips; tap-to-stage, ▶ go-live (`scene:activate`), ✕ remove (`scene:remove`), "+ New scene" |
 | Staging sidebar | `scenes/SceneBuilder.tsx` | edit *that scene's* combatants (`scene:set-combatants`), rename (`scene:rename`), add SRD monsters (`MonsterBrowser`) |
 | On-map buttons | `scene/EncounterMap.tsx` | staging props `moveSceneId` / `staging={onBackToLive,onMakeLive}` / `onScenePrep` (◀ Live / Make live ⬆ / 🎬 Scenes) |
 | Preview store | `scenes/scenePreview.ts` | `usePreviewScene` / `setPreviewScene` — **client-only**, never hits the server |
@@ -334,7 +343,8 @@ projection unchanged; the bridge only chooses *which map* is presented, never *w
 - **New:** `scenes/SceneGallery.tsx` (the hub) + a `SceneCard`, a scene **build panel** (evolves
   `ScenePanel` beyond create-only), and reorder logic.
 - **Evolve:** `SceneSwitcher` → slim Encounter-tab quick-switcher; `SceneBuilder` staging sidebar
-  reused; `scenePreview.ts` unchanged.
+  reused; `scenePreview.ts` unchanged. *(Outcome: the quick-switcher became the "Scenes" button +
+  gallery popup instead, and `SceneSwitcher` was deleted rather than evolved.)*
 - **Fold in:** `MapManager` rendered inside the Scenes hub / build flow rather than a top-level tab.
 - **`main.tsx`:** re-cut `GM_TABS`, the tab-gated blocks, and the `mapLibrary` / `selectedMap`
   orchestration; consolidate the double map-library fetch to one owner.
@@ -357,8 +367,9 @@ projection unchanged; the bridge only chooses *which map* is presented, never *w
 
 ### 7.3 CSS + mobile parity (`docs/ai-context/mobile-ux.md`)
 
-- New `scenes/scene-gallery.css`; rework `scenes/scene-switcher.css`, `scenes/scene-panel.css`,
-  `styles.css` (`.gm-tabs`, `.table-layout`); reuse `maps/map-manager.css`.
+- New `scenes/scene-gallery.css`; rework `scenes/scene-panel.css`, `styles.css` (`.gm-tabs`,
+  `.table-layout`); reuse `maps/map-manager.css`. *(`scenes/scene-switcher.css` was on this list;
+  it was deleted with its component rather than reworked.)*
 - Honor breakpoints: `styles.css` at 980/760/560; `scene-panel.css` at 560; `map-manager.css` at
   850/560. Gallery collapses toward `1fr` at narrow widths.
 - **Drag-to-reorder must use Pointer Events and set `touch-action: none`** on the draggable surface
@@ -447,7 +458,7 @@ From `docs/ai-context/{viewer-mode,auth-roles,realtime,map-grid,mobile-ux}.md`:
 - `docs/ai-ledger/current-state.md` — describe the new scene-centric IA.
 - `docs/ai-ledger/known-bugs.md` — close the "Maps/scenes/encounter IA redesign" item.
 - `docs/ai-ledger/decision-log.md` — record the scene↔TV bridge decision and the Map-Setup-tab retirement.
-- `docs/ai-ledger/session-summary.md` — session entry.
+- `docs/archive/ai-ledger/session-history.md` — session entry.
 - `docs/api-reference.md` — regenerated from the contract.
 - `NEXT-STEPS.md` — retire/refresh the stale "PR E" section.
 
@@ -463,10 +474,13 @@ combat rules engine, dice, or the calibration math.
 
 ## 14. Consolidated file index (reference)
 
-**Client — scenes & IA:** `apps/client/src/main.tsx` · `scenes/SceneSwitcher.tsx` ·
+**Client — scenes & IA:** `apps/client/src/main.tsx` · `scenes/SceneGallery.tsx` ·
 `scenes/ScenePanel.tsx` · `scenes/SceneBuilder.tsx` · `scenes/scenePreview.ts` ·
-`scenes/scene-switcher.css` · `scenes/scene-panel.css` · `scene/EncounterMap.tsx` ·
+`scenes/scene-gallery.css` · `scenes/scene-panel.css` · `scene/EncounterMap.tsx` ·
 `scene/encounter-map.css` · `styles.css` · `encounter/EncounterPanel.tsx` · `encounter/MonsterBrowser.tsx`.
+*(This index was written as a plan. `scenes/SceneSwitcher.tsx` and `scenes/scene-switcher.css`
+stood here until 2026-08-01; both were deleted in `c9f3132` and are replaced above by the gallery
+files that shipped instead.)*
 
 **Client — maps:** `maps/MapManager.tsx` · `maps/map-manager.css` · `scene/mapImage.tsx`.
 
@@ -495,4 +509,4 @@ combat rules engine, dice, or the calibration math.
 `viewer-presentation*.test.ts` · `map-*.test.ts` · `grid-*.test.ts`.
 
 **Context docs:** `docs/ai-context/{architecture,viewer-mode,auth-roles,realtime,map-grid,mobile-ux,design-language,ux-principles}.md`
-· `docs/ai-ledger/{current-state,known-bugs,decision-log,session-summary}.md`.
+· `docs/ai-ledger/{current-state,known-bugs,decision-log}.md` · `docs/archive/ai-ledger/session-history.md`.

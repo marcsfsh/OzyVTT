@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Point-in-time license and usefulness evaluation of ten candidate reference repositories (2026-07).
+> **Current through:** 2026-07-17  (last commit that kept it true: `02d67cc`)
+> **Superseded by:** nothing; the evaluation finished and nothing was ingested wholesale.
+> **Read this for:** the licence verdict on each candidate, and why several are learn-from-only.
+> **Do not read this for:** current dependencies or current licence posture — this is a survey of other people's repos as they stood in July 2026.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Reference repo evaluation (2026-07)
 
 Owner asked for the 10 candidate repos to be (re-)evaluated for ideas/patterns even where

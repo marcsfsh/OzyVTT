@@ -18,6 +18,9 @@ annotations/measurements, or the encounter canvas.
 - `apps/server/src/grid-calibration-wizard.ts` — measure→refine→verify→complete state machine.
 - `apps/server/src/token-placement.ts` — server token sizing + `snappedPosition`.
 - `apps/server/src/annotations.ts`, `map-measurement.ts`, `grid-overlay.ts`, `map-http.ts`.
+- `apps/client/src/codex/MapSurface.tsx` — the Codex atlas pan/zoom surface. Not an encounter
+  canvas, but it uses the same image-pixel-space convention via `imagePointFromClient`, so the
+  rules below apply to it too.
 - `packages/domain/src/index.ts` — `EncounterToken`, `Annotation`, `CombatState`, contracts.
 
 ## Core model
@@ -30,10 +33,21 @@ rotation to 0**. **Gridless / regional / world** use `deriveMapDistanceScale`: t
 a known distance → `distancePerPixel`. Calibration =
 `{origin, cellSizePx, rotationRadians, distancePerCell}`.
 
-Tokens are server-sized to the grid (`sizePx = min(shortestSide, cellSizePx*0.82)`).
-`token:move` sends a raw image point; the server bounds it and snaps to the nearest fitting
-cell-center (gridless just clamps). The client renders a live snapped **preview** that
-mirrors — but never replaces — the server result.
+**The server sizes tokens to the grid.** The factors are per creature size and differ for
+multi-cell footprints; `token-placement.ts` is the source of truth and the client never
+computes a persisted size.
+
+**The server snaps.** `token:move` sends a raw image point; the server bounds it, then odd
+footprints land on a cell centre, even footprints on a grid intersection, and gridless maps
+clamp without snapping. The client renders a preview that mirrors the server and never
+replaces it.
+
+**Fog** (`apps/server/src/fog.ts`, ADR-0022) is an ordered list of GM-painted reveal/hide
+rects over the scene, rendered by `FogOverlay` in `mapImage.tsx`. It is **presentation only,
+never a security boundary** — the projection rule lives in `viewer-mode.md`.
+
+**Scenes** (`apps/server/src/scenes.ts`) park and resume an encounter: maps are prepared
+privately and the live scene switches non-destructively.
 
 ## Invariants / constraints
 
@@ -45,7 +59,9 @@ mirrors — but never replaces — the server result.
   `preserveAspectRatio` / camera). Rotation only through `imageToGrid` / `gridToImage`.
 - **Area calibration rotation stays 0** — never infer rotation from drag imprecision.
 - **Viewer safety:** the shared screen gets only `public` actors and `public`, non-expired
-  annotations; content is served `private, no-store`; `gm-only` / `gm-actor` never leak.
+  annotations, plus the scene's fog geometry; content is served `private, no-store`;
+  `gm-only` / `gm-actor` never leak. The rule that governs what may be added is in
+  `viewer-mode.md` — read it there rather than reasoning from this line.
 - Annotations require calibration (gridless throws on `requireCalibration`); respect domain
   bounds (position ≤1e6, size ≤4096, rotation ∈[-π,π], ≤300 annotations).
 
@@ -65,5 +81,7 @@ mirrors — but never replaces — the server result.
 
 No dedicated maps/grid ADR. Governing: `0014` (device/touch/pinch), `0005` (`token:move` /
 `annotation:*` commands, `expectedRevision`), `0004` (React/Vite/SVG), `0001` (server
-authority over snapping), `0011` (claim-gated token moves). See
-`docs/product/phase-0-renderer-spike.md`.
+authority over snapping), `0011` (claim-gated token moves), `0022` (manual fog of war), and
+`0009`'s closing record (square grid, five-foot cells). The renderer question is closed by
+`docs/adr/0003-renderer-choice.md`; `docs/product/phase-0-renderer-spike.md` is the abandoned
+spike it records.

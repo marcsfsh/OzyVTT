@@ -1775,12 +1775,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
    *
    * **NOTHING IS BROADCAST from either of these routes, or from the revision delete below** - the one place in
    * this file that departs from "every write calls `notifyChanged`", so it is worth saying why rather than
-   * looking like an omission. `notifyCodexChanged` emits `codex:changed` with a `scope` to EVERY socket,
-   * players included, and the scope union names content kinds (`pages`, `maps`, `markers`, `journal`,
-   * `sessions`, `quests`). None of them is true here: no page, marker or entry changed, so pinging `"pages"`
-   * would make every client refetch a list that did not move, on the strength of a false statement. Adding a
-   * seventh scope would broadcast a GM-only tooling fact to every player socket for no reader's benefit -
-   * there is exactly one GM, and they get the new state in this response.
+   * looking like an omission. `notifyChanged` is a content-free ping (D22) - it carries a revision and
+   * nothing else, so it cannot say "settings changed" even if that were worth saying. Firing it here would
+   * make every client, players included, refetch a list that did not move. Nothing a player can read
+   * changed: these settings describe how the GM's own authoring history is kept. There is exactly one GM,
+   * and they get the new state in this response.
    *
    * The store still bumps the coarse codex revision inside each write's transaction (every write does), so an
    * ETag-driven reader is not left holding a stale token; there is simply no content to push.

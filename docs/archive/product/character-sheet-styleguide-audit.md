@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Completed design-system compliance audit of the character sheet, plus the remediation record.
+> **Current through:** 2026-07-24  (last commit that kept it true: `1e158de`)
+> **Superseded by:** nothing; the remediation shipped. `docs/ai-context/design-language.md` is the live design system.
+> **Read this for:** the measured baseline the remediation started from, and which bespoke UI was replaced by which primitive.
+> **Do not read this for:** the current primitive roster — that is `packages/ui/src/index.ts` and the `/styleguide` route.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Character sheet — design-system compliance audit & remediation (2026-07-23)
 
 The player character sheet shipped over ~6 feedback rounds (v2–v6) and works well, but it grew a large

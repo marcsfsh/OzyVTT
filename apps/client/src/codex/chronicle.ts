@@ -330,10 +330,10 @@ export function campaignDeadlines<T extends DeadlineRef>(records: readonly T[]):
 /**
  * A raw date snapped the way the SERVER snaps it before turning it into an instant
  * (`calendarInstantOf`): the month index clamped into the calendar, then the day clamped into that
- * month. The client's own `dateToInstant` clamps the day only at the bottom (`>= 1`), so a stored
- * "day 31 of a 30-day month" — the one lossy date the calendar admits — would otherwise place a day
- * later here than it does on the server, and the confirm below would promise a date the clock will not
- * actually land on.
+ * month — the same clamp `dateToInstant` applies before converting. It is stated separately here
+ * because this returns a **date**, not an instant: the confirm below promises a date out loud, and it
+ * must be the date the server's clock will actually land on, including for the one lossy case the
+ * calendar admits ("day 31 of a 30-day month").
  */
 function clampToCalendar(calendar: CodexCalendar, date: CodexInWorldDate): CodexInWorldDate {
   const month = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));

@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Original design spec for the Claude Code tooling layer: skills, subagents, rules, hooks and the ledger model.
+> **Current through:** 2026-07-24  (last commit that kept it true: `1e158de`)
+> **Superseded by:** `.claude/README.md` — the live roster. This file was never the roster and says so itself.
+> **Read this for:** the "why" behind the tooling design: what each mechanism is for and what was rejected.
+> **Do not read this for:** what exists now. Its counts have drifted (it describes three reviewer subagents; there are five). `.claude/README.md` is the live roster.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Claude Code tooling upgrade — outline
 
 > **Status (2026-07-24): historical design rationale — not the live roster.** This is the

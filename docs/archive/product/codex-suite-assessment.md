@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Stage One investigation: the measured baseline of the Codex surface before the overhaul.
+> **Current through:** 2026-07-31  (last commit that kept it true: `600cc84`)
+> **Superseded by:** nothing; the overhaul it triggered shipped in `706eab5` (#52). Live rules: `docs/ai-context/codex.md`.
+> **Read this for:** the measured evidence the overhaul started from, and why each problem was judged worth fixing.
+> **Do not read this for:** the Codex as it exists now. The surface it assesses is gone — `CodexWorkspace.tsx` was deleted in `2781793`. Live answers: `docs/ai-context/codex.md`, `docs/api-reference.md`, the code.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 > ## ⚠ SUPERSEDED — 2026-07-31
 >
 > This is a **Stage One investigation**, kept for its evidence and its reasoning, not as a description

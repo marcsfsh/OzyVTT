@@ -7,6 +7,7 @@ paths:
   - "apps/server/src/login-rate-limit.ts"
   - "apps/server/src/game-operations.ts"
   - "apps/server/src/game-commands.ts"
+  - "apps/server/src/codex-http.ts"
   - "packages/api-contract/**"
 ---
 

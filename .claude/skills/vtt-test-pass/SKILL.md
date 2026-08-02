@@ -1,6 +1,6 @@
 ---
 name: vtt-test-pass
-description: Use when you've made implementation changes and need to prove the app still runs, or to decide the minimum verification before calling work done on this repo. Defines the verification tiers and the live Playwright smoke so "verified" is never a vague phrase.
+description: Use when you've made implementation changes and need to prove the app still runs, or to decide the minimum verification before calling work done on this repo. Defines the verification tiers and the browser pass so "verified" is never a vague phrase.
 ---
 
 # vtt-test-pass
@@ -19,16 +19,22 @@ detail; this skill is the procedure for choosing and reporting.
 | UI / client behavior | CI-parity **+ live app**: `npm run dev`, exercise the flow at a desktop width **and** a narrow/touch viewport |
 | Projections / viewer | the above **+ viewer-safety pass**: pair `/viewer.html` and confirm nothing GM-only leaks |
 
-Remember: `@vtt/web` has **no unit tests** — client correctness rides on `check` + `build`
-**plus** an actual browser pass. Don't skip the manual look for UI work.
+`@vtt/web` **has** a Vitest + jsdom suite — run it and extend it. But jsdom loads no stylesheet
+and computes no layout, so a green client suite proves logic and the accessibility tree and
+**nothing about layout, pointer geometry, focus behaviour or touch targets**. Those still need a
+browser: `scripts/browser-verify.mjs`. See `docs/ai-context/testing.md`.
 
-## Live Playwright smoke (the project bar for UI PRs)
+## The browser pass (the bar for UI work)
 
-UI PRs get a live smoke: **seed a map + calibration + encounter via the
-API**, then drive the map inside the full-viewport **"Enlarge map"** overlay (so drags land
-on-screen), exercising the changed flow (e.g. dock the panel to each edge, inline-edit an
-initiative score, calibrate a gridless grid, switch scenes). Verify GM, player, and paired
-`/viewer.html` surfaces where the change touches them.
+The repo's browser gate is `scripts/browser-verify.mjs`. Seed a throwaway campaign
+(`node scripts/seed-codex.mjs` against a `DATA_DIR` you can delete), run the server, run the
+script; every check reports the fact it observed or what it saw instead. It drives Playwright
+from an **external install** — Playwright is deliberately not a repo dependency, so point
+`PLAYWRIGHT_PKG` at one and never run `playwright install`.
+
+For map/encounter work the script does not cover, drive the map inside the full-viewport
+**"Enlarge map"** overlay so drags land on-screen, and verify GM, player and paired
+`/viewer.html` where the change touches them. Full detail: `docs/ai-context/testing.md`.
 
 ## Report what you actually ran
 

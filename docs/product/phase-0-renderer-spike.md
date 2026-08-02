@@ -1,3 +1,20 @@
+> ## ⚠ SUPERSEDED — 2026-08-01
+>
+> **What this is:** the Phase 0 WebGL renderer spike (PixiJS in a React lifecycle component).
+> Kept in place, not archived, because `docs/adr/0003-renderer-choice.md`,
+> `docs/adr/0014-device-support.md` and `docs/ai-context/map-grid.md` all cite it.
+> **Current through:** the spike's own date. **The question it was built to settle is closed.**
+> **What actually happened:** the shipped map surface is DOM/SVG on every surface, not WebGL.
+> The spike was abandoned rather than concluded, and `docs/adr/0003-renderer-choice.md` is the
+> closing record. `apps/client/src/scene/RendererProof.tsx` still exists and still compiles, but
+> it has **zero import sites** — PixiJS is a dependency nothing renders.
+> **So the "Still required before ADR-003 is accepted" list below is not an open work list.**
+> ADR-0003 was closed by the code, not by that evidence. Its device-testing items survive as
+> BUILD_PLAN GAP-001 (the physical-device pass), which is still genuinely open.
+> **Read this for:** what the WebGL path demonstrated, and the measured 519 kB baseline.
+> **Do not read this for:** how the map renders now. That is `docs/ai-context/map-grid.md`.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Phase 0 renderer and input spike
 
 ## Purpose

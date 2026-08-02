@@ -4,8 +4,14 @@
 tempted to re-open a settled question. These are durable decisions — don't relitigate them
 without a clear new reason, and if you do change one, record it here with the date and why.
 
-The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
-load-bearing decisions in one place plus operating decisions that don't have an ADR.
+The **canonical architecture record is `docs/adr/`**; its index is `docs/adr/README.md`. This
+log captures the load-bearing decisions in one place plus operating decisions that don't have
+an ADR.
+
+**When a decision here is overtaken, mark it in place.** Keep its text and its date, and add a
+`> **SUPERSEDED**` line naming what replaced it and where. Do not delete it and do not append a
+newer entry beside it without marking the older one — an unmarked superseded decision is the
+worst artifact this file can produce, because it reads as current.
 
 ## 2026-08-01 — Codex final polish: five durable rules
 
@@ -900,7 +906,16 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
 
 ## Architecture (see `docs/adr/` for full rationale)
 
+> **Undated section.** Everything below this heading predates the dated sections above and
+> carries no date of its own, so a claim here can only be checked against the code, never
+> against a timeline. Entries known to be overtaken are marked individually. If you are about
+> to rely on one, verify it at HEAD first.
+
 - **Authoritative LAN server owns `GameState`.** No game decision runs on the client. (ADR-0001)
+  > **STILL TRUE, BUT NARROWER THAN IT READS.** `GameState` is the *game's* authoritative store.
+  > It is not the whole of authoritative state: the Codex, the homebrew library and the viewer
+  > presentation each own a separate store with its own revision counter. The authority rule is
+  > unchanged; the container is not the boundary. See `docs/ai-context/architecture.md`.
 - **Realtime protocol:** command → validate → authorize per command → transactional
   execute (receipt + event + projection) → broadcast role-specific projections. Contract
   lives once in `packages/domain`. (ADR-0005)
@@ -981,7 +996,13 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   `docs/api-reference.md`, and pinned by `contract.test.ts`. **Auth model documented from the handlers, and
   it differs from the game API:** codex routes are *session*-authorized (a GM **or** player session — players
   get the revealed-only projection), never integration-scope `bearerAuth`; every write is GM-only, and
-  folders/revisions/export stay GM-only even for reads. No route/behavior change — the server still serves the
+  folders/revisions/export stay GM-only even for reads.
+  > **SUPERSEDED (the auth clause only), 2026-08-01.** The Codex **is** credential-reachable now:
+  > `codex:read` / `codex:write` are real `IntegrationScope` values (`packages/api-contract`), the
+  > router wires `verifyIntegration` (`apps/server/src/server.ts`), and `principalFor` resolves
+  > `integration` alongside gm / player (`apps/server/src/codex-http.ts`). The authoritative table
+  > is `docs/api-reference.md` under "Authentication"; the rules are `docs/ai-context/codex.md`.
+  > Everything else in this entry still holds. No route/behavior change — the server still serves the
   same literal byte-identical (`app-map.md`: 94→132 HTTP paths). The codex is a first-party UI surface, so this
   is documentation completeness, not an invitation to drive it as an external integration. **Footgun for future
   edits:** the endpoint *grouping* is duplicated in THREE places that must stay in sync — `reference.ts`
@@ -1019,6 +1040,12 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   (3) No orphan-asset GC on `codexAssets` and no `DELETE /codex-assets/:id` (mirrors `map-http`'s
   existing gap); (4) `codex_page_revisions` snapshots every autosave with no prune. All low-severity at
   home-campaign scale; do not treat their absence as a bug to "fix" without a real trigger.
+  > **PARTLY SUPERSEDED, 2026-08-01.** Two of the four gaps are closed. **(1) is no longer true:**
+  > the Codex has an integration-API surface — `codex:read` / `codex:write` scopes, a wired
+  > `credentials.verify()`, and OpenAPI paths in the served document. **(4) is no longer true:**
+  > `codex_page_revisions` is bounded by a global switch plus a coalescing window, with
+  > `DELETE /codex/page-revisions` to trim history that already exists. **(2) and (3) still hold**
+  > and remain accepted. See `docs/ai-context/codex.md`.
 - **Worldbuilding is now a core pillar, not out-of-scope (2026-07-24, product-owner directive).** The
   original constitution listed "campaign wiki" as a do-not-drift boundary. The product owner
   (garrettpstrand) explicitly redefined the product as a D&D VTT **and** a full worldbuilding platform
@@ -1274,7 +1301,7 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
 - **2026-07-17 — Adopt a small Claude Code skill system** (not a meta-agent) for this repo:
   constitutional `CLAUDE.md` index, modular `docs/ai-context/` briefs, a `docs/ai-ledger/`,
   committed `.claude/loop.md` cadence, and `.claude/skills/`. Rationale and full roadmap in
-  `docs/claude-code-tooling-outline.md`. Scheduling that lives in code = `.claude/loop.md` +
+  `docs/archive/claude-code-tooling-outline.md`. Scheduling that lives in code = `.claude/loop.md` +
   GitHub Actions `schedule:`; session `/loop` and cron tasks are runtime-only.
 - **2026-07-17 — Model-usage policy: minimum necessary model.** Only the most core,
   high-stakes, or unsupervised functions use Opus 4.8 at high effort; everything else uses

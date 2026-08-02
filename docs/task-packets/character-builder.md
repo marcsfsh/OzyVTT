@@ -1,3 +1,20 @@
+> ## ⚠ SUPERSEDED IN PART — 2026-08-01
+>
+> **What this is:** the approved implementation plan for the guided character builder, written
+> 2026-07-26. Kept in place, not archived, because `packages/content-srd-5.2.1/src/character-content.ts`
+> cites it as the source of its content shapes (phase 1.1).
+> **Current through:** 2026-07-26. **It reads as entirely future work; most of it is not.**
+> **What shipped:** phases 1-2 (the wizard, the server-side assembler, the must-fix-first items) —
+> `apps/client/src/builder/`, `apps/server/src/character-build.ts`; see
+> `docs/adr/0021-player-character-sheet-closing-record.md`. Phase 5 "Remaining content — the other
+> 9 classes + 12 subclasses + feats" is done: the bundles carry **all 12 classes, 12 subclasses and
+> 19 feats** (`packages/content-srd-5.2.1/bundles/`).
+> **What has not:** phase 3's server-held drafts — the wizard still parks drafts in `localStorage`
+> (`apps/client/src/builder/draft.ts`) — and phase 6 (level-up + respec).
+> **Read this for:** the 16 approved decisions in §2 and the reasoning behind the phasing.
+> **Do not read this for:** what is left to build. That is `docs/ai-ledger/current-state.md`.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Character Builder — implementation plan (guided wizard + level-up + respec + generator)
 
 > **Status:** approved scope, phased delivery. Discovery complete 2026-07-26 (16 decisions, §2).

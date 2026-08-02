@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Round-4 GM playtest feedback on the character sheet, with the decisions it produced.
+> **Current through:** 2026-07-24  (last commit that kept it true: `1e158de`)
+> **Superseded by:** nothing; the round closed. Later rounds are `character-sheet-v5..v6-feedback.md`.
+> **Read this for:** what the GM actually asked for, and which items reached beyond the sheet into app IA and the wire contract.
+> **Do not read this for:** outstanding work. Its "Update **Status**" instruction is spent — do not act on it.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Character sheet — v4 UX feedback & fixes
 
 Round-4 GM feedback after v3 landed (Seraphina screenshots). Durable checklist. Update **Status**.

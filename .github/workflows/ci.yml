@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["main", "claude/**"]
+  # Any base branch, not just main: a PR from claude/b into claude/a currently runs nothing.
   pull_request:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -21,6 +21,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          # REQUIRED, not a nicety. apps/server/test/docs-paths.test.ts distinguishes "a file this
+          # repo once had" from "a name that never existed here" using `git log --all`. At the
+          # default depth of 1 that history is invisible, every dead reference is suppressed and
+          # the check passes while doing nothing. It ships a canary that fails loudly instead.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

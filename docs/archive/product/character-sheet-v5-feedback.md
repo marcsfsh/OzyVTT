@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Round-5 GM playtest feedback on the character sheet, with the decisions it produced.
+> **Current through:** 2026-07-24  (last commit that kept it true: `1e158de`)
+> **Superseded by:** nothing; the round closed. The final round is `character-sheet-v6-feedback.md`.
+> **Read this for:** what the GM actually asked for, in their own words.
+> **Do not read this for:** outstanding work — the checklist is spent.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Character sheet — v5 UX feedback & fixes
 
 Round-5 GM feedback after v4. Durable checklist. _Captured 2026-07-23; branch

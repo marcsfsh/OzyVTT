@@ -11,11 +11,16 @@ This directory holds product contracts, checkpoint outcomes, wireframes, browser
 - [Phase 0 command/persistence spike](phase-0-command-persistence-spike.md)
 - [Phase 1 starter roster and character claims](phase-1-character-roster.md)
 - [Scene-centric IA redesign — design & implementation plan](scene-centric-ia.md)
-- [Character sheets — initiative handoff & roadmap](character-sheet-initiative.md)
-- [Codex worldbuilding suite — current-state assessment](codex-suite-assessment.md)
-- [Codex worldbuilding suite — product specification](codex-suite-spec.md)
-- [Codex worldbuilding suite — experience design](codex-suite-design.md)
-- [Codex worldbuilding suite — implementation plan](codex-suite-plan.md)
-- [Codex campaign tracking — deferred programme (M8–M12)](codex-campaign-tracking.md)
+- [Character sheets — initiative handoff & roadmap](character-sheet-initiative.md) — ⚠ superseded
+- [Rules-engine follow-up — implementation assessment and corrected scope](rules-engine-followup-assessment.md) — ⚠ frozen
+
+Three documents here are **point-in-time records that are still cited from an ADR or from source**,
+so they are bannered in place rather than archived: the two marked above, plus
+[the Phase 0 renderer spike](phase-0-renderer-spike.md). Read each one's opening banner before
+its body — it says what has since changed.
+
+Finished specs and plans live in [`docs/archive/product/`](../archive/product/) — including the
+six Codex suite documents (assessment, specification, experience design, implementation plan,
+campaign tracking, and the phase-4 handoff), whose work has shipped.
 
 Physical-device observations, end-to-end wireframes, and realtime multi-client convergence evidence remain to be added.

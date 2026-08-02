@@ -2,13 +2,15 @@
 
 The single source of truth for **what Claude tooling exists here**. This repo drives Claude Code
 with project memory, path-scoped rules, skills, subagents, and hooks — deliberately light (design
-rationale in `docs/claude-code-tooling-outline.md`). Update this file when you add or remove a
+rationale in `docs/archive/claude-code-tooling-outline.md`). Update this file when you add or remove a
 skill / agent / rule / hook.
 
 - **Memory:** root `CLAUDE.md` (constitutional index) → `docs/ai-context/` (how it's built) +
   `docs/ai-ledger/` (living state). Keep `CLAUDE.md` short and stable.
-- **Verification bar:** `npm run check` (typecheck, `tsc --noEmit`) · `npm run test` (Vitest) ·
-  `npm run build`; CI order is `test → check → build`.
+- **Verification bar:** `npm run check` · `npm run test` · `npm run build`; CI order is
+  `test → check → build`. Neither `check` nor `test` covers every workspace — both are
+  `--if-present`. UI work additionally needs a browser pass; `docs/ai-context/testing.md`
+  owns the bar.
 
 ## Skills (`.claude/skills/`, model-invocable)
 
@@ -45,10 +47,10 @@ the `scope-guard` hook also points at them at prompt time. They hold the hard in
 
 | Rule | Loads for |
 | --- | --- |
-| `viewer-safety.md` | `projections.ts`, `viewer-*.ts`, `apps/client/src/viewer/**` |
-| `roles-auth.md` | auth / authorization / claims / credentials / command handlers, `api-contract` |
+| `viewer-safety.md` | `projections.ts`, `viewer-*.ts`, `codex-projections.ts`, `codex-http.ts`, client viewer + `viewer-main.tsx` + `PlayerCodex.tsx` |
+| `roles-auth.md` | auth / authorization / claims / credentials / command handlers, `codex-http.ts`, `api-contract` |
 | `realtime.md` | `packages/domain/**`, `server.ts`, `game-operations.ts`, `game-commands.ts` |
-| `maps-grid.md` | `grid-*`, `map-*`, token placement / annotations / fog, client `maps`/`scene(s)` |
+| `maps-grid.md` | `grid-*`, `map-*`, token placement / annotations / fog, client `maps`/`scene(s)` + `codex/MapSurface.tsx` |
 | `mobile.md` | client `*.tsx`/`*.css`, `packages/ui/**` |
 | `api-contract.md` | `packages/api-contract/**`, `api-v1.ts`, `*-http.ts` |
 
@@ -68,5 +70,5 @@ commands and enables auto memory (required for the subagents' persistent memory)
 ## Scheduling
 
 - `.claude/loop.md` — the default `/loop` operator cadence (committed).
-- `.github/workflows/scheduled-ledger-drift.yml` — an intentional scaffold (cron commented out);
-  the durable home for any future unattended ledger-drift / health job.
+- There is no scheduled workflow. Documentation drift is a `npm test` failure
+  (`apps/server/test/docs-*.test.ts`), not an unattended report nobody is assigned to.

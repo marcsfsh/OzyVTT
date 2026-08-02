@@ -18,8 +18,9 @@ lightest tier that actually covers the change under review and run it.
 - **Change-focused:** `npm run check && npm test` (scope with `--workspace=@vtt/server` while
   narrowing, full before you conclude).
 - **CI-parity:** `npm test && npm run check && npm run build` — the exact CI order.
-- **UI change:** CI-parity is necessary but not sufficient — note that `@vtt/web` has no unit
-  tests, so client correctness needs a live browser + narrow-viewport pass and (for
+- **UI change:** CI-parity is necessary but not sufficient. `@vtt/web` has a jsdom suite —
+  check it ran and check it was extended. Then ask what the suite *cannot* prove (layout,
+  pointer geometry, focus, the touch floor) and whether a browser pass covered it, plus (for
   projection/viewer changes) a viewer-safety check. Call out what you could and couldn't
   exercise headlessly.
 

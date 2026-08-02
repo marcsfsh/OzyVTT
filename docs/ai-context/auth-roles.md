@@ -30,17 +30,44 @@ cutoff for revoke-all.
 player-character's `ownerSessionId`, enforcing: target is a `player-character`, not owned by
 another session, and the claimant owns no other character (must release first).
 
-**Projection is the boundary.** `projectPlayerView` drops `notes` and `ownerSessionId`,
-exposes derived `claimStatus` (available/mine/claimed) + presence, filters actors to
-`visibility==="public"`, filters rolls by visibility (public/self-only) while stripping
-`initiatorSessionId`, applies annotation visibility, and masks hidden turns (`hiddenTurn`).
-`projectGmView` returns full state.
+**Projection is the boundary.** `projectPlayerView` (`apps/server/src/projections.ts`) does
+not filter state — it destructures the sensitive fields away in one place and then re-adds a
+narrow set, and the shape of that code is the rule:
+
+- **Stripped and never returned:** GM knowledge about an actor — notes, owner identity,
+  monster defences, and GM-only management flags.
+- **Re-added only for the owner** (`...(mine ? {…} : {})`): sheet resources — action uses,
+  hit dice, spell and pact slots, prepared spells, inventory, currency, and the actor's own
+  imported `ActorDefinition`. Another player never sees them; the viewer projects separately.
+- **Re-added coarsened for everyone:** exact HP becomes a health band; a hidden effect's
+  source becomes "A hidden threat"; a token display style ships only when the GM aimed it at
+  the whole table.
+- **Filtered out entirely:** actors that are not `visibility === "public"`, and actors that
+  are archived. Rolls are filtered by visibility (public/self-only) with
+  `initiatorSessionId` stripped, and a hidden turn is masked (`hiddenTurn`).
+
+**Do not maintain a field list here.** Read the destructure — it is one line and it is the
+enumeration. Any new owner-only field on `Actor` must be stripped-then-re-added-when-`mine`;
+copy how `actionUses` and `hitDice` are handled.
+
+`projectGmView` is **not** "full state": it filters expired annotations and attaches per-actor
+presence, and the socket-facing GM view wraps it again to add turn-history metadata
+(`apps/server/src/server.ts`).
+
+**There are two projection boundaries, not one.** `projections.ts` is the game's.
+`apps/server/src/codex-projections.ts` is the Codex's, and it is the bigger of the two: every
+player-facing Codex read routes through it, and its rules are a *reveal graph* rather than a
+flat visibility flag — a map is player-visible only when its parent is, a marker's page links
+are filtered to the revealed subset, a quest's entity ids likewise. The module's own header
+calls itself "the single audited choke point"; do the stripping there, never in the store or
+the router. Full rules in `codex.md`.
 
 ## Invariants
 
 - Only **loopback** sets the first GM password.
-- **GM-only commands** (`encounter:*`, `initiative:*`, `character:force-release`, gm-only
-  rolls, viewer/map/integration admin) are gated by `auth.verify` per command.
+- **GM-only commands** are gated by `auth.verify` per command. Do not keep a list here: the
+  authoritative one is `GAME_COMMAND_SCOPES` in `packages/api-contract`, rendered into the
+  generated `docs/app-map.md`.
 - A player may only roll/move for an actor whose `ownerSessionId` matches theirs.
 - Players **cannot**: claim a non-PC or already-claimed actor, own two characters, make
   gm-only rolls, or see other sessions' `ownerSessionId` / `notes` / private rolls / hidden
@@ -57,7 +84,12 @@ exposes derived `claimStatus` (available/mine/claimed) + presence, filters actor
   online/offline state.
 - Tokens are **signed, not encrypted** — payload is only `{role, sessionId, issuedAt,
   expiresAt}`; no secrets belong there.
-- Integration-API credentials are a **separate auth axis** from GM/player sessions.
+- **Four principal kinds exist**, not two: GM session, player session, integration credential,
+  and paired viewer (a cookie, not a bearer token). Which surfaces each one reaches is the
+  part worth reading twice, and it is tabled in the generated, freshness-tested
+  `docs/api-reference.md` under "Authentication". Read it there; a copy here would rot.
+  There are also two *preview* minting paths — the viewer preview and the GM's player-preview
+  session for the Codex — both of which mint a genuinely lower-privileged principal on purpose.
 
 ## Relevant ADRs
 

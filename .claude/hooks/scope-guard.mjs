@@ -35,6 +35,8 @@ if (has('socket', 'realtime', 'real-time', 'broadcast', 'revision', 'idempotency
   reminders.push('realtime & server authority — contract lives once in packages/domain; validate + authorize per command: .claude/rules/realtime.md');
 if (has('grid', 'token', 'map', 'annotation', 'calibrate', 'calibration', 'snap', 'scene'))
   reminders.push('maps & grid geometry — server owns snapping; client math is preview-only in image-pixel space: .claude/rules/maps-grid.md');
+if (has('codex', 'worldbuilding', 'atlas', 'journal', 'quest', 'session log', 'calendar', 'wiki', 'marker', 'reveal', 'lore', 'timeline'))
+  reminders.push('codex two-layer safety — a player sees the player half of a REVEALED record and nothing else; project in codex-projections.ts, never filter in the store or the router: .claude/rules/viewer-safety.md');
 if (has('mobile', 'responsive', 'touch', 'phone', 'css', 'layout', 'viewport', 'drag', 'gesture'))
   reminders.push('mobile parity — phone + laptop first-class; touch-action:none; verify a narrow viewport: .claude/rules/mobile.md');
 if (has('api', 'integration', 'openapi', 'endpoint', 'rest') || /\/api\/v1/i.test(prompt))

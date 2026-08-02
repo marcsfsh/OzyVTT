@@ -1,3 +1,12 @@
+> ## ⚠ ARCHIVED — 2026-08-01
+>
+> **What this is:** Standalone execution plan for the remaining Cycle-4 work (PR D, E, F). All of it shipped.
+> **Current through:** 2026-07-24  (last commit that kept it true: `1e158de`)
+> **Superseded by:** nothing; the work it planned shipped. Current work lives in `docs/ai-ledger/current-state.md`.
+> **Read this for:** why the Cycle-4 batches were sequenced the way they were.
+> **Do not read this for:** what is outstanding — its unticked items are done. `docs/ai-ledger/current-state.md` is the live answer.
+> **Paths, line numbers and counts inside this file are as of the date above and are not maintained.**
+
 # Next steps — Cycle 4 remaining work (PR D, E, F)
 
 > Standalone plan for the remaining Cycle-4 work, kept in the repo so it's easy to find.

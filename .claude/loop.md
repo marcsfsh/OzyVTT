@@ -21,10 +21,11 @@ work; if everything is clean, say so in one line and wait for the next tick.
      surface it.
    Never touch another agent's `claude/*` branch (see `vtt-branch-safety`).
 
-3. **Ledger-drift check.** Compare recent real changes against `docs/ai-ledger/`.
-   If a shipped change isn't reflected, update `current-state.md` / `known-bugs.md` /
-   `decision-log.md` concisely (use `vtt-ledger-update` if available). Don't rewrite
-   history; append what changed.
+3. **Ledger-drift check.** Compare recent real changes against `docs/ai-ledger/`. If a
+   shipped change is not reflected, **correct the line that is wrong** in
+   `current-state.md` / `known-bugs.md` / `decision-log.md` (use `vtt-ledger-update` if
+   available). Correct in place; do not append a newer line beside a stale one. If a bug on
+   the list is fixed, delete its entry. If nothing has drifted, say so in one line and move on.
 
 4. **QA the last material change.** If code changed since the last QA pass, review it
    against its acceptance criteria — acceptance met, viewer safety, GM/player role

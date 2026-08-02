@@ -5,29 +5,28 @@ there is no reduced mobile mode, and a mouse-only control is a bug.
 
 ## Key files
 
-- `apps/client/src/styles.css` — global reset, fluid type, main layout.
-- `apps/client/src/scene/encounter-map.css` — token tray, map stage, zoom dock.
-- `apps/client/src/encounter/encounter-panel.css` — initiative/turn controls.
-- `apps/client/src/maps/map-manager.css` — upload / grid calibration.
-- `apps/client/src/viewer/viewer.css` (+ `viewer-controls.css`, `viewer-preview.css`,
-  `viewer-page.css`), `scene/annotation.css`.
-- Gesture logic: `scene/RendererProof.tsx` (Pixi pointer drag + wheel zoom + two-finger
-  pinch) and `scene/EncounterMap.tsx` (pointer gesture state machine: pan / token / measure
-  via `setPointerCapture`).
+- Responsive rules live in the stylesheet next to the surface they govern
+  (`apps/client/src/**/*.css`) and in the shared tokens (`packages/ui/src/styles/`). There is
+  no central responsive stylesheet, and adding one is not the fix.
+- Gesture logic: `apps/client/src/scene/EncounterMap.tsx` (the encounter pointer gesture state
+  machine: pan / token / measure via `setPointerCapture`) and
+  `apps/client/src/codex/MapSurface.tsx` (the Codex atlas pan/zoom surface, same
+  `imagePointFromClient` convention).
 - Decision record: `docs/adr/0014-device-support.md`.
 
 ## Responsive conventions
 
-- **Breakpoints:** width `max-width: 760px` and `560px` (styles.css), `650px`+`560px`
-  (encounter-map), `850px`+`560px` (map-manager); `min-width: 980px` promotes the table to
-  two columns. The **viewer reflows on orientation** instead:
-  `@media (max-aspect-ratio: 4/3)` moves the initiative rail from a side column to a bottom
-  strip.
+- **Breakpoints are a shared ladder, not per-file taste.** The ladder is defined once in
+  `design-language.md`. A new number in a new stylesheet makes two components change shape at
+  widths a few dozen pixels apart for no reason — reuse a rung or change the ladder
+  deliberately. The viewer is the deliberate exception: it reflows on **orientation**
+  (`@media (max-aspect-ratio: 4/3)` moves the initiative rail from a side column to a bottom
+  strip), because a TV is a landscape device and width tells you nothing about it.
 - **Fluid sizing** via `clamp()` for type/spacing/canvas height; narrow layouts collapse
   grids to `1fr`. `body { min-width: 320px }` is the supported floor.
 - `prefers-reduced-motion: reduce` disables ping/pulse animations.
-- High-DPI: `autoDensity` + `resolution: min(devicePixelRatio, 2)`; SVG uses
-  `vector-effect: non-scaling-stroke`.
+- The shipping map surface is SVG, and it stays crisp with
+  `vector-effect: non-scaling-stroke` rather than a device-pixel-ratio setting.
 
 ## Constraints
 
@@ -37,8 +36,8 @@ there is no reduced mobile mode, and a mouse-only control is a bug.
 - **Touch drag for tokens and grid calibration must work via Pointer Events** from the
   start — not an afterthought.
 - **Any new draggable/zoomable surface MUST set `touch-action: none`** so native
-  scroll/zoom doesn't fight the gesture handlers (already set on `.proof-canvas`,
-  `.encounter-map-stage`, `.viewer-stage`, `.tray-token`, `.map-preview.movable`, etc.).
+  scroll/zoom doesn't fight the gesture handlers. Grep the property to find the existing
+  ones rather than trusting a list here.
 
 ## Gotchas
 
