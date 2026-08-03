@@ -1,5 +1,6 @@
 import type { Actor, GameState, RollRecord } from "@vtt/domain";
 import { parseDiceFormula, resolveDeathSave, resolveDice, type RandomSource } from "@vtt/rules-5e";
+import { recordRoll as recordRollInHistory } from "./roll-history.js";
 
 export type DeathSaveMode = "advantage" | "disadvantage" | "normal";
 
@@ -55,8 +56,7 @@ export function rollDeathSave(state: GameState, actor: Actor, options: Readonly<
       dice: resolution.terms.flatMap((term) => { if (term.kind !== "dice") return []; const currentGroup = group++; return term.dice.map((die) => ({ group: currentGroup, sides: term.sides, face: die.face, kept: die.kept, sign: term.sign })); }),
       modifiers: [], total: resolution.total, createdAt: deps.now()
     };
-    state.rolls.push(record);
-    if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
+    recordRollInHistory(state, record);
   }
   const outcome = resolveDeathSave(actor.deathSaves, face);
   if (options.commit) actor.deathSaves = outcome.state;

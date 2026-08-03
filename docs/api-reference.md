@@ -95,6 +95,10 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `death-save.roll` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `rules.set-policy` | `combat:write` |
+| `action.use` | `combat:write` |
+| `save.roll` | `combat:write` |
+| `rules.ask` | `combat:write` |
+| `rules.answer` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-player-initiative-mode` | `combat:write` |
@@ -1789,6 +1793,82 @@ Clears every fog stroke - with fog enabled the whole map is hidden again (GM-gra
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `sceneId` | string (uuid) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actions/use`
+
+Uses an action and lets the SERVER decide what that means (D10 - the routing used to be a client-side boolean, so the same tap meant different things on different clients). In the fight on this creature's turn it delegates to the full structured resolution and acks `route: "resolved"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, touches no combat state, and acks `route: "loose"` with the roll ids. No hit points ever move on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `actionId` | string (pattern) | yes |  |
+| `targetIds` | string (uuid)[] | no |  |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no |  |
+| `includeDamage` | boolean | no | Loose route only: roll the action's damage parts in the same tap. Opt-in so a sheet rendering its own damage chip cannot double-roll. Ignored in the fight, where the resolver rolls damage itself. |
+| `override` | object | no | GM-grade only: waves the off-turn refusal (and the resolver's own economy blocks) through, remembers the family for the rest of the turn, and audits the line. The reason is optional. |
+| `override.reason` | string | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/saves/roll`
+
+Rolls a saving throw for one character (D10). When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`; the sheet's save chip used to roll a loose die that ignored the open prompt entirely. With nothing open it rolls a loose, attributed save at the same modifier the resolver would use, and acks `route: "loose"`. Supply `total` for an off-screen die. GM-grade for anyone; a player session only for their own claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no |  |
+| `total` | integer (-50–100) | no | Hand-entered final total (an off-screen die), used verbatim instead of rolling |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/rules/ask`
+
+Asks the GM to allow a command the rules engine just blocked (D8 - a blocked player is never a silent dead end). Send the ORIGINAL request as `payload`; the server revalidates it with that command's own schema and re-runs it under YOUR authority with no override, so an action that would now succeed simply succeeds (`ran: true`) and nothing is parked. A still-blocked command is parked as one question per character (a second replaces the first, up to ten at the table) and the response carries `askId` plus the `blocked` details. Player sessions may ask only about their own claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `type` | `action.resolve` \| `action.use` \| `token.move` \| `actor.set-condition` | yes | Which command was blocked - a closed list, because Allow replays it under GM authority |
+| `payload` | object (free-form) | yes | The original request body, verbatim. Revalidated with the named command's own schema before it runs again; its `expectedRevision` is stripped on replay (the ask-time revision would always conflict) and its `commandId` is replaced by the server-minted ask id, which is what makes a repeated Allow idempotent. |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/rules/answer`
+
+Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override - the `reason` is optional and the audit line falls back to "GM override" - and the rules engine remembers the rule's FAMILY for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. `allow: false` clears it and tells the player. A question that no longer exists is a 409.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `askId` | string (uuid) | yes |  |
+| `allow` | boolean | yes | true replays the parked command with an override; false declines it and tells the player |
+| `reason` | string | no | Optional audit note; omitted lines read "GM override" |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

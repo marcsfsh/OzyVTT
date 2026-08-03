@@ -108,6 +108,13 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
         // concentration effect references (endsEffects) are server bookkeeping and are stripped.
         ...(entry.onFailEffect ? { onFailEffect: { ...entry.onFailEffect, sourceActorId: null, sourceName: entry.onFailEffect.sourceActorId !== null && !publicActorIds.has(entry.onFailEffect.sourceActorId) ? "A hidden threat" : entry.onFailEffect.sourceName } } : {})
       })),
+    // ASK THE GM (D8), same boundary as saves and reaction prompts: a player sees ONLY their own
+    // claimed character's parked asks - never another player's question, and never the GM's
+    // deliberation about it. The parked `command` is dropped entirely: its payload can name target ids
+    // the asker is not allowed to know, and reading their own pending question needs none of it.
+    pendingRuleAsks: state.combat.pendingRuleAsks
+      .filter((entry) => { const actor = state.actors.find((candidate) => candidate.id === entry.actorId); return actor !== undefined && actor.ownerSessionId !== null && actor.ownerSessionId === playerSessionId; })
+      .map(({ command: _command, ...entry }) => entry),
     // Same boundary as saves: a player sees only their own claimed character's reaction prompts,
     // with the source actor id stripped and a hidden source's name masked.
     pendingReactions: state.combat.pendingReactions

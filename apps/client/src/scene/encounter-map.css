@@ -42,11 +42,8 @@
 .encounter-token.movable:focus-visible .encounter-token-body { stroke: var(--cyan); stroke-width: 6; }
 .encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
 .encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
-/* Keep the zoom cluster clear of a left/right docked panel by moving it to the opposite corner. */
+/* Keep the scene cluster clear of a left/right docked panel by moving it to the opposite corner. */
 .encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
-/* The 3-way dock control lives in the zoom cluster so it's reachable even inside the enlarged map. */
-.encounter-map-dock-control { display: inline-flex; gap: .35rem; margin-right: .2rem; }
-.encounter-map-zoom .encounter-map-dock-control button[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 /* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize. */
 .encounter-map-dock { position: absolute; z-index: 2; overflow: auto; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
 .encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid var(--line); }
@@ -58,8 +55,10 @@
 .encounter-map-dock-resize.dock-resize-right { right: calc(var(--dock-side-width) - 7px); }
 .encounter-map-dock-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--line); transition: background .15s, width .15s; }
 .encounter-map-dock-resize:hover::before, .encounter-map-dock-resize:active::before { background: var(--cyan); width: 3px; }
-.encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
-.encounter-map-zoom button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* The zoom cluster is the SCENE cluster now — one Scenes button, or the two staging buttons while
+   arranging. Zoom, dock, enlarge and fullscreen moved into the toolbar's View group (D4), which is
+   what stopped this corner from wrapping into a second and third row of controls over the map. */
+.encounter-map-zoom .nh-btn { box-shadow: var(--shadow-1); }
 .encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: var(--void); }
 .encounter-map-stage:fullscreen svg { max-height: 100vh; height: 100vh; }
 /* "Enlarge map" is an in-tab overlay (not the OS Fullscreen API): the whole interaction area floats
@@ -75,49 +74,100 @@
 .encounter-map-interaction.enlarged .encounter-map-saving { position: absolute; z-index: 4; left: 1rem; bottom: 1rem; margin: 0; padding: .2rem .55rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 78%, transparent); }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: var(--text-dim); font-size: .78rem; }
 
-/* Top-left overlaid tool cluster (eye ▾ · tools · ruler toggle · wrench ▾). Visible in normal,
-   enlarged, and OS-fullscreen modes since it lives inside the stage. */
-/* align-items: center keeps every control on one vertical plane; min-height reserves the slide-out's
-   height so opening a tab never nudges the whole row down (report #8). */
-.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 2.5rem; max-width: calc(100% - 1.4rem); }
-/* The per-viewer notifications bell sits top-right, opposite the top-left tool cluster. */
-.encounter-map-notify { position: absolute; right: .7rem; top: .7rem; z-index: 3; }
-.encounter-map-tools { display: flex; gap: .3rem; }
-/* Drawing and fog tools open as one grouped tab that slides out to the right of their toggle (reports
-   #11, #13): a bordered panel that reads as a set. It grows in from the left on open and fades out on
-   close (via .closing) rather than snapping (report #8). */
-.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; min-width: 0; padding: 0 .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); overflow: visible; white-space: nowrap; }
-/* Opening/closing animate the tab's own width (clipped) so the buttons it pushes aside slide with it,
-   not snap (report #4); once settled the class drops so the eye/color/wrench dropdowns can overflow. */
-.encounter-map-slideout.opening { overflow: hidden; animation: encounter-map-slideout .18s ease-out; }
-.encounter-map-slideout.closing { overflow: hidden; pointer-events: none; animation: encounter-map-slideout-close .18s ease-in forwards; }
-@keyframes encounter-map-slideout { from { opacity: 0; max-width: 0; } to { opacity: 1; max-width: 24rem; } }
-@keyframes encounter-map-slideout-close { from { opacity: 1; max-width: 24rem; } to { opacity: 0; max-width: 0; } }
-.encounter-map-eye, .encounter-map-wrench, .encounter-map-color { position: relative; }
-.encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem; max-width: 11rem; }
-.encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); cursor: pointer; }
+/* ─────────────────────── THE ONE MAP TOOLBAR (D4) ───────────────────────
+   Was: three floating clusters (top-left tools with `flex-wrap: wrap`, top-right bell,
+   bottom-right zoom stack) that piled ~13 icons onto the battle map and wrapped into two and
+   three rows as the viewport narrowed. Now: ONE bar, `nowrap`, six controls wide, with
+   everything else one tap deeper inside a bounded panel.
+
+   The container spans the stage but is `pointer-events: none` — only the bar, the panel and the
+   phone rail take input, so the map behind the empty half of the row is still draggable. (It was
+   not before: the old cluster's `max-width: calc(100% - 1.4rem)` swallowed every press in that
+   band.) `inset` gives the panel a height to shrink into, which is why it can scroll instead of
+   spilling out of the stage's `overflow: hidden`. */
+.encounter-map-overlay { position: absolute; left: .7rem; right: .7rem; bottom: .7rem; top: calc(.7rem + var(--tray-height, 0px)); z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; pointer-events: none; }
+.encounter-map-overlay > * { pointer-events: auto; }
+/* The phone form (≤560px): the whole toolbar is one `Tools` button in the bottom-left, where a
+   thumb reaches, and the rail opens upward from it. It does NOT take the tray offset — the tray is a
+   TOP-edge overlay and this toolbar is at the bottom, and on a 232px-tall phone stage paying for the
+   tray twice left the button no room at all (measured: it overflowed the stage and stopped taking
+   taps). The tray is capped instead, below. */
+.encounter-map-overlay.compact { top: .7rem; justify-content: flex-end; }
+/* Open, the rail outranks the token tray (z-index 4) so it can use the whole stage height instead of
+   being painted behind it. Closed, it stays under — the tray is the thing you are reading then. */
+.encounter-map-overlay.compact.open { z-index: 5; }
+.map-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: .35rem; max-width: 100%; padding: .25rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 88%, transparent); }
+/* 2.5rem of paint, not the primitive's 2.25rem, and that is a hit-area decision rather than a
+   visual one: `.tap-target` overhangs by (44 − paint) / 2 per side, so 2.25rem neighbours would
+   need an 8px gap to stop stealing each other's taps and this bar gaps by 5.6px. At 2.5rem the
+   overhang is 2px a side — the same budget `.encounter-map-tools` has always run on. */
+.map-toolbar .nh-iconbtn { width: 2.5rem; height: 2.5rem; background: transparent; border-color: transparent; font-size: 1.15rem; }
+.map-toolbar .nh-iconbtn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.map-toolbar .nh-iconbtn[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
+/* The three constant tools. `.encounter-map-tools` keeps its name (and its gap budget): the 44px
+   hit areas overlap unless neighbours are ≥4px apart — .35rem is 5.6px. codex.css:231 cites it. */
+.encounter-map-tools { display: flex; gap: .35rem; }
+.map-toolbar-divider { align-self: stretch; width: 1px; margin: .2rem .1rem; background: var(--line-strong); }
+/* A group button is icon + WORD at every width above the collapse. The word is not a tooltip:
+   a phone has no hover, so a label that only exists on hover does not exist (design-language §4). */
+.map-toolbar-group { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.5rem; padding: 0 .5rem; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.map-toolbar-group:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.map-toolbar-group[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
+.map-toolbar-group-icon { display: grid; place-items: center; font-size: 1.05rem; }
+.map-toolbar-caret { display: grid; place-items: center; font-size: .8rem; color: var(--text-muted); transition: transform .16s ease; }
+.map-toolbar-caret.open { transform: rotate(180deg); }
+/* One open group at a time, in one bounded surface: never a second row of floating icons. It
+   shrinks to whatever height the stage leaves and scrolls inside itself. */
+.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: .5rem; padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overflow-y: auto; overscroll-behavior: contain; }
+.map-toolbar-panel-title { margin: 0; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
+.map-toolbar-panel .nh-field, .map-toolbar-panel-body .nh-field { gap: .2rem; }
+.map-toolbar-field { font-size: .78rem; }
+.map-toolbar-label { display: flex; align-items: center; gap: .35rem; margin: .1rem 0 0; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
+.map-toolbar-label span { display: grid; place-items: center; font-size: .95rem; }
+.map-toolbar-note { margin: 0; color: var(--text-muted); font-size: .7rem; line-height: 1.35; }
+.map-toolbar-choices { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; }
+.map-toolbar-choice { display: flex; align-items: center; justify-content: center; gap: .3rem; min-height: 2.5rem; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; cursor: pointer; }
+.map-toolbar-choice:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.map-toolbar-choice[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
+.map-toolbar-choice:disabled { color: var(--text-muted); cursor: not-allowed; }
+.map-toolbar-actions { display: flex; flex-direction: column; gap: .3rem; }
+.map-toolbar-actions-row { flex-direction: row; }
+.map-toolbar-actions-row .nh-btn { flex: 1; }
+/* A switch's own paint is short, and these stack. Route 1 (grow the paint to the floor) rather than
+   route 2, because overlapping ::after boxes in a vertical list steal their neighbours' taps. */
+.map-toolbar-switch { align-self: flex-start; min-height: var(--tap-min); font-size: .78rem; }
+.map-toolbar-segmented { width: 100%; }
+.map-toolbar-segmented .nh-segmented-option { min-height: var(--tap-min); }
+/* The custom-colour well is a control, so it carries a control's touch target (44px), not the
+   1.7rem swatch the shape editor gets away with inside a form row. */
+.map-toolbar-custom-colour { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 2.75rem; color: var(--text-dim); font-size: .72rem; }
+.map-toolbar-custom-colour input { width: 3rem; height: 2.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); }
+/* The phone rail: the same three tools and the same three groups, every row icon + words. */
+.map-toolbar-toggle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 92%, transparent); color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.map-toolbar-toggle[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
+.map-toolbar-rail { min-height: 0; width: min(17rem, 100%); display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overflow-y: auto; overscroll-behavior: contain; }
+.map-toolbar-rail-tools { display: flex; flex-direction: column; gap: .15rem; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
+.map-toolbar-rail-section + .map-toolbar-rail-section { border-top: 1px solid var(--line); }
+.map-toolbar-row { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.75rem; padding: .3rem .5rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; text-align: left; cursor: pointer; }
+.map-toolbar-row:disabled { color: var(--text-muted); cursor: not-allowed; }
+.map-toolbar-row[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
+.map-toolbar-row-icon { display: grid; place-items: center; font-size: 1.1rem; }
+.map-toolbar-rail-head .map-toolbar-caret { margin-left: auto; }
+.map-toolbar-panel-body { display: flex; flex-direction: column; gap: .5rem; padding: .1rem .5rem .5rem; }
+/* The rail scrolls when the stage is shorter than it is (a 390px phone leaves ~210px of map). The
+   section a tap just opened is scrolled to, so its contents are never left below the fold. */
+.map-toolbar-rail { scroll-behavior: smooth; }
+/* Icon + word inside a real Button (the scene cluster, the staging pair). */
+.map-button-icon { display: inline-grid; place-items: center; margin-right: .35rem; font-size: 1rem; vertical-align: -.15em; }
+.encounter-target-arrow { display: inline-grid; place-items: center; vertical-align: -.1em; }
+/* A swatch is a tap target like any other: 2.25rem of paint plus the `.tap-target` ::after takes it
+   to 44px, and the .3rem gap (4.8px) clears the 4px-per-side hit overhang so neighbouring swatches
+   never steal each other's taps. They wrap rather than shrink. */
+.encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 100%; }
+.encounter-map-swatches button { width: 2.5rem; height: 2.5rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); cursor: pointer; }
 .encounter-map-swatches button.selected { outline: 2px solid var(--cyan-hi); outline-offset: 1px; }
 .encounter-shape-editor-color { flex-direction: row !important; align-items: center; justify-content: space-between; }
 .encounter-shape-editor-color input { width: 2.4rem; height: 1.7rem; padding: 0; }
-/* The mid-combat map tools are the most touch-critical cluster in the product, so they meet the
-   44px floor (design-language §4): 2.5rem of paint — as much as a floating overlay over the map can
-   spend without eating the battlefield — plus the `.tap-target` recipe for the last 4px of hit AREA
-   (2px per side, which is why .encounter-map-tools/.encounter-map-slideout gap by .3rem: 4.8px > 4px,
-   so two neighbouring areas never overlap and never steal each other's taps). */
-.encounter-map-icon { position: relative; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); color: var(--text); font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
-.encounter-map-icon::after { content: ""; position: absolute; top: 50%; left: 50%; width: max(100%, var(--tap-min)); height: max(100%, var(--tap-min)); transform: translate(-50%, -50%); }
-.encounter-map-icon:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.encounter-map-icon[aria-pressed="true"], .encounter-map-icon[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
-.encounter-map-icon:disabled { opacity: .4; cursor: not-allowed; }
-/* Clears the 2.5rem trigger plus its 2px hit-area overhang. */
-.encounter-map-menu { position: absolute; left: 0; top: 2.9rem; z-index: 6; min-width: 12rem; display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
-.encounter-map-wrench .encounter-map-menu { left: auto; right: 0; }
-.encounter-map-menu-title { margin: .1rem .3rem .3rem; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
-.encounter-map-menu button { padding: .5rem .6rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); text-align: left; font-size: .82rem; cursor: pointer; }
-.encounter-map-menu button:hover { background: var(--surface-3); }
-.encounter-map-menu button.selected { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); color: var(--text); }
-.encounter-map-menu-select { display: flex; flex-direction: column; gap: .25rem; margin: .3rem; color: var(--text-dim); font-size: .72rem; }
-.encounter-map-menu-select select { padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
 
 .annotation-handle { fill: var(--cyan-hi); stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: pointer; }
 .annotation-handle-move { cursor: move; }
@@ -145,7 +195,19 @@
 .encounter-move-line { stroke: var(--cyan); stroke-width: 3; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 
 @media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
-@media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } .encounter-token-name { display: none; } .encounter-shape-editor { width: 12rem; } }
+/* The phone form of the map (§E). The toolbar collapses to its `Tools` button in JS at the same
+   rung (MapToolbar's COMPACT_QUERY); these rules keep the two floating clusters in OPPOSITE bottom
+   corners so a saved right-dock can never stack the scene cluster on top of the toolbar. */
+@media (max-width: 560px) {
+  .encounter-map-stage { min-height: 14rem; }
+  /* A full tray must not eat a phone's whole map. Capped and scrollable, so every unplaced token is
+     still reachable while the battlefield and the bottom-left toolbar keep their room. */
+  .encounter-token-tray { max-height: 8.5rem; overflow-y: auto; }
+  .encounter-token-name { display: none; }
+  .encounter-shape-editor { width: 12rem; }
+  .encounter-map-zoom, .encounter-map-zoom.zoom-dock-right { right: .7rem; left: auto; justify-content: flex-end; max-width: calc(100% - 8rem); }
+  .map-toolbar-rail, .map-toolbar-panel { width: min(17rem, calc(100vw - 2.8rem)); }
+}
 /* Health/condition badges over tokens: bloodied magenta, down danger; condition initials beneath. */
 .token-health { stroke: var(--void); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .token-health-bloodied { fill: var(--magenta); }
@@ -194,7 +256,10 @@
 .token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
 .token-context-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .token-context-head strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.token-context-head button { flex: none; padding: .2rem .5rem; border: 0; background: transparent; color: var(--text-dim); font-size: .9rem; cursor: pointer; }
+/* The close is the shared IconButton now (SVG, not a "✕" character), so this only quiets it into the
+   header: no fill, no border, and it keeps the primitive's 44px `.tap-target` area. */
+.token-context-head .nh-iconbtn { flex: none; background: transparent; border-color: transparent; }
+.token-context-head .nh-iconbtn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .token-context-hp { display: flex; gap: .3rem; }
 .token-context-hp input { width: 3.4rem; margin: 0; padding: .5rem; text-align: center; }
 .token-context-hp button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer; }
@@ -214,7 +279,6 @@
 .token-context-feedback { margin: .1rem 0 0; color: var(--text-dim); font-size: .75rem; }
 
 .encounter-map-scene-live { display: inline-flex; gap: .35rem; }
-.encounter-map-scene-live .scene-golive { background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 
 /* Narrow viewports: a saved left/right dock must never squeeze the map to a sliver.
    650 is this file's documented narrow step (mobile-ux.md), not a fourth number. */

@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 10 GameState fields · 78 commands · 182 HTTP paths
+- 10 GameState fields · 82 commands · 186 HTTP paths
 
 ## GameState shape
 
@@ -38,6 +38,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | Command | Scope |
 | --- | --- |
 | `action.resolve` | `combat:write` |
+| `action.use` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
 | `actor.heal` | `actor:write` |
@@ -99,9 +100,12 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `initiative.set` | `combat:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
+| `rules.answer` | `combat:write` |
+| `rules.ask` | `combat:write` |
 | `rules.set-policy` | `combat:write` |
 | `save.answer` | `combat:write` |
 | `save.dismiss` | `combat:write` |
+| `save.roll` | `combat:write` |
 | `scene.activate` | `scene:write` |
 | `scene.create` | `scene:write` |
 | `scene.duplicate` | `scene:write` |
@@ -190,6 +194,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/encounters/{id}/visibility`
 - `GET /api/v1/game`
 - `POST /api/v1/game/actions/resolve`
+- `POST /api/v1/game/actions/use`
 - `POST /api/v1/game/actors`
 - `DELETE /api/v1/game/actors/{actorId}`
 - `POST /api/v1/game/actors/{actorId}/archived`
@@ -254,9 +259,12 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/reactions/{reactionId}/answer`
 - `POST /api/v1/game/reactions/{reactionId}/dismiss`
 - `POST /api/v1/game/rolls`
+- `POST /api/v1/game/rules/answer`
+- `POST /api/v1/game/rules/ask`
 - `POST /api/v1/game/rules/policy`
 - `POST /api/v1/game/saves/{saveId}/answer`
 - `POST /api/v1/game/saves/{saveId}/dismiss`
+- `POST /api/v1/game/saves/roll`
 - `POST /api/v1/game/scenes`
 - `DELETE /api/v1/game/scenes/{sceneId}`
 - `POST /api/v1/game/scenes/{sceneId}/activate`

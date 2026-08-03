@@ -73,9 +73,13 @@ const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/g
 
 /**
  * The measured population, as (file, glyphs) rows — one row per file, one character per
- * violation. Measured 2026-08-03 by this file's own scan: 23 files, 84 pairs.
+ * violation. Measured 2026-08-03 by this file's own scan: 23 files, 84 pairs. **19 files / 52
+ * pairs** now: the map toolbar (D4) took `scene/EncounterMap.tsx` (28 — the largest row this list
+ * ever had) and `scene/TokenContextMenu.tsx` with it, and the shell rebuild (D15/D30) took the two
+ * roster rows' 🎭 and `main.tsx`'s `→` (the landing's arrows are `IconArrow` now). That is the
+ * whole point of a ratchet.
  *
- * Every row is a call site waiting on its icon. The icons exist
+ * Every remaining row is a call site waiting on its icon. The icons exist
  * (`packages/ui/src/primitives/icons.tsx` — `IconArrow`, `IconSelect`, `IconPing`,
  * `IconMeasure`, `IconDraw`, `IconFog`, `IconColor`, `IconCleanup`, `IconScene`, `IconStar`,
  * `IconDownload`, `IconChevronLeft/Right`, …); the call sites have not moved yet. Four of the
@@ -83,8 +87,6 @@ const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/g
  * says "**Primitives** never render a glyph as text" and four primitives do.
  */
 const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
-  ["apps/client/src/actors/ActorRoster.tsx", "🎭"],
-  ["apps/client/src/actors/PartyRosterTab.tsx", "🎭"],
   ["apps/client/src/encounter/ActionRunner.tsx", "→↻▴▾⚠✕✦"],
   ["apps/client/src/encounter/CharacterSheet.tsx", "↑→✕"],
   ["apps/client/src/encounter/EncounterPanel.tsx", "→▦▶◧◨✕⭐"],
@@ -92,12 +94,9 @@ const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/encounter/RollControls.tsx", "✕"],
   ["apps/client/src/integrations/ApiReference.tsx", "✓⬇"],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", "🔌"],
-  ["apps/client/src/main.tsx", "←→▾🎬"],
+  ["apps/client/src/main.tsx", "←▾🎬"],
   ["apps/client/src/maps/MapManager.tsx", "←↑→↓"],
   ["apps/client/src/replay/ReplayPanel.tsx", "←→⏭⏮⏸▶⬇🎬"],
-  // The whole map toolbar, in one file. M1's primary target and the single largest row here.
-  ["apps/client/src/scene/EncounterMap.tsx", "→⇲⏻▢▦▩▹◀◧◨◭◯◼☀⛌⛶✏⬆🌫🎨🎬👁📍📏🔔🔕🕶🛠"],
-  ["apps/client/src/scene/TokenContextMenu.tsx", "✕"],
   ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
   ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🎬🗑🗺"],
   ["apps/client/src/tokens/TokenLibrary.tsx", "🎴"],
@@ -471,10 +470,12 @@ describe("(d) colours come from design-tokens.css — design-language.md:46-47",
  */
 const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 
-/** Measured 2026-08-03: 122 call sites across 15 files, every one a surface awaiting its rebuild onto `useToast`. */
+/**
+ * Measured 2026-08-03: 122 call sites across 15 files, every one a surface awaiting its rebuild
+ * onto `useToast`. **103 across 13** since the shell rebuild (D15): `actors/ActorRoster.tsx` (18)
+ * is gone entirely and the Roster tab's one call became a toast.
+ */
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/actors/ActorRoster.tsx", 18],
-  ["apps/client/src/actors/PartyRosterTab.tsx", 1],
   ["apps/client/src/dice/DicePanel.tsx", 7],
   ["apps/client/src/encounter/CharacterSheet.tsx", 8],
   ["apps/client/src/encounter/EncounterPanel.tsx", 17],

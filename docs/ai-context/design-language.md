@@ -168,7 +168,6 @@ unmeasured. Run it at 320px too: the narrower width is the worse case, not the b
 | Control | Why it is still open |
 |---|---|
 | `DicePanel`'s two `<summary>` disclosures | Unclassed `<summary>` in `apps/client/src/dice/`, which has no stylesheet of its own; needs a scoped rule there. |
-| `.encounter-map-swatches button` (color picker) | Inside a popover grid; 44px areas would overlap at the current gap. |
 | Raw `<input type="checkbox">` outside the named labels | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
 | `.codex-graph-node` (Connection graph) | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. The number of sub-floor nodes is data-dependent and width-dependent — it scales with the campaign, so it is a tool output, never a constant in a document. |
 
@@ -195,7 +194,9 @@ Two ways to meet the floor — pick by whether growing the paint hurts:
 the sum of their overhangs** or the later sibling silently steals the earlier one's
 taps. Worked examples live in the codebase — `.nh-card-tools`, a pressable-chip row,
 and `.encounter-map-tools`, which gets away with a small gap only because its paint is
-already close to the floor.
+already close to the floor. That last one is why the map toolbar sizes its `IconButton`s
+UP to 2.5rem (`scene/encounter-map.css`) instead of taking the primitive's 2.25rem: the
+2px-a-side overhang fits the bar's gap, a 4px-a-side one would not.
 
 New controls inherit this by composing `@vtt/ui` primitives. A hand-rolled control
 must state which of the two routes it took. **Verify by measuring, not by eye**, and

@@ -2,6 +2,7 @@ import type { AbilityId, Actor, GameState, PendingSave, RollRecord } from "@vtt/
 import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
+import { recordRoll as recordRollInHistory } from "./roll-history.js";
 import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -187,8 +188,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
     total: resolution.total,
     createdAt: base.createdAt
   };
-  state.rolls.push(record);
-  if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
+  recordRollInHistory(state, record);
 }
 
 /**

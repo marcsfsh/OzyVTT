@@ -10,16 +10,29 @@ main { width: min(100% - 2rem, 1720px); margin: 0 auto; padding: clamp(1.5rem, 5
 /* Height of the fixed connection strip (see .connection-banner). Declared here so the page
    padding, the strip, and the builder's top inset all read one number. */
 :root { --connection-banner-h: 2.5rem; }
-header { max-width: 40rem; }
+/* (No bare `header` rule. One lived here — `max-width: 40rem`, written for the old left-aligned landing
+   hero — and it clamped EVERY <header> in the app to 640px, including the character builder's sticky
+   header and the Codex entry heads: known-bugs.md's `[ui] bare header` entry. D30's landing owns its
+   own width (`.home-hero`, `.landing`), so the global goes rather than gets scoped.) */
 
 h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1; letter-spacing: var(--tracking-display); margin: .35rem 0 1rem; }
 h2 { font-family: var(--font-display); font-size: var(--fs-h1); line-height: var(--lh-snug); margin: 0 0 .5rem; }
 p { color: var(--text-dim); line-height: var(--lh-body); }
 .eyebrow { display: inline-block; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
 
-.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 3rem; max-width: 46rem; }
-.choices button { position: relative; }
-.choices .nav-arrow { position: absolute; top: 1.3rem; right: 1.3rem; margin: 0; font-size: 1.15rem; line-height: 1; color: var(--cyan); }
+/* D30 — the landing page is one centred column, and it is centred BY the column rather than by the
+   page happening to be narrow: `.landing` is its own centred stack, so the wordmark's box is centred
+   at every width including the 1720px `main`. */
+.landing { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: min(84vh, 52rem); padding-bottom: 4rem; text-align: center; }
+.landing > *:not(.home-hero-atmos) { position: relative; z-index: 1; width: 100%; }
+/* Quiet, and out of the column: the theme switch is the only other control on the page. */
+.landing .home-theme-switch { position: absolute; right: 0; bottom: 0; width: auto; margin: 0; opacity: .75; }
+.landing .home-theme-switch:hover, .landing .home-theme-switch:focus-within { opacity: 1; }
+.landing .notice { max-width: 32rem; margin-inline: auto; text-align: left; }
+.landing .card { margin-inline: auto; text-align: left; }
+.choices { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: clamp(1.5rem, 4vw, 2.5rem); }
+.choices .nh-btn { flex: 0 1 15rem; justify-content: center; padding: 1rem 1.6rem; font-size: 1.05rem; }
+.choices .nav-arrow { color: currentColor; }
 
 /* Base controls. Reusable buttons should use @vtt/ui <Button>; this styles the
    raw <button>/<input>/<select> that remain, in the token vocabulary. */
@@ -43,7 +56,7 @@ button strong { font-size: 1.1rem; }
 button span { color: var(--text-dim); font-size: .9rem; margin-top: .25rem; }
 .secondary { background: transparent; }
 
-.card, .table, .dice-proof, .roster { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.card, .table, .dice-proof { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .card { max-width: 32rem; }
 
 /* Code/identifiers use the branded mono face (Space Mono), not the browser default monospace. */
@@ -64,28 +77,47 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .empty strong { color: var(--text); font-family: var(--font-display); font-weight: 400; }
 .empty span { margin-top: .4rem; }
 
+/* Shared by the Integrations panel's heading/feedback rows (the roster that used to own these classes
+   is gone — its party is the strip below and its management moved to the Roster tab). */
 .roster-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
 .roster-heading h2 { font-size: var(--fs-h1); }
 .roster-heading p { max-width: 23rem; margin: 0; font-size: .9rem; text-align: right; }
-
-.actor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; margin-top: 1.3rem; }
-.actor-card { display: flex; flex-direction: column; min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.actor-card-owned { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-.actor-card-title { display: flex; align-items: center; gap: .75rem; }
-.actor-card h3 { margin: 0 0 .2rem; font: 400 1rem/1.2 var(--font-display); }
-.actor-card-status { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .25rem; }
 .presence { display: inline-flex; align-items: center; font-size: .7rem; color: var(--text-muted); }
 .presence-online { color: var(--cyan-hi); }
 .presence-reconnecting { color: var(--violet-hi); }
 .presence-offline { color: var(--text-muted); }
-.actor-card dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; margin: 1rem 0; }
-.actor-card dl div { padding: .55rem .35rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
-.actor-card dt { color: var(--text-muted); font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; }
-.actor-card dd { margin: .15rem 0 0; font-weight: 700; font-family: var(--font-mono); }
-/* Card CTA now renders as <Button variant="primary|secondary" block> (@vtt/ui);
-   only the pin-to-card-bottom layout hook stays local (block gives full width). */
-.actor-action { margin-top: auto; }
 .roster-feedback { min-height: 1.4rem; margin: .8rem 0 0; font-size: .85rem; }
+
+/* ---- The party strip (D15): the whole roster, out of combat, in one ~56px row ----
+   `min-width: 0` on the strip and on the map column is load-bearing, not defensive dressing: a grid
+   item's automatic minimum size is its CONTENT's, so a party of five pills (5 x 13rem) widened the
+   whole table column past the phone — measured in Chromium's 390px emulation as a 706px layout
+   viewport, i.e. the entire app zoomed out. The row scrolls; the page must not. */
+.party-strip { min-width: 0; max-width: 100%; margin: 0 0 .9rem; }
+.table-layout > .table { min-width: 0; }
+.party-strip-row { display: flex; gap: .5rem; min-width: 0; max-width: 100%; margin: 0; padding: 0 0 .25rem; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.party-strip-item { flex: 0 0 auto; }
+.party-strip-entry { display: flex; align-items: center; gap: .5rem; min-height: 3.5rem; max-width: 13rem; padding: .5rem .8rem .5rem .5rem; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); text-align: left; }
+button.party-strip-entry { cursor: pointer; }
+button.party-strip-entry:hover { border-color: var(--line-strong); }
+.party-strip-item.is-mine .party-strip-entry { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.party-strip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.party-strip-hp { flex: 0 0 auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .8rem; color: var(--text-dim); }
+.party-strip-claim { flex: 0 0 auto; width: .5rem; height: .5rem; border-radius: 50%; background: var(--text-muted); }
+.party-strip-claim--claimed { background: var(--violet-hi); }
+.party-strip-claim--mine { background: var(--cyan-hi); }
+.party-strip-empty { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+.party-strip-empty p { margin: 0; font-size: .85rem; }
+
+/* ---- The player's pre-claim picker (B4.2) ---- */
+.claim-view { margin-bottom: 1.2rem; }
+.claim-heading h2 { font-size: var(--fs-h2); }
+.claim-heading p { margin: 0 0 1rem; font-size: .9rem; }
+.claim-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .8rem; margin: 0; padding: 0; list-style: none; }
+.claim-card { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); text-align: center; }
+.claim-card-name { margin: 0; font: 400 1.05rem/1.2 var(--font-display); }
+.claim-card-action { margin-top: auto; }
+.claim-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
 
 .renderer-proof { margin-top: 3rem; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-1); }
 .proof-heading { padding: 1.25rem 1.5rem .8rem; display: flex; justify-content: space-between; gap: 1rem; align-items: end; }
@@ -175,12 +207,15 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 
 @media (max-width: 760px) {
   .dice-form { grid-template-columns: 1fr 1fr; }
-  .actor-grid { grid-template-columns: 1fr; }
   .integration-form { grid-template-columns: 1fr; }
   .integration-meta { grid-template-columns: repeat(2, 1fr); }
+  .import-preview div { grid-template-columns: 1fr; gap: .1rem; }
 }
 @media (max-width: 560px) {
-  .choices { grid-template-columns: 1fr; }
+  /* The two landing doors sit side by side above this rung and stack full-width below it (§E). */
+  .choices .nh-btn { flex: 1 1 100%; }
+  .party-queue-actions { width: 100%; margin-left: 0; }
+  .party-queue-actions .nh-btn { flex: 1 1 auto; }
   .roster-heading, .proof-heading { display: block; }
   .roster-heading p, .proof-heading p { text-align: left; margin-top: .8rem; }
   .proof-canvas { height: 68vw; min-height: 310px; }
@@ -247,27 +282,21 @@ main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
    claimed character = cyan selection accent. Head (name + HP) · labelled Conditions · HP tracker · buttons. */
 .you-are-playing { display: flex; align-items: center; justify-content: space-between; gap: 1rem 1.4rem; flex-wrap: wrap; margin-top: 1.3rem; padding: .9rem 1.2rem; border: 1px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--glow-cyan); }
 .you-are-playing-head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
-.you-are-playing .eyebrow { color: var(--cyan-hi); }
+.you-are-playing-label { color: var(--cyan-hi); }
 .you-are-playing-head strong { font: 400 1.3rem var(--font-display); color: var(--text); }
 .you-are-playing-conditions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 /* v5 #7.1: the conditions control needs an explicit label so its "+ Add" isn't ambiguous. */
 .you-are-playing-cond-label { color: var(--text-muted); font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .you-are-playing-buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
 .you-are-playing button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
-.you-are-playing .roster-feedback { flex-basis: 100%; min-height: 0; margin: 0; }
 .you-badge { margin-left: .5rem; vertical-align: middle; }
 
 .own-hp { color: var(--cyan-hi); font-size: .85rem; font-weight: 700; }
 .own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
 .own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
-/* Damage/Heal/Temp now render as <Button size="sm"> (@vtt/ui); the flex row above places them. */
-/* Hit Point Dice (SRD short-rest healing): pool readout + stepper + one roll button. */
-.hit-dice-spender { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
-.hit-dice-pool { color: var(--text-dim); font-size: .8rem; font-weight: 700; }
-/* Roll & heal now renders as <Button size="sm"> (@vtt/ui). */
-.hit-dice-empty { margin: .6rem 0 0; color: var(--text-muted); font-size: .78rem; }
-.actor-rest { display: flex; gap: .5rem; margin: .6rem 0; }
-.actor-rest .nh-btn { flex: 1; }
+/* Damage/Heal/Temp now render as <Button size="sm"> (@vtt/ui); the flex row above places them.
+   Rests and Hit Dice live on the sheet (one tap from here and from the party strip), which is where
+   the GM already had them — the roster's second copy went with the roster. */
 
 .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; }
 /* .anim-view animates transform; with fill-mode:both Blink keeps .table-layout as a containing block
@@ -299,15 +328,32 @@ main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
 .scene-prep-modal .scene-panel { margin-top: 0; }
 .empty-scene-prep { margin-top: 1rem; padding: .6rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
 
-/* Live-combat roster collapse: one quiet line instead of a wall of duplicate character cards. */
-.roster-collapsed { margin: 1.2rem 0 0; }
-.roster-collapsed > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
-.roster-collapsed > summary:hover { border-color: var(--line-strong); color: var(--text); }
-.roster-collapsed[open] > summary { margin-bottom: .4rem; }
 .sidebar-collapsed { margin-top: .8rem; }
 .sidebar-collapsed > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .sidebar-collapsed > summary:hover { border-color: var(--line-strong); color: var(--text); }
 .sidebar-collapsed > .dice-proof, .sidebar-collapsed > section { margin-top: .5rem; }
+
+/* ---- The Roster tab's management sections (B6). The party gallery itself is styled with the other
+   card galleries in encounter-panel.css; these are the pieces the tab gained when it became the
+   management home: the header's actions, the approval queue, the archived disclosure. ---- */
+.party-heading-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0 0 1.4rem; }
+.party-queue { margin: 0 0 1.6rem; padding: 1rem 1.1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); }
+.party-section-head { margin: 0 0 .7rem; font: 400 1.1rem/1.2 var(--font-display); color: var(--violet-hi); }
+.party-queue-list { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.party-queue-row { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); }
+.party-queue-name { font-weight: 700; }
+.party-queue-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-left: auto; }
+.party-card-preview { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; padding: 0 .9rem .6rem; }
+.party-card-preview-label { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.party-archived { margin-top: 1.4rem; }
+.party-archived > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.party-archived > summary:hover { border-color: var(--line-strong); color: var(--text); }
+.party-archived-note { margin: .7rem 0; font-size: .85rem; }
+.import-preview { display: grid; gap: .5rem; margin: 0; }
+.import-preview div { display: grid; grid-template-columns: 9rem 1fr; gap: .6rem; align-items: baseline; }
+.import-preview dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.import-preview dd { margin: 0; }
+.import-preview-abilities { display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-family: var(--font-mono); }
 
 /* Theme switch placements. */
 .home-theme-switch { margin-top: var(--space-6); }
@@ -332,15 +378,20 @@ main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
 [data-theme="light"] .app-texture { display: none; }
 @media (prefers-reduced-transparency: reduce) { .app-texture { display: none; } }
 
-/* Home hero: one bold moment — arcade wordmark over a receding grid + color bloom. */
-.home-hero { position: relative; overflow: hidden; max-width: none; padding: clamp(2rem, 7vw, 5rem) 0 clamp(3rem, 9vw, 6rem); }
-.home-hero > *:not(.home-hero-atmos) { position: relative; z-index: 1; }
-.home-hero > p { max-width: 40rem; }
+/* Home hero: one bold moment — arcade wordmark over a receding grid + color bloom. D30 makes it the
+   WHOLE statement: the wordmark, centred, and nothing else in the header at all. */
+.home-hero { position: relative; max-width: none; padding: 0 0 clamp(1.5rem, 5vw, 3rem); text-align: center; }
 .home-hero-atmos, .empty-atmos { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .home-hero-bloom { position: absolute; left: 6%; right: 6%; top: 4%; height: 46%; background: var(--grad-bloom); filter: blur(72px); opacity: .32; border-radius: 50%; }
 .home-hero-grid { position: absolute; left: -25%; right: -25%; bottom: -12%; height: 62%; opacity: .7; -webkit-mask-image: linear-gradient(to top, #000, transparent); mask-image: linear-gradient(to top, #000, transparent); }
-.home-hero-title { margin: .35rem 0 1.1rem; }
-.home-hero-title .nh-wordmark { font-size: clamp(2.6rem, 9vw, 5.5rem); line-height: .95; }
+/* Over a full-height column the bloom sits high behind the wordmark and the horizon runs across the
+   lower third — the receding-grid statement D30 asks for, instead of a 60px band behind one word. */
+.landing .home-hero-bloom { top: 12%; height: 40%; opacity: .38; }
+.landing .home-hero-grid { bottom: 0; height: 42%; opacity: .8; }
+.home-hero-title { margin: 0; }
+/* `block` + centred text, not an inline gradient span left where the flow put it: the wordmark's own
+   box has to be the centred thing, or it only LOOKS centred when the page column happens to be narrow. */
+.home-hero-title .nh-wordmark { display: block; font-size: clamp(3rem, 13vw, 8rem); line-height: .95; }
 
 /* Empty map = the hero moment built from grid + line + color, not an object (§6.5). It stands in for a
    loaded battlemap, so it's sized like one — this also drives the map panel (and the --setup-h-matched

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, BuilderAbilityMethodSchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, RuleExceptionsSchema, RuleModeSchema } from "@vtt/domain";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, AskableCommandSchema, BuilderAbilityMethodSchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, RuleExceptionsSchema, RuleModeSchema } from "@vtt/domain";
 import { AbilitySchema, CharacterChoiceSchema, CharacterIdentitySchema, CurrencySchema, InventoryItemSchema, ProficienciesSchema } from "@vtt/schemas";
 
 /**
@@ -159,6 +159,48 @@ export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId:
 export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), commit: z.boolean().default(true), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), naturalRoll: z.number().int().min(1).max(20).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Change the LIVE fight's dial, and optionally its per-family exceptions. Omitting `exceptions` leaves the stored ones untouched, so an old mode-only payload still means exactly what it always meant. */
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: RuleModeSchema, exceptions: WireRuleExceptionsSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * THE TAP IS THE ATTACK (D10). One command for "use this action", whatever the situation: the SERVER
+ * decides whether it resolves in the fight, is refused because it is not this creature's turn, or rolls
+ * as loose dice. `includeDamage` is opt-in so a sheet that renders its own damage chip cannot make the
+ * same tap roll damage twice.
+ */
+export const ActionUseSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  actionId: z.string().regex(/^[a-z0-9-]+$/).max(120),
+  targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+  rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+  /** Loose route only: also roll the action's damage parts in the same tap. Ignored in the fight, where the resolver rolls damage. */
+  includeDamage: z.boolean().optional(),
+  /** GM bypass of a rules block (including the off-turn refusal); reason optional (D9). Refused for players, like `action.resolve`. */
+  override: RulesOverrideSchema.optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
+ * THE SAVE CHIP ANSWERS THE QUESTION (D10). A sheet save chip used to roll a loose d20 that ignored an
+ * open pending save entirely - the table watched a save happen and the tracker kept waiting for it.
+ * This routes: a matching pending save is ANSWERED; with none open it is a loose, attributed save roll.
+ */
+export const SaveRollSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  ability: AbilitySchema,
+  rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+  /** A hand-entered final total (the off-screen die), used verbatim instead of rolling. */
+  total: z.number().int().min(-50).max(100).optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
+ * ASK THE GM (D8). The payload is the player's ORIGINAL command, verbatim - the server revalidates it
+ * with that command's own schema before it goes anywhere, so `z.unknown()` here is a hand-off, not a
+ * hole. The ask carries its own `commandId` so the ask itself is idempotent like every other command.
+ */
+export const RulesAskSchema = z.object({ commandId: z.string().uuid(), type: AskableCommandSchema, payload: z.unknown(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM answers a parked ask (D9): Allow re-runs the parked command with an override, Deny tells the player. The reason is OPTIONAL - one tap, never a mandatory modal. */
+export const RulesAnswerSchema = z.object({ commandId: z.string().uuid(), askId: z.string().uuid(), allow: z.boolean(), reason: z.string().trim().min(1).max(300).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** GM sets the STANDING rules policy every new fight inherits (D7). Omitting `exceptions` keeps the stored ones (the `customFormula` tri-state precedent). */
 export const RulesSetPolicySchema = z.object({ commandId: z.string().uuid(), dial: RuleModeSchema, exceptions: WireRuleExceptionsSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** GM sets the table's staging defaults (D2): the visibility a newly staged combatant's token starts at. */

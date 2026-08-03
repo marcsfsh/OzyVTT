@@ -318,6 +318,40 @@ export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
  */
 export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
 
+/**
+ * The commands a blocked player may ask the GM about (D8). Deliberately a closed list: `rules.answer`
+ * re-runs the parked payload under GM authority, so "which commands can be replayed with an override"
+ * has to be a decision, never whatever a client happens to send.
+ */
+export const AskableCommandSchema = z.enum(["action.resolve", "action.use", "token.move", "actor.set-condition"]);
+export type AskableCommand = z.infer<typeof AskableCommandSchema>;
+
+/**
+ * A player's parked "Ask the GM" (D8). A blocked player action used to be a SILENT dead end - they
+ * tapped, the server refused, and nothing at all reached them. Now the block carries one button, and
+ * the tap parks the exact command here for the GM to allow or deny in one tap of their own.
+ *
+ * The owner is NOT stored: it is the parked actor's `ownerSessionId`, read live, exactly as pending
+ * saves and reaction prompts decide whose prompt is whose. `command.payload` is the original request,
+ * kept verbatim so the re-run is the SAME command - it is revalidated against its own schema before it
+ * runs again, and it never crosses to a player (it can name target ids they cannot see).
+ */
+export const PendingRuleAskSchema = z.object({
+  id: z.string().uuid(),
+  /** The character the blocked command was for; also decides which player may see this ask. */
+  actorId: z.string().uuid(),
+  /** The machine-readable rule that blocked it (e.g. `economy.action-used`). */
+  rule: z.string().min(1).max(120),
+  /** The rule's family, or null when nothing has classified it (see RuleFamilySchema). */
+  family: RuleFamilySchema.nullable().default(null),
+  /** The player-facing sentence the block produced ("That needs your action - already used this turn"). */
+  message: z.string().min(1).max(300),
+  /** The parked command, replayed verbatim on Allow. GM-only - never projected to any player. */
+  command: z.object({ type: AskableCommandSchema, payload: z.unknown() }).strict(),
+  createdAt: z.string().datetime()
+}).strict();
+export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
+
 /** Combat fields shared by the live top-level combat and each parked scene - everything except the map (a Scene carries its own) and the scene bookkeeping (only the top level carries that). */
 const sceneCombatShape = {
   active: z.boolean().default(false),
@@ -404,6 +438,8 @@ const sceneCombatShape = {
   pendingReactions: z.array(PendingReactionSchema).max(20).default([]),
   /** Player-initiated hits awaiting the GM's Apply tap in proposal mode (see PendingDamageSchema). GM-only. */
   pendingDamage: z.array(PendingDamageSchema).max(50).default([]),
+  /** Blocked player actions waiting on the GM's Allow/Deny (see PendingRuleAskSchema). A player sees only their own. */
+  pendingRuleAsks: z.array(PendingRuleAskSchema).max(10).default([]),
   /** Claimed-PC actorIds whose owner still owes an initiative roll (when the encounter started with
    * `playersRollInitiative`). Cleared as each player rolls (initiative:roll-self) or the GM rolls the rest. */
   pendingInitiative: z.array(z.string().uuid()).max(200).default([])
@@ -445,7 +481,7 @@ export const CombatStateSchema = z.object({
   }
   if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["activeSceneId"], message: "The active scene must be one of the prepared scenes." });
   const active = combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
-  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || Object.keys(active.combat.legendaryUsed).length > 0 || active.combat.fog.enabled || active.combat.fog.shapes.length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0 || active.combat.pendingDamage.length > 0 || active.combat.pendingInitiative.length > 0)) {
+  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || Object.keys(active.combat.legendaryUsed).length > 0 || active.combat.fog.enabled || active.combat.fog.shapes.length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0 || active.combat.pendingDamage.length > 0 || active.combat.pendingRuleAsks.length > 0 || active.combat.pendingInitiative.length > 0)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes"], message: "The active scene's stored combat must be empty - its live copy is the top-level combat." });
   }
 });
@@ -540,7 +576,13 @@ export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: bool
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects">;
 /** A player's own pending reaction prompts only; same masking rules as saves. */
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: RuleMode; /** Per-family overrides of `rulesMode` (see CombatState.ruleExceptions). Players see the table's rules configuration exactly as they already see `rulesMode` - it holds no secrets, and a player's sheet has to know whether a block is coming before they tap. */ ruleExceptions: RuleExceptions; /** Per-table policy for a player's own hits (see CombatState.playerDamageMode); lets the player runner label the outcome ("handed to the GM" vs "applied"). The pendingDamage proposals themselves stay GM-only. */ playerDamageMode: "proposal" | "direct"; /** Public claimed-PC actorIds still owing an initiative roll - a player checks whether their own id is here to show the "Roll initiative" prompt. */ pendingInitiative: readonly string[]; /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode: "immediate" | "wait"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
+/**
+ * A player's view of their OWN parked ask (D8): enough to say "waiting on the GM" and which of their
+ * taps it was. `command` is absent by design - the parked payload can name target ids the player is not
+ * allowed to know, and a player never needs it to read their own pending question.
+ */
+export type PlayerPendingRuleAsk = Omit<PendingRuleAsk, "command">;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: RuleMode; /** Per-family overrides of `rulesMode` (see CombatState.ruleExceptions). Players see the table's rules configuration exactly as they already see `rulesMode` - it holds no secrets, and a player's sheet has to know whether a block is coming before they tap. */ ruleExceptions: RuleExceptions; /** Per-table policy for a player's own hits (see CombatState.playerDamageMode); lets the player runner label the outcome ("handed to the GM" vs "applied"). The pendingDamage proposals themselves stay GM-only. */ playerDamageMode: "proposal" | "direct"; /** Public claimed-PC actorIds still owing an initiative roll - a player checks whether their own id is here to show the "Roll initiative" prompt. */ pendingInitiative: readonly string[]; /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode: "immediate" | "wait"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** The player's OWN parked Ask-the-GM questions (see PlayerPendingRuleAsk) - never another player's, never the GM's deliberation. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
 /**
  * The door to an archived character's read-only sheet, and NOTHING else: id and name only, and only
  * for archived characters the GM explicitly shared (`sheetPreview`) that were public to begin with.
@@ -553,8 +595,30 @@ export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
 export type TurnHistoryEntry = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string }>;
 export type GmView = Omit<GameState, "actors"> & { actors: GmActor[]; turnHistory?: readonly TurnHistoryEntry[] };
-/** A persisted combat-log line. Players only ever receive gmOnly=false entries; the GM sees all. */
-export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll" | "movement" | "effect" | "death-save" | "override"; text: string; gmOnly: boolean; revision: number }>;
+/**
+ * One line of THE TABLE FEED (D11) - the single durable record of what happened at the table: rolls,
+ * hits, saves, turn starts, narration. Players only ever receive gmOnly=false entries; the GM sees all,
+ * and a `self-only` roll reaches exactly one player (the roller) and the GM.
+ *
+ * The feed superseded the dice-log/combat-log split: `kind: "roll"` rows carry the whole roll in `roll`
+ * so "where did my roll go" has one answer. `GameState.rolls` stays as the live 200-roll hot window
+ * (wire contract, and the sheet's pinned last roll reads it) - the two share `RollRecord.id`, so a client
+ * that reads both dedupes on it rather than double-rendering.
+ */
+export type CombatLogEntry = Readonly<{
+  id: number;
+  at: string;
+  kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll" | "movement" | "effect" | "death-save" | "override";
+  text: string;
+  gmOnly: boolean;
+  revision: number;
+  /** Which character or monster this line is about (D11 "every roll attributed") - drives the feed's "just mine" filter. Absent on table-wide lines. */
+  actorId?: string | null;
+  /** The roll behind a `kind: "roll"` row, in the player-safe shape - `initiatorSessionId` is stripped for EVERY recipient, GM included (the GM already has it in `GameState.rolls`). */
+  roll?: PlayerRollRecord;
+  /** True only on a `self-only` roll the RECIPIENT rolled - "only you can see this". Computed per recipient; never stored. */
+  private?: boolean;
+}>;
 
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
 export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save"; text: string; actorIds: readonly string[]; at: number }>;
@@ -836,6 +900,23 @@ export interface ClientToServerEvents {
   "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; maxLevel?: number; playerBuilder?: "open" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   /** GM sets the STANDING rules policy every new fight inherits (D7): the dial plus per-family exceptions. Omitted `exceptions` keeps the stored ones. */
   "rules:set-policy": (payload: { commandId: string; dial: RuleMode; exceptions?: RuleExceptions; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /**
+   * THE TAP IS THE ATTACK (D10). One command for "use this action"; the ack's `route` says what the
+   * server did - `resolved` (in the fight, on this creature's turn), or `loose` (no fight, or this
+   * creature is not in it) with the roll ids. Off turn it comes back `blocked` like any rules refusal,
+   * which is what makes it overridable by the GM and askable by the player.
+   */
+  "action:use": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; rollMode?: "advantage" | "disadvantage" | "normal"; includeDamage?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult & { route?: "resolved" | "loose"; rollIds?: readonly string[]; warning?: string }) => void) => void;
+  /** Roll a saving throw (D10): answers a matching pending save when one is open (`route: "answered"`), otherwise a loose attributed save (`route: "loose"`). */
+  "save:roll": (payload: { commandId: string; actorId: string; ability: AbilityId; rollMode?: "advantage" | "disadvantage" | "normal"; total?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult & { route?: "answered" | "loose"; saveId?: string; rollId?: string }) => void) => void;
+  /**
+   * ASK THE GM (D8). A player whose command came back `blocked` sends the SAME command here; the server
+   * re-runs it under their own authority first, so an ask that would now succeed just succeeds
+   * (`ran: true`), and only a still-blocked command is parked for the GM (`askId`).
+   */
+  "rules:ask": (payload: { commandId: string; type: AskableCommand; payload: unknown; expectedRevision?: number }, acknowledgement: (result: MutationResult & { askId?: string; ran?: boolean }) => void) => void;
+  /** GM answers a parked ask in one tap (D9): Allow re-runs the parked command with an override (reason optional), Deny tells the player. */
+  "rules:answer": (payload: { commandId: string; askId: string; allow: boolean; reason?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   /** GM sets the table's staging defaults (D2): what visibility a newly staged combatant's token starts at. */
   "table:set-staging-defaults": (payload: { commandId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-token-image": (payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

@@ -55,7 +55,9 @@ narrow set, and the shape of that code is the rule:
   It is a door, not a second actor projection; everything else about them stays omitted.
 - **Table policy the player must see to obey it** is copied FIELD BY FIELD, never spread:
   `builderPolicy` (which ability methods, the custom formula, the level cap, whether the
-  builder is open to players) and the combat's `rulesMode` + `ruleExceptions`. The field-by-field
+  builder is open to players) and the combat's `rulesMode` + `ruleExceptions`. `pendingRuleAsks`
+  is filtered by the same ownership rule as `pendingSaves`/`pendingReactions` and drops
+  `command` entirely. The field-by-field
   copy is the review point — a field added to `BuilderPolicySchema` reaches players only when
   someone writes it into that copy on purpose.
 
@@ -84,7 +86,11 @@ the router. Full rules in `codex.md`.
 - A player may only roll/move for an actor whose `ownerSessionId` matches theirs.
 - Players **cannot**: claim a non-PC or already-claimed actor, own two characters, make
   gm-only rolls, or see other sessions' `ownerSessionId` / `notes` / private rolls / hidden
-  actors / hidden turns.
+  actors / hidden turns / other players' parked rules questions.
+- **A blocked player is never a silent dead end.** A rules refusal reaches them as a
+  machine-readable `blocked`, and `rules.ask` parks it for the GM (`combat.pendingRuleAsks`).
+  A player sees only their OWN ask, and never its parked `command` payload — that can name
+  target ids they may not know. Only a GM-grade principal may `rules.answer`.
 - Role derives from the **signed token, not network position**.
 
 ## Gotchas

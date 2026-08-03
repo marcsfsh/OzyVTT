@@ -151,15 +151,6 @@ Format: `[area] — description — suspected cause / status`.
   auto-roll client-side, but nothing server-side accepts a typed builder result the way
   `initiative.roll-self` accepts `natural`. Without it the client owns the roll (violates server
   authority).
-- **[ui] A bare `header { max-width: 40rem }` in `apps/client/src/styles.css` clamps every
-  `<header>` in the app.** It was written for the landing hero. Found 2026-07-27 when it silently
-  clamped the character builder's sticky header to 640px, letting the step body scroll visibly
-  through the uncovered gutter. Every `@vtt/ui` primitive that owns a `<header>` now defends itself
-  with `max-width: none` (`WizardShell`, `ReviewSummary`, `Modal`, `Panel`, `Drawer`), so the
-  primitives are safe — **the app global itself is still unscoped**, and it still clamps every
-  app-owned `<header>`: `.codex-entry-head`, `.acting-console-head` and anything added later, which
-  inherits the bug by default rather than opting out of it. The real fix is to scope the global
-  (e.g. `main > header`) — a visual change wide enough to want its own pass.
 - **[character-builder] No GM-facing editor for `builder.set-policy`.** The command and the
   `PlayerView.builderPolicy` projection both exist and the wizard honours the policy (it offers only
   the permitted ability methods, and "custom" only when a formula is configured), but nothing in the
@@ -344,18 +335,6 @@ for a layout or pointer claim, a contrast calculator against
   nine false failures before it was understood. The browser pass therefore runs its two pin checks at
   desktop only and says why; pin reachability on a phone is the tap audit's job, where it is measured
   rather than clicked.
-
-- **[app-shell/mobile] At 375px the GM's Codex starts roughly 1500px down the document,** below the
-  character-roster dock and the eight-tab strip. **The PLAYER half of this is fixed** (2026-07-31, Codex
-  QA client pass): D4 moved the player Codex out of a top-layer `<dialog>.showModal()` into document
-  flow under the same dock, which was a new regression rather than the shell's inherited problem, so the
-  roster and the YouArePlaying bar are now hidden while the player's Codex view is open. The GM's Codex
-  was already `GM_TABS[3]` before this engagement and that half stands as written below. Observed while capturing browser evidence: a viewport
-  screenshot at scroll 0 on any Codex address is a picture of the roster. **Not the Codex's doing** —
-  the dock is the app shell's and the stacking affects every GM tab equally — so it was left untouched
-  rather than worked around inside one tab. It is nonetheless the single worst thing about using the
-  Codex on a phone, and it is a shell-level fix (collapse the dock below the ladder's narrow step, or
-  make the tab strip sticky). Flagged for whoever owns the shell.
 
 - **[codex/verify] `tap-audit.mjs`'s "unresolved" column over-reports at narrow widths.** `reach === 0`
   means `elementFromPoint` never resolved to the control — for an SVG child, or for anything that could

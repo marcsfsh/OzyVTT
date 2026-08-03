@@ -3,8 +3,10 @@ import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
 import "@vtt/ui/styles.css";
 import "./styles.css";
-import { ActorRoster, YouArePlaying } from "./actors/ActorRoster";
+import { ClaimCharacter } from "./actors/ClaimCharacter";
 import { PartyRosterTab } from "./actors/PartyRosterTab";
+import { PartyStrip } from "./actors/PartyStrip";
+import { YouArePlaying } from "./actors/YouArePlaying";
 import { CharacterBuilder } from "./builder/CharacterBuilder";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
@@ -29,7 +31,7 @@ import { NotFoundView } from "./components/NotFoundView";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal, Badge, Button, Input } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, IconArrow, Modal, Badge, Button, Input } from "@vtt/ui";
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
@@ -43,9 +45,11 @@ async function api(path: string, init?: RequestInit) {
 // v4 #10: reordered to Encounter | Scenes | Character Roster | ... | VTT Setup; Viewer is kept (it drives
 // the shared screen) and placed after Character Roster.
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
-  { id: "table", label: "Encounter" },
+  // D28: the place is the **Table** (an "encounter" is the fight that happens on it), and the roster is
+  // the **Roster** — one word, matching its address and the strip that now carries the party.
+  { id: "table", label: "Table" },
   { id: "scenes", label: "Scenes" },
-  { id: "roster", label: "Character Roster" },
+  { id: "roster", label: "Roster" },
   { id: "codex", label: "Codex" },
   // Immediately after Codex: the two GM authoring surfaces sit adjacent, and Homebrew
   // is not the eighth-and-furthest label in the tab bar's scroll container.
@@ -77,8 +81,9 @@ function App() {
     navigate(next === gmTab ? pathForGmTab(next) : lastLocationForTab("gm", pathForGmTab(next).slice(1)) ?? pathForGmTab(next));
   /** D4: the player's two views. Every address that is not the Codex is the table. */
   const playerView: "table" | "codex" = route.segments[0] === "codex" ? "codex" : "table";
-  /** The player is READING the Codex, so the table's own furniture above it is not what they asked for. */
-  const playerCodexOpen = mode === "player" && playerView === "codex";
+  /* (The shell used to hide its roster while the player read the Codex — the one surface it had been
+     removed from. There is no shell roster to hide any more: the party lives on the table, so every
+     view except the table is now free of it by construction rather than by exception.) */
   /**
    * D3 — an address the app does not answer, for a signed-in GM. Two rules, and the second was missing.
    *
@@ -289,6 +294,12 @@ function App() {
   // GM can position the tracker during encounter setup too (report #9/#6). Players' projection nulls
   // mapAssetId until combat is active, so this stays GM-side and never affects the viewer.
   const combatMapActive = !!state && !!state.combat.mapAssetId;
+  /**
+   * Has this player claimed anyone? It decides which half of the player's table renders: the pre-claim
+   * picker (§B4.2) or their own character. Read off the projection's own `claimStatus`, never inferred.
+   */
+  const playerHasClaimed = mode === "player" && !!state
+    && (state as PlayerView).actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
   const showDocked = combatMapActive && dockPosition !== "sidebar";
   const encounterDock = combatMapActive ? { position: dockPosition, onChange: setDockPosition } : undefined;
   const encounterPanel = state
@@ -325,29 +336,42 @@ function App() {
     if (previewScene) { navigate(pathForGmTab("table")); setScenePrepOpen(false); setScenesModalOpen(false); }
   }, [previewScene]);
   const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
+  /**
+   * D30 — the landing page is ONE centred column: the wordmark, the two doors, nothing else.
+   *
+   * The GM password step is part of it (the buttons swap for the card), so the hero stays up rather
+   * than the app appearing to change identity between two halves of the same decision.
+   */
+  const preAuth = mode === "home" || (mode === "gm" && !gmToken);
   return <main>
     <div className="app-texture" aria-hidden="true" />
     {mode !== "home" && <TableEventToasts />}
-    {mode === "home" && <header className="home-hero scanlines anim-view">
-      <div className="home-hero-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div>
-      <span className="eyebrow">Your table</span>
-      <h1 className="home-hero-title"><Wordmark>OzyVTT</Wordmark></h1>
-      <p>Combat-first D&amp;D 5e, hosted by your group. Table ready.</p>
-      <div className="home-theme-switch"><ThemeToggle /></div>
-    </header>}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
-    <Notice notice={notice} />
-    {mode === "home" && <section className="choices anim-view">
-      <button className="lift" onClick={joinPlayer} disabled={busy}><strong>Join as Player</strong><span>Choose your character and take your seat.</span><span className="nav-arrow" aria-hidden="true">→</span></button>
-      <button className="secondary lift" onClick={() => { setNotice(null); setMode("gm"); }}><strong>Enter as GM</strong><span>Run the table, encounter, and hidden information.</span><span className="nav-arrow" aria-hidden="true">→</span></button>
-    </section>}
-    {mode === "gm" && !gmToken && <section className="card anim-view">
-      <h2>{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
-      <p>{bootstrapped ? "Enter the GM password to run the table." : "Do this once, on the host machine, before players join."}</p>
-      <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
-      <Button variant="primary" onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}{!busy && <span className="nav-arrow" aria-hidden="true">→</span>}</Button>
-      <Button variant="ghost" className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</Button>
-    </section>}
+    {preAuth && <div className="landing scanlines">
+      {/* The atmosphere belongs to the whole view, not to the wordmark's own box: bloom high, the
+          perspective horizon across the lower third, scanlines over both. All three are existing
+          tokens/classes (`--grad-bloom`, `grid-floor`, `scanlines`) that only the old hero used. */}
+      <div className="home-hero-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div>
+      <header className="home-hero anim-view">
+        {/* The one bold thing on the view: no eyebrow, no subtext, nothing beside it (D30). */}
+        <h1 className="home-hero-title"><Wordmark>OzyVTT</Wordmark></h1>
+      </header>
+      {mode === "home" && <section className="choices anim-view">
+        <Button variant="primary" size="md" lift onClick={joinPlayer} disabled={busy}>{busy ? "Connecting…" : "Join as Player"}<IconArrow className="nav-arrow" /></Button>
+        <Button variant="secondary" lift onClick={() => { setNotice(null); setMode("gm"); }}>Enter as GM<IconArrow className="nav-arrow" /></Button>
+      </section>}
+      {mode === "gm" && !gmToken && <section className="card anim-view">
+        <h2>{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
+        <p>{bootstrapped ? "Enter the GM password to run the table." : "Do this once, on the host machine, before players join."}</p>
+        <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
+        <Button variant="primary" onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}{!busy && <IconArrow className="nav-arrow" />}</Button>
+        <Button variant="ghost" className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</Button>
+      </section>}
+      {/* Auth errors are the sanctioned inline exception to toast-only feedback (§D6). */}
+      <Notice notice={notice} />
+      <div className="home-theme-switch"><ThemeToggle /></div>
+    </div>}
+    {!preAuth && <Notice notice={notice} />}
     {mode === "gm" && gmToken && state && builderOpen && <CharacterBuilder
       state={state}
       sessionKey="gm"
@@ -358,25 +382,13 @@ function App() {
       onCreated={(name) => setNotice({ tone: "success", text: `${name} joined the roster — ready to claim.` })}
     />}
     {mode !== "home" && state && !builderOpen && <>
-      {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live encounter it
-          duplicates the combat tracker at several times the size, so it collapses behind one "Character
-          Roster" disclosure - the arrow is the only toggle (v5 #6.1) - still one tap away mid-fight. */}
-      {/* v5 #7: a player's own character is no longer inside the roster; it rides the always-shown
-          YouArePlaying bar below, so the roster can collapse for both roles without hiding their identity. */}
-      {/* D4 moved the player Codex out of a top-layer `<dialog>.showModal()` and into document flow. The
-          roster and the YouArePlaying bar sit above it, and out of combat the roster is a full one-column
-          card grid at =<760px — so a player tapping Codex, reloading, or following a deep link landed at
-          scroll 0 looking at the party roster with the Codex about 1500px below it. The modal it replaced
-          was visible immediately regardless of scroll, which makes this a regression D4 introduced rather
-          than the shell's pre-existing tab problem. The Codex is a WHOLE VIEW of the player app: while it
-          is open, the table's furniture is not what they asked for. (The GM's Codex tab has the same
-          shell above it, but the Codex was already GM_TABS[3] before this engagement — see
-          known-bugs.md — so that half stays out of this pass.) */}
-      {!playerCodexOpen && (state.combat.active
-        ? <details className="roster-collapsed"><summary>Character Roster</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, onCreateCharacter: () => setBuilderOpen(true) } : { role: "player" as const, state: state as PlayerView })} /></details>
-        : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, onCreateCharacter: () => setBuilderOpen(true) } : { role: "player" as const, state: state as PlayerView })} />)}
-      {mode === "player" && !playerCodexOpen && <YouArePlaying state={state as PlayerView} />}
-
+      {/* **A10/D15: the shell renders no roster.** It used to render the whole one — a full-size card
+          grid out of combat — above the tab bar, which put it above the map, above Scenes, above
+          Homebrew, above the GM's Codex (which therefore began ~1500px down at phone width), and above
+          the Roster tab, where it appeared a SECOND time under the tab's own gallery. The party belongs
+          to the table, so it lives on the table: a slim strip out of combat (§B2.2), the player's
+          pre-claim picker on the player's table (§B4.2), and management — create, import, approve,
+          archive — on the Roster tab (§B6). Nothing above the tabs but the tabs. */}
       {mode === "gm" && <Tabs
         className="gm-tabs"
         ariaLabel="GM sections"
@@ -421,6 +433,16 @@ function App() {
           {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <div className="scenes-open-row">
             <Button variant="secondary" className="scenes-open" aria-label={activeScene ? `Scenes — ${activeScene.name} is live` : "Scenes"} onClick={() => setScenesModalOpen(true)}><span className="scenes-open-icon" aria-hidden="true">🎬</span>{activeSceneName}<span className="scenes-open-caret" aria-hidden="true">▾</span></Button>
           </div>}
+          {/* D15/D32 — the party is part of the TABLE. A player who has claimed nobody gets the picker
+              (never stranded by the roster's removal); a player who has claimed leads with their own
+              character; and out of combat both roles get the slim strip, because in combat the turn
+              order already carries the same people. */}
+          {mode === "player" && (playerHasClaimed
+            ? <YouArePlaying state={state as PlayerView} />
+            : <ClaimCharacter state={state as PlayerView} />)}
+          {!previewScene && !state.combat.active && (mode === "gm"
+            ? <PartyStrip role="gm" state={state as GmView} onOpenRoster={() => navigate(pathForGmTab("roster"))} />
+            : playerHasClaimed ? <PartyStrip role="player" state={state as PlayerView} /> : null)}
           {previewScene ? <>
             <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> - only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
             <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} fog={previewScene.combat.fog} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} healthDisplay={previewScene.combat.healthDisplay} state={state} />
@@ -479,7 +501,7 @@ function App() {
 
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} onCreateCharacter={() => setBuilderOpen(true)} /></div>}
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} openArchiveId={replayArchiveId} onOpenedArchive={() => navigate("/replays", { replace: true })} /></div>}
       {mode === "gm" && gmToken && route.segments[0] === "codex" && <div className="anim-view codex-anim"><CodexShell gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}

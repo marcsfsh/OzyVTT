@@ -5,6 +5,7 @@ import { criticalThreshold, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
+import { recordRoll as recordRollInHistory } from "./roll-history.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
@@ -109,8 +110,7 @@ function recordRoll(state: GameState, resolution: ReturnType<typeof resolveDice>
     modifiers: resolution.terms.filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier").map((term) => ({ value: term.value, sign: term.sign })),
     total: resolution.total
   };
-  state.rolls.push(record);
-  if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
+  recordRollInHistory(state, record);
 }
 
 const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;

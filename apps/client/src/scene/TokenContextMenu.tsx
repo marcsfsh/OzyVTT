@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
+import { IconButton, IconX } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -73,13 +74,14 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   };
   // GM-only control: the token's per-token override (undefined = follows the table default).
   const healthOverride = role === "gm" ? (actor as GmActor).healthDisplay : undefined;
-  const onGmLayer = actor.visibility === "gm-only";
-  const toggleLayer = () => {
-    const visibility = onGmLayer ? "public" : "gm-only";
+  // The reveal words, not layer jargon (D28): a token is either shown to players or hidden from them.
+  const hiddenFromPlayers = actor.visibility === "gm-only";
+  const toggleReveal = () => {
+    const visibility = hiddenFromPlayers ? "public" : "gm-only";
     setBusy(true);
     socket.emit("actor:set-visibility", { commandId: newId(), actorId: actor.id, visibility }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
-      setFeedback(result.ok ? (visibility === "gm-only" ? "Moved to the GM layer." : "Moved to the shared layer.") : result.message ?? "The layer could not be changed.");
+      setFeedback(result.ok ? (visibility === "gm-only" ? "Hidden from players." : "Shown to players.") : result.message ?? "That could not be changed.");
     });
   };
   const SIZES = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
@@ -96,7 +98,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   // which is hidden) so the menu is visible. Falls back to body when not in fullscreen.
   return createPortal(
     <div ref={ref} className="token-context-menu anim-popover" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
-      <div className="token-context-head"><strong>{actor.name}</strong><button type="button" aria-label="Close menu" onClick={onClose}>✕</button></div>
+      <div className="token-context-head"><strong>{actor.name}</strong><IconButton label="Close menu" size="sm" onClick={onClose}><IconX /></IconButton></div>
       {role === "gm" && <div className="token-context-hp" role="group" aria-label="Adjust hit points">
         <input type="number" min="1" max="1000" placeholder="HP" aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", "Damaged")}>Dmg</button>
@@ -128,7 +130,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       </details>
       <button type="button" className="token-context-item" onClick={() => { onOpenSheet(); onClose(); }}>Open {actor.kind === "player-character" ? "character sheet" : "stat block"}</button>
       {role === "gm" && gmToken && <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>Set token image…</button>}
-      {role === "gm" && <button type="button" className="token-context-item" disabled={busy} title={onGmLayer ? "Reveal this token to players and the shared screen" : "Hide this token from players and the shared screen"} onClick={toggleLayer}>{onGmLayer ? "Move to shared layer" : "Move to GM layer"}</button>}
+      {role === "gm" && <button type="button" className="token-context-item" disabled={busy} title={hiddenFromPlayers ? "Reveal this token to players and the shared screen" : "Hide this token from players and the shared screen"} onClick={toggleReveal}>{hiddenFromPlayers ? "Show to players" : "Hide from players"}</button>}
       <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent - restore" : "Use reaction"}</button>
       {role === "gm" && placed && <button type="button" className="token-context-item" onClick={() => { onReturnToTray(); onClose(); }}>Return to tray</button>}
       {feedback && <p className="token-context-feedback" role="status">{feedback}</p>}

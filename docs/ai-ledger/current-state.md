@@ -17,7 +17,10 @@ scale (`apps/server/src/grid-calibration.ts`, `grid-calibration-wizard.ts`);
 server-authoritative token sizing, snapping and movement (`token-placement.ts`); initiative,
 turns and rounds (`encounter.ts`); drawings, measurements and pings (`annotations.ts`);
 GM-painted manual fog (`fog.ts`, ADR-0022); staged scenes that park and resume an encounter
-(`scenes.ts`).
+(`scenes.ts`). Every map tool reaches the GM through **one collapsible toolbar**
+(`apps/client/src/scene/MapToolbar.tsx`): Select · Ping · Measure always visible, everything
+else one tap deeper under a labelled Draw / Fog / View group, collapsing to a single `Tools`
+button at ≤560px. Nothing floats loose over the battle map any more.
 
 **5e rules engine** (ADR-0020, server-owned). Action resolution, typed damage, persistent
 effects and conditions, saving throws, reactions and opportunity attacks, concentration,
@@ -29,6 +32,27 @@ each fight inherits at `encounter.start`, plus per-family exceptions (`combat.ru
 "don't police movement" doesn't also switch off the action economy — the family map and the one
 `effectiveModeFor` every rule site reads live in `rules-families.ts` beside the engine. A GM override
 is one tap (the reason is optional) and is remembered per family for the rest of that turn.
+A blocked player is no longer a dead end: `rules.ask` parks the exact command in
+`combat.pendingRuleAsks` (`rule-asks.ts`) and `rules.answer` allows it — replaying that command under
+GM authority with the override injected and the stale `expectedRevision` stripped — or declines it.
+A player sees only their own ask, without its payload.
+
+**One table feed** (D11). The combat-log store IS the feed (`apps/server/src/combat-log.ts`): every
+roll now lands there as a `kind: "roll"` row carrying the whole `RollRecord`, attributed to its
+character, alongside the narration it always held. `GameState.rolls` stays as the live 200-roll hot
+window; the two share `RollRecord.id` so a reader dedupes rather than double-renders. One writer
+(`roll-history.ts` `recordRoll`) feeds both, initiative finally records real rolls, and a player's
+loose tray roll is attributed server-side to their claimed character. Delivery is per socket: a
+`self-only` roll reaches its roller and the GM, a `blind` roll the GM alone, and the roller's session
+id is stripped for every recipient (`projectFeedRow`). Rows written before the feed columns existed
+read back as plain narration; nothing is backfilled.
+
+**The tap is the attack** (D10, server-side). `action.use` routes a sheet tap itself — resolved in
+the fight on this creature's turn, refused off turn with the overridable and askable
+`economy.not-your-turn`, or loose attributed dice with no fight running (`tap-routing.ts`). `save.roll`
+answers a matching pending save through the same path the tracker uses instead of rolling a die past
+it. Both are additive: `action.resolve`, `save.answer` and `dice.roll` are unchanged, and the client
+still uses the old paths until its surfaces switch over.
 
 **Character sheet and guided builder.** An interactive play sheet
 (`apps/client/src/encounter/CharacterSheet.tsx`, ADR-0021) plus a full-page guided builder
@@ -48,6 +72,12 @@ homebrew authoring with its own store, router and change ping
 Beyond PDF sheet ingestion (`packages/dndbeyond-pdf`, `apps/client/src/pdfImport/`,
 ADR-0018) including player-submitted imports and a GM approval queue
 (`GameState.pendingImports`).
+
+**The shell holds no roster** (D15/D30). `/` is the centred wordmark over bloom and horizon, two
+Buttons, no subtext. The party is the table's: a slim scrolling strip out of combat
+(`apps/client/src/actors/PartyStrip.tsx`), the pre-claim picker on the player's table
+(`ClaimCharacter.tsx`), and create/import/approve/archive — the PDF queue included — on the Roster
+tab (`PartyRosterTab.tsx`). Nothing renders above the tab bar, so every GM tab starts at the top.
 
 **Table viewer / second screen.** Pairing codes exchanged for a hashed cookie session, an
 SSE presentation feed, and a player-safe projection that never carries `GameState`

@@ -58,13 +58,18 @@ export const CONVENTION_SHAPE = {
    */
   glyphSourceFloor: 80,
   /**
-   * Current offenders as (file, glyph) pairs: **23 files / 84 pairs**, measured 2026-08-03 by
-   * the scan in `design-conventions.test.ts` itself (walk the scanned set, strip comments,
-   * report `codepoint -> file:line`). Both must reach 0 — the icons exist now
-   * (`packages/ui/src/primitives/icons.tsx`), the call sites have not migrated yet.
+   * Current offenders as (file, glyph) pairs: **19 files / 52 pairs**. Measured 2026-08-03 at
+   * 23/84 by the scan in `design-conventions.test.ts` itself (walk the scanned set, strip
+   * comments, report `codepoint -> file:line`); down 2 files / 29 pairs when the collapsible map
+   * toolbar (D4) landed and `scene/EncounterMap.tsx` (28 — the largest row the list ever had)
+   * and `scene/TokenContextMenu.tsx` (1) started rendering `@vtt/ui` icons instead of emoji, and
+   * down another 2 files / 3 pairs when the shell rebuild (D15/D30) deleted the lobby roster,
+   * gave the Roster tab an icon-free empty state, and put `IconArrow` on the landing's two doors.
+   * Both must reach 0 — the icons exist (`packages/ui/src/primitives/icons.tsx`), the remaining
+   * call sites have not migrated yet.
    */
-  glyphAllowFiles: 23,
-  glyphAllowPairs: 84,
+  glyphAllowFiles: 19,
+  glyphAllowPairs: 52,
 
   // ─────────────────────────── (b) raw form elements ───────────────────────────
   /**
@@ -95,19 +100,22 @@ export const CONVENTION_SHAPE = {
    */
   eyebrowSourceFloor: 100,
   /**
-   * Local `eyebrow` class token in a `className`: **20** uses in **16** files (2026-08-03).
+   * Local `eyebrow` class token in a `className`: **15** uses in **14** files. Measured
+   * 2026-08-03 at 20/16; the shell rebuild (D15/D30) took five with it — the landing's eyebrow
+   * (D30 removes the subtext outright), the deleted lobby roster's two, the Roster tab's, and
+   * the player bar's, which renders `<Eyebrow>` now.
    * This is the TOKEN count, not `\beyebrow\b`, which measures 35 on the same tree because
    * `\b` matches at a hyphen and sweeps in the different classes `viewer-eyebrow` (x4) and
    * `viewer-tools-eyebrow` (x1). Those are the viewer rebuild's problem, not this scan's.
    */
-  eyebrowUses: 20,
-  eyebrowFiles: 16,
+  eyebrowUses: 15,
+  eyebrowFiles: 14,
   /**
-   * `.eyebrow` selectors still in `apps/client/src/styles.css`: **2** — the declaration at
-   * `styles.css:18` and the second consumer at `styles.css:250`. Both go when the last use
-   * moves to `<Eyebrow>`; the check then holds absence.
+   * `.eyebrow` selectors still in `apps/client/src/styles.css`: **1** — the declaration alone.
+   * The second, `.you-are-playing .eyebrow`, went when the player bar moved to `<Eyebrow>`. The
+   * declaration goes when the last of the 15 call sites moves; the check then holds absence.
    */
-  eyebrowCssSelectors: 2,
+  eyebrowCssSelectors: 1,
 
   // ─────────────────────────── (d) hand-typed colours ───────────────────────────
   /**
@@ -129,16 +137,17 @@ export const CONVENTION_SHAPE = {
 
   // ─────────────────────────── (e) one feedback channel ───────────────────────────
   /**
-   * Inline `setMessage(…)` / `setFeedback(…)` feedback: **122** call sites in **15** files
-   * (2026-08-03). Command:
+   * Inline `setMessage(…)` / `setFeedback(…)` feedback: **103** call sites in **13** files.
+   * Measured 2026-08-03 at 122/15; the shell rebuild (D15) deleted `actors/ActorRoster.tsx` (18
+   * of them) and moved the Roster tab's one onto `useToast`. Command:
    * `grep -rnoE '\bset(Message|Feedback)\s*\(' apps/client/src --include=*.tsx | wc -l`
    *
    * The `useState` destructurings do not count and need no subtraction — `setMessage]` is not
    * followed by `(`. When the surfaces land on `useToast`, the state itself goes and this
    * reaches 0, which is a structurally stronger assertion than any string match.
    */
-  feedbackAllowFiles: 15,
-  feedbackAllowSites: 122,
+  feedbackAllowFiles: 13,
+  feedbackAllowSites: 103,
 
   // ─────────────────────────── (f) the breakpoint ladder ───────────────────────────
   /**
