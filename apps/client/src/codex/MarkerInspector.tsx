@@ -1,9 +1,8 @@
-import { Alert, Badge, Button, Combobox, Field, IconButton, IconPlay, IconPlus, IconX, Input, SaveState, Select, Switch, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, HiddenFromPlayers, IconButton, IconPlay, IconPlus, IconX, Input, RevealSwitch, SaveState, Select, Switch, TagInput } from "@vtt/ui";
 import { atlasApi, journalApi, type CodexAutosaveSettings, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { useCodexAutosave } from "./autosave";
 import { CodexIcon, IconPicker, EntityIcon, pinSwatchVar } from "./icons";
 
-import { RevealSwitch, HiddenFromPlayers } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { socket } from "../socket";
 import { useCallback, useEffect, useMemo, useState } from "react";

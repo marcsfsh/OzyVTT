@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 8 GameState fields · 76 commands · 179 HTTP paths
+- 8 GameState fields · 75 commands · 178 HTTP paths
 
 ## GameState shape
 
@@ -84,7 +84,6 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-player-initiative-mode` | `combat:write` |
-| `encounter.set-roll-mode` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.start` | `combat:write` |
 | `fog.paint` | `scene:write` |
@@ -234,7 +233,6 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/encounter/health-display`
 - `POST /api/v1/game/encounter/player-damage-mode`
 - `POST /api/v1/game/encounter/player-initiative-mode`
-- `POST /api/v1/game/encounter/roll-mode`
 - `POST /api/v1/game/encounter/rules-mode`
 - `POST /api/v1/game/encounter/start`
 - `POST /api/v1/game/fog/enabled`

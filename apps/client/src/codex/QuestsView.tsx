@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Combobox, Field, GmOnlyTag, IconButton, IconChevron, IconPlus, IconX, Input, Panel, RevealSwitch, SaveState, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
 import { questApi, type CodexAutosaveSettings, type CodexQuest, type CodexQuestObjective, type CodexQuestStatus } from "./api";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
 import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";
-import { GmOnlyTag, RevealSwitch, VisibilityBadge } from "./SecretMarkers";
 import { CodexIcon, EntityIcon } from "./icons";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";

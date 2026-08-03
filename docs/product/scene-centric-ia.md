@@ -115,7 +115,7 @@ No duplication.
 
 - `sceneCombatShape` (~line 212) — the combat fields shared by live combat and every parked scene:
   `active`, `round`, `turnActorId`, `initiative`, `tokens`, `annotations`, `turn` (economy),
-  `rulesMode`, `rollMode`, `healthDisplay`, `underwater`, `reactionsUsed`, `legendaryUsed`, `fog`,
+  `rulesMode`, `healthDisplay`, `underwater`, `reactionsUsed`, `legendaryUsed`, `fog`,
   `pendingSaves`, `pendingReactions`.
 - `SceneCombatSchema` (~line 278) — `sceneCombatShape` + `refineCombatContext` validation.
 - **`SceneSchema`** (~line 282) — `{ id: uuid, name: string(1..120), mapAssetId: uuid, combat: SceneCombat }`.

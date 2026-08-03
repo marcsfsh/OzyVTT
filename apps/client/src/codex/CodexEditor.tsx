@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from "react";
-import { MarkdownEditor } from "@vtt/ui";
+import { GmOnlyTag, MarkdownEditor } from "@vtt/ui";
 import { CodexMarkdown } from "./CodexMarkdown";
-import { GmOnlyTag } from "./SecretMarkers";
 import { uploadCodexAsset, pageLinkKey } from "./api";
 
 /**

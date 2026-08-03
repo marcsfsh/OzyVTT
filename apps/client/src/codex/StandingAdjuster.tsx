@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Field, Input, Meter, Modal } from "@vtt/ui";
+import { Alert, Badge, Button, Field, Input, Meter, Modal, RevealSwitch } from "@vtt/ui";
 import { standingApi, type CodexStanding } from "./api";
 import { STANDING_MAX, STANDING_METER_MAX, STANDING_MIN, clampStanding, standingLabel, standingMeterTone, standingMeterValue, standingTone, standingValueLabel } from "./chronicle";
-import { RevealSwitch } from "./SecretMarkers";
 
 /**
  * M12 / CT-6 — where the GM moves a faction's standing, and says why.

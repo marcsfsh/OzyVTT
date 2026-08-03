@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import {
+  type AbilityPoolValue,
   AbilityScoreAllocator,
   Alert,
   Avatar,
@@ -8,9 +9,10 @@ import {
   Button,
   Checklist,
   type ChecklistItem,
+  Chip,
   ChoiceCard,
   ChoiceGrid,
-  Chip,
+  type ChoiceOption,
   Combobox,
   DiceInputRow,
   Drawer,
@@ -18,20 +20,35 @@ import {
   FeatureList,
   Field,
   FieldGrid,
+  GmOnlyTag,
+  HiddenFromPlayers,
+  IconArrow,
   IconButton,
   IconCheck,
   IconChevron,
+  IconChevronLeft,
+  IconChevronRight,
+  IconCleanup,
+  IconColor,
   IconCopy,
   IconDie,
+  IconDownload,
   IconDrag,
+  IconDraw,
   IconEye,
   IconEyeOff,
+  IconFog,
   IconInfo,
+  IconMeasure,
   IconPencil,
+  IconPing,
   IconPlay,
   IconPlus,
+  IconScene,
   IconSearch,
+  IconSelect,
   IconShuffle,
+  IconStar,
   IconTrash,
   IconWarning,
   IconX,
@@ -40,35 +57,35 @@ import {
   LinkButton,
   MarkdownEditor,
   Menu,
-  Meter,
   MenuItem,
+  Meter,
   Modal,
   NameField,
   NumberField,
   Panel,
   PanelHeader,
+  RevealSwitch,
   ReviewSummary,
   RowEditor,
   SaveState,
+  type SaveStatus,
   SegmentedControl,
   Select,
   Skeleton,
   Stepper,
   Steps,
   Switch,
-  TagInput,
+  type TabItem,
   Tabs,
+  TagInput,
   Textarea,
   ThemeToggle,
-  Tooltip,
   ToastProvider,
+  Tooltip,
   useToast,
+  VisibilityBadge,
   WizardShell,
-  Wordmark,
-  type AbilityPoolValue,
-  type ChoiceOption,
-  type SaveStatus,
-  type TabItem
+  Wordmark
 } from "@vtt/ui";
 
 /** Living style guide for the OzyVTT design system. Dev-only reference
@@ -238,7 +255,9 @@ const OVERFLOW_TABS: TabItem[] = [
 
 const ICONS = [
   { name: "IconCheck", glyph: <IconCheck />, use: "the one chosen mark" },
-  { name: "IconChevron", glyph: <IconChevron />, use: "disclosure; rotate for back" },
+  { name: "IconChevron", glyph: <IconChevron />, use: "disclosure; rotate when open" },
+  { name: "IconChevronLeft", glyph: <IconChevronLeft />, use: "back / previous" },
+  { name: "IconChevronRight", glyph: <IconChevronRight />, use: "next / more this way" },
   { name: "IconSearch", glyph: <IconSearch />, use: "filter a catalog" },
   { name: "IconShuffle", glyph: <IconShuffle />, use: "generate; in flight" },
   { name: "IconDie", glyph: <IconDie />, use: "roll it for me" },
@@ -255,7 +274,23 @@ const ICONS = [
   // typed as characters. The close control was a literal "×" in five components (Manrope has no U+00D7
   // at the right weight, so it substituted), and the run/activate control was a "▶".
   { name: "IconX", glyph: <IconX />, use: "close / clear a chosen value" },
-  { name: "IconPlay", glyph: <IconPlay />, use: "make live / run" }
+  { name: "IconPlay", glyph: <IconPlay />, use: "make live / run" },
+  // The forward arrow was held back for years on an all-or-none argument, and the sweep that replaces
+  // every text glyph is the pass that finally pays for it — the landing hero, the roster and the sheet
+  // take it together. Rotate it for ← ↑ ↓; it is centred on the 24-box for exactly that.
+  { name: "IconArrow", glyph: <IconArrow />, use: "this takes you there" },
+  { name: "IconDownload", glyph: <IconDownload />, use: "keep a copy / export" },
+  // The map toolbar's tools, which were emoji until this set grew them: emoji take no token colour,
+  // draw differently per platform, and read as decoration in a row of controls that are not.
+  { name: "IconSelect", glyph: <IconSelect />, use: "select / move — the resting tool" },
+  { name: "IconPing", glyph: <IconPing />, use: "ping: look here" },
+  { name: "IconMeasure", glyph: <IconMeasure />, use: "distance" },
+  { name: "IconDraw", glyph: <IconDraw />, use: "draw shapes" },
+  { name: "IconFog", glyph: <IconFog />, use: "fog of war" },
+  { name: "IconColor", glyph: <IconColor />, use: "pick a drawing colour" },
+  { name: "IconCleanup", glyph: <IconCleanup />, use: "sweep the map's marks (not destructive)" },
+  { name: "IconScene", glyph: <IconScene />, use: "a scene" },
+  { name: "IconStar", glyph: <IconStar />, use: "legendary — always worded" }
 ];
 
 const SAVE_STATUSES: SaveStatus[] = ["idle", "dirty", "saving", "saved", "conflict", "error"];
@@ -740,6 +775,9 @@ export function StyleGuide() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerSide, setDrawerSide] = useState<"right" | "left">("right");
   const [cardPick, setCardPick] = useState("fighter");
+  const [charges, setCharges] = useState(3);
+  const [attuned, setAttuned] = useState(true);
+  const [revealed, setRevealed] = useState(false);
 
   return (
     <ToastProvider>
@@ -795,7 +833,7 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="icons" title="Icons" blurb="The system's own SVG glyphs — 24×24, filled with currentColor, sized in em, always aria-hidden so the control around them carries the name. A primitive never renders a glyph as TEXT: Manrope has no ⚠, so it silently falls back to a system face at the wrong size and iOS/Android give it emoji presentation — a yellow triangle, a hue this palette does not own. The set is deliberately small; the app's richer fantasy-cartography glyphs live in the client. There is no IconArrow: the forward → is all-or-none across seven existing call sites, and half-adopting it would mix a drawn arrow with a fallback glyph on the same screen.">
+          <Section id="icons" title="Icons" blurb="The system's own SVG glyphs — 24×24, filled with currentColor, sized in em, always aria-hidden so the control around them carries the name. A primitive never renders a glyph as TEXT: Manrope has no ⚠, so it silently falls back to a system face at the wrong size and iOS/Android give it emoji presentation — a yellow triangle, a hue this palette does not own. The app's richer fantasy-cartography glyphs still live in the client, but everything the CHROME needs is here — including the map tools, which were emoji (✏ 👁 🌫 🎨 📍 📏) until this set grew them, and IconArrow, which was held back for years on the grounds that the forward → is all-or-none across its call sites: half-adopting it would have mixed a drawn arrow with a font fallback on one screen, so it landed with the sweep that replaces the rest of them.">
             <div className="sg-icons">
               {ICONS.map((icon) => (
                 <div className="sg-icon" key={icon.name}>
@@ -877,6 +915,27 @@ export function StyleGuide() {
                   <NumberField id={`sg-fg-${ability.id}`} value={10} onChange={() => {}} min={1} max={30} />
                 </Field>
               ))}
+            </FieldGrid>
+            <h3 className="sg-h3">The label band — four controls, one line</h3>
+            <p className="sg-muted">
+              A <code>Field</code> stacks a label over its control, so every input well in a grid row starts one
+              label-height plus one row-gap below the top of its cell. A <code>Stepper</code> used to put its label
+              BESIDE the control and a <code>Switch</code> had no band at all, so both began at the cell top —
+              about 25px high — and the stepper dragged its centred label up out of the label row with it. The
+              height is now one token, <code>--nh-label-band</code>, written once in <code>forms.css</code> as the
+              arithmetic of the two rules it has to match. A labeled Stepper stacks into it; a Switch
+              <em> reserves</em> it with <code>banded</code> and leaves the cell above the track empty, which is
+              the right answer — the track belongs level with the wells, not with the labels. Sight down the tops.
+            </p>
+            {/* `.sg-align-row` is the selector `scripts/primitive-align-check.mjs` measures — it compares
+                the control tops inside this row at 390px and 1280px. Rename it there in the same edit. */}
+            <FieldGrid className="sg-align-row" min="12rem">
+              <Field label="Display name" htmlFor="sg-align-name"><Input id="sg-align-name" placeholder="Frost Warden" /></Field>
+              <Field label="Rarity" htmlFor="sg-align-rarity">
+                <Select id="sg-align-rarity" defaultValue="rare"><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></Select>
+              </Field>
+              <Stepper value={charges} onChange={setCharges} min={0} max={9} label="Charges" />
+              <Switch checked={attuned} onChange={setAttuned} label="Requires attunement" banded />
             </FieldGrid>
           </Section>
 
@@ -981,7 +1040,7 @@ export function StyleGuide() {
             </div>
             <p className="sg-muted">
               The <strong>record axis</strong> is a different question: whether a whole record has been shared
-              yet. These two axes collided once and were deliberately separated (see <code>SecretMarkers.tsx</code>),
+              yet. These two axes collided once and were deliberately separated (see the Reveal section below),
               so “Hidden from players” is <em>neutral with an eye-off icon</em> and never violet — a hidden page
               is one switch away from being shared, while a GM body never will be. Use <code>VisibilityBadge</code>
               rather than hand-rolling the pair.
@@ -1099,20 +1158,60 @@ export function StyleGuide() {
             </ul>
           </Section>
 
-          <Section id="switch" title="Switch" blurb="On/off toggle for settings that take effect immediately (role=switch). Reach for a checkbox only inside a form that's submitted.">
+          <Section id="switch" title="Switch" blurb="On/off toggle for settings that take effect immediately (role=switch). Reach for a checkbox only inside a form that's submitted. Two props exist for the same failure — a switch that moves. banded reserves the label band above the track so it lines up with the input wells in a form row (see Field grid); labelAlternate reserves the width of the OTHER state's label so the track does not slide out from under the pointer on the click that changes it. Neither is on by default: a switch in a toolbar row has no band to match and a switch whose label never changes has nothing to reserve.">
             <div className="sg-row">
-              <Switch checked={switchOn} onChange={setSwitchOn} label="Shown to players" />
-              <Switch checked={!switchOn} onChange={(v) => setSwitchOn(!v)} label="GM-only" />
+              <Switch checked={switchOn} onChange={setSwitchOn} label="Auto-stage new monsters" />
+              <Switch checked={!switchOn} onChange={(v) => setSwitchOn(!v)} label="Announce rolls" />
               <Switch checked={false} onChange={() => {}} disabled aria-label="Disabled off" />
+            </div>
+            <h3 className="sg-h3">labelAlternate — toggle it; nothing moves</h3>
+            <p className="sg-muted">
+              Both switches say the same two things. The left one reserves the wider string and the right one
+              does not: click each a few times and watch the second one shove the text beside it. The label lives
+              inside the button (it is part of the tap target), so its width IS the control's width.
+            </p>
+            <div className="sg-row">
+              <Switch checked={switchOn} onChange={setSwitchOn} aria-label="With reservation"
+                label={switchOn ? "Shown to players" : "Hidden from players"}
+                labelAlternate={switchOn ? "Hidden from players" : "Shown to players"} />
+              <span className="sg-muted tabular">↤ stays put</span>
+            </div>
+            <div className="sg-row">
+              <Switch checked={switchOn} onChange={setSwitchOn} aria-label="Without reservation"
+                label={switchOn ? "Shown to players" : "Hidden from players"} />
+              <span className="sg-muted tabular">↤ shifts</span>
             </div>
           </Section>
 
-          <Section id="stepper" title="Stepper" blurb="Numeric −/+ spinner for small bounded quantities — ability scores, dice counts, HP nudges, limited uses. Clamps and disables the spent edge. Pass format to render signed modifiers or units.">
+          <Section id="stepper" title="Stepper" blurb="Numeric −/+ spinner for small bounded quantities — ability scores, dice counts, HP nudges, limited uses. Clamps and disables the spent edge. Pass format to render signed modifiers or units. A VISIBLE label stacks above the control in the label band, so a stepper standing in a form row top-aligns with the fields either side of it; with no visible label (aria-label only, as in the ability allocator below) the control renders on its own, because a band nothing fills is just a hole.">
             <div className="sg-row">
               <Stepper value={count} onChange={setCount} min={1} max={6} label="Dice" />
               <Stepper value={16} onChange={() => {}} min={1} max={20} label="STR" />
               <Stepper value={0} onChange={() => {}} min={0} max={9} label="Spell level" />
               <Stepper value={mod} onChange={setMod} label="Modifier" format={(v) => (v === 0 ? "±0" : v > 0 ? `+${v}` : `−${Math.abs(v)}`)} />
+            </div>
+            <h3 className="sg-h3">No visible label — no band</h3>
+            <div className="sg-row">
+              <Stepper value={count} onChange={setCount} min={1} max={6} aria-label="Dice" />
+            </div>
+          </Section>
+
+          <Section id="reveal" title="Reveal — one control for “do the players see this?”" blurb="Four components and three phrases, and the phrases are the decision. This began in the Codex, where the same idea had been written five ways — GM layer, shared layer, Add as GM-only, secret, public — and every surface that asked the question later asked it in its own words. It is a primitive now, so there is exactly one place the words can change: RevealSwitch for the record's own toggle, VisibilityBadge for that same fact stated read-only on a card, HiddenFromPlayers for a list that only marks what is withheld, and GmOnlyTag for the other axis entirely — a paragraph of a shared record that is the GM's alone. The two axes are deliberately different sentences: they once shared “GM only” and appeared eighty pixels apart on one journal row, answering two different questions with the same three words.">
+            <div className="sg-row">
+              <RevealSwitch revealed={revealed} onChange={setRevealed} ariaLabel="Show this page to players" />
+              <VisibilityBadge revealed={revealed} />
+              <span className="sg-muted">↤ toggle it; neither one changes width</span>
+            </div>
+            <h3 className="sg-h3">The record axis, read-only</h3>
+            <div className="sg-row sg-row-baseline">
+              <VisibilityBadge revealed />
+              <VisibilityBadge revealed={false} />
+              <HiddenFromPlayers />
+            </div>
+            <h3 className="sg-h3">The content axis — violet, and only ever this</h3>
+            <div className="sg-row sg-row-baseline">
+              <GmOnlyTag />
+              <span className="sg-muted">Violet means GM-only content and nothing else. A hidden record is one switch away from being shared; a GM body never will be — which is why the record axis above is neutral with an eye-off mark instead.</span>
             </div>
           </Section>
 

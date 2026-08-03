@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Checklist, Meter, Skeleton, type ChecklistItem } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Meter, Skeleton, VisibilityBadge, type ChecklistItem } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
 import { sessionTitle } from "./sessions";
 import { openQuests, questProgress } from "./quests";
 import { CHRONICLE_KIND_META, STANDING_METER_MAX, deadlineStateLabel, deadlineStateTone, standingLabel, standingMeterTone, standingMeterValue, standingTone, standingValueLabel } from "./chronicle";
 import { DashCard } from "./DashCard";
-import { VisibilityBadge } from "./SecretMarkers";
 import type { CodexChronicleKind, CodexQuestStatus } from "./api";
 
 /**

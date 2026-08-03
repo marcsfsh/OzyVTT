@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Badge, Button, Input, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, HiddenFromPlayers, Input, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import { journalApi, type CodexJournalEntry } from "./api";
-import { HiddenFromPlayers } from "./SecretMarkers";
 
 /**
  * A page's pinned campaign history, shown inline in the editor: every journal entry attached to this

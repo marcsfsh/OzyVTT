@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Modal, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, Modal, RevealSwitch, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, codexApi, journalApi, questApi, revealAuditApi, sessionApi, standingApi, type CodexRevealAudit, type CodexRevealAuditKind, type CodexRevealAuditSection } from "./api";
 import { CHRONICLE_KIND_META, chronicleKindOfJournal } from "./chronicle";
 import { CodexIcon } from "./icons";
-import { RevealSwitch } from "./SecretMarkers";
 
 /**
  * M12 / CT-9 — the reveal audit: **one surface answering "what can the players see right now?"**

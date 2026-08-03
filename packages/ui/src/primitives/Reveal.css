@@ -1,0 +1,13 @@
+/* Both status pills read as STATUS rather than prose: the mono face plus tracked uppercase is the
+   system's "this is a machine fact about the record" treatment, and it keeps a two-word pill from
+   being mistaken for the record's own copy. */
+.nh-reveal-pill { font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+/* Corner-anchored variant for a GM-only content block. The positioning CONTEXT belongs to the block —
+   the pill only claims the corner and never eats the clicks in it. */
+.nh-reveal-pill--floating { position: absolute; top: var(--space-2); right: var(--space-2); pointer-events: none; }
+
+/* The visibility badge keeps sentence case: it is a fact stated in the product's own words, which the
+   glossary locks verbatim, and uppercasing them would make the badge and the switch beside it look like
+   two different vocabularies. The icon rides slightly under the cap height so it reads as a mark rather
+   than a second glyph in the sentence. */
+.nh-visibility-badge svg { width: .9em; height: .9em; }

@@ -10,6 +10,17 @@
   cursor: pointer;
 }
 .nh-switch--labeled { padding: var(--space-1) 0; }
+/* D23b — the switch has no label of its own to stack, so in a form grid it reserves the band that every
+   Field-wrapped neighbour's label occupies (`--nh-label-band`, defined in forms.css next to the two
+   rules it is derived from). The cell above the track is simply empty, which is the asked-for result:
+   track top level with the input wells, label height preserved.
+   MARGIN, not padding: the button's paint and the `.tap-target` `::after` extension are both measured
+   from its border box, and padding here would push the 44px hit area down with the track. */
+.nh-switch--banded { margin-top: var(--nh-label-band); }
+/* …and the labeled form pads itself by `--space-1` above the track (the rule three lines up), so the
+   band has to give that back or the track lands exactly that far below its neighbours' wells. Measured,
+   not reasoned: `scripts/primitive-align-check.mjs` reported the row 4.00px out before this existed. */
+.nh-switch--banded.nh-switch--labeled { margin-top: calc(var(--nh-label-band) - var(--space-1)); }
 /* Guard the toggle's internal spans from an app shell's global `button span` / `button strong`
    rules (e.g. margin-top or font-size meant for composite buttons), which would otherwise shove
    the absolutely-centered thumb off-center and resize the label. */

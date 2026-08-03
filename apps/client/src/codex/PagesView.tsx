@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Chip, Combobox, IconChevron, IconPlus, Input, MenuItem, Modal, Select, Skeleton } from "@vtt/ui";
+import { Button, Chip, Combobox, IconChevron, IconPlus, Input, MenuItem, Modal, Select, Skeleton, VisibilityBadge } from "@vtt/ui";
 import { codexApi, type CodexAutosaveSettings, type CodexPage, type CodexPageConnection, type CodexPageSummary } from "./api";
 import { PageEditor } from "./PageEditor";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
-import { VisibilityBadge } from "./SecretMarkers";
 import { EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import { MissingRecordNotice } from "../components/NotFoundView";

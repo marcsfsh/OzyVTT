@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Field, Input, Modal, SaveState, SegmentedControl, Select, TagInput, Textarea } from "@vtt/ui";
+import { Alert, Button, Field, GmOnlyTag, Input, Modal, RevealSwitch, SaveState, SegmentedControl, Select, TagInput, Textarea } from "@vtt/ui";
 import { calendarApi, codexApi, uploadCodexAsset, type CodexAutosaveSettings, type CodexCalendar, type CodexPage, type CodexPageConnection, type CodexPageRevision, type CodexPageSummary, type CodexSettings } from "./api";
 import { CodexImage } from "./CodexImage";
 import { CodexEditor } from "./CodexEditor";
 import { PageTimeline } from "./PageTimeline";
 import { PageMarkers } from "./PageMarkers";
 import { ConnectionsPanel } from "./ConnectionsPanel";
-import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";

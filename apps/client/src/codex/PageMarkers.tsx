@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Skeleton } from "@vtt/ui";
+import { Alert, HiddenFromPlayers, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import { codexApi, type CodexMarker } from "./api";
 import { CodexIcon } from "./icons";
-import { HiddenFromPlayers } from "./SecretMarkers";
 
 /**
  * CI-4 (return edge): **where this page sits on the atlas.** The Atlas has always been able to say

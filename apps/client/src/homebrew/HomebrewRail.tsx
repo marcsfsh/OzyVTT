@@ -16,8 +16,7 @@
  */
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { Badge, Button, Field, Input, Select } from "@vtt/ui";
-import { GmOnlyTag } from "../codex/SecretMarkers";
+import { Badge, Button, Field, GmOnlyTag, Input, Select } from "@vtt/ui";
 import type { HomebrewRecordSummary } from "./api";
 import { HOMEBREW_TYPES, STATUS_FILTERS, isHomebrewType, typePlural, type HomebrewType, type StatusFilter } from "./types";
 

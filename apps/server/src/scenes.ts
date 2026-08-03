@@ -24,7 +24,6 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     annotations: combat.annotations,
     turn: combat.turn,
     rulesMode: combat.rulesMode,
-    rollMode: combat.rollMode,
     playerDamageMode: combat.playerDamageMode,
     playerInitiativeMode: combat.playerInitiativeMode,
     healthDisplay: combat.healthDisplay,
@@ -41,7 +40,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
 
 /** The empty combat an inactive/active-slot scene holds (the single-source-of-truth invariant for the active scene). */
 function emptySceneCombat(): SceneCombat {
-  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", playerDamageMode: "proposal", playerInitiativeMode: "immediate", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingInitiative: [] };
+  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", playerDamageMode: "proposal", playerInitiativeMode: "immediate", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingInitiative: [] };
 }
 
 /** Builds a prepared (inactive) combat context from a combatant list: initiative at score 0, tokens at default (unplaced) positions. */
@@ -57,7 +56,7 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
   });
   const tokens = createEncounterTokens(initiative.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), geometry);
   // A newly prepared scene inherits the table's current policy settings rather than resetting to defaults.
-  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, rollMode: state.combat.rollMode, playerDamageMode: state.combat.playerDamageMode, playerInitiativeMode: state.combat.playerInitiativeMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
+  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, playerDamageMode: state.combat.playerDamageMode, playerInitiativeMode: state.combat.playerInitiativeMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
 }
 
 export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry): Scene {

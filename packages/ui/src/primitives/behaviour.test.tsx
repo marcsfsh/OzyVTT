@@ -1,10 +1,11 @@
 /**
  * Direct tests for `@vtt/ui` primitives whose contract is behavioural rather than visual.
  *
- * **Why these live in `apps/client` rather than `packages/ui`.** That package has no test script and no
- * test harness at all - only `check` - so primitives are otherwise exercised only indirectly, through
- * whichever feature happens to render them. That is adequate for a Button and inadequate for a control
- * whose defining property is something a feature test would never assert.
+ * **Moved here from `apps/client/src/ui-primitives.test.tsx`**, unchanged assertion for assertion. It was
+ * written in the client only because this package had no test script and no harness at all - only `check` -
+ * so a primitive was otherwise exercised indirectly, through whichever feature happened to render it. That
+ * is adequate for a Button and inadequate for a control whose defining property is something a feature test
+ * would never assert. The package has its own suite now, so the tests live beside the code they describe.
  *
  * `Drawer` is exactly that case. The whole reason it is not built on `Modal` is that the session console
  * must stay usable *alongside* the Codex mode behind it: no top layer, no focus trap, no scroll lock, and
@@ -18,7 +19,9 @@ import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { Combobox, Drawer, MarkdownEditor, applyMarkdownFormat, wikiLinkContext } from "@vtt/ui";
+import { Combobox } from "./Combobox";
+import { Drawer } from "./Drawer";
+import { MarkdownEditor, applyMarkdownFormat, wikiLinkContext } from "./MarkdownEditor";
 
 describe("Drawer", () => {
   it("renders titled, closeable, non-modal, and inert while closed", async () => {

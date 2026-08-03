@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, IconChevron, IconPlus, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Field, GmOnlyTag, IconChevron, IconPlus, Input, Panel, RevealSwitch, SaveState, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
 import { sessionApi, type CodexAutosaveSettings, type CodexPageSummary, type CodexSession, type CodexSessionStatus } from "./api";
 import { pickNextSession, sessionTitle } from "./sessions";
 import { createSession } from "./creates";
 import { CodexEditor } from "./CodexEditor";
-import { GmOnlyTag, RevealSwitch, VisibilityBadge } from "./SecretMarkers";
 import { TagChip } from "./TagChip";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";

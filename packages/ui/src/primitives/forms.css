@@ -1,3 +1,14 @@
+/* THE LABEL BAND (D23). A Field stacks a label over its control, so inside a FieldGrid cell every
+   Field-wrapped input's well starts one label-height plus one row-gap below the cell top. A control
+   that renders its OWN label (Stepper) or none at all (Switch) has to reserve the same distance or it
+   floats ~25px above its neighbours, dragging its label out of the label row with it.
+
+   Named once here, next to the two rules it is derived FROM — `.nh-field-label`'s line box
+   (`--fs-sm` × 1.3) plus `.nh-field`'s own `gap` — so the three can never drift apart silently.
+   Change either rule below and change this calc in the same edit; `forms-band.test.tsx` holds the
+   pairing at source level and `scripts/primitive-align-check.mjs` measures the result in a browser. */
+:root { --nh-label-band: calc(var(--fs-sm) * 1.3 + var(--space-2)); }
+
 .nh-field { display: grid; gap: var(--space-2); }
 .nh-field-label { font: 600 var(--fs-sm) / 1.3 var(--font-body); color: var(--text-dim); }
 .nh-field-req { color: var(--magenta); }

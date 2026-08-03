@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { IconChevron, IconDrag, IconPencil, Menu, MenuItem } from "@vtt/ui";
-import { VisibilityBadge } from "./SecretMarkers";
+import { IconChevron, IconDrag, IconPencil, Menu, MenuItem, VisibilityBadge } from "@vtt/ui";
 import { type CodexPageSummary } from "./api";
 import { CodexIcon, EntityIcon } from "./icons";
 

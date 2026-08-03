@@ -46,7 +46,7 @@ import {
   InitiativeRollRemainingSchema, InitiativeRollSelfSchema, InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   SetPlayerInitiativeModeSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetPlayerDamageModeSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetPlayerDamageModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -1190,17 +1190,6 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    async encounterSetRollMode(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
-      requireGmGrade(principal, "Only the GM can change the roll mode.");
-      const request = parse(SetRollModeSchema, raw, "The roll-mode command is malformed.");
-      const { commandId, mode, expectedRevision } = request;
-      const result = await store.execute({ id: commandId, type: "encounter.set-roll-mode", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        state.combat = { ...state.combat, rollMode: mode };
-      });
-      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Roll mode set to ${mode === "auto" ? "auto-roll" : "manual entry"}.`, gmOnly: true }); }
-      return { revision: result.state.revision, duplicate: result.duplicate };
-    },
-
     async encounterSetPlayerDamageMode(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can change how players' hits apply damage.");
       const request = parse(SetPlayerDamageModeSchema, raw, "The player-damage-mode command is malformed.");
@@ -1785,7 +1774,6 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["effect.end", "End an effect (GM anyone; a player their claimed character), clearing linked conditions and firing its on-end grants.", (p, raw) => operations.effectEnd(p, raw)],
     ["death-save.roll", "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).", (p, raw) => operations.deathSaveRoll(p, raw)],
     ["encounter.set-rules-mode", "Set the rules-engine enforcement mode: strict, assisted, or freeform (GM).", (p, raw) => operations.encounterSetRulesMode(p, raw)],
-    ["encounter.set-roll-mode", "Set the table's roll preference: auto-roll or manual entry first (GM).", (p, raw) => operations.encounterSetRollMode(p, raw)],
     ["encounter.set-player-damage-mode", "Set how a player's own hit reaches an enemy's HP: a GM-confirmed proposal or direct server-side apply (GM).", (p, raw) => operations.encounterSetPlayerDamageMode(p, raw)],
     ["encounter.set-player-initiative-mode", "Set whether player-rolled initiative begins turns immediately or waits for all players to roll (GM).", (p, raw) => operations.encounterSetPlayerInitiativeMode(p, raw)],
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Combobox, Field, Input, Panel, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, GmOnlyTag, Input, Panel, RevealSwitch, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexAutosaveSettings, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type CodexSession, type GmCodexCalendar } from "./api";
 import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META, CHRONICLE_LENSES, questEventLabel, questEventOf, chronicleWhenLabel, deadlineFired, deadlinesPassedBy, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, revealAheadOfPlayers, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
@@ -7,7 +7,6 @@ import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 import { CodexEditor } from "./CodexEditor";
-import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { sessionByNumber, sessionTitle } from "./sessions";
 import { Notice, useConfirm, type NoticeMessage } from "../components/feedback";
 

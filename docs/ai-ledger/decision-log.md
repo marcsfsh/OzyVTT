@@ -1087,7 +1087,8 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   reflow). Rule: the raw date is the source of truth; the instant is a derived sort key, recomputed.
 - **Codex has ONE secret-language and ONE relationship vocabulary (2026-07-25).** A six-lens UX review
   found the "players see this / players don't" idea — the codex's signature concept — expressed ~5 ways.
-  Durable rule, enforced by shared components in `apps/client/src/codex/SecretMarkers.tsx`: (1) *record
+  Durable rule, enforced by shared components in `packages/ui/src/primitives/Reveal.tsx` (promoted out
+  of the Codex when the same question started being asked on every surface): (1) *record
   reveal* is always `<RevealSwitch>` → "Shown to players" / "GM only" (never "Map shown/secret",
   "Shown/Secret", etc.); (2) *GM-only content* is always `<GmOnlyTag>` + the `.codex-gm-block` violet
   accent, identical on secret fields, the GM body tab AND its preview, the journal composer's GM field,
@@ -1129,8 +1130,10 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
     GM's.
   - **One per-browser dice-input preference (2026-07-24).** The character sheet's manual/auto + bonus
     toggle is now a shared per-browser store (`apps/client/src/dice/roll-preference.ts`) read by every
-    roll surface, replacing the table-wide GM `combat.rollMode` (retired from the UI; field/command
-    left inert). The preference is **per person, not per table** (product decision): each player
+    roll surface, replacing the table-wide GM `combat.rollMode` (retired from the UI; the field and
+    `encounter.set-roll-mode` were left inert, then **deleted outright on 2026-08-03** — the one
+    approved breaking API change of the play-facing unification). The preference is
+    **per person, not per table** (product decision): each player
     controls how their own dice input works; the toggle lives on the sheet and in the DicePanel.
   - **Attacks from the sheet too (2026-07-24).** A player's stat-block attacks resolve from their OPEN
     sheet on their turn, not just the initiative list, via a per-browser `sheetAttackMode` in the same

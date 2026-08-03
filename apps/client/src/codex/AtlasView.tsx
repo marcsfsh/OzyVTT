@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Combobox, Field, IconEyeOff, IconPlus, Input, Modal, Select, Skeleton, Switch, TagInput, useToast } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, IconEyeOff, IconPlus, Input, Modal, RevealSwitch, Select, Skeleton, Switch, TagInput, useToast } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
 import { codexApi } from "./api";
 import { MapSurface } from "./MapSurface";
 import { MarkerInspector } from "./MarkerInspector";
-import { RevealSwitch } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
 import { CODEX_ROOT, atlasPath } from "./routes";

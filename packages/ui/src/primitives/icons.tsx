@@ -27,6 +27,21 @@ export function IconChevron({ className }: Readonly<{ className?: string }>) {
   return <Glyph className={className}><path d="M12 15.4 5.6 9l1.4-1.4 5 5 5-5L18.4 9z" /></Glyph>;
 }
 
+/* The two horizontal chevrons are drawn rather than left to a CSS rotation of the one above. A rotated
+   glyph is a per-call-site decision — every consumer picks its own transform, its own origin and its own
+   whether-to-animate — and the sideways caret is the most-copied mark in the app (pagination, back,
+   carousels, master-detail). One shape, one name, no transform to get wrong. */
+
+/** Back / previous. */
+export function IconChevronLeft({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M15.4 5.6 16.8 7l-5 5 5 5-1.4 1.4L9 12z" /></Glyph>;
+}
+
+/** Forward / next / "there is more this way". */
+export function IconChevronRight({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M8.6 18.4 7.2 17l5-5-5-5L8.6 5.6 15 12z" /></Glyph>;
+}
+
 export function IconSearch({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -86,8 +101,7 @@ export function IconInfo({ className }: Readonly<{ className?: string }>) {
 
 /* ---- Authoring glyphs (RowEditor, TagInput, and the homebrew/Codex editors).
    Added together because a repeating-row editor needs the whole set at once: add a
-   row, drag it, copy it, throw it away. `IconArrow` is deliberately NOT here — the
-   forward → is all-or-none across seven existing call sites and is its own pass. ---- */
+   row, drag it, copy it, throw it away. ---- */
 
 /** Add — the one "make another of these" mark (RowEditor's Add, TagInput's commit). */
 export function IconPlus({ className }: Readonly<{ className?: string }>) {
@@ -154,4 +168,100 @@ export function IconX({ className }: Readonly<{ className?: string }>) {
 /** Go live / play. The one "start this" mark. */
 export function IconPlay({ className }: Readonly<{ className?: string }>) {
   return <Glyph className={className}><path d="M8 5.2 19 12 8 18.8z" /></Glyph>;
+}
+
+/** Forward — "this takes you there". The set carried no arrow for a long time on the grounds that the
+    → is all-or-none across its call sites and half-adopting it would mix a drawn arrow with a font
+    fallback on one screen. It is drawn now because the sweep that replaces every text glyph is the work
+    this belongs to: the landing hero, the roster's ⇒, the sheet and the action runner all take it at
+    once. Rotate it for ← ↑ ↓ (the map library's four nudges) — it is centred on the 24-box for exactly
+    that. */
+export function IconArrow({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M4 11h11.2l-4.9-4.9L11.7 4.7 19 12l-7.3 7.3-1.4-1.4 4.9-4.9H4z" /></Glyph>;
+}
+
+/** Download / export — the replay's "keep a copy", and any save-to-disk action. */
+export function IconDownload({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M11 3h2v8.2l3.1-3.1 1.4 1.4L12 15l-5.5-5.5 1.4-1.4L11 11.2zM4 18h16v2H4z" /></Glyph>;
+}
+
+/* ---- Map-tool glyphs. The map toolbar rendered its tools as emoji (✏ 👁 🌫 🎨 📍 📏 ⛌ …), which is the
+   failure this whole module exists to end: emoji cannot take a token colour, render as a different
+   drawing on every platform, and read as decoration in a row of controls that are anything but. One
+   drawn shape per tool, all on the same 24-box, all `currentColor` — so an active tool is the SAME
+   glyph in the accent colour rather than a second picture. ---- */
+
+/** Select / move — the toolbar's resting tool, and the one every other tool returns to. */
+export function IconSelect({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M6 3v15.4l3.6-3.5 2.3 5 2.6-1.2-2.3-4.9h5z" /></Glyph>;
+}
+
+/** Ping — "look here", the transient beacon a GM drops on the map. Rings around a point, because that
+    is what it draws. */
+export function IconPing({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M12 3.6a8.4 8.4 0 1 0 0 16.8 8.4 8.4 0 0 0 0-16.8zm0 2a6.4 6.4 0 1 1 0 12.8 6.4 6.4 0 0 1 0-12.8zm0 3.4a3 3 0 1 1 0 6 3 3 0 0 1 0-6z" />
+    </Glyph>
+  );
+}
+
+/** Measure — distance in squares or feet. A ruler, ticks and all, so it cannot be read as a plain bar. */
+export function IconMeasure({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M3 8h18a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zm1 2v4h16v-4h-1.6v2.2h-1.6V10h-2.2v2.2h-1.6V10h-2.2v2.2H9.2V10H7v2.2H5.4V10z" />
+    </Glyph>
+  );
+}
+
+/** Draw — the shape tools (rectangle, circle, cone, line) under one mark. */
+export function IconDraw({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M12 2.6 18.4 13H5.6zM3.4 14.8h7.2V22H3.4zM17.6 14.4a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6z" />
+    </Glyph>
+  );
+}
+
+/** Fog of war — the covered map. Banded rather than a cloud: what it hides is a rectangle of ground. */
+export function IconFog({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M4 6.4h16v2.3H4zM7 11.3h13v2.3H7zM4 16.2h12v2.3H4z" /></Glyph>;
+}
+
+/** Colour — the drawing palette. Never the only way to say what a mark means (the palette is
+    colour-vision-unfriendly by design, §2), so it labels a CHOICE of colour and nothing else. */
+export function IconColor({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M12 3c-5.5 0-10 3.1-10 7 0 4.7 5 8 10 8 .9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1 0-.9.7-1.6 1.6-1.6h1.9c3.4 0 5.7-2.3 5.7-5.7C22 6.1 17.5 3 12 3zM7.4 12.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4zm3.2-4.4a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4zm4.8 0a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z" />
+    </Glyph>
+  );
+}
+
+/** Cleanup — sweep the map's own marks away (pings, measurements, drawings). Distinct from `IconTrash`
+    on purpose: nothing a GM authored is destroyed, so it must not wear the destructive mark. */
+export function IconCleanup({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M18.4 2.9 21.1 5.6l-6.3 6.3-2.7-2.7zM11.2 10.6l2.7 2.7-5.5 5.5A4 4 0 0 1 5.6 20H2.9l2.2-2.2a2.3 2.3 0 0 0 .4-2.7z" />
+    </Glyph>
+  );
+}
+
+/* ---- Content marks: a scene, and the thing that makes a monster unusual. Both were emoji (🎬, ⭐). ---- */
+
+/** A scene — the prepared board a GM makes live. */
+export function IconScene({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.3 6.8 20.9 4.2l.5 3.4-18.6 2.6zM3 11.6h18V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </Glyph>
+  );
+}
+
+/** Legendary — the monster that breaks the turn order's rules. Always paired with a word; a lone star
+    means "favourite" to most people and that is not what this says. */
+export function IconStar({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M12 2.8 14.7 8.7l6.4.7-4.8 4.3 1.3 6.3L12 16.8l-5.6 3.2 1.3-6.3L2.9 9.4l6.4-.7z" /></Glyph>;
 }

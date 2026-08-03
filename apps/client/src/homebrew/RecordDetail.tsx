@@ -21,8 +21,7 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, IconChevron, Menu, MenuItem, SaveState } from "@vtt/ui";
-import { RevealSwitch } from "../codex/SecretMarkers";
+import { Alert, Badge, Button, IconChevron, Menu, MenuItem, RevealSwitch, SaveState } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { HomebrewRequestError, homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
 import { FeatureEditor } from "./FeatureEditor";
