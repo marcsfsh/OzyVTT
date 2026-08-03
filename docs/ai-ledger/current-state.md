@@ -24,13 +24,23 @@ effects and conditions, saving throws, reactions and opportunity attacks, concen
 spell slots and pact slots, hit dice, short/long rests, legendary actions, death saves —
 `apps/server/src/` `action-resolution.ts` · `effects.ts` · `condition-rules.ts` ·
 `saving-throws.ts` · `reactions.ts` · `spellcasting.ts` · `rests.ts` · `death-saves.ts` ·
-`turn-economy.ts`.
+`turn-economy.ts`. How strictly it polices is a **standing table policy** (`GameState.rulesPolicy`)
+each fight inherits at `encounter.start`, plus per-family exceptions (`combat.ruleExceptions`) so
+"don't police movement" doesn't also switch off the action economy — the family map and the one
+`effectiveModeFor` every rule site reads live in `rules-families.ts` beside the engine. A GM override
+is one tap (the reason is optional) and is remembered per family for the rest of that turn.
 
 **Character sheet and guided builder.** An interactive play sheet
 (`apps/client/src/encounter/CharacterSheet.tsx`, ADR-0021) plus a full-page guided builder
 with a server-side assembler (`apps/client/src/builder/`, `apps/server/src/character-build.ts`).
-The builder is GM-gated today (`apps/client/src/main.tsx`); the table's allowed ability
-methods are a GM policy on `GameState.builderPolicy`.
+The builder is GM-gated today (`apps/client/src/main.tsx`); `GameState.builderPolicy` holds the
+table's allowed ability methods, custom formula, and level cap (enforced on BOTH doors — the
+builder and the sheet's identity edit). `playerBuilder` is stored and projected but nothing reads
+it for authorization yet: un-gating player creation is a separate change. The three example
+characters are ordinary imports (`import-<actorId>` sheets), so they are editable and deletable;
+an existing save is re-keyed once by the `example-party-normalization-v1` seed.
+Archived characters are out of play server-side — refused by claim, by scene staging and by
+encounter start/add — and archiving releases any claim.
 
 **Content.** SRD 5.2.1 canonical bundles (`packages/content-srd-5.2.1`, ADR-0015); GM
 homebrew authoring with its own store, router and change ping

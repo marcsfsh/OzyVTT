@@ -94,6 +94,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `effect.end` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
+| `rules.set-policy` | `combat:write` |
+| `table.set-staging-defaults` | `combat:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
@@ -124,6 +126,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `actor.set-health-display` | `actor:write` |
 | `actor.set-visibility` | `actor:write` |
 | `actor.set-archived` | `actor:write` |
+| `actor.set-sheet-preview` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
 | `scene.create` | `scene:write` |
 | `scene.rename` | `scene:write` |
@@ -330,9 +333,10 @@ Starts an encounter on a calibrated battlemap with initial combatants (GM-grade 
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mapAssetId` | string (uuid) | yes |  |
-| `rulesMode` | `strict` \| `assisted` \| `freeform` | no | Rules-engine enforcement for this fight; omitted keeps the table's current mode |
+| `rulesMode` | `strict` \| `assisted` \| `freeform` | no | Rules-engine enforcement for this fight; omitted seeds from the table's standing rules policy |
+| `ruleExceptions` | RuleExceptions | no | Per-family exceptions for this fight; omitted seeds from the table's standing rules policy |
 | `playersRollInitiative` | boolean | no | When true, claimed player-characters (without an explicit score) roll their own initiative; a provisional auto-roll parks them until they do |
-| `entries` | object[] | yes |  |
+| `entries` | object[] | no | Combatants to start with. Omit the whole field while a prepared scene is live to start on exactly the combatants staged in it (the server owns that list). Archived characters are rejected. |
 | `entries[].actorId` | string (uuid) | yes |  |
 | `entries[].score` | integer (-1000–1000) | no | Omit to roll initiative server-side |
 | `entries[].surprised` | boolean | no | 2024 surprise: the server rolls this combatant's initiative with disadvantage |
@@ -554,6 +558,7 @@ Instantiates a bundled SRD monster onto the roster (GM-grade only). The response
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `definitionId` | string (pattern) | yes |  |
 | `visibility` | `public` \| `gm-only` | no | Default: `"public"`. |
+| `joinEncounter` | boolean | no | Also drop the new combatant into the running fight - roster, initiative and tray token in ONE command and one revision. Ignored when no encounter is running |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -960,6 +965,7 @@ Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mode` | `strict` \| `assisted` \| `freeform` | yes |  |
+| `exceptions` | RuleExceptions | no | Per-family overrides for the LIVE fight; omitting the field leaves the stored exceptions untouched |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1216,6 +1222,39 @@ Creates a character from CHOICES rather than a finished sheet (GM-grade only in 
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/rules/policy`
+
+Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. The `slots` family ships as `assisted` so slot tracking advises rather than blocks until a GM opts in.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `dial` | `strict` \| `assisted` \| `freeform` | yes | The standing enforcement level every new fight inherits |
+| `exceptions` | RuleExceptions | no | Standing per-family overrides; omitting the field keeps the stored ones |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/table/staging-defaults`
+
+Sets the table's staging defaults (GM-grade only): the token visibility a newly staged combatant starts at. A surface initializes its "Shown to players / GM only" toggle from this; the per-add `visibility` argument stays explicit on the wire, so a command still says exactly what it did.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `visibility` | `public` \| `gm-only` | yes | What a newly staged combatant's token visibility starts at |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/builder/policy`
 
 Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing "custom" is only actionable while a formula is set. The stored policy is projected to every player verbatim.
@@ -1230,6 +1269,8 @@ Sets the character-builder table policy (GM-grade only; task-packet decision 10)
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `allowedAbilityMethods` | `standard-array` \| `point-buy` \| `roll` \| `custom`[] | yes | Which ability-score methods the wizard offers players (task-packet decision 10); duplicates rejected |
 | `customFormula` | string \| null | no | The GM's custom roll formula (e.g. 3d6, 2d6+6), validated through the server dice grammar and 1-30 bounds; null clears it. Omitting the field keeps the stored formula |
+| `maxLevel` | integer (1–20) | no | Highest character level this table builds to (default 20). Enforced by the builder AND by the sheet's identity edit; omitting the field keeps the stored cap |
+| `playerBuilder` | `open` \| `gm-only` | no | Whether players may run the character builder themselves (default open). Stored policy: character creation is still GM-gated at this version, and the projected value is what a player's wizard reads to know whether its door is open. Omitting the field keeps the stored setting |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1504,7 +1545,7 @@ Moves a combatant between the shared layer (public) and the GM-only layer (GM-gr
 
 ### `POST /api/v1/game/actors/{actorId}/archived`
 
-Archives or restores a character (GM-grade only). Archived characters are hidden from players and excluded from the encounter builder; a character in the running encounter must be removed first.
+Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.
 
 **Auth:** Integration credential with `actor:write` · GM session
 
@@ -1516,7 +1557,25 @@ Archives or restores a character (GM-grade only). Archived characters are hidden
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
-| `archived` | boolean | yes | true archives (hides from players + encounter builder); false restores |
+| `archived` | boolean | yes | true archives (hides from players, refuses claims, and is rejected by scene/encounter staging) and releases any claim; false restores |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/sheet-preview`
+
+Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Default hidden - a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `enabled` | boolean | yes | true shares this archived character's sheet with players read-only; false hides it again (the default) |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1570,7 +1629,8 @@ Prepares a staged scene on a battlemap, privately, without touching the live tab
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `name` | string | yes |  |
 | `mapAssetId` | string (uuid) | yes |  |
-| `combatantIds` | string (uuid)[] | yes |  |
+| `combatantIds` | string (uuid)[] | yes | Archived characters are rejected |
+| `activate` | boolean | no | Go live on the new scene in the same command (prepare-and-go), parking whatever was live |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -2051,6 +2111,22 @@ Permanently deletes one archived encounter (GM session or an admin-scoped creden
 **Parameters:** `id` (path) - integer (≥ 1)
 
 **Responses:** `200` Deleted - envelope of `EncounterArchiveDeletedData` · errors `400` `401` `403` `404`
+
+### `POST /api/v1/encounters/{id}/visibility`
+
+Shares (or un-shares) one archived encounter with players (GM sessions and integration credentials only). Hidden by default - an ended fight is the GM's record until the GM says otherwise. This stores the decision; the archive read endpoints are still GM-grade at this version, so sharing does not yet expose a document to a player session.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Parameters:** `id` (path) - integer (≥ 1)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `playerVisible` | boolean | yes | true shares this archived fight with players; false hides it again (the default) |
+
+**Responses:** `200` The stored visibility - envelope of `EncounterArchiveVisibilityData` · errors `400` `401` `403` `404`
 
 ## Map assets & calibration
 
@@ -4585,6 +4661,14 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `startedAt` | string \| null | yes |  |
 | `endedAt` | string (date-time) | yes |  |
 | `turnCount` | integer (≥ 0) | yes |  |
+| `playerVisible` | boolean | yes | Has the GM shared this record with players? False until shared |
+
+### `EncounterArchiveVisibilityData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `playerVisible` | boolean | yes |  |
 
 ### `GameCommandCatalogData`
 
@@ -6168,6 +6252,18 @@ One of the following:
 | --- | --- | --- | --- |
 | `token` | string | yes | Bearer token for player-limited calls; long-lived, not individually revocable (LAN trust). |
 | `sessionId` | string (uuid) | yes |  |
+
+### `RuleExceptions`
+
+Per-family overrides of the dial (movement, economy, resources, targeting, slots). An absent family follows the dial. Wire values stay `strict`/`assisted`/`freeform`; the GM-facing words Enforce/Advise/Off are surface copy only.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `movement` | `strict` \| `assisted` \| `freeform` | no |  |
+| `economy` | `strict` \| `assisted` \| `freeform` | no |  |
+| `resources` | `strict` \| `assisted` \| `freeform` | no |  |
+| `targeting` | `strict` \| `assisted` \| `freeform` | no |  |
+| `slots` | `strict` \| `assisted` \| `freeform` | no |  |
 
 ### `SystemCapabilities`
 

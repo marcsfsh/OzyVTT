@@ -132,6 +132,13 @@
    the same glyph the other way — one shape, two rotations, no second icon. */
 .hb-blocked-jump { vertical-align: middle; }
 .hb-blocked-jump-icon { display: inline-flex; transform: rotate(-90deg); font-size: 1.05em; }
+/* The checklist. One outstanding requirement stays a bare sentence; two or more become a list
+   under a count, so "how much is left" is readable before any of it is read. No bullet glyph —
+   at `--fs-sm` in the caution tone a marker column costs an indent that a phone cannot spare, and
+   each line already begins with an imperative verb. */
+.hb-blocked-list { margin: var(--space-1) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.hb-blocked-line { margin: 0; }
+.hb-blocked-count { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .hb-usage { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 /* The create modal's consequence line: a fact, not a warning — the quiet register. */
 .hb-create-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }

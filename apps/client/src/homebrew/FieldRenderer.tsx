@@ -72,6 +72,11 @@ export function FieldRenderer(props: FieldRendererProps) {
   const fieldId = `${idPrefix}-${field.key.replace(/\./g, "-")}${autoId}`;
   const raw = field.read ? field.read(value) : getAt(value, field.key);
   const set = (next: unknown) => onValue(field.write ? field.write(next, value) : setAt(value, field.key, next));
+  /* An emptied control writes what its COLUMN means by empty — `undefined` (the key goes away) for
+     an optional column, `null` for a required-but-nullable one. See `FieldDef.emptyValue`; the
+     default is omit, because writing `null` into an `.optional()` enum is how "Not set" turned four
+     ordinary authoring gestures into an unpublishable record. */
+  const setEmpty = () => set(field.emptyValue === "null" ? null : undefined);
   const isDisabled = disabled || field.disabled;
 
   // A live field error — never a "you haven't filled this in" error. See the header.
@@ -129,7 +134,7 @@ export function FieldRenderer(props: FieldRendererProps) {
           allowNegative={field.allowNegative}
           placeholder={field.placeholder}
           invalid={!!error}
-          onChange={set}
+          onChange={(next) => (next === null ? setEmpty() : set(next))}
         />
       );
 
@@ -178,7 +183,7 @@ export function FieldRenderer(props: FieldRendererProps) {
           value={asString(raw)}
           disabled={isDisabled}
           invalid={!!error}
-          onChange={(event) => set(event.target.value || null)}
+          onChange={(event) => (event.target.value ? set(event.target.value) : setEmpty())}
         >
           <option value="">{field.placeholder ?? "Not set"}</option>
           {groupOptions(options).map((block, index) =>
@@ -337,17 +342,46 @@ export function FieldRenderer(props: FieldRendererProps) {
     }
 
     case "text":
-    default:
+    default: {
+      /**
+       * **The complete list, plus other** — one native `<input list>` + `<datalist>`, which is the
+       * pattern `FeatureEditor` has always used for choice kinds and the only one in the repo that
+       * gets both halves right: every SRD value is one tap away on a phone, and a word the SRD has
+       * never heard of is still typeable, because `school`, `category`, `rarity` and `creatureType`
+       * are OPEN slugs in their schemas and a closed control over an open slug is its own defect.
+       *
+       * `suggestions` on a text field used to be DEAD — only the `tags` case read it — so the item
+       * category's declared suggestions rendered nowhere and every damage-type field in the editor
+       * was a bare box a GM had to spell "bludgeoning" into from memory. Reading it here is the
+       * whole fix; no new `FieldKind`, per the standing rule at the top of `schema.ts`.
+       */
+      const suggestions = resolveSuggestions(field, ctx);
+      const listId = suggestions.length > 0 ? `${fieldId}-list` : undefined;
       return wrap(
-        <Input
-          id={fieldId}
-          value={asString(raw)}
-          placeholder={field.placeholder}
-          disabled={isDisabled}
-          invalid={!!error}
-          maxLength={field.max}
-          onChange={(event) => set(event.target.value)}
-        />
+        <>
+          <Input
+            id={fieldId}
+            list={listId}
+            value={asString(raw)}
+            placeholder={field.placeholder}
+            disabled={isDisabled}
+            invalid={!!error}
+            maxLength={field.max}
+            /* An empty box is empty text unless the field says otherwise. Most string columns take
+               `""` happily; the ones that do not — an open-slug `rarity` whose regex rejects it, a
+               nullable `shape.unit` — declare `emptyValue` and get the same omit/null treatment a
+               select gets. */
+            onChange={(event) => (event.target.value === "" && field.emptyValue ? setEmpty() : set(event.target.value))}
+          />
+          {listId && (
+            <datalist id={listId}>
+              {suggestions.map((suggestion) => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
+          )}
+        </>
       );
+    }
   }
 }

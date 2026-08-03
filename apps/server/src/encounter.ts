@@ -1,4 +1,5 @@
-import type { ActorDefinition, EncounterStartEntry, GameState, InitiativeEntry } from "@vtt/domain";
+import type { ActorDefinition, EncounterStartEntry, GameState, InitiativeEntry, RuleExceptions, RuleMode } from "@vtt/domain";
+import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode, collectRiders, type RollModeSource } from "@vtt/rules-5e";
 import { deriveEquipment } from "./equipment-derivation.js";
@@ -10,7 +11,9 @@ import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
   entries: readonly EncounterStartEntry[];
-  rulesMode?: "strict" | "assisted" | "freeform";
+  rulesMode?: RuleMode;
+  /** Per-family exceptions for this fight; omitted keeps whatever the seeded/previous fight carried. */
+  ruleExceptions?: RuleExceptions;
   /** When true, each claimed player-character without an explicit score gets a provisional auto-roll AND is
    * parked in `pendingInitiative` for its owner to roll (combat.playerInitiativeMode picks immediate/wait). */
   playersRollInitiative?: boolean;
@@ -97,6 +100,8 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     actorIds.add(entry.actorId);
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!actor) throw new CommandRejectedError("One of the selected combatants no longer exists.");
+    // An archived character is out of play; the picker filters were never the guard (server authority).
+    assertNotArchived(state, entry.actorId);
     actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
     const tieBreaker = actor.initiative ?? 0;
     // 2024 Surprise: a surprised combatant rolls initiative with disadvantage (two d20s, keep lower).
@@ -127,6 +132,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     annotations: [],
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
+    ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
     underwater: false,
     reactionsUsed: [],
     legendaryUsed: {},
@@ -147,6 +153,7 @@ export function addCombatant(state: GameState, actorId: string, score: number | 
   if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  assertNotArchived(state, actorId);
   if (state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("That combatant is already in the encounter.");
   if (state.combat.initiative.length >= 200) throw new CommandRejectedError("This encounter already has 200 combatants.");
   const tieBreaker = actor.initiative ?? 0;

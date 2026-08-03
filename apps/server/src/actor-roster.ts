@@ -171,6 +171,7 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,
+    sheetPreview: false,
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
     size: definition.size,
@@ -211,10 +212,28 @@ export function resolvePendingImport(state: GameState, importId: string, approve
   if (approve) importActorDefinition(state, pending.definition, newActorId, "public");
 }
 
+/**
+ * Archived characters are OUT OF PLAY, and that has to be true server-side: the picker filters were
+ * the only guard, so any caller that replayed a known actorId could stage or start a fight with a
+ * character the GM had put away. Rejected rather than silently filtered - a silent filter makes the
+ * GM's own selection lie back to them.
+ */
+export function assertNotArchived(state: GameState, actorId: string) {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived - restore them first.`);
+}
+
 export function removeActor(state: GameState, actorId: string) {
   const actor = state.actors.find((item) => item.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (actor.kind === "player-character" && actor.ownerSessionId !== null) throw new CommandRejectedError("Release that character's claim before removing it.");
+  // An ARCHIVED character that is still claimed can be deleted, releasing the claim as part of the
+  // same mutation: archiving used to leave the claim in place while hiding the character from
+  // everyone, so an abandoned claim (a 30-day token expiry mints a new identity) turned the character
+  // into undeletable garbage. A character still in play keeps the original protection.
+  if (actor.kind === "player-character" && actor.ownerSessionId !== null) {
+    if (!actor.archived) throw new CommandRejectedError("Release that character's claim before removing it.");
+    actor.ownerSessionId = null;
+  }
   if (actor.kind === "player-character" && !actor.definitionId?.startsWith("import-")) throw new CommandRejectedError("Player characters can't be removed from the roster.");
   // A recorded turn snapshot may reference this actor; removing it while rewound would leave the
   // restore pointing at a combatant that no longer exists. Make the GM leave history review first.

@@ -168,6 +168,18 @@ Format: `[area] — description — suspected cause / status`.
 
 ### Homebrew system — open items (2026-07-27)
 
+- **[homebrew] Editing a PUBLISHED record can still demote it mid-keystroke.** `HomebrewStore.update`
+  re-validates every PATCH to a published row and, when the new body would no longer publish, drops
+  the row to an invisible draft in the same transaction (`apps/server/src/homebrew-store.ts`
+  `stillPublishable` / the demote branch) — and the editor autosaves ~800 ms after a keystroke
+  (`apps/client/src/homebrew/useAutosave.ts`). The rule itself is right; what is wrong is that a
+  half-typed edit is a *published-state* event at all. The fix is the draft-until-update lifecycle
+  (decision D20): a published row's PATCHes land in a `draft_body_json` column, `body_json` and
+  `visible_to_players` never move, and an explicit **Update** validates and swaps. Deferred as a
+  unit, deliberately — a half-built lifecycle would be worse than the current honest one. **Much
+  narrower than it was:** the demotion used to fire on ordinary edits because a touched-but-
+  incomplete `weapon`/`armor` block was unpublishable; those bodies now publish (see below), so the
+  remaining trigger is an edit that genuinely invalidates the record.
 - **[homebrew] Validity is point-in-time.** The publish gate checks a record against the world as it
   stands at that moment. Nothing re-checks **dependents** when the world changes underneath them, so
   deleting or editing a dependency can leave a dependent record published-and-invalid (`restore`

@@ -91,11 +91,25 @@ anything consumes it.
   armor training right where it is printed, rather than being a bare id nothing consumes.
   `choice.from` remains the canonical id list and is derived from `options` when those are
   authored, so a consumer that only wants ids never changes.
+- `src/schemas.ts` — every content SHAPE, and **the only entry a browser build may import**
+  (`@vtt/content-srd-5.2.1/schemas`). Re-exports `character-content.ts`, `spell-lists.ts` and
+  `enums.ts`, and adds `HOMEBREW_BODY_SCHEMAS`: the one type→schema map the publish gate's tier 1,
+  the store's read-back parse, and the homebrew editor's publish checklist all run. That third
+  consumer is why the split exists — the checklist used to be a hand-written description of these
+  schemas and drifted looser than them, so Publish enabled on bodies the store refused.
+  **Nothing in this module, or anything it imports, may touch `node:` or a bundle.**
+- `src/enums.ts` — the canonical SRD vocabularies as plain id arrays (`DAMAGE_TYPE_IDS`,
+  `CONDITION_IDS`, `MAGIC_SCHOOL_IDS`, `CREATURE_TYPE_IDS`, `WEAPON_PROPERTY_IDS`,
+  `WEAPON_MASTERY_IDS`, `GEAR_CATEGORY_IDS`). Literals rather than loader calls because the forms
+  that need them run in a browser; `test/enums.test.ts` re-derives every list from the bundles and
+  fails on any difference, which is what lets them be literals at all.
 - `src/index.ts` — typed, validated loaders (`loadMonsterDefinitions`, `loadConditions`,
   `loadSpells`, `loadWeapons`, `loadWeaponProperties`, `loadArmor`, `loadSkills`,
   `loadDamageTypes`, `loadRules`, `loadAttribution`, plus `loadClasses`, `loadSubclasses`,
-  `loadSpecies`, `loadBackgrounds`, `loadFeats`, `loadNames`). Server-side only: clients
-  receive content via server projections, never by importing this package.
+  `loadSpecies`, `loadBackgrounds`, `loadFeats`, `loadNames`) — and a re-export of everything in
+  `src/schemas.ts`, so no server import site had to change. The LOADERS are server-side only
+  (`createRequire` reads the bundles off disk); clients receive content via server projections and
+  import only the schemas entry.
 
 ## Curation record (why the bundle differs from the raw fixtures)
 

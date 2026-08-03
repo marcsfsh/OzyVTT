@@ -1330,3 +1330,34 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   `permissions.allow` list + auto memory. **ADR-0021 collision resolved:** the player character
   sheet keeps 0021 (fewer referrers, already bound in `CLAUDE.md`), manual fog renumbered →
   **ADR-0022**. Verified `check` + `test` + `build` green.
+- **2026-08-03 — Rules enforcement is a table policy with five families, not one table-wide switch.**
+  `GameState.rulesPolicy` (dial + per-family exceptions) is the standing setting every fight inherits
+  at `encounter.start`; `combat.rulesMode` + the additive `combat.ruleExceptions` are that fight's
+  live copy. The five families are `movement`, `economy`, `resources`, `targeting`, `slots`
+  (`rules-families.ts`), and `effectiveModeFor` is the single reader every rule site
+  now uses in place of a raw `combat.rulesMode` read — so switching movement policing off no longer
+  silences opportunity attacks' siblings in other families. Three consequences worth knowing:
+  (1) **the wire enum keeps its names.** `strict|assisted|freeform` is unchanged; Enforce/Advise/Off
+  is surface copy. Renaming would be a second breaking API change and only one was approved.
+  (2) **`slots` defaults to `assisted`, not to the dial** — slot enforcement is new, and inheriting a
+  default-strict dial would start hard-blocking casts that have always worked. The GM opts in.
+  (3) **an override is one tap and its reason is optional** (schemas loosened, audit falls back to
+  "GM override"), and it is remembered per FAMILY for the rest of that creature's turn
+  (`turn.rulesOverriddenFamilies`, superseding the two-prefix `turn.rulesOverridden` boolean, which
+  is kept so a mid-turn save written by an older build still parses and still behaves).
+- **2026-08-03 — Archived means out of play on the server, not just out of the picker.** The only
+  guard on archived characters was the player projection and some client `.filter()` calls, so any
+  caller replaying a known `actorId` could claim one or stage one. `claimCharacter`, `buildSceneCombat`
+  (scene create + set-combatants), `startEncounter` and `addCombatant` now refuse them outright rather
+  than silently filtering — a silent filter makes the GM's own selection lie back to them. Two paired
+  fixes make the state reachable again rather than a trap: archiving a claimed character releases the
+  claim in the same mutation, and an archived-but-still-claimed character can be deleted (releasing
+  the claim), which abandoned claims previously made impossible. A parked scene prepared before this
+  can still contain archived combatants; activation warns the GM in the feed and does **not** refuse —
+  refusing would strand the scene, and no stored prep is scrubbed.
+- **2026-08-03 — The example party ships as ordinary characters.** Their sheets were keyed `example-*`,
+  and two gates read the `import-` prefix as "this sheet belongs to one character and may be edited or
+  removed" — so the starter party could never be levelled, respecced or deleted. Fresh installs are
+  fixed at the source; existing saves are repaired once by the `example-party-normalization-v1` seed,
+  which re-keys the definition (body copied verbatim) and drops the orphaned row. Net zero against the
+  100-definition cap, idempotent, and it never touches a definition another actor still references.

@@ -454,7 +454,7 @@ describe("public game API over /api/v1", () => {
 
     // Players see the default policy (all four methods) before the GM touches anything.
     const before = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
-    expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null });
+    expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null, maxLevel: 20, playerBuilder: "open" });
 
     // Player write refused; the policy is the GM's (decision 10).
     const denied = await post(base, GAME_PATHS.builderPolicy, playerToken, { allowedAbilityMethods: ["standard-array"] });
@@ -471,7 +471,8 @@ describe("public game API over /api/v1", () => {
 
     // Player-READABLE: the stored policy reaches the player projection verbatim.
     const after = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
-    expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6" });
+    // The two additive fields are omitted by this request, so they must survive it untouched.
+    expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6", maxLevel: 20, playerBuilder: "open" });
   });
 
   it("creates a character from choices over HTTP (GM only); the actor id equals the commandId and the sheet is import-keyed", async () => {
@@ -814,6 +815,8 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.characterSetProficiencies, "post", "character.set-proficiencies"],
       [GAME_PATHS.characters, "post", "character.create"],
       [GAME_PATHS.builderPolicy, "post", "builder.set-policy"],
+      [GAME_PATHS.rulesPolicy, "post", "rules.set-policy"],
+      [GAME_PATHS.stagingDefaults, "post", "table.set-staging-defaults"],
       [GAME_PATHS.annotations, "post", "annotation.add"],
       [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
       [GAME_PATHS.annotationsClear, "post", "annotation.clear"],
@@ -829,6 +832,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.actorSize, "post", "actor.set-size"],
       [GAME_PATHS.actorVisibility, "post", "actor.set-visibility"],
       [GAME_PATHS.actorArchived, "post", "actor.set-archived"],
+      [GAME_PATHS.actorSheetPreview, "post", "actor.set-sheet-preview"],
       [GAME_PATHS.actorHealthDisplay, "post", "actor.set-health-display"],
       [GAME_PATHS.actorSpeed, "post", "actor.set-speed"],
       [GAME_PATHS.scenes, "post", "scene.create"],

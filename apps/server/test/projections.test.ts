@@ -85,7 +85,31 @@ describe("archived characters (v4 #10, GM management)", () => {
     const view = projectPlayerView(state, playerA, noPresence);
     expect(view.actors.map((actor) => actor.name)).toEqual(["Active Hero"]);
     expect(JSON.stringify(view)).not.toContain("Retired Hero");
-    expect(JSON.stringify(view)).not.toContain("archived");
+    // The KEY, not the substring: `archivedCharacters` (the shared-keepsake door, empty here) is a
+    // legitimate player-facing field, so a bare "archived" search would now match itself. What must
+    // never appear is the management FLAG on an actor - or its sheet-sharing sibling.
+    expect(JSON.stringify(view)).not.toContain("\"archived\":");
+    expect(JSON.stringify(view)).not.toContain("sheetPreview");
+    expect(view.archivedCharacters).toEqual([]);
+  });
+
+  it("offers an archived character's name only after the GM shares its sheet, and nothing else about them", () => {
+    const shared = GameStateSchema.parse({ schemaVersion: 1, actors: [{ ...archived, sheetPreview: true, notes: "GM plot notes" }, active] });
+    const view = projectPlayerView(shared, playerA, noPresence);
+    expect(view.archivedCharacters).toEqual([{ id: archived.id, name: "Retired Hero" }]);
+    // The door carries id and name. It must not become a second, quieter actor projection.
+    expect(Object.keys(view.archivedCharacters[0]).sort()).toEqual(["id", "name"]);
+    expect(view.actors.map((actor) => actor.name)).toEqual(["Active Hero"]);
+    expect(JSON.stringify(view)).not.toContain("GM plot notes");
+  });
+
+  it("keeps a shared archived character hidden while it is gm-only", () => {
+    const hidden = GameStateSchema.parse({ schemaVersion: 1, actors: [{ ...archived, sheetPreview: true, visibility: "gm-only" }, active] });
+    expect(projectPlayerView(hidden, playerA, noPresence).archivedCharacters).toEqual([]);
+  });
+
+  it("does not advertise an archived character the GM has not shared", () => {
+    expect(projectPlayerView(GameStateSchema.parse({ schemaVersion: 1, actors: [archived, active] }), playerA, noPresence).archivedCharacters).toEqual([]);
   });
 
   it("keeps archived characters in the GM view (so the roster tab can manage them)", () => {

@@ -1,5 +1,6 @@
-import type { GameState, Scene, SceneCombat } from "@vtt/domain";
+import { DEFAULT_RULE_EXCEPTIONS, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
+import { assertNotArchived } from "./actor-roster.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
 /**
@@ -24,6 +25,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     annotations: combat.annotations,
     turn: combat.turn,
     rulesMode: combat.rulesMode,
+    ruleExceptions: combat.ruleExceptions,
     playerDamageMode: combat.playerDamageMode,
     playerInitiativeMode: combat.playerInitiativeMode,
     healthDisplay: combat.healthDisplay,
@@ -40,8 +42,9 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
 
 /** The empty combat an inactive/active-slot scene holds (the single-source-of-truth invariant for the active scene). */
 function emptySceneCombat(): SceneCombat {
-  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", playerDamageMode: "proposal", playerInitiativeMode: "immediate", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingInitiative: [] };
+  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", ruleExceptions: { ...DEFAULT_RULE_EXCEPTIONS }, playerDamageMode: "proposal", playerInitiativeMode: "immediate", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingInitiative: [] };
 }
+
 
 /** Builds a prepared (inactive) combat context from a combatant list: initiative at score 0, tokens at default (unplaced) positions. */
 function buildSceneCombat(state: GameState, combatantIds: readonly string[], geometry: TokenMapGeometry): SceneCombat {
@@ -52,17 +55,33 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     seen.add(actorId);
     const actor = state.actors.find((candidate) => candidate.id === actorId);
     if (!actor) throw new CommandRejectedError("One of the chosen combatants no longer exists.");
+    assertNotArchived(state, actorId);
     return { actorId, score: 0, tieBreaker: actor.initiative ?? 0 };
   });
   const tokens = createEncounterTokens(initiative.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), geometry);
   // A newly prepared scene inherits the table's current policy settings rather than resetting to defaults.
-  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, playerDamageMode: state.combat.playerDamageMode, playerInitiativeMode: state.combat.playerInitiativeMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
+  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, ruleExceptions: { ...state.combat.ruleExceptions }, playerDamageMode: state.combat.playerDamageMode, playerInitiativeMode: state.combat.playerInitiativeMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
 }
 
-export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry): Scene {
+/**
+ * Recency for the scene-setup "Recent" list. `lastUsedAt` was stamped only when a creature entered a
+ * FIGHT, so a GM who preps ahead saw a Recent list that knew nothing about the evening they just
+ * spent staging. Staging counts as use. Player characters are excluded: they are the standing party,
+ * always at hand, and stamping them would push the monsters a GM is actually reaching for off the list.
+ * GM-only field - already stripped from the player projection.
+ */
+function stampStagingRecency(state: GameState, combatantIds: readonly string[], now: number) {
+  for (const actorId of combatantIds) {
+    const actor = state.actors.find((candidate) => candidate.id === actorId);
+    if (actor && actor.kind !== "player-character") actor.lastUsedAt = now;
+  }
+}
+
+export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry, now: number = Date.now()): Scene {
   if (state.combat.scenes.length >= MAX_SCENES) throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} scenes.`);
   if (state.combat.scenes.some((scene) => scene.id === input.sceneId)) throw new CommandRejectedError("That scene already exists.");
   const scene: Scene = { id: input.sceneId, name: input.name, mapAssetId: input.mapAssetId, combat: buildSceneCombat(state, input.combatantIds, geometry) };
+  stampStagingRecency(state, input.combatantIds, now);
   state.combat = { ...state.combat, scenes: [...state.combat.scenes, scene] };
   return scene;
 }
@@ -78,7 +97,7 @@ export function removeScene(state: GameState, sceneId: string) {
   state.combat = { ...state.combat, scenes: state.combat.scenes.filter((scene) => scene.id !== sceneId) };
 }
 
-export function setSceneCombatants(state: GameState, sceneId: string, combatantIds: readonly string[], geometry: TokenMapGeometry) {
+export function setSceneCombatants(state: GameState, sceneId: string, combatantIds: readonly string[], geometry: TokenMapGeometry, now: number = Date.now()) {
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live - change its combatants from the encounter instead.");
@@ -86,6 +105,7 @@ export function setSceneCombatants(state: GameState, sceneId: string, combatantI
   const placed = new Map(scene.combat.tokens.map((token) => [token.actorId, token.position]));
   const combat = buildSceneCombat(state, combatantIds, geometry);
   const combatKeepingPositions = { ...combat, tokens: combat.tokens.map((token) => ({ ...token, position: placed.get(token.actorId) ?? token.position })) };
+  stampStagingRecency(state, combatantIds, now);
   state.combat = { ...state.combat, scenes: state.combat.scenes.map((candidate) => candidate.id === sceneId ? { ...candidate, combat: combatKeepingPositions } : candidate) };
 }
 

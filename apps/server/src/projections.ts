@@ -75,6 +75,11 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
       // Hidden turn: movement spent would narrate a hidden combatant's activity - reset with the rest.
       : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
     rulesMode: state.combat.rulesMode,
+    // The per-family exceptions ride to players for exactly the reason `rulesMode` already does: they
+    // are the table's rules CONFIGURATION, not its secrets, and a player's sheet has to know whether a
+    // tap is about to be blocked, warned, or waved through before they take it. Copied, never a live
+    // reference into GameState.
+    ruleExceptions: { ...state.combat.ruleExceptions },
     // The policy (not the GM-only pendingDamage proposals) rides to players so the runner can say
     // whether a hit is handed to the GM or applied directly.
     playerDamageMode: state.combat.playerDamageMode,
@@ -126,17 +131,34 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
   return {
     revision: state.revision,
     // The GM's builder policy travels verbatim (GM-set, player-read - decision 10): it holds no
-    // secrets, and a player's wizard must know which ability methods to offer. Copied, never a
-    // live reference into GameState.
-    builderPolicy: { allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods], customFormula: state.builderPolicy.customFormula },
+    // secrets, and a player's wizard must know which ability methods to offer. Copied FIELD BY FIELD,
+    // never spread: this list is the viewer-safety review point for the builder policy, so a field
+    // added to BuilderPolicySchema reaches players only when someone writes it here on purpose.
+    //   - maxLevel: the cap the player's own wizard must enforce in its UI before the server refuses.
+    //   - playerBuilder: whether the wizard door is open to them at all. A dial about the player, told
+    //     to the player; it names no character, no monster and no GM plan.
+    builderPolicy: {
+      allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods],
+      customFormula: state.builderPolicy.customFormula,
+      maxLevel: state.builderPolicy.maxLevel,
+      playerBuilder: state.builderPolicy.playerBuilder
+    },
+    // The door to an archived character's shared sheet, and nothing more: id + name, only for archived
+    // characters the GM explicitly shared, and only ones that were public to begin with. Everything
+    // else about them - hit points, conditions, claim, notes, the definition - is omitted. Empty for
+    // every table that has not used the feature, which is the default.
+    archivedCharacters: state.actors
+      .filter((actor) => actor.archived && actor.sheetPreview && actor.visibility === "public")
+      .map((actor) => ({ id: actor.id, name: actor.name })),
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((source) => {
       // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
       // actionUses (limited-use spending names stat-block action ids - own claimed character only),
       // conditionImmunities and legendary resources (monster defenses are GM knowledge),
       // hitDice (a healing resource that tracks with exact HP - own claimed character only), and
-      // archived (GM-only management flag).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, ...actor } = source;
+      // archived and sheetPreview (GM-only management flags - the shared-archived door is the
+      // name-and-id-only `archivedCharacters` list above, never a flag on a live actor).
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, sheetPreview: _sheetPreview, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Effective token-health display = the per-token override or the table default. The richer
       // bar/ring reaches players only when the GM aimed it at everyone (audience "all"); band stays

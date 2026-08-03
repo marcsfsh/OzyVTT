@@ -79,7 +79,7 @@ export type TimelineOps = Readonly<{
 }>;
 
 export type EncounterArchiveInput = Readonly<{ commandId: string; startedAt: string | null; endedAt: string; turnCount: number; documentJson: string }>;
-export type EncounterArchiveSummary = Readonly<{ id: number; archivedAt: string; startedAt: string | null; endedAt: string; turnCount: number }>;
+export type EncounterArchiveSummary = Readonly<{ id: number; archivedAt: string; startedAt: string | null; endedAt: string; turnCount: number; /** Has the GM shared this record with players? Default false - hidden until shared (D26). */ playerVisible: boolean }>;
 
 const MIGRATIONS = [{
   version: 1,
@@ -159,7 +159,17 @@ const MIGRATIONS = [{
       at TEXT NOT NULL
     ) STRICT;
   `
+}, {
+  version: 6,
+  // Per-replay sharing (D26): an archived fight is the GM's until the GM shares it. Additive column,
+  // default 0 - every archive that already exists stays hidden, which is the safe direction.
+  sql: `ALTER TABLE encounter_archives ADD COLUMN player_visible INTEGER NOT NULL DEFAULT 0;`
 }];
+
+/** The one-time repair that turns `example-*` starter sheets into ordinary `import-<actorId>` ones. */
+const EXAMPLE_PARTY_NORMALIZATION_SEED = "example-party-normalization-v1";
+/** Literal, not imported: the store must not depend on the seed-content module (that would be an import cycle). `initial-game-state.ts` exports the same prefix and a test pins the two together. */
+const EXAMPLE_DEFINITION_ID_PREFIX = "example-";
 
 export class GameStore {
   private state: GameState;
@@ -182,6 +192,9 @@ export class GameStore {
     if (row) this.state = GameStateSchema.parse(JSON.parse(row.state_json));
     else this.insertInitialState();
     this.applyPlaceholderRosterSeed();
+    // Order matters: the roster seed may have just BACKFILLED the example party into an empty save, so
+    // the normalization has to run after it or it would find nothing to repair on a fresh install.
+    this.applyExamplePartyNormalizationSeed();
     // Reconcile a downgrade/upgrade cycle: an old server build strips historyCursor from the persisted
     // state while the turn_snapshots rows survive, which would strand a stale return-point mid-timeline.
     if (this.state.combat.historyCursor === null) this.database.exec("DELETE FROM turn_snapshots WHERE kind = 'return'");
@@ -257,8 +270,17 @@ export class GameStore {
 
   /** Permanent, machine-readable records of ended encounters (GM-only; the document holds full state). Newest first. */
   listEncounterArchives(): readonly EncounterArchiveSummary[] {
-    return (this.requireDatabase().prepare("SELECT id, archived_at, started_at, ended_at, turn_count FROM encounter_archives ORDER BY id DESC").all() as Array<{ id: number; archived_at: string; started_at: string | null; ended_at: string; turn_count: number }>)
-      .map((row) => ({ id: row.id, archivedAt: row.archived_at, startedAt: row.started_at || null, endedAt: row.ended_at, turnCount: row.turn_count }));
+    return (this.requireDatabase().prepare("SELECT id, archived_at, started_at, ended_at, turn_count, player_visible FROM encounter_archives ORDER BY id DESC").all() as Array<{ id: number; archived_at: string; started_at: string | null; ended_at: string; turn_count: number; player_visible: number }>)
+      .map((row) => ({ id: row.id, archivedAt: row.archived_at, startedAt: row.started_at || null, endedAt: row.ended_at, turnCount: row.turn_count, playerVisible: row.player_visible === 1 }));
+  }
+  /**
+   * Share (or un-share) one archived fight with players (D26). Returns false when no such archive
+   * exists so the caller can 404 rather than silently succeeding. The player-facing READ projection is
+   * a separate, later change - this is the stored decision, and nothing serves a player an archive yet.
+   */
+  setEncounterArchiveVisibility(id: number, playerVisible: boolean): boolean {
+    const result = this.requireDatabase().prepare("UPDATE encounter_archives SET player_visible = ? WHERE id = ?").run(playerVisible ? 1 : 0, id);
+    return Number(result.changes) > 0;
   }
   /** The full archive document (JSON string) for one encounter, or null if unknown. */
   getEncounterArchive(id: number): string | null {
@@ -355,6 +377,56 @@ export class GameStore {
         database.prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?").run(JSON.stringify(nextState), nextState.revision);
       }
       database.prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)").run(PLACEHOLDER_ROSTER_SEED, now);
+      database.exec("COMMIT");
+      this.state = nextState;
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
+   * One-time repair for saves written before the example party became ordinary characters. The three
+   * starter sheets were stored under `example-*` definition ids, and two gates read the `import-`
+   * prefix as "this sheet belongs to one character": with an `example-*` key the starter party could
+   * never be edited (`character-edit.ts`) or removed (`actor-roster.ts`).
+   *
+   * The repair is a re-key, not a rewrite: the definition BODY is copied verbatim to
+   * `import-<actorId>`, the actor is repointed, and the now-unreferenced `example-*` row is dropped.
+   * Net zero against the 100-definition cap. No user-authored data is touched - an `example-*` row
+   * that some actor still references is left exactly where it is.
+   */
+  private applyExamplePartyNormalizationSeed() {
+    const database = this.requireDatabase();
+    if (database.prepare("SELECT 1 FROM application_seeds WHERE seed_key = ?").get(EXAMPLE_PARTY_NORMALIZATION_SEED)) return;
+    const nextState = structuredClone(this.state);
+    let changed = false;
+    for (const actor of nextState.actors) {
+      const current = actor.definitionId;
+      if (!current || !current.startsWith(EXAMPLE_DEFINITION_ID_PREFIX)) continue;
+      const stored = nextState.definitions.find((entry) => entry.id === current);
+      if (!stored) continue;
+      const replacement = `import-${actor.id}`;
+      // Never overwrite a definition that already exists under the target key.
+      if (!nextState.definitions.some((entry) => entry.id === replacement)) {
+        nextState.definitions = [...nextState.definitions, { id: replacement, definition: structuredClone(stored.definition) }];
+      }
+      actor.definitionId = replacement;
+      changed = true;
+    }
+    if (changed) {
+      // Drop only the `example-*` rows nothing points at any more.
+      nextState.definitions = nextState.definitions.filter((entry) =>
+        !entry.id.startsWith(EXAMPLE_DEFINITION_ID_PREFIX) || nextState.actors.some((actor) => actor.definitionId === entry.id));
+    }
+    const now = new Date().toISOString();
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      if (changed) {
+        database.prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1").run(JSON.stringify(nextState), now);
+        database.prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?").run(JSON.stringify(nextState), nextState.revision);
+      }
+      database.prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)").run(EXAMPLE_PARTY_NORMALIZATION_SEED, now);
       database.exec("COMMIT");
       this.state = nextState;
     } catch (error) {

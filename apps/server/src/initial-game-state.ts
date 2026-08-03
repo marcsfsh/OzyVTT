@@ -18,10 +18,26 @@ export const PLACEHOLDER_ACTOR_IDS = {
   wizard: "b073fe5f-4394-4869-9e79-a0e3dc4e1703"
 } as const;
 
-const EXAMPLE_DEFINITION_IDS = {
+/**
+ * The example party's sheets are keyed EXACTLY like any imported character - `import-<actorId>` -
+ * because two gates in the codebase read that prefix as "this sheet belongs to one character and is
+ * editable/removable" (`character-edit.ts`, `actor-roster.ts`). Keying them `example-*` made the
+ * starter party permanently un-editable and un-deletable: a GM could not level Borin up, could not
+ * respec him, and could not get rid of him. Ordinary characters, from the first launch.
+ *
+ * `EXAMPLE_DEFINITION_IDS` (the old `example-*` keys) is exported so the one-time normalization seed
+ * in `game-store.ts` can find and repoint the same three definitions in an existing save.
+ */
+export const EXAMPLE_DEFINITION_ID_PREFIX = "example-";
+export const LEGACY_EXAMPLE_DEFINITION_IDS = {
   fighter: "example-borin-fighter-7",
   cleric: "example-mirena-cleric-7",
   wizard: "example-lyra-wizard-7"
+} as const;
+const EXAMPLE_DEFINITION_IDS = {
+  fighter: `import-${PLACEHOLDER_ACTOR_IDS.fighter}`,
+  cleric: `import-${PLACEHOLDER_ACTOR_IDS.cleric}`,
+  wizard: `import-${PLACEHOLDER_ACTOR_IDS.wizard}`
 } as const;
 
 const SOURCE = { name: "Example party (SRD 5.2.1)", version: "1.0.0" } as const;

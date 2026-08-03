@@ -486,7 +486,15 @@ export const ActorSchema = z.object({
   /** Coin purse, seeded from the definition's starting currency. Owner-only. Additive. */
   currency: CurrencySchema.default({}),
   /** GM-archived: hidden from players and excluded from the encounter builder / party. GM management flag; never projected to players or the viewer. Additive. */
-  archived: z.boolean().default(false)
+  archived: z.boolean().default(false),
+  /**
+   * The GM shared this ARCHIVED character's sheet back to players as a read-only keepsake (D26).
+   * Default false - hidden until shared, never the other way round. Meaningless while `archived` is
+   * false (a live character's sheet reaches only its owner, unchanged). The flag itself is GM
+   * management and is stripped from player projections; what players receive is the name-and-id-only
+   * `PlayerView.archivedCharacters` door. Additive.
+   */
+  sheetPreview: z.boolean().default(false)
 });
 
 export type Actor = z.infer<typeof ActorSchema>;

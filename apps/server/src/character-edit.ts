@@ -73,6 +73,11 @@ function mergeClassRows(stored: readonly ClassRow[], supplied: readonly ClassRow
 
 export function setCharacterIdentity(state: GameState, actorId: string, character: ActorDefinition["character"]): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
+  // The table's level cap is a table rule, not a builder rule: the sheet's free-text identity editor
+  // writes class levels directly, so without this check the shallow door walks straight past the cap
+  // the guided builder enforces. Totalled across classes - a multiclass sheet's level is the sum.
+  const requested = (character?.classes ?? []).reduce((total, row) => total + row.level, 0);
+  if (requested > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
   const stored = definition.character;
   const merged = carryForwardOmitted(stored, character);
   const next = merged !== undefined && stored !== undefined

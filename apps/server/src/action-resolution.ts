@@ -4,6 +4,7 @@ import { toRollModes, type ActorDefinition } from "@vtt/schemas";
 import { criticalThreshold, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
@@ -19,7 +20,7 @@ export type ResolveInput = Readonly<{
   /** Explicit GM roll-mode choice; wins over the aggregated advantage/disadvantage sources. */
   rollMode?: "advantage" | "disadvantage" | "normal" | null;
   /** GM override of a rules-mode rejection; audited in the log and journal (ADR-0020). */
-  override?: Readonly<{ reason: string }> | null;
+  override?: Readonly<{ reason?: string }> | null;
   /** The action came from the builtin catalog (not the stat block) - enables the builtin special cases. */
   builtin?: boolean;
   /** Free-text annotation (the Ready action's trigger); folded into the granted effect's name. */
@@ -452,26 +453,26 @@ export function actionAvailability(state: GameState, attacker: LiveActor, action
  * violations to warnings; freeform skips validation.
  */
 function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[], distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined, siblings: ReadonlyArray<DefinitionAction>): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
-  const mode = state.combat.rulesMode;
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(state, attacker, action, input.targetIds, definition, distanceFeet, siblings);
   warnings.push(...notes);
 
   let overridden: { rule: string; reason: string } | null = null;
-  const allViolations = [...violations, ...softViolations];
-  if (mode !== "freeform" && allViolations.length > 0) {
+  // The mode is per FAMILY now, not per table: "don't police movement" must not also switch off the
+  // action economy. A violation whose family is Off is simply not a violation for this table.
+  const policed = [...violations, ...softViolations].filter((violation) => effectiveModeFor(state.combat, violation.rule) !== "freeform");
+  if (policed.length > 0) {
     if (input.override) {
-      overridden = { rule: allViolations[0].rule, reason: input.override.reason };
+      overridden = { rule: policed[0].rule, reason: overrideReason(input.override) };
     } else {
-      // A GM override earlier this turn (turn.rulesOverridden) covers the per-turn-repeatable families
-      // for the rest of the creature's turn: action/bonus/reaction economy and positional range/reach.
-      // Every other family (incapacitation, limited uses, legendary, cover, target-specific) still
-      // re-prompts, so it stays an explicit, audited call each time.
-      const covered = (rule: string) => state.combat.turn.rulesOverridden === true && (rule.startsWith("economy.") || rule.startsWith("range."));
-      const blocking = violations.filter((violation) => !covered(violation.rule));
-      if (mode === "strict" && blocking.length > 0) {
+      // A GM override earlier this turn covers that FAMILY for the rest of the creature's turn, so the
+      // next block of the same kind isn't re-prompted. Every other family still re-prompts, so it stays
+      // an explicit, audited call each time.
+      const covered = (rule: string) => overrideCovers(state.combat.turn, rule);
+      const blocking = violations.filter((violation) => !covered(violation.rule) && effectiveModeFor(state.combat, violation.rule) === "strict");
+      if (blocking.length > 0) {
         throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
       } else {
-        warnings.push(...allViolations.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
+        warnings.push(...policed.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
         if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
       }
     }
@@ -685,9 +686,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // server applies the math): total cover can't be targeted directly; half/three-quarters add to AC
   // and Dexterity saves below.
   const coverBonus = input.cover === "half" ? 2 : input.cover === "three-quarters" ? 5 : 0;
-  if (input.cover === "total" && state.combat.rulesMode !== "freeform") {
-    if (state.combat.rulesMode === "strict" && !input.override) throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
-    if (input.override && overridden === null) overridden = { rule: "cover.total", reason: input.override.reason };
+  const coverMode = effectiveModeFor(state.combat, "cover.total");
+  if (input.cover === "total" && coverMode !== "freeform") {
+    if (coverMode === "strict" && !input.override && !overrideCovers(state.combat.turn, "cover.total")) throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
+    if (input.override && overridden === null) overridden = { rule: "cover.total", reason: overrideReason(input.override) };
     else warnings.push("The target has Total Cover - allowed per the rules mode.");
   }
 
@@ -997,7 +999,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // spends the reaction and applies half, "decline" applies it in full (see reactions.ts). Freeform
   // mode stays prompt-free - reference-level play keeps the manual damage flow.
   const reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }> = [];
-  if (attack !== null && (attack.outcome === "crit" || attack.outcome === "hit") && state.combat.rulesMode !== "freeform" && deps.resolveDefinition) {
+  // The reaction WINDOW is action economy (a reaction is spent), so it follows the economy family -
+  // switching off movement policing must not also silence Uncanny Dodge.
+  if (attack !== null && (attack.outcome === "crit" || attack.outcome === "hit") && familyModeFor(state.combat, "economy") !== "freeform" && deps.resolveDefinition) {
     const target = targets[0];
     const proposedParts = [
       ...damage.map((part) => ({ amount: part.total, type: part.type })),
@@ -1095,12 +1099,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   if (plan.markReaction) {
     state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id] };
   }
-  // A GM override of a per-turn-repeatable rule (economy, or positional range/reach) applies for the
-  // rest of this creature's turn, so the next action/bonus/reaction/attack isn't re-blocked for the
-  // same family. Cleared on turn advance with the rest of `turn`.
-  if (overridden && (overridden.rule.startsWith("economy.") || overridden.rule.startsWith("range."))) {
-    state.combat = { ...state.combat, turn: { ...state.combat.turn, rulesOverridden: true } };
-  }
+  // A GM override applies to that rule's whole FAMILY for the rest of this creature's turn, so the
+  // next block of the same kind isn't re-prompted (D9 - one tap, no nagging). Every family is
+  // remembered now, not just economy/range. Cleared on turn advance with the rest of `turn`.
+  if (overridden) rememberOverride(state, overridden.rule);
   if (plan.spendLegendary) {
     state.combat = { ...state.combat, legendaryUsed: { ...state.combat.legendaryUsed, [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost } };
   }

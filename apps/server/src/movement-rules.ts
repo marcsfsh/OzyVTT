@@ -5,6 +5,7 @@ import { effectiveSpeedFeet, isIncapacitated } from "./condition-rules.js";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
 
 type Point = Readonly<{ x: number; y: number }>;
 
@@ -18,7 +19,7 @@ export type MovementRulesInput = Readonly<{
   distance: (a: Point, b: Point) => number | null;
   /** Footprint-aware feet between an enemy combatant and the mover standing at `point` (SRD: measure from the nearest point of each creature's space); falls back to center-to-center when absent. Used for reach checks. */
   creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
-  override: Readonly<{ reason: string }> | null;
+  override: Readonly<{ reason?: string }> | null;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so a reach-granting item widens the opportunity-attack trigger. */
   catalog?: EquipmentCatalog;
@@ -56,7 +57,10 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const prompts: Array<{ actorId: string; name: string }> = [];
   let warning: string | null = null;
   let overridden: string | null = null;
-  if (!mover || !state.combat.active || state.combat.turnActorId !== actorId || from === null || to === null || state.combat.rulesMode === "freeform") {
+  // The movement family owns both halves of this function - the speed budget and the opportunity-attack
+  // prompts - so a GM who switches movement policing Off gets neither, and a GM who leaves it on keeps
+  // both no matter what the rest of the dial says.
+  if (!mover || !state.combat.active || state.combat.turnActorId !== actorId || from === null || to === null || familyModeFor(state.combat, "movement") === "freeform") {
     return { warning, overridden, prompts };
   }
 
@@ -65,14 +69,20 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   if (moved !== null && effective !== null && moved > 0.05) {
     const used = state.combat.turn.movementUsedFeet;
     const overrun = used + moved > effective + 1e-6;
+    const rule = effective === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed";
     if (overrun && !input.override) {
       const message = effective === 0
         ? `${mover.name} can't move - its Speed is 0.`
         : `${mover.name} has ${Math.max(0, Math.round((effective - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft).`;
-      if (state.combat.rulesMode === "strict") throw new RulesBlockedError(effective === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed", message);
+      // A GM Allow earlier this turn already covered movement - don't re-block the same family (D9).
+      if (effectiveModeFor(state.combat, rule) === "strict" && !overrideCovers(state.combat.turn, rule)) throw new RulesBlockedError(rule, message);
       warning = message;
     }
-    if (overrun && input.override) overridden = input.override.reason;
+    if (overrun && input.override) {
+      overridden = overrideReason(input.override);
+      // Movement overrides never used to be remembered, so every step re-prompted. They are now.
+      rememberOverride(state, rule);
+    }
     state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
   }
 

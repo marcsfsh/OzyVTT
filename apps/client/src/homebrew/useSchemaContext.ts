@@ -13,6 +13,9 @@
  */
 
 import { useMemo } from "react";
+import {
+  CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS
+} from "@vtt/content-srd-5.2.1/schemas";
 import { CatalogChoiceError, resolveCatalogChoice } from "@vtt/domain";
 import { useBackgroundCatalog, useBuilderCatalogs, useClassCatalog, useFeatCatalog, useSkillCatalog, useSpeciesCatalog } from "../content/catalogs";
 import { useEquipmentReference } from "../encounter/equipment";
@@ -23,6 +26,11 @@ import type { SpellMembership } from "./SpellListContents";
 import type { HomebrewType } from "./types";
 
 const byLabel = (a: SelectOption, b: SelectOption) => a.label.localeCompare(b.label);
+
+/** Properties and masteries in one list — the trigger that consumes it gates on either, and both
+    families live in one id space in the bundle. Spelled once, at module scope, so the memo below
+    does not rebuild an array that can never change. */
+const WEAPON_SLUGS: readonly string[] = [...WEAPON_PROPERTY_IDS, ...WEAPON_MASTERY_IDS];
 
 /** SRD rows plus every homebrew record of `type`, de-duplicated by id. Homebrew wins a
     clash, because a homebrew record with an SRD id is an override by construction. */
@@ -118,6 +126,16 @@ export function useSchemaContext(
       spells: spellEntries,
       equipment: equipmentEntries,
       equipmentCategories: distinct(equipment.catalog.map((item) => item.category)),
+      /* Constants, not a fetch: these are the CANONICAL SRD vocabularies and they are compiled in
+         from the same package the server validates with, under a bundle-drift test. Nothing here
+         waits on a socket, so a damage-type list is complete on the first paint of the form rather
+         than after the content catalogs land — which is the difference between a GM typing "fire"
+         from memory and picking it. */
+      damageTypes: DAMAGE_TYPE_IDS,
+      conditions: CONDITION_IDS,
+      schools: MAGIC_SCHOOL_IDS,
+      creatureTypes: CREATURE_TYPE_IDS,
+      weaponProperties: WEAPON_SLUGS,
       resolveCatalog: (slug) => {
         try {
           return { count: resolveCatalogChoice(slug, builder.choice).length };

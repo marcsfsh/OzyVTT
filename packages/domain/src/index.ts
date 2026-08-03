@@ -274,6 +274,50 @@ function refineCombatContext(combat: { active: boolean; turnActorId: string | nu
   }
 }
 
+/**
+ * How strictly the engine polices one rule (ADR-0020). The wire values never change: the GM-facing
+ * words are Enforce / Advise / Off, but those are COPY - renaming the enum would be a second
+ * breaking API change, and only one was approved. Surfaces translate; the protocol does not.
+ */
+export const RuleModeSchema = z.enum(["strict", "assisted", "freeform"]);
+export type RuleMode = z.infer<typeof RuleModeSchema>;
+
+/**
+ * The five families every rule id in the engine belongs to. A GM relaxes rules a FAMILY at a time
+ * ("don't police movement"), never one rule id at a time - per-rule toggles would be a settings
+ * wall, and the per-turn override memory (`turn.rulesOverriddenFamilies`) is keyed the same way so
+ * one Allow stops the same kind of block nagging for the rest of that creature's turn.
+ *
+ * The rule-id → family mapping is server-side (`apps/server/src/rules-families.ts`) and pinned by a
+ * totality test; this enum is the wire vocabulary both sides share.
+ */
+export const RuleFamilySchema = z.enum(["movement", "economy", "resources", "targeting", "slots"]);
+export type RuleFamily = z.infer<typeof RuleFamilySchema>;
+
+/**
+ * Per-family overrides of the standing dial. An absent key means "follow the dial", which is why
+ * every key is optional rather than a full record: the stored shape says what the GM CHANGED.
+ *
+ * Deliberately not `.strict()` for stored state - an unknown family from a newer build strips on
+ * load instead of failing the whole GameState parse (the ADR-0007 additive rule). The command
+ * schemas call `.strict()` on it so a typo in a request is a rejection, not a silent no-op.
+ */
+export const RuleExceptionsSchema = z.object({
+  movement: RuleModeSchema.optional(),
+  economy: RuleModeSchema.optional(),
+  resources: RuleModeSchema.optional(),
+  targeting: RuleModeSchema.optional(),
+  slots: RuleModeSchema.optional()
+});
+export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
+
+/**
+ * `slots` starts at "assisted", NOT at the dial. Slot enforcement is new; inheriting a default-strict
+ * dial would silently start hard-blocking casts that have always worked. The GM opts into strict slot
+ * tracking; nothing opts them in for us.
+ */
+export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
+
 /** Combat fields shared by the live top-level combat and each parked scene - everything except the map (a Scene carries its own) and the scene bookkeeping (only the top level carries that). */
 const sceneCombatShape = {
   active: z.boolean().default(false),
@@ -299,11 +343,23 @@ const sceneCombatShape = {
     /** GM knowledge: the GM overrode a strict rules block this turn, so the rest of this creature's turn
      * skips re-prompting for the per-turn-repeatable families it covers - action/bonus/reaction economy
      * and positional range/reach. Other families (incapacitation, limited uses, legendary, cover) still
-     * re-prompt. Cleared with the rest of `turn` on turn advance. Optional/additive; stripped from player projections. */
-    rulesOverridden: z.boolean().optional()
+     * re-prompt. Cleared with the rest of `turn` on turn advance. Optional/additive; stripped from player projections.
+     *
+     * LEGACY: superseded by `rulesOverriddenFamilies` below, which covers every family instead of two
+     * hardcoded prefixes. Kept so a state persisted mid-turn by an older build still parses and still
+     * behaves; writers set BOTH, readers prefer the array. */
+    rulesOverridden: z.boolean().optional(),
+    /** GM knowledge: which rule families the GM has already waved through THIS turn (D9 - one tap, then
+     * the same kind of block stops nagging until the turn ends). Cleared with the rest of `turn` on turn
+     * advance. Optional/additive; stripped from player projections. */
+    rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional()
   }).default({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }),
   /** How structured action resolution enforces rules (ADR-0020): strict rejects with an override path, assisted warns, freeform stays reference-level. */
-  rulesMode: z.enum(["strict", "assisted", "freeform"]).default("strict"),
+  rulesMode: RuleModeSchema.default("strict"),
+  /** Per-family overrides of this fight's `rulesMode` (see RuleExceptionsSchema). An absent key follows
+   * the dial. Additive; the default keeps new slot enforcement advisory rather than silently hardening
+   * a save that has been casting freely. Player-readable alongside `rulesMode` - it holds no secrets. */
+  ruleExceptions: RuleExceptionsSchema.default(DEFAULT_RULE_EXCEPTIONS),
   /** Per-table policy for how a PLAYER's confirmed hit reaches an enemy's HP: "proposal" parks a GM-confirmed
    * damage proposal (the GM taps Apply - the default, preserving "players never mutate a creature they don't
    * own"); "direct" applies the typed damage immediately, server-side, when the GM opts the table in. The GM's
@@ -410,9 +466,42 @@ export type BuilderAbilityMethod = z.infer<typeof BuilderAbilityMethodSchema>;
  */
 export const BuilderPolicySchema = z.object({
   allowedAbilityMethods: z.array(BuilderAbilityMethodSchema).min(1).max(4).default(["standard-array", "point-buy", "roll", "custom"]),
-  customFormula: z.string().min(1).max(160).nullable().default(null)
+  customFormula: z.string().min(1).max(160).nullable().default(null),
+  /** The highest character level this table builds to. Enforced server-side by the builder AND by the
+   * sheet's shallow identity edit, so neither door can exceed the cap. Additive; 20 preserves today. */
+  maxLevel: z.number().int().min(1).max(20).default(20),
+  /** Whether players may run the character builder themselves ("open") or only the GM can ("gm-only").
+   * Additive; the default is the D13 answer - players build their own. STORED POLICY ONLY at this
+   * slice: `character.create` is still GM-gated in `game-operations.ts`, and the un-gating (with its
+   * auto-claim and per-session create caps) is the separate WI5 §2 change. Nothing reads it to make an
+   * authorization decision yet - it is projected so the surface work and the auth change land together
+   * against one already-persisted policy rather than migrating a second time. */
+  playerBuilder: z.enum(["open", "gm-only"]).default("open")
 }).strict();
 export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;
+
+/**
+ * How strictly the table polices rules by DEFAULT - the standing campaign setting each new fight
+ * starts from (D7). Lives top-level beside `builderPolicy` for the same reason: it is table policy,
+ * not fight state, so it must not ride scene park/resume. `combat.rulesMode`/`combat.ruleExceptions`
+ * are the LIVE copy for the fight in progress; this is what the next fight inherits.
+ */
+export const RulesPolicySchema = z.object({
+  dial: RuleModeSchema.default("strict"),
+  exceptions: RuleExceptionsSchema.default(DEFAULT_RULE_EXCEPTIONS)
+}).strict();
+export type RulesPolicy = z.infer<typeof RulesPolicySchema>;
+
+/**
+ * Table defaults for staging (D2): what a newly staged combatant's token visibility starts as, so a
+ * GM who preps hidden ambushes doesn't re-pick "GM only" on every add. The per-add `visibility`
+ * argument stays explicit on the wire - this is the value a SURFACE initializes its toggle from, not
+ * a server-side silent substitution, so the command still says exactly what it did.
+ */
+export const StagingDefaultsSchema = z.object({
+  visibility: z.enum(["public", "gm-only"]).default("public")
+}).strict();
+export type StagingDefaults = z.infer<typeof StagingDefaultsSchema>;
 
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
@@ -425,7 +514,11 @@ export const GameStateSchema = z.object({
   /** Player-submitted PDF imports awaiting GM approval. GM-only: curated out of PlayerView (a Pick) and the viewer. Additive per ADR-0007/0018. */
   pendingImports: z.array(PendingImportSchema).max(20).default([]),
   /** Character-builder table policy (decision 10). GM-set, player-read; additive with a full default so older saves parse unchanged. */
-  builderPolicy: BuilderPolicySchema.default({})
+  builderPolicy: BuilderPolicySchema.default({}),
+  /** Standing rules policy every new fight starts from (D7). GM-set, player-read; additive with a full default. */
+  rulesPolicy: RulesPolicySchema.default({}),
+  /** Table defaults for staging new combatants (D2). GM-set, GM-read; additive with a full default. */
+  stagingDefaults: StagingDefaultsSchema.default({})
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
@@ -440,15 +533,22 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
 export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool (per-die `entries` plus the derived total summary) - only on the requesting player's own claimed character. */ hitDice?: NonNullable<Actor["hitDice"]>; /** Sheet resources (spell slots, prepared spells, inventory, currency) - only on the requesting player's own claimed character. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived" | "sheetPreview"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool (per-die `entries` plus the derived total summary) - only on the requesting player's own claimed character. */ hitDice?: NonNullable<Actor["hitDice"]>; /** Sheet resources (spell slots, prepared spells, inventory, currency) - only on the requesting player's own claimed character. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand; /** Active condition ids + parallel display labels ("Prone", "Exhaustion 3"): public info, so players and the shared screen render the same dots from one source. */ conditionIds: readonly string[]; conditions: readonly string[] }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects">;
 /** A player's own pending reaction prompts only; same masking rules as saves. */
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; /** Per-table policy for a player's own hits (see CombatState.playerDamageMode); lets the player runner label the outcome ("handed to the GM" vs "applied"). The pendingDamage proposals themselves stay GM-only. */ playerDamageMode: "proposal" | "direct"; /** Public claimed-PC actorIds still owing an initiative roll - a player checks whether their own id is here to show the "Roll initiative" prompt. */ pendingInitiative: readonly string[]; /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode: "immediate" | "wait"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
-export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[]; /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy };
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: RuleMode; /** Per-family overrides of `rulesMode` (see CombatState.ruleExceptions). Players see the table's rules configuration exactly as they already see `rulesMode` - it holds no secrets, and a player's sheet has to know whether a block is coming before they tap. */ ruleExceptions: RuleExceptions; /** Per-table policy for a player's own hits (see CombatState.playerDamageMode); lets the player runner label the outcome ("handed to the GM" vs "applied"). The pendingDamage proposals themselves stay GM-only. */ playerDamageMode: "proposal" | "direct"; /** Public claimed-PC actorIds still owing an initiative roll - a player checks whether their own id is here to show the "Roll initiative" prompt. */ pendingInitiative: readonly string[]; /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode: "immediate" | "wait"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
+/**
+ * The door to an archived character's read-only sheet, and NOTHING else: id and name only, and only
+ * for archived characters the GM explicitly shared (`sheetPreview`) that were public to begin with.
+ * Hit points, conditions, claims, notes and the definition are all omitted - when in doubt, omit; this
+ * list exists so a player can find the preview, not so it can render one.
+ */
+export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
+export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[]; /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy; /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
 export type TurnHistoryEntry = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string }>;
@@ -724,7 +824,8 @@ export interface ClientToServerEvents {
   "character:release": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:force-release": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "content:monsters": (payload: Record<string, never>, acknowledgement: (result: ContentMonstersResult) => void) => void;
-  "actor:add-from-definition": (payload: { commandId: string; definitionId: string; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
+  /** `joinEncounter` drops the new combatant straight into the running fight (roster + initiative + tray token) in ONE command - the mid-fight "add monsters" trap was that the roster add and the fight join were two separate trips. Ignored when no fight is running. */
+  "actor:add-from-definition": (payload: { commandId: string; definitionId: string; visibility?: "public" | "gm-only"; joinEncounter?: boolean; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "actor:remove": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:import-definition": (payload: { commandId: string; definition: unknown; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "character:submit-import": (payload: { commandId: string; definition: unknown; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -732,17 +833,23 @@ export interface ClientToServerEvents {
   /** Create a character from CHOICES (ids + scores + per-level HP entries + the choices[] ledger); the server's feature-rider interpreter assembles the ActorDefinition and lands it through the import path (`actorId` = commandId, definition keyed `import-<actorId>`). GM-only in phase 2. */
   "character:create": (payload: { commandId: string; name: string; speciesId: string; backgroundId: string; classId: string; level: number; subclassId?: string; abilityMethod: BuilderAbilityMethod; baseScores: Record<AbilityId, number>; backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>; hp: { mode: "average" | "entries"; entries?: readonly number[] }; choices: ReadonlyArray<{ level: number; classId?: string; kind: string; id: string; payload?: Record<string, unknown> }>; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   /** GM sets the character-builder table policy (decision 10): allowed ability methods + the custom roll formula. */
-  "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; maxLevel?: number; playerBuilder?: "open" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /** GM sets the STANDING rules policy every new fight inherits (D7): the dial plus per-family exceptions. Omitted `exceptions` keeps the stored ones. */
+  "rules:set-policy": (payload: { commandId: string; dial: RuleMode; exceptions?: RuleExceptions; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /** GM sets the table's staging defaults (D2): what visibility a newly staged combatant's token starts at. */
+  "table:set-staging-defaults": (payload: { commandId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-token-image": (payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-size": (payload: { commandId: string; actorId: string; size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-visibility": (payload: { commandId: string; actorId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-archived": (payload: { commandId: string; actorId: string; archived: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /** GM shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (D26). Default hidden. */
+  "actor:set-sheet-preview": (payload: { commandId: string; actorId: string; enabled: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-speed": (payload: { commandId: string; actorId: string; speedFeet: number | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; parts?: ReadonlyArray<{ amount: number; type: string }>; sourceActorId?: string; sourceActionId?: string; sourceName?: string; critical?: boolean; nonlethal?: boolean; expectedRevision?: number }, acknowledgement: (result: DamageApplyResult) => void) => void;
   "actor:heal": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-temp-hp": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; override?: { reason: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
+  "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; override?: { reason?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
   "content:spells": (payload: Record<string, never>, acknowledgement: (result: ContentSpellsResult) => void) => void;
@@ -755,11 +862,11 @@ export interface ClientToServerEvents {
   "content:names": (payload: Record<string, never>, acknowledgement: (result: ContentNamesResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
-  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; commit?: boolean; attackNatural?: number; attackTotal?: number; critical?: boolean; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
+  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason?: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; commit?: boolean; attackNatural?: number; attackTotal?: number; critical?: boolean; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
   "effect:add": (payload: { commandId: string; actorId: string; name: string; tags?: readonly string[]; duration?: { type: "rounds"; rounds: number } | { type: "until-source-next-turn" } | { type: "encounter" } | { type: "manual" }; modifiers?: readonly EffectModifier[]; expectedRevision?: number }, acknowledgement: (result: MutationResult & { effectId?: string }) => void) => void;
   "effect:end": (payload: { commandId: string; actorId: string; effectId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "death-save:roll": (payload: { commandId: string; actorId: string; commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; naturalRoll?: number; expectedRevision?: number }, acknowledgement: (result: DeathSaveResult) => void) => void;
-  "encounter:set-rules-mode": (payload: { commandId: string; mode: "strict" | "assisted" | "freeform"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "encounter:set-rules-mode": (payload: { commandId: string; mode: RuleMode; exceptions?: RuleExceptions; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-player-damage-mode": (payload: { commandId: string; mode: "proposal" | "direct"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-player-initiative-mode": (payload: { commandId: string; mode: "immediate" | "wait"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-health-display": (payload: { commandId: string; style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -786,7 +893,7 @@ export interface ClientToServerEvents {
   "turn:use-legendary": (payload: { commandId: string; actorId: string; spent: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; label?: string; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
-  "encounter:start": (payload: { commandId: string; mapAssetId: string; entries: readonly EncounterStartEntry[]; playersRollInitiative?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "encounter:start": (payload: { commandId: string; mapAssetId: string; /** Omit while a prepared scene is live to start on exactly the combatants staged in it - the server owns "who is in the staged fight", not the client's copy of the list. */ entries?: readonly EncounterStartEntry[]; playersRollInitiative?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:add-combatant": (payload: { commandId: string; actorId: string; score?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:set": (payload: { commandId: string; actorId: string; score: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -795,8 +902,8 @@ export interface ClientToServerEvents {
   "initiative:next": (payload: { commandId: string; confirmRewrite?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:previous": (payload: { commandId: string; confirmDiscard?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "log:read": (payload: Record<string, never>, acknowledgement: (result: { ok: boolean; message?: string; entries?: readonly CombatLogEntry[] }) => void) => void;
-  "token:move": (payload: { commandId: string; actorId: string; position: EncounterTokenPosition | null; sceneId?: string; override?: { reason: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
-  "scene:create": (payload: { commandId: string; name: string; mapAssetId: string; combatantIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: SceneCreateResult) => void) => void;
+  "token:move": (payload: { commandId: string; actorId: string; position: EncounterTokenPosition | null; sceneId?: string; override?: { reason?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
+  "scene:create": (payload: { commandId: string; name: string; mapAssetId: string; combatantIds: readonly string[]; /** Go live on the new scene in the same command (prepare-and-go), parking whatever was live. */ activate?: boolean; expectedRevision?: number }, acknowledgement: (result: SceneCreateResult) => void) => void;
   "scene:rename": (payload: { commandId: string; sceneId: string; name: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:remove": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:activate": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

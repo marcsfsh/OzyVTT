@@ -147,7 +147,10 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
   "spell-list": () => ({ ...BASE, basedOn: [], add: [], remove: [] }),
 
   /* `EquipmentReferenceSchema` is `.strict()` and its three value fields are
-     `.nullable()`, not `.optional()` — so `null`, and only these keys. */
+     `.nullable()`, not `.optional()` — so `null`, and only these keys. The `weapon` and
+     `armor` sub-objects are deliberately ABSENT: an ordinary lantern is not a weapon, and
+     the schema declares both `.optional()`. What they must never be is HALF present —
+     see `SUB_OBJECT_DEFAULTS` below. */
   equipment: () => ({ source: "homebrew", description: null, category: "gear", costGp: 0, weightLb: 0 }),
 
   /* A creature IS an `ActorDefinition`. `schemaId`, `schemaVersion` and `source` are
@@ -177,6 +180,39 @@ export function blankDraft(type: HomebrewType): Draft {
 }
 
 /**
+ * **Sub-objects that are OPTIONAL as a whole and COMPLETE once present.**
+ *
+ * This is the data half of the item-publish repair (the behaviour half is `inContainer` in
+ * `schema.ts`, which seeds one of these the first time any field inside it is touched, and the
+ * top-up in `withDefaults` below, which repairs a record already stored half-written).
+ *
+ * The rule these three obey, and the one a fourth entry must obey too: **every value here is either
+ * a null, a false, or the option the control is already showing.** Nothing invents a number. A
+ * seeded `acBase: 13` would be a stat the GM never chose and would never notice; leaving `acBase`
+ * out means the checklist says "Fill in base armour class", which is the truth. Likewise
+ * `damageDice: ""` rather than a guessed die.
+ *
+ * `weapon.category` is the one enum here, and it gets `"simple"` because the column is a closed
+ * two-value enum with no null: the select is ALREADY displaying Simple when the section is untouched,
+ * so seeding it writes down what the GM is looking at rather than inventing a third answer.
+ */
+export const SUB_OBJECT_DEFAULTS: Readonly<Partial<Record<HomebrewType, Readonly<Record<string, Readonly<Record<string, unknown>>>>>>> = {
+  equipment: {
+    // All five keys required; `rangeFeet`/`longRangeFeet` nullable. `null` ranges ARE a melee
+    // weapon — every duplicated SRD melee weapon carries exactly this shape.
+    weapon: { category: "simple", damageDice: "", damageType: "", rangeFeet: null, longRangeFeet: null },
+    // All five required; three of them have honest empties. `acBase` and `addDexModifier` do not
+    // appear: `addDexModifier` is a switch (always written) and `acBase` is the GM's to choose.
+    armor: { dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null }
+  },
+  spell: {
+    // `shape` is `.nullable()` as a whole and blank-seeded to `null`; touching Shape or Size has to
+    // produce all three keys, `size`/`unit` nullable.
+    shape: { type: "sphere", size: null, unit: "feet" }
+  }
+};
+
+/**
  * The keys the EDITOR mints and the STORE must never see.
  *
  * `RowEditor` needs a stable key per row — keying by index is the bug that primitive exists to
@@ -191,14 +227,23 @@ export function blankDraft(type: HomebrewType): Draft {
  */
 const EDITOR_KEYS = ["rowId"];
 
-/** Deep copy minus the editor-only keys. Arrays and plain objects only — a draft is JSON. */
+/**
+ * Deep copy minus the editor-only keys, and minus anything `undefined`. Arrays and plain objects
+ * only — a draft is JSON.
+ *
+ * Dropping `undefined` is not tidying. `FieldDef.emptyValue: "omit"` means an emptied control
+ * REMOVES its key, and `setAt` writes `undefined` to say so; a key that survives to here holding
+ * `undefined` would be dropped anyway by `JSON.stringify` on its way to the store, so leaving it in
+ * would make this function disagree with the body the server actually receives — and the publish
+ * checklist validates what this function returns.
+ */
 export function forStorage(value: Draft): Draft {
   const walk = (node: unknown): unknown => {
     if (Array.isArray(node)) return node.map(walk);
     if (!node || typeof node !== "object") return node;
     const out: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(node as Record<string, unknown>)) {
-      if (EDITOR_KEYS.includes(key)) continue;
+      if (EDITOR_KEYS.includes(key) || entry === undefined) continue;
       out[key] = walk(entry);
     }
     return out;
@@ -225,6 +270,21 @@ export function withDefaults(type: HomebrewType, record: Draft): Draft {
       current !== null && typeof current === "object" && !Array.isArray(current);
     if (mergeable) out[key] = { ...(fallback as object), ...(current as object) };
     if (current === undefined) out[key] = fallback;
+  }
+  /**
+   * Repair a HALF-WRITTEN optional sub-object, and only ever a half-written one.
+   *
+   * A record authored before the seeding fix, or imported from a pack, can be sitting on
+   * `weapon: { damageDice: "1d8" }` — which is the exact shape the store refuses. Topping it up on
+   * open is what makes that record publishable again without the GM being told to type a range into
+   * a mace. The guard matters as much as the repair: an ABSENT `weapon` stays absent, so opening an
+   * ordinary lantern never grows it a weapon block, never marks the draft dirty, and never turns
+   * "select a record" into a PATCH (`useAutosave`'s dual baseline).
+   */
+  for (const [key, defaults] of Object.entries(SUB_OBJECT_DEFAULTS[type] ?? {})) {
+    const current = out[key];
+    if (current === null || current === undefined || typeof current !== "object" || Array.isArray(current)) continue;
+    out[key] = { ...defaults, ...(current as Record<string, unknown>) };
   }
   return out;
 }

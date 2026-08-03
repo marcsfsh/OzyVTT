@@ -475,7 +475,8 @@ export function createServer(options: CreateServerOptions) {
     archives: {
       list: () => store.listEncounterArchives(),
       get: (id) => store.getEncounterArchive(id),
-      remove: (id) => store.deleteEncounterArchive(id)
+      remove: (id) => store.deleteEncounterArchive(id),
+      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible)
     },
     sessions: {
       // The HTTP mirror of the socket's open LAN-trust join: anyone who can reach the host may
@@ -598,6 +599,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("actor:set-size", (payload, acknowledge) => respond(acknowledge, "Only the GM can resize tokens.", "The token could not be resized.", (principal) => operations.actorSetSize(principal, payload)));
     socket.on("actor:set-visibility", (payload, acknowledge) => respond(acknowledge, "Only the GM can change token visibility.", "The token visibility could not be changed.", (principal) => operations.actorSetVisibility(principal, payload)));
     socket.on("actor:set-archived", (payload, acknowledge) => respond(acknowledge, "Only the GM can archive characters.", "The character could not be archived.", (principal) => operations.actorSetArchived(principal, payload)));
+    socket.on("actor:set-sheet-preview", (payload, acknowledge) => respond(acknowledge, "Only the GM can share an archived character's sheet.", "The archived sheet could not be shared.", (principal) => operations.actorSetSheetPreview(principal, payload)));
     socket.on("actor:set-speed", (payload, acknowledge) => respond(acknowledge, "Only the GM can set movement speed.", "The speed could not be set.", (principal) => operations.actorSetSpeed(principal, payload)));
     socket.on("actor:apply-damage", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The damage could not be applied.", (principal) => operations.actorApplyDamage(principal, payload)));
     socket.on("actor:heal", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The healing could not be applied.", (principal) => operations.actorHeal(principal, payload)));
@@ -628,6 +630,8 @@ export function createServer(options: CreateServerOptions) {
     socket.on("effect:end", (payload, acknowledge) => respond(acknowledge, "Join the table before managing effects.", "The effect could not be ended.", (principal) => operations.effectEnd(principal, payload)));
     socket.on("death-save:roll", (payload, acknowledge) => respond(acknowledge, "Join the table before rolling death saves.", "The death save failed.", (principal) => operations.deathSaveRoll(principal, payload)));
     socket.on("encounter:set-rules-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the rules mode.", "The rules mode could not be changed.", (principal) => operations.encounterSetRulesMode(principal, payload)));
+    socket.on("rules:set-policy", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the rules policy.", "The rules policy could not be changed.", (principal) => operations.rulesSetPolicy(principal, payload)));
+    socket.on("table:set-staging-defaults", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the table's staging defaults.", "The staging defaults could not be changed.", (principal) => operations.tableSetStagingDefaults(principal, payload)));
     socket.on("encounter:set-player-damage-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change how players' hits apply damage.", "The player damage mode could not be changed.", (principal) => operations.encounterSetPlayerDamageMode(principal, payload)));
     socket.on("encounter:set-player-initiative-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change how player initiative works.", "The player initiative mode could not be changed.", (principal) => operations.encounterSetPlayerInitiativeMode(principal, payload)));
     socket.on("encounter:set-health-display", (payload, acknowledge) => respond(acknowledge, "Only the GM can change how health is shown.", "The health display could not be changed.", (principal) => operations.encounterSetHealthDisplay(principal, payload)));

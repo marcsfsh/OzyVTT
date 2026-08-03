@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CombatLogEntry, GameState, GmView, PlayerView, RollRecord, TableEvent } from "@vtt/domain";
+import type { CombatLogEntry, EncounterStartEntry, GameState, GmView, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
 import { rollDice, validateAbilityFormula } from "@vtt/rules-5e";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { buildCharacterDefinition } from "./character-build.js";
@@ -46,7 +46,8 @@ import {
   InitiativeRollRemainingSchema, InitiativeRollSelfSchema, InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   SetPlayerInitiativeModeSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetPlayerDamageModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  RulesSetPolicySchema, TableSetStagingDefaultsSchema,
+  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorSheetPreviewSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetPlayerDamageModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -100,6 +101,12 @@ function gmGradeLabelOf(principal: GamePrincipal): string { return principal.kin
 
 function requireGmGrade(principal: GamePrincipal, message: string) {
   if (!isGmGrade(principal)) throw new GameAccessDeniedError(message);
+}
+
+/** GM-only audit text for a per-family exception set ("movement: freeform, slots: strict"), or "no exceptions". */
+function describeRuleExceptions(exceptions: RuleExceptions): string {
+  const entries = Object.entries(exceptions).filter(([, mode]) => mode !== undefined);
+  return entries.length === 0 ? "no exceptions" : entries.map(([family, mode]) => `${family}: ${mode}`).join(", ");
 }
 
 function parse<Schema extends z.ZodTypeAny>(schema: Schema, raw: unknown, malformedMessage: string, preferIssueMessage = false): z.output<Schema> {
@@ -316,10 +323,30 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(EncounterStartSchema, raw, "The encounter setup is malformed.");
       const encounterMap = context.mapCatalog.get(request.mapAssetId);
       if (!encounterMap || encounterMap.kind !== "battlemap") throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
-      const { commandId, mapAssetId, entries, rulesMode, playersRollInitiative, expectedRevision } = request;
+      const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, expectedRevision } = request;
       const tokenGeometry = await context.tokenGeometryFor(mapAssetId);
+      // Omitted `entries` means "start the fight that is already staged here": the server derives the
+      // combatants from the LIVE scene rather than trusting the client's copy of the staged list.
+      // Derived INSIDE the transaction, against the state the command actually commits against - and
+      // deliberately without a refusal of its own, so `startEncounter`'s own guards keep their order
+      // and their wording (an already-running fight is told to end it, not to pick combatants).
+      const stagedEntries = (state: GameState): readonly EncounterStartEntry[] => {
+        // The ACTIVE scene's own slot is empty by invariant - its live copy is the top-level combat -
+        // so the staged list IS the top-level initiative; the scene lookup only proves one is live.
+        const live = state.combat.activeSceneId !== null && state.combat.scenes.some((candidate) => candidate.id === state.combat.activeSceneId);
+        return live ? state.combat.initiative.map((entry) => ({ actorId: entry.actorId })) : [];
+      };
       const result = await store.executeTimeline({ id: commandId, type: "encounter.start", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
-        startEncounter(state, { mapAssetId, entries, rulesMode, playersRollInitiative }, () => context.random(20), tokenGeometry, (definitionId) => resolveDefinitionIn(state, definitionId), Date.now(), equipmentCatalog());
+        const entries = request.entries ?? stagedEntries(state);
+        // A fresh fight starts from the TABLE's standing rules policy (D7) unless this command names
+        // its own; the previous fight's mid-combat re-tune does not silently become the new normal.
+        startEncounter(state, {
+          mapAssetId,
+          entries,
+          rulesMode: rulesMode ?? state.rulesPolicy.dial,
+          ruleExceptions: ruleExceptions ?? { ...state.rulesPolicy.exceptions },
+          playersRollInitiative
+        }, () => context.random(20), tokenGeometry, (definitionId) => resolveDefinitionIn(state, definitionId), Date.now(), equipmentCatalog());
         // Fresh fight: clear any prior encounter's snapshots and record this start as the baseline
         // the GM can always rewind back to (a distinct label so it reads apart from turn boundaries).
         timeline.truncateAll();
@@ -330,7 +357,7 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         context.appendLog({ kind: "encounter", text: "The encounter began.", gmOnly: false });
-        for (const entry of entries) {
+        for (const entry of request.entries ?? []) {
           if (entry.surprised === true) context.appendLog({ kind: "encounter", text: `${actorName(entry.actorId)} is surprised - initiative rolled at disadvantage.`, actorIds: [entry.actorId], gmOnly: actorHidden(entry.actorId) });
         }
         context.logTurnBegin(result.state);
@@ -621,7 +648,16 @@ export function createGameOperations(context: GameOperationsContext) {
       // Like annotation:add, the commandId doubles as the new entity id so a duplicate
       // delivery acks the same actorId instead of minting a fresh unused one.
       const actorId = request.commandId;
-      const result = await store.execute({ id: request.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => addActorFromDefinition(state, definition, actorId, request.visibility, equipmentCatalog()));
+      // `joinEncounter` closes the mid-fight two-step trap: the "add monsters" browser used to put a
+      // creature on the ROSTER only, and joining the fight was a second trip through a different menu.
+      // One command, one revision - roster row, initiative entry and tray token together.
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      const geometry = request.joinEncounter === true && mapAssetId ? await context.tokenGeometryFor(mapAssetId) : null;
+      const result = await store.execute({ id: request.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        addActorFromDefinition(state, definition, actorId, request.visibility, equipmentCatalog());
+        // Ignored out of combat: there is no fight to join, and the roster add is the whole intent.
+        if (request.joinEncounter === true && state.combat.active && geometry) addCombatant(state, actorId, undefined, () => context.random(20), geometry);
+      });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },
@@ -653,6 +689,10 @@ export function createGameOperations(context: GameOperationsContext) {
         // The builder gets the CALLER's catalog, never the whole library: a player must not be able
         // to name a GM-only homebrew class id they were never shown. GM-only today, so the audience
         // is always "gm" - passing it anyway is what keeps phase 3's player path correct by default.
+        // The table's level cap is enforced HERE, inside the command, against the policy the state
+        // actually holds - not against a copy the caller sent. The sheet's shallow identity edit
+        // carries the same check (`character-edit.ts`), so neither door can exceed the cap.
+        if (request.level > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
         const definition = buildCharacterDefinition(request, catalogFor(principal), state.builderPolicy);
         importActorDefinition(state, definition, actorId, "public", equipmentCatalog());
       });
@@ -676,7 +716,10 @@ export function createGameOperations(context: GameOperationsContext) {
         state.builderPolicy = {
           allowedAbilityMethods: [...allowedAbilityMethods],
           // Omitted = keep the stored formula; null = clear; a string = the validated new formula.
-          customFormula: request.customFormula === undefined ? state.builderPolicy.customFormula : request.customFormula
+          customFormula: request.customFormula === undefined ? state.builderPolicy.customFormula : request.customFormula,
+          // Same tri-state spirit for the two additive fields: omitted keeps what is stored.
+          maxLevel: request.maxLevel ?? state.builderPolicy.maxLevel,
+          playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder
         };
       });
       if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Character-builder ability methods set to ${allowedAbilityMethods.join(", ")}.`, gmOnly: true }); }
@@ -1182,11 +1225,47 @@ export function createGameOperations(context: GameOperationsContext) {
     async encounterSetRulesMode(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can change the rules mode.");
       const request = parse(SetRulesModeSchema, raw, "The rules-mode command is malformed.");
-      const { commandId, mode, expectedRevision } = request;
+      const { commandId, mode, exceptions, expectedRevision } = request;
       const result = await store.execute({ id: commandId, type: "encounter.set-rules-mode", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        state.combat = { ...state.combat, rulesMode: mode };
+        // Omitted exceptions leave the stored ones alone, so an old mode-only payload still means
+        // exactly what it always meant - the field is additive, not a reset.
+        state.combat = { ...state.combat, rulesMode: mode, ...(exceptions === undefined ? {} : { ruleExceptions: { ...exceptions } }) };
       });
-      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Rules mode set to ${mode}.`, gmOnly: true }); }
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Rules mode set to ${mode}${exceptions === undefined ? "" : ` (${describeRuleExceptions(exceptions)})`}.`, gmOnly: true }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    /**
+     * The STANDING rules policy every new fight inherits (D7) - campaign policy, not fight state, which
+     * is why it lives top-level beside `builderPolicy` instead of on `combat` (parking it on combat
+     * would drag it through scene park/resume). Changing it does NOT touch the fight in progress; that
+     * is `encounter.set-rules-mode`, and keeping the two separate is what makes "each fight starts from
+     * the table's settings" a promise rather than a surprise mid-combat re-tune.
+     */
+    async rulesSetPolicy(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can set the rules policy.");
+      const request = parse(RulesSetPolicySchema, raw, "The rules-policy command is malformed.");
+      const { commandId, dial, exceptions, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "rules.set-policy", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        state.rulesPolicy = { dial, exceptions: exceptions === undefined ? { ...state.rulesPolicy.exceptions } : { ...exceptions } };
+      });
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Table rules policy set to ${dial}${exceptions === undefined ? "" : ` (${describeRuleExceptions(exceptions)})`}.`, gmOnly: true }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    /**
+     * Table defaults for staging (D2). Stored only - the per-add `visibility` argument stays explicit
+     * on the wire, so this is what a surface INITIALIZES its toggle from, never a silent server-side
+     * substitution that would make an add command say one thing and do another.
+     */
+    async tableSetStagingDefaults(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can set the table's staging defaults.");
+      const request = parse(TableSetStagingDefaultsSchema, raw, "The staging-defaults command is malformed.");
+      const { commandId, visibility, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "table.set-staging-defaults", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        state.stagingDefaults = { visibility };
+      });
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `New combatants now stage as ${visibility === "gm-only" ? "GM only" : "shown to players"}.`, gmOnly: true }); }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -1632,13 +1711,44 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, actorId, archived, expectedRevision } = request;
       // Archiving hides a character from players (projection) and the encounter builder; a live actor may
       // not be archived while it's in the running fight - the GM removes it from combat first.
+      let releasedClaim = false;
       const result = await store.execute({ id: commandId, type: "actor.set-archived", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const actor = state.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That character no longer exists.");
         if (archived && state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("Remove this character from the encounter before archiving it.");
+        // Archiving a CLAIMED character used to leave the claim in place while the projection hid the
+        // character from everyone INCLUDING its owner: the player held an invisible claim and, because
+        // the one-claim rule counts by session, could not claim anything else. Release it here, in the
+        // same mutation, so archiving means what it says - hidden, kept, out of play.
+        releasedClaim = archived && actor.ownerSessionId !== null;
+        if (releasedClaim) forceReleaseCharacter(state, actorId, "gm");
         actor.archived = archived;
       });
-      if (!result.duplicate) await context.publishGameState(result.state);
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        if (releasedClaim) context.appendLog({ kind: "encounter", text: `${actorName(actorId)} was archived - their player's claim was released.`, actorIds: [actorId], gmOnly: true });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    /**
+     * Share (or un-share) an ARCHIVED character's sheet back to players as a read-only keepsake (D26).
+     * Default hidden; the flag is meaningless while the character is live, whose sheet reaches only its
+     * owner exactly as before. Players receive nothing but the id and name (`archivedCharacters`).
+     */
+    async actorSetSheetPreview(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can share an archived character's sheet.");
+      const request = parse(SetActorSheetPreviewSchema, raw, "The sheet-preview command is malformed.");
+      const { commandId, actorId, enabled, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "actor.set-sheet-preview", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That character no longer exists.");
+        actor.sheetPreview = enabled;
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "encounter", text: `${actorName(actorId)}'s archived sheet is now ${enabled ? "shared with players" : "hidden from players"}.`, actorIds: [actorId], gmOnly: true });
+      }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -1649,10 +1759,26 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(SceneCreateSchema, raw, "The scene setup is malformed.");
       const sceneMap = context.mapCatalog.get(request.mapAssetId);
       if (!sceneMap || sceneMap.kind !== "battlemap") throw new CommandRejectedError("Prepare scenes on an uploaded battlemap.");
-      const { commandId, name, mapAssetId, combatantIds, expectedRevision } = request;
+      const { commandId, name, mapAssetId, combatantIds, activate, expectedRevision } = request;
       const geometry = await context.tokenGeometryFor(mapAssetId);
-      const result = await store.execute({ id: commandId, type: "scene.create", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => { createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry); });
-      if (!result.duplicate) await context.publishGameState(result.state);
+      const implicitSceneId = context.newId();
+      // `activate` makes "prepare and go" one command instead of prepare-then-switch. It runs the SAME
+      // park/resume swap `scene.activate` runs (and inherits its refusals - a GM mid-history-review is
+      // still told to finish first), which is why it goes through executeTimeline and truncates.
+      const result = await store.executeTimeline({ id: commandId, type: "scene.create", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
+        createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry);
+        if (activate === true) {
+          // The implicit-scene id must NOT be the commandId here: the scene we just created already
+          // owns it, and parking a pre-scenes encounter under the same id would collide.
+          activateScene(state, commandId, implicitSceneId);
+          timeline.truncateAll();
+        }
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        // Going live also presents the map on the shared screen - the same one action scene.activate is.
+        if (activate === true && result.state.combat.mapAssetId) await context.presentSceneMap(result.state.combat.mapAssetId);
+      }
       return { revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId };
     },
 
@@ -1687,6 +1813,13 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         const scene = result.state.combat.scenes.find((candidate) => candidate.id === sceneId);
         context.appendLog({ kind: "scene", text: `Switched to scene "${scene?.name ?? "Untitled"}".`, gmOnly: true });
+        // A scene prepared before archived characters were rejected server-side may still hold one.
+        // Activation deliberately does NOT refuse (that would strand the scene with no way back); the
+        // GM is told instead, and removes them. No destructive scrub of stored prep.
+        const resumedArchived = result.state.combat.initiative
+          .map((entry) => result.state.actors.find((actor) => actor.id === entry.actorId))
+          .filter((actor): actor is NonNullable<typeof actor> => actor !== undefined && actor.archived);
+        if (resumedArchived.length > 0) context.appendLog({ kind: "scene", text: `This scene still stages ${resumedArchived.length} archived character${resumedArchived.length === 1 ? "" : "s"} (${resumedArchived.map((actor) => actor.name).join(", ")}) - restore or remove them.`, gmOnly: true });
         // Going live also presents the scene's map on the shared screen, so it's one action.
         if (result.state.combat.mapAssetId) await context.presentSceneMap(result.state.combat.mapAssetId);
       }
@@ -1740,7 +1873,7 @@ export type GameCommandDescriptor = Readonly<{
 
 export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<string, GameCommandDescriptor> {
   const entries: ReadonlyArray<[GameCommandType, string, GameCommandDescriptor["run"]]> = [
-    ["encounter.start", "Start an encounter on a battlemap with initial combatants (GM).", (p, raw) => operations.encounterStart(p, raw)],
+    ["encounter.start", "Start an encounter on a battlemap; omit the combatants to start on the live scene's staged list (GM).", (p, raw) => operations.encounterStart(p, raw)],
     ["encounter.end", "End the encounter and archive it permanently (GM).", (p, raw) => operations.encounterEnd(p, raw)],
     ["encounter.add-combatant", "Add a rostered actor to the running encounter (GM).", (p, raw) => operations.encounterAddCombatant(p, raw)],
     ["initiative.set", "Set a combatant's initiative score (GM).", (p, raw) => operations.initiativeSet(p, raw)],
@@ -1753,7 +1886,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["turn.use-reaction", "Mark a combatant's reaction used/unused.", (p, raw) => operations.turnUseReaction(p, raw)],
     ["turn.use-legendary", "Set a legendary creature's spent legendary actions this round.", (p, raw) => operations.turnUseLegendary(p, raw)],
     ["token.move", "Move a combatant's token (server-snapped); position null returns it to the tray.", (p, raw) => operations.tokenMove(p, raw)],
-    ["actor.add-from-definition", "Instantiate a bundled SRD monster onto the roster (GM).", (p, raw) => operations.actorAddFromDefinition(p, raw)],
+    ["actor.add-from-definition", "Instantiate a bundled SRD monster onto the roster, optionally joining the running fight in the same command (GM).", (p, raw) => operations.actorAddFromDefinition(p, raw)],
     ["actor.import-definition", "Import a canonical ActorDefinition JSON as a claimable actor (GM).", (p, raw) => operations.actorImportDefinition(p, raw)],
     ["character.submit-import", "Submit a character sheet into the GM's approval queue (anyone at the table); the queued importId equals the commandId.", (p, raw) => operations.characterSubmitImport(p, raw)],
     ["character.resolve-import", "Approve or reject a queued character submission (GM); approving instantiates the actor, whose id equals the commandId.", (p, raw) => operations.characterResolveImport(p, raw)],
@@ -1773,7 +1906,9 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["effect.add", "Add a rules-engine effect to a combatant (GM).", (p, raw) => operations.effectAdd(p, raw)],
     ["effect.end", "End an effect (GM anyone; a player their claimed character), clearing linked conditions and firing its on-end grants.", (p, raw) => operations.effectEnd(p, raw)],
     ["death-save.roll", "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).", (p, raw) => operations.deathSaveRoll(p, raw)],
-    ["encounter.set-rules-mode", "Set the rules-engine enforcement mode: strict, assisted, or freeform (GM).", (p, raw) => operations.encounterSetRulesMode(p, raw)],
+    ["encounter.set-rules-mode", "Set the LIVE fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).", (p, raw) => operations.encounterSetRulesMode(p, raw)],
+    ["rules.set-policy", "Set the table's standing rules policy - the dial and per-family exceptions every new fight starts from (GM).", (p, raw) => operations.rulesSetPolicy(p, raw)],
+    ["table.set-staging-defaults", "Set the table's staging defaults: the token visibility a newly staged combatant starts at (GM).", (p, raw) => operations.tableSetStagingDefaults(p, raw)],
     ["encounter.set-player-damage-mode", "Set how a player's own hit reaches an enemy's HP: a GM-confirmed proposal or direct server-side apply (GM).", (p, raw) => operations.encounterSetPlayerDamageMode(p, raw)],
     ["encounter.set-player-initiative-mode", "Set whether player-rolled initiative begins turns immediately or waits for all players to roll (GM).", (p, raw) => operations.encounterSetPlayerInitiativeMode(p, raw)],
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],
@@ -1803,9 +1938,10 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["actor.set-token-image", "Set or clear a combatant's token image from the token library (GM).", (p, raw) => operations.actorSetTokenImage(p, raw)],
     ["actor.set-size", "Set a combatant's creature size; the token re-snaps to its footprint (GM).", (p, raw) => operations.actorSetSize(p, raw)],
     ["actor.set-visibility", "Move a combatant between the shared layer and the GM-only layer (GM).", (p, raw) => operations.actorSetVisibility(p, raw)],
-    ["actor.set-archived", "Archive or restore a character - archived characters are hidden from players and left out of the encounter builder (GM).", (p, raw) => operations.actorSetArchived(p, raw)],
+    ["actor.set-archived", "Archive or restore a character - archived characters are hidden from players, refused by claim, rejected by scene and encounter staging, and any claim is released on archive (GM).", (p, raw) => operations.actorSetArchived(p, raw)],
+    ["actor.set-sheet-preview", "Share or hide an archived character's sheet as a read-only keepsake for players; hidden by default (GM).", (p, raw) => operations.actorSetSheetPreview(p, raw)],
     ["actor.set-speed", "Set a combatant's walking speed in feet (null clears to unknown, skipping movement rules) (GM).", (p, raw) => operations.actorSetSpeed(p, raw)],
-    ["scene.create", "Prepare a staged scene on a battlemap without touching the live table (GM).", (p, raw) => operations.sceneCreate(p, raw)],
+    ["scene.create", "Prepare a staged scene on a battlemap without touching the live table, or go live on it in the same command (GM).", (p, raw) => operations.sceneCreate(p, raw)],
     ["scene.rename", "Rename a prepared scene (GM).", (p, raw) => operations.sceneRename(p, raw)],
     ["scene.remove", "Remove a prepared scene (GM).", (p, raw) => operations.sceneRemove(p, raw)],
     ["scene.activate", "Switch the live table to a prepared scene, parking the current one (GM).", (p, raw) => operations.sceneActivate(p, raw)],
