@@ -35,6 +35,7 @@ import {
   appStylesheets,
   assertRoots,
   eyebrowScanned,
+  ladderStylesheets,
   lineOf,
   playTsx,
   scannedTsx,
@@ -556,7 +557,9 @@ const LADDER_ALLOW: ReadonlyArray<readonly [file: string, kind: "min" | "max", w
 ];
 
 describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
-  const sources = stylesheets();
+  // `ladderStylesheets()`, not `stylesheets()`: (d)'s design-tokens.css exemption is about
+  // COLOUR and does not transfer to breakpoints. See the helper's own note.
+  const sources = ladderStylesheets();
   const conditions: { path: string; line: number; kind: string; width: number }[] = [];
   for (const source of sources) {
     const src = source.read();

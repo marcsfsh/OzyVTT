@@ -170,9 +170,10 @@ export const CONVENTION_SHAPE = {
   ladderMax: [560, 650, 760, 849, 979] as readonly number[],
   ladderMin: [561, 651, 761, 850, 980, 1280] as readonly number[],
   /**
-   * Floor on the `@media` width conditions parsed. Measured 2026-08-04: **62** (53 on-ladder,
-   * 9 off). The parse is media-query-only on purpose: the doc's self-audit grep also catches
-   * *property* `max-width`s that are not breakpoints at all — `codex.css:827`'s 820px and a
+   * Floor on the `@media` width conditions parsed. Measured 2026-08-04: **63** (54 on-ladder,
+   * 9 off) — 62 before `design-tokens.css` joined (f)'s scope, see `ladderStylesheets()`. The
+   * parse is media-query-only on purpose: the doc's self-audit grep also catches *property*
+   * `max-width`s that are not breakpoints at all — `codex.css:827`'s 820px and a
    * `min-width: 320px` both vanish here, and neither belongs in an allowlist.
    */
   ladderConditionFloor: 50,
@@ -368,13 +369,32 @@ export function eyebrowScanned(): Source[] {
   ];
 }
 
-/** Every stylesheet both checks (d) and (f) read. `design-tokens.css` is the definition, so it is exempt. */
+/** Every stylesheet check (d) reads. `design-tokens.css` is the colour DEFINITION, so it is exempt. */
 export function stylesheets(): Source[] {
   const css = (n: string) => /\.css$/.test(n);
   return [
     ...walk(CLIENT_SRC, css).map((rel) => source(CLIENT_SRC, rel, clientPath)),
     ...walk(UI_SRC, css).map((rel) => source(UI_SRC, rel, uiPath))
   ].filter((s) => !s.path.endsWith("design-tokens.css"));
+}
+
+/**
+ * Check (f)'s scope: the same set PLUS `design-tokens.css`.
+ *
+ * (d)'s exemption is about COLOUR — that file is where the hexes are supposed to live — and it
+ * does not transfer to breakpoints: the ladder is about which widths the app changes shape at,
+ * and a rung typed there binds every consumer at once. The file was outside (d), outside (f)'s
+ * `stylesheets()`, and outside (g)/(h)'s client-only walk, so an off-ladder `@media` landing in
+ * it was unenforced anywhere. Found while it grew by 322 lines in one lane; nothing had actually
+ * slipped (its one width query is `max-width: 760px`, a rung), which is the moment to close a
+ * hole rather than after something falls through it.
+ */
+export function ladderStylesheets(): Source[] {
+  const css = (n: string) => /\.css$/.test(n);
+  return [
+    ...walk(CLIENT_SRC, css).map((rel) => source(CLIENT_SRC, rel, clientPath)),
+    ...walk(UI_SRC, css).map((rel) => source(UI_SRC, rel, uiPath))
+  ];
 }
 
 /**
