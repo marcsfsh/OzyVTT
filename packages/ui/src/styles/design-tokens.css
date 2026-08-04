@@ -664,8 +664,17 @@ button, a, .interactive, [role="button"], summary {
 .lift:active { transform: translateY(0); }
 
 /* Forward-nav nudge (7.5): a trailing arrow glyph that slides 2px when its control is
-   hovered or focused. Put <span class="nav-arrow">→</span> at the end of the label. */
-.nav-arrow { display: inline-block; margin-left: .35em; transition: transform var(--dur-press) var(--ease-settle); }
+   hovered or focused. Put <span class="nav-arrow">→</span> at the end of the label.
+
+   `color: inherit` is a FIX, not a formality. The arrow is a <span> inside a <button>, and the
+   client's base control styling carries `button span { color: var(--text-dim) }` — written for
+   card-shaped buttons with a dim second line, but it catches this too. Element selectors lose to
+   a class, so naming the property here is enough; without it the arrow inside a primary Button
+   rendered --text-dim on the magenta fill and measured 1.44:1 (dark; 1.93 dusk, 1.68 light)
+   against a 4.5 floor — the app's worst reading anywhere. `display` was already claimed for the
+   same reason. A shared utility has to state every property a consumer's element selector might
+   reach, because it cannot see that stylesheet. */
+.nav-arrow { display: inline-block; margin-left: .35em; color: inherit; transition: transform var(--dur-press) var(--ease-settle); }
 button:hover .nav-arrow, a:hover .nav-arrow, [role="button"]:hover .nav-arrow, .lift:hover .nav-arrow,
 button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: translateX(2px); }
 
@@ -794,6 +803,14 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    text (the `.wordmark-name` lesson, one rule up). NOT for `.nh-panel-title`, `.settings-head h2`
    or any section heading — one edit there puts the metal on every panel and it stops meaning
    anything.
+
+   "WORDMARK-SCALE ONLY" IS A CONTRAST LIMIT, not a taste one, and daybreak is where it bites.
+   Measured by image (the element pass cannot see it — `color` is transparent here): every
+   horizontal band of the wordmark reads 3.37-6.91 against the pale sky, so all 34 measured
+   scanline rows are under the 4.5 normal-text floor and none is under 3.0. That is AA-LARGE, and
+   AA-large is the applicable floor at clamp(2.5rem, 8vw, 4.5rem) — with 0.37 of margin, which is
+   thin. Night and the sunset hour have room (7.88-18.89). Shrink a `.sign` below display scale in
+   daybreak and it stops passing; deepen the light --sign-chrome's mid bands first if you must.
 
    IT LIVES HERE, away from its §9 siblings (`.chamfer`, `.rim-*`, `.neon-beam`), for a reason
    worth keeping: a treatment that REPLACES the default wordmark fill has to come after the rule

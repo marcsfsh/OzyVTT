@@ -512,9 +512,15 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   outline. `--sign-chrome` / `--sign-stroke` / `--sign-glow` + the `.sign` utility. Reserved for
   a full-page moment that IS the screen — the landing today, and no second call site in play.
   **Never a panel header**, never a section heading, never `.nh-panel-title`: one edit there puts
-  the metal on every panel in the app and it stops meaning anything. The values deliberately
-  duplicate `--landing-sign`/`--landing-stroke`/`--landing-title-glow`; the landing should alias
-  them once the entry-animation lane lands.
+  the metal on every panel in the app and it stops meaning anything. **In daybreak it clears
+  AA-LARGE only** — measured by image, because `background-clip: text` makes `color` transparent
+  and an element-level check skips it: every horizontal band of the wordmark reads 3.37–6.91
+  against the pale sky, so all 34 measured scanline rows sit under the 4.5 normal-text floor and
+  none under 3.0. At the demo's `clamp(2.5rem, 8vw, 4.5rem)` that is large text and it passes with
+  0.37 of margin; **`.sign` is valid at wordmark scale and nowhere smaller.** Night and the sunset
+  hour have room to spare (7.88–18.89). The values deliberately duplicate
+  `--landing-sign`/`--landing-stroke`/`--landing-title-glow`; the landing should alias them once
+  the entry-animation lane lands.
 - **Neon linework** *(built 2026-08-04)*. The sky's horizon, lent to the chrome:
   `--rule-beam` / `--rule-beam-v` / `--rule-beam-glow` (derived from `--cyan`/`--magenta`, so
   daybreak's deepened inks come free) and the `.neon-beam` utility, which draws a 1px lit rule on

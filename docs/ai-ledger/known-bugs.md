@@ -300,6 +300,17 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   `--indigo` has no readable `-hi` twin the way `--danger`/`--caution` do, which is the actual gap —
   D21 #1 fixed exactly this shape for `--text-muted`.
 
+- **[ui/Button] `.nh-btn--destructive`'s label fails AA in daybreak, and the sky takes it 0.14 lower.**
+  The light `--danger` ink `#E24C6C` on the settings glass measures **3.48:1** at 1440×900 and
+  **3.49:1** at 390×844 (GM `/settings`, the *Revoke all GM sessions* control, region scrolled to its
+  end), against a 4.5 floor. Night reads 6.78 and the sunset hour 5.16, so daybreak alone is under —
+  the light `--danger` token is the defect, not the button. **It was under before the sky:** measured
+  in the same frame with the sky removed it reads 3.62, so the scene contributes −0.14 and the
+  remaining 0.88 is the token's. The delta is logged so the token fix is sized against the
+  COMPOSITED value rather than the flat one; this was the only row in the lane's contrast sweep
+  where the sky moved a ratio *and* the result was below AA. Same shape as the two entries around
+  it: a hue with no readable twin in one theme.
+
 - **[scenes] `.scene-live-note` ("● Live now") measures 4.07:1 in the sunset hour.** `--magenta`
   (#FF2E9A) as 11px/700 text on dusk `--surface-1` (#2E2160); dark reads 5.32 and light 5.17, so dusk
   alone is under. Same measurement run and the same proof of independence as the entry above (identical
