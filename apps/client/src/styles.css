@@ -738,6 +738,23 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    GM token. The rim costs no layout (it is an inset shadow, not a border), so the gutter still
    puts the labels on the same column as the surface headings below them. */
 .gm-tabs, .player-view-tabs { grid-row: 2; padding-inline: var(--pane-gutter); }
+/* THE CHROME-TIER SCANLINE. `--scanline-color` is the CHROME strength (.22 / .14 / .05); the
+   shared `.scanlines` utility halves it with `opacity: .5` for the SCENE tier, which is why the
+   sky is at .11 and this bar is at .22 — two strengths of one texture, not a contradiction. The
+   style guide's own bar wears it and this one wore nothing, so the bar read as a hole between
+   the sky above and the sky below. A background-IMAGE, not the utility: the utility is an inset
+   ::after and this element scrolls its tabs horizontally, so a positioned overlay would scroll
+   away; a background is painted on the box and stays. Daybreak drops it, matching the utility's
+   own light-theme rule and the caption ("texture drops to near-nothing"). */
+.gm-tabs, .player-view-tabs {
+  background-image: linear-gradient(to bottom,
+    transparent 0,
+    transparent calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) var(--scanline-gap));
+  background-size: 100% var(--scanline-gap);
+}
+[data-theme="light"] .gm-tabs, [data-theme="light"] .player-view-tabs { background-image: none; }
 .gm-tabs { background-color: var(--rim-gm-wash); }
 .player-view-tabs { background-color: var(--rim-player-wash); }
 

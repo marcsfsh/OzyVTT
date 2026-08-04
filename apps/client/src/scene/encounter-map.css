@@ -46,8 +46,17 @@
 .encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
 /* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize. */
 .encounter-map-dock { position: absolute; z-index: 2; overflow: auto; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
-.encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid var(--line); }
-.encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid var(--line); }
+/* THE DOCK EDGE TAKES THE LINEWORK (§9, director ruling). The table gets no sky — a horizon
+   behind a battle map competes with the map, and the map is the canvas — but its CHROME speaks
+   the same language, and the dock's inner edge is the one boundary on this surface that is
+   structural rather than decorative: it is where the map stops and the panels begin. So it is
+   the horizon's rule (--rule-beam-v) instead of a flat `--line`, drawn through `border-image`
+   because a border cannot hold a gradient on its own and a positioned pseudo would scroll with
+   the dock's contents. Everything else here stays quiet: the stage's own border, the toolbar
+   divider and the resize grip are unchanged, because neon marks what is interactive, focused,
+   selected or live (pillar 1) and a beam per panel edge would be noise, not language. */
+.encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
+.encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
 .encounter-map-dock .encounter-panel { margin: 0; border: 0; background: transparent; padding: 0; }
 /* Inner-edge grab strip to resize a left/right dock; spans the full height so you can grab anywhere. */
 .encounter-map-dock-resize { position: absolute; top: 0; bottom: 0; width: 14px; z-index: 3; cursor: col-resize; touch-action: none; }
