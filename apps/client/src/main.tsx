@@ -521,7 +521,7 @@ function App() {
       <span className="landing-flare" aria-hidden="true" />
       <header className="home-hero anim-view">
         {/* The one bold thing on the view: no eyebrow, no subtext, nothing beside it (D30). */}
-        <h1 className="home-hero-title"><Wordmark>OzyVTT</Wordmark></h1>
+        <h1 className="home-hero-title"><Wordmark>OZYVTT</Wordmark></h1>
       </header>
       {mode === "home" && <section className="choices anim-view">
         <Button variant="primary" size="md" lift onClick={joinPlayer} disabled={busy}>{busy ? "Connecting…" : "Join as Player"}<IconArrow className="nav-arrow" /></Button>
