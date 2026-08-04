@@ -671,7 +671,6 @@ const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phas
   ["apps/client/src/replay/replay.css", "68vh", "B"],
   ["apps/client/src/replay/replay.css", "50vh", "B"],
   ["apps/client/src/scene/encounter-map.css", "72vh", "B"],
-  ["apps/client/src/styleguide/styleguide.css", "100vh", "A"],
   ["apps/client/src/styles.css", "52vh", "B"],
   ["apps/client/src/viewer/viewer-controls.css", "54vh", "B"],
   ["apps/client/src/viewer/viewer-controls.css", "50vh", "B"]

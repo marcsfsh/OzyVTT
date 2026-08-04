@@ -10,7 +10,11 @@ body { margin: 0; }
 html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
-.sg { min-height: 100vh; }
+/* The lock unit, not `100vh`: on a phone the URL bar makes `vh` taller than the screen, which
+   is why the standard reads dvh everywhere (§7) — even here, on the one entry that scrolls on
+   purpose, where the only job of this line is to let the page background reach the bottom of a
+   short section. */
+.sg { min-height: 100dvh; }
 
 .sg-header {
   position: sticky;

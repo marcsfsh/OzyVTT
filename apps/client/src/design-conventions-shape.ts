@@ -205,10 +205,11 @@ export const CONVENTION_SHAPE = {
    * the end of the refresh's phase C; every row is tagged with the phase whose recompose
    * drains it. Measured 2026-08-04 by the check's own scan: **28 occurrences across 8
    * files** (raw grep says 30 lines with 44 unit tokens; the scan excludes the structural
-   * `100dvh`/paired/`:fullscreen` allows and counts occurrences, not lines).
+   * `100dvh`/paired/`:fullscreen` allows and counts occurrences, not lines) — then −1 file
+   * the same day, when the styleguide's lone bare `100vh` took the lock unit instead.
    */
-  viewportLegacyFiles: 8,
-  viewportLegacyTotal: 28,
+  viewportLegacyFiles: 7,
+  viewportLegacyTotal: 27,
 
   // ─────────────────────────── (h) declared scroll regions ───────────────────────────
   /**

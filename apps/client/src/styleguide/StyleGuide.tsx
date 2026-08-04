@@ -797,7 +797,7 @@ export function StyleGuide() {
             to see all three themes. Build new features from these; do not hand-roll bespoke controls.
           </p>
 
-          <Section id="layout" title="Layout — the screen is the page" blurb="Adopted 2026-08-04 (decision log; design-language.md §7). The app page never scrolls: a surface is a FRAME (chrome that never moves) plus REGIONS, and every region either fits its box or scrolls itself — the one blessed treatment is .scroll-y. One region per surface is the CANVAS and flex-fills what is left (flex: 1; min-height: 0). In force today for the landing, the shared-screen viewer, the wizard layer and Modal/Drawer; every other surface adopts it in the client-gated refresh. The miniature below is the whole idea: the outer frame never moves, the dock list scrolls itself, the canvas takes the remainder.">
+          <Section id="layout" title="Layout — the screen is the page" blurb="Adopted 2026-08-04 (decision log; design-language.md §7). The app page never scrolls: a surface is a FRAME (chrome that never moves) plus REGIONS, and every region either fits its box or scrolls itself — the one blessed treatment is .scroll-y. One region per surface is the CANVAS and flex-fills what is left (flex: 1; min-height: 0). In force today: the shell itself is locked (body 100dvh, main is the frame), and the landing, the shared-screen viewer, Modal/Drawer, the wizard layer, Settings, the Roster, the Scenes gallery, the Replays list and the Sheet layer all own their frames. What is left — the Table, the Codex, Homebrew, the replay viewer, the shared-screen controls and map calibration — rides ONE staged pane region each until its phase lands. The miniature below is the whole idea: the outer frame never moves, the dock list scrolls itself, the canvas takes the remainder.">
             <div className="sg-lock-demo" aria-label="Locked-viewport frame demonstration">
               <div className="sg-lock-bar"><span className="sg-lock-tab is-on">Table</span><span className="sg-lock-tab">Scenes</span><span className="sg-lock-tab">Codex</span><span className="sg-lock-hint">frame — never scrolls</span></div>
               <div className="sg-lock-body">
@@ -818,8 +818,8 @@ export function StyleGuide() {
               <tr><td>Table (phone)</td><td>redesign</td><td>map band + one tabbed sheet (Turn / Dice / Log) — three stacked panels cannot share 844px with a map</td></tr>
               <tr><td>Maps + calibration</td><td>redesign</td><td>the long top-to-bottom sequence becomes steps with the canvas always visible</td></tr>
               <tr><td>Codex · Homebrew</td><td>recompose</td><td>main pane is the scroller; per-view NNvh caps convert; editors own their height</td></tr>
-              <tr><td>Settings · Roster · Scenes · Replays list</td><td>trivial</td><td>one declared region each; Settings goes two-column at 1280+ so 1080p width is spent</td></tr>
-              <tr><td>Builder · Sheet · Landing · Viewer</td><td>done / trivial</td><td>already conforming — the references the rest adopt</td></tr>
+              <tr><td>Settings · Roster · Scenes · Replays list</td><td>done</td><td>one declared region each, standing on the scene sky; Settings is two columns at 1280+ so 1080p width is spent, and the scenes grid halves its card density at 560</td></tr>
+              <tr><td>Builder · Sheet · Landing · Viewer</td><td>done</td><td>the references the rest adopt — the wizard’s step body is its region, the sheet’s pane is its own</td></tr>
             </tbody></table></div>
           </Section>
 
