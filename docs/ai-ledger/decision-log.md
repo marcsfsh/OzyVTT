@@ -1471,7 +1471,9 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
     mentions a table — so it is a director ruling and must not be "fixed" later by an agent
     reconciling the two. A horizon behind a battle map competes with the map, and the map is the
     canvas. Its CHROME does take the linework instead, so it does not read as left out: the tab bar
-    wears the chrome-tier scanline, and the dock's inner edge wears the horizon's own rule.
+    wears the chrome-tier scanline, and the dock's inner edge wears the horizon's own rule. *(The
+    dock's half was invisible as first shipped — the resize grip painted over it; see the correction
+    entry below.)*
   - **The sky is generalized FROM the landing, never shared WITH it.** New `--sky-*` tokens and a
     `.pane-sky` layer; the `--landing-*` block and the landing's own rules are untouched (the entry
     animation is a concurrent lane). Three departures make it a work screen: the horizon is a fixed

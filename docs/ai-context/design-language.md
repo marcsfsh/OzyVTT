@@ -524,7 +524,13 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   and the table dock's inner edge (`--rule-beam-v` through `border-image`, the one boundary on
   that surface where the map stops and the panels begin). It never lands on a control, never
   marks a state, and never replaces a resting `--line` border just because one was there — which
-  is why it runs at about half the horizon's intensity and its glow is a whisper. The app's two
+  is why it runs at about half the horizon's intensity and its glow is a whisper.
+  **Check what sits ON the boundary before claiming it:** the dock's beam shipped invisible in
+  every state because `.encounter-map-dock-resize`'s 2px `--line` bar sits at the same x, one
+  z-index higher, and painted straight over it (measured: the edge column read flat `--line` in
+  all three hours; hiding only that pseudo brought the beam's magenta back). The grip is
+  transparent at rest now, so the dock owns its edge and the grip's own paint is reserved for its
+  STATE — cyan while you are dragging it, which is also why the beam stays off a control. The app's two
   tab bars also take the **chrome-tier** scanline: `--scanline-color` is the chrome strength
   (.22/.14/.05) and `.scanlines` halves it with `opacity: .5` for the scene tier, so the sky sits
   at .11 and the bar at .22 — two strengths of one texture, and daybreak drops both.

@@ -58,11 +58,20 @@
 .encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
 .encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
 .encounter-map-dock .encounter-panel { margin: 0; border: 0; background: transparent; padding: 0; }
-/* Inner-edge grab strip to resize a left/right dock; spans the full height so you can grab anywhere. */
+/* Inner-edge grab strip to resize a left/right dock; spans the full height so you can grab anywhere.
+   IT SITS EXACTLY ON THE DOCK'S BORDER — same x, z-index 3 against the dock's 2 — so whatever it
+   paints at rest IS the dock's edge. That is how the beam above shipped invisible: this strip drew
+   a flat 2px --line over it in every state. Measured with the panel docked left at 1920x1080, the
+   grip's ::before centre landed on page x 976.0 and the dock's border on 976; device-pixel offsets
+   -2..+1 around it read 46,42,78 (dark) / 90,74,154 (dusk) / 214,211,230 (light) — --line in each
+   hour — and hiding ONLY this pseudo in the same frame brought back 167,37,113 / 176,43,132 /
+   216,110,173, the beam's magenta midpoint. So the strip is TRANSPARENT AT REST and the dock owns
+   its own edge, which also keeps the beam off a control: it marks a structural boundary, and this
+   element's own paint is reserved for its STATE (cyan while you are grabbing it). */
 .encounter-map-dock-resize { position: absolute; top: 0; bottom: 0; width: 14px; z-index: 3; cursor: col-resize; touch-action: none; }
 .encounter-map-dock-resize.dock-resize-left { left: calc(var(--dock-side-width) - 7px); }
 .encounter-map-dock-resize.dock-resize-right { right: calc(var(--dock-side-width) - 7px); }
-.encounter-map-dock-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--line); transition: background .15s, width .15s; }
+.encounter-map-dock-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; transition: background .15s, width .15s; }
 .encounter-map-dock-resize:hover::before, .encounter-map-dock-resize:active::before { background: var(--cyan); width: 3px; }
 /* The zoom cluster is the SCENE cluster now — one Scenes button, or the two staging buttons while
    arranging. Zoom, dock, enlarge and fullscreen moved into the toolbar's View group (D4), which is
