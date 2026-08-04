@@ -429,13 +429,20 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   entry)*. `.pane-scene` + a `.pane-sky` child + `.scanlines` (`apps/client/src/styles.css`)
   paint the drive: a tiled starfield, a sun cresting a lit horizon, and a receding perspective
   grid floor, all off `--sky-*` tokens with no hand-typed colour, so night, the sunset hour and
-  daybreak come free. Settings, the roster, the scenes gallery and the replays list stand on it;
-  **the table never does** (texture only — a horizon behind a battle map competes with the map,
-  and the map is the canvas). Three rules make it a work screen rather than a title screen, and
+  daybreak come free. Settings, the roster, the scenes gallery, the replays list, the builder gate
+  and the not-found page stand on it; **the table never does** (texture only — a horizon behind a
+  battle map competes with the map, and the map is the canvas). Not-found joined late: it is the
+  most content-light surface in the app — two lines and two doors on a full pane — and it was the
+  only one of them on flat ground, which is the shape of inconsistency a later reader "fixes"
+  without measuring. Three rules make it a work screen rather than a title screen, and
   each one is load-bearing:
   - **The horizon is a fixed inset from the pane's bottom** (`--sky-horizon-inset`, 7rem /
     5.75rem ≤760px), never the landing's percentage — a percentage drifts up into content as the
-    pane grows. Every other layer is measured against that one number.
+    pane grows. Every other layer is measured against that one number, **including `--sky-wash`'s
+    own stops**: they were fractions of the full box while the knee was `calc(100% - inset)`, and
+    those two orderings cross in any box under ~350px — CSS clamps the decreasing stop, two stops
+    share a position, and the ramp becomes a hard band. Horizon-relative, the list is monotonic at
+    any height, and the ramp on a real pane is unchanged (stops move under a pixel at 1920×1080).
   - **The sun is a crest, not a disc** — and the crown is **exactly half the diameter**, so what
     stands above the line is a hemisphere. Its box is only the crown and `--sky-sun-mask` cuts
     that to the top of a circle centred on the line, so the landing's clipping sky band and its

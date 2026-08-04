@@ -153,7 +153,12 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 .sg-sky-panel p { margin: var(--space-2) 0 0; }
 .sg-beam-demo { margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--line); background: var(--surface-1); }
 .sg-rim-demo { display: flex; flex-direction: column; gap: var(--space-1); min-width: 13rem; padding: var(--space-3) var(--space-4); background: var(--surface-1); }
-.sg-sign-demo { margin-top: var(--space-4); padding: var(--space-6) var(--space-4); text-align: center; background: var(--sky-wash); }
+/* The sign stands on a sky, because "a metal the scene does not wear" is the whole point — but
+   --sky-wash's stops are calc()'d against --sky-horizon-inset, so in a SHORT box the ramp's knee
+   lands near the top and the last two stops compress into a visible step. At the old ~130px it
+   drew a hard band across the wordmark. Tall enough that the ramp resolves, like `.sg-sky` above;
+   the token is written for a pane and a demo of it has to be pane-shaped. */
+.sg-sign-demo { display: grid; place-items: center; min-height: 16rem; margin-top: var(--space-4); padding: var(--space-6) var(--space-4); text-align: center; background: var(--sky-wash); }
 .sg-sign-demo .nh-wordmark { font-size: clamp(2.5rem, 8vw, 4.5rem); line-height: 1; }
 
 /* Command-palette demo (D25). Deliberately local to the styleguide: the palette is a COMPOSITION, so

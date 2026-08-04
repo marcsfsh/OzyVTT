@@ -227,10 +227,21 @@
   /* NIGHT. Measured 2026-08-04 (Chromium, WCAG 2.1) against the raw wash, no glass:
      --text-dim #A8A2CC reads 6.86 at the horizon stop (#241448) and 5.51 at the bottom
      stop (#3A1B72); --text-muted 5.82 / 4.68; --text 13.97 / 11.22. Night needs no
-     truncation — the whole landing ramp clears AA on its own. The calc() stops pin the
-     ramp's knee to the horizon at any pane height. */
+     truncation — the whole landing ramp clears AA on its own.
+
+     EVERY STOP IS EXPRESSED AGAINST THE HORIZON, which is the rule the rest of the scene
+     already follows and the wash alone was breaking. The sky stops used to be fractions of the
+     FULL box (24/46/68%) while the knee was calc(100% - inset), and those two orderings cross
+     whenever the box is shorter than about 350px: CSS clamps a decreasing stop to the one
+     before it, two stops land on the same position, and the ramp turns into a hard horizontal
+     band. Written as fractions of `100% - inset` the list is monotonic at ANY height, and on a
+     real pane it is the same ramp — the multipliers are the old percentages re-solved against
+     a 1036px pane, so the stops move under a pixel there and ~7px at phone height. */
   --sky-wash: linear-gradient(180deg,
-    #030210 0%, #070417 24%, #0B0722 46%, #150E33 68%,
+    #030210 0%,
+    #070417 calc((100% - var(--sky-horizon-inset)) * 0.27),
+    #0B0722 calc((100% - var(--sky-horizon-inset)) * 0.52),
+    #150E33 calc((100% - var(--sky-horizon-inset)) * 0.76),
     #241448 calc(100% - var(--sky-horizon-inset)),
     #301A5E calc(100% - var(--sky-horizon-inset) * 0.5),
     #3A1B72 100%);
@@ -1133,8 +1144,12 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    The GRID stays — "dawn over the same grid" — which is why it is a sky layer of its own and
    not the theme-gated `.grid-floor` utility. */
 [data-theme="light"] {
+  /* Same horizon-relative stops as night, for the same reason (see there). */
   --sky-wash: linear-gradient(180deg,
-    #DCE6FB 0%, #E6E2F9 24%, #EFDFF6 42%, #F6DAEC 56%,
+    #DCE6FB 0%,
+    #E6E2F9 calc((100% - var(--sky-horizon-inset)) * 0.27),
+    #EFDFF6 calc((100% - var(--sky-horizon-inset)) * 0.47),
+    #F6DAEC calc((100% - var(--sky-horizon-inset)) * 0.63),
     #FBD9E4 calc(100% - var(--sky-horizon-inset)),
     #FDD8CE calc(100% - var(--sky-horizon-inset) * 0.4),
     #FFD6B4 100%);
