@@ -82,9 +82,14 @@ type Ack = Readonly<{ ok: boolean; message?: string }>;
  * One settings group. The `--{id}` modifier is what the ≥1280 two-column rule places by name
  * (The table on the left, Mine + Players on the right — settings.css); `.surface-glass` is the
  * scene tier (§9): these panels stand on the surface's sky rather than on flat app ground.
+ *
+ * `gmOnly` takes the violet role rim (§9). It says something the GM cannot otherwise see on this
+ * page: THESE are the groups a player is never handed — *Mine* renders for both roles, the other
+ * two do not render at all without a GM token. The rim is never the only signal; each group's
+ * Eyebrow names it in words and is this section's accessible name.
  */
-function Group({ id, label, children }: Readonly<{ id: string; label: string; children: React.ReactNode }>) {
-  return <section className={`settings-group settings-group--${id} surface-glass`} aria-labelledby={`settings-${id}`}>
+function Group({ id, label, gmOnly = false, children }: Readonly<{ id: string; label: string; gmOnly?: boolean; children: React.ReactNode }>) {
+  return <section className={`settings-group settings-group--${id} surface-glass${gmOnly ? " rim-gm" : ""}`} aria-labelledby={`settings-${id}`}>
     <Eyebrow id={`settings-${id}`}>{label}</Eyebrow>
     {children}
   </section>;
@@ -172,7 +177,7 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
 
   const health = state.combat.healthDisplay;
 
-  return <Group id="table" label="The table">
+  return <Group id="table" label="The table" gmOnly>
     <Row title="Rules assistant" help="Each fight starts from this and can be changed mid-fight on the Table." stacked>
       <SegmentedControl
         ariaLabel="Rules assistant"
@@ -304,7 +309,7 @@ function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: Gm
     });
   };
 
-  return <Group id="players" label="Players">
+  return <Group id="players" label="Players" gmOnly>
     {claimed.length === 0
       ? <p className="settings-empty">No players connected yet.</p>
       : <ul className="settings-players">

@@ -435,7 +435,7 @@ function App() {
         tab); nothing above the tabs but the tabs. The bar stays up while a full-page layer
         is open now that layers render inside the pane, so the frame never blinks. */}
     {shellVisible && mode === "gm" && <Tabs
-      className="gm-tabs"
+      className="gm-tabs rim-gm"
       ariaLabel="GM sections"
       tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
       activeId={gmTab}
@@ -448,7 +448,7 @@ function App() {
         accessible name ("Codex, 2 new") rather than a coloured dot a screen reader never
         reaches. */}
     {shellVisible && mode === "player" && <Tabs
-      className="player-view-tabs"
+      className="player-view-tabs rim-player"
       ariaLabel="Table, Codex or Settings"
       tabs={[
         { id: "table", label: "Table" },

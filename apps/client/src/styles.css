@@ -725,7 +725,21 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* Both tab bars are frame row 2 (the @vtt/ui <Tabs> primitive owns the bar's own x-scroll
    and fade). The gutter aligns their labels with the staged panes' column; the old
    margin-top died with the page flow it spaced against. */
+/* THE ROLE RIM ON FRAME ROW 2 (§9). The bar is the one piece of chrome that is on screen on
+   every route in both roles, and until now the two roles' bars were pixel-identical — so the
+   rim is the first thing in the app that says, at a glance and without a word, whose seat this
+   is: magenta for the player's, violet for the GM's. The edge comes from the `.rim-*` utility
+   in the markup; the matching 7% wash lives here because ONE rule owns this element's
+   background (the utility deliberately does not set one — it would clobber `.surface-glass`
+   wherever else a rim lands).
+
+   It is never the only signal: each bar's aria-label already names its role ("GM sections" /
+   "Table, Codex or Settings"), the tab sets differ, and the GM's bar is unreachable without a
+   GM token. The rim costs no layout (it is an inset shadow, not a border), so the gutter still
+   puts the labels on the same column as the surface headings below them. */
 .gm-tabs, .player-view-tabs { grid-row: 2; padding-inline: var(--pane-gutter); }
+.gm-tabs { background-color: var(--rim-gm-wash); }
+.player-view-tabs { background-color: var(--rim-player-wash); }
 
 /* ---- Signature atmosphere (hero/empty zones + subtle app-shell CRT texture) ---- */
 

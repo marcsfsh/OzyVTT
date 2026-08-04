@@ -302,6 +302,51 @@
     transparent 100%);
   --rule-beam-glow: 0 0 10px color-mix(in srgb, var(--magenta) 18%, transparent);
 
+  /* ---- ROLE RIMS (§9) ----
+     Magenta is the player's door, violet is the GM's — the pairing the landing's two arcade
+     doors established, promoted so role-scoped CHROME can inherit it.
+
+     READ THE SCOPE CAREFULLY: this attaches to the GM-SECRET TREATMENT (a 3px inline-start
+     edge plus a faint wash of the same hue — the idiom `.scene-preview-banner`, `.party-queue`,
+     `.scene-builder` and the codex's GM blocks already wear), NOT to a claim that the HUE means
+     GM. It does not: --violet is load-bearing for magical/concentration (§2), NPC token strokes,
+     condition dots, legendary actions and presence across ~50 rules, and writing "violet = GM"
+     into the language would make the doc a defect against its own semantic table.
+
+     And a rim is never the only signal. Every site that wears one already says which role it
+     belongs to in words a screen reader reaches — the two tab bars in their aria-labels, the
+     settings groups in their visible Eyebrow. A rim reinforces; it never carries.
+
+     Not aliases of --magenta/--violet: both are lifted (#FF3FA4 vs #FF2E9A, #9F6BFF vs #A45CFF)
+     because an EDGE needs more separation from its surface than a fill does. The glow twins are
+     drop-shadow filters, so a chamfered edge can wear them. */
+  --rim-player: #FF3FA4;
+  --rim-gm: #9F6BFF;
+  --rim-player-wash: color-mix(in srgb, var(--rim-player) 7%, transparent);
+  --rim-gm-wash: color-mix(in srgb, var(--rim-gm) 7%, transparent);
+  --rim-player-glow: drop-shadow(0 0 6px rgba(255, 63, 164, 0.55)) drop-shadow(0 0 18px rgba(255, 63, 164, 0.33));
+  --rim-gm-glow: drop-shadow(0 0 6px rgba(159, 107, 255, 0.55)) drop-shadow(0 0 18px rgba(159, 107, 255, 0.33));
+
+  /* ---- THE SIGN (§9) ----
+     A hero title wears a metal the scene does not — cold blue-steel on this warm magenta/violet
+     drive — and its legibility comes from the CHROME STRUCTURE (light crown, deepening body,
+     one softened mirror meet at 50->54%, flash, dark base), not from an outline. That is why the
+     stroke is a hairline and the glow is one solid extrusion plus one tight halo rather than a
+     haze: the bands do the work.
+
+     RESERVED FOR TRUE HERO MOMENTS — a full-page title that IS the screen. Never a panel header,
+     never a section heading, never `.nh-panel-title`. One edit there would put the metal on every
+     panel in the app and it would stop meaning anything.
+
+     Deliberate duplication of --landing-sign/--landing-stroke/--landing-title-glow, which the
+     concurrent entry-animation lane owns and this one may not edit. When that lands, the landing
+     should alias these three and the --landing-* copies should go. */
+  --sign-chrome: linear-gradient(180deg, #FAFDFF 0%, #EDF6FE 10%, #C6E0F7 22%, #93BEEA 34%, #5E92D4 44%, #2F5C9C 47%, #1F4276 50%, #FBFEFF 54%, #E2F1FC 61%, #A6CBF0 71%, #6FA0DF 82%, #3E6BB1 92%, #254789 100%);
+  --sign-stroke: rgba(12, 32, 72, 0.78);
+  --sign-glow:
+    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85))
+    drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
+
   /* Texture sizing + noise tile. --noise-opacity is a token for the same reason
      --landing-noise-opacity is one (§9): grain strength is a per-theme dial, not a
      constant baked into the utility. */
@@ -648,6 +693,40 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    and it draws a 1px lit line across that element's own width, so it aligns with the content
    column rather than bleeding to the pane's edges. One per boundary; see the token block for
    why this is not a licence to beam every border. */
+/* Role rims (§9): the GM-secret edge, generalized. A 3px start-edge bar plus a 7% wash of the
+   same hue. Put one on chrome that BELONGS to a role; never on selection state (that axis is
+   cyan and repainting it magenta would break the focus ring's meaning), and never as the only
+   thing saying which role it is.
+
+   THE EDGE IS AN INSET SHADOW, NOT A BORDER, and that is not a style preference — it is the only
+   form that works. This file loads before every app stylesheet, so a `border-inline-start` here
+   loses at equal specificity to `.settings-group`'s own `border` shorthand and to the tab bar's:
+   measured, both rimmed sites computed `border-left-width: 0px`. An inset shadow contests no
+   property, adds no 3px to the box (so no gutter has to be given back), and is painted on the
+   BORDER box — which matters on the tab bar, because an absolutely-positioned pseudo would have
+   scrolled away with the tabs. (It does mean a rimmed element cannot also wear `.is-selected` or
+   `.is-active-turn`; neither rim site is a selectable thing, and a role is not a state.)
+
+   The UTILITY is the EDGE ALONE. The wash stays a token a site applies in its own rule, because
+   a utility that set background-color would clobber `.surface-glass` on anything it decorated —
+   and the two best rim sites are a glass settings group and a tab bar that also wants a
+   scanline. One rule per element owning its background is the only arrangement that composes. */
+.rim-player { box-shadow: inset 3px 0 0 0 var(--rim-player); }
+.rim-gm     { box-shadow: inset 3px 0 0 0 var(--rim-gm); }
+
+/* The sign (§9): a hero title's metal. Wordmark-scale display type only, on a full-page moment
+   that IS the screen. `background-clip: text` needs the fill transparent; the glow rides
+   drop-shadow because text-shadow cannot show through clipped text (the `.wordmark-name`
+   lesson). NOT for `.nh-panel-title`, `.settings-head h2` or any section heading. */
+.sign {
+  background-image: var(--sign-chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.5px var(--sign-stroke);
+  filter: var(--sign-glow);
+}
+
 .neon-beam { position: relative; padding-bottom: var(--space-3); }
 .neon-beam::after {
   content: "";
@@ -1041,4 +1120,31 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    rung (§3). */
 @media (max-width: 760px) {
   :root { --sky-horizon-inset: 5.75rem; --sky-sun-crown: 2.75rem; }
+}
+
+/* =========================================================
+   ROLE RIMS + THE SIGN, PER THEME. Night and the sunset hour
+   share the rims and the steel — the cold metal against a warm
+   drive is the whole point of the sign, and an edge that reads
+   at night reads at dusk. Only the sign's HALO follows the
+   hour. Daybreak deepens all of it: on a pale sky an edge
+   separates by being darker, and glow grounds instead of blooms
+   (the light-theme rule the --glow-drop-* set already follows).
+   ========================================================= */
+[data-theme="dusk"] {
+  --sign-glow:
+    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8))
+    drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
+  --sign-stroke: rgba(12, 32, 72, 0.72);
+}
+[data-theme="light"] {
+  --rim-player: #C81D80;
+  --rim-gm: #6C3FD4;
+  --rim-player-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --rim-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
+  --sign-chrome: linear-gradient(180deg, #FFFFFF 0%, #EFF6FD 12%, #CBE0F5 26%, #9DBFE7 38%, #6E93CC 47%, #40619E 50%, #FBFDFF 54%, #E2EEFA 63%, #ABCAED 75%, #7396CE 87%, #47649F 100%);
+  --sign-stroke: rgba(20, 40, 90, 0.55);
+  --sign-glow:
+    drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5))
+    drop-shadow(0 0 8px rgba(226, 76, 156, 0.30));
 }
