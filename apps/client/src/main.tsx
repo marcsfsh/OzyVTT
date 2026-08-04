@@ -563,8 +563,9 @@ function App() {
       {/* D24 — one Settings surface, one component, both roles. A player is handed no GM group at
           all: `SettingsPage` renders `TableGroup`/`PlayersGroup` only for a GM token, so the GM-only
           controls are absent from the tree rather than hidden in it.
-          staged region — A2 (settings trivial) drains it */}
-      {mode === "player" && playerView === "settings" && <div className="anim-view pane-stage scroll-y"><SettingsPage role="player" state={state} /></div>}
+          Settings owns its frame now (heading row + one scrolling region + its own sky), so it
+          takes the pane directly — no staging wrapper. */}
+      {mode === "player" && playerView === "settings" && <SettingsPage role="player" state={state} />}
       {/* A player on a GM-only or unknown address: the not-found view, indistinguishable from each other
           and from a genuinely unknown address (invariant §3.2). */}
       {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <div className="pane-stage scroll-y"><NotFoundView role="player" /></div>}
@@ -688,8 +689,9 @@ function App() {
 
       {/* A7/D24 — Settings replaces "VTT Setup", and nothing /setup held is lost: theme moved to Mine,
           credentials and session security to The table → Access & integrations (§B9.4).
-          staged region — A2 (settings trivial: region + ≥1280 two-column) drains it */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "settings" && <div className="anim-view pane-stage scroll-y"><SettingsPage
+          The GM's page is the two-column one at ≥1280 (settings.css); the surface owns the
+          frame either way, so it takes the pane directly. */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "settings" && <SettingsPage
         role="gm"
         state={state}
         gmToken={gmToken}
@@ -697,7 +699,7 @@ function App() {
         onPreviewPlayers={() => { navigate(pathForGmTab("table")); setShowViewerPreview(true); }}
         onSignOut={signOutGm}
         onRevokeAll={revokeAllGmSessions}
-      /></div>}
+      />}
     </>}
     </div>
     {/* A11/D18 — the token picker, opened from the sheet or from Settings → Players. The server

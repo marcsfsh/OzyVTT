@@ -407,7 +407,7 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 | Roster | trivial | heading · actions | queue + gallery + archived ▤ |
 | Codex shell | recompose | its own top bar | sidebar (sticky already) · main pane ▤ — per-view `NNvh` caps convert; the body editor owns its height (`resize: vertical` retires) |
 | Homebrew | recompose | modebar | rail ▤ (already) · record detail ▤; level table keeps its own x-scroll inside |
-| Settings | trivial | heading | the group column ▤; ≥1280 goes two-column so 1080p width is spent |
+| Settings | **done (A2)** | heading | the group column ▤; at ≥1280 it is two columns — The table \| Mine + Players — so a 1080p width is spent instead of scrolled |
 | Shared-screen controls | recompose (light) | heading | two columns ≥1280: tools (preview pinned visible) ▤ · access ▤ |
 | Replays list / shelf | trivial | heading | table body ▤ |
 | Replay viewer | recompose | header · transport | stage canvas · side lists ▤ (phone: side lists become tabs) |
@@ -424,6 +424,15 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   `.surface-frost` (chrome tier, over app surfaces) and `.surface-glass` (scene tier,
   panels standing on a canvas — a live map, a sky; the landing's `--landing-glass` is its
   scene-local ancestor). Both go solid under reduced transparency. Do not grow a third.
+- **The sky is for content-light surfaces.** `.pane-scene` + `.scanlines`
+  (`apps/client/src/styles.css`) paint a work-screen sky: one vertical wash off the theme's own
+  surface ramp and a single brand bloom — no sun, no horizon, no stars, and no hand-typed
+  colour, so all three themes come free and daybreak drops the CRT by the utility's own rule.
+  Settings, the roster, the scenes gallery and the replays list stand on it with
+  `.surface-glass` panels; **the table never does** (texture only — the sky must not render
+  behind combat). An empty state on such a surface is a scene moment, not a dashed box:
+  `.scene-empty` is one line and, where there is an action to offer, one chamfered primary
+  door (a surface that fills itself, like the replays list, offers none).
 - **Scanline tile.** A full-viewport `repeating-linear-gradient` rasterizes unevenly; the
   landing found it and the shared `.scanlines::after` utility now paints the same one-gap
   `background-size` tile the landing does (`apps/client/src/styles.css`, documented at

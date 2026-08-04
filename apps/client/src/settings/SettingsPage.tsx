@@ -78,8 +78,13 @@ const HEALTH_STYLES = [
 
 type Ack = Readonly<{ ok: boolean; message?: string }>;
 
+/**
+ * One settings group. The `--{id}` modifier is what the ≥1280 two-column rule places by name
+ * (The table on the left, Mine + Players on the right — settings.css); `.surface-glass` is the
+ * scene tier (§9): these panels stand on the surface's sky rather than on flat app ground.
+ */
 function Group({ id, label, children }: Readonly<{ id: string; label: string; children: React.ReactNode }>) {
-  return <section className="settings-group" aria-labelledby={`settings-${id}`}>
+  return <section className={`settings-group settings-group--${id} surface-glass`} aria-labelledby={`settings-${id}`}>
     <Eyebrow id={`settings-${id}`}>{label}</Eyebrow>
     {children}
   </section>;
@@ -341,13 +346,18 @@ export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut
   busy?: boolean;
 }>) {
   const gm = role === "gm" && gmToken ? (state as GmView | null) : null;
-  return <div className="settings-page anim-view">
+  /* THE FRAME (§7): the heading never moves, and the groups are the one region that scrolls.
+     Settings no longer rides the shell's staged pane — it owns its column, its sky, and its
+     scroller. */
+  return <div className="settings-page pane-frame pane-scene scanlines frame-col anim-view">
     <header className="settings-head">
       <h2>Settings</h2>
       <p>{role === "gm" ? "Your device, this table, and the people at it." : "Your device. The rest of the table is your GM's to set."}</p>
     </header>
-    <MineGroup />
-    {gm && gmToken && <TableGroup state={gm} gmToken={gmToken} onSignOut={onSignOut ?? (() => {})} onRevokeAll={onRevokeAll ?? (() => {})} busy={busy} />}
-    {gm && gmToken && <PlayersGroup state={gm} gmToken={gmToken} onPreviewPlayers={onPreviewPlayers ?? (() => {})} />}
+    <div className="settings-body scroll-y frame-fill">
+      <MineGroup />
+      {gm && gmToken && <TableGroup state={gm} gmToken={gmToken} onSignOut={onSignOut ?? (() => {})} onRevokeAll={onRevokeAll ?? (() => {})} busy={busy} />}
+      {gm && gmToken && <PlayersGroup state={gm} gmToken={gmToken} onPreviewPlayers={onPreviewPlayers ?? (() => {})} />}
+    </div>
   </div>;
 }

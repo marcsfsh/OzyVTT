@@ -1,11 +1,21 @@
-/* Settings — one scrolling page, three groups (D24). No tabs inside a tab: the groups are stacked
-   sections with Eyebrow headers, so a phone scrolls one column and a laptop reads the same order. */
+/* Settings — three groups (D24). No tabs inside a tab: the groups are stacked sections with
+   Eyebrow headers, so a phone reads one column and a laptop reads the same order — until 1280,
+   where the width buys a second column instead of a longer scroll (§7 "spend the width").
 
-.settings-page { display: flex; flex-direction: column; gap: 1.4rem; max-width: 56rem; margin: 0 auto; padding-bottom: 2rem; }
+   THE FRAME (§7): `.settings-page` is the surface's frame — the pane's one child, a column that
+   never scrolls — and `.settings-body` is its one region. The shared `.pane-frame` gives the page
+   column its gutter and the region its safe-area bottom; the width cap lives on the two children
+   rather than the frame, because the frame is now full-bleed: it paints the sky. */
+
+.settings-page { gap: 1.4rem; }
+.settings-head, .settings-body { width: 100%; max-width: 56rem; margin-inline: auto; }
 .settings-head h2 { margin: 0; font: 700 1.4rem/1.2 var(--font-display); }
 .settings-head p { margin: .3rem 0 0; color: var(--text-dim); font-size: .92rem; }
+.settings-body { display: flex; flex-direction: column; gap: 1.4rem; }
 
-.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: 1rem 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+/* No background of its own: `.surface-glass` (the markup carries it) is the scene tier, and a
+   flat `--surface-1` fill here would paint over it. */
+.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: 1rem 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .settings-group > .nh-eyebrow { margin-bottom: .6rem; }
 
 .settings-row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: .8rem 0; border-top: 1px solid var(--line); }
@@ -37,6 +47,24 @@
 .settings-player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-player-meta { color: var(--text-dim); font-size: .78rem; }
 .settings-player-actions { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: flex-end; }
+
+/* THE LAPTOP RUNG (§3, added 2026-08-04). A 1080p screen showed one 56rem column with a 2000px
+   scroll beside 700px of empty desk. Two columns instead: The table — the GM's big group, two
+   thirds of the page — on the left, and the two short people groups (Mine, then Players) stacked
+   on the right. `:has()` keeps this to the GM's page: a player is handed the Mine group and
+   nothing else, and one lonely column beside an empty one is worse than the centred page. */
+@media (min-width: 1280px) {
+  .settings-page:has(.settings-group--table) .settings-head,
+  .settings-page:has(.settings-group--table) .settings-body { max-width: 84rem; }
+  .settings-page:has(.settings-group--table) .settings-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-content: start;
+  }
+  .settings-group--table { grid-column: 1; grid-row: 1 / span 2; }
+  .settings-group--mine { grid-column: 2; grid-row: 1; }
+  .settings-group--players { grid-column: 2; grid-row: 2; }
+}
 
 @media (max-width: 650px) {
   /* Every row stacks: a control pushed to the right edge of a 390px screen is a control with no room
