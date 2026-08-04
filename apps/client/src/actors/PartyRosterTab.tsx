@@ -127,7 +127,10 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
     </li>;
   };
 
-  return <section className="party-roster">
+  /* THE FRAME (§7): the heading and its actions never move; the queue, the gallery and the
+     archived drawer share one declared region below them. The surface stands on the scene
+     sky (§9) — it is a browse-and-pick page, not the table. */
+  return <section className="party-roster pane-frame pane-scene scanlines frame-col anim-view">
     <div className="party-heading">
       <h2>The party</h2>
       <p>Every character on the table — create, import, approve, archive.</p>
@@ -139,6 +142,7 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
       </div>
     </div>
 
+    <div className="party-roster-body scroll-y frame-fill">
     {/* The approval queue (B6.3). It lived inside the shell roster and nowhere else; this is its home. */}
     {pendingImports.length > 0 && <div className="party-queue">
       <h3 className="party-section-head">Waiting for approval</h3>
@@ -154,7 +158,12 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
     </div>}
 
     {pcs.length === 0
-      ? <div className="nh-empty"><span className="nh-empty-title">No characters yet</span><span className="nh-empty-text">Create a character or import a sheet — both live here.</span></div>
+      /* An empty roster is a scene moment (§9): one line, one door. The import routes are still
+         one tap away in the heading row above — this is the first thing to do, not the only one. */
+      ? <div className="scene-empty">
+          <p>Nobody is on the table yet.</p>
+          {onCreateCharacter && <Button variant="primary" arrow onClick={onCreateCharacter}>Create a character</Button>}
+        </div>
       : <>
         <ul className="nh-gallery party-gallery">{active.map((actor) => card(actor, false))}</ul>
         {archived.length > 0 && <details className="party-archived">
@@ -163,6 +172,7 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
           <ul className="nh-gallery party-gallery">{archived.map((actor) => card(actor, true))}</ul>
         </details>}
       </>}
+    </div>
 
     {sheetActor && <CharacterSheet actor={sheetActor} role="gm" state={state} onClose={() => setSheetActorId(null)} />}
     {previewImport && <Modal open onClose={() => setPreviewImportId(null)} size="md" title={previewImport.name} ariaLabel={`Preview ${previewImport.name}`}

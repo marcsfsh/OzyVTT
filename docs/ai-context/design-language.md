@@ -404,7 +404,7 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 | Scenes gallery | trivial | heading · command bar | card grid ▤ (phone card density halves; reorder grip re-verified per §7.6) |
 | Scene prep / staging | trivial | — | already capped lists; rides the table dock |
 | Maps library + calibration | **redesign** | back · heading · upload row | list rail ▤ · calibration pane: the long top-to-bottom sequence becomes a step layout (mode → canvas → fields → verify) with the interactive canvas always visible |
-| Roster | trivial | heading · actions | queue + gallery + archived ▤ |
+| Roster | **done (A2)** | heading · actions | queue + gallery + archived ▤ (cards take a 15rem cell so a claimed character's three actions fit; the archived `<summary>` carries the 44px floor) |
 | Codex shell | recompose | its own top bar | sidebar (sticky already) · main pane ▤ — per-view `NNvh` caps convert; the body editor owns its height (`resize: vertical` retires) |
 | Homebrew | recompose | modebar | rail ▤ (already) · record detail ▤; level table keeps its own x-scroll inside |
 | Settings | **done (A2)** | heading | the group column ▤; at ≥1280 it is two columns — The table \| Mine + Players — so a 1080p width is spent instead of scrolled |

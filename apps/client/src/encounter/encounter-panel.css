@@ -652,13 +652,25 @@
 .sheet-standalone { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--surface-2); }
 .sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 2rem; color: var(--text-dim); font-size: var(--fs-body); text-align: center; }
 
-/* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab. */
-.party-roster { max-width: 72rem; }
+/* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab.
+   (The surface's 72rem width cap moved onto its two frame rows in styles.css when the roster took
+   the pane: the section itself is full-bleed now, because it paints the scene behind them.) */
 .party-heading h2 { margin: .2rem 0 .3rem; }
 .party-heading p { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 1.1rem; }
 /* Character card thumb: a centred identity monogram on the card's surface (characters have no map image). */
 .party-card-thumb { display: grid; place-items: center; aspect-ratio: 16 / 10; background: linear-gradient(150deg, color-mix(in srgb, var(--violet) 22%, var(--surface-3)), var(--surface-3)); }
 .party-card.is-archived { opacity: .62; }
+/* A character card carries a VARIABLE action set — two buttons, or three once someone has claimed
+   the character ("View sheet · Archive · Force release claim") — and the shared gallery row divides
+   its width equally (`.nh-card-actions > button { flex: 1 1 0; min-width: 0 }`), which at a 13rem
+   card cut every label to a few characters and pushed the third button past the card's edge at
+   1280. Here the row wraps and each button keeps its own label's width: three actions become two
+   lines on a narrow card instead of one unreadable one. A character card also earns a wider cell
+   than a scene thumbnail needs (15rem, not the shared 13rem), so the two actions every card
+   carries share one line and only the third wraps. */
+.nh-gallery.party-gallery { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+.party-gallery .nh-card-actions { flex-wrap: wrap; }
+.party-gallery .nh-card-actions > button { flex: 1 1 auto; min-width: max-content; }
 .party-archived-head { margin: 1.4rem 0 .6rem; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
 .party-feedback { margin-top: .8rem; color: var(--text-dim); font-size: var(--fs-sm); }
 

@@ -656,8 +656,10 @@ function App() {
       {/* staged region — B3 (viewer-controls recompose) drains it */}
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <div className="anim-view pane-stage scroll-y"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
-      {/* staged regions — A2 (roster and replays-list trivials) drains these two */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <div className="anim-view pane-stage scroll-y"><PartyRosterTab state={state as GmView} onCreateCharacter={() => navigate("/builder")} /></div>}
+      {/* The roster owns its frame (heading row + one region + its own sky), so it takes the pane
+          directly — the staging wrapper drained with it. */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <PartyRosterTab state={state as GmView} onCreateCharacter={() => navigate("/builder")} />}
+      {/* staged region — A2 (replays-list trivial) drains it */}
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "replay" && <div className="anim-view pane-stage scroll-y"><ReplayList role="gm" token={gmToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} /></div>}
       {/* D27 — a player reaches the shared list at the same address, as its own page, with the Table
           tab lit and a way back to it. Unshared ids are 404 at the server, so the list is the truth.

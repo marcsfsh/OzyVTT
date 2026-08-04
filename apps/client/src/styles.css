@@ -70,15 +70,22 @@ main {
    shared `.scanlines` utility (add the class beside this one), which is already display:none in
    daybreak — that is why "scanlines in night and dusk" needs no rule of its own. Panels standing
    on the sky take `.surface-glass` (the scene tier of the two glass tiers).
-   The frame's own children lift above the tile: content over texture, because legibility outranks
-   vibe (pillar 3) — the landing learned the same thing about its labels. */
+   The tile paints UNDER the surface's content — content over texture, because legibility outranks
+   vibe (pillar 3), the same lesson the landing's labels taught. `isolation` is what makes the
+   negative z-index land between the sky and the content: a negative-index pseudo paints above the
+   background of its nearest STACKING CONTEXT, so without one here the tile would slide behind the
+   sky and vanish. `isolation` creates that context WITHOUT creating a containing block, so every
+   fixed overlay (sheet float, drawer, viewer preview) still measures against the viewport — the
+   trap `.anim-view`'s fill-mode lesson records. Lifting the children instead would have been the
+   other route, and it would have re-positioned the `<dialog>`s these surfaces render as siblings. */
 .pane-scene {
   position: relative;
+  isolation: isolate;
   background:
     radial-gradient(120% 62% at 50% 0%, color-mix(in srgb, var(--violet) 20%, transparent) 0%, transparent 68%),
     linear-gradient(180deg, var(--surface-1) 0%, var(--bg) 62%);
 }
-.pane-scene > * { position: relative; z-index: 1; }
+.pane-scene.scanlines::after { z-index: -1; }
 /* An EMPTY STATE ON A SCENE is a moment, not a dashed box: one line, and one door standing in
    the sky. The door is the primary Button (chamfered since §9, glow on drop-shadow filters),
    sized up here to read as a tile rather than a form control. Where a surface has no action to
@@ -572,6 +579,10 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* ---- The Roster tab's management sections (B6). The party gallery itself is styled with the other
    card galleries in encounter-panel.css; these are the pieces the tab gained when it became the
    management home: the header's actions, the approval queue, the archived disclosure. ---- */
+/* The frame's two rows: the heading (never moves) and the one region under it. The width cap
+   that used to sit on `.party-roster` (72rem, encounter-panel.css) moved onto these, because the
+   surface itself is full-bleed now — it paints the scene. */
+.party-heading, .party-roster-body { width: 100%; max-width: 72rem; margin-inline: auto; }
 .party-heading-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0 0 1.4rem; }
 .party-queue { margin: 0 0 1.6rem; padding: 1rem 1.1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); }
 .party-section-head { margin: 0 0 .7rem; font: 400 1.1rem/1.2 var(--font-display); color: var(--violet-hi); }
@@ -582,7 +593,10 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .party-card-preview { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; padding: 0 .9rem .6rem; }
 .party-card-preview-label { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .party-archived { margin-top: 1.4rem; }
-.party-archived > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
+/* Route 1 (design-language §4): a disclosure row in a stacked list grows its PAINT to the floor
+   — an invisible `::after` extension would reach over its neighbours and steal their taps. The
+   paint was 30px; `--tap-min` with the text centred in it is the whole fix. */
+.party-archived > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .party-archived > summary:hover { border-color: var(--line-strong); color: var(--text); }
 .party-archived-note { margin: .7rem 0; font-size: .85rem; }
 .import-preview { display: grid; gap: .5rem; margin: 0; }
