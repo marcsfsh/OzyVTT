@@ -424,15 +424,36 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   `.surface-frost` (chrome tier, over app surfaces) and `.surface-glass` (scene tier,
   panels standing on a canvas — a live map, a sky; the landing's `--landing-glass` is its
   scene-local ancestor). Both go solid under reduced transparency. Do not grow a third.
-- **The sky is for content-light surfaces.** `.pane-scene` + `.scanlines`
-  (`apps/client/src/styles.css`) paint a work-screen sky: one vertical wash off the theme's own
-  surface ramp and a single brand bloom — no sun, no horizon, no stars, and no hand-typed
-  colour, so all three themes come free and daybreak drops the CRT by the utility's own rule.
-  Settings, the roster, the scenes gallery and the replays list stand on it; **the table never
-  does** (texture only — the sky must not render behind combat). `.surface-glass` is worn by
-  settings' panels alone today — the other three put plain `.nh-card`s on the sky, because a
-  gallery of cards reads as glass-on-glass when every card is translucent. Whether those three
-  should take the tier is an open look question, not a settled rule. An empty state on such a surface is a scene moment, not a dashed box:
+- **The sky is for content-light surfaces, and it is a LITERAL sky** *(reversal, 2026-08-04 —
+  this bullet used to read "no sun, no horizon, no stars"; the decision log carries the dated
+  entry)*. `.pane-scene` + a `.pane-sky` child + `.scanlines` (`apps/client/src/styles.css`)
+  paint the drive: a tiled starfield, a sun cresting a lit horizon, and a receding perspective
+  grid floor, all off `--sky-*` tokens with no hand-typed colour, so night, the sunset hour and
+  daybreak come free. Settings, the roster, the scenes gallery and the replays list stand on it;
+  **the table never does** (texture only — a horizon behind a battle map competes with the map,
+  and the map is the canvas). Three rules make it a work screen rather than a title screen, and
+  each one is load-bearing:
+  - **The horizon is a fixed inset from the pane's bottom** (`--sky-horizon-inset`, 7rem /
+    5.75rem ≤760px), never the landing's percentage — a percentage drifts up into content as the
+    pane grows. Every other layer is measured against that one number.
+  - **The sun is a crest, not a disc.** Its box is only the crown above the horizon and
+    `--sky-sun-mask` cuts that to the top of a circle centred on the line, so the landing's
+    clipping sky band and its slat gradient are both unnecessary — the horizon does the cutting
+    and the hidden half is exactly the slatted half.
+  - **The bright band is RESERVED.** Measured over every pixel of the bare sky, the band failing
+    AA for `--text-muted` is ≤149px at 1920×1080 and ≤125px at 390×844 in all three hours, so
+    `.pane-scene > .scroll-y` pads `--sky-horizon-inset + --sky-sun-crown` (164px / 136px) at the
+    bottom. Legibility is a structure, not an opacity dial: a surface that adds bare copy inherits
+    it. Above the reserve the bare sky measures `--text-dim` ≥ 6.53, `--text-muted` ≥ 5.32.
+  Never put `transform`, `filter`, `backdrop-filter`, `perspective`, `will-change` or
+  `contain: paint` on `.pane-scene` — any one makes it the containing block for every fixed
+  overlay. The floor's perspective is on a pseudo-element inside the clipped `.pane-sky`, which
+  also stops its ~500px-per-side spill from growing `document.scrollHeight`. Under reduced
+  transparency the wash and horizon stay (they are what tells the hours apart) and the floor and
+  sun go. `.surface-glass` is worn by settings' panels alone today — the other three put plain
+  `.nh-card`s on the sky, because a gallery of cards reads as glass-on-glass when every card is
+  translucent. Whether those three should take the tier is an open look question, not a settled
+  rule. An empty state on such a surface is a scene moment, not a dashed box:
   `.scene-empty` is one line and, where there is an action to offer, one chamfered primary
   door (a surface that fills itself, like the replays list, offers none).
 - **Scanline tile.** A full-viewport `repeating-linear-gradient` rasterizes unevenly; the
@@ -448,11 +469,42 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   panels, cards, feature tiles, status tags and the primary/destructive buttons
   (`Button.css`; `sm` buttons exempt — the cut would clip their `.tap-target` hit area).
   Never on a control that relies on `.tap-target`.
-- **Role rims.** Magenta = the player's door, violet = the GM's — consistent with
-  violet-is-GM-only. Any future role-scoped chrome inherits the pairing.
-- **The sign principle.** A hero title wears a metal the scene does not (blue-steel on the
-  magenta drive) and carries legibility in its chrome *structure*, not an outline. Reserved
-  for the landing and any future true hero moment — never a panel header.
+- **Role rims** *(built 2026-08-04)*. Magenta is the player's, violet is the GM's:
+  `--rim-player` / `--rim-gm` (+ washes and drop-shadow glow twins) and the `.rim-player` /
+  `.rim-gm` utilities. Worn by the two tab bars — frame row 2 is on screen on every route in
+  both roles, and the two roles' bars were otherwise identical — and by the two GM-only settings
+  groups, which tells the GM which half of a page a player is never handed. **The rim attaches to
+  the GM-SECRET TREATMENT** (the 3px start edge + faint wash that `.scene-preview-banner`,
+  `.party-queue`, `.scene-builder` and the codex's GM blocks already wear), **never to a claim
+  that the hue means GM** — §2 assigns `--violet` to magical/concentration and ~50 rules use it
+  for NPC strokes, condition dots, legendary actions and presence. A rim is never the only
+  signal: every site that wears one names its role in words a screen reader reaches. Keep rims
+  off selection state, whose axis is cyan. The edge is an **inset box-shadow**, not a border:
+  this file loads before every app stylesheet, so a shared `border-inline-start` loses at equal
+  specificity to a consumer's own `border` shorthand (measured — both rim sites computed
+  `border-left-width: 0px`), and a shadow also costs no layout and does not scroll away inside
+  the tab bar's own x-scroller.
+- **The sign principle** *(built 2026-08-04)*. A hero title wears a metal the scene does not
+  (blue-steel on the magenta drive) and carries legibility in its chrome *structure*, not an
+  outline. `--sign-chrome` / `--sign-stroke` / `--sign-glow` + the `.sign` utility. Reserved for
+  a full-page moment that IS the screen — the landing today, and no second call site in play.
+  **Never a panel header**, never a section heading, never `.nh-panel-title`: one edit there puts
+  the metal on every panel in the app and it stops meaning anything. The values deliberately
+  duplicate `--landing-sign`/`--landing-stroke`/`--landing-title-glow`; the landing should alias
+  them once the entry-animation lane lands.
+- **Neon linework** *(built 2026-08-04)*. The sky's horizon, lent to the chrome:
+  `--rule-beam` / `--rule-beam-v` / `--rule-beam-glow` (derived from `--cyan`/`--magenta`, so
+  daybreak's deepened inks come free) and the `.neon-beam` utility, which draws a 1px lit rule on
+  an element's bottom edge. **It is scene language, not state language,** and that is the whole
+  restraint — pillar 1 keeps neon for what is interactive, focused, selected or live. A beam
+  marks a STRUCTURAL boundary only: the four scene surfaces' heading row against their region,
+  and the table dock's inner edge (`--rule-beam-v` through `border-image`, the one boundary on
+  that surface where the map stops and the panels begin). It never lands on a control, never
+  marks a state, and never replaces a resting `--line` border just because one was there — which
+  is why it runs at about half the horizon's intensity and its glow is a whisper. The app's two
+  tab bars also take the **chrome-tier** scanline: `--scanline-color` is the chrome strength
+  (.22/.14/.05) and `.scanlines` halves it with `opacity: .5` for the scene tier, so the sky sits
+  at .11 and the bar at .22 — two strengths of one texture, and daybreak drops both.
 
 ---
 

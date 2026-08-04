@@ -714,19 +714,6 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 .rim-player { box-shadow: inset 3px 0 0 0 var(--rim-player); }
 .rim-gm     { box-shadow: inset 3px 0 0 0 var(--rim-gm); }
 
-/* The sign (§9): a hero title's metal. Wordmark-scale display type only, on a full-page moment
-   that IS the screen. `background-clip: text` needs the fill transparent; the glow rides
-   drop-shadow because text-shadow cannot show through clipped text (the `.wordmark-name`
-   lesson). NOT for `.nh-panel-title`, `.settings-head h2` or any section heading. */
-.sign {
-  background-image: var(--sign-chrome);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-stroke: 0.5px var(--sign-stroke);
-  filter: var(--sign-glow);
-}
-
 .neon-beam { position: relative; padding-bottom: var(--space-3); }
 .neon-beam::after {
   content: "";
@@ -791,6 +778,28 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   background: none;
   color: var(--text);
   filter: none;
+}
+
+/* THE SIGN (§9): a hero title's metal — blue-steel, a metal the scene never wears. Wordmark-scale
+   display type only, on a full-page moment that IS the screen. `background-clip: text` needs the
+   fill transparent; the glow rides drop-shadow because text-shadow cannot show through clipped
+   text (the `.wordmark-name` lesson, one rule up). NOT for `.nh-panel-title`, `.settings-head h2`
+   or any section heading — one edit there puts the metal on every panel and it stops meaning
+   anything.
+
+   IT LIVES HERE, away from its §9 siblings (`.chamfer`, `.rim-*`, `.neon-beam`), for a reason
+   worth keeping: a treatment that REPLACES the default wordmark fill has to come after the rule
+   that sets it. Grouped with the others it sat ~40 lines earlier, lost at equal specificity, and
+   a `.sign` wordmark rendered in the ordinary magenta chrome — measured. The `[data-theme]` half
+   of the selector answers the same problem one notch up: daybreak swaps `.wordmark-name` to flat
+   ink at (0,2,0), and daybreak has its own depth-tuned --sign-chrome to wear instead. */
+.sign, [data-theme="light"] .sign {
+  background-image: var(--sign-chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.5px var(--sign-stroke);
+  filter: var(--sign-glow);
 }
 
 /* ---- Texture utilities (6.1-6.4). Atmosphere zones only. ----

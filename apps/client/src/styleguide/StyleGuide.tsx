@@ -1490,6 +1490,35 @@ export function StyleGuide() {
             </div>
           </Section>
 
+          <Section id="scene" title="The scene — sky, rims, beam, sign" blurb="Reversal, 2026-08-04 (decision log; design-language.md §9): the scene tier used to be one quiet wash and now it is a literal sky — a starfield, a sun cresting a lit horizon, a receding grid floor — off one --sky-* token set, so the theme toggle changes the HOUR. Three rules make it a work screen rather than a title screen. The horizon is a FIXED INSET from the pane's bottom (--sky-horizon-inset), never a percentage, so it cannot drift up into content as the pane grows. The sun is a CREST, not a disc: its box is only the crown above the line and a mask cuts it to the top of a circle centred on the horizon, which is why the landing's clipping sky band and slat gradient are both unnecessary here. And the bright band is RESERVED — measured over every pixel of the bare sky, the band that fails AA for --text-muted is at most 149px at 1920x1080 and 125px at 390x844 in all three hours, so a scene surface's scroll region pads --sky-horizon-inset + --sky-sun-crown at the bottom and no row can rest in it. Legibility is a structure, not an opacity dial. The table deliberately gets no sky: a horizon behind a battle map competes with the map, and the map is the canvas — its chrome takes the linework instead.">
+            <h3 className="sg-h3">The sky — switch the theme above to change the hour</h3>
+            <div className="sg-sky pane-scene scanlines">
+              <div className="pane-sky" aria-hidden="true" />
+              <div className="sg-sky-panel surface-glass">
+                <Eyebrow>On the sky</Eyebrow>
+                <p className="sg-muted">A panel standing on the scene takes <code>.surface-glass</code> — the scene tier of the two glass tiers. Never put <code>transform</code>, <code>filter</code> or <code>contain: paint</code> on <code>.pane-scene</code>: any one of them makes it the containing block for every fixed overlay.</p>
+              </div>
+            </div>
+
+            <h3 className="sg-h3">Neon linework — <code>.neon-beam</code></h3>
+            <p className="sg-muted">The sky&rsquo;s horizon, lent to the chrome. It marks a STRUCTURAL boundary — a surface&rsquo;s heading row against its region, the table dock&rsquo;s inner edge — and nothing else. It is scene language, not state language: pillar 1 keeps neon for what is interactive, focused, selected or live, so a beam never lands on a control, never marks a state, and never replaces a resting <code>--line</code> border just because one was there.</p>
+            <div className="sg-beam-demo">
+              <div className="neon-beam"><strong>Replays</strong><span className="sg-muted"> — the frame&rsquo;s chrome row</span></div>
+              <p className="sg-muted" style={{ marginTop: "var(--space-3)" }}>…and the region below it.</p>
+            </div>
+
+            <h3 className="sg-h3">Role rims — <code>.rim-player</code> / <code>.rim-gm</code></h3>
+            <p className="sg-muted">Magenta is the player&rsquo;s, violet is the GM&rsquo;s. The rim attaches to the GM-secret TREATMENT, never to a claim that the hue means GM — <code>--violet</code> is load-bearing for magical/concentration and ~50 other rules. It is never the only signal: every site that wears one names its role in words, as these two do. The edge is an inset box-shadow, not a border, so it costs no layout and cannot be clobbered by a consumer&rsquo;s own <code>border</code> shorthand.</p>
+            <div className="sg-row">
+              <div className="sg-rim-demo rim-player"><Eyebrow>Player</Eyebrow><span className="sg-muted">Frame row 2, player</span></div>
+              <div className="sg-rim-demo rim-gm"><Eyebrow>GM only</Eyebrow><span className="sg-muted">Frame row 2, GM</span></div>
+            </div>
+
+            <h3 className="sg-h3">The sign — <code>.sign</code></h3>
+            <p className="sg-muted">A hero title wears a metal the scene does not, and its legibility rides the chrome STRUCTURE (light crown, deepening body, one softened mirror meet, flash, dark base), not an outline — which is why the stroke is a hairline. Reserved for a full-page moment that IS the screen. <strong>Never a panel header</strong>, never a section heading, never <code>.nh-panel-title</code>: one edit there would put the metal on every panel in the app and it would stop meaning anything.</p>
+            <div className="sg-sign-demo"><Wordmark className="sign">OzyVTT</Wordmark></div>
+          </Section>
+
           <Section id="motion" title="Motion & interaction" blurb="One easing (--ease-settle), tiered durations. Smooth the moments that change context; leave dense lists alone. Nothing pulses; reduced-motion neutralizes all of it.">
             <h3 className="sg-h3">Hover-lift cards — hover them</h3>
             <div className="sg-grid3">

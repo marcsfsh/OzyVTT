@@ -145,6 +145,17 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 .sg-grid-demo .grid-floor { position: absolute; inset: 0; }
 .sg-texture span { position: relative; z-index: 1; }
 
+/* The scene demo (§9). Tall enough that --sky-horizon-inset (7rem) reads as a horizon with sky
+   above it rather than as a stripe. No `overflow` of its own on purpose — `.pane-sky` clips the
+   floor's spill itself, and the demo should behave exactly as a real pane does. */
+.sg-sky { position: relative; height: 20rem; margin-top: var(--space-4); border: 1px solid var(--line); }
+.sg-sky-panel { max-width: 30rem; margin: var(--space-6); padding: var(--space-4); border: 1px solid var(--line); }
+.sg-sky-panel p { margin: var(--space-2) 0 0; }
+.sg-beam-demo { margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--line); background: var(--surface-1); }
+.sg-rim-demo { display: flex; flex-direction: column; gap: var(--space-1); min-width: 13rem; padding: var(--space-3) var(--space-4); background: var(--surface-1); }
+.sg-sign-demo { margin-top: var(--space-4); padding: var(--space-6) var(--space-4); text-align: center; background: var(--sky-wash); }
+.sg-sign-demo .nh-wordmark { font-size: clamp(2.5rem, 8vw, 4.5rem); line-height: 1; }
+
 /* Command-palette demo (D25). Deliberately local to the styleguide: the palette is a COMPOSITION, so
    shipping a `.nh-palette` class would be the design system quietly growing a component it does not own. */
 .sg-palette-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }

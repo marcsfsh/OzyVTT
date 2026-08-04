@@ -1456,3 +1456,42 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   !important so the reduced-motion kill always wins), and the one-shot **landing→app entry
   transition** (`entry-dip`/`entry-settle` keyframes; the shell wires them when it locks). Still
   ruled out, no reversals: scroll parallax and ambient loops.
+- **2026-08-04 (later the same day) — REVERSAL: the app wears the REAL sky, and the table stays
+  texture-only.** Phase A of the refresh built the scene tier as "one quiet vertical wash off the
+  theme's own surface ramp plus a single brand bloom — **no sun, no horizon, no stars**", and wrote
+  that into `design-language.md` §9. That was the director's own reading and it was wrong: the style
+  guide's "three skies" are three theme cards each rendering a LITERAL sky — a sun disc, a horizon
+  line, a receding perspective grid and stars — and its captions describe hours, not washes ("deep
+  indigo void, magenta grid"; "ember horizon over deep twilight purple"; "dawn over the same grid…
+  stars stand down"). **The client reversed the ruling: `.pane-scene` paints the drive.** Recorded
+  here rather than edited away, per CLAUDE.md. The scope ruling above is NOT superseded — which
+  surfaces stand on a sky is unchanged, and the codex sky it promises is still unbuilt behind B2.
+  What changed is what a sky IS.
+  - **The table gets no sky. This half has no backing in the style guide** — the guide never
+    mentions a table — so it is a director ruling and must not be "fixed" later by an agent
+    reconciling the two. A horizon behind a battle map competes with the map, and the map is the
+    canvas. Its CHROME does take the linework instead, so it does not read as left out: the tab bar
+    wears the chrome-tier scanline, and the dock's inner edge wears the horizon's own rule.
+  - **The sky is generalized FROM the landing, never shared WITH it.** New `--sky-*` tokens and a
+    `.pane-sky` layer; the `--landing-*` block and the landing's own rules are untouched (the entry
+    animation is a concurrent lane). Three departures make it a work screen: the horizon is a fixed
+    inset from the pane bottom rather than a percentage, so it cannot drift into content; the sun is
+    a masked CREST rather than a disc, so the landing's clipping sky band and slat gradient are both
+    unnecessary; and the floor rides a clipped decoration layer, because its perspective throws paint
+    ~500px past each edge and would otherwise grow `document.scrollHeight` and fail the no-scroll
+    audit on every scene route.
+  - **Legibility is structural, not dialled.** Measured over every pixel of the bare sky, the band
+    failing AA for `--text-muted` is ≤149px at 1920×1080 and ≤125px at 390×844 in all three hours,
+    so the scroll regions RESERVE `--sky-horizon-inset + --sky-sun-crown` (164px / 136px) in their
+    bottom padding. A surface that adds bare copy tomorrow inherits the guarantee. The sunset hour's
+    wash is truncated at `#6E1B66` rather than run to the landing's ember `#E88A4A`, which measures
+    1.45:1 under `--text-dim` — dusk, not daybreak, was the real defect.
+- **2026-08-04 — The last two landing lessons get built: role rims and the sign.** `--rim-player` /
+  `--rim-gm` (+ `.rim-*`) and `--sign-chrome`/`--sign-stroke`/`--sign-glow` (+ `.sign`) were written
+  into §9 as lessons and never implemented. Now real. **The rim attaches to the GM-SECRET
+  TREATMENT, not to the hue:** "violet is GM-only" is not literally true — `--violet` is load-bearing
+  for magical/concentration (§2), NPC token strokes, condition dots, legendary actions and presence
+  across ~50 rules — so writing "violet = GM" as a colour rule would make the language a defect
+  against its own semantic table. The rim is never the only signal: every site that wears one names
+  its role in words a screen reader reaches. The sign stays barred from panel headers; one edit to
+  `.nh-panel-title` would put the metal on every panel and it would stop meaning anything.

@@ -3,11 +3,9 @@
 **Read this at session start.** What ships today, what is in flight, what is known broken — and
 nothing else. It is a snapshot: **edit it in place** when something real changes, and only then.
 
-- Not a changelog. A dated entry belongs in `docs/archive/`.
-- Not a bug tracker. Individual defects live in `known-bugs.md`; this page names only the gaps that
-  change how you'd plan work.
-- Not an inventory. `docs/app-map.md` (generated) has the state shape, command catalog and HTTP
-  surface; `docs/api-reference.md` (generated) has the API. Both are freshness-tested.
+- Not a changelog (dated entries go to `docs/archive/`); not a bug tracker (`known-bugs.md` holds the
+  defects — this page names only the gaps that change how you'd plan work); not an inventory
+  (`docs/app-map.md` and `docs/api-reference.md` are generated and freshness-tested).
 
 ## Ships today
 
@@ -38,8 +36,7 @@ per socket, and the roller's session id is stripped for every recipient (`projec
 **The tap is the attack** (D10, server-side). `action.use` routes a sheet tap itself — resolved in the
 fight on its own turn, refused off turn with the overridable and askable `economy.not-your-turn`, or
 loose attributed dice with no fight running (`tap-routing.ts`). `save.roll` answers a matching pending
-save through the tracker's own path. Both are additive; `action.resolve`, `save.answer` and `dice.roll`
-are unchanged.
+save through the tracker's own path. Both are purely additive — the older commands are untouched.
 
 **Character sheet and guided builder.** An interactive play sheet (`encounter/CharacterSheet.tsx`,
 ADR-0021) plus a full-page guided builder with a server-side assembler (`apps/client/src/builder/`,
@@ -54,9 +51,8 @@ the wizard's dice server-side into the feed. A player also dresses their own cha
 per-entry `hidden` flag — one picker for both roles (`tokens/TokenLibrary.tsx`). Archived characters
 are out of play server-side — refused by claim, scene staging and fight start/add.
 
-**Homebrew keeps its promises** (D21). Every field the item editor offers now reaches the fight
-(`equipment-derivation.ts`, one test per formerly-inert field in
-`apps/server/test/homebrew-inert-fields.test.ts`).
+**Homebrew keeps its promises** (D21). Every field the item editor offers reaches the fight
+(`equipment-derivation.ts`, one test per formerly-inert field in `homebrew-inert-fields.test.ts`).
 
 **Replays** (D25/D26). `replay.launch` parks the live table exactly as a scene switch does and makes
 one recorded moment live, cloning everyone under new ids so tonight's characters are never rewritten
@@ -70,16 +66,23 @@ default), *Launch from here* whose confirm says the live scene is **parked**, an
 own store, router and change ping (`homebrew-store.ts`, `homebrew-http.ts`); D&D Beyond PDF ingestion
 (`packages/dndbeyond-pdf`, ADR-0018). The example party are ordinary characters.
 
+
 **The screen is the page** (D15/D30, refresh A1). `body` is locked and `<main>` is a 100dvh grid —
 [connection row][tab bar][content pane] (`apps/client/src/styles.css`); layers render in the pane,
 unconverted surfaces scroll a phase-tagged `.pane-stage` region, post-auth notices ride the toast.
 `/` is the title screen (per-theme `--landing-*` skies); the party is the table's, not the shell's.
+**And the app wears a sky** (§9 reversal, decision log 2026-08-04): `.pane-scene` + a `.pane-sky` child
+paint a literal scene — starfield, a sun cresting a lit horizon, a receding grid floor — off one
+`--sky-*` set, so the toggle changes the *hour*. Settings, roster, scenes, replays and the builder gate
+stand on it; **the table never does** (a horizon competes with the map), though its chrome takes the
+linework. AA is STRUCTURAL: `.pane-scene > .scroll-y` reserves the sky's bright band, so no row rests
+in it. `.rim-*` (role rims), `.sign` and `.neon-beam` are the landing's last three lessons, now real.
 
 **Settings — one tab, three groups, one page** (A7/D24, `apps/client/src/settings/SettingsPage.tsx`).
-*Mine* (theme, "How you roll") reaches every role; *The table* and *Players* are GM-only and are not
-rendered without a GM token, so a player's page holds one group rather than three with two hidden. The
-rules dial lives here rather than in a mid-fight menu and reads **Enforce / Advise / Off** (D6 — copy
-only; the wire stays `strict|assisted|freeform`), one toggle per server rule family. `builderPolicy`
+*Mine* (theme, "How you roll") reaches every role; *The table* and *Players* are never rendered without
+a GM token, so a player's page holds one group rather than three with two hidden. The rules dial lives
+here rather than in a mid-fight menu and reads **Enforce / Advise / Off** (D6 — copy only; the wire
+stays `strict|assisted|freeform`), one toggle per server rule family. `builderPolicy`
 gets its first client control, beside health display, staging defaults, players' hits and players'
 initiative; `/setup` folded into *Access & integrations*. `SETTINGS_GROUPS` is data, pinned by
 `settings-groups.test.ts`.
@@ -98,22 +101,20 @@ which reads **everything under `apps/client/src` minus a pinned exclusion list**
 `packages/ui/src/primitives`, so a new directory is born locked. A retired word ("actor", "combatant",
 "Encounter" the place, the five dice phrasings) fails `npm run test` with the replacement named;
 exemptions are (file, string) pairs and die when they rescue nothing; the words D28 KEEPS are asserted
-present. `design-conventions.test.ts` does the same for glyphs, raw inputs, colours, feedback,
-breakpoints, viewport units and undeclared scroll regions — shrink-only, sized in `design-conventions-shape.ts`. The judgement half —
-skills, subagents, path-scoped rules and hooks — is under `.claude/`, roster in `.claude/README.md`.
+present. `design-conventions.test.ts` does the same for glyphs, raw inputs, colours, feedback, breakpoints,
+viewport units and undeclared scroll regions — shrink-only, sized in `design-conventions-shape.ts`.
 
 **Table viewer / second screen.** Pairing codes exchanged for a hashed cookie session, an SSE feed, and
 a player-safe projection that never carries `GameState` (`apps/server/src/viewer-http.ts`,
-`viewer-presentation.ts`). See `docs/ai-context/viewer-mode.md`.
+`viewer-presentation.ts`; `docs/ai-context/viewer-mode.md`).
 
 **Worldbuilding Codex.** Typed pages and folders, atlas, journal and timeline, sessions with prep and
 recap (staged `sceneIds` GM-only always), quests, calendar, downtime, party standing, reveal audit,
 relationship graph, search, revisions, backup. Every player-facing read goes through
-`apps/server/src/codex-projections.ts`. See `docs/ai-context/codex.md`.
+`apps/server/src/codex-projections.ts` (`docs/ai-context/codex.md`).
 
 **Public integration API v1** (ADR-0016). Versioned envelopes over the same handlers as the UI,
-GM-minted scoped credentials, and an OpenAPI document at `/api/v1/openapi.json`
-(`packages/api-contract`).
+GM-minted scoped credentials, an OpenAPI document at `/api/v1/openapi.json` (`packages/api-contract`).
 
 **Realtime and persistence.** One command pipeline: zod-validate → authorize per command from the
 signed token → commit receipt + event + projection in one SQLite transaction → broadcast a per-role
@@ -123,18 +124,17 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 ## In flight
 
 - **"The screen is the page" refresh (this branch, 2026-08-04).** Tokens, ratchets (g)/(h), the
-  route×role `scripts/no-scroll-audit.mjs` (19 rows green), A1's shell lock and A2's seven trivial
-  surfaces (a frame + one declared region each; the content-light ones on a scene sky) are in. The
-  table, codex, homebrew, replay viewer, viewer-controls and calibration stage on, through B and C.
+  route×role `scripts/no-scroll-audit.mjs` (19 rows green), A1's shell lock, A2's seven trivial
+  surfaces (a frame + one declared region each) and the scene sky are in. The table, codex, homebrew,
+  replay viewer, viewer-controls and calibration stage on, through B and C.
 - **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
   rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
-
-No phase exit gate has been claimed. `BUILD_PLAN.md` carries the roadmap.
+- **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.
 
 ## Known broken
 
-Individual defects are in `known-bugs.md` — every entry there is broken at HEAD or it is
-deleted. The structural gaps worth knowing before you plan:
+Individual defects are in `known-bugs.md` — every entry there is broken at HEAD or it is deleted.
+The structural gaps worth knowing before you plan:
 
 - **`apps/server/test/` is not typechecked.** `apps/server/tsconfig.json` has `"include": ["src"]`, so
   `npm run check` never sees the server test suite; `apps/client/tsconfig.app.json` is the same shape.
@@ -145,6 +145,6 @@ deleted. The structural gaps worth knowing before you plan:
 
 ## How to change this page
 
-Edit the line that is wrong. Delete the line that is no longer true. If a claim here and the code
-disagree, the code wins and the line is a defect — fix it in the same change. Do not append. History is
-in git and in `docs/archive/ai-ledger/current-state-history-2026-08-01.md`.
+Edit the line that is wrong; delete the line that is no longer true. If a claim here and the code
+disagree, the code wins and the line is a defect — fix it in the same change. Do not append. History
+is in git and in `docs/archive/ai-ledger/current-state-history-2026-08-01.md`.
