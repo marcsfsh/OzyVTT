@@ -39,6 +39,31 @@ import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, IconArrow, IconCh
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
+
+/**
+ * Keyboard safety under the locked shell (§7.5). The page cannot scroll a focused field
+ * into view any more — the body is locked — so the REGION must: this nudges the focused
+ * text field within its own scrolling ancestor (scrollIntoView walks every scrollable
+ * ancestor and stops at the first that can help, so it finds the region, never the dead
+ * page). Twice: immediately, for fields parked under a region's edge; and again after the
+ * on-screen keyboard has had time to land, because the keyboard resizes the viewport AFTER
+ * focus. `block: "nearest"` keeps the correction minimal, and the regions' own
+ * scroll-padding (`.pane-stage`, the wizard layer) keeps the landing spot clear of sticky
+ * chrome and the home bar.
+ */
+const FOCUS_NUDGE_TARGETS = "input, textarea, select, [contenteditable=''], [contenteditable='true']";
+function installKeyboardFocusHelper(): () => void {
+  const nudge = (field: HTMLElement) => field.scrollIntoView({ block: "nearest" });
+  const onFocusIn = (event: FocusEvent) => {
+    const field = event.target;
+    if (!(field instanceof HTMLElement) || !field.matches(FOCUS_NUDGE_TARGETS)) return;
+    nudge(field);
+    window.setTimeout(() => { if (document.activeElement === field) nudge(field); }, 300);
+  };
+  document.addEventListener("focusin", onFocusIn);
+  return () => document.removeEventListener("focusin", onFocusIn);
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { headers: { "content-type": "application/json", ...init?.headers }, ...init });
   const body = await response.json();
@@ -141,6 +166,27 @@ function App() {
   });
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
+  /**
+   * The landing→app ENTRY TRANSITION (§7.7, one-shot): the door answers → the scene dips
+   * away (the landing stays mounted alone for one beat, wearing .anim-entry-dip) → the
+   * frame settles up with the cascade (main wears .anim-cascade; the pane's leg of it is
+   * opacity-led — the pane-in rule in styles.css). The classes are STATE, dropped when the
+   * entry lands, so no animation is retained to trap a fixed overlay later (refresh risk
+   * #2) and later tab navigation never replays it. Reduced motion skips the phases
+   * entirely — the swap is instant, which is also what the global animation kill would
+   * collapse them to.
+   */
+  const [entry, setEntry] = useState<"dip" | "settle" | null>(null);
+  const entryTimers = useRef<number[]>([]);
+  const beginEntry = () => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    setEntry("dip");
+    entryTimers.current.push(window.setTimeout(() => setEntry("settle"), 200));
+    entryTimers.current.push(window.setTimeout(() => setEntry(null), 700));
+  };
+  useEffect(() => () => { entryTimers.current.forEach(clearTimeout); }, []);
+  /** Keyboard safety is shell plumbing: installed once, for every region on every surface. */
+  useEffect(() => installKeyboardFocusHelper(), []);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
   // Undocked setup: the encounter-setup panel is sized to the map/scene panel's exact height (its
@@ -160,9 +206,14 @@ function App() {
     tableObserverRef.current.observe(section);
   }, []);
 
+  /**
+   * PRE-auth feedback stays inline beside the form that caused it — the landing's Notice is
+   * the sanctioned exception to toast-only feedback (§D6). POST-auth feedback rides the one
+   * toast channel (convention (e)): the locked frame has no notice slot — an in-flow message
+   * between the frame's rows would be a phantom row the grid never planned for.
+   */
   const fail = (text: string) => setNotice({ tone: "error", text });
-  // Ephemeral acknowledgements ("Signed out", "GM password set") go to the shared toast surface;
-  // errors and pending states stay inline (Notice) where they're prominent next to the auth form.
+  const failToast = (text: string) => toast(text, { tone: "error" });
   const succeed = (text: string) => toast(text, { tone: "success" });
 
   useEffect(() => {
@@ -256,7 +307,7 @@ function App() {
       if (!result.ok) fail(result.message ?? "Couldn't join the table. Please try again.");
       else {
         if (result.token) localStorage.setItem(PLAYER_TOKEN_KEY, result.token);
-        setMode("player"); setConnection("online"); setNotice(null);
+        setMode("player"); setConnection("online"); setNotice(null); beginEntry();
       }
     });
   };
@@ -267,7 +318,7 @@ function App() {
       setGmToken(token); socket.auth = { token }; socket.connect();
       socket.emit("session:join", { token }, (result: SessionJoinResult) => {
         setBusy(false);
-        result.ok ? (setMode("gm"), setConnection("online"), setPassword(""), setNotice(null)) : fail(result.message ?? "Couldn't sign in as GM.");
+        result.ok ? (setMode("gm"), setConnection("online"), setPassword(""), setNotice(null), beginEntry()) : fail(result.message ?? "Couldn't sign in as GM.");
       });
     } catch (error) { setBusy(false); fail((error as Error).message); }
   };
@@ -289,7 +340,7 @@ function App() {
     setBusy(true);
     const token = gmToken;
     try { if (token) await api("/api/gm/logout", { method: "POST", headers: { authorization: `Bearer ${token}` } }); }
-    catch (error) { setBusy(false); fail((error as Error).message); return; }
+    catch (error) { setBusy(false); failToast((error as Error).message); return; }
     setBusy(false);
     leaveGmSession("Signed out.");
   };
@@ -299,7 +350,7 @@ function App() {
     if (!ok) return;
     setBusy(true);
     try { await api("/api/gm/sessions/revoke-all", { method: "POST", headers: { authorization: `Bearer ${token}` } }); }
-    catch (error) { setBusy(false); fail((error as Error).message); return; }
+    catch (error) { setBusy(false); failToast((error as Error).message); return; }
     setBusy(false);
     leaveGmSession("All GM sessions revoked. Sign in again to continue.");
   };
@@ -361,11 +412,66 @@ function App() {
    * than the app appearing to change identity between two halves of the same decision.
    */
   const preAuth = mode === "home" || (mode === "gm" && !gmToken);
-  return <main>
+  /** The post-auth shell — rows 2-3's content. Suppressed for one beat while the landing
+      plays the entry dip, so the frame then arrives all at once with the cascade. */
+  const shellVisible = !preAuth && state !== null && entry !== "dip";
+  /**
+   * THE FRAME (§7 — the screen is the page): <main> is a 100dvh grid, rows
+   * [connection strip][tab bar][content pane], and the page never scrolls. Every in-flow
+   * child carries an explicit grid row (styles.css); overlays, dialogs and the texture take
+   * no row. During the one-shot entry transition the frame wears .anim-cascade — its pane
+   * leg is opacity-led so no transform ever traps a fixed overlay (refresh risk #2).
+   */
+  return <main className={entry === "settle" ? "anim-cascade" : undefined}>
     <div className="app-texture" aria-hidden="true" />
     {mode !== "home" && <TableEventToasts />}
+    {/* Row 1 — connection. A real frame row: it height-animates in and the frame steps down
+        to make room, so it can never paint over a surface and no surface can cover it — the
+        fixed-strip life, its z-index and the :has() padding dance all retired with the lock.
+        It stays visible over full-page layers too (the wizard used to paint over it). */}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
-    {preAuth && <div className="landing">
+    {/* Row 2 — the tab bar. **A10/D15: the shell renders no roster** — the party lives on
+        the table (slim strip out of combat, the pre-claim picker, management on the Roster
+        tab); nothing above the tabs but the tabs. The bar stays up while a full-page layer
+        is open now that layers render inside the pane, so the frame never blinks. */}
+    {shellVisible && mode === "gm" && <Tabs
+      className="gm-tabs"
+      ariaLabel="GM sections"
+      tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+      activeId={gmTab}
+      onChange={(id) => setGmTab(id as GmTab)}
+    />}
+    {/* D4 — the player Codex is a VIEW of the player app, not a modal over the table. The
+        views are a switcher, at real addresses (`/table` and `/codex/*`), so the Android
+        back gesture walks between them and a player can be sent a link to a page.
+        CT-3: the recap count rides INSIDE the switching affordance, so it is part of its
+        accessible name ("Codex, 2 new") rather than a coloured dot a screen reader never
+        reaches. */}
+    {shellVisible && mode === "player" && <Tabs
+      className="player-view-tabs"
+      ariaLabel="Table, Codex or Settings"
+      tabs={[
+        { id: "table", label: "Table" },
+        { id: "codex", label: <>Codex{recapBadge.unread > 0 && <> <Badge tone="info" solid>{recapBadge.unread} new</Badge></>}</> },
+        /* D24: a real tab, not hidden chrome — it lights when active and it is addressed. A player
+           who opens it sees the Mine group and nothing else, because nothing else is rendered. */
+        { id: "settings", label: "Settings" }
+      ]}
+      activeId={playerView}
+      /* Same rule for the player's views: the Codex reopens on the page they were reading. */
+      onChange={(id) => {
+        if (id === "codex") recapBadge.markSeen();
+        const home = id === "codex" ? "/codex" : id === "settings" ? "/settings" : "/table";
+        if (id === playerView) { navigate(home); return; }
+        navigate(id === "codex" ? lastLocationForTab("player", "codex") ?? "/codex" : home);
+      }}
+    />}
+    {/* Row 3 — the pane: one always-rendered element owning the canvas for whatever the
+        address says. A surface that has not adopted the frame yet rides a temporary
+        `.pane-stage scroll-y` region inside it — the staging rule (styles.css); each
+        wrapper below names the refresh phase that drains it. */}
+    <div className="app-pane">
+    {(preAuth || entry === "dip") && <div className={entry === "dip" ? "landing anim-entry-dip" : "landing"}>
       {/* D30's full statement — the 80s retro-cyber title screen, layer by layer: star field, the
           slatted sun rising behind the horizon line, the grid rolling toward the viewer, analog
           grain, and the CRT vignette + scanlines the `.landing` pseudo-elements paint over it all.
@@ -396,23 +502,25 @@ function App() {
       <Notice notice={notice} />
       <div className="home-theme-switch"><ThemeToggle /></div>
     </div>}
-    {!preAuth && <Notice notice={notice} />}
     {/* D29 — the FULL-PAGE layers. Each was component state (`builderOpen`, five sheet openers,
         `?archive=`); each is an address now, so a refresh keeps you where you were and Back closes
-        the layer instead of leaving the tab. They replace the shell body rather than floating over
-        it: the tabs and the map would otherwise scroll behind a full-height wizard. */}
-    {mode !== "home" && state && layer?.kind === "builder" && (mode === "gm" || state.builderPolicy.playerBuilder === "open"
+        the layer instead of leaving the tab. Under the locked frame they render INSIDE the pane —
+        rows 1-2 stay up — and each owns (or stages) its internal scroll; post-auth feedback that
+        used to render as an inline Notice here rides the toast channel instead (convention (e)). */}
+    {shellVisible && state && layer?.kind === "builder" && (mode === "gm" || state.builderPolicy.playerBuilder === "open"
       ? <CharacterBuilder
           state={state}
           sessionKey={mode === "gm" ? "gm" : "player"}
-          /* The builder covers the viewport, so the connection banner above is painted over. It gates
-             its own last step on this instead. */
+          /* The connection strip is frame row 1 and visible above the wizard now, but the wizard
+             still gates its own final step on this prop — a disabled Create button beats a banner
+             the player has to notice. */
           connection={connection}
           onClose={() => navigate(mode === "gm" ? pathForGmTab("roster") : "/table")}
-          onCreated={(name) => setNotice({ tone: "success", text: `${name} joined the roster — ready to claim.` })}
+          onCreated={(name) => succeed(`${name} joined the roster — ready to claim.`)}
         />
-      : <div className="anim-view builder-gate card"><h2>Your GM builds the characters at this table</h2><p>Ask them to make one for you, or claim one that&rsquo;s already on the table.</p><Button variant="secondary" onClick={() => navigate("/table")}>Back to the table</Button></div>)}
-    {mode !== "home" && state && layer?.kind === "level" && <LevelFlow
+      : /* staged region — A2 (sheet/roster trivials) drains it */
+        <div className="anim-view pane-stage scroll-y"><div className="builder-gate card"><h2>Your GM builds the characters at this table</h2><p>Ask them to make one for you, or claim one that&rsquo;s already on the table.</p><Button variant="secondary" onClick={() => navigate("/table")}>Back to the table</Button></div></div>)}
+    {shellVisible && state && layer?.kind === "level" && <LevelFlow
       state={state}
       role={mode === "gm" ? "gm" : "player"}
       actorId={layer.actorId}
@@ -421,7 +529,8 @@ function App() {
       onClose={() => navigate(`/characters/${layer.actorId}`)}
       onDone={() => navigate(`/characters/${layer.actorId}`)}
     />}
-    {mode !== "home" && state && layer?.kind === "replay" && mapToken && <div className="anim-view replay-page">
+    {/* staged region — B3 (replay viewer recompose) drains it */}
+    {shellVisible && state && layer?.kind === "replay" && mapToken && <div className="anim-view replay-page pane-stage scroll-y">
       <ReplayViewer
         role={mode === "gm" ? "gm" : "player"}
         token={mapToken}
@@ -430,12 +539,13 @@ function App() {
         onLaunched={() => navigate("/table")}
       />
     </div>}
-    {mode !== "home" && state && layer?.kind === "sheet" && (() => {
+    {shellVisible && state && layer?.kind === "sheet" && (() => {
       const actor = state.actors.find((entry) => entry.id === layer.actorId);
       // A player asking for someone else's sheet gets the not-found view: their projection does not
       // carry it, so "no such character" is both the true answer and the indistinguishable one.
-      if (!actor) return <NotFoundView role={mode === "gm" ? "gm" : "player"} />;
-      return <div className="anim-view sheet-page">
+      if (!actor) return <div className="pane-stage scroll-y"><NotFoundView role={mode === "gm" ? "gm" : "player"} /></div>;
+      /* staged region — A2 (sheet layer trivial: page actions move into the sheet frame) drains it */
+      return <div className="anim-view sheet-page pane-stage scroll-y">
         <CharacterSheet actor={actor} role={mode === "gm" ? "gm" : "player"} state={state} standalone onClose={() => navigate(mode === "gm" ? pathForGmTab("roster") : "/table")} />
         <div className="sheet-page-actions">
           <Button variant="secondary" onClick={() => navigate(`/characters/${layer.actorId}/level`)}>Level up or down…</Button>
@@ -443,59 +553,28 @@ function App() {
         </div>
       </div>;
     })()}
-    {mode !== "home" && state && !fullPageLayer && <>
-      {/* **A10/D15: the shell renders no roster.** It used to render the whole one — a full-size card
-          grid out of combat — above the tab bar, which put it above the map, above Scenes, above
-          Homebrew, above the GM's Codex (which therefore began ~1500px down at phone width), and above
-          the Roster tab, where it appeared a SECOND time under the tab's own gallery. The party belongs
-          to the table, so it lives on the table: a slim strip out of combat (§B2.2), the player's
-          pre-claim picker on the player's table (§B4.2), and management — create, import, approve,
-          archive — on the Roster tab (§B6). Nothing above the tabs but the tabs. */}
-      {mode === "gm" && <Tabs
-        className="gm-tabs"
-        ariaLabel="GM sections"
-        tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
-        activeId={gmTab}
-        onChange={(id) => setGmTab(id as GmTab)}
-      />}
+    {shellVisible && state && !fullPageLayer && <>
       {/* D3: an address the app does not answer, and a GM-only address asked for by a player, both land
           here — indistinguishable on purpose (invariant §3.2). */}
-      {mode === "gm" && gmToken && gmAddressUnknown && <NotFoundView role="gm" />}
+      {mode === "gm" && gmToken && gmAddressUnknown && <div className="pane-stage scroll-y"><NotFoundView role="gm" /></div>}
 
-      {/* D4 — the player Codex is a VIEW of the player app now, not a modal over the table. The two
-          are a switcher, at real addresses (`/table` and `/codex/*`), so the Android back gesture walks
-          between them and a player can be sent a link to a page.
-          CT-3: the recap count rides INSIDE the switching affordance, so it is part of its accessible
-          name ("Codex, 2 new") rather than a coloured dot a screen reader never reaches. */}
-      {mode === "player" && <Tabs
-        className="player-view-tabs"
-        ariaLabel="Table, Codex or Settings"
-        tabs={[
-          { id: "table", label: "Table" },
-          { id: "codex", label: <>Codex{recapBadge.unread > 0 && <> <Badge tone="info" solid>{recapBadge.unread} new</Badge></>}</> },
-          /* D24: a real tab, not hidden chrome — it lights when active and it is addressed. A player
-             who opens it sees the Mine group and nothing else, because nothing else is rendered. */
-          { id: "settings", label: "Settings" }
-        ]}
-        activeId={playerView}
-        /* Same rule for the player's views: the Codex reopens on the page they were reading. */
-        onChange={(id) => {
-          if (id === "codex") recapBadge.markSeen();
-          const home = id === "codex" ? "/codex" : id === "settings" ? "/settings" : "/table";
-          if (id === playerView) { navigate(home); return; }
-          navigate(id === "codex" ? lastLocationForTab("player", "codex") ?? "/codex" : home);
-        }}
-      />}
-      {mode === "player" && playerView === "codex" && mapToken && <div className="anim-view codex-anim"><PlayerCodex token={mapToken} /></div>}
+      {/* staged region — B2 (codex recompose) drains it */}
+      {mode === "player" && playerView === "codex" && mapToken && <div className="anim-view codex-anim pane-stage scroll-y"><PlayerCodex token={mapToken} /></div>}
       {/* D24 — one Settings surface, one component, both roles. A player is handed no GM group at
           all: `SettingsPage` renders `TableGroup`/`PlayersGroup` only for a GM token, so the GM-only
-          controls are absent from the tree rather than hidden in it. */}
-      {mode === "player" && playerView === "settings" && <SettingsPage role="player" state={state} />}
+          controls are absent from the tree rather than hidden in it.
+          staged region — A2 (settings trivial) drains it */}
+      {mode === "player" && playerView === "settings" && <div className="anim-view pane-stage scroll-y"><SettingsPage role="player" state={state} /></div>}
       {/* A player on a GM-only or unknown address: the not-found view, indistinguishable from each other
           and from a genuinely unknown address (invariant §3.2). */}
-      {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundView role="player" />}
+      {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <div className="pane-stage scroll-y"><NotFoundView role="player" /></div>}
 
-      {((mode === "player" && playerView === "table" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
+      {/* staged region — B1 (table laptop recompose) then C1 (table phone redesign) drain it.
+          The player half excludes `/replays`: that address renders the shared-replays page (below),
+          and without the exclusion the live table stacked on top of it — the census's one
+          stacking anomaly, which the lock forces fixed (the audit's player `/replays` row is its
+          regression check). */}
+      {((mode === "player" && playerView === "table" && route.segments[0] !== "replays" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view pane-stage scroll-y${showDocked ? " docked" : ""}`}>
         <section className="table" ref={measureTablePanel}>
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
               Guarded on the field, not just the mode - the first state after login can still be
@@ -563,33 +642,39 @@ function App() {
         </div>
       </div>}
 
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view">
+      {/* staged region — A2 (scenes gallery trivial) then C2 (maps/calibration redesign) drain it */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view pane-stage scroll-y">
         {scenesView === "maps"
           ? <div className="scenes-maps-view">
               <Button variant="ghost" className="scenes-back" onClick={() => navigate(pathForGmTab("scenes"))}><IconChevronLeft /> Back to scenes</Button>
               <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />
             </div>
-          : <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => navigate("/scenes/maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={(text) => setNotice({ tone: "error", text })} />}
+          : <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => navigate("/scenes/maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={failToast} />}
       </div>}
 
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
+      {/* staged region — B3 (viewer-controls recompose) drains it */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <div className="anim-view pane-stage scroll-y"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} onCreateCharacter={() => navigate("/builder")} /></div>}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "replay" && <div className="anim-view"><ReplayList role="gm" token={gmToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} /></div>}
+      {/* staged regions — A2 (roster and replays-list trivials) drains these two */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <div className="anim-view pane-stage scroll-y"><PartyRosterTab state={state as GmView} onCreateCharacter={() => navigate("/builder")} /></div>}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "replay" && <div className="anim-view pane-stage scroll-y"><ReplayList role="gm" token={gmToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} /></div>}
       {/* D27 — a player reaches the shared list at the same address, as its own page, with the Table
-          tab lit and a way back to it. Unshared ids are 404 at the server, so the list is the truth. */}
-      {mode === "player" && playerView === "table" && route.segments[0] === "replays" && mapToken && <div className="anim-view replay-page">
+          tab lit and a way back to it. Unshared ids are 404 at the server, so the list is the truth.
+          staged region — A2 (replays-list trivial) drains it */}
+      {mode === "player" && playerView === "table" && route.segments[0] === "replays" && mapToken && <div className="anim-view replay-page pane-stage scroll-y">
         <Button variant="ghost" onClick={() => navigate("/table")}><IconChevronLeft /> Back to the table</Button>
         <ReplayList role="player" token={mapToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />
       </div>}
-      {mode === "gm" && gmToken && route.segments[0] === "codex" && <div className="anim-view codex-anim"><CodexShell gmToken={gmToken}
+      {/* staged region — B2 (codex recompose) drains it */}
+      {mode === "gm" && gmToken && route.segments[0] === "codex" && <div className="anim-view codex-anim pane-stage scroll-y"><CodexShell gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
         actors={(state as GmView | null)?.actors?.map((actor) => ({ id: actor.id, name: actor.name })) ?? []}
         activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
         onActivateScene={(sceneId: string) => { makeSceneLive(sceneId); navigate(pathForGmTab("table")); }}
         onOpenReplay={(archiveId: number) => navigate(`/replays/${archiveId}`)} /></div>}
 
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "homebrew" && <div className="anim-view"><HomebrewPanel gmToken={gmToken} /></div>}
+      {/* staged region — B2 (homebrew recompose) drains it */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "homebrew" && <div className="anim-view pane-stage scroll-y"><HomebrewPanel gmToken={gmToken} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview &&<ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
@@ -598,12 +683,13 @@ function App() {
       </Modal>}
 
       {mode === "gm" && gmToken && scenesModalOpen && state && Array.isArray((state as GmView).combat.scenes) && <Modal open onClose={() => setScenesModalOpen(false)} size="lg" className="scenes-modal" title="Scenes" ariaLabel="Scenes">
-        <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} hideHeading onNewScene={() => { setScenesModalOpen(false); setScenePrepOpen(true); }} onManageMaps={() => { setScenesModalOpen(false); navigate("/scenes/maps"); }} onClose={() => setScenesModalOpen(false)} onFeedback={(text) => setNotice({ tone: "error", text })} />
+        <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} hideHeading onNewScene={() => { setScenesModalOpen(false); setScenePrepOpen(true); }} onManageMaps={() => { setScenesModalOpen(false); navigate("/scenes/maps"); }} onClose={() => setScenesModalOpen(false)} onFeedback={failToast} />
       </Modal>}
 
       {/* A7/D24 — Settings replaces "VTT Setup", and nothing /setup held is lost: theme moved to Mine,
-          credentials and session security to The table → Access & integrations (§B9.4). */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "settings" && <SettingsPage
+          credentials and session security to The table → Access & integrations (§B9.4).
+          staged region — A2 (settings trivial: region + ≥1280 two-column) drains it */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "settings" && <div className="anim-view pane-stage scroll-y"><SettingsPage
         role="gm"
         state={state}
         gmToken={gmToken}
@@ -611,10 +697,12 @@ function App() {
         onPreviewPlayers={() => { navigate(pathForGmTab("table")); setShowViewerPreview(true); }}
         onSignOut={signOutGm}
         onRevokeAll={revokeAllGmSessions}
-      />}
+      /></div>}
     </>}
+    </div>
     {/* A11/D18 — the token picker, opened from the sheet or from Settings → Players. The server
-        decides who may set which token; this is the door, not the gate. */}
+        decides who may set which token; this is the door, not the gate. Dialogs live outside the
+        pane: open they are top-layer, closed they render no box — neither takes a frame row. */}
     {tokenPickerFor && mapToken && state && (() => {
       const actor = state.actors.find((entry) => entry.id === tokenPickerFor);
       if (!actor) return null;

@@ -100,8 +100,9 @@ automated does.**
   route × role table (landing, viewer entry, a real GM session, a real player session) at
   1280×900, 1280×720 and 390×844 and exits non-zero if any route's document scrolls on
   either axis *or* any route goes unmeasured. Same terms as the tap audit: needs a browser
-  and a live dev server, so it is a thing you run, not a thing that runs. While the refresh
-  is in flight, unconverted surfaces are expectedly red — each phase drains its rows.
+  and a live dev server, so it is a thing you run, not a thing that runs. The shell lock
+  took the whole table green (staged pane regions absorb unconverted surfaces), so any red
+  cell is a regression; the (g)/(h) ratchets carry the remaining conversion debt.
 
 Say what you ran and what you saw. A tier you did not execute is not verification, and
 "should work now" is not a result.

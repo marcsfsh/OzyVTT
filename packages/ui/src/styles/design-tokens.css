@@ -253,8 +253,9 @@
   --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
 
   /* Layout (§7) — the frame's shared dimensions, seeded 2026-08-04 from the live values
-     they will replace; the shell lock and the recomposes consume them phase by phase. */
-  --header-h: 64px;   /* legacy: its one consumer is the root scroll recipe below; both retire with the shell lock */
+     they will replace; the shell lock and the recomposes consume them phase by phase.
+     (--header-h and its one consumer, the root scroll recipe, retired with the shell lock:
+     the SPA page no longer scrolls, and the styleguide entry carries its own copy.) */
   --app-bar-h: calc(var(--tap-min) + 1px);  /* the tab-bar row: one 44px tab (Tabs.css min-height) + the bar's 1px baseline */
   --pane-gap: var(--space-6);               /* frame gutter — the table's live 1.5rem column gap (.table-layout) */
   --rail-w: clamp(220px, 22vw, 280px);      /* nav/list rails: homebrew's live 220px floor, the viewer rail's live 22vw growth, §7's 280px cap */
@@ -471,10 +472,11 @@ button, a, .interactive, [role="button"], summary {
   transform: translate(-50%, -50%);
 }
 
-html {
-  scroll-behavior: smooth;
-  scroll-padding-top: calc(var(--header-h) + 10px);
-}
+/* (No root scroll recipe. `html { scroll-behavior: smooth; scroll-padding-top }` lived here
+   compensating for a sticky header only the styleguide entry has; under the locked shell the
+   SPA page cannot scroll at all, so anchors and scroll-padding belong to the REGION that
+   scrolls — §7 rule 3. The styleguide keeps its own copy in styleguide.css; the wizard layer
+   and the shell's `.pane-stage` already carry region scroll-padding.) */
 
 /* House transition recipe. Never `all` (7.2). `filter` is in the list because chamfered
    surfaces glow through drop-shadow filters (see .chamfer) and their glow should ease
@@ -751,9 +753,8 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   .static-noise::after { display: none; }
 }
 
-/* Reduced motion: collapse all motion, keep end states, stop smooth scroll */
+/* Reduced motion: collapse all motion, keep end states */
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;

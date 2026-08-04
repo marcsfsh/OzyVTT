@@ -41,9 +41,14 @@ there is no reduced mobile mode, and a mouse-only control is a bug.
 
 ## Gotchas
 
-- `viewer.css` is shared by the standalone viewer **and** the GM in-tab preview — the page
-  reset (`overflow:hidden`) is deliberately isolated in `viewer-page.css` (imported only by
-  `viewer-main.tsx`). Don't merge it in.
+- `viewer.css` is shared by the standalone viewer **and** the GM in-tab preview — the
+  viewer entry's page reset stays isolated in `viewer-page.css` (imported only by
+  `viewer-main.tsx`); the SPA's own lock lives in `apps/client/src/styles.css` (`body`
+  lock + the `<main>` grid frame). Keep the two resets separate.
+- Keyboard safety under the locked shell: a `focusin` helper in `apps/client/src/main.tsx`
+  nudges the focused field into view within its own scrolling region, and regions carry
+  `scroll-padding` + safe-area bottoms (`.pane-stage`; the wizard layer's own padding).
+  Verified in emulation only — the physical-device pass is still GAP-001.
 - Token name labels are hidden `@media (max-width:560px)`.
 - The map toolbar (`apps/client/src/scene/MapToolbar.tsx`) collapses at that same 560 rung, but in
   **JS** (`matchMedia`), not CSS — the phone form is a different tree (one `Tools` button opening a

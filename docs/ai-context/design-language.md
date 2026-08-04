@@ -297,22 +297,23 @@ them, and that the two steps no test can demand are remembered.
 8. **The surface fits the locked viewport and declares its scroll regions** (§7). The page
    never scrolls; every region either fits or scrolls itself via `.scroll-y`. Run
    `node scripts/no-scroll-audit.mjs` against your route at 1280×720-class and 390×844
-   before calling it done. *(Status: standard adopted 2026-08-04; conforming today: the
-   landing, the shared-screen viewer, the wizard layer, every Modal/Drawer. The ratchet
-   checks and the route audit are in repo — §10; other surfaces convert phase by phase.)*
+   before calling it done. *(Status: standard adopted 2026-08-04; the shell lock is in
+   force — the body is locked and `<main>` is the frame — so no surface can scroll the
+   document; a surface not yet recomposed scrolls one staged `.pane-stage` region until its
+   phase lands. The ratchet checks and the route audit are in repo — §10.)*
 
 ---
 
 ## 7. Layout — THE SCREEN IS THE PAGE
 
-> **Status: adopted 2026-08-04 (decision log); partially in force.** In force today for the
-> landing (`apps/client/src/styles.css` — `height: 100dvh`, `html:has(.landing)` overflow
-> lock), the standalone shared-screen viewer (`apps/client/src/viewer/viewer-page.css`), the
-> standalone sheet entry, the wizard layer (`apps/client/src/builder/character-builder.css`),
-> and the Modal/Drawer primitives. **Every other surface still scrolls the document** — the
-> measured census lives with the refresh plan. Sections marked *(refresh)* below describe the
-> standard those surfaces adopt when the client-gated UI refresh implements them; nothing in
-> them is a claim about today's behaviour.
+> **Status: adopted 2026-08-04 (decision log); the shell is locked (refresh phase A1).**
+> `body` holds `height: 100dvh; overflow: hidden` and `<main>` is the frame
+> (`apps/client/src/styles.css`); the standalone shared-screen viewer
+> (`apps/client/src/viewer/viewer-page.css`), the standalone sheet entry and the
+> Modal/Drawer primitives were already conforming. **The document never scrolls; a surface
+> not yet recomposed scrolls one temporary pane region** (`.pane-stage` + `.scroll-y`,
+> phase-tagged per wrapper in `apps/client/src/main.tsx`) until its phase lands. Sections
+> marked *(refresh)* below describe the standard those surfaces adopt as B/C implement them.
 
 **The law.** The app page never scrolls. A surface is a **frame** (chrome that never moves:
 tab bar, headers, toolbars, transport rows) plus **regions**, and every region either fits
@@ -330,9 +331,9 @@ it the frame stays fixed and regions scroll harder, and nothing may become unrea
 **The vocabulary.**
 
 - **Frame** — never scrolls, never shrinks below its intrinsic height. The app shell's frame
-  is `[connection strip when present][tab bar][content pane]` *(refresh: the strip becomes a
-  real grid row; today it is `position: fixed` plus a `:has()` padding dance in
-  `apps/client/src/styles.css`)*.
+  is `[connection strip when present][tab bar][content pane]` — a 100dvh grid in
+  `apps/client/src/styles.css`; the strip is grid row 1 and height-animates in (the old
+  `position: fixed` strip and its `:has()` padding dance retired with the lock).
 - **Region** — a box inside the frame. A region that can outgrow its box carries `.scroll-y`
   (`packages/ui/src/styles/design-tokens.css`) — the one blessed scroll treatment: quiet thin
   scrollbar, `scrollbar-gutter: stable`. *(refresh: `.scroll-y` becomes the mandatory marker;
@@ -352,29 +353,35 @@ it the frame stays fixed and regions scroll harder, and nothing may become unrea
    inside a real column *(refresh — the census enumerates every site)*. A leftover cap
    inside a locked frame reintroduces double-scroll.
 3. Anchors and `scroll-padding` belong to regions, not the root: the
-   `html { scroll-behavior… scroll-padding-top }` recipe migrates into the scrolling region
-   when its surface locks *(refresh)*; `--header-h`'s only consumer goes with it.
+   `html { scroll-behavior… scroll-padding-top }` recipe is retired from the shared tokens —
+   the styleguide entry keeps its own copy (`styleguide.css`), and scrolling regions declare
+   their own padding (the wizard layer and `.pane-stage` do). `--header-h` retired with it.
 4. Density: `comfortable` rows are ≥44px (`--tap-min`) and the default everywhere;
    `compact` (36px paint, `.tap-target` route 2) exists only inside GM data regions
    (initiative rows, level tables, log lines) and never on a phone *(the pair is the
    `--row-h`/`--row-h-compact` tokens; components adopt them as they recompose)*.
 5. Keyboard: a focused input inside a locked region must stay visible above the on-screen
-   keyboard — the region scrolls to it; the frame never moves. `100dvh` + `env(safe-area-*)`
-   are already the wizard/Modal practice; the editor panes adopt it *(refresh)*.
+   keyboard — the region scrolls to it; the frame never moves. A shell-level `focusin`
+   helper (`apps/client/src/main.tsx`) nudges the focused field into view within its own
+   region, and regions carry `scroll-padding` + safe-area bottoms (`.pane-stage`, the
+   wizard/Modal practice). iOS/Android remain unverified on device (GAP-001).
 6. Gestures: `touch-action: none` on draggables stands (mobile-ux.md). New rule — once a
    draggable's *container* scrolls, re-verify drag-vs-scroll at 390px; a drag that used to
    rubber-band the dead page now fights a live scroller.
-7. Motion at the view level *(refresh)*: tab swap = `anim-view` (200ms settle); layer push
-   (sheet, wizard, full-page) = `sheet-up`/`dialog-in`; drawers = `--ease-drawer`. The
-   ignition flicker stays the landing's. Nothing moves on scroll; reduced-motion freezes all
-   of it — the arcade feel comes from *placement snapping into a frame*, not parallax.
+7. Motion at the view level: tab swap = `anim-view` (200ms settle) — **opacity-led at the
+   pane** (`pane-in`, styles.css): an animated transform there is a containing block that
+   traps `position: fixed` overlays, the Blink lesson the old `.table-layout` fill-mode
+   patch learned one arm at a time. The landing→app entry transition (dip → cascade) is
+   one-shot state in `main.tsx`, its classes dropped when it settles. Layer push =
+   `sheet-up`/`dialog-in`; drawers = `--ease-drawer`; the ignition flicker stays the
+   landing's. Nothing moves on scroll; reduced-motion freezes (or skips) all of it — the
+   arcade feel comes from *placement snapping into a frame*, not parallax.
 
 **Layout tokens** *(in `design-tokens.css` §Layout since 2026-08-04, seeded from the live
 values they replace)*: `--app-bar-h` (the tab bar row), `--pane-gap` (frame gutter),
 `--rail-w` (nav/list rails, 220–280px), `--dock-w` (the table's side dock, 22rem),
-`--row-h`/`--row-h-compact`. Consume these; do not invent siblings ad hoc. `--header-h`
-is legacy — its one consumer is the root scroll recipe, and both retire with the shell
-lock.
+`--row-h`/`--row-h-compact`. Consume these; do not invent siblings ad hoc. (`--header-h`
+and its one consumer, the root scroll recipe, retired when the shell locked.)
 
 ---
 
@@ -389,7 +396,7 @@ lock.
 
 | Surface | Grade | Frame | Regions (scroll marked ▤) |
 |---|---|---|---|
-| App shell | recompose (unlocks all below) | connection row · tab bar | content pane (canvas for the active surface) |
+| App shell | **done (A1)** — unlocked all below | connection row · tab bar | content pane (canvas for the active surface; unconverted surfaces ride a staged `.pane-stage` ▤ until their phase) |
 | Table, GM — laptop | recompose | tab bar · scene row · party strip | **map canvas** (flex-fill; the `72vh` cap and the `--setup-h` map-measuring plumbing retire) · side dock: turn tracker ▤ / dice ▤ / log ▤ — one flexes, the others collapse (the in-combat `<details>` idiom, made deliberate) |
 | Table, GM — phone | **redesign** | tab bar · slim scene/party row | map as a fixed **band**; beneath it one tabbed sheet: Turn ▤ / Dice ▤ / Log ▤ (three stacked panels cannot share 844px with a map) |
 | Table, player | recompose / phone follows GM pattern | tab bar · YouArePlaying | claim picker or sheet pane ▤ · map canvas · shelf ▤ |
@@ -406,7 +413,7 @@ lock.
 | Replay viewer | recompose | header · transport | stage canvas · side lists ▤ (phone: side lists become tabs) |
 | Builder / level flow | trivial (reference) | wizard head/foot | step body ▤ (formally moves the scroller from the layer to `.nh-wizard-body`) |
 | Sheet layer | trivial | sheet header · rollbar | sheet pane ▤ (the below-the-fold page actions move into the frame) |
-| Player `/replays` | recompose | — | the replay list alone — the census caught the live table rendering above it (`main.tsx` view condition); the lock forces that fix |
+| Player `/replays` | **done (A1)** | — | the replay list alone — the `main.tsx` view condition excludes the table now (the census's stacking anomaly); the audit's player `/replays` row is its regression check |
 | Landing / viewer / sheet entry | done | — | — |
 
 ---
@@ -446,8 +453,9 @@ lock.
   1280×720 and 390×844, failing (exit non-zero) on any document scroll, either axis, or any
   unmeasured route. Scripted-manual on the same terms as `tap-audit.mjs` (needs a browser
   and a live dev server, honestly outside vitest) — `docs/ai-context/testing.md` has the
-  row. Unconverted surfaces are expectedly red until their phase lands; converted surfaces
-  going red again is the regression the gate exists for.
+  row. The A1 shell lock took the whole table green — unconverted surfaces scroll a staged
+  pane region, not the document — so any red cell is a regression; the (g)/(h) ratchets
+  below carry the remaining conversion debt.
 - **Static checks (in repo, ratchet style):** `design-conventions.test.ts` — **(g)**
   viewport units in app CSS: `100dvh`/`100svh` and paired/`:fullscreen` `100vh` are
   structural; every other occurrence answers to a reasoned `VIEWPORT_CONFORMING` row or a

@@ -3,6 +3,13 @@
    control can push the document past the viewport at 375px. */
 body { margin: 0; }
 
+/* The root scroll recipe, this entry's own copy. It used to live in design-tokens.css and
+   retired from there with the shell lock (the SPA page no longer scrolls); this reference
+   document still scrolls and still jumps to #motion, so it keeps the smooth behavior and
+   pads anchor landings clear of its sticky .sg-header (78px measured + 10px clearance). */
+html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
 .sg { min-height: 100vh; }
 
 .sg-header {

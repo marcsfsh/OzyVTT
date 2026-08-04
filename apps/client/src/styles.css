@@ -1,15 +1,66 @@
-/* App shell + shared surfaces, migrated to the OzyVTT tokens (@vtt/ui).
-   Base surface/text/body type come from the token `body` rule; the theme root is
-   data-theme on <html>. Layout is unchanged; only color/type/radius/state moved
-   to tokens. Reusable controls should prefer the @vtt/ui primitives; these legacy
-   classes are the app-specific surfaces those primitives don't cover. */
+/* App shell + shared surfaces, in the OzyVTT tokens (@vtt/ui). Base surface/text/body
+   type come from the token `body` rule; the theme root is data-theme on <html>. The shell
+   frame (the locked page, §7) lives at the top of this file; reusable controls should
+   prefer the @vtt/ui primitives — these legacy classes are the app-specific surfaces those
+   primitives don't cover. */
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
-main { width: min(100% - 2rem, 1720px); margin: 0 auto; padding: clamp(1.5rem, 5vw, 4rem) 0; }
-/* Height of the fixed connection strip (see .connection-banner). Declared here so the page
-   padding, the strip, and the builder's top inset all read one number. */
+/* THE SHELL LOCK (design-language.md §7 — the screen is the page). The body is the viewport
+   and never scrolls; `<main>` below is the frame. This file is also loaded by sheet.html —
+   whose content is exactly one 100dvh column, so the lock is a no-op there — but NOT by
+   viewer.html (its own reset, viewer-page.css) or styleguide.html (a reference document
+   that deliberately scrolls). */
+body { margin: 0; min-width: 320px; height: 100dvh; overflow: hidden; }
+/* The frame: one viewport-high grid, rows [connection strip][tab bar][content pane]. Rows
+   1-2 size to their content and collapse to nothing when absent; the pane takes the rest —
+   minmax(0, 1fr) both ways so it may shrink below its content (a grid item's automatic
+   minimum size is its CONTENT's: the party-strip lesson, one level up). Children take
+   explicit grid-row assignments (each rule below), so a stray in-flow child cannot silently
+   reshape the frame. --pane-gutter reproduces the retired page column
+   (width: min(100% - 2rem, 1720px); margin auto) as inline padding, so the chrome rows and
+   the staged panes align to one column. */
+main {
+  --pane-gutter: max(1rem, calc((100% - 1720px) / 2));
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+/* Height of the connection strip row — the row's box AND its entrance animation's target
+   read this one number (see .connection-banner). */
 :root { --connection-banner-h: 2.5rem; }
+/* Row 3 — the content pane. One element, always rendered, owning the canvas for whatever
+   the address says: the landing, a full-page layer, or the active tab surface. Flex, so its
+   one in-flow child fills it exactly; fixed and top-layer children (viewer preview, every
+   <dialog>) take no box here. */
+.app-pane { grid-row: 3; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.app-pane > * { flex: 1 1 auto; min-width: 0; min-height: 0; }
+/* THE STAGING RULE (refresh hazard H1). A surface that has not adopted the locked frame yet
+   must not strand content below a clipped pane, so its arm wraps in ONE temporary scroll
+   region: this class plus `.scroll-y` in the markup — the blessed marker, so check (h)
+   gains no bare-overflow site. The padding is the retired page column's. Every wrapper in
+   main.tsx names the phase that drains it (A2/B1/B2/B3/C1/C2); when a surface recomposes
+   into a real frame its wrapper drops this class and the surface owns its regions.
+   overscroll-behavior: a drag past the region's end must chain nowhere — the page behind it
+   is locked, and rubber-banding a dead page reads as breakage (refresh risk #7).
+   scroll-padding + the safe-area bottom keep a keyboard-focused field clear of the region's
+   bottom edge (§7.5; the focusin helper in main.tsx does the nudging). */
+.pane-stage {
+  padding: var(--space-4) var(--pane-gutter) calc(clamp(1.5rem, 5vw, 4rem) + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-6);
+}
+/* Pane-level entrances are OPACITY-led. `.anim-view`'s view-in animates transform, and Blink
+   keeps an animated (and, with `both` fill, a settled) transform as the containing block for
+   position: fixed descendants — which would clamp every in-place fixed overlay (enlarged
+   map, sheet float, drawer, viewer preview) to the pane instead of the viewport. The old
+   `.table-layout.anim-view { animation-fill-mode: backwards }` patch covered that one arm;
+   the pane generalizes the entrance instead: same timing, opacity only, nothing to trap. */
+@keyframes pane-in { from { opacity: 0; } to { opacity: 1; } }
+.app-pane > .anim-view { animation-name: pane-in; }
+/* The landing→app entry's cascade (one-shot; main.tsx drops the class when it settles):
+   the chrome rows ride view-in, the pane rides opacity — same trap, same answer. */
+main.anim-cascade > .app-pane { animation-name: pane-in; }
 /* (No bare `header` rule. One lived here — `max-width: 40rem`, written for the old left-aligned landing
    hero — and it clamped EVERY <header> in the app to 640px, including the character builder's sticky
    header and the Codex entry heads: known-bugs.md's `[ui] bare header` entry. D30's landing owns its
@@ -31,14 +82,13 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
 .landing {
   position: relative; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  width: 100vw; margin-inline: calc(50% - 50vw);
-  /* The title screen IS the viewport: exact height, main's paddings cancelled top AND
-     bottom, and the page scroller pinned below — nothing to scroll to, so no scrolling. */
-  margin-block: calc(-1 * clamp(1.5rem, 5vw, 4rem));
-  height: 100dvh; padding: clamp(1.25rem, 4vh, 3rem) 1rem 4rem; text-align: center;
+  /* The title screen IS the pane: pre-auth the frame has no chrome rows, so the pane is the
+     whole viewport and the scene fills it edge to edge — the pane sizes it (.app-pane > *).
+     The full-bleed negative-margin hacks and the html:has() overflow pin retired with the
+     shell lock: the page they compensated for and pinned no longer exists to scroll. */
+  padding: clamp(1.25rem, 4vh, 3rem) 1rem 4rem; text-align: center;
   background: var(--landing-sky);
 }
-html:has(.landing), body:has(.landing) { overflow: hidden; }
 .landing > *:not(.landing-scene) { position: relative; z-index: 3; width: 100%; }
 /* CRT dressing over the whole scene, under the content: vignette then scanlines. */
 .landing::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--landing-vignette); }
@@ -401,49 +451,32 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* `useConfirm`'s optional "don't ask again" row. Separated from the body prose by a rule so it reads as a
    setting rather than as another sentence of the warning it turns off. */
 .confirm-suppress { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); }
-/* "The table is offline" outranks whatever is on top of the page, because every command the surface
-   above it can issue is one that will not land. As a STATIC in-flow <p> it had no z-index to compare
-   at all, so any positioned overlay won by default and the builder (`.cb-page`, z-index 40) simply
-   painted over it.
-   41 is chosen against the app's whole ladder, not just the builder: it clears the full-viewport
-   40s (.cb-page, .encounter-overlay-backdrop, .encounter-map-interaction.enlarged, .nh-menu) and
-   stays UNDER everything transient that is answering a live gesture — .encounter-menu (42),
-   Tooltip (50), .sheet-float / .token-context-menu / .codex-palette-scrim (60), Toast (80) — and
-   under every Modal, which is a native <dialog> in the top layer and so above all of these.
-   Its placement and its `pointer-events` are explained on the rule itself. */
+/* "The table is offline" is frame row 1 — a real row the frame makes room for, not a fixed
+   strip painting over whatever happened to be at the top (its previous life; the
+   `main:has(> .connection-banner)` padding dance that reserved its room retired with it,
+   and so did its z-index — nothing renders beneath an in-flow row, and a role="status"
+   readout that overlaps nothing catches no taps either). It HEIGHT-animates in (200ms
+   settle) so the tab bar and pane step down instead of jumping; unmount on reconnect is
+   instant — good news needs no ceremony. Fixed height, not min-height: the height is the
+   animated property, and the message fits one line down to the 320px floor. */
 .connection-banner {
-  /* FIXED, not in flow. In flow it takes `main`'s page padding, which put it 88px down the viewport
-     — straight across the builder's step rail, hiding all seven step labels behind an opaque card.
-     Floating it as a centred pill instead only moved the collision: at 375px it clipped the wizard's
-     title and half of Save & close, because a full-viewport surface leaves no empty band at phone
-     width. So it takes a strip of its own at the very top and the page GIVES it that strip (below),
-     rather than painting over whatever happens to be there. */
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 41;
-  /* A role="status" readout is never clicked, so it must never catch a click. Measured: without
-     this it swallowed the taps on two step-rail buttons that were still visible either side of it. */
-  pointer-events: none;
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--connection-banner-h);
+  height: var(--connection-banner-h);
+  overflow: hidden;
   margin: 0;
-  padding: .5rem 1rem;
+  padding: 0 1rem;
   background: var(--surface-2);
   border-bottom: 1px solid var(--line-strong);
   border-left: 3px solid var(--caution);
   color: var(--text-dim);
   font-size: .9rem;
   text-align: center;
+  animation: connection-in var(--dur-base) var(--ease-settle);
 }
-/* Reserve the strip's room. `:has()` keys off the banner's own presence, so nothing needs to be
-   told the connection dropped: the page's top padding grows by exactly the strip, and the one
-   full-viewport surface that would otherwise start underneath it starts below it instead. */
-main:has(> .connection-banner) { padding-top: calc(clamp(1.5rem, 5vw, 4rem) + var(--connection-banner-h)); }
-main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
+@keyframes connection-in { from { height: 0; opacity: 0; } to { height: var(--connection-banner-h); opacity: 1; } }
 
 /* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
    card, token library) now render through the shared @vtt/ui Modal primitive - no bespoke backdrops. */
@@ -469,12 +502,9 @@ main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
    the GM already had them — the roster's second copy went with the roster. */
 
 .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; }
-/* .anim-view animates transform; with fill-mode:both Blink keeps .table-layout as a containing block
-   for position:fixed even after the entrance settles, which shrank the "Enlarge map" overlay
-   (.encounter-map-interaction.enlarged, inset:1rem) to this grid box instead of the viewport. Drop the
-   forward fill so the settled layout stops trapping fixed descendants — the entrance still plays (its
-   end state already equals the static layout). */
-.table-layout.anim-view { animation-fill-mode: backwards; }
+/* (The `.table-layout.anim-view { animation-fill-mode: backwards }` patch that kept a settled
+   transform from trapping the enlarged-map overlay is gone: pane-level entrances are
+   opacity-led now — the `pane-in` rule with the shell frame at the top of this file.) */
 .table-sidebar > .dice-proof { margin-top: auto; }
 .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; }
 .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
@@ -529,8 +559,10 @@ main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
 .home-theme-switch { margin-top: var(--space-6); }
 .setup-appearance { margin-top: var(--space-10); display: flex; flex-direction: column; gap: var(--space-3); align-items: start; }
 
-/* GM section tabs use the @vtt/ui <Tabs> primitive; this only adds outer spacing. */
-.gm-tabs { margin-top: var(--space-5); }
+/* Both tab bars are frame row 2 (the @vtt/ui <Tabs> primitive owns the bar's own x-scroll
+   and fade). The gutter aligns their labels with the staged panes' column; the old
+   margin-top died with the page flow it spaced against. */
+.gm-tabs, .player-view-tabs { grid-row: 2; padding-inline: var(--pane-gutter); }
 
 /* ---- Signature atmosphere (hero/empty zones + subtle app-shell CRT texture) ---- */
 

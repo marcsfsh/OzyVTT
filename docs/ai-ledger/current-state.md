@@ -70,9 +70,10 @@ default), *Launch from here* whose confirm says the live scene is **parked**, an
 own store, router and change ping (`homebrew-store.ts`, `homebrew-http.ts`); D&D Beyond PDF ingestion
 (`packages/dndbeyond-pdf`, ADR-0018). The example party are ordinary characters.
 
-**The shell holds no roster** (D15/D30); `/` is a viewport-locked title screen (`100dvh`, no page
-scroll), re-skinned per theme via `--landing-*` tokens. The party is the table's: a slim strip out
-of combat, the pre-claim picker, and create/import/approve/archive on the Roster tab.
+**The screen is the page** (D15/D30, refresh A1). `body` is locked and `<main>` is a 100dvh grid —
+[connection row][tab bar][content pane] (`apps/client/src/styles.css`); layers render in the pane,
+unconverted surfaces scroll a phase-tagged `.pane-stage` region, post-auth notices ride the toast.
+`/` is the title screen (per-theme `--landing-*` skies); the party is the table's, not the shell's.
 
 **Settings — one tab, three groups, one page** (A7/D24, `apps/client/src/settings/SettingsPage.tsx`).
 *Mine* (theme, "How you roll") reaches every role; *The table* and *Players* are GM-only and are not
@@ -121,9 +122,8 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **"The screen is the page" refresh (this branch, phase A opened 2026-08-04).** Square standard and
-  layout tokens/utilities are in; ratchets (g) viewport units + (h) declared scroll regions and the
-  route×role `scripts/no-scroll-audit.mjs` hold the line. Shell lock + recomposes follow (A→B→C).
+- **"The screen is the page" refresh (this branch, opened 2026-08-04).** Tokens, ratchets (g)/(h),
+  the route×role `scripts/no-scroll-audit.mjs` and the A1 shell lock are in; A2 trivials → B → C follow.
 - **Server-held character drafts (builder Phase 3).** `localStorage`-parked; the server-held swap is
   designed, deliberately not built (`apps/client/src/builder/draft.ts`).
 - **Rules engine follow-ups.** Difficult terrain, a server-authoritative movement preview, and

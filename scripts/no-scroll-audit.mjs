@@ -36,10 +36,11 @@
  * "[codex/ui] closed session-console drawer" entry. A readback only reports scroll that a
  * user could actually perform. No equivalent inert stretch is known on the Y axis.
  *
- * READING THE OUTPUT while the refresh is in flight: surfaces that have not adopted the
- * locked shell yet scroll the document BY DESIGN OF THE OLD LAYOUT, so their rows are red
- * until their phase lands. The rows going green per phase is the point; the exit code is
- * for the finished state and for regressions on converted surfaces.
+ * READING THE OUTPUT: the shell lock (refresh A1) took the whole table green — the document
+ * cannot scroll anywhere, because every unconverted surface scrolls one staged `.pane-stage`
+ * region inside the locked frame instead. Any red cell is therefore a REGRESSION now. The
+ * remaining conversion debt (staged regions becoming real per-surface frames) is carried by
+ * the (g)/(h) ratchets in design-conventions.test.ts, not by this table.
  */
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_CORE ?? "playwright-core");

@@ -4,12 +4,13 @@
    give each offer a heading rhythm. Tokens only — no hex, no new breakpoint (760 is the documented
    phone/laptop step, the same one WizardShell and Steps already swap at). */
 
-/* The wizard OWNS the viewport: it is a full page on a laptop and a full-screen sheet on a phone
-   (decision 4), never a modal floating over the table. */
+/* The wizard OWNS the pane: it fills the shell's content pane below the frame rows (the tab
+   bar and the connection strip stay visible above it now — the strip used to be painted over
+   when this layer was `position: fixed; inset: 0` covering the viewport), and it is still a
+   whole-surface page rather than a modal floating over the table (decision 4). The pane sizes
+   it (`.app-pane > *` in styles.css); this element remains the layer's own scroll container. */
 .cb-page {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -22,6 +23,10 @@
   scroll-padding-top: calc(var(--space-16) + var(--space-6));
   scroll-padding-bottom: calc(var(--space-16) + var(--space-6));
 }
+/* Inside the pane the wizard column fills the PANE, not the viewport: WizardShell's own
+   `min-height: 100dvh` (right for its other, standalone lives) would force ~one chrome-row's
+   worth of dead scroll here, with the sticky footer floating over it. */
+.cb-page .nh-wizard { min-height: 100%; }
 
 .cb-step {
   display: flex;
