@@ -90,10 +90,15 @@ html:has(.landing), body:has(.landing) { overflow: hidden; }
 .landing-grid {
   position: absolute; left: -32%; right: -32%; top: 64%; bottom: -3%;
   background-image:
-    repeating-linear-gradient(to right, var(--landing-grid-x) 0 2px, transparent 2px var(--grid-cell)),
-    repeating-linear-gradient(to bottom, var(--landing-grid-y) 0 2px, transparent 2px var(--grid-cell));
+    repeating-linear-gradient(to right, var(--landing-grid-x) 0 2px, transparent 2px var(--landing-grid-cell)),
+    repeating-linear-gradient(to bottom, var(--landing-grid-y) 0 2px, transparent 2px var(--landing-grid-cell));
   transform: perspective(340px) rotateX(63deg); transform-origin: center top;
 }
+/* The night's quiet companion: a small ringed planet, upper right — subtle by token
+   opacity, gone at daybreak. The ring is a tilted, squashed circle border. */
+.landing-planet { position: absolute; right: 11%; top: 9%; width: clamp(3.25rem, 6vw, 5.5rem); aspect-ratio: 1; border-radius: 50%; background: var(--landing-planet); box-shadow: var(--landing-planet-glow); opacity: var(--landing-planet-opacity); }
+.landing-planet::after { content: ""; position: absolute; inset: 26% -38%; border: 2px solid var(--landing-planet-ring); border-radius: 50%; transform: rotate(-18deg); }
+
 /* Analog grain over the whole scene — the last 2% of the CRT. Its own layer with a per-theme
    opacity token, because the .static-noise utility is display:none in light and daybreak
    still wants a whisper of it. */
@@ -121,27 +126,27 @@ html:has(.landing), body:has(.landing) { overflow: hidden; }
 .choices .nh-btn {
   position: relative; flex: 0 1 18rem; justify-content: center; min-height: 3.5rem; padding: 1.05rem 2.4rem;
   font-family: var(--font-display); font-size: 1.02rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em;
-  border: 0; border-radius: 0;
+  border-radius: 0;
   clip-path: polygon(0 .6rem, .6rem 0, 100% 0, 100% calc(100% - .6rem), calc(100% - .6rem) 100%, 0 100%);
   transition: color var(--dur-hover), background var(--dur-hover), filter var(--dur-hover), transform var(--dur-press) var(--ease-settle);
 }
 /* The inner edge line: a second, quieter outline just inside the cut, like a cabinet bezel. */
-.choices .nh-btn::after { content: ""; position: absolute; inset: 4px; pointer-events: none; border: 1px solid currentColor; opacity: .35; clip-path: polygon(0 .45rem, .45rem 0, 100% 0, 100% calc(100% - .45rem), calc(100% - .45rem) 100%, 0 100%); }
+.choices .nh-btn::after { content: ""; position: absolute; inset: 4px; pointer-events: none; border: 1px solid currentColor; opacity: .22; clip-path: polygon(0 .45rem, .45rem 0, 100% 0, 100% calc(100% - .45rem), calc(100% - .45rem) 100%, 0 100%); }
 /* The cue: a small solid triangle that appears and blinks while the door is under the pointer
    or focused — drawn with clip-path, no glyph character anywhere near the copy scanners. */
 .choices .nh-btn::before { content: ""; position: absolute; left: .95rem; top: 50%; width: .55rem; height: .85rem; transform: translateY(-50%); background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); opacity: 0; }
 .choices .nh-btn:hover:not(:disabled)::before, .choices .nh-btn:focus-visible::before { opacity: 1; }
 .choices .nh-btn:focus-visible { outline: 2px solid currentColor; outline-offset: -6px; }
 .choices .nh-btn--primary {
-  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-play-bg);
-  color: var(--landing-door-play-ink); filter: var(--landing-door-play-glow);
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-bg);
+  border: 2px solid var(--landing-door-play-rim); color: var(--landing-door-label); filter: var(--landing-door-play-glow);
 }
-.choices .nh-btn--primary:hover:not(:disabled), .choices .nh-btn--primary:focus-visible { filter: var(--landing-door-play-glow-strong); transform: translateY(-1px); }
+.choices .nh-btn--primary:hover:not(:disabled), .choices .nh-btn--primary:focus-visible { filter: var(--landing-door-play-glow-strong) brightness(1.15); transform: translateY(-1px); }
 .choices .nh-btn--secondary {
-  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-gm-bg);
-  color: var(--landing-door-gm-ink); filter: var(--landing-door-gm-glow);
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-bg);
+  border: 2px solid var(--landing-door-gm-rim); color: var(--landing-door-label); filter: var(--landing-door-gm-glow);
 }
-.choices .nh-btn--secondary:hover:not(:disabled), .choices .nh-btn--secondary:focus-visible { filter: var(--landing-door-gm-glow-strong); transform: translateY(-1px); }
+.choices .nh-btn--secondary:hover:not(:disabled), .choices .nh-btn--secondary:focus-visible { filter: var(--landing-door-gm-glow-strong) brightness(1.15); transform: translateY(-1px); }
 .choices .nav-arrow { color: currentColor; }
 @media (prefers-reduced-motion: no-preference) {
   .choices .nh-btn:hover:not(:disabled)::before, .choices .nh-btn:focus-visible::before { animation: landing-cue-blink 1.1s steps(2, jump-none) infinite; }
@@ -154,31 +159,34 @@ html:has(.landing), body:has(.landing) { overflow: hidden; }
    the one screen whose night never changes may do that. Size, position and labels are untouched. */
 .landing .home-theme-switch { position: absolute; right: .75rem; bottom: .75rem; width: auto; margin: 0; opacity: .8; }
 .landing .home-theme-switch:hover, .landing .home-theme-switch:focus-within { opacity: 1; }
-.landing .home-theme-switch .nh-segmented { background: var(--landing-door-fill); border-color: color-mix(in srgb, var(--landing-neon-cyan) 38%, transparent); backdrop-filter: blur(4px); }
+.landing .home-theme-switch .nh-segmented { background: var(--landing-glass); border-color: color-mix(in srgb, var(--landing-door-gm-rim) 38%, transparent); backdrop-filter: blur(4px); }
+/* The switch stands on violet glass in every sky, so its resting labels read from the
+   label ink, never the theme's text ink (light's deep indigo vanished on the glass). */
+.landing .home-theme-switch .nh-segmented-option { color: color-mix(in srgb, var(--landing-door-label) 72%, transparent); }
 .landing .home-theme-switch .nh-segmented-option { color: color-mix(in srgb, var(--landing-star) 66%, transparent); }
 .landing .home-theme-switch .nh-segmented-option:hover { color: var(--landing-star); }
-.landing .home-theme-switch .nh-segmented-option[aria-pressed="true"] { background: color-mix(in srgb, var(--landing-neon-cyan) 16%, transparent); color: var(--landing-neon-cyan-hi); box-shadow: var(--landing-door-glow-c); }
+.landing .home-theme-switch .nh-segmented-option[aria-pressed="true"] { background: color-mix(in srgb, var(--landing-door-gm-rim) 16%, transparent); color: var(--landing-door-label); box-shadow: var(--glow-violet); }
 .landing .notice { max-width: 32rem; margin-inline: auto; text-align: left; }
 /* The GM sign-in is the scene's THIRD DOOR (the judges' one unanimous revision): the doors' dark
    glass, a cyan neon edge with the doors' glow, the heading lit cyan, the CRT texture carried
    across the glass — and every colour pinned to the --landing-* set, because the card too stands
    on the night that never re-themes (a theme-following panel here reads as another app's modal). */
-.landing .card { position: relative; overflow: hidden; margin-inline: auto; text-align: left; background: var(--landing-door-fill); backdrop-filter: blur(8px); border-color: var(--landing-neon-cyan); box-shadow: var(--landing-door-glow-c); }
+.landing .card { position: relative; overflow: hidden; margin-inline: auto; text-align: left; background: var(--landing-glass); backdrop-filter: blur(8px); border-color: var(--landing-door-gm-rim); box-shadow: var(--glow-violet); }
 .landing .card::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .4; border-radius: inherit; background-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--scanline-gap) - 1px), var(--landing-scanline) calc(var(--scanline-gap) - 1px), var(--landing-scanline) var(--scanline-gap)); background-size: 100% var(--scanline-gap); }
 .landing .card > * { position: relative; z-index: 1; }
-.landing .card h2 { color: var(--landing-neon-cyan-hi); }
+.landing .card h2 { color: var(--landing-door-label); }
 .landing .card p { color: color-mix(in srgb, var(--landing-star) 82%, transparent); }
-.landing .card input { border-color: color-mix(in srgb, var(--landing-neon-cyan) 45%, transparent); background: color-mix(in srgb, var(--landing-ink) 62%, transparent); color: var(--landing-star); }
+.landing .card input { border-color: color-mix(in srgb, var(--landing-door-gm-rim) 45%, transparent); background: color-mix(in srgb, var(--landing-ink-deep) 62%, transparent); color: var(--landing-door-label); }
 .landing .card input::placeholder { color: color-mix(in srgb, var(--landing-star) 55%, transparent); }
-.landing .card input:focus { border-color: var(--landing-neon-cyan); box-shadow: var(--landing-door-glow-c); }
+.landing .card input:focus { border-color: var(--landing-door-gm-rim); box-shadow: var(--glow-violet); }
 /* Its actions are doors too. "Enter table" rests as a cyan door and fills on hover exactly like
    ENTER AS GM; disabled keeps the full cyan treatment and lets the global disabled opacity dim it
    — dormant neon, never grey plastic. Back is a low-key pink ghost so both belong to the scene. */
-.landing .card .nh-btn--primary { border: 1px solid var(--landing-neon-cyan); background: var(--landing-door-fill); color: var(--landing-neon-cyan-hi); box-shadow: var(--landing-door-glow-c); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; }
-.landing .card .nh-btn--primary:hover:not(:disabled), .landing .card .nh-btn--primary:focus-visible { background: var(--landing-neon-cyan); border-color: var(--landing-neon-cyan); color: var(--landing-ink); box-shadow: var(--landing-door-glow-c-strong); }
-.landing .card .nh-btn--primary:disabled { background: var(--landing-door-fill); border-color: var(--landing-neon-cyan); color: var(--landing-neon-cyan-hi); box-shadow: var(--landing-door-glow-c); }
-.landing .card .link { color: color-mix(in srgb, var(--landing-neon-magenta-hi) 75%, transparent); }
-.landing .card .link:hover:not(:disabled) { color: var(--landing-neon-magenta-hi); background: color-mix(in srgb, var(--landing-neon-magenta) 14%, transparent); }
+.landing .card .nh-btn--primary { border: 1px solid var(--landing-door-gm-rim); background: var(--landing-glass); color: var(--landing-door-label); box-shadow: var(--glow-violet); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; }
+.landing .card .nh-btn--primary:hover:not(:disabled), .landing .card .nh-btn--primary:focus-visible { background: var(--landing-door-gm-rim); border-color: var(--landing-door-gm-rim); color: var(--landing-ink-deep); box-shadow: var(--glow-violet); }
+.landing .card .nh-btn--primary:disabled { background: var(--landing-glass); border-color: var(--landing-door-gm-rim); color: var(--landing-door-label); box-shadow: var(--glow-violet); }
+.landing .card .link { color: color-mix(in srgb, var(--landing-door-play-rim) 80%, transparent); }
+.landing .card .link:hover:not(:disabled) { color: var(--landing-door-label); background: color-mix(in srgb, var(--landing-door-play-rim) 14%, transparent); }
 
 /* ---- Motion: ignition, twinkle, and the drive. Freeze under reduced motion. ---- */
 @media (prefers-reduced-motion: no-preference) {
@@ -190,7 +198,7 @@ html:has(.landing), body:has(.landing) { overflow: hidden; }
 }
 @keyframes landing-ignite { 0% { opacity: 0; } 12% { opacity: 1; } 18% { opacity: .25; } 26% { opacity: 1; } 34% { opacity: .45; } 41% { opacity: 1; } 100% { opacity: 1; } }
 @keyframes landing-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-@keyframes landing-grid-roll { to { background-position: 0 0, 0 var(--grid-cell); } }
+@keyframes landing-grid-roll { to { background-position: 0 0, 0 var(--landing-grid-cell); } }
 @keyframes landing-sunrise { from { transform: translateX(-50%) translateY(6%); } to { transform: translateX(-50%) translateY(0); } }
 
 /* Base controls. Reusable buttons should use @vtt/ui <Button>; this styles the
@@ -375,7 +383,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      Stacked, they sit directly ON the sun's slatted half, so the glass goes near-opaque (~90% ink):
      at .68 the slats striped straight through the label band and the pink door lost figure-ground
      against the pink sun — the judges' one shared 390px note. Borders and glow are unchanged. */
-  .choices .nh-btn { flex: 1 1 100%; background: color-mix(in srgb, var(--landing-ink) 90%, transparent); }
+  .choices .nh-btn { flex: 1 1 100%; }
   .party-queue-actions { width: 100%; margin-left: 0; }
   .party-queue-actions .nh-btn { flex: 1 1 auto; }
   .roster-heading, .proof-heading { display: block; }

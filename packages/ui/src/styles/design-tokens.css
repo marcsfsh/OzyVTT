@@ -146,30 +146,43 @@
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.50) 100%);
   --landing-scanline: rgba(0, 0, 0, 0.26);
   --landing-noise-opacity: 0.05;
-  /* The sign (client refs, 2026-08-04): a BANDED sunset fill — warm cream-to-orange upper
-     half, hard stop, violet lower half — does the legibility work the heavy black stroke
-     was doing, because the warm top sits on dark sky and the violet bottom sits on the
-     sun's bright crown. The stroke drops to a hairline; the glow drops from a four-layer
-     haze to one solid extrusion offset plus one tight neon halo. The warm band is also the
-     dusk-orange hint the night carries. */
-  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFD9A6 24%, #FFAE5C 44%, #FFE9C9 47%, #FFE9C9 50%, #F06BB8 58%, #9A54E8 76%, #4E2596 100%);
+  /* The sign (client refs, final round): VIOLET CHROME, structured like the reference
+     chrome lettering — light crown, deepening body, a crisp mirror meet just under the
+     waist, a bright flash below it, dark base. One family (violet), so it sits inside the
+     scene; the chrome STRUCTURE is what carries legibility over sky and sun alike, with a
+     hairline stroke and one solid extrusion + one tight halo. No thin glint stripe, no
+     two-hue butt joint — the transition IS the design. */
+  --landing-sign: linear-gradient(180deg, #F8F3FF 0%, #E4D2FF 16%, #B78FFF 32%, #7F4BE4 44%, #5A2FB8 49%, #F1E6FF 52%, #CDA9FF 63%, #9666F5 78%, #5A31BD 90%, #3A1E85 100%);
   --landing-stroke: rgba(46, 16, 84, 0.65);
   --landing-title-glow:
     drop-shadow(0 3px 0 rgba(30, 10, 50, 0.85))
     drop-shadow(0 0 10px rgba(255, 46, 154, 0.38));
   /* The doors. Chamfered arcade panels clipped with clip-path, so their glow rides
      drop-shadow filters (which follow the cut) rather than box-shadow (which cannot). */
-  /* The doors wear hues the scene does NOT: amber gold for the player door, ice for the
-     GM door — solid arcade slabs with dark ink, so they stand OFF the magenta/cyan/violet
-     drive instead of dissolving into it (client note, 2026-08-04). Re-paired per theme. */
-  --landing-door-play-bg: linear-gradient(180deg, #FFD056 0%, #FFAE33 100%);
-  --landing-door-play-ink: #241102;
-  --landing-door-play-glow: drop-shadow(0 0 6px rgba(255, 176, 32, 0.5)) drop-shadow(0 0 18px rgba(255, 176, 32, 0.3));
-  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 176, 32, 0.8)) drop-shadow(0 0 28px rgba(255, 176, 32, 0.5));
-  --landing-door-gm-bg: linear-gradient(180deg, #F4FAFF 0%, #C9E8F7 100%);
-  --landing-door-gm-ink: #082433;
-  --landing-door-gm-glow: drop-shadow(0 0 6px rgba(214, 240, 255, 0.5)) drop-shadow(0 0 18px rgba(160, 220, 250, 0.3));
-  --landing-door-gm-glow-strong: drop-shadow(0 0 8px rgba(224, 245, 255, 0.8)) drop-shadow(0 0 28px rgba(170, 225, 250, 0.5));
+  /* The doors live in the scene's own language (client note, final round): deep-violet
+     panels, WHITE-HOT labels, a magenta rim on the player door and a violet rim on the
+     GM door. They stand out by LUMINANCE — the labels are the brightest small things on
+     the screen — not by borrowing hues the drive never uses. One design, all three skies. */
+  --landing-door-bg: linear-gradient(180deg, #261448 0%, #170B31 100%);
+  --landing-door-label: #FBF7FF;
+  --landing-door-play-rim: #FF3FA4;
+  --landing-door-play-glow: drop-shadow(0 0 6px rgba(255, 63, 164, 0.55)) drop-shadow(0 0 18px rgba(255, 63, 164, 0.33));
+  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 63, 164, 0.85)) drop-shadow(0 0 30px rgba(255, 63, 164, 0.5));
+  --landing-door-gm-rim: #9F6BFF;
+  --landing-door-gm-glow: drop-shadow(0 0 6px rgba(159, 107, 255, 0.55)) drop-shadow(0 0 18px rgba(159, 107, 255, 0.33));
+  --landing-door-gm-glow-strong: drop-shadow(0 0 8px rgba(159, 107, 255, 0.85)) drop-shadow(0 0 30px rgba(159, 107, 255, 0.5));
+  /* The grid, 40% more open than the app texture's 34px cell (client note): the drive
+     reads as a road at this density, not a mesh. */
+  --landing-grid-cell: 56px;
+  /* Violet glass + deep ink for the panels that stand ON the scene (theme switch, GM card). */
+  --landing-glass: rgba(23, 11, 49, 0.72);
+  --landing-ink-deep: #0B0620;
+  /* The night's quiet companion (client note): a small ringed planet, upper right — the
+     genre's postcard signature, kept subtle. Daybreak hides it (opacity 0). */
+  --landing-planet: radial-gradient(circle at 35% 30%, #C79BFF 0%, #7A3FD6 55%, #4A2699 100%);
+  --landing-planet-ring: rgba(255, 92, 184, 0.75);
+  --landing-planet-glow: 0 0 16px 2px rgba(164, 92, 255, 0.45);
+  --landing-planet-opacity: 0.55;
 
   /* Texture sizing + noise tile */
   --grid-cell: 34px;
@@ -659,16 +672,15 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-grid-y: rgba(255, 46, 154, 0.50);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
   --landing-scanline: rgba(10, 0, 10, 0.22);
-  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFDf94 26%, #FFAE5C 44%, #FFF0D2 47%, #FFF0D2 50%, #F06BB8 60%, #A445E0 78%, #5B2EA8 100%);
+  --landing-sign: linear-gradient(180deg, #FFF4F8 0%, #F2D4FF 16%, #C489FF 32%, #8E4BD8 44%, #6626A8 49%, #FFEFF7 52%, #E0A9FF 63%, #A85CE8 78%, #7A35B8 90%, #4A1E78 100%);
+  --landing-planet: radial-gradient(circle at 35% 30%, #FFD9A6 0%, #C86AD9 55%, #7A35B8 100%);
+  --landing-planet-ring: rgba(255, 193, 92, 0.7);
+  --landing-planet-glow: 0 0 16px 2px rgba(255, 150, 80, 0.4);
+  --landing-planet-opacity: 0.4;
   --landing-stroke: rgba(40, 10, 40, 0.60);
   --landing-title-glow:
     drop-shadow(0 3px 0 rgba(40, 8, 36, 0.8))
     drop-shadow(0 0 10px rgba(255, 150, 80, 0.40));
-  /* On the amber sunset, gold would dissolve — the player door flips to hot magenta here. */
-  --landing-door-play-bg: linear-gradient(180deg, #FF5CB8 0%, #F0188A 100%);
-  --landing-door-play-ink: #2A0316;
-  --landing-door-play-glow: drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 18px rgba(255, 46, 154, 0.32));
-  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.85)) drop-shadow(0 0 28px rgba(255, 46, 154, 0.5));
 }
 [data-theme="light"] {
   --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #E6E2F9 24%, #EFDFF6 42%, #F6DAEC 56%, #FBD9E4 68%, #FDD8CE 84%, #FFD6B4 100%);
@@ -689,19 +701,12 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-sign: linear-gradient(180deg, #FFE9B8 0%, #FFC178 42%, #FFF3DA 46%, #FFF3DA 50%, #C86AD9 60%, #6A34B0 100%);
+  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #EBD9FF 18%, #C9A1FF 36%, #9A62E0 47%, #7B44C4 50%, #F6ECFF 53%, #D9B8FF 66%, #A878E8 82%, #7746B8 100%);
+  --landing-planet-opacity: 0;
   --landing-stroke: rgba(70, 40, 110, 0.50);
   --landing-title-glow:
     drop-shadow(0 2px 0 rgba(90, 50, 130, 0.5))
     drop-shadow(0 0 8px rgba(226, 76, 156, 0.28));
-  /* Daybreak doors: deep-inked slabs with white lettering — the darkest things on the dawn,
-     which is exactly why they read. Legibility outranks bloom here. */
-  --landing-door-play-bg: linear-gradient(180deg, #D8267E 0%, #A0135D 100%);
-  --landing-door-play-ink: #FFFFFF;
-  --landing-door-play-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
-  --landing-door-play-glow-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
-  --landing-door-gm-bg: linear-gradient(180deg, #14639C 0%, #0A426C 100%);
-  --landing-door-gm-ink: #FFFFFF;
-  --landing-door-gm-glow: drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
-  --landing-door-gm-glow-strong: drop-shadow(0 2px 8px rgba(15, 127, 192, 0.42));
+  /* Daybreak: the same deep-violet doors — the darkest things on the dawn, which is
+     exactly why they read; the violet family ties them to the sign above. */
 }

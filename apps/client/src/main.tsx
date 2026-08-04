@@ -374,7 +374,7 @@ function App() {
       <div className="landing-scene" aria-hidden="true">
         <span className="landing-stars-far" /><span className="landing-stars" />
         <span className="landing-skyband"><span className="landing-sun" /></span>
-        <span className="landing-horizon" /><span className="landing-grid" />
+        <span className="landing-planet" /><span className="landing-horizon" /><span className="landing-grid" />
         <span className="landing-noise" />
       </div>
       <header className="home-hero anim-view">
