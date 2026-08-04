@@ -412,7 +412,7 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 | Replays list | **done (A2)** | heading (the player's Back to the table is a row in it) | the rows ▤ — the list is the surface now, not a `.card`, so the rows are the cards standing on it |
 | Replay viewer | recompose | header · transport | stage canvas · side lists ▤ (phone: side lists become tabs) |
 | Builder / level flow | trivial (reference) | wizard head/foot | step body ▤ (formally moves the scroller from the layer to `.nh-wizard-body`) |
-| Sheet layer | trivial | sheet header · rollbar | sheet pane ▤ (the below-the-fold page actions move into the frame) |
+| Sheet layer | **done (A2)** | sheet header · rollbar · page actions (a bottom row **inside** the sheet — they were the whole of this route's overflow) | sheet pane ▤ (`.scroll-y` in the markup, all four presentations) — `sheet.html` passes no page actions and keeps its 100dvh column |
 | Player `/replays` | **done (A1)** | — | the replay list alone — the `main.tsx` view condition excludes the table now (the census's stacking anomaly); the audit's player `/replays` row is its regression check |
 | Landing / viewer / sheet entry | done | — | — |
 

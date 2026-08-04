@@ -790,7 +790,7 @@ const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/builder/character-builder.css", 1],
   ["apps/client/src/codex/codex.css", 8],
   ["apps/client/src/encounter/combat-log.css", 1],
-  ["apps/client/src/encounter/encounter-panel.css", 7],
+  ["apps/client/src/encounter/encounter-panel.css", 6],
   ["apps/client/src/homebrew/homebrew.css", 3],
   ["apps/client/src/maps/map-picker.css", 1],
   ["apps/client/src/scene/encounter-map.css", 5],

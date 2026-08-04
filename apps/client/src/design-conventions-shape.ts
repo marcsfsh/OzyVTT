@@ -217,12 +217,13 @@ export const CONVENTION_SHAPE = {
    * (the utility in design-tokens.css owns the quiet scrollbar and the stable gutter) and
    * the CSS declaration deleted, so this is SHRINK-ONLY with target **0**. `overflow-x`
    * is deliberately not counted — the wide-content rule (§7) requires it. Measured
-   * 2026-08-04: **33 sites across 13 files**. Command:
+   * 2026-08-04: **33 sites across 13 files**, −1 the same day when the sheet layer's pane took
+   * `.scroll-y` in the markup (encounter-panel.css 7 → 6). Command:
    * `grep -roE 'overflow(-y)?: *(auto|scroll)' apps/client/src --include='*.css' | wc -l`
-   * → 34 raw; one is a codex.css comment the strip removes.
+   * → one more than the count here; one hit is a codex.css comment the strip removes.
    */
   scrollAllowFiles: 13,
-  scrollAllowSites: 33,
+  scrollAllowSites: 32,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**

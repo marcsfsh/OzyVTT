@@ -208,7 +208,7 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
  * a player only ever receives their own actor (and no monster definition fetch succeeds
  * for them server-side).
  */
-export function CharacterSheet({ actor, role, state, standalone = false, embedded = false, combat, onJumpToInitiative, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; embedded?: boolean; /** Combat context for the player's OWN sheet, enabling structured attacks from the Actions section on their turn. */ combat?: { revision: number; active: boolean; myTurn: boolean; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }; /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void; onClose: () => void }>) {
+export function CharacterSheet({ actor, role, state, standalone = false, embedded = false, combat, onJumpToInitiative, standaloneActions, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; embedded?: boolean; /** Combat context for the player's OWN sheet, enabling structured attacks from the Actions section on their turn. */ combat?: { revision: number; active: boolean; myTurn: boolean; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }; /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void; /** Page-level doors for the STANDALONE presentation, rendered as the frame's bottom row (§7). Only the SPA's `/characters/:id` passes any: they navigate to app addresses, which `sheet.html` — a page with no router — cannot honour, so that entry passes nothing and renders no row. */ standaloneActions?: React.ReactNode; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
   // The GM fetches immutable bundled definitions into `fetched`; a player's own definition rides the
@@ -890,8 +890,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       </span>
     </button>}
     <div className="sheet-workspace-cols">
-      <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
-      {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
+      {/* `.scroll-y` is the declared-region marker (§7): the sheet's pane is where this surface
+          scrolls, in every one of its four presentations. */}
+      <div className="sheet-workspace-pane sheet-pane scroll-y">{sheetScroll}</div>
+      {hasLog && state && <div className="sheet-workspace-pane log-pane scroll-y"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
     </div>
     {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
   </div>);
@@ -900,8 +902,12 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // the header × returns to the initiative view. The caller omits state, so there's no dice log.
   if (embedded) return <><div className="sheet-embedded">{buildWorkspace(false)}</div>{dialog}</>;
 
-  // Its own browser tab (feedback #9.3): fills the window, header × ends the tab.
-  if (standalone) return <><div className="sheet-standalone">{buildWorkspace(false)}</div>{dialog}</>;
+  // Its own browser tab (feedback #9.3) or the SPA's `/characters/:id` layer: fills its box, header
+  // × ends the tab / returns. Page-level doors ride the frame's bottom row when the caller has any.
+  if (standalone) return <><div className="sheet-standalone">
+    {buildWorkspace(false)}
+    {standaloneActions && <div className="sheet-standalone-actions">{standaloneActions}</div>}
+  </div>{dialog}</>;
 
   if (presentation === "floating") {
     return <>

@@ -544,13 +544,16 @@ function App() {
       // A player asking for someone else's sheet gets the not-found view: their projection does not
       // carry it, so "no such character" is both the true answer and the indistinguishable one.
       if (!actor) return <div className="pane-stage scroll-y"><NotFoundView role={mode === "gm" ? "gm" : "player"} /></div>;
-      /* staged region — A2 (sheet layer trivial: page actions move into the sheet frame) drains it */
-      return <div className="anim-view sheet-page pane-stage scroll-y">
-        <CharacterSheet actor={actor} role={mode === "gm" ? "gm" : "player"} state={state} standalone onClose={() => navigate(mode === "gm" ? pathForGmTab("roster") : "/table")} />
-        <div className="sheet-page-actions">
-          <Button variant="secondary" onClick={() => navigate(`/characters/${layer.actorId}/level`)}>Level up or down…</Button>
-          {mapToken && <Button variant="secondary" onClick={() => setTokenPickerFor(layer.actorId)}>Set token image…</Button>}
-        </div>
+      /* The sheet is its own frame (§7): the workspace fills the pane and its pane scrolls. The two
+         page-level doors used to hang BELOW that 100dvh box — the whole of this route's overflow —
+         and now ride inside it as the frame's bottom row. They are passed only from here: they
+         navigate to app addresses, and `sheet.html` has no router to honour them. */
+      return <div className="anim-view sheet-page frame-col">
+        <CharacterSheet actor={actor} role={mode === "gm" ? "gm" : "player"} state={state} standalone onClose={() => navigate(mode === "gm" ? pathForGmTab("roster") : "/table")}
+          standaloneActions={<>
+            <Button variant="secondary" onClick={() => navigate(`/characters/${layer.actorId}/level`)}>Level up or down…</Button>
+            {mapToken && <Button variant="secondary" onClick={() => setTokenPickerFor(layer.actorId)}>Set token image…</Button>}
+          </>} />
       </div>;
     })()}
     {shellVisible && state && !fullPageLayer && <>

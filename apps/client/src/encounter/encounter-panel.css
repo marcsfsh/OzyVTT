@@ -596,7 +596,9 @@
    behind the Sheet/Dice toggle instead of docking beside the sheet, so the sheet keeps its clean full
    width whichever way it's opened (map right-click / "View sheet" / initiative toggle all match). */
 .sheet-workspace-cols { display: flex; flex: 1; min-height: 0; }
-.sheet-workspace-pane { min-width: 0; overflow-y: auto; }
+/* The scroll is declared in the MARKUP (`.scroll-y`, @vtt/ui) — check (h): a bare `overflow-y` here
+   would be an undeclared region, and the utility carries the quiet scrollbar with it. */
+.sheet-workspace-pane { min-width: 0; }
 .sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
 .log-pane { flex: 1 1 auto; padding: var(--space-4); }
 .sheet-workspace.has-log.show-sheet .log-pane { display: none; }
@@ -650,6 +652,13 @@
 .player-view-toggle button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
 /* Its own browser tab: the workspace fills the window; no modal chrome. */
 .sheet-standalone { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--surface-2); }
+/* The same presentation inside the SPA's `/characters/:id` layer fills the PANE, not the window —
+   the frame rows above it are real (`.sheet-page` is the pane's child). `sheet.html` has no
+   `.sheet-page`, so its 100dvh column is untouched: same rule as the wizard layer's. */
+.sheet-page > .sheet-standalone { flex: 1; min-height: 0; height: auto; }
+/* The page-level doors: a frame row pinned under the sheet, above the home bar. Only the SPA passes
+   any (CharacterSheet's `standaloneActions`), so this row does not exist in the standalone tab. */
+.sheet-standalone-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-5) calc(var(--space-3) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface-1); }
 .sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 2rem; color: var(--text-dim); font-size: var(--fs-body); text-align: center; }
 
 /* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab.
