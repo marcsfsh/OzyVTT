@@ -31,10 +31,14 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
 .landing {
   position: relative; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  width: 100vw; margin-inline: calc(50% - 50vw); margin-top: clamp(-4rem, -5vw, -1.5rem);
-  min-height: 100dvh; padding: clamp(2rem, 6vh, 4rem) 1rem 4.5rem; text-align: center;
+  width: 100vw; margin-inline: calc(50% - 50vw);
+  /* The title screen IS the viewport: exact height, main's paddings cancelled top AND
+     bottom, and the page scroller pinned below — nothing to scroll to, so no scrolling. */
+  margin-block: calc(-1 * clamp(1.5rem, 5vw, 4rem));
+  height: 100dvh; padding: clamp(1.25rem, 4vh, 3rem) 1rem 4rem; text-align: center;
   background: var(--landing-sky);
 }
+html:has(.landing), body:has(.landing) { overflow: hidden; }
 .landing > *:not(.landing-scene) { position: relative; z-index: 3; width: 100%; }
 /* CRT dressing over the whole scene, under the content: vignette then scanlines. */
 .landing::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--landing-vignette); }
@@ -99,12 +103,11 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
    `.wordmark-name` to solid ink — right everywhere else in the app, wrong on this scene.
    Legibility comes from the BAND PLACEMENT (client refs): the warm top half stands on dark
    sky, the violet bottom half stands on the sun's bright crown, so the outline drops to a
-   hairline and the glow to one solid extrusion + one tight halo — crisp, not hazy. The
-   skew is the reference lettering's forward lean. ---- */
+   hairline and the glow to one solid extrusion + one tight halo — crisp, not hazy.
+   (Upright: the earlier reference lean read as a narrow italic and was taken back out.) ---- */
 .landing .home-hero { padding-bottom: clamp(1rem, 3.5vh, 2rem); }
 .landing .home-hero-title .nh-wordmark {
   display: block; font-size: clamp(3.4rem, 16vw, 10.5rem); line-height: .92;
-  transform: skewX(-6deg);
   background: var(--landing-sign); -webkit-background-clip: text; background-clip: text; color: transparent;
   -webkit-text-stroke: 1px var(--landing-stroke);
   filter: var(--landing-title-glow);
@@ -117,26 +120,28 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
 .choices { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(1rem, 3vw, 1.75rem); margin-top: clamp(1.5rem, 4.5vh, 2.75rem); }
 .choices .nh-btn {
   position: relative; flex: 0 1 18rem; justify-content: center; min-height: 3.5rem; padding: 1.05rem 2.4rem;
-  font-family: var(--font-display); font-size: 1.02rem; text-transform: uppercase; letter-spacing: .12em;
-  border-width: 2px; border-radius: 0;
+  font-family: var(--font-display); font-size: 1.02rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em;
+  border: 0; border-radius: 0;
   clip-path: polygon(0 .6rem, .6rem 0, 100% 0, 100% calc(100% - .6rem), calc(100% - .6rem) 100%, 0 100%);
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 2px, var(--landing-scanline) 2px 3px),
-    var(--landing-door-fill);
-  backdrop-filter: blur(4px);
-  transition: color var(--dur-hover), background var(--dur-hover), border-color var(--dur-hover), filter var(--dur-hover), transform var(--dur-press) var(--ease-settle);
+  transition: color var(--dur-hover), background var(--dur-hover), filter var(--dur-hover), transform var(--dur-press) var(--ease-settle);
 }
 /* The inner edge line: a second, quieter outline just inside the cut, like a cabinet bezel. */
-.choices .nh-btn::after { content: ""; position: absolute; inset: 4px; pointer-events: none; border: 1px solid currentColor; opacity: .3; clip-path: polygon(0 .45rem, .45rem 0, 100% 0, 100% calc(100% - .45rem), calc(100% - .45rem) 100%, 0 100%); }
+.choices .nh-btn::after { content: ""; position: absolute; inset: 4px; pointer-events: none; border: 1px solid currentColor; opacity: .35; clip-path: polygon(0 .45rem, .45rem 0, 100% 0, 100% calc(100% - .45rem), calc(100% - .45rem) 100%, 0 100%); }
 /* The cue: a small solid triangle that appears and blinks while the door is under the pointer
    or focused — drawn with clip-path, no glyph character anywhere near the copy scanners. */
 .choices .nh-btn::before { content: ""; position: absolute; left: .95rem; top: 50%; width: .55rem; height: .85rem; transform: translateY(-50%); background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); opacity: 0; }
 .choices .nh-btn:hover:not(:disabled)::before, .choices .nh-btn:focus-visible::before { opacity: 1; }
 .choices .nh-btn:focus-visible { outline: 2px solid currentColor; outline-offset: -6px; }
-.choices .nh-btn--primary { border-color: var(--landing-neon-magenta); color: var(--landing-neon-magenta-hi); filter: var(--landing-door-glow-m); }
-.choices .nh-btn--primary:hover:not(:disabled), .choices .nh-btn--primary:focus-visible { background: var(--landing-neon-magenta); color: var(--landing-ink); filter: var(--landing-door-glow-m-strong); }
-.choices .nh-btn--secondary { border-color: var(--landing-neon-cyan); color: var(--landing-neon-cyan-hi); filter: var(--landing-door-glow-c); }
-.choices .nh-btn--secondary:hover:not(:disabled), .choices .nh-btn--secondary:focus-visible { background: var(--landing-neon-cyan); color: var(--landing-ink); border-color: var(--landing-neon-cyan); filter: var(--landing-door-glow-c-strong); }
+.choices .nh-btn--primary {
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-play-bg);
+  color: var(--landing-door-play-ink); filter: var(--landing-door-play-glow);
+}
+.choices .nh-btn--primary:hover:not(:disabled), .choices .nh-btn--primary:focus-visible { filter: var(--landing-door-play-glow-strong); transform: translateY(-1px); }
+.choices .nh-btn--secondary {
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-gm-bg);
+  color: var(--landing-door-gm-ink); filter: var(--landing-door-gm-glow);
+}
+.choices .nh-btn--secondary:hover:not(:disabled), .choices .nh-btn--secondary:focus-visible { filter: var(--landing-door-gm-glow-strong); transform: translateY(-1px); }
 .choices .nav-arrow { color: currentColor; }
 @media (prefers-reduced-motion: no-preference) {
   .choices .nh-btn:hover:not(:disabled)::before, .choices .nh-btn:focus-visible::before { animation: landing-cue-blink 1.1s steps(2, jump-none) infinite; }

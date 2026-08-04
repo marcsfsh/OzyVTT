@@ -128,7 +128,7 @@
      exactly these tokens and nothing else. Base values below are the NIGHT. */
   --landing-sky:
     radial-gradient(130% 80% at 50% 112%, rgba(164, 92, 255, 0.34) 0%, transparent 56%),
-    linear-gradient(180deg, #030210 0%, #0B0722 34%, #1A1140 64%, #3A1B72 100%);
+    linear-gradient(180deg, #030210 0%, #070417 20%, #0B0722 38%, #150E33 56%, #241448 74%, #301A5E 88%, #3A1B72 100%);
   --landing-star: rgba(255, 255, 255, 1);
   --landing-star-dim: rgba(199, 155, 255, 0.6);
   --landing-sun: linear-gradient(180deg, #FFE7F6 0%, #FF5CB8 26%, #FF2E9A 52%, #A45CFF 84%, #5B6EF5 100%);
@@ -152,23 +152,24 @@
      sun's bright crown. The stroke drops to a hairline; the glow drops from a four-layer
      haze to one solid extrusion offset plus one tight neon halo. The warm band is also the
      dusk-orange hint the night carries. */
-  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFC896 28%, #FF9E4A 50%, #B77CFF 50%, #7A3FD6 78%, #4E2596 100%);
+  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFD9A6 24%, #FFAE5C 44%, #FFE9C9 47%, #FFE9C9 50%, #F06BB8 58%, #9A54E8 76%, #4E2596 100%);
   --landing-stroke: rgba(46, 16, 84, 0.65);
   --landing-title-glow:
     drop-shadow(0 3px 0 rgba(30, 10, 50, 0.85))
     drop-shadow(0 0 10px rgba(255, 46, 154, 0.38));
   /* The doors. Chamfered arcade panels clipped with clip-path, so their glow rides
      drop-shadow filters (which follow the cut) rather than box-shadow (which cannot). */
-  --landing-neon-magenta: #FF2E9A;
-  --landing-neon-magenta-hi: #FF7CC7;
-  --landing-neon-cyan: #2DE2FF;
-  --landing-neon-cyan-hi: #9BF2FF;
-  --landing-ink: #08040F;
-  --landing-door-fill: rgba(4, 2, 14, 0.68);
-  --landing-door-glow-m: drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 20px rgba(255, 46, 154, 0.35));
-  --landing-door-glow-m-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.8)) drop-shadow(0 0 30px rgba(255, 46, 154, 0.55));
-  --landing-door-glow-c: drop-shadow(0 0 6px rgba(45, 226, 255, 0.5)) drop-shadow(0 0 20px rgba(45, 226, 255, 0.32));
-  --landing-door-glow-c-strong: drop-shadow(0 0 8px rgba(45, 226, 255, 0.75)) drop-shadow(0 0 30px rgba(45, 226, 255, 0.5));
+  /* The doors wear hues the scene does NOT: amber gold for the player door, ice for the
+     GM door — solid arcade slabs with dark ink, so they stand OFF the magenta/cyan/violet
+     drive instead of dissolving into it (client note, 2026-08-04). Re-paired per theme. */
+  --landing-door-play-bg: linear-gradient(180deg, #FFD056 0%, #FFAE33 100%);
+  --landing-door-play-ink: #241102;
+  --landing-door-play-glow: drop-shadow(0 0 6px rgba(255, 176, 32, 0.5)) drop-shadow(0 0 18px rgba(255, 176, 32, 0.3));
+  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 176, 32, 0.8)) drop-shadow(0 0 28px rgba(255, 176, 32, 0.5));
+  --landing-door-gm-bg: linear-gradient(180deg, #F4FAFF 0%, #C9E8F7 100%);
+  --landing-door-gm-ink: #082433;
+  --landing-door-gm-glow: drop-shadow(0 0 6px rgba(214, 240, 255, 0.5)) drop-shadow(0 0 18px rgba(160, 220, 250, 0.3));
+  --landing-door-gm-glow-strong: drop-shadow(0 0 8px rgba(224, 245, 255, 0.8)) drop-shadow(0 0 28px rgba(170, 225, 250, 0.5));
 
   /* Texture sizing + noise tile */
   --grid-cell: 34px;
@@ -642,7 +643,7 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 [data-theme="dusk"] {
   --landing-sky:
     radial-gradient(120% 70% at 50% 108%, rgba(255, 120, 60, 0.28) 0%, transparent 55%),
-    linear-gradient(180deg, #140A2E 0%, #2A1055 34%, #6E1B66 62%, #B23A62 82%, #E88A4A 100%);
+    linear-gradient(180deg, #140A2E 0%, #1F0C44 20%, #2A1055 36%, #4A1560 52%, #6E1B66 64%, #92285F 74%, #B23A62 84%, #D0623F 93%, #E88A4A 100%);
   --landing-star: rgba(255, 235, 220, 0.85);
   --landing-star-dim: rgba(255, 170, 190, 0.5);
   --landing-sun: linear-gradient(180deg, #FFF3C9 0%, #FFC15C 26%, #FF7BAB 55%, #FF2E9A 78%, #A45CFF 100%);
@@ -658,14 +659,19 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-grid-y: rgba(255, 46, 154, 0.50);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
   --landing-scanline: rgba(10, 0, 10, 0.22);
-  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFD27A 30%, #FF9E4A 50%, #E86AB8 50%, #A445E0 78%, #5B2EA8 100%);
+  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFDf94 26%, #FFAE5C 44%, #FFF0D2 47%, #FFF0D2 50%, #F06BB8 60%, #A445E0 78%, #5B2EA8 100%);
   --landing-stroke: rgba(40, 10, 40, 0.60);
   --landing-title-glow:
     drop-shadow(0 3px 0 rgba(40, 8, 36, 0.8))
     drop-shadow(0 0 10px rgba(255, 150, 80, 0.40));
+  /* On the amber sunset, gold would dissolve — the player door flips to hot magenta here. */
+  --landing-door-play-bg: linear-gradient(180deg, #FF5CB8 0%, #F0188A 100%);
+  --landing-door-play-ink: #2A0316;
+  --landing-door-play-glow: drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 18px rgba(255, 46, 154, 0.32));
+  --landing-door-play-glow-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.85)) drop-shadow(0 0 28px rgba(255, 46, 154, 0.5));
 }
 [data-theme="light"] {
-  --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #EFDFF6 38%, #FBD9E4 62%, #FFD6B4 100%);
+  --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #E6E2F9 24%, #EFDFF6 42%, #F6DAEC 56%, #FBD9E4 68%, #FDD8CE 84%, #FFD6B4 100%);
   /* Daybreak: no stars. Transparent star inks keep the layers (and their markup) inert. */
   --landing-star: rgba(255, 255, 255, 0);
   --landing-star-dim: rgba(255, 255, 255, 0);
@@ -683,20 +689,19 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-sign: linear-gradient(180deg, #FFE9B8 0%, #FFB86B 50%, #9A5BD6 50%, #6A34B0 100%);
+  --landing-sign: linear-gradient(180deg, #FFE9B8 0%, #FFC178 42%, #FFF3DA 46%, #FFF3DA 50%, #C86AD9 60%, #6A34B0 100%);
   --landing-stroke: rgba(70, 40, 110, 0.50);
   --landing-title-glow:
     drop-shadow(0 2px 0 rgba(90, 50, 130, 0.5))
     drop-shadow(0 0 8px rgba(226, 76, 156, 0.28));
-  /* Daybreak doors: inked neon on white glass, ring glows — legibility outranks bloom here. */
-  --landing-neon-magenta: #C81D80;
-  --landing-neon-magenta-hi: #9E1263;
-  --landing-neon-cyan: #0F7FC0;
-  --landing-neon-cyan-hi: #0A5E8F;
-  --landing-ink: #FFFFFF;
-  --landing-door-fill: rgba(255, 255, 255, 0.60);
-  --landing-door-glow-m: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
-  --landing-door-glow-m-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
-  --landing-door-glow-c: drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
-  --landing-door-glow-c-strong: drop-shadow(0 2px 8px rgba(15, 127, 192, 0.42));
+  /* Daybreak doors: deep-inked slabs with white lettering — the darkest things on the dawn,
+     which is exactly why they read. Legibility outranks bloom here. */
+  --landing-door-play-bg: linear-gradient(180deg, #D8267E 0%, #A0135D 100%);
+  --landing-door-play-ink: #FFFFFF;
+  --landing-door-play-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --landing-door-play-glow-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
+  --landing-door-gm-bg: linear-gradient(180deg, #14639C 0%, #0A426C 100%);
+  --landing-door-gm-ink: #FFFFFF;
+  --landing-door-gm-glow: drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
+  --landing-door-gm-glow-strong: drop-shadow(0 2px 8px rgba(15, 127, 192, 0.42));
 }
