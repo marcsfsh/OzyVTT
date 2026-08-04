@@ -1492,6 +1492,15 @@ export function StyleGuide() {
 
           <Section id="scene" title="The scene — sky, rims, beam, sign" blurb="Reversal, 2026-08-04 (decision log; design-language.md §9): the scene tier used to be one quiet wash and now it is a literal sky — a starfield, a sun cresting a lit horizon, a receding grid floor — off one --sky-* token set, so the theme toggle changes the HOUR. Three rules make it a work screen rather than a title screen. The horizon is a FIXED INSET from the pane's bottom (--sky-horizon-inset), never a percentage, so it cannot drift up into content as the pane grows. The sun is a CREST, not a disc, and the crown is exactly HALF the diameter so what stands above the line is a hemisphere: --sky-sun-d is derived from --sky-sun-crown rather than typed, because the first cut set them independently and the mask's cap flattened into a 394x54px slab. And the bright band is RESERVED — row-scanned over every pixel of the bare sky, the band that fails AA for --text-muted is at most 157px at 1920x1080 and 130px at 390x844 in all three hours, against a 176px / 144px reserve, so a scene surface's scroll region pads --sky-horizon-inset + --sky-sun-crown at the bottom and no row can rest in it. Legibility is a structure, not an opacity dial — with one named caveat: the scan sets point features aside, because a 1px star can land anywhere and no bottom reserve can bound it. The table deliberately gets no sky: a horizon behind a battle map competes with the map, and the map is the canvas — its chrome takes the linework instead.">
             <h3 className="sg-h3">The sky — switch the theme above to change the hour</h3>
+            {/* The box below is INERT on this page and the note says so rather than letting a reader
+                conclude the sky is broken. `.pane-scene` / `.pane-sky` live in the client's own
+                styles.css, which styleguide.html deliberately does not load (it carries the shell
+                lock, and a reference document has to scroll). Every other §9 utility — .chamfer,
+                .rim-*, .neon-beam, .sign, .surface-glass — is in design-tokens.css and demos fine;
+                the scene tier is the outlier. Moving it there is the fix and it is not free: the
+                reserve rule `.pane-scene > .scroll-y` currently wins over `.pane-frame > .scroll-y`
+                on SOURCE ORDER, and crossing the package boundary reverses that. */}
+            <p className="sg-muted">The markup below is the real composition, but this page cannot paint it: the scene tier lives in the client&rsquo;s <code>styles.css</code>, which the styleguide does not load. See it live on Settings, the Roster, Scenes, Replays or any unanswered address.</p>
             <div className="sg-sky pane-scene scanlines">
               <div className="pane-sky" aria-hidden="true" />
               <div className="sg-sky-panel surface-glass">

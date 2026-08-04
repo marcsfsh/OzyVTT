@@ -1503,3 +1503,34 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   false at three of the four sites, and the words were added there.)* The sign stays barred from
   panel headers; one edit to `.nh-panel-title` would put the metal on every panel and it would stop
   meaning anything.
+- **2026-08-04 — The sky's first cut is corrected: what the tokens promised and the pixels did not
+  deliver.** Three independent audits of the reversal above found the same class of defect — a
+  claim the code did not keep — and each was reproduced in the browser before it was touched.
+  Recorded here, not edited away, because the corrections change numbers the entries above quote.
+  - **The sun was a slab, not a disc.** `--sky-sun-d` and `--sky-sun-crown` shipped as independent
+    numbers (24rem under 3.25rem), and at that ratio the mask's circular cap degenerates into a
+    chord: the visible silhouette measured 394×54px, 7.3:1, 8.4% taper, hard vertical sides. The
+    diameter is derived now — `calc(--sky-sun-crown * 2)`, a hemisphere — because two numbers that
+    must hold a ratio should not both be typed. The reserve moved with the taller crown: worst
+    unsafe band 157px / 130px against 176px / 144px (was 148/125 against 164/136).
+  - **The reserve's guarantee has a caveat and it is now stated.** The band scan sets POINT
+    FEATURES aside; per-pixel, a star fails AA anywhere in the pane, and no bottom reserve can
+    bound a 1px dot. Read it as "no *band* of unsafe sky above the reserve".
+  - **The GM's rim was invisible on a phone.** `Tabs`' edge-fade mask erased the inset shadow that
+    is the rim on every route whose active tab sits past the fold. Frame row 2 is a
+    `.frame-tabbar` wrapper now: **a rim must never live on a masked element.**
+  - **Three of the four rim sites did not name their role in words**, which is exactly what the
+    entry above promises they do. Fixed rather than narrowed — the player bar is "Player sections",
+    and the settings `Group` appends "GM only" to its Eyebrow from the same flag that paints the
+    edge, so the two cannot drift.
+  - **The dock's beam was painted over** by the resize grip's flat `--line` bar, which sits at the
+    same x one z-index higher — so the table-chrome half of the ruling above was invisible in every
+    state. The grip is transparent at rest; the dock owns its edge and the grip owns its state.
+  - **`--sky-wash`'s stops crossed in a short box**, banding the ramp; every stop is horizon-relative
+    now, which is the rule the rest of the scene already followed.
+  - **Not-found joined the sky** — the most content-light surface in the app was the only one of its
+    kind on flat ground.
+  - Two contrast limits were measured and written down rather than left to be discovered: `.sign`
+    clears **AA-large only** in daybreak (valid at wordmark scale, nowhere smaller), and the light
+    `--danger` destructive label is under AA with or without the scene (known-bugs, with the sky's
+    −0.14 recorded so the token fix is sized against the composited value).

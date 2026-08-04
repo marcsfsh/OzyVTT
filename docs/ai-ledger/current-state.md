@@ -73,10 +73,10 @@ unconverted surfaces scroll a phase-tagged `.pane-stage` region, post-auth notic
 `/` is the title screen (per-theme `--landing-*` skies); the party is the table's, not the shell's.
 **And the app wears a sky** (§9 reversal, decision log 2026-08-04): `.pane-scene` + a `.pane-sky` child
 paint a literal scene — starfield, a sun cresting a lit horizon, a receding grid floor — off one
-`--sky-*` set, so the toggle changes the *hour*. Settings, roster, scenes, replays and the builder gate
-stand on it; **the table never does** (a horizon competes with the map), though its chrome takes the
-linework. AA is STRUCTURAL: `.pane-scene > .scroll-y` reserves the sky's bright band, so no row rests
-in it. `.rim-*` (role rims), `.sign` and `.neon-beam` are the landing's last three lessons, now real.
+`--sky-*` set, so the toggle changes the *hour*. Settings, roster, scenes, replays, the builder gate and
+not-found stand on it; **the table never does** (a horizon competes with the map), though its chrome takes
+the linework. AA is STRUCTURAL: `.pane-scene > .scroll-y` reserves the bright band (176px/144px against a
+measured 157/130), so no row rests in it. `.rim-*`, `.sign` and `.neon-beam` are the last three lessons.
 
 **Settings — one tab, three groups, one page** (A7/D24, `apps/client/src/settings/SettingsPage.tsx`).
 *Mine* (theme, "How you roll") reaches every role; *The table* and *Players* are never rendered without
