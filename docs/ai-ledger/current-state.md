@@ -122,12 +122,12 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **"The screen is the page" refresh (this branch, opened 2026-08-04).** Tokens, ratchets (g)/(h),
-  the route×role `scripts/no-scroll-audit.mjs` and the A1 shell lock are in; A2 trivials → B → C follow.
-- **Server-held character drafts (builder Phase 3).** `localStorage`-parked; the server-held swap is
-  designed, deliberately not built (`apps/client/src/builder/draft.ts`).
-- **Rules engine follow-ups.** Difficult terrain, a server-authoritative movement preview, and
-  damage-taken/AC-response reaction triggers (`packages/domain/src/index.ts`) are unimplemented.
+- **"The screen is the page" refresh (this branch, 2026-08-04).** Tokens, ratchets (g)/(h), the
+  route×role `scripts/no-scroll-audit.mjs` (19 rows green), A1's shell lock and A2's seven trivial
+  surfaces (a frame + one declared region each; the content-light ones on a scene sky) are in. The
+  table, codex, homebrew, replay viewer, viewer-controls and calibration stage on, through B and C.
+- **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
+  rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
 
 No phase exit gate has been claimed. `BUILD_PLAN.md` carries the roadmap.
 

@@ -316,7 +316,21 @@ const SURFACES = [
   { name: "play-roster", path: "/roster", root: "main", ready: ".party-heading-actions" },
   { name: "play-replays", path: "/replays", root: "main", ready: ".replay-panel" },
   { name: "play-settings", path: "/settings", root: "main", ready: ".settings-group" },
-  { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" }
+  { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" },
+  // The sheet LAYER (`/characters/:id`) — a parameterised address, so it resolves its id from the
+  // table's own tokens the way the no-scroll audit does, then navigates. Its page actions live
+  // inside the sheet frame now, which is exactly the row this measurement should see.
+  { name: "play-sheet", path: "/table", root: "main", ready: ".table-layout", open: async (page) => {
+      const id = await page.evaluate(() => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null);
+      if (!id) throw new Error("no character token on the table to open a sheet from");
+      await page.evaluate((target) => {
+        history.pushState(null, "", target);
+        dispatchEvent(new PopStateEvent("popstate", { state: null }));
+        dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      }, `/characters/${id}`);
+      await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
+      await page.waitForTimeout(700);
+    } }
 ];
 
 /**
