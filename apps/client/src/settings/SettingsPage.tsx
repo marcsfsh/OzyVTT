@@ -85,12 +85,19 @@ type Ack = Readonly<{ ok: boolean; message?: string }>;
  *
  * `gmOnly` takes the violet role rim (§9). It says something the GM cannot otherwise see on this
  * page: THESE are the groups a player is never handed — *Mine* renders for both roles, the other
- * two do not render at all without a GM token. The rim is never the only signal; each group's
- * Eyebrow names it in words and is this section's accessible name.
+ * two do not render at all without a GM token.
+ *
+ * A RIM IS NEVER THE ONLY SIGNAL, and the words come from this ONE place rather than each call
+ * site, so the edge and the sentence cannot drift apart: `gmOnly` paints the rim and appends
+ * "GM only" to the Eyebrow in the same breath. It shipped without the words first — the two
+ * Eyebrows read "The table" and "Players", so the violet edge was the only thing separating the
+ * GM-only groups from *Mine*, which is exactly the claim §9 makes and the markup did not have.
+ * "GM only" unhyphenated is the reveal vocabulary's spelling (play-vocabulary.test.ts). The
+ * Eyebrow is the section's accessible name, so a screen reader reaches it.
  */
 function Group({ id, label, gmOnly = false, children }: Readonly<{ id: string; label: string; gmOnly?: boolean; children: React.ReactNode }>) {
   return <section className={`settings-group settings-group--${id} surface-glass${gmOnly ? " rim-gm" : ""}`} aria-labelledby={`settings-${id}`}>
-    <Eyebrow id={`settings-${id}`}>{label}</Eyebrow>
+    <Eyebrow id={`settings-${id}`}>{label}{gmOnly ? " · GM only" : ""}</Eyebrow>
     {children}
   </section>;
 }

@@ -1497,5 +1497,7 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   for magical/concentration (§2), NPC token strokes, condition dots, legendary actions and presence
   across ~50 rules — so writing "violet = GM" as a colour rule would make the language a defect
   against its own semantic table. The rim is never the only signal: every site that wears one names
-  its role in words a screen reader reaches. The sign stays barred from panel headers; one edit to
-  `.nh-panel-title` would put the metal on every panel and it would stop meaning anything.
+  its role in words a screen reader reaches. *(True as of the correction entry below — it shipped
+  false at three of the four sites, and the words were added there.)* The sign stays barred from
+  panel headers; one edit to `.nh-panel-title` would put the metal on every panel and it would stop
+  meaning anything.

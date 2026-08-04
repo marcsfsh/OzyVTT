@@ -487,13 +487,26 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   the GM-SECRET TREATMENT** (the 3px start edge + faint wash that `.scene-preview-banner`,
   `.party-queue`, `.scene-builder` and the codex's GM blocks already wear), **never to a claim
   that the hue means GM** — §2 assigns `--violet` to magical/concentration and ~50 rules use it
-  for NPC strokes, condition dots, legendary actions and presence. A rim is never the only
-  signal: every site that wears one names its role in words a screen reader reaches. Keep rims
-  off selection state, whose axis is cyan. The edge is an **inset box-shadow**, not a border:
-  this file loads before every app stylesheet, so a shared `border-inline-start` loses at equal
-  specificity to a consumer's own `border` shorthand (measured — both rim sites computed
-  `border-left-width: 0px`), and a shadow also costs no layout and does not scroll away inside
-  the tab bar's own x-scroller.
+  for NPC strokes, condition dots, legendary actions and presence. Keep rims off selection state,
+  whose axis is cyan.
+  - **A rim is never the only signal, and the four sites say so in words a screen reader
+    reaches:** the bars' `aria-label`s are "GM sections" / "Player sections", and the settings
+    `Group` appends "GM only" to its Eyebrow (the section's accessible name) from the same
+    `gmOnly` flag that paints the edge — one place, so the edge and the sentence cannot drift.
+    All four shipped without it and this bullet asserted it anyway: the player bar read "Table,
+    Codex or Settings" and the two Eyebrows read "The table" / "Players", so on the GM's
+    `/settings` the violet edge was the *only* thing separating the GM-only groups from *Mine*.
+    A new rim site inherits the obligation; if it cannot name its role, it does not get a rim.
+  - **A rim must not live on a masked element.** The edge is an **inset box-shadow**, not a
+    border: this file loads before every app stylesheet, so a shared `border-inline-start` loses
+    at equal specificity to a consumer's own `border` shorthand (measured — both rim sites
+    computed `border-left-width: 0px`), and a shadow costs no layout. But a shadow is still the
+    element's own paint, and `Tabs`' edge-fade mask (`is-scrolled-start`) makes the leading 24px
+    of the bar transparent — which erased the GM's rim outright on a phone on every route whose
+    active tab sits past the fold. So frame row 2 is now a **`.frame-tabbar` wrapper** that
+    carries the rim, the wash and the chrome scanline, with the scrolling bar as its content.
+    Mask applies after filters and shadows, so nothing an element paints survives it: when a
+    rim meets a mask, move the rim to a parent.
 - **The sign principle** *(built 2026-08-04)*. A hero title wears a metal the scene does not
   (blue-steel on the magenta drive) and carries legibility in its chrome *structure*, not an
   outline. `--sign-chrome` / `--sign-stroke` / `--sign-glow` + the `.sign` utility. Reserved for

@@ -434,22 +434,22 @@ function App() {
         the table (slim strip out of combat, the pre-claim picker, management on the Roster
         tab); nothing above the tabs but the tabs. The bar stays up while a full-page layer
         is open now that layers render inside the pane, so the frame never blinks. */}
-    {shellVisible && mode === "gm" && <Tabs
-      className="gm-tabs rim-gm"
+    {shellVisible && mode === "gm" && <div className="frame-tabbar rim-gm"><Tabs
+      className="gm-tabs"
       ariaLabel="GM sections"
       tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
       activeId={gmTab}
       onChange={(id) => setGmTab(id as GmTab)}
-    />}
+    /></div>}
     {/* D4 — the player Codex is a VIEW of the player app, not a modal over the table. The
         views are a switcher, at real addresses (`/table` and `/codex/*`), so the Android
         back gesture walks between them and a player can be sent a link to a page.
         CT-3: the recap count rides INSIDE the switching affordance, so it is part of its
         accessible name ("Codex, 2 new") rather than a coloured dot a screen reader never
         reaches. */}
-    {shellVisible && mode === "player" && <Tabs
-      className="player-view-tabs rim-player"
-      ariaLabel="Table, Codex or Settings"
+    {shellVisible && mode === "player" && <div className="frame-tabbar rim-player"><Tabs
+      className="player-view-tabs"
+      ariaLabel="Player sections"
       tabs={[
         { id: "table", label: "Table" },
         { id: "codex", label: <>Codex{recapBadge.unread > 0 && <> <Badge tone="info" solid>{recapBadge.unread} new</Badge></>}</> },
@@ -465,7 +465,7 @@ function App() {
         if (id === playerView) { navigate(home); return; }
         navigate(id === "codex" ? lastLocationForTab("player", "codex") ?? "/codex" : home);
       }}
-    />}
+    /></div>}
     {/* Row 3 — the pane: one always-rendered element owning the canvas for whatever the
         address says. A surface that has not adopted the frame yet rides a temporary
         `.pane-stage scroll-y` region inside it — the staging rule (styles.css); each

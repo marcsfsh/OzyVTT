@@ -736,31 +736,42 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .home-theme-switch { margin-top: var(--space-6); }
 .setup-appearance { margin-top: var(--space-10); display: flex; flex-direction: column; gap: var(--space-3); align-items: start; }
 
-/* Both tab bars are frame row 2 (the @vtt/ui <Tabs> primitive owns the bar's own x-scroll
-   and fade). The gutter aligns their labels with the staged panes' column; the old
-   margin-top died with the page flow it spaced against. */
-/* THE ROLE RIM ON FRAME ROW 2 (§9). The bar is the one piece of chrome that is on screen on
-   every route in both roles, and until now the two roles' bars were pixel-identical — so the
-   rim is the first thing in the app that says, at a glance and without a word, whose seat this
-   is: magenta for the player's, violet for the GM's. The edge comes from the `.rim-*` utility
-   in the markup; the matching 7% wash lives here because ONE rule owns this element's
-   background (the utility deliberately does not set one — it would clobber `.surface-glass`
-   wherever else a rim lands).
+/* FRAME ROW 2 IS THE WRAPPER, NOT THE BAR — and the split is a defect fix, not tidying.
+   The @vtt/ui <Tabs> primitive owns the bar's x-scroll and, once it overflows, an EDGE-FADE
+   MASK: `is-scrolled-start` makes the leftmost 24px of the element transparent. A mask erases
+   everything the element paints, so the role rim (an inset box-shadow) and the row's wash and
+   texture were being erased with it. Measured at 390x844 on the GM's /settings and /replays,
+   where the bar auto-scrolls the active tab into view (scrollLeft 344, `is-scrolled-start`
+   present): the bar's first device-pixel column read page background in all three hours, and
+   forcing scrollLeft to 0 in the same frame brought back rgb(159,107,255) — exactly --rim-gm.
+   The GM's rim was invisible on a phone on every route past the fold.
 
-   It is never the only signal: each bar's aria-label already names its role ("GM sections" /
-   "Table, Codex or Settings"), the tab sets differ, and the GM's bar is unreachable without a
-   GM token. The rim costs no layout (it is an inset shadow, not a border), so the gutter still
-   puts the labels on the same column as the surface headings below them. */
-.gm-tabs, .player-view-tabs { grid-row: 2; padding-inline: var(--pane-gutter); }
+   So the ROW is this wrapper and the BAR is its content. Row-level paint — the rim, the wash,
+   the chrome scanline — belongs to the box that never scrolls and is never masked; the fade
+   keeps doing its one job, telling a thumb there are more tabs. There is no way to do this on
+   the bar itself: mask applies after filter and after shadows, so no shadow, border, outline or
+   pseudo of a masked element survives it.
+
+   THE ROLE RIM ITSELF (§9). The bar is the one piece of chrome on screen on every route in both
+   roles, and the two roles' bars were otherwise pixel-identical — so the rim is the first thing
+   in the app that says whose seat this is: magenta for the player's, violet for the GM's. The
+   edge comes from the `.rim-*` utility in the markup; the wash pairs with it here because the
+   utility deliberately sets no background (it would clobber `.surface-glass` wherever else a rim
+   lands). It is never the only signal: each bar's aria-label names its role ("GM sections" /
+   "Player sections"), the tab sets differ, and the GM's bar is unreachable without a GM token.
+   The rim costs no layout (an inset shadow, not a border), so the gutter still puts the labels
+   on the same column as the surface headings below them. */
+.frame-tabbar { grid-row: 2; min-width: 0; }
+.gm-tabs, .player-view-tabs { padding-inline: var(--pane-gutter); }
 /* THE CHROME-TIER SCANLINE. `--scanline-color` is the CHROME strength (.22 / .14 / .05); the
    shared `.scanlines` utility halves it with `opacity: .5` for the SCENE tier, which is why the
    sky is at .11 and this bar is at .22 — two strengths of one texture, not a contradiction. The
    style guide's own bar wears it and this one wore nothing, so the bar read as a hole between
-   the sky above and the sky below. A background-IMAGE, not the utility: the utility is an inset
-   ::after and this element scrolls its tabs horizontally, so a positioned overlay would scroll
-   away; a background is painted on the box and stays. Daybreak drops it, matching the utility's
-   own light-theme rule and the caption ("texture drops to near-nothing"). */
-.gm-tabs, .player-view-tabs {
+   the sky above and the sky below. Still a background-IMAGE rather than the `.scanlines` utility
+   (an inset ::after would sit above the tabs), but now on the row, which neither scrolls nor
+   masks. Daybreak drops it, matching the utility's own light-theme rule and the caption
+   ("texture drops to near-nothing"). */
+.frame-tabbar {
   background-image: linear-gradient(to bottom,
     transparent 0,
     transparent calc(var(--scanline-gap) - 1px),
@@ -768,9 +779,9 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
     var(--scanline-color) var(--scanline-gap));
   background-size: 100% var(--scanline-gap);
 }
-[data-theme="light"] .gm-tabs, [data-theme="light"] .player-view-tabs { background-image: none; }
-.gm-tabs { background-color: var(--rim-gm-wash); }
-.player-view-tabs { background-color: var(--rim-player-wash); }
+[data-theme="light"] .frame-tabbar { background-image: none; }
+.frame-tabbar.rim-gm { background-color: var(--rim-gm-wash); }
+.frame-tabbar.rim-player { background-color: var(--rim-player-wash); }
 
 /* ---- Signature atmosphere (hero/empty zones + subtle app-shell CRT texture) ---- */
 
