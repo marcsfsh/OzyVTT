@@ -58,6 +58,10 @@ main {
    the bottom padding, the safe area and the scroll behaviour, because those belong to the thing
    that actually scrolls (§7.5, refresh risk #7). */
 .pane-frame { padding: var(--space-4) var(--pane-gutter) 0; }
+/* The not-found page's region: the view inside it carries `margin: auto`, which only centres against
+   a flex parent — so the region is one, and an unanswered address puts its message in the middle of
+   the pane instead of pinned to the top of it. */
+.notfound-stage { display: flex; }
 .pane-frame > .scroll-y {
   padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
   overscroll-behavior: contain;

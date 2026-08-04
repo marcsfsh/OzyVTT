@@ -31,7 +31,7 @@ import { SceneBuilder } from "./scenes/SceneBuilder";
 import { EncounterMap } from "./scene/EncounterMap";
 import { socket } from "./socket";
 import { currentHref, isGmOnlyPath, isKnownPath, lastLocationForTab, layerOf, litGmTab, navigate, pathForGmTab, redirectForRetiredPath, rememberLocation, resumeTarget, useRoute, type GmTab } from "./router";
-import { NotFoundView } from "./components/NotFoundView";
+import { NotFoundPage } from "./components/NotFoundView";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
@@ -549,7 +549,7 @@ function App() {
       const actor = state.actors.find((entry) => entry.id === layer.actorId);
       // A player asking for someone else's sheet gets the not-found view: their projection does not
       // carry it, so "no such character" is both the true answer and the indistinguishable one.
-      if (!actor) return <div className="pane-stage scroll-y"><NotFoundView role={mode === "gm" ? "gm" : "player"} /></div>;
+      if (!actor) return <NotFoundPage role={mode === "gm" ? "gm" : "player"} />;
       /* The sheet is its own frame (§7): the workspace fills the pane and its pane scrolls. The two
          page-level doors used to hang BELOW that 100dvh box — the whole of this route's overflow —
          and now ride inside it as the frame's bottom row. They are passed only from here: they
@@ -565,7 +565,7 @@ function App() {
     {shellVisible && state && !fullPageLayer && <>
       {/* D3: an address the app does not answer, and a GM-only address asked for by a player, both land
           here — indistinguishable on purpose (invariant §3.2). */}
-      {mode === "gm" && gmToken && gmAddressUnknown && <div className="pane-stage scroll-y"><NotFoundView role="gm" /></div>}
+      {mode === "gm" && gmToken && gmAddressUnknown && <NotFoundPage role="gm" />}
 
       {/* staged region — B2 (codex recompose) drains it */}
       {mode === "player" && playerView === "codex" && mapToken && <div className="anim-view codex-anim pane-stage scroll-y"><PlayerCodex token={mapToken} /></div>}
@@ -577,7 +577,7 @@ function App() {
       {mode === "player" && playerView === "settings" && <SettingsPage role="player" state={state} />}
       {/* A player on a GM-only or unknown address: the not-found view, indistinguishable from each other
           and from a genuinely unknown address (invariant §3.2). */}
-      {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <div className="pane-stage scroll-y"><NotFoundView role="player" /></div>}
+      {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundPage role="player" />}
 
       {/* staged region — B1 (table laptop recompose) then C1 (table phone redesign) drain it.
           The player half excludes `/replays`: that address renders the shared-replays page (below),

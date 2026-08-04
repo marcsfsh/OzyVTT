@@ -24,6 +24,21 @@ export function NotFoundView({ role: _role }: Readonly<{ role: "gm" | "player" }
 }
 
 /**
+ * The not-found view as a WHOLE PANE, rather than as the codex main column's contents.
+ *
+ * The view itself is shared with the codex shells, which hand it their own frame, so the page shape
+ * lives here instead of on the view's root: `.pane-frame` for the page column, one declared region so
+ * a short viewport can still reach the doors, and the view centred inside it (§7.5).
+ */
+export function NotFoundPage({ role }: Readonly<{ role: "gm" | "player" }>) {
+  return (
+    <div className="pane-frame frame-col">
+      <div className="scroll-y frame-fill notfound-stage"><NotFoundView role={role} /></div>
+    </div>
+  );
+}
+
+/**
  * A known section whose named RECORD is gone. Deliberately not the not-found view: a stale bookmark to a
  * deleted page should still land you in Pages with the list in front of you, saying what happened.
  */
