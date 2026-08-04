@@ -365,14 +365,19 @@ function App() {
     <div className="app-texture" aria-hidden="true" />
     {mode !== "home" && <TableEventToasts />}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
-    {preAuth && <div className="landing scanlines">
-      {/* The atmosphere belongs to the whole view, not to the wordmark's own box: bloom high, the
-          perspective horizon across the lower third, scanlines over both. All three are existing
-          tokens/classes (`--grad-bloom`, `grid-floor`, `scanlines`) that only the old hero used. */}
-      <div className="home-hero-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div>
+    {preAuth && <div className="landing">
+      {/* D30's full statement — the 80s retro-cyber title screen, layer by layer: star field, the
+          slatted sun rising behind the horizon line, the grid rolling toward the viewer, and the CRT
+          vignette + scanlines the `.landing` pseudo-elements paint over it all. Every colour is a
+          --landing-* token, and the scene commits to its night in every theme (see the token note). */}
+      <div className="landing-scene" aria-hidden="true">
+        <span className="landing-stars-far" /><span className="landing-stars" />
+        <span className="landing-skyband"><span className="landing-sun" /></span>
+        <span className="landing-horizon" /><span className="landing-grid" />
+      </div>
       <header className="home-hero anim-view">
         {/* The one bold thing on the view: no eyebrow, no subtext, nothing beside it (D30). */}
-        <h1 className="home-hero-title"><Wordmark>OzyVTT</Wordmark></h1>
+        <h1 className="home-hero-title"><Wordmark chromatic>OzyVTT</Wordmark></h1>
       </header>
       {mode === "home" && <section className="choices anim-view">
         <Button variant="primary" size="md" lift onClick={joinPlayer} disabled={busy}>{busy ? "Connecting…" : "Join as Player"}<IconArrow className="nav-arrow" /></Button>
