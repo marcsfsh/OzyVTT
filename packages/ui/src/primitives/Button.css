@@ -22,7 +22,24 @@
 
 /* Primary — magenta fill, dark ink, glow only on hover (§5.1) */
 .nh-btn--primary { background: var(--primary); color: var(--text-on-neon); }
-.nh-btn--primary:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
+.nh-btn--primary:hover:not(:disabled) { background: var(--magenta-hi); filter: var(--glow-drop-magenta); }
+
+/* THE SQUARE STANDARD (§4/§9): primary and destructive are a view's doors, so they wear
+   the landing's chamfer cut. Their hover glow rides the --glow-drop-* filters above and
+   below (box-shadow cannot follow a clip-path cut), and focus-visible becomes an INSET
+   outline for the same reason — the global outer ring would be clipped away.
+   `sm` buttons are exempt from the cut on purpose: they meet the 44px floor through
+   .tap-target's ::after, and clip-path clips hit-testing, so cutting them would destroy
+   the extended hit area. They stay plain squares (the radius tokens are 0). */
+.nh-btn--primary:not(.nh-btn--sm), .nh-btn--destructive:not(.nh-btn--sm) {
+  clip-path: var(--chamfer-cut);
+  border-radius: 0;
+}
+.nh-btn--primary:focus-visible, .nh-btn--destructive:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -5px;
+  box-shadow: none;
+}
 
 /* Secondary — bordered, fills to surface-3 with a low-alpha cyan edge on hover */
 .nh-btn--secondary { border-color: var(--line-strong); color: var(--text); }
@@ -37,9 +54,9 @@
 
 /* Destructive — danger edge at rest, fills on hover, always with a clear label */
 .nh-btn--destructive { border-color: var(--danger); color: var(--danger-hi); }
-.nh-btn--destructive:hover:not(:disabled) { background: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
+.nh-btn--destructive:hover:not(:disabled) { background: var(--danger); color: var(--text-on-neon); filter: var(--glow-drop-danger); }
 
-.nh-btn:disabled { background: var(--surface-2); color: var(--text-muted); border-color: transparent; cursor: not-allowed; box-shadow: none; }
+.nh-btn:disabled { background: var(--surface-2); color: var(--text-muted); border-color: transparent; cursor: not-allowed; box-shadow: none; filter: none; }
 
 /* Icon-only square control. Paint stays compact for dense toolbars; `.tap-target`
    (added by the component) lifts the hit area to the 44px floor. */

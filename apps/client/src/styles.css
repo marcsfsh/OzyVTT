@@ -182,9 +182,9 @@ html:has(.landing), body:has(.landing) { overflow: hidden; }
 /* Its actions are doors too. "Enter table" rests as a cyan door and fills on hover exactly like
    ENTER AS GM; disabled keeps the full cyan treatment and lets the global disabled opacity dim it
    — dormant neon, never grey plastic. Back is a low-key pink ghost so both belong to the scene. */
-.landing .card .nh-btn--primary { border: 1px solid var(--landing-door-gm-rim); background: var(--landing-glass); color: var(--landing-door-label); box-shadow: var(--glow-violet); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; }
-.landing .card .nh-btn--primary:hover:not(:disabled), .landing .card .nh-btn--primary:focus-visible { background: var(--landing-door-gm-rim); border-color: var(--landing-door-gm-rim); color: var(--landing-ink-deep); box-shadow: var(--glow-violet); }
-.landing .card .nh-btn--primary:disabled { background: var(--landing-glass); border-color: var(--landing-door-gm-rim); color: var(--landing-door-label); box-shadow: var(--glow-violet); }
+.landing .card .nh-btn--primary { border: 1px solid var(--landing-door-gm-rim); background: var(--landing-glass); color: var(--landing-door-label); filter: var(--landing-door-gm-glow); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; }
+.landing .card .nh-btn--primary:hover:not(:disabled), .landing .card .nh-btn--primary:focus-visible { background: var(--landing-door-gm-rim); border-color: var(--landing-door-gm-rim); color: var(--landing-ink-deep); filter: var(--landing-door-gm-glow-strong); }
+.landing .card .nh-btn--primary:disabled { background: var(--landing-glass); border-color: var(--landing-door-gm-rim); color: var(--landing-door-label); filter: var(--landing-door-gm-glow); }
 .landing .card .link { color: color-mix(in srgb, var(--landing-door-play-rim) 80%, transparent); }
 .landing .card .link:hover:not(:disabled) { color: var(--landing-door-label); background: color-mix(in srgb, var(--landing-door-play-rim) 14%, transparent); }
 

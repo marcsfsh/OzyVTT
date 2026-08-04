@@ -152,7 +152,11 @@ currently violated in several stylesheets**; see for yourself before adding to t
 ## 4. Spacing, radius, elevation, touch targets
 
 - Spacing is a 4px-based token ladder (`--space-*`); radius is `--radius-sm/md/lg/pill`.
-  Both are in `design-tokens.css`. Avoid large soft blobs; chips and token rings may go pill.
+  Both are in `design-tokens.css`. **The square standard (2026-08-04, decision log):
+  `--radius-sm/md/lg` are 0** — surfaces sit square, and big-choice surfaces wear the
+  `.chamfer` cut (§9) instead of a large radius. `--radius-pill` survives for gauges:
+  HP/progress bars, status pills, chips and token rings stay round. Keep writing the
+  radius tokens, never a literal — reversing the ruling must stay one edit.
 - Elevation, in order of preference: a lighter surface token; a 1px border in
   `--line` or a low-alpha accent; a dark ambient shadow. Colored glow is state,
   not resting elevation.
@@ -219,10 +223,13 @@ outward from the control's centre until it stops returning the control.
 ## 5. Components (see `@vtt/ui` + `/styleguide`)
 
 - **Buttons.** Primary: magenta fill, `--text-on-neon`, no glow at rest; hover
-  lifts to `--magenta-hi` + `--glow-magenta`. Secondary: transparent, 1px
+  lifts to `--magenta-hi` + `--glow-drop-magenta`. Secondary: transparent, 1px
   `--line-strong`, hover fills `--surface-3` with a low-alpha cyan border. Ghost:
-  text only. Destructive: `--danger` border/text, fills on hover, always labelled.
-  One primary action per view; labels are sentence case, body face.
+  text only. Destructive: `--danger` border/text, fills on hover (`--glow-drop-danger`),
+  always labelled. Primary and destructive wear the chamfer cut (§9) — except `sm`
+  buttons, whose `.tap-target` hit area the cut would clip — so their glow rides
+  drop-shadow filters and their focus ring is inset. One primary action per view;
+  labels are sentence case, body face.
 - **Inputs.** Well `--surface-3`, 1px `--line`, `--text-muted` placeholder. Focus
   shifts the border to `--cyan` with a soft `--glow-cyan` (the main place cyan
   appears in a resting form). Validation uses icon + text.
@@ -347,8 +354,8 @@ it the frame stays fixed and regions scroll harder, and nothing may become unrea
    when its surface locks *(refresh)*; `--header-h`'s only consumer goes with it.
 4. Density: `comfortable` rows are ≥44px (`--tap-min`) and the default everywhere;
    `compact` (36px paint, `.tap-target` route 2) exists only inside GM data regions
-   (initiative rows, level tables, log lines) and never on a phone *(refresh: the pair
-   becomes `--row-h`/`--row-h-compact` tokens; today the values are per-component)*.
+   (initiative rows, level tables, log lines) and never on a phone *(the pair is the
+   `--row-h`/`--row-h-compact` tokens; components adopt them as they recompose)*.
 5. Keyboard: a focused input inside a locked region must stay visible above the on-screen
    keyboard — the region scrolls to it; the frame never moves. `100dvh` + `env(safe-area-*)`
    are already the wizard/Modal practice; the editor panes adopt it *(refresh)*.
@@ -360,11 +367,12 @@ it the frame stays fixed and regions scroll harder, and nothing may become unrea
    ignition flicker stays the landing's. Nothing moves on scroll; reduced-motion freezes all
    of it — the arcade feel comes from *placement snapping into a frame*, not parallax.
 
-**Layout tokens** *(refresh — land in `design-tokens.css` §Layout beside `--tap-min`)*:
-`--app-bar-h` (the tab bar row), `--pane-gap` (frame gutter), `--rail-w` (nav/list rails,
-220–280px), `--dock-w` (the table's side dock, 320–380px), `--row-h`/`--row-h-compact`.
-Until they land, the only layout tokens are `--header-h` and `--tap-min` — do not invent
-siblings ad hoc.
+**Layout tokens** *(in `design-tokens.css` §Layout since 2026-08-04, seeded from the live
+values they replace)*: `--app-bar-h` (the tab bar row), `--pane-gap` (frame gutter),
+`--rail-w` (nav/list rails, 220–280px), `--dock-w` (the table's side dock, 22rem),
+`--row-h`/`--row-h-compact`. Consume these; do not invent siblings ad hoc. `--header-h`
+is legacy — its one consumer is the root scroll recipe, and both retire with the shell
+lock.
 
 ---
 
@@ -401,21 +409,25 @@ siblings ad hoc.
 
 ---
 
-## 9. What the landing taught the system *(status: token facts in force; adoption marked)*
+## 9. What the landing taught the system *(status: in force as shared utilities since 2026-08-04)*
 
-- **Glass tiers.** `.surface-frost` (chrome tier, over app surfaces) and `--landing-glass`
-  (scene tier, panels standing on a canvas) are the same idea at two depths. *(refresh:
-  unify as two named tiers of one treatment; a locked app full of docks over a live map
-  wants the scene tier — do not grow a third.)*
+- **Glass tiers.** Two named tiers of one treatment, both in `design-tokens.css`:
+  `.surface-frost` (chrome tier, over app surfaces) and `.surface-glass` (scene tier,
+  panels standing on a canvas — a live map, a sky; the landing's `--landing-glass` is its
+  scene-local ancestor). Both go solid under reduced transparency. Do not grow a third.
 - **Scanline tile.** A full-viewport `repeating-linear-gradient` rasterizes unevenly; the
-  landing paints a one-gap `background-size` tile instead (`apps/client/src/styles.css`,
-  documented at the rule). *(refresh: the shared `.scanlines::after` utility adopts the
-  tile before any atmosphere zone scales up.)*
-- **Noise opacity is a token.** `--landing-noise-opacity` re-skins per theme; the shared
-  `.static-noise` hardcodes its alpha. *(refresh: parameterize the utility the same way.)*
+  landing found it and the shared `.scanlines::after` utility now paints the same one-gap
+  `background-size` tile the landing does (`apps/client/src/styles.css`, documented at
+  both rules).
+- **Noise opacity is a token.** `--landing-noise-opacity` re-skins the landing per theme;
+  the shared `.static-noise` reads `--noise-opacity` the same way.
 - **Clipped panels glow via `drop-shadow`.** `box-shadow` cannot follow a `clip-path`
-  chamfer; the door treatment (chamfer + inner bezel + filter glow) is the pattern for any
-  future big-choice tile. In force as the landing's tokens; reusable on sight.
+  chamfer, and neither does the outer focus ring — a chamfered control's focus is an
+  INSET outline. The door treatment is generalized as the `.chamfer` utility +
+  `--chamfer-cut` polygon + the `--glow-drop-*` filter twins of the glow set: for
+  panels, cards, feature tiles, status tags and the primary/destructive buttons
+  (`Button.css`; `sm` buttons exempt — the cut would clip their `.tap-target` hit area).
+  Never on a control that relies on `.tap-target`.
 - **Role rims.** Magenta = the player's door, violet = the GM's — consistent with
   violet-is-GM-only. Any future role-scoped chrome inherits the pairing.
 - **The sign principle.** A hero title wears a metal the scene does not (blue-steel on the

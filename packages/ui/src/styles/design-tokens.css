@@ -103,6 +103,15 @@
   --glow-violet:         0 0 0 1px rgba(164, 92, 255, 0.55), 0 0 16px 2px rgba(164, 92, 255, 0.32);
   --glow-danger:         0 0 0 1px rgba(255, 45, 94, 0.55), 0 0 16px 2px rgba(255, 45, 94, 0.32);
 
+  /* Glow as a FILTER — drop-shadow twins of the set above, for chamfered (clip-path)
+     surfaces: box-shadow cannot follow the cut, drop-shadow can (the landing doors
+     proved the pattern). Same hues, door-tuned alphas. */
+  --glow-drop-magenta:        drop-shadow(0 0 6px rgba(255, 46, 154, 0.55)) drop-shadow(0 0 18px rgba(255, 46, 154, 0.33));
+  --glow-drop-magenta-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.85)) drop-shadow(0 0 30px rgba(255, 46, 154, 0.5));
+  --glow-drop-cyan:           drop-shadow(0 0 6px rgba(45, 226, 255, 0.55)) drop-shadow(0 0 18px rgba(45, 226, 255, 0.30));
+  --glow-drop-violet:         drop-shadow(0 0 6px rgba(164, 92, 255, 0.55)) drop-shadow(0 0 18px rgba(164, 92, 255, 0.30));
+  --glow-drop-danger:         drop-shadow(0 0 6px rgba(255, 45, 94, 0.55)) drop-shadow(0 0 18px rgba(255, 45, 94, 0.30));
+
   /* Ambient shadows (dark, for resting elevation) */
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.50);
@@ -186,9 +195,12 @@
   --landing-planet-glow: 0 0 16px 2px rgba(164, 92, 255, 0.45);
   --landing-planet-opacity: 0.55;
 
-  /* Texture sizing + noise tile */
+  /* Texture sizing + noise tile. --noise-opacity is a token for the same reason
+     --landing-noise-opacity is one (§9): grain strength is a per-theme dial, not a
+     constant baked into the utility. */
   --grid-cell: 34px;
   --scanline-gap: 3px;
+  --noise-opacity: 0.045;
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* Typography
@@ -220,14 +232,35 @@
   --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
   --space-12: 48px; --space-16: 64px;
 
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* Radius — THE SQUARE STANDARD (2026-08-04, decision log). The surface radii are ZERO:
+     the screen is the page and its edges are cut, not rounded — panels, cards, inputs and
+     controls sit square, and the big-choice surfaces wear the .chamfer cut below instead.
+     The tokens stay (reversing the ruling is one edit here); only the values flipped.
+     --radius-pill SURVIVES: gauges stay gauges — HP/progress bars, status pills, chips
+     and token rings keep their round form. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
   --radius-pill: 999px;
 
-  /* Layout */
-  --header-h: 64px;   /* update from JS if the header height changes */
+  /* The chamfer (§9, generalized from the landing doors): the corner cut that stands in
+     for the retired big radius on panels, cards, feature tiles, status tags and the
+     primary/danger buttons. --chamfer sizes the cut; --chamfer-cut is the polygon
+     (top-left and bottom-right corners cut) for rules that cannot take the .chamfer
+     utility class. Glow on a cut surface rides the --glow-drop-* filters, never
+     box-shadow — box-shadow cannot follow a clip-path cut. */
+  --chamfer: .6rem;
+  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+
+  /* Layout (§7) — the frame's shared dimensions, seeded 2026-08-04 from the live values
+     they will replace; the shell lock and the recomposes consume them phase by phase. */
+  --header-h: 64px;   /* legacy: its one consumer is the root scroll recipe below; both retire with the shell lock */
+  --app-bar-h: calc(var(--tap-min) + 1px);  /* the tab-bar row: one 44px tab (Tabs.css min-height) + the bar's 1px baseline */
+  --pane-gap: var(--space-6);               /* frame gutter — the table's live 1.5rem column gap (.table-layout) */
+  --rail-w: clamp(220px, 22vw, 280px);      /* nav/list rails: homebrew's live 220px floor, the viewer rail's live 22vw growth, §7's 280px cap */
+  --dock-w: 22rem;                          /* the table's side dock — the in-map dock's live --dock-side-width (encounter-map.css); the sidebar column's minmax(21rem, 27rem) converges here */
+  --row-h: var(--tap-min);                  /* comfortable rows (§7.4) — the default everywhere */
+  --row-h-compact: 36px;                    /* compact row paint (§7.4) — GM data regions only, never on a phone; route 2 (.tap-target) carries the floor */
 
   /* Touch-target floor (decision 16, DESIGN_LANGUAGE §4).
      Every interactive control presents AT LEAST this hit area on every device.
@@ -243,6 +276,7 @@
   --dur-base: 200ms;    /* panels, tabs, popovers, combat tint */
   --dur-enter: 260ms;   /* full view entrances               */
   --dur-reveal: 560ms;  /* one-time data reveals             */
+  --dur-theme: 400ms;   /* the theme-switch sky moment       */
 
   /* Focus ring */
   --focus-ring-color: var(--cyan);
@@ -354,6 +388,14 @@
   --glow-violet:         0 0 0 2px rgba(122, 63, 208, 0.90), 0 2px 6px rgba(122, 63, 208, 0.20);
   --glow-danger:         0 0 0 2px rgba(200, 20, 62, 0.90),  0 2px 6px rgba(200, 20, 62, 0.20);
 
+  /* Drop-shadow glow follows the light rule: a filter cannot draw the solid ring, so
+     chamfered surfaces GROUND (tight low shadow in the deepened accent) instead of bloom. */
+  --glow-drop-magenta:        drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --glow-drop-magenta-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
+  --glow-drop-cyan:           drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
+  --glow-drop-violet:         drop-shadow(0 1px 4px rgba(122, 63, 208, 0.28));
+  --glow-drop-danger:         drop-shadow(0 1px 4px rgba(200, 20, 62, 0.30));
+
   --shadow-1: 0 1px 2px rgba(23, 19, 46, 0.08);
   --shadow-2: 0 10px 30px rgba(23, 19, 46, 0.12);
 
@@ -434,12 +476,15 @@ html {
   scroll-padding-top: calc(var(--header-h) + 10px);
 }
 
-/* House transition recipe. Never `all` (7.2). */
+/* House transition recipe. Never `all` (7.2). `filter` is in the list because chamfered
+   surfaces glow through drop-shadow filters (see .chamfer) and their glow should ease
+   exactly like a box-shadow glow does. */
 .interactive {
   transition:
     border-color var(--dur-hover),
     background var(--dur-hover),
     box-shadow var(--dur-hover),
+    filter var(--dur-hover),
     transform var(--dur-press) var(--ease-settle);
 }
 .interactive:active { transform: translateY(0.5px); }
@@ -468,6 +513,33 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   backdrop-filter: blur(16px) saturate(1.3);
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
 }
+
+/* Scene-tier glass (§9): panels standing ON a canvas — a live map, a sky. The deeper of
+   the two glass tiers (.surface-frost above is the chrome tier, over app surfaces).
+   Two tiers of one treatment; do not grow a third. */
+.surface-glass {
+  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+  backdrop-filter: blur(8px) saturate(1.15);
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+}
+
+/* Chamfered panel (§9): the landing doors' cut, generalized — panels, cards, feature
+   tiles, status tags and the primary/danger buttons wear it; secondary controls stay
+   plain squares. Rules: glow rides the --glow-drop-* FILTERS (box-shadow is clipped by
+   the cut); a focus ring must be an INSET outline (outline-offset ≤ -5px) because an
+   outer ring is clipped too; and never put the cut on a control that relies on
+   .tap-target — clip-path clips hit-testing, so the extended ::after area would die. */
+.chamfer {
+  clip-path: var(--chamfer-cut);
+  border-radius: 0;
+}
+
+/* Frame utilities (§7). A frame is a column that never scrolls; its regions divide the
+   box. .frame-col is the column — min-height: 0 so its children may shrink below their
+   content. .frame-fill is the canvas region that takes the leftover space. A region that
+   can outgrow its share carries .scroll-y as well. */
+.frame-col { display: flex; flex-direction: column; min-height: 0; }
+.frame-fill { flex: 1; min-height: 0; }
 
 /* Thin, quiet scrollbars; reserve gutter to avoid width jitter */
 .scroll-y {
@@ -529,22 +601,27 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   pointer-events: none;
 }
 
-/* Faint CRT scanlines overlay on a positioned atmosphere container */
+/* Faint CRT scanlines overlay on a positioned atmosphere container.
+   A one-gap TILE (background-size), not one huge repeating gradient: the repeating form
+   rasterizes unevenly over large layers — the landing found it first (§9): a visible band
+   at one edge, nothing mid-field — and a var(--scanline-gap) tile paints the same
+   everywhere. */
 .scanlines { position: relative; }
 .scanlines::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(to bottom,
+  background-image: linear-gradient(to bottom,
     transparent 0,
     transparent calc(var(--scanline-gap) - 1px),
     var(--scanline-color) calc(var(--scanline-gap) - 1px),
     var(--scanline-color) var(--scanline-gap));
+  background-size: 100% var(--scanline-gap);
   opacity: 0.5;
 }
 
-/* Analog static / grain overlay, kept very low opacity */
+/* Analog static / grain overlay, kept very low opacity (--noise-opacity, per theme) */
 .static-noise { position: relative; }
 .static-noise::after {
   content: "";
@@ -553,7 +630,7 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   pointer-events: none;
   background-image: var(--noise);
   background-size: 140px 140px;
-  opacity: 0.045;
+  opacity: var(--noise-opacity);
   mix-blend-mode: screen;
 }
 
@@ -625,12 +702,48 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 @keyframes bar-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 .anim-bar-reveal { animation: bar-reveal var(--dur-reveal) var(--ease-settle) both; }
 
+/* View-swap cascade (§7.7): the frame's rows settle into place in a brief stagger —
+   placement snapping into a frame, not parallax. Attach to the frame container; its
+   DIRECT children ride view-in with a capped delay (containers, never long lists — 7.3).
+   One-shot; the reduced-motion kill below collapses it like every other animation. */
+.anim-cascade > * { animation: view-in var(--dur-enter) var(--ease-settle) both; }
+.anim-cascade > :nth-child(2) { animation-delay: 60ms; }
+.anim-cascade > :nth-child(3) { animation-delay: 120ms; }
+.anim-cascade > :nth-child(n + 4) { animation-delay: 180ms; }
+
+/* The landing→app entry transition (one-shot, settles): the scene answers the door and
+   dips away; the app frame settles up into place, usually carrying the cascade. The
+   shell wires .anim-entry-dip onto the departing landing and .anim-entry-settle onto
+   the arriving frame. */
+@keyframes entry-dip    { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(1.015); } }
+@keyframes entry-settle { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.anim-entry-dip    { animation: entry-dip    var(--dur-base)  var(--ease-settle) both; }
+.anim-entry-settle { animation: entry-settle var(--dur-enter) var(--ease-settle) both; }
+
+/* The theme-switch sky moment: stamp .theme-switching on the root for the swap and drop
+   it when the fade lands (~var(--dur-theme)); every surface cross-fades to the new hour
+   instead of snapping. Deliberately NOT !important, so the reduced-motion kill below
+   still wins outright. */
+.theme-switching, .theme-switching *, .theme-switching *::before, .theme-switching *::after {
+  transition:
+    background-color var(--dur-theme) ease,
+    color var(--dur-theme) ease,
+    border-color var(--dur-theme) ease,
+    fill var(--dur-theme) ease,
+    box-shadow var(--dur-theme) ease;
+}
+
 /* ---- Accessibility fallbacks ---- */
 
 /* Reduced transparency: drop blur and texture for a solid surface */
 @media (prefers-reduced-transparency: reduce) {
   .surface-frost {
     background: var(--surface-2);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .surface-glass {
+    background: var(--surface-1);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
