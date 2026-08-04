@@ -28,6 +28,35 @@
 .scene-gallery-hub .nh-card-thumb { flex: 1 1 auto; aspect-ratio: auto; min-height: 0; }
 .scene-gallery-hub .nh-card--new { aspect-ratio: 1 / 1; height: auto; min-height: 0; }
 
+/* AS THE SURFACE (the Scenes tab) the hub is the frame: the heading and the command bar are pinned
+   rows and the card grid is the one region (§7). Inside the picker Modal the same component is
+   content — the modal body is already the region — so these rules are scoped to `.pane-frame`,
+   which only the surface instance carries. The region is the WRAPPER, never the grid (see the
+   markup note): a grid with a definite block size stops sizing its auto rows from their cards.
+   The wrapper keeps a small gutter so a card's hover lift and its ⋯ popover are not clipped
+   against the scroller's edge. */
+.scene-gallery-grid { min-width: 0; }
+.scene-gallery-hub.pane-frame > .scene-gallery-grid { padding: var(--space-1) var(--space-1) var(--space-4); }
+
+/* PHONE DENSITY HALVES (§8). A 1:1 card at 390px is a 358px square: eight prepared scenes were a
+   ~3200px scroll, most of it thumbnail. Two columns of the card's own 16/10 thumb put the same eight
+   in reach — the square is a laptop luxury, not the card's identity — and the two actions stack so
+   each keeps a full-width 44px target instead of splitting a 160px row.
+   DRAG-VS-SCROLL (§7.6): the reorder grip stays pointer-driven and `touch-action: none`, and its
+   hit-testing is viewport-space, so a scrolling grid keeps the coordinates right. There is no
+   edge-autoscroll, so a card that is off-screen cannot be reached mid-drag; the ⋯ menu's Move
+   earlier / Move later is the accepted answer for those (it is also the keyboard route). */
+@media (max-width: 560px) {
+  .scene-gallery-hub .nh-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+  .scene-gallery-hub .nh-card { aspect-ratio: auto; }
+  .scene-gallery-hub .nh-card--new { aspect-ratio: auto; min-height: 9rem; }
+  .scene-gallery-hub .nh-card-thumb { flex: none; aspect-ratio: 16 / 10; }
+  /* One line of meta at this width: the map name and the head-count already say it, and a
+     three-line wrap costs more height than the thumbnail it sits under. */
+  .scene-gallery-hub .nh-card-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scene-gallery-hub .nh-card-actions { flex-direction: column; align-items: stretch; }
+}
+
 /* The picker popup widens the dialog and sizes its columns so the squares have room to breathe. */
 .nh-modal.scenes-modal { max-width: min(100vw - 2rem, 68rem); }
 .scenes-modal .nh-gallery { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }

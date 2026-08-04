@@ -99,7 +99,7 @@ const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/integrations/IntegrationsPanel.tsx", "🔌"],
   ["apps/client/src/maps/MapManager.tsx", "←↑→↓"],
   ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
-  ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🎬🗑🗺"],
+  ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🗑🗺"],
   ["apps/client/src/viewer/ViewerControls.tsx", "●"],
   ["apps/client/src/viewer/ViewerPreviewPanel.tsx", "✕"],
   // packages/ui — the four primitives that break their own rule.

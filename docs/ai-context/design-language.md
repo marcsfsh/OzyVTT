@@ -401,7 +401,7 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 | Table, GM — phone | **redesign** | tab bar · slim scene/party row | map as a fixed **band**; beneath it one tabbed sheet: Turn ▤ / Dice ▤ / Log ▤ (three stacked panels cannot share 844px with a map) |
 | Table, player | recompose / phone follows GM pattern | tab bar · YouArePlaying | claim picker or sheet pane ▤ · map canvas · shelf ▤ |
 | Feed panels | trivial | — | roll list ▤ and log list ▤ go `flex:1` inside the dock |
-| Scenes gallery | trivial | heading · command bar | card grid ▤ (phone card density halves; reorder grip re-verified per §7.6) |
+| Scenes gallery | **done (A2)** | heading · command bar | card grid ▤ — the region is the grid's WRAPPER, never the grid (a grid with a definite block size stops sizing its auto rows from its cards); ≤560 goes two compact columns instead of 1:1 squares; the ⋯ menu's Move earlier/later is the reorder route a scrolling grid cannot autoscroll to |
 | Scene prep / staging | trivial | — | already capped lists; rides the table dock |
 | Maps library + calibration | **redesign** | back · heading · upload row | list rail ▤ · calibration pane: the long top-to-bottom sequence becomes a step layout (mode → canvas → fields → verify) with the interactive canvas always visible |
 | Roster | **done (A2)** | heading · actions | queue + gallery + archived ▤ (cards take a 15rem cell so a claimed character's three actions fit; the archived `<summary>` carries the 44px floor) |

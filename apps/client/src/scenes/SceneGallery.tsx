@@ -28,7 +28,7 @@ function SceneThumb({ mapAssetId, token }: Readonly<{ mapAssetId: string; token:
  * ⋯ menu to reorder, rename, duplicate, or remove it. "New scene" opens the prep flow. The live scene
  * carries a glowing LIVE badge; the one you're privately staging takes a quiet cyan edge.
  */
-export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatantCount, mapLibrary, previewingSceneId, token, onNewScene, onManageMaps, onClose, hideHeading, onFeedback }: Readonly<{
+export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatantCount, mapLibrary, previewingSceneId, token, onNewScene, onManageMaps, onClose, hideHeading, surface, onFeedback }: Readonly<{
   scenes: readonly Scene[];
   activeSceneId: string | null;
   combatActive: boolean;
@@ -46,6 +46,12 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
   onClose?: () => void;
   /** Hide the "GM PREP / Scenes" header (the picker popup carries its own title). */
   hideHeading?: boolean;
+  /**
+   * This instance IS the Scenes surface: it owns the pane's frame (§7) — heading and command bar
+   * pinned, the card grid the one scrolling region — and stands on the scene sky. The picker Modal
+   * renders the same component as CONTENT inside a body that already scrolls, and passes nothing.
+   */
+  surface?: boolean;
   onFeedback?: (text: string) => void;
 }>) {
   const { confirm, dialog } = useConfirm();
@@ -140,7 +146,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
     ? dragOrder.map((id) => scenes.find((scene) => scene.id === id)).filter((scene): scene is Scene => Boolean(scene))
     : scenes;
 
-  return <section className="scene-gallery-hub" aria-label="Scenes">
+  return <section className={`scene-gallery-hub${surface ? " pane-frame pane-scene scanlines frame-col anim-view" : ""}`} aria-label="Scenes">
     {!hideHeading && <div className="scene-gallery-head">
       <span className="eyebrow">GM PREP</span>
       <h2 id="scene-gallery-heading">Scenes</h2>
@@ -151,13 +157,18 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
       {onManageMaps && <Button variant="secondary" onClick={onManageMaps}>Manage maps</Button>}
     </div>}
     {scenes.length === 0
-      ? <div className="nh-empty">
-          <span className="nh-empty-icon" aria-hidden="true">🎬</span>
-          <span className="nh-empty-title">No scenes yet</span>
-          <span className="nh-empty-text">Prepare your first scene — choose a battle map and who’s in it, then go live when your table is ready.</span>
+      /* A scene moment (§9): one line and one door. The old dashed box carried a title, two
+         sentences and a decorative glyph — three of the four said the same thing. */
+      ? <div className="scene-empty">
+          <p>No scenes prepared yet — pick a map, stage who’s in it, then go live.</p>
           <Button variant="primary" arrow onClick={onNewScene}>New scene</Button>
         </div>
-      : <ul className="nh-gallery" ref={galleryRef}>
+      /* The REGION is this wrapper, never the grid itself: a grid with a definite block size
+         stops sizing its auto rows from their cards (measured — every card overflowed its row
+         into the one below at 390px), so the scroller wraps the grid and the grid keeps the auto
+         height it has always had. */
+      : <div className={`scene-gallery-grid${surface ? " scroll-y frame-fill" : ""}`}>
+        <ul className="nh-gallery" ref={galleryRef}>
           {ordered.map((scene, index) => {
             const live = scene.id === activeSceneId;
             const staging = scene.id === previewingSceneId;
@@ -186,7 +197,8 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
             </li>;
           })}
           <li><button type="button" className="nh-card nh-card--new" onClick={onNewScene}><span className="nh-card-new-icon" aria-hidden="true">＋</span>New scene</button></li>
-        </ul>}
+        </ul>
+      </div>}
     {dialog}
     {promptDialog}
   </section>;

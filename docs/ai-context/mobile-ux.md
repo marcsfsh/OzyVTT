@@ -49,6 +49,15 @@ there is no reduced mobile mode, and a mouse-only control is a bug.
   nudges the focused field into view within its own scrolling region, and regions carry
   `scroll-padding` + safe-area bottoms (`.pane-stage`; the wizard layer's own padding).
   Verified in emulation only — the physical-device pass is still GAP-001.
+- **Card grids halve their density at the 560 rung.** The scenes gallery is the pattern
+  (`apps/client/src/scenes/scene-gallery.css`): the 1:1 card a laptop shows becomes a two-column
+  compact card — the thumbnail drops back to its 16/10 shape, the meta line clamps to one line, and
+  the two actions stack so each keeps a full-width 44px target. A phone gets four cards where it
+  used to get one and a bit.
+- **A card that reorders by dragging needs a keyboard/menu route once its container scrolls.**
+  There is no edge-autoscroll during a drag, so a card scrolled out of view cannot be reached with
+  the grip; the scenes gallery's ⋯ menu carries Move earlier / Move later for exactly that (and for
+  keyboard users, who never had the grip).
 - Token name labels are hidden `@media (max-width:560px)`.
 - The map toolbar (`apps/client/src/scene/MapToolbar.tsx`) collapses at that same 560 rung, but in
   **JS** (`matchMedia`), not CSS — the phone form is a different tree (one `Tools` button opening a

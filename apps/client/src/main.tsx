@@ -643,15 +643,15 @@ function App() {
         </div>
       </div>}
 
-      {/* staged region — A2 (scenes gallery trivial) then C2 (maps/calibration redesign) drain it */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view pane-stage scroll-y">
-        {scenesView === "maps"
-          ? <div className="scenes-maps-view">
-              <Button variant="ghost" className="scenes-back" onClick={() => navigate(pathForGmTab("scenes"))}><IconChevronLeft /> Back to scenes</Button>
-              <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />
-            </div>
-          : <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => navigate("/scenes/maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={failToast} />}
-      </div>}
+      {/* The Scenes tab is two addresses in one arm: the gallery owns the pane's frame itself
+          (`surface`), while the map library below it still rides a staged region — C2 (maps and
+          calibration redesign) drains that one. */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && (scenesView === "maps"
+        ? <div className="anim-view pane-stage scroll-y scenes-maps-view">
+            <Button variant="ghost" className="scenes-back" onClick={() => navigate(pathForGmTab("scenes"))}><IconChevronLeft /> Back to scenes</Button>
+            <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />
+          </div>
+        : <SceneGallery surface scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => navigate("/scenes/maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={failToast} />)}
 
       {/* staged region — B3 (viewer-controls recompose) drains it */}
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <div className="anim-view pane-stage scroll-y"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}

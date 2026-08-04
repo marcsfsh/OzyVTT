@@ -65,11 +65,13 @@ export const CONVENTION_SHAPE = {
    * and `scene/TokenContextMenu.tsx` (1) started rendering `@vtt/ui` icons instead of emoji, and
    * down another 2 files / 3 pairs when the shell rebuild (D15/D30) deleted the lobby roster,
    * gave the Roster tab an icon-free empty state, and put `IconArrow` on the landing's two doors.
+   * −1 pair again (2026-08-04) when the scenes gallery's empty state became a scene moment: one
+   * line and one door, so its decorative 🎬 has no call site left.
    * Both must reach 0 — the icons exist (`packages/ui/src/primitives/icons.tsx`), the remaining
    * call sites have not migrated yet.
    */
   glyphAllowFiles: 16,
-  glyphAllowPairs: 40,
+  glyphAllowPairs: 39,
 
   // ─────────────────────────── (b) raw form elements ───────────────────────────
   /**
