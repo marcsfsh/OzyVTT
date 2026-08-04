@@ -659,15 +659,12 @@ function App() {
       {/* The roster owns its frame (heading row + one region + its own sky), so it takes the pane
           directly — the staging wrapper drained with it. */}
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "roster" && <PartyRosterTab state={state as GmView} onCreateCharacter={() => navigate("/builder")} />}
-      {/* staged region — A2 (replays-list trivial) drains it */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "replay" && <div className="anim-view pane-stage scroll-y"><ReplayList role="gm" token={gmToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} /></div>}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "replay" && <ReplayList role="gm" token={gmToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />}
       {/* D27 — a player reaches the shared list at the same address, as its own page, with the Table
-          tab lit and a way back to it. Unshared ids are 404 at the server, so the list is the truth.
-          staged region — A2 (replays-list trivial) drains it */}
-      {mode === "player" && playerView === "table" && route.segments[0] === "replays" && mapToken && <div className="anim-view replay-page pane-stage scroll-y">
-        <Button variant="ghost" onClick={() => navigate("/table")}><IconChevronLeft /> Back to the table</Button>
-        <ReplayList role="player" token={mapToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />
-      </div>}
+          tab lit and a way back to it (the surface's own frame row now, not a button stranded above
+          it). Unshared ids are 404 at the server, so the list is the truth. */}
+      {mode === "player" && playerView === "table" && route.segments[0] === "replays" && mapToken &&
+        <ReplayList role="player" token={mapToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} onBack={() => navigate("/table")} />}
       {/* staged region — B2 (codex recompose) drains it */}
       {mode === "gm" && gmToken && route.segments[0] === "codex" && <div className="anim-view codex-anim pane-stage scroll-y"><CodexShell gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}

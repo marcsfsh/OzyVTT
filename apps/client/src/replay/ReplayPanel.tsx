@@ -355,7 +355,10 @@ export function useReplays(token: string | null): Readonly<{ archives: readonly 
   return { archives, error, refresh: () => setTick((value) => value + 1) };
 }
 
-export function ReplayList({ role, token, onOpen }: Readonly<{ role: "gm" | "player"; token: string; onOpen: (archiveId: number) => void }>) {
+export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm" | "player"; token: string; onOpen: (archiveId: number) => void;
+  /** The player reaches this list at its own address, so its way back to the table is a frame row
+      here rather than a button stranded above the surface (D27). */
+  onBack?: () => void }>) {
   const { archives, error, refresh } = useReplays(token);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
@@ -392,14 +395,21 @@ export function ReplayList({ role, token, onOpen }: Readonly<{ role: "gm" | "pla
     finally { setBusy(null); }
   };
 
-  return <section className="card replay-panel">
-    <h2>Replays</h2>
-    <p>{role === "gm" ? "Every finished fight, kept." : "The fights your GM has shared with the party."}</p>
-    {error && <p className="replay-error">{error}</p>}
+  /* THE FRAME (§7): the heading (and the player's way back) never move; the rows are the one
+     region. Not a `.card` any more — the list IS the surface, so it stands on the scene sky and
+     the rows are the cards on it. */
+  return <section className="replay-panel replay-list-page pane-frame pane-scene scanlines frame-col anim-view">
+    <header className="replay-list-head">
+      {onBack && <Button variant="ghost" className="replay-list-back" onClick={onBack}><IconChevronLeft /> Back to the table</Button>}
+      <h2>Replays</h2>
+      <p>{role === "gm" ? "Every finished fight, kept." : "The fights your GM has shared with the party."}</p>
+      {error && <p className="replay-error">{error}</p>}
+    </header>
+    <div className="replay-list-body scroll-y frame-fill">
     {archives === null && <p>Loading replays…</p>}
-    {archives !== null && archives.length === 0 && !error && <div className="nh-empty">
-      <span className="nh-empty-title">{role === "gm" ? "No replays yet" : "Nothing here yet."}</span>
-      {role === "gm" && <span className="nh-empty-text">When a fight ends it&rsquo;s saved here automatically.</span>}
+    {/* A scene moment (§9), and one with no door: this list fills itself when a fight ends. */}
+    {archives !== null && archives.length === 0 && !error && <div className="scene-empty">
+      <p>{role === "gm" ? "No replays yet — every fight that ends is kept here." : "Your GM hasn’t shared a fight yet."}</p>
     </div>}
     {archives !== null && archives.length > 0 && <ul className="replay-rows">
       {archives.map((archive) => {
@@ -425,6 +435,7 @@ export function ReplayList({ role, token, onOpen }: Readonly<{ role: "gm" | "pla
         </li>;
       })}
     </ul>}
+    </div>
     {dialog}
   </section>;
 }

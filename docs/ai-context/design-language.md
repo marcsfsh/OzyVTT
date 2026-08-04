@@ -409,7 +409,7 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 | Homebrew | recompose | modebar | rail ▤ (already) · record detail ▤; level table keeps its own x-scroll inside |
 | Settings | **done (A2)** | heading | the group column ▤; at ≥1280 it is two columns — The table \| Mine + Players — so a 1080p width is spent instead of scrolled |
 | Shared-screen controls | recompose (light) | heading | two columns ≥1280: tools (preview pinned visible) ▤ · access ▤ |
-| Replays list / shelf | trivial | heading | table body ▤ |
+| Replays list | **done (A2)** | heading (the player's Back to the table is a row in it) | the rows ▤ — the list is the surface now, not a `.card`, so the rows are the cards standing on it |
 | Replay viewer | recompose | header · transport | stage canvas · side lists ▤ (phone: side lists become tabs) |
 | Builder / level flow | trivial (reference) | wizard head/foot | step body ▤ (formally moves the scroller from the layer to `.nh-wizard-body`) |
 | Sheet layer | trivial | sheet header · rollbar | sheet pane ▤ (the below-the-fold page actions move into the frame) |

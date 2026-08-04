@@ -32,9 +32,22 @@
 .replay-log li.replay-log-gm { border-left-style: dashed; }
 .replay-log-empty { opacity: 0.7; }
 
-.replay-list { width: 100%; border-collapse: collapse; }
-.replay-list th, .replay-list td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); }
-.replay-list td:last-child { text-align: right; }
+/* ---- The replays LIST (its own surface; the viewer above is a different composition) ----
+   The frame's heading row, then the rows. (`.replay-list` lived here as a `<table>` skin with no
+   consumer at all — the list has rendered `.nh-card` rows for a long time. Deleted rather than
+   restyled.) The four row classes below never had rules either: the rows rode element defaults,
+   which stopped being invisible once the list stood on the scene instead of inside a card. */
+.replay-list-page .replay-list-head { max-width: 60rem; margin-inline: auto; width: 100%; }
+.replay-list-page .replay-list-body { max-width: 60rem; margin-inline: auto; width: 100%; }
+.replay-list-back { align-self: flex-start; margin-bottom: var(--space-2); }
+.replay-rows { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+/* The row is the shared card chassis turned on its side: no thumbnail, so no column and no 9rem
+   floor. `.nh-card.` because the primitive's own rule would otherwise win on source order. */
+.nh-card.replay-row { flex-direction: row; align-items: center; gap: var(--space-3); min-height: var(--row-h); padding: var(--space-3); }
+.replay-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.replay-row-title { color: var(--text); font-weight: 700; }
+.replay-row-meta { color: var(--text-muted); font-size: var(--fs-xs); }
+@media (max-width: 560px) { .nh-card.replay-row { flex-wrap: wrap; } .replay-row-text { flex: 1 0 100%; } }
 
 @media (max-width: 900px) {
   .replay-layout { grid-template-columns: 1fr; }
