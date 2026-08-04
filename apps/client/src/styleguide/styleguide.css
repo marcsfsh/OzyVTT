@@ -105,17 +105,20 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
   font-size: var(--fs-sm);
 }
 
-/* Wizard demo — the shell owns the viewport in the app, so the style guide bounds it
-   in a scroll frame to keep this page readable. The sticky header/footer stick to
-   the frame instead of the window, which is exactly what they do in the app. */
+/* Wizard demo — the shell owns a whole surface in the app, so the style guide bounds it in a
+   36rem box to keep this page readable. That box is now the shell's viewport: the wizard column
+   fills it, its sticky head and foot pin to the box's edges, and the STEP BODY scrolls inside
+   them (`.nh-wizard-body`) — exactly the composition the builder ships, which is the point of a
+   demo. The frame itself declares no scroll: the region does, in the markup. */
 .sg-wizard-frame {
   height: 36rem;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--bg);
 }
-.sg-wizard-frame .nh-wizard { min-height: 100%; }
+.sg-wizard-frame .nh-wizard { flex: 1; min-height: 0; }
 .sg-wizard-step { display: grid; gap: var(--space-3); padding-bottom: var(--space-4); }
 /* No hand-rolled "Show preview" button here any more: WizardShell owns both halves of the
    master-detail swap (onOpenDetail / onCloseDetail) and shows each at the right width. */

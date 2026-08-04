@@ -518,8 +518,14 @@ function App() {
           onClose={() => navigate(mode === "gm" ? pathForGmTab("roster") : "/table")}
           onCreated={(name) => succeed(`${name} joined the roster — ready to claim.`)}
         />
-      : /* staged region — A2 (sheet/roster trivials) drains it */
-        <div className="anim-view pane-stage scroll-y"><div className="builder-gate card"><h2>Your GM builds the characters at this table</h2><p>Ask them to make one for you, or claim one that&rsquo;s already on the table.</p><Button variant="secondary" onClick={() => navigate("/table")}>Back to the table</Button></div></div>)}
+      : /* The builder is closed to players at this table, so the address answers with a scene
+           moment (§9) rather than a card in a scrolling stage: one line and one door back. */
+        <div className="anim-view builder-gate pane-frame pane-scene scanlines frame-col">
+          <div className="scene-empty frame-fill">
+            <p>Your GM builds the characters at this table. Ask them to make you one, or claim one that&rsquo;s already on the table.</p>
+            <Button variant="primary" onClick={() => navigate("/table")}>Back to the table</Button>
+          </div>
+        </div>)}
     {shellVisible && state && layer?.kind === "level" && <LevelFlow
       state={state}
       role={mode === "gm" ? "gm" : "player"}

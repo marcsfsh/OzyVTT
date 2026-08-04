@@ -217,13 +217,15 @@ export const CONVENTION_SHAPE = {
    * (the utility in design-tokens.css owns the quiet scrollbar and the stable gutter) and
    * the CSS declaration deleted, so this is SHRINK-ONLY with target **0**. `overflow-x`
    * is deliberately not counted — the wide-content rule (§7) requires it. Measured
-   * 2026-08-04: **33 sites across 13 files**, −1 the same day when the sheet layer's pane took
-   * `.scroll-y` in the markup (encounter-panel.css 7 → 6). Command:
+   * 2026-08-04: **33 sites across 13 files**, then −3 the same day as the A2 surfaces converted:
+   * the sheet layer's pane took `.scroll-y` in the markup (encounter-panel.css 7 → 6), and the
+   * wizard's step body became the scroller its layer used to be, which emptied both
+   * `builder/character-builder.css` and the styleguide's bounded demo frame. Command:
    * `grep -roE 'overflow(-y)?: *(auto|scroll)' apps/client/src --include='*.css' | wc -l`
    * → one more than the count here; one hit is a codex.css comment the strip removes.
    */
-  scrollAllowFiles: 13,
-  scrollAllowSites: 32,
+  scrollAllowFiles: 11,
+  scrollAllowSites: 30,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**

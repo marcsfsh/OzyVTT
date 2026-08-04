@@ -8,25 +8,24 @@
    bar and the connection strip stay visible above it now — the strip used to be painted over
    when this layer was `position: fixed; inset: 0` covering the viewport), and it is still a
    whole-surface page rather than a modal floating over the table (decision 4). The pane sizes
-   it (`.app-pane > *` in styles.css); this element remains the layer's own scroll container. */
+   it (`.app-pane > *` in styles.css).
+   THE LAYER NO LONGER SCROLLS — the step body does (`.nh-wizard-body`, WizardShell.css, §7's
+   formal shape: the frame is the sticky head and foot, the region is the step). The
+   `overflow-y`, the overscroll containment and the scroll-padding that used to live here moved
+   there with the scroller; the comment that explained the padding moved with them. */
 .cb-page {
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   background: var(--bg);
-  /* This element is the scroll container, and the shell's header and footer are sticky over it.
-     Without scroll padding, anything the BROWSER scrolls to — a card reached by keyboard focus, an
-     anchor jump — lands underneath the footer and reads as unreachable. Found by driving the wizard
-     with a real browser: the focused card was visible and un-clickable. */
-  scroll-padding-top: calc(var(--space-16) + var(--space-6));
-  scroll-padding-bottom: calc(var(--space-16) + var(--space-6));
 }
-/* Inside the pane the wizard column fills the PANE, not the viewport: WizardShell's own
-   `min-height: 100dvh` (right for its other, standalone lives) would force ~one chrome-row's
-   worth of dead scroll here, with the sticky footer floating over it. */
-.cb-page .nh-wizard { min-height: 100%; }
+/* Inside the pane the wizard column IS the pane: WizardShell's own `min-height: 100dvh` (right
+   for a wizard that owns a whole window) would push the sticky footer below the fold, and with
+   the body scrolling there is no page left to scroll it back. `flex: 1; min-height: 0` makes the
+   column exactly the pane's height and hands the leftover to the step body. The primitive keeps
+   its own default: the app-side override is one line, and every other mount of the shell — the
+   level flow (same layer) and the styleguide's bounded demo — states its own box the same way. */
+.cb-page .nh-wizard { flex: 1; min-height: 0; }
 
 .cb-step {
   display: flex;

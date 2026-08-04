@@ -787,7 +787,6 @@ const SCROLL_DECL = /overflow(?:-y)?\s*:\s*(?:auto|scroll)/g;
 
 /** The measured population, per file — the FEEDBACK_ALLOW shape. */
 const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/builder/character-builder.css", 1],
   ["apps/client/src/codex/codex.css", 8],
   ["apps/client/src/encounter/combat-log.css", 1],
   ["apps/client/src/encounter/encounter-panel.css", 6],
@@ -796,7 +795,6 @@ const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/scene/encounter-map.css", 5],
   ["apps/client/src/scenes/scene-prep.css", 1],
   ["apps/client/src/scenes/staging-tray.css", 1],
-  ["apps/client/src/styleguide/styleguide.css", 1],
   ["apps/client/src/styles.css", 1],
   ["apps/client/src/viewer/viewer-controls.css", 1],
   ["apps/client/src/viewer/viewer.css", 2]
