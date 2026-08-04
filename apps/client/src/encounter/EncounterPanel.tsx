@@ -729,7 +729,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     setBusy(true); setMessage("");
     try {
       const result = await operation();
-      if (!result.ok) throw new Error(result.message ?? "The encounter command was rejected.");
+      if (!result.ok) throw new Error(result.message ?? "The command was rejected.");
       setMessage(success);
     } catch (error) { setMessage((error as Error).message); }
     finally { setBusy(false); }
@@ -748,7 +748,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     });
     if (entries.length === 0) throw new Error("Stage at least one character or monster.");
     return emitCommand("encounter:start", { commandId: newId(), mapAssetId: startMapId, entries, playersRollInitiative, expectedRevision: state.revision });
-  }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
+  }, "The fight has started. Blank Initiative scores were rolled, and every token is ready in the tray above.");
   // Inline-edit an initiative score: Enter or blur commits, Escape (via cancelEditRef) discards.
   const commitEdit = (actorId: string, previous: number) => {
     if (cancelEditRef.current) { cancelEditRef.current = false; setEditingActorId(null); return; }
@@ -1036,12 +1036,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           <div className="initiative-row-main">
             {/* Foundry-style row: [avatar | name + HP bar | initiative]. The whole row opens a
                 floating tools card OVER the list - rows never shift while you work. */}
-            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} - HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>
+            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "this token"} - HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>
               <span className={`initiative-avatar ${actor?.kind ?? "npc"}${actor?.visibility === "gm-only" ? " gm-hidden" : ""}`} aria-hidden="true">{initialsOf(actor?.name ?? "?")}</span>
               <span className="initiative-main-col">
                 <span className="initiative-name-line">
                   {active && <span className="initiative-caret" aria-hidden="true">▶</span>}
-                  <strong className="initiative-name-text">{actor?.name ?? "Removed combatant"}</strong>
+                  <strong className="initiative-name-text">{actor?.name ?? "(removed)"}</strong>
                   {actor && <ConditionDots conditions={actor.conditions} />}
                   {actor && state.combat.reactionsUsed.includes(actor.id) && <span className="reaction-spent-dot" title="Reaction spent (restore in the row tools)">R</span>}
                   {actor && <span className={`initiative-hp-text hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</span>}

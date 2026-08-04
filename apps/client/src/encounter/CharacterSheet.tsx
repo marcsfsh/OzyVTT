@@ -841,7 +841,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // The prominent identity line (feedback #4): class/level/race for a PC, or the size/CR typeline for a
   // monster stat block. Sits right under the name in the header instead of reading like a footnote.
   const identityLine = identity ?? (definition
-    ? `${titleCase(definition.size)} ${extension.type ?? "creature"}${extension.alignment ? `, ${extension.alignment}` : ""}${extension.challengeRating !== undefined ? ` · CR ${formatChallenge(extension.challengeRating)}` : ""}`
+    ? `${titleCase(definition.size)} ${extension.type ?? "being"}${extension.alignment ? `, ${extension.alignment}` : ""}${extension.challengeRating !== undefined ? ` · CR ${formatChallenge(extension.challengeRating)}` : ""}`
     : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`);
 
   // One header row for every presentation (feedback #2.1/2.2): name + prominent identity on the left;

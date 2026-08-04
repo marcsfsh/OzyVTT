@@ -87,6 +87,22 @@ export function userFacingStrings(file: string, source: string): CopyString[] {
     for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_CALLS})\\(\\s*${quoted}`, "g"))) {
       found.push({ file, line: index + 1, text: match[1] ?? match[2] });
     }
+    // A display fallback inside a JSX expression — `{actor?.name ?? "combatant"}` — is copy the same
+    // way a JSX text node is: the person reads it when the left side is missing. The trailing `}` is
+    // what keeps this honest and narrow: a code default (`visibility ?? "public") !== "gm-only"`, or
+    // `const mode = x ?? "public";`) closes on `)` or `;`, never the `}` of a rendered expression, so
+    // enum defaults stay code. It does NOT reach a fallback assigned to a variable first and rendered
+    // later (`const label = x ?? "Battlemap";`) or one passed to `setError(x ?? "…")` — those two
+    // shapes are the scanner's known boundary, watched by review rather than regex.
+    for (const match of line.matchAll(new RegExp(`\\?\\?\\s*${quoted}\\s*\\}`, "g"))) {
+      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
+    }
+    // A success message trailing a callback argument — `run(async () => {…}, "Encounter started…")` —
+    // is a toast with no prop to hang it on, and `COPY_CALLS` cannot see it because it is the SECOND
+    // argument. The closing line `}, "…")` is its unmistakable, low-noise tell.
+    for (const match of line.matchAll(new RegExp(`\\},\\s*${quoted}\\s*\\)`, "g"))) {
+      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
+    }
     // A JSX text node runs from the `>` that closed a tag up to the next `<` or `{`. The old form
     // required a literal `<` to close it, so any sentence interrupted by an interpolation vanished
     // whole — including MarkerInspector's "is hidden from them. Players cannot see either.{onRevealMap …".

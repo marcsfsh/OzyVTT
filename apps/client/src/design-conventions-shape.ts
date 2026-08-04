@@ -181,11 +181,15 @@ export const CONVENTION_SHAPE = {
    */
   playSourceFloor: 115,
   /**
-   * Floor on the user-facing strings that scan yields. Measured 2026-08-03: **1763** (1797 raw,
-   * 34 of them dropped by `looksLikeCode`; the Codex corpus, for scale, is 919 over 47 files).
+   * Floor on the user-facing strings that scan yields. Re-measured 2026-08-04: **1827**, up from
+   * 1763, because the QA drive found two banned words the scan could not see — a display fallback
+   * (`{actor?.name ?? "combatant"}`) and a success message trailing a callback
+   * (`run(async () => {…}, "Encounter started…")`). `copy-scan.ts` now reads both shapes, so the
+   * corpus grew and this floor grew with it: leaving it at 1580 would leave the tripwire slack
+   * exactly where the scan was just proven blind. (The Codex corpus, for scale, is 919 over 47.)
    * Command: the test's own scan — `playCopySources()` through `scanCopy`, minus the artifacts.
    */
-  playCorpusFloor: 1580,
+  playCorpusFloor: 1640,
   /**
    * (file, string) exemptions in `play-vocabulary.test.ts`: **2** — SRD's "creature type" in the
    * homebrew rider form, and the English verb "taken" in the feature editor's repeatability help.

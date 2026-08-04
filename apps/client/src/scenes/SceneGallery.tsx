@@ -55,7 +55,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
       if (!result.ok) onFeedback?.(result.message ?? failure);
     });
   };
-  const mapName = (mapAssetId: string) => (mapLibrary ?? []).find((map) => map.id === mapAssetId)?.name ?? "Battlemap";
+  const mapName = (mapAssetId: string) => (mapLibrary ?? []).find((map) => map.id === mapAssetId)?.name ?? "Battle map";
 
   const goLive = async (scene: Scene) => {
     if (!combatActive || (await confirm({ title: "Make scene live?", body: `Make “${scene.name}” live? Players and the shared screen switch now; the current fight is parked and resumes when you switch back.`, confirmLabel: "Make live" }))) {
