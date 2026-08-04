@@ -22,8 +22,8 @@ const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
 export const ROLL_VISIBILITY_WORD: Readonly<Record<RollVisibility, string>> = {
   public: "Shown to players",
   "gm-only": "GM only",
-  "self-only": "Hidden from players",
-  blind: "GM only — you won't see it"
+  "self-only": "Hidden from players — you and the GM see it",
+  blind: "GM only — you won't see the result"
 };
 
 /**

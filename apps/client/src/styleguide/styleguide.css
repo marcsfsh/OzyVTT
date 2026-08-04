@@ -144,3 +144,17 @@ body { margin: 0; }
   color: var(--text); font: inherit; cursor: pointer;
 }
 .sg-palette-item:hover { background: var(--surface-2); border-color: var(--line); }
+
+/* Layout section: the locked-frame miniature (tokens only; the demo is the doctrine). */
+.sg-lock-demo { display: flex; flex-direction: column; height: 20rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); overflow: hidden; background: var(--bg); }
+.sg-lock-bar { display: flex; gap: var(--space-2); align-items: center; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); background: var(--surface-1); }
+.sg-lock-tab { font: 600 var(--fs-sm)/1 var(--font-body); color: var(--text-dim); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
+.sg-lock-tab.is-on { color: var(--text); box-shadow: inset 0 -2px 0 var(--magenta); }
+.sg-lock-hint { margin-left: auto; font: 400 var(--fs-2xs)/1.3 var(--font-mono); color: var(--text-muted); }
+.sg-lock-body { display: flex; flex: 1; min-height: 0; }
+.sg-lock-canvas { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); color: var(--text-dim); font: 600 var(--fs-sm)/1.3 var(--font-body); background: repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)), repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)); }
+.sg-lock-dock { width: 13rem; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--surface-1); }
+.sg-lock-dockhead { padding: var(--space-2) var(--space-3); font: 700 var(--fs-xs)/1.3 var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--line); }
+.sg-lock-list { flex: 1; min-height: 0; }
+.sg-lock-row { padding: var(--space-2) var(--space-3); font: 400 var(--fs-sm)/1.3 var(--font-body); color: var(--text-dim); border-bottom: 1px solid var(--line); }
+@media (max-width: 560px) { .sg-lock-dock { width: 9rem; } }

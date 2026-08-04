@@ -70,9 +70,9 @@ default), *Launch from here* whose confirm says the live scene is **parked**, an
 own store, router and change ping (`homebrew-store.ts`, `homebrew-http.ts`); D&D Beyond PDF ingestion
 (`packages/dndbeyond-pdf`, ADR-0018). The example party are ordinary characters.
 
-**The shell holds no roster** (D15/D30). `/` is the centred wordmark, two Buttons, no subtext. The
-party is the table's: a slim strip out of combat (`PartyStrip.tsx`), the pre-claim picker on the
-player's table (`ClaimCharacter.tsx`), and create/import/approve/archive on the Roster tab.
+**The shell holds no roster** (D15/D30); `/` is a viewport-locked title screen (`100dvh`, no page
+scroll), re-skinned per theme via `--landing-*` tokens. The party is the table's: a slim strip out
+of combat, the pre-claim picker, and create/import/approve/archive on the Roster tab.
 
 **Settings — one tab, three groups, one page** (A7/D24, `apps/client/src/settings/SettingsPage.tsx`).
 *Mine* (theme, "How you roll") reaches every role; *The table* and *Players* are GM-only and are not

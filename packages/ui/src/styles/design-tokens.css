@@ -72,8 +72,9 @@
      that must mean exactly one thing meant two. Orange is the only direction left that is
      neither loss-red, brand magenta/cyan, nor GM-violet; the restraint rule's "no yellow"
      is respected in letter and intent. Measured 2026-07-31 (Chromium, WCAG 2.1):
-     --caution-hi #FFB877 reads 10.77 / 9.96 / 8.85 on dark's three surfaces and
-     7.06 / 6.07 / 5.05 on dusk's; light's #8F4406 reads 6.80 / 6.36 / 5.93. */
+     --caution-hi #FFB877 reads 10.77 / 9.96 / 8.85 on dark's three surfaces and (re-measured
+     2026-08-04 after the sunset retune) 8.24 / 7.20 / 6.08 on dusk's; light's #8F4406 reads
+     6.80 / 6.36 / 5.93. */
   --caution: #FF9E4A;
   /* Caution as TEXT. The --danger/--danger-hi pair exists because the fill hue isn't
      readable as small type; caution needs the same pair. Use --caution for edges and

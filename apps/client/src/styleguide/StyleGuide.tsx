@@ -194,7 +194,7 @@ function MarkdownEditorDemo() {
         rows={6}
       />
       <p className="sg-muted">Type <code>[[</code> in the body to raise the page autocomplete. The Edit/View switch only appears because a <code>renderPreview</code> was supplied — an editor with no reader shows no switch.</p>
-      <h3 className="sg-h3">With an overlay — how the Codex marks its GM layer</h3>
+      <h3 className="sg-h3">With an overlay — how the Codex marks GM-only content</h3>
       <MarkdownEditor
         ariaLabel="GM-only notes"
         value={"Strahd already knows. He is letting them carry it."}
@@ -202,7 +202,7 @@ function MarkdownEditorDemo() {
         rows={3}
         overlay={<Badge tone="violet">GM only</Badge>}
       />
-      <p className="sg-muted">The overlay slot exists so the design system never learns what a “GM layer” is. Violet is the one hue reserved for it, and it is worn by the badge, not by the editor.</p>
+      <p className="sg-muted">The overlay slot exists so the design system never learns the app’s visibility words at all. Violet is the one hue reserved for it, and it is worn by the badge, not by the editor.</p>
     </div>
   );
 }
@@ -797,6 +797,42 @@ export function StyleGuide() {
             to see all three themes. Build new features from these; do not hand-roll bespoke controls.
           </p>
 
+          <Section id="layout" title="Layout — the screen is the page" blurb="Adopted 2026-08-04 (decision log; design-language.md §7). The app page never scrolls: a surface is a FRAME (chrome that never moves) plus REGIONS, and every region either fits its box or scrolls itself — the one blessed treatment is .scroll-y. One region per surface is the CANVAS and flex-fills what is left (flex: 1; min-height: 0). In force today for the landing, the shared-screen viewer, the wizard layer and Modal/Drawer; every other surface adopts it in the client-gated refresh. The miniature below is the whole idea: the outer frame never moves, the dock list scrolls itself, the canvas takes the remainder.">
+            <div className="sg-lock-demo" aria-label="Locked-viewport frame demonstration">
+              <div className="sg-lock-bar"><span className="sg-lock-tab is-on">Table</span><span className="sg-lock-tab">Scenes</span><span className="sg-lock-tab">Codex</span><span className="sg-lock-hint">frame — never scrolls</span></div>
+              <div className="sg-lock-body">
+                <div className="sg-lock-canvas"><span>canvas — flex-fills</span><span className="sg-lock-hint">min-height: 0</span></div>
+                <div className="sg-lock-dock">
+                  <div className="sg-lock-dockhead">dock region</div>
+                  <div className="sg-lock-list scroll-y">{Array.from({ length: 14 }, (_, i) => <div key={i} className="sg-lock-row">row {i + 1} — scrolls inside</div>)}</div>
+                </div>
+              </div>
+            </div>
+            <p className="sg-muted">Targets: laptop 16:9 1080p spends the width (rails, docks, columns) as well as the height; phone 390×844 spends the height. Wide content always gets its own overflow-x container. The NNvh internal-cap idiom converts to flex inside real frames during the refresh. Verify with <code>node scripts/no-scroll-audit.mjs</code> — scrollHeight over innerHeight at the document is a defect, same terms as tap-audit.</p>
+          </Section>
+
+          <Section id="layout-blueprints" title="Layout — surface blueprints (refresh)" blurb="How each surface recomposes under the standard, from the measured census: TRIVIAL wraps existing content in one declared region; RECOMPOSE re-places existing pieces into a frame; REDESIGN changes the pieces. Reference implementations to adopt rather than rebuild: landing, viewer, wizard layer, Modal/Drawer, the map’s docked/enlarged/fullscreen modes. Full table in design-language.md §8.">
+            <div className="sg-table-wrap"><table className="nh-table"><thead><tr><th>Surface</th><th>Grade</th><th>The move</th></tr></thead><tbody>
+              <tr><td>App shell</td><td>recompose</td><td>main becomes a 100dvh column: connection row · tab bar · content pane — unlocks everything below</td></tr>
+              <tr><td>Table (laptop)</td><td>recompose</td><td>map canvas flex-fills; the dock’s tracker/dice/log split one height — one flexes, others collapse</td></tr>
+              <tr><td>Table (phone)</td><td>redesign</td><td>map band + one tabbed sheet (Turn / Dice / Log) — three stacked panels cannot share 844px with a map</td></tr>
+              <tr><td>Maps + calibration</td><td>redesign</td><td>the long top-to-bottom sequence becomes steps with the canvas always visible</td></tr>
+              <tr><td>Codex · Homebrew</td><td>recompose</td><td>main pane is the scroller; per-view NNvh caps convert; editors own their height</td></tr>
+              <tr><td>Settings · Roster · Scenes · Replays list</td><td>trivial</td><td>one declared region each; Settings goes two-column at 1280+ so 1080p width is spent</td></tr>
+              <tr><td>Builder · Sheet · Landing · Viewer</td><td>done / trivial</td><td>already conforming — the references the rest adopt</td></tr>
+            </tbody></table></div>
+          </Section>
+
+          <Section id="words" title="Words — the glossary in force" blurb="The D28 vocabulary, stated where an author reads rather than only where a test fails (the locks live in play-vocabulary.test.ts and codex/vocabulary.test.ts off one shared scanner — this page is scan-excluded precisely so it may name the retired words beside their replacements).">
+            <div className="sg-table-wrap"><table className="nh-table"><thead><tr><th>Say</th><th>Never</th><th>Because</th></tr></thead><tbody>
+              <tr><td>character · monster · NPC</td><td>actor, combatant, creature</td><td>the specific kind, always; a fight’s list is “Turn order”</td></tr>
+              <tr><td>the Table (the place) · a fight (the event)</td><td>“Encounter” as a place</td><td>the tab is where you sit; encounters are what happen there</td></tr>
+              <tr><td>Shown to players · Hidden from players · GM only</td><td>GM layer, shared layer, public, “Everyone”</td><td>one visibility vocabulary, carried by the Reveal family — never re-typed</td></tr>
+              <tr><td>Delete (forever, confirmed) · Archive (kept, reversible) · Remove (out of this list)</td><td>mixing them</td><td>the verb states the consequence; “cannot be undone” appears iff Delete</td></tr>
+              <tr><td>Enforce · Advise · Off</td><td>strict / assisted / freeform in copy</td><td>the wire keeps its enum; people get plain words</td></tr>
+            </tbody></table></div>
+          </Section>
+
           <Section id="color" title="Color" blurb="Magenta leads, cyan supports. Surfaces are dark and quiet; neon is reserved for edges and states.">
             <h3 className="sg-h3">Surfaces</h3>
             <div className="sg-swatches">{SURFACES.map((t) => <Swatch key={t} token={t} />)}</div>
@@ -848,7 +884,7 @@ export function StyleGuide() {
           <Section id="buttons" title="Buttons" blurb="One primary action per view. Variants map to semantic roles; labels are sentence case.">
             <div className="sg-row">
               <Button variant="primary">Roll initiative</Button>
-              <Button variant="secondary">Add combatant</Button>
+              <Button variant="secondary">Add monsters</Button>
               <Button variant="ghost">Cancel</Button>
               <Button variant="destructive">End encounter</Button>
               <Button variant="primary" disabled>Disabled</Button>
@@ -955,7 +991,7 @@ export function StyleGuide() {
             <MarkdownEditorDemo />
           </Section>
 
-          <Section id="palette" title="Command palette (a pattern, not a primitive)" blurb="Modal align='top' + an input + a result list. It is documented here as a COMPOSITION on purpose: nothing about it is reusable except the top alignment, which is the one thing the Modal primitive gained for it. A palette anchored in the vertical centre of the viewport puts the result list under the fold on a laptop and under the keyboard on a phone, so align='top' is the whole primitive change and the rest is three ordinary controls. In the app it is scoped to the Codex and deliberately not global — ⌘K means nothing on the Encounter tab, and a test locks that, because 'make it global' is the obvious next step and is out of scope.">
+          <Section id="palette" title="Command palette (a pattern, not a primitive)" blurb="Modal align='top' + an input + a result list. It is documented here as a COMPOSITION on purpose: nothing about it is reusable except the top alignment, which is the one thing the Modal primitive gained for it. A palette anchored in the vertical centre of the viewport puts the result list under the fold on a laptop and under the keyboard on a phone, so align='top' is the whole primitive change and the rest is three ordinary controls. In the app it is scoped to the Codex and deliberately not global — ⌘K means nothing on the Table tab, and a test locks that, because 'make it global' is the obvious next step and is out of scope.">
             <CommandPaletteDemo />
           </Section>
 
@@ -1119,7 +1155,7 @@ export function StyleGuide() {
             <ul className="nh-gallery">
               <li className="nh-card is-live">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
-                <div className="nh-card-body"><h3 className="nh-card-title">Bridge Ambush</h3><span className="nh-card-meta">4 combatants</span></div>
+                <div className="nh-card-body"><h3 className="nh-card-title">Bridge Ambush</h3><span className="nh-card-meta">4 in the fight</span></div>
                 <span className="nh-card-status"><Badge tone="primary" solid>LIVE</Badge></span>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯" icon label="Scene actions" align="end">
@@ -1131,7 +1167,7 @@ export function StyleGuide() {
               </li>
               <li className="nh-card is-staging">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
-                <div className="nh-card-body"><h3 className="nh-card-title">Boss Chamber</h3><span className="nh-card-meta">6 combatants</span></div>
+                <div className="nh-card-body"><h3 className="nh-card-title">Boss Chamber</h3><span className="nh-card-meta">6 in the fight</span></div>
                 <span className="nh-card-status"><Badge>Staging</Badge></span>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯" icon label="Scene actions" align="end">
@@ -1144,7 +1180,7 @@ export function StyleGuide() {
               </li>
               <li className="nh-card">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
-                <div className="nh-card-body"><h3 className="nh-card-title">Escape Tunnels</h3><span className="nh-card-meta">2 combatants</span></div>
+                <div className="nh-card-body"><h3 className="nh-card-title">Escape Tunnels</h3><span className="nh-card-meta">2 in the fight</span></div>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
@@ -1302,7 +1338,7 @@ export function StyleGuide() {
             <ChoiceGridDemo />
           </Section>
 
-          <Section id="choicegrid-multi" title="Choice grid (choose N)" blurb="selection='multiple' turns the same grid into the choose-N list every content offer needs — three Weapon Masteries, six prepared spells, two Magic Initiate cantrips. Same cards, same single chosen treatment; only the semantics change (role=checkbox, and arrows move focus without ticking every card they pass). Pass max and the grid locks the UNCHOSEN cards at capacity with a reason, while the chosen ones stay tappable so a pick can always be swapped — capacity handled once here rather than re-derived by each step. The chosen cards keep their cyan edge and check but spend no glow: a choose-6 region has six answers, and §8.1 budgets one glowing element per region — six blooming cards is the wallpaper that rule exists to prevent.">
+          <Section id="choicegrid-multi" title="Choice grid (choose N)" blurb="selection='multiple' turns the same grid into the choose-N list every content offer needs — three Weapon Masteries, six prepared spells, two Magic Initiate cantrips. Same cards, same single chosen treatment; only the semantics change (role=checkbox, and arrows move focus without ticking every card they pass). Pass max and the grid locks the UNCHOSEN cards at capacity with a reason, while the chosen ones stay tappable so a pick can always be swapped — capacity handled once here rather than re-derived by each step. The chosen cards keep their cyan edge and check but spend no glow: a choose-6 region has six answers, and pillar 1 (design-language.md §1) budgets one glowing element per region — six blooming cards is the wallpaper that rule exists to prevent.">
             <ChoiceGridMultiDemo />
           </Section>
 

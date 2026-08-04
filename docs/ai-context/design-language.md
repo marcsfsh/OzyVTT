@@ -108,7 +108,9 @@ Themes: three themes share one structure and token set; only values change. Set
 with `data-theme="dark|dusk|light"` on the root element (dark is the default). In
 light, glow becomes an accent ring, texture drops to near-nothing, and the wordmark
 drops its chrome fill for solid ink. Legibility outranks aesthetic there without
-exception.
+exception. (The landing's sign is the one documented exception: its `--landing-sign`
+steel re-skins per theme rather than dropping to ink — the daybreak ramp is depth-tuned
+for the pale sky, and the reasoning lives beside the tokens.)
 
 ---
 
@@ -276,3 +278,160 @@ them, and that the two steps no test can demand are remembered.
 5. **Breakpoints from the ladder** (§3). An off-ladder query fails with the nearest rung named.
 6. **A narrow-viewport and touch pass before you call it done** (§4, `mobile-ux.md`).
 7. **Docs in the same commit** — the brief whose behaviour you changed, and the ledger.
+8. **The surface fits the locked viewport and declares its scroll regions** (§7). The page
+   never scrolls; every region either fits or scrolls itself via `.scroll-y`. Run
+   `node scripts/no-scroll-audit.mjs` against your route at 1280×720-class and 390×844
+   before calling it done. *(Status: standard adopted 2026-08-04; enforced today for the
+   landing, the shared-screen viewer, the wizard layer and every Modal/Drawer; app-wide
+   enforcement lands with the refresh — see §10.)*
+
+---
+
+## 7. Layout — THE SCREEN IS THE PAGE
+
+> **Status: adopted 2026-08-04 (decision log); partially in force.** In force today for the
+> landing (`apps/client/src/styles.css` — `height: 100dvh`, `html:has(.landing)` overflow
+> lock), the standalone shared-screen viewer (`apps/client/src/viewer/viewer-page.css`), the
+> standalone sheet entry, the wizard layer (`apps/client/src/builder/character-builder.css`),
+> and the Modal/Drawer primitives. **Every other surface still scrolls the document** — the
+> measured census lives with the refresh plan. Sections marked *(refresh)* below describe the
+> standard those surfaces adopt when the client-gated UI refresh implements them; nothing in
+> them is a claim about today's behaviour.
+
+**The law.** The app page never scrolls. A surface is a **frame** (chrome that never moves:
+tab bar, headers, toolbars, transport rows) plus **regions**, and every region either fits
+its box or scrolls *itself*. There is no third option; "the page grew" is a defect. The
+landing proved the feel; the shared-screen viewer has run this way since it shipped — the
+standard is a promotion of what already works, not an invention.
+
+**Targets.** One build, two postures. Laptop: 16:9, 1080p-class — compositions must spend
+the **width** (rails, docks, side columns), because locking the height while keeping one
+narrow centre column just hides the same content behind an internal scrollbar. Phone:
+390×844-class portrait — compositions spend the **height**; width collapses per the ladder
+(§3). Floors: width 320px (already declared on `body`); height **600px** *(refresh)* — below
+it the frame stays fixed and regions scroll harder, and nothing may become unreachable.
+
+**The vocabulary.**
+
+- **Frame** — never scrolls, never shrinks below its intrinsic height. The app shell's frame
+  is `[connection strip when present][tab bar][content pane]` *(refresh: the strip becomes a
+  real grid row; today it is `position: fixed` plus a `:has()` padding dance in
+  `apps/client/src/styles.css`)*.
+- **Region** — a box inside the frame. A region that can outgrow its box carries `.scroll-y`
+  (`packages/ui/src/styles/design-tokens.css`) — the one blessed scroll treatment: quiet thin
+  scrollbar, `scrollbar-gutter: stable`. *(refresh: `.scroll-y` becomes the mandatory marker;
+  a bare `overflow-y: auto` in app CSS is the tell of an undeclared region.)*
+- **Canvas** — the one region per surface that flex-fills leftover space (`flex: 1;
+  min-height: 0`): the map stage, the codex main pane, a wizard's step body. The map's
+  enlarged/docked modes and the viewer's stage are the proof this works.
+- **Wide content** — tables, level grids, tab strips, folder chips — always its own
+  `overflow-x` container. The locked page never scrolls sideways either.
+
+**Composition rules.**
+
+1. One primary scroller per pane. Nested same-axis scrollers only across a frame boundary
+   (a modal over a page, a drawer over a pane) — never two siblings guessing.
+2. The `NNvh`/fixed-rem internal cap idiom (19rem roll list, 16rem log, 40–94vh caps — the
+   codebase's pre-standard substitute for a frame) converts to `flex: 1; min-height: 0`
+   inside a real column *(refresh — the census enumerates every site)*. A leftover cap
+   inside a locked frame reintroduces double-scroll.
+3. Anchors and `scroll-padding` belong to regions, not the root: the
+   `html { scroll-behavior… scroll-padding-top }` recipe migrates into the scrolling region
+   when its surface locks *(refresh)*; `--header-h`'s only consumer goes with it.
+4. Density: `comfortable` rows are ≥44px (`--tap-min`) and the default everywhere;
+   `compact` (36px paint, `.tap-target` route 2) exists only inside GM data regions
+   (initiative rows, level tables, log lines) and never on a phone *(refresh: the pair
+   becomes `--row-h`/`--row-h-compact` tokens; today the values are per-component)*.
+5. Keyboard: a focused input inside a locked region must stay visible above the on-screen
+   keyboard — the region scrolls to it; the frame never moves. `100dvh` + `env(safe-area-*)`
+   are already the wizard/Modal practice; the editor panes adopt it *(refresh)*.
+6. Gestures: `touch-action: none` on draggables stands (mobile-ux.md). New rule — once a
+   draggable's *container* scrolls, re-verify drag-vs-scroll at 390px; a drag that used to
+   rubber-band the dead page now fights a live scroller.
+7. Motion at the view level *(refresh)*: tab swap = `anim-view` (200ms settle); layer push
+   (sheet, wizard, full-page) = `sheet-up`/`dialog-in`; drawers = `--ease-drawer`. The
+   ignition flicker stays the landing's. Nothing moves on scroll; reduced-motion freezes all
+   of it — the arcade feel comes from *placement snapping into a frame*, not parallax.
+
+**Layout tokens** *(refresh — land in `design-tokens.css` §Layout beside `--tap-min`)*:
+`--app-bar-h` (the tab bar row), `--pane-gap` (frame gutter), `--rail-w` (nav/list rails,
+220–280px), `--dock-w` (the table's side dock, 320–380px), `--row-h`/`--row-h-compact`.
+Until they land, the only layout tokens are `--header-h` and `--tap-min` — do not invent
+siblings ad hoc.
+
+---
+
+## 8. Surface blueprints *(refresh)*
+
+> How each surface recomposes under §7. Grades from the measured census (2026-08-04, in the
+> engagement record): **trivial** = wrap the existing content in one declared region;
+> **recompose** = re-place existing pieces into a frame; **redesign** = the pieces themselves
+> change. Reference implementations (already conforming, adopt-don't-rebuild): landing ·
+> shared-screen viewer · wizard layer · Modal/Drawer · the map's docked/enlarged/fullscreen
+> modes · every capped picker list.
+
+| Surface | Grade | Frame | Regions (scroll marked ▤) |
+|---|---|---|---|
+| App shell | recompose (unlocks all below) | connection row · tab bar | content pane (canvas for the active surface) |
+| Table, GM — laptop | recompose | tab bar · scene row · party strip | **map canvas** (flex-fill; the `72vh` cap and the `--setup-h` map-measuring plumbing retire) · side dock: turn tracker ▤ / dice ▤ / log ▤ — one flexes, the others collapse (the in-combat `<details>` idiom, made deliberate) |
+| Table, GM — phone | **redesign** | tab bar · slim scene/party row | map as a fixed **band**; beneath it one tabbed sheet: Turn ▤ / Dice ▤ / Log ▤ (three stacked panels cannot share 844px with a map) |
+| Table, player | recompose / phone follows GM pattern | tab bar · YouArePlaying | claim picker or sheet pane ▤ · map canvas · shelf ▤ |
+| Feed panels | trivial | — | roll list ▤ and log list ▤ go `flex:1` inside the dock |
+| Scenes gallery | trivial | heading · command bar | card grid ▤ (phone card density halves; reorder grip re-verified per §7.6) |
+| Scene prep / staging | trivial | — | already capped lists; rides the table dock |
+| Maps library + calibration | **redesign** | back · heading · upload row | list rail ▤ · calibration pane: the long top-to-bottom sequence becomes a step layout (mode → canvas → fields → verify) with the interactive canvas always visible |
+| Roster | trivial | heading · actions | queue + gallery + archived ▤ |
+| Codex shell | recompose | its own top bar | sidebar (sticky already) · main pane ▤ — per-view `NNvh` caps convert; the body editor owns its height (`resize: vertical` retires) |
+| Homebrew | recompose | modebar | rail ▤ (already) · record detail ▤; level table keeps its own x-scroll inside |
+| Settings | trivial | heading | the group column ▤; ≥1280 goes two-column so 1080p width is spent |
+| Shared-screen controls | recompose (light) | heading | two columns ≥1280: tools (preview pinned visible) ▤ · access ▤ |
+| Replays list / shelf | trivial | heading | table body ▤ |
+| Replay viewer | recompose | header · transport | stage canvas · side lists ▤ (phone: side lists become tabs) |
+| Builder / level flow | trivial (reference) | wizard head/foot | step body ▤ (formally moves the scroller from the layer to `.nh-wizard-body`) |
+| Sheet layer | trivial | sheet header · rollbar | sheet pane ▤ (the below-the-fold page actions move into the frame) |
+| Player `/replays` | recompose | — | the replay list alone — the census caught the live table rendering above it (`main.tsx` view condition); the lock forces that fix |
+| Landing / viewer / sheet entry | done | — | — |
+
+---
+
+## 9. What the landing taught the system *(status: token facts in force; adoption marked)*
+
+- **Glass tiers.** `.surface-frost` (chrome tier, over app surfaces) and `--landing-glass`
+  (scene tier, panels standing on a canvas) are the same idea at two depths. *(refresh:
+  unify as two named tiers of one treatment; a locked app full of docks over a live map
+  wants the scene tier — do not grow a third.)*
+- **Scanline tile.** A full-viewport `repeating-linear-gradient` rasterizes unevenly; the
+  landing paints a one-gap `background-size` tile instead (`apps/client/src/styles.css`,
+  documented at the rule). *(refresh: the shared `.scanlines::after` utility adopts the
+  tile before any atmosphere zone scales up.)*
+- **Noise opacity is a token.** `--landing-noise-opacity` re-skins per theme; the shared
+  `.static-noise` hardcodes its alpha. *(refresh: parameterize the utility the same way.)*
+- **Clipped panels glow via `drop-shadow`.** `box-shadow` cannot follow a `clip-path`
+  chamfer; the door treatment (chamfer + inner bezel + filter glow) is the pattern for any
+  future big-choice tile. In force as the landing's tokens; reusable on sight.
+- **Role rims.** Magenta = the player's door, violet = the GM's — consistent with
+  violet-is-GM-only. Any future role-scoped chrome inherits the pairing.
+- **The sign principle.** A hero title wears a metal the scene does not (blue-steel on the
+  magenta drive) and carries legibility in its chrome *structure*, not an outline. Reserved
+  for the landing and any future true hero moment — never a panel header.
+
+---
+
+## 10. Enforcement & migration *(plan — nothing here weakens an existing check)*
+
+- **In repo today:** `scripts/no-scroll-audit.mjs` — drives routes at 1280×900/720 and
+  390×844 and fails on `scrollHeight > innerHeight` at the document. Run per-surface during
+  the refresh; joins `npm test`'s browser-tier docs once the shell locks (same terms as
+  `tap-audit.mjs`: needs a browser, so scripted-manual, honestly outside vitest).
+- **Static checks (land with the refresh, ratchet style):** new `design-conventions`
+  checks — (e) no `100vh`/`min-height: NNvh` in app CSS outside the conforming set
+  (shrink-only allowlist seeded from the census); (f) `overflow-y` in app CSS only via
+  `.scroll-y` or an allowlisted legacy site. Both follow the existing CHECK_SHAPE pin
+  discipline.
+- **Phase order (the refresh, when the client releases it):** A — the shell lock + every
+  *trivial* surface (one commit-sized region each); B — the *recompose* surfaces (table
+  laptop, codex, homebrew, replay viewer, viewer-controls); C — the two *redesigns* (table
+  phone, map calibration). Checks land with A; docs and ledger move per commit, as always.
+- The styleguide's Layout sections mirror §7–§9 for authors; the census and the refresh
+  plan live in the engagement record until implementation, then their durable facts land
+  here.

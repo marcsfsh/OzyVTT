@@ -1400,3 +1400,30 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   fixed at the source; existing saves are repaired once by the `example-party-normalization-v1` seed,
   which re-keys the definition (body copied verbatim) and drops the orphaned row. Net zero against the
   100-definition cap, idempotent, and it never touches a definition another actor still references.
+- **2026-08-04 — The landing is a title screen, and the toggle re-skins it.** D30's "full
+  statement" landed as a full-viewport scene: star field, slatted sun, a grid rolling toward the
+  viewer, the wordmark as a blue-steel chrome sign, two chamfered doors, CRT vignette + scanlines.
+  Midway the scene was declared theme-invariant ("an attract screen commits to its night"); the
+  client reversed that the same day — the toggle re-skins the drive. Three skies now share one
+  composition: night (dark), the sunset hour (dusk), daybreak (light), all via the `--landing-*`
+  token block (`packages/ui/src/styles/design-tokens.css`), which is the only thing the themes
+  override. The sign's final form came from client references: blue-steel chrome — a metal the
+  scene never wears — with a 13-stop smooth ramp, a softened mirror meet, a 0.5px hairline, and one
+  magenta halo. The doors live in the scene's language (deep-violet panels, white-hot labels,
+  magenta player rim / violet GM rim) and stand out by luminance, not borrowed hues; daybreak swaps
+  them to pale glass with deep-inked rims.
+- **2026-08-04 — Dusk is the sunset hour, not a washed-out dark.** The dusk theme's surfaces read
+  as dark-mode-lifted-and-drained; they deepened into a true twilight purple
+  (`--bg #2E2856 → #251A4E` and the surface ladder with it). Every text pair GAINED contrast:
+  caution 7.06/6.07/5.05 → 8.24/7.20/6.08, muted 6.55/5.63/4.68 → 7.64/6.68/5.64, re-measured and
+  recorded beside the values in `design-tokens.css`.
+- **2026-08-04 — THE SCREEN IS THE PAGE (adopted; implementation pending).** The landing's locked
+  viewport is promoted to the app-wide layout standard: the page itself never scrolls — only
+  designated regions inside a surface scroll. Targets: laptop 16:9 1080p using width AND height;
+  phone using vertical space. Adopted from the client's direction after the title screen shipped;
+  the standard, the layout system, the per-surface recomposition blueprints and the enforcement
+  plan live in `docs/ai-context/design-language.md` (v2) and the `/styleguide` route's Layout
+  sections, each marked **in force** or **adopted — lands with the refresh**. No app surface was
+  reworked under this entry; the refresh is a separate, client-gated engagement. Reference
+  implementations already conforming: the landing, the shared-screen viewer, the wizard layer,
+  Modal/Drawer.

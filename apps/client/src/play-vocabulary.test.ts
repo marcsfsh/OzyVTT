@@ -226,7 +226,15 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
     // Comments stripped: the component's own header quotes all five retired phrasings in order to
     // say they are retired, exactly as the styleguide exclusion does at directory scope.
     const source = stripComments(readFileSync(`${process.cwd()}/src/dice/DicePanel.tsx`, "utf8"));
-    for (const phrase of ["Shown to players", "GM only", "Hidden from players"]) {
+    // The four audiences, pinned at their EXACT strings. self-only and blind carry plan-1 §C's
+    // clarifier suffixes (restored 2026-08-04): the head of each is still the reveal phrase, and
+    // the suffix is the fact a player most needs ("the GM sees it" / "you won't see the result").
+    for (const phrase of [
+      "Shown to players",
+      "GM only",
+      "Hidden from players — you and the GM see it",
+      "GM only — you won't see the result"
+    ]) {
       expect(
         source.includes(`"${phrase}"`),
         `dice/DicePanel.tsx no longer says ${JSON.stringify(phrase)}.\n` +
