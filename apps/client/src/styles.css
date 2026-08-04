@@ -103,11 +103,19 @@ main {
 /* THE HORIZON BAND IS RESERVED, and this one rule is what makes the sky's legibility a
    STRUCTURE rather than a hope. Everything bright in the scene — the sun's crest, the beam,
    its glow, the ember, the grid — lives within --sky-horizon-inset + --sky-sun-crown of the
-   pane's bottom edge. Measured 2026-08-04 (Chromium, WCAG 2.1, every pixel of the bare sky on
-   a 7px x 2px grid, point features set aside): the band that fails AA for --text-muted is at
-   most 149px at 1920x1080 and 125px at 390x844 across all three hours, and the reserve is
-   164px / 136px — strictly taller in every cell. ABOVE it the bare sky measures --text-dim
-   >= 6.53 and --text-muted >= 5.32 in the worst theme at either size.
+   pane's bottom edge. Re-measured 2026-08-04 after the sun became a hemisphere (Chromium,
+   WCAG 2.1, every pixel of the bare sky — content hidden, so the wash and .pane-sky alone —
+   row-scanned for a run of >= 4 consecutive failing pixels): the band that fails AA for
+   --text-muted is at most 157px at 1920x1080 and 130px at 390x844 across all three hours,
+   against a reserve of 176px / 144px — strictly taller in every cell, by 19px and 14px.
+
+   THE RUN RULE IS THE CAVEAT, AND IT IS LOAD-BEARING: it sets POINT FEATURES aside. A star is
+   one 1-1.5px dot of near-white, it can land anywhere in the pane, and no bottom reserve can
+   bound it — scanned per-pixel instead, the failing band is the whole pane in night and the
+   sunset hour (0 in daybreak, where --sky-star is transparent). The residual is a dot narrower
+   than a glyph stem, and if it ever needs answering the fix is --sky-star's alpha or a mask
+   over the content column, not a taller reserve. Read the guarantee as "no BAND of unsafe sky
+   above the reserve", never as "every pixel".
 
    So the region simply cannot put a row down there, and a surface that adds bare copy tomorrow
    inherits the guarantee instead of re-deriving it. This is what the style guide does too — its
@@ -177,7 +185,13 @@ main {
    overflow-hidden sky band and a slat gradient over the disc's lower half to get this read;
    here the horizon does the cutting and the hidden half is exactly the slatted half, so neither
    is needed. The fill is transparent at the top and strongest at the line, which puts the
-   brightest ink furthest from the text. */
+   brightest ink furthest from the text.
+
+   THE BOX AND THE CIRCLE MUST HOLD A RATIO OR THERE IS NO SUN, and that is why the token
+   derives the diameter from the crown (2:1 — a hemisphere). Set them independently and the
+   mask's cap flattens into a chord: shipped at 24rem under a 3.25rem crown this rendered a
+   394x54px slab with 8.8% taper and hard vertical sides. Nothing in this rule enforces the
+   ratio; design-tokens.css does. */
 .pane-sky::after {
   content: "";
   position: absolute;

@@ -436,15 +436,25 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   - **The horizon is a fixed inset from the pane's bottom** (`--sky-horizon-inset`, 7rem /
     5.75rem ≤760px), never the landing's percentage — a percentage drifts up into content as the
     pane grows. Every other layer is measured against that one number.
-  - **The sun is a crest, not a disc.** Its box is only the crown above the horizon and
-    `--sky-sun-mask` cuts that to the top of a circle centred on the line, so the landing's
-    clipping sky band and its slat gradient are both unnecessary — the horizon does the cutting
-    and the hidden half is exactly the slatted half.
-  - **The bright band is RESERVED.** Measured over every pixel of the bare sky, the band failing
-    AA for `--text-muted` is ≤149px at 1920×1080 and ≤125px at 390×844 in all three hours, so
-    `.pane-scene > .scroll-y` pads `--sky-horizon-inset + --sky-sun-crown` (164px / 136px) at the
-    bottom. Legibility is a structure, not an opacity dial: a surface that adds bare copy inherits
-    it. Above the reserve the bare sky measures `--text-dim` ≥ 6.53, `--text-muted` ≥ 5.32.
+  - **The sun is a crest, not a disc** — and the crown is **exactly half the diameter**, so what
+    stands above the line is a hemisphere. Its box is only the crown and `--sky-sun-mask` cuts
+    that to the top of a circle centred on the line, so the landing's clipping sky band and its
+    slat gradient are both unnecessary — the horizon does the cutting and the hidden half is
+    exactly the slatted half. `--sky-sun-d` is **derived** (`calc(--sky-sun-crown * 2)`) rather
+    than typed: the first cut set the two independently and the mask's cap flattened into a
+    chord — a measured 394×54px slab, 8.8% taper, hard vertical sides. Two numbers that must
+    hold a ratio should not both be typed.
+  - **The bright band is RESERVED.** Row-scanned over every pixel of the bare sky for a run of
+    ≥4 consecutive failing pixels, the band failing AA for `--text-muted` is ≤157px at 1920×1080
+    and ≤130px at 390×844 in all three hours, so `.pane-scene > .scroll-y` pads
+    `--sky-horizon-inset + --sky-sun-crown` (176px / 144px) at the bottom — taller by 19px and
+    14px. Legibility is a structure, not an opacity dial: a surface that adds bare copy inherits
+    it. **The run rule is the caveat and it is load-bearing:** it sets point features aside. A
+    star is one 1–1.5px near-white dot, it can land anywhere in the pane, and no bottom reserve
+    can bound it — per-pixel, the failing band is the whole pane in night and the sunset hour
+    (0 in daybreak, where `--sky-star` is transparent). The residual is narrower than a glyph
+    stem; if it ever needs answering the answer is `--sky-star`'s alpha, not a taller reserve.
+    Read the guarantee as "no *band* of unsafe sky above the reserve", never as "every pixel".
   Never put `transform`, `filter`, `backdrop-filter`, `perspective`, `will-change` or
   `contain: paint` on `.pane-scene` — any one makes it the containing block for every fixed
   overlay. The floor's perspective is on a pseudo-element inside the clipped `.pane-sky`, which

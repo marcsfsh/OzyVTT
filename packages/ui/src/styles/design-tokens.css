@@ -239,9 +239,17 @@
   --sky-star: rgba(236, 234, 251, 0.8);
   --sky-star-dim: rgba(164, 92, 255, 0.45);
   --sky-star-tile: 251px;
-  /* The crest. --sky-sun-d is the notional disc; only --sky-sun-crown of it is ever drawn. */
-  --sky-sun-d: clamp(13rem, 30vw, 24rem);
-  --sky-sun-crown: 3.25rem;
+  /* The crest, and the ONE RATIO that makes it read as a sun: the crown is exactly HALF the
+     disc, so what stands above the line is a hemisphere and the equator sits on the horizon.
+     The diameter is DERIVED from the crown for that reason — the first cut of this shipped
+     them as independent numbers (a 24rem disc under a 3.25rem crown) and the mask's circular
+     cap degenerated into a near-straight chord: measured on the live page at 1920 the visible
+     silhouette was 394x54px, a 7.3:1 slab with 8.8% taper and hard vertical sides, worst in
+     daybreak. Two numbers that must hold a ratio should not both be typed. The crown is also
+     the reserve's second term, so it stays the driver: what you set here is what the scene
+     promises to keep clear of text. */
+  --sky-sun-crown: 4rem;
+  --sky-sun-d: calc(var(--sky-sun-crown) * 2);
   --sky-sun: linear-gradient(180deg,
     rgba(255, 231, 246, 0) 0%,
     rgba(255, 92, 184, 0.42) 52%,
@@ -1075,10 +1083,15 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
     #140A2E 0%, #1F0C44 24%, #2A1055 44%, #4A1560 68%, #6E1B66 100%);
   --sky-star: rgba(255, 235, 220, 0.85);
   --sky-star-dim: rgba(255, 170, 190, 0.5);
+  /* "Amber-gold sun" is the caption, and the first cut missed it: an amber stop at 0.44 under
+     a rose base measured hue 340deg (rgb 192,90,124) three pixels above the line — rose, not
+     gold. The amber now starts higher and carries the base, so the hue at the line is the
+     ember's own rather than the wash's. The pink is gone entirely: the horizon beam is already
+     --caution-hi gold here and a rose disc sitting on a gold line was two warm stories. */
   --sky-sun: linear-gradient(180deg,
     rgba(255, 243, 201, 0) 0%,
-    rgba(255, 193, 92, 0.44) 52%,
-    rgba(255, 123, 171, 0.88) 100%);
+    rgba(255, 206, 122, 0.5) 46%,
+    rgba(255, 168, 66, 0.9) 100%);
   --sky-horizon-a: color-mix(in srgb, var(--caution-hi) 90%, transparent);
   --sky-horizon-glow: radial-gradient(46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
     rgba(255, 150, 80, 0.34) 0%, rgba(255, 46, 154, 0.14) 46%, transparent 74%);
@@ -1126,9 +1139,10 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 /* Mobile: at 390px the pane's visible sky is a ~10px gutter each side plus the bottom band,
    so the horizon IS the scene. Stepping the inset down keeps the floor from eating 13% of an
    844px pane; without it the grid also runs under the iOS home indicator. 760 is a ladder
-   rung (§3). */
+   rung (§3). Only the crown is stepped — the diameter follows it, so the sun stays a
+   hemisphere at every width and only its scale changes. */
 @media (max-width: 760px) {
-  :root { --sky-horizon-inset: 5.75rem; --sky-sun-crown: 2.75rem; }
+  :root { --sky-horizon-inset: 5.75rem; --sky-sun-crown: 3.25rem; }
 }
 
 /* =========================================================

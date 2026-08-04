@@ -1480,10 +1480,14 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
     unnecessary; and the floor rides a clipped decoration layer, because its perspective throws paint
     ~500px past each edge and would otherwise grow `document.scrollHeight` and fail the no-scroll
     audit on every scene route.
-  - **Legibility is structural, not dialled.** Measured over every pixel of the bare sky, the band
-    failing AA for `--text-muted` is ≤149px at 1920×1080 and ≤125px at 390×844 in all three hours,
-    so the scroll regions RESERVE `--sky-horizon-inset + --sky-sun-crown` (164px / 136px) in their
-    bottom padding. A surface that adds bare copy tomorrow inherits the guarantee. The sunset hour's
+  - **Legibility is structural, not dialled.** Row-scanned over every pixel of the bare sky for a
+    run of ≥4 consecutive failing pixels, the band failing AA for `--text-muted` is ≤157px at
+    1920×1080 and ≤130px at 390×844 in all three hours, so the scroll regions RESERVE
+    `--sky-horizon-inset + --sky-sun-crown` (176px / 144px) in their bottom padding. *(Numbers
+    re-measured the same day when the sun became a hemisphere — see the correction entry below;
+    the first cut measured 149/125 against 164/136.)* A surface that adds bare copy tomorrow
+    inherits the guarantee, with one named caveat: the run rule sets POINT FEATURES aside, because
+    a 1px star can land anywhere in the pane and no bottom reserve can bound it. The sunset hour's
     wash is truncated at `#6E1B66` rather than run to the landing's ember `#E88A4A`, which measures
     1.45:1 under `--text-dim` — dusk, not daybreak, was the real defect.
 - **2026-08-04 — The last two landing lessons get built: role rims and the sign.** `--rim-player` /
