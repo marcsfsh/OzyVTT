@@ -146,13 +146,12 @@
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.50) 100%);
   --landing-scanline: rgba(0, 0, 0, 0.26);
   --landing-noise-opacity: 0.05;
-  /* The sign (client refs, final round): VIOLET CHROME, structured like the reference
-     chrome lettering — light crown, deepening body, a crisp mirror meet just under the
-     waist, a bright flash below it, dark base. One family (violet), so it sits inside the
-     scene; the chrome STRUCTURE is what carries legibility over sky and sun alike, with a
-     hairline stroke and one solid extrusion + one tight halo. No thin glint stripe, no
-     two-hue butt joint — the transition IS the design. */
-  --landing-sign: linear-gradient(180deg, #F8F3FF 0%, #E4D2FF 16%, #B78FFF 32%, #7F4BE4 44%, #5A2FB8 49%, #F1E6FF 52%, #CDA9FF 63%, #9666F5 78%, #5A31BD 90%, #3A1E85 100%);
+  /* The sign: SILVER chrome, violet-tinted — the reference chrome is blue-steel silver,
+     not a hue — with SMOOTH, designed transitions: thirteen blended stops, one gently
+     softened mirror meet (50 -> 54%), no hard jump anywhere. The chrome STRUCTURE (light
+     crown, deepening body, mirror meet, flash, dark base) carries legibility over sky and
+     sun alike, with a hairline stroke and one solid extrusion + one tight halo. */
+  --landing-sign: linear-gradient(180deg, #FDFDFF 0%, #EFECFA 12%, #D8D3EE 24%, #B7AFD9 36%, #8D84BC 44%, #59517F 47%, #4E4678 50%, #F4F2FD 54%, #E0DBF3 62%, #B9B1DC 72%, #8D83C0 82%, #5C529A 92%, #453C82 100%);
   --landing-stroke: rgba(46, 16, 84, 0.65);
   --landing-title-glow:
     drop-shadow(0 3px 0 rgba(30, 10, 50, 0.85))
@@ -672,7 +671,7 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-grid-y: rgba(255, 46, 154, 0.50);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
   --landing-scanline: rgba(10, 0, 10, 0.22);
-  --landing-sign: linear-gradient(180deg, #FFF4F8 0%, #F2D4FF 16%, #C489FF 32%, #8E4BD8 44%, #6626A8 49%, #FFEFF7 52%, #E0A9FF 63%, #A85CE8 78%, #7A35B8 90%, #4A1E78 100%);
+  --landing-sign: linear-gradient(180deg, #FFFDF9 0%, #F4EDE9 12%, #E2D6DC 24%, #C4B4CC 36%, #9A88AF 44%, #6E5E8C 47%, #5E5080 50%, #FBF7F2 54%, #EBDFE8 62%, #C8B6D6 72%, #9886BC 84%, #6A5A9E 94%, #4E4288 100%);
   --landing-planet: radial-gradient(circle at 35% 30%, #FFD9A6 0%, #C86AD9 55%, #7A35B8 100%);
   --landing-planet-ring: rgba(255, 193, 92, 0.7);
   --landing-planet-glow: 0 0 16px 2px rgba(255, 150, 80, 0.4);
@@ -701,12 +700,22 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #EBD9FF 18%, #C9A1FF 36%, #9A62E0 47%, #7B44C4 50%, #F6ECFF 53%, #D9B8FF 66%, #A878E8 82%, #7746B8 100%);
+  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #F1EEF9 14%, #DCD6EE 28%, #BBB2D8 40%, #9187BC 47%, #6B6198 50%, #F8F6FE 54%, #E6E1F5 63%, #C1B8E0 75%, #9187C2 87%, #6A5FA6 100%);
   --landing-planet-opacity: 0;
   --landing-stroke: rgba(70, 40, 110, 0.50);
   --landing-title-glow:
     drop-shadow(0 2px 0 rgba(90, 50, 130, 0.5))
     drop-shadow(0 0 8px rgba(226, 76, 156, 0.28));
-  /* Daybreak: the same deep-violet doors — the darkest things on the dawn, which is
-     exactly why they read; the violet family ties them to the sign above. */
+  /* Daybreak doors: pale glass with deep-inked rims and labels — sunlit panels for a
+     sunlit sky, not the night's carried into the morning. Hover brightens; the labels
+     stay deep and readable. */
+  --landing-door-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(242, 233, 255, 0.88) 100%);
+  --landing-door-label: #3A2470;
+  --landing-door-play-rim: #C81D80;
+  --landing-door-play-glow: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.30));
+  --landing-door-play-glow-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
+  --landing-door-gm-rim: #6C3FD4;
+  --landing-door-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
+  --landing-door-gm-glow-strong: drop-shadow(0 2px 8px rgba(108, 63, 212, 0.42));
+  --landing-glass: rgba(255, 255, 255, 0.66);
 }
