@@ -104,13 +104,20 @@ absent. Therefore every semantic state carries an **icon and/or text label**, ne
 color alone; body/label text meets WCAG AA in all three themes; neon fills use
 `--text-on-neon`; never put saturated magenta text on saturated cyan or the reverse.
 
-Themes: three themes share one structure and token set; only values change. Set
-with `data-theme="dark|dusk|light"` on the root element (dark is the default). In
-light, glow becomes an accent ring, texture drops to near-nothing, and the wordmark
-drops its chrome fill for solid ink. Legibility outranks aesthetic there without
-exception. (The landing's sign is the one documented exception: its `--landing-sign`
-steel re-skins per theme rather than dropping to ink — the daybreak ramp is depth-tuned
-for the pale sky, and the reasoning lives beside the tokens.)
+Themes: three themes share one structure and token set; only values change — one
+place, three hours. Set with `data-theme="dark|dusk|light"` on the root element
+(dark is the default). By name: **night** (dark) is the default drive — deepest
+surfaces, strongest texture. **The sunset hour** (dusk, reimagined 2026-08-04 —
+see `decision-log.md`) is deep ember twilight, not a washed-out dark: surfaces
+lift to `#251A4E…#443381`, the muted pair was retuned to `#C2BBE0`, and every
+text pair *gained* contrast from the deepening (re-measured numbers live beside
+the tokens in `design-tokens.css`). **Daybreak** (light) turns glow into an
+accent ring, drops texture to near-nothing, and deepens neon to ink — legibility
+outranks aesthetic there without exception, and the wordmark drops its chrome
+fill for solid ink. (The landing's sign is the one documented exception: its
+`--landing-sign` steel re-skins per theme rather than dropping to ink — night
+and the sunset hour share the blue-steel ramp, daybreak's is depth-tuned for the
+pale sky, and the reasoning lives beside the tokens.)
 
 ---
 
