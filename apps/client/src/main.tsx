@@ -367,13 +367,15 @@ function App() {
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
     {preAuth && <div className="landing">
       {/* D30's full statement — the 80s retro-cyber title screen, layer by layer: star field, the
-          slatted sun rising behind the horizon line, the grid rolling toward the viewer, and the CRT
-          vignette + scanlines the `.landing` pseudo-elements paint over it all. Every colour is a
-          --landing-* token, and the scene commits to its night in every theme (see the token note). */}
+          slatted sun rising behind the horizon line, the grid rolling toward the viewer, analog
+          grain, and the CRT vignette + scanlines the `.landing` pseudo-elements paint over it all.
+          Every colour is a --landing-* token, re-skinned by the theme toggle: night, the sunset
+          hour, daybreak — same composition, three skies (client call, 2026-08-04). */}
       <div className="landing-scene" aria-hidden="true">
         <span className="landing-stars-far" /><span className="landing-stars" />
         <span className="landing-skyband"><span className="landing-sun" /></span>
         <span className="landing-horizon" /><span className="landing-grid" />
+        <span className="landing-noise" />
       </div>
       <header className="home-hero anim-view">
         {/* The one bold thing on the view: no eyebrow, no subtext, nothing beside it (D30). */}

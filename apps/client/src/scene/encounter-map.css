@@ -97,11 +97,12 @@
    being painted behind it. Closed, it stays under — the tray is the thing you are reading then. */
 .encounter-map-overlay.compact.open { z-index: 5; }
 .map-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: .35rem; max-width: 100%; padding: .25rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 88%, transparent); }
-/* 2.5rem of paint, not the primitive's 2.25rem, and that is a hit-area decision rather than a
-   visual one: `.tap-target` overhangs by (44 − paint) / 2 per side, so 2.25rem neighbours would
-   need an 8px gap to stop stealing each other's taps and this bar gaps by 5.6px. At 2.5rem the
-   overhang is 2px a side — the same budget `.encounter-map-tools` has always run on. */
-.map-toolbar .nh-iconbtn { width: 2.5rem; height: 2.5rem; background: transparent; border-color: transparent; font-size: 1.15rem; }
+/* 2.75rem of paint — the 44px floor carried as REAL paint (route 1), not the primitive's 2.25rem
+   plus overhang. Measured before this: every bar button painted 40px tall at ≥561px while the
+   phone rail's rows painted 44, and a `.tap-target` overhang a QA pass cannot see is a floor a
+   QA pass cannot trust. At full paint the overhang is zero, so neighbours cannot steal taps at
+   ANY gap — the .35rem budget `.encounter-map-tools` runs on is now purely visual. */
+.map-toolbar .nh-iconbtn { width: 2.75rem; height: 2.75rem; background: transparent; border-color: transparent; font-size: 1.15rem; }
 .map-toolbar .nh-iconbtn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .map-toolbar .nh-iconbtn[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
 /* The three constant tools. `.encounter-map-tools` keeps its name (and its gap budget): the 44px
@@ -110,7 +111,7 @@
 .map-toolbar-divider { align-self: stretch; width: 1px; margin: .2rem .1rem; background: var(--line-strong); }
 /* A group button is icon + WORD at every width above the collapse. The word is not a tooltip:
    a phone has no hover, so a label that only exists on hover does not exist (design-language §4). */
-.map-toolbar-group { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.5rem; padding: 0 .5rem; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.map-toolbar-group { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .5rem; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .map-toolbar-group:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .map-toolbar-group[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
 .map-toolbar-group-icon { display: grid; place-items: center; font-size: 1.05rem; }
