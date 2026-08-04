@@ -147,7 +147,11 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
     : scenes;
 
   return <section className={`scene-gallery-hub${surface ? " pane-frame pane-scene scanlines frame-col anim-view" : ""}`} aria-label="Scenes">
-    {!hideHeading && <div className="scene-gallery-head">
+    {/* The sky and the heading's beam are BOTH gated on `surface`, like the frame classes above:
+        this same component is the Scenes modal's body, and a sky there would stack a second scene
+        over the table's chrome. */}
+    {surface && <div className="pane-sky" aria-hidden="true" />}
+    {!hideHeading && <div className={`scene-gallery-head${surface ? " neon-beam" : ""}`}>
       <span className="eyebrow">GM PREP</span>
       <h2 id="scene-gallery-heading">Scenes</h2>
       <p>Build your fights ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>

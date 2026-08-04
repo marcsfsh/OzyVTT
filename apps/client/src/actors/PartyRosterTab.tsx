@@ -131,7 +131,8 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
      archived drawer share one declared region below them. The surface stands on the scene
      sky (§9) — it is a browse-and-pick page, not the table. */
   return <section className="party-roster pane-frame pane-scene scanlines frame-col anim-view">
-    <div className="party-heading">
+    <div className="pane-sky" aria-hidden="true" />
+    <div className="party-heading neon-beam">
       <h2>The party</h2>
       <p>Every character on the table — create, import, approve, archive.</p>
       <div className="party-heading-actions">

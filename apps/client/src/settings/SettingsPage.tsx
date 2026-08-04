@@ -350,7 +350,8 @@ export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut
      Settings no longer rides the shell's staged pane — it owns its column, its sky, and its
      scroller. */
   return <div className="settings-page pane-frame pane-scene scanlines frame-col anim-view">
-    <header className="settings-head">
+    <div className="pane-sky" aria-hidden="true" />
+    <header className="settings-head neon-beam">
       <h2>Settings</h2>
       <p>{role === "gm" ? "Your device, this table, and the people at it." : "Your device. The rest of the table is your GM's to set."}</p>
     </header>

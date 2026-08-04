@@ -399,7 +399,8 @@ export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm
      region. Not a `.card` any more — the list IS the surface, so it stands on the scene sky and
      the rows are the cards on it. */
   return <section className="replay-panel replay-list-page pane-frame pane-scene scanlines frame-col anim-view">
-    <header className="replay-list-head">
+    <div className="pane-sky" aria-hidden="true" />
+    <header className="replay-list-head neon-beam">
       {onBack && <Button variant="ghost" className="replay-list-back" onClick={onBack}><IconChevronLeft /> Back to the table</Button>}
       <h2>Replays</h2>
       <p>{role === "gm" ? "Every finished fight, kept." : "The fights your GM has shared with the party."}</p>

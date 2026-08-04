@@ -521,6 +521,7 @@ function App() {
       : /* The builder is closed to players at this table, so the address answers with a scene
            moment (§9) rather than a card in a scrolling stage: one line and one door back. */
         <div className="anim-view builder-gate pane-frame pane-scene scanlines frame-col">
+          <div className="pane-sky" aria-hidden="true" />
           <div className="scene-empty frame-fill">
             <p>Your GM builds the characters at this table. Ask them to make you one, or claim one that&rsquo;s already on the table.</p>
             <Button variant="primary" onClick={() => navigate("/table")}>Back to the table</Button>

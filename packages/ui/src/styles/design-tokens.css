@@ -195,6 +195,113 @@
   --landing-planet-glow: 0 0 16px 2px rgba(164, 92, 255, 0.45);
   --landing-planet-opacity: 0.55;
 
+  /* ---- THE WORK-SCREEN SKY (§9; client call 2026-08-04, reversing "no sun, no horizon,
+     no stars") ----
+     The landing's drive, generalized for a pane that has WORK on it. Same four motifs —
+     stars, a sun cresting a horizon, the glowing horizon line, a receding grid floor —
+     rebuilt to three rules the title screen does not have to obey:
+
+       1. THE HORIZON IS A FIXED INSET FROM THE PANE BOTTOM, never a percentage. A
+          percentage horizon drifts up into the content as the pane grows; 7rem never does,
+          and every other layer is expressed against this one number.
+       2. THE SUN IS A CREST, NOT A DISC. Its box IS the crown above the horizon
+          (--sky-sun-crown tall); --sky-sun-mask cuts that rectangle to the top of a
+          --sky-sun-d circle whose centre sits on the horizon. So the slats the landing
+          paints over the disc's lower half have nothing to cut — the crest is the
+          unslatted half — and the brightest ink is at the line, fading to nothing upward,
+          which is where the text is.
+       3. THE INK IS BUDGETED. --sky-floor-opacity and --sky-sun-opacity are measured
+          per-theme ceilings, not taste: legibility outranks vibe (pillar 3), and the
+          measurements live beside each theme's block.
+
+     Derive, do not hand-type: --sky-horizon-a/b and --sky-grid-x/y are color-mix() over
+     --cyan/--magenta, which already flip per theme, so night and daybreak come free from
+     ONE definition and only the sunset hour overrides them.
+
+     THE ONE-LAYER INVARIANT: --sky-wash must stay a SINGLE background layer. It is the
+     only background on `.pane-scene`; the drive rides `.pane-sky`, whose size/repeat lists
+     assume exactly ten layers. A two-layer wash spliced into a tiled stack re-tiles the
+     ramp into bands — the landing's own --landing-sky is two layers in night and dusk,
+     which is precisely why this is a separate token and not an alias of it. */
+  --sky-horizon-inset: 7rem;
+  /* NIGHT. Measured 2026-08-04 (Chromium, WCAG 2.1) against the raw wash, no glass:
+     --text-dim #A8A2CC reads 6.86 at the horizon stop (#241448) and 5.51 at the bottom
+     stop (#3A1B72); --text-muted 5.82 / 4.68; --text 13.97 / 11.22. Night needs no
+     truncation — the whole landing ramp clears AA on its own. The calc() stops pin the
+     ramp's knee to the horizon at any pane height. */
+  --sky-wash: linear-gradient(180deg,
+    #030210 0%, #070417 24%, #0B0722 46%, #150E33 68%,
+    #241448 calc(100% - var(--sky-horizon-inset)),
+    #301A5E calc(100% - var(--sky-horizon-inset) * 0.5),
+    #3A1B72 100%);
+  /* One flat tile, seven dots, sky-wide — not the landing's two parallax layers. Daybreak
+     stands the stars down by making the INK transparent, so the layer list never changes. */
+  --sky-star: rgba(236, 234, 251, 0.8);
+  --sky-star-dim: rgba(164, 92, 255, 0.45);
+  --sky-star-tile: 251px;
+  /* The crest. --sky-sun-d is the notional disc; only --sky-sun-crown of it is ever drawn. */
+  --sky-sun-d: clamp(13rem, 30vw, 24rem);
+  --sky-sun-crown: 3.25rem;
+  --sky-sun: linear-gradient(180deg,
+    rgba(255, 231, 246, 0) 0%,
+    rgba(255, 92, 184, 0.42) 52%,
+    rgba(255, 46, 154, 0.86) 100%);
+  --sky-sun-mask: radial-gradient(circle calc(var(--sky-sun-d) / 2) at 50% 100%, #000 97%, rgba(0, 0, 0, 0) 100%);
+  --sky-sun-opacity: 0.5;
+  /* The horizon beam. The same pair drives the `.neon-beam` divider, so one token owns the
+     sky's line and the chrome's. */
+  --sky-horizon-a: color-mix(in srgb, var(--cyan) 85%, transparent);
+  --sky-horizon-b: color-mix(in srgb, var(--magenta) 92%, transparent);
+  --sky-horizon-glow: radial-gradient(46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(255, 46, 154, 0.30) 0%, rgba(45, 226, 255, 0.12) 46%, transparent 74%);
+  /* Night's bloom is the crown the pre-reversal wash already carried, kept because it
+     measured safe (--text-dim 5.26; its AA ceiling is 0.24, so 0.20 keeps margin). */
+  --sky-bloom: radial-gradient(120% 62% at 50% 0%, rgba(164, 92, 255, 0.20) 0%, transparent 68%);
+  /* The floor. Shallower and flatter than the landing's road (±32%, 36% tall,
+     perspective 340/63deg, 56/56 cell): a work pane wants a strip, not a highway. Rows are
+     denser than columns — that is what sells the recession once the tilt lands. */
+  --sky-grid-x: color-mix(in srgb, var(--magenta) 50%, transparent);
+  --sky-grid-y: color-mix(in srgb, var(--cyan) 45%, transparent);
+  --sky-grid-col: 56px;
+  --sky-grid-row: 44px;
+  --sky-grid-perspective: 260px;
+  --sky-grid-tilt: 58deg;
+  --sky-grid-bleed: 12%;
+  /* Measured AA ceilings for --text-dim sitting directly on a grid line over this theme's
+     floor band (#301A5E): columns 0.44, rows 0.29. 0.28 keeps both (rows 4.57, cols 5.08). */
+  --sky-floor-opacity: 0.28;
+  /* Densest in the middle of the band, quiet at both the horizon join and the pane's bottom
+     edge — where a region's last row lands. The cheapest legibility win in the whole scene. */
+  --sky-floor-mask: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000 30%, #000 62%, rgba(0, 0, 0, 0) 100%);
+
+  /* ---- NEON LINEWORK (§9) ----
+     The horizon's line, lent to the chrome. The style guide separates its parts with the same
+     rule it draws its horizon with, and this is that rule: one token pair for the sky's line
+     and the chrome's, so they can never drift apart.
+
+     IT IS SCENE LANGUAGE, NOT STATE LANGUAGE, and the difference is the whole restraint
+     (pillar 1: neon marks what is interactive, focused, selected or live). A beam is a
+     STRUCTURAL boundary — the frame's chrome row against its region, a dock against the map.
+     It never lands on a control, never marks a state, and never replaces a resting `--line`
+     border just because one was there. That is why it runs at roughly half the horizon's
+     intensity and why the glow is a whisper: a resting rule that glowed like the active tab's
+     underline would say "live" about a heading.
+
+     Derived from --cyan/--magenta so daybreak's deepened inks come free. */
+  --rule-beam: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--cyan) 48%, transparent) 22%,
+    color-mix(in srgb, var(--magenta) 62%, transparent) 50%,
+    color-mix(in srgb, var(--cyan) 48%, transparent) 78%,
+    transparent 100%);
+  --rule-beam-v: linear-gradient(180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--cyan) 48%, transparent) 22%,
+    color-mix(in srgb, var(--magenta) 62%, transparent) 50%,
+    color-mix(in srgb, var(--cyan) 48%, transparent) 78%,
+    transparent 100%);
+  --rule-beam-glow: 0 0 10px color-mix(in srgb, var(--magenta) 18%, transparent);
+
   /* Texture sizing + noise tile. --noise-opacity is a token for the same reason
      --landing-noise-opacity is one (§9): grain strength is a per-theme dial, not a
      constant baked into the utility. */
@@ -536,6 +643,24 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   border-radius: 0;
 }
 
+/* The beam divider (§9): the sky's horizon, used as a rule. Put it on the element whose
+   BOTTOM edge is a structural boundary — a scene surface's heading row against its region —
+   and it draws a 1px lit line across that element's own width, so it aligns with the content
+   column rather than bleeding to the pane's edges. One per boundary; see the token block for
+   why this is not a licence to beam every border. */
+.neon-beam { position: relative; padding-bottom: var(--space-3); }
+.neon-beam::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background-image: var(--rule-beam);
+  box-shadow: var(--rule-beam-glow);
+  pointer-events: none;
+}
+
 /* Frame utilities (§7). A frame is a column that never scrolls; its regions divide the
    box. .frame-col is the column — min-height: 0 so its children may shrink below their
    content. .frame-fill is the canvas region that takes the leftover space. A region that
@@ -834,4 +959,86 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-door-gm-glow: drop-shadow(0 1px 4px rgba(108, 63, 212, 0.28));
   --landing-door-gm-glow-strong: drop-shadow(0 2px 8px rgba(108, 63, 212, 0.42));
   --landing-glass: rgba(255, 255, 255, 0.66);
+}
+
+/* =========================================================
+   THE WORK-SCREEN SKY, RE-SKINNED BY THEME. Its own fenced
+   blocks rather than rows inside the landing's above: the two
+   scenes are re-skinned by the same toggle but they are not
+   the same scene, and a shared block would make every sky
+   edit a diff against the title screen.
+
+   Only --sky-* appears here. --sky-horizon-a/b and
+   --sky-grid-x/y are absent from daybreak on purpose: they
+   are color-mix() over --cyan/--magenta, which the light
+   theme already deepens to ink, so the base definitions
+   resolve to daybreak's inks unchanged.
+   ========================================================= */
+
+/* THE SUNSET HOUR — and the one theme where the sky was a real legibility defect.
+   The landing's dusk ramp runs to #E88A4A: measured 2026-08-04 (Chromium, WCAG 2.1) that
+   ember end reads 1.45:1 against --text-dim #C4BEE2 and 2.24:1 against --text #F0EEFB, and
+   its 85% band still only 3.08. Both fail AA badly, and no opacity dial rescues a ramp.
+   So the WASH stops at #6E1B66 (--text-dim 5.87, --text-muted 5.71, --text 9.11) and the
+   ember is carried by the beam and by a bloom confined BELOW the horizon — "ember horizon
+   over deep twilight purple" survives; only the ember climbing into the text zone is cut. */
+[data-theme="dusk"] {
+  --sky-wash: linear-gradient(180deg,
+    #140A2E 0%, #1F0C44 24%, #2A1055 44%, #4A1560 68%, #6E1B66 100%);
+  --sky-star: rgba(255, 235, 220, 0.85);
+  --sky-star-dim: rgba(255, 170, 190, 0.5);
+  --sky-sun: linear-gradient(180deg,
+    rgba(255, 243, 201, 0) 0%,
+    rgba(255, 193, 92, 0.44) 52%,
+    rgba(255, 123, 171, 0.88) 100%);
+  --sky-horizon-a: color-mix(in srgb, var(--caution-hi) 90%, transparent);
+  --sky-horizon-glow: radial-gradient(46% 4rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(255, 150, 80, 0.34) 0%, rgba(255, 46, 154, 0.14) 46%, transparent 74%);
+  /* The ellipse's vertical radius IS the horizon inset, so the ember dies at the line and
+     content never crosses it. Measured ceiling on the truncated wash is 0.16 alpha where
+     text can reach; below the horizon it is structural rather than dialled. */
+  --sky-bloom: radial-gradient(110% var(--sky-horizon-inset) at 50% 100%,
+    rgba(255, 120, 60, 0.16) 0%, rgba(255, 46, 154, 0.07) 46%, transparent 72%);
+  --sky-grid-x: color-mix(in srgb, var(--caution) 55%, transparent);
+  --sky-grid-y: color-mix(in srgb, var(--magenta) 50%, transparent);
+  /* Measured ceilings on #6E1B66: columns 0.30, rows 0.46. 0.28 keeps the tighter one. */
+  --sky-floor-opacity: 0.28;
+}
+
+/* DAYBREAK — the safest wash of the three, not the riskiest. Measured 2026-08-04 on the raw
+   ramp at every stop: --text #17132E ≥ 13.28:1, --text-dim #4A4568 ≥ 6.63:1, --text-muted
+   #5B5578 ≥ 5.15:1. The hazards here are line ink, not wash: --text-dim on a grid line
+   measures 3.75 raw (hence the floor budget below), and --cyan #0F7FC0 as small type on this
+   sky measures 3.35 — never put cyan small text on the daybreak sky, use --text-dim.
+   Texture drops to near-nothing per the caption: stars stand down (transparent ink, layers
+   intact), no bloom, and `.scanlines`/`.static-noise` are already display:none in this theme.
+   The GRID stays — "dawn over the same grid" — which is why it is a sky layer of its own and
+   not the theme-gated `.grid-floor` utility. */
+[data-theme="light"] {
+  --sky-wash: linear-gradient(180deg,
+    #DCE6FB 0%, #E6E2F9 24%, #EFDFF6 42%, #F6DAEC 56%,
+    #FBD9E4 calc(100% - var(--sky-horizon-inset)),
+    #FDD8CE calc(100% - var(--sky-horizon-inset) * 0.4),
+    #FFD6B4 100%);
+  --sky-star: rgba(255, 255, 255, 0);
+  --sky-star-dim: rgba(255, 255, 255, 0);
+  --sky-sun: linear-gradient(180deg,
+    rgba(255, 251, 234, 0) 0%,
+    rgba(255, 217, 143, 0.5) 52%,
+    rgba(255, 143, 192, 0.72) 100%);
+  --sky-sun-opacity: 0.4;
+  --sky-horizon-glow: radial-gradient(46% 3.25rem at 50% calc(100% - var(--sky-horizon-inset)),
+    rgba(200, 29, 128, 0.16) 0%, rgba(255, 150, 120, 0.14) 48%, transparent 76%);
+  --sky-bloom: none;
+  /* Measured ceilings on #FBD9E4: columns 0.73, rows 1.00. 0.55 spends the headroom the
+     deepened inks buy without letting a line touch the AA floor. */
+  --sky-floor-opacity: 0.55;
+}
+
+/* Mobile: at 390px the pane's visible sky is a ~10px gutter each side plus the bottom band,
+   so the horizon IS the scene. Stepping the inset down keeps the floor from eating 13% of an
+   844px pane; without it the grid also runs under the iOS home indicator. 760 is a ladder
+   rung (§3). */
+@media (max-width: 760px) {
+  :root { --sky-horizon-inset: 5.75rem; --sky-sun-crown: 2.75rem; }
 }

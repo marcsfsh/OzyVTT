@@ -36,7 +36,12 @@
    The wrapper keeps a small gutter so a card's hover lift and its ⋯ popover are not clipped
    against the scroller's edge. */
 .scene-gallery-grid { min-width: 0; }
-.scene-gallery-hub.pane-frame > .scene-gallery-grid { padding: var(--space-1) var(--space-1) var(--space-4); }
+/* The inline --space-1 is the card glow's room; the BOTTOM is the sky's reserved horizon band
+   (styles.css `.pane-scene > .scroll-y`), restated here because this selector is more specific
+   than the shared one and would otherwise let the last row of cards rest in the grid floor. */
+.scene-gallery-hub.pane-frame > .scene-gallery-grid {
+  padding: var(--space-1) var(--space-1) calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
+}
 
 /* PHONE DENSITY HALVES (§8). A 1:1 card at 390px is a 358px square: eight prepared scenes were a
    ~3200px scroll, most of it thumbnail. Two columns of the card's own 16/10 thumb put the same eight

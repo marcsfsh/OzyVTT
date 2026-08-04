@@ -68,28 +68,137 @@ main {
   scroll-padding-block: var(--space-6);
 }
 /* THE SCENE TIER (§9 + the refresh's scope ruling: content-light surfaces stand on a sky, the
-   table never does). Not the landing's full drive — no sun, no horizon, no stars: one quiet
-   vertical wash off the theme's OWN surface ramp plus a single brand bloom, so night, the sunset
-   hour and daybreak each get their sky for free and no colour is hand-typed. The CRT tile is the
-   shared `.scanlines` utility (add the class beside this one), which is already display:none in
-   daybreak — that is why "scanlines in night and dusk" needs no rule of its own. Panels standing
-   on the sky take `.surface-glass` (the scene tier of the two glass tiers).
-   The tile paints UNDER the surface's content — content over texture, because legibility outranks
-   vibe (pillar 3), the same lesson the landing's labels taught. `isolation` is what makes the
-   negative z-index land between the sky and the content: a negative-index pseudo paints above the
-   background of its nearest STACKING CONTEXT, so without one here the tile would slide behind the
-   sky and vanish. `isolation` creates that context WITHOUT creating a containing block, so every
-   fixed overlay (sheet float, drawer, viewer preview) still measures against the viewport — the
-   trap `.anim-view`'s fill-mode lesson records. Lifting the children instead would have been the
-   other route, and it would have re-positioned the `<dialog>`s these surfaces render as siblings. */
+   table never does). A LITERAL sky since the 2026-08-04 reversal — stars, a sun cresting a
+   glowing horizon, a receding grid floor — where this rule used to paint "one quiet vertical
+   wash, no sun, no horizon, no stars". Every value is a --sky-* token (design-tokens.css), so
+   the three hours come free and nothing here is hand-typed. The CRT tile is the shared
+   `.scanlines` utility (add the class beside this one), already display:none in daybreak —
+   that is why "scanlines in night and dusk" needs no rule of its own. Panels standing on the
+   sky take `.surface-glass` (the scene tier of the two glass tiers), and that is not decoration:
+   it is the structural half of the legibility guarantee, because a scroll region's last row
+   lands in the floor band and the opacity budget alone cannot carry bare copy there.
+
+   THE WASH IS THIS ELEMENT'S OWN BACKGROUND and the drive is the `.pane-sky` child, for two
+   reasons. (1) One layer, no size/repeat list — the invariant the token block states. (2) The
+   floor's perspective transform throws its paint box ~500px past each edge, and `.pane-scene`
+   computes `overflow: visible`: left here that spill grows `document.scrollHeight` and fails
+   `scripts/no-scroll-audit.mjs` on every scene route. The clip belongs on a decoration-only
+   layer, never on this one, which hosts menus and `<dialog>`s.
+
+   `isolation` is what makes the negative z-indexes land between the sky and the content: a
+   negative-index child paints above the background of its nearest STACKING CONTEXT, so without
+   one here the tile would slide behind the sky and vanish. `isolation` creates that context
+   WITHOUT creating a containing block, so every fixed overlay (sheet float, drawer, viewer
+   preview) still measures against the viewport — the trap `.anim-view`'s fill-mode lesson
+   records. NEVER put transform, filter, backdrop-filter, perspective, will-change or
+   contain:paint on THIS element: any one of them makes it the containing block for all of them
+   and re-breaks what A1 verified. The transforms below are all on decoration that has no
+   descendants. */
 .pane-scene {
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(120% 62% at 50% 0%, color-mix(in srgb, var(--violet) 20%, transparent) 0%, transparent 68%),
-    linear-gradient(180deg, var(--surface-1) 0%, var(--bg) 62%);
+  background: var(--sky-wash);
 }
 .pane-scene.scanlines::after { z-index: -1; }
+/* THE HORIZON BAND IS RESERVED, and this one rule is what makes the sky's legibility a
+   STRUCTURE rather than a hope. Everything bright in the scene — the sun's crest, the beam,
+   its glow, the ember, the grid — lives within --sky-horizon-inset + --sky-sun-crown of the
+   pane's bottom edge. Measured 2026-08-04 (Chromium, WCAG 2.1, every pixel of the bare sky on
+   a 7px x 2px grid, point features set aside): the band that fails AA for --text-muted is at
+   most 149px at 1920x1080 and 125px at 390x844 across all three hours, and the reserve is
+   164px / 136px — strictly taller in every cell. ABOVE it the bare sky measures --text-dim
+   >= 6.53 and --text-muted >= 5.32 in the worst theme at either size.
+
+   So the region simply cannot put a row down there, and a surface that adds bare copy tomorrow
+   inherits the guarantee instead of re-deriving it. This is what the style guide does too — its
+   content column reserves 150px against a 112px floor. It costs a scroller some trailing space
+   and cuts off nothing: the padding is INSIDE the scroll, so every row is still reachable.
+   Specificity ties `.pane-frame > .scroll-y` above and wins on source order. */
+.pane-scene > .scroll-y {
+  padding-bottom: calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
+}
+/* THE DRIVE. One aria-hidden, pointer-inert child; `overflow: clip` (not `hidden` — nothing
+   here scrolls, and `clip` creates no scroll container) contains the floor's spill locally.
+   Ten background layers, first paints topmost: the horizon beam, its glow, seven stars, the
+   bloom. The beam's own `background-position` puts its BOTTOM edge exactly
+   --sky-horizon-inset from the pane's, which is the one number the rest of the scene is
+   measured against. Stars tile the whole pane rather than stopping at the horizon — the
+   style guide's own scroller does the same, and the brightening wash swallows the low ones. */
+.pane-sky {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: clip;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, transparent 0%, var(--sky-horizon-a) 22%, var(--sky-horizon-b) 50%, var(--sky-horizon-a) 78%, transparent 100%),
+    var(--sky-horizon-glow),
+    radial-gradient(1px 1px at 22px 31px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 121px 87px, var(--sky-star-dim) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 193px 22px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 71px 140px, var(--sky-star-dim) 50%, transparent 51%),
+    radial-gradient(1px 1px at 160px 171px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 45px 213px, var(--sky-star-dim) 50%, transparent 51%),
+    radial-gradient(1px 1px at 227px 129px, var(--sky-star) 50%, transparent 51%),
+    var(--sky-bloom);
+  background-size:
+    100% 2px, 100% 100%,
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile),
+    100% 100%;
+  background-position: 0 calc(100% - var(--sky-horizon-inset)), 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, no-repeat;
+}
+/* The grid floor. `transform-origin: center top` is the whole illusion — it pins the near edge
+   at the horizon and throws the far edge toward the vanishing point. Rows are denser than
+   columns (44 vs 56) because that is what reads as recession once the tilt lands. The mask puts
+   the densest lines mid-band and goes quiet at both the horizon join and the pane's bottom edge,
+   where a region's last row sits; the opacity is the measured per-theme ceiling on top of it. */
+.pane-sky::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--sky-grid-bleed));
+  right: calc(-1 * var(--sky-grid-bleed));
+  bottom: 0;
+  height: var(--sky-horizon-inset);
+  background-image:
+    repeating-linear-gradient(to right, var(--sky-grid-x) 0 2px, transparent 2px var(--sky-grid-col)),
+    repeating-linear-gradient(to bottom, var(--sky-grid-y) 0 2px, transparent 2px var(--sky-grid-row));
+  transform: perspective(var(--sky-grid-perspective)) rotateX(var(--sky-grid-tilt));
+  transform-origin: center top;
+  opacity: var(--sky-floor-opacity);
+  -webkit-mask-image: var(--sky-floor-mask);
+  mask-image: var(--sky-floor-mask);
+}
+/* The sun, as a CREST. The box is the crown above the horizon and nothing more; the mask cuts
+   it to the top of a --sky-sun-d circle centred on the line. The landing needs an
+   overflow-hidden sky band and a slat gradient over the disc's lower half to get this read;
+   here the horizon does the cutting and the hidden half is exactly the slatted half, so neither
+   is needed. The fill is transparent at the top and strongest at the line, which puts the
+   brightest ink furthest from the text. */
+.pane-sky::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - var(--sky-sun-d) / 2);
+  bottom: var(--sky-horizon-inset);
+  width: var(--sky-sun-d);
+  height: var(--sky-sun-crown);
+  background-image: var(--sky-sun);
+  opacity: var(--sky-sun-opacity);
+  -webkit-mask-image: var(--sky-sun-mask);
+  mask-image: var(--sky-sun-mask);
+}
+/* Reduced transparency degrades the scene rather than deleting it: the wash and the horizon
+   stay, because they are what distinguishes the three hours and hiding them would make night
+   and the sunset hour identical — that is a transparency preference, not a contrast one. What
+   goes is the two layers that sit closest to the words: the floor's mesh and the sun's film.
+   (`.scanlines`/`.static-noise` already answer the same preference in design-tokens.css, and
+   `.surface-glass` goes solid there, which is what carries the text.) */
+@media (prefers-reduced-transparency: reduce) {
+  .pane-sky::before, .pane-sky::after { display: none; }
+}
 /* An EMPTY STATE ON A SCENE is a moment, not a dashed box: one line, and one door standing in
    the sky. The door is the primary Button (chamfered since §9, glow on drop-shadow filters),
    sized up here to read as a tile rather than a form control. Where a surface has no action to
