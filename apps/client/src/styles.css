@@ -794,19 +794,32 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    Rests and Hit Dice live on the sheet (one tap from here and from the party strip), which is where
    the GM already had them — the roster's second copy went with the roster. */
 
-.table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; }
+/* THE TABLE IS A FRAME (§7). It fills the pane exactly and never scrolls as a whole — the map takes
+   the space that is left over, and anything that can outgrow its share scrolls inside its own region.
+   That is the difference the client could feel: the surface used to be a document that happened to be
+   about the height of a screen, so at 1920x1080 it overflowed its pane by 51px, at 1280x720 by 411,
+   and a player at 1080p by 211 — "scroll a little bit to see it all" on the one tab where you cannot
+   afford to look away. Measured before the change; the same probe reads 0 after it.
+   `margin-top: 2.5rem` went with the staging wrapper that used to supply the page column. */
+.table-layout { display: grid; gap: 1.5rem; height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; }
+/* `.scroll-y` is on this element in the markup, and above the 980 rung it never has anything to
+   scroll — the frame fits, measured. It earns its place BELOW the rung, where the two columns stack
+   into one tall phone column: that composition legitimately scrolls itself, which is the law's other
+   half ("fits its box or scrolls itself"). C1 replaces it with the map band and the tabbed sheet;
+   until then this is the honest shape rather than a surface that quietly overflows the pane. */
 /* (The `.table-layout.anim-view { animation-fill-mode: backwards }` patch that kept a settled
    transform from trapping the enlarged-map overlay is gone: pane-level entrances are
    opacity-led now — the `pane-in` rule with the shell frame at the top of this file.) */
-.table-sidebar > .dice-proof { margin-top: auto; }
 .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; }
-.table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+/* The left column is a frame: the scene row, the party strip and the status line are fixed rows, and
+   the map underneath them is the one thing that grows. */
+.table-layout > .table { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; min-height: 0; }
 @media (min-width: 980px) {
-  .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(21rem, 27rem); align-items: start; }
-  /* When the tracker is docked into the map, the sidebar is just the dice panel — stretch it to the
-     map's height and let the dice sit at the bottom so its lower edge lines up with the battlemap. */
-  .table-layout.docked { align-items: stretch; }
-  .table-layout.docked .table-sidebar { min-height: 100%; }
+  .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(var(--dock-w), 27rem); }
+  /* `.dice-proof { margin-top: auto }` and the `.docked` stretch pair retired here: both existed to
+     fake a shared height between two columns that were each sized by their own content. The frame
+     gives them one height for real, so bottom-aligning by margin would now fight it. */
   .viewer-preview-toggle { margin-top: .6rem; }
 }
 

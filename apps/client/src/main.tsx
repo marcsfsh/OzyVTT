@@ -219,22 +219,11 @@ function App() {
   useEffect(() => installKeyboardFocusHelper(), []);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
-  // Undocked setup: the encounter-setup panel is sized to the map/scene panel's exact height (its
-  // combatant list scrolls inside). We measure that panel live and publish it as `--setup-h` on the
-  // grid, which the setup panel reads; the ResizeObserver keeps it in step as the map column reflows
-  // (async image load, window resize, combat toggling). A callback ref binds it whenever the panel
-  // mounts, without depending on render order.
-  const tableObserverRef = useRef<ResizeObserver | null>(null);
-  const measureTablePanel = useCallback((section: HTMLElement | null) => {
-    tableObserverRef.current?.disconnect();
-    tableObserverRef.current = null;
-    if (!section) return;
-    const layout = section.closest(".table-layout") as HTMLElement | null;
-    const apply = () => layout?.style.setProperty("--setup-h", `${section.offsetHeight}px`);
-    apply();
-    tableObserverRef.current = new ResizeObserver(apply);
-    tableObserverRef.current.observe(section);
-  }, []);
+  /* (The `--setup-h` plumbing lived here: a ResizeObserver on the map panel publishing its height so
+     the setup panel beside it could match. It measured one column to size another because neither
+     column had a height of its own. The table is a frame now — both columns are given the same height
+     by the grid — so the observer, its ref, the custom property and the setup panel's `max-height`
+     that read it are all gone. Nothing in this app should be measuring a sibling to guess a height.) */
 
   /**
    * PRE-auth feedback stays inline beside the form that caused it — the landing's Notice is
@@ -616,13 +605,15 @@ function App() {
           and from a genuinely unknown address (invariant §3.2). */}
       {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundPage role="player" />}
 
-      {/* staged region — B1 (table laptop recompose) then C1 (table phone redesign) drain it.
+      {/* THE TABLE OWNS ITS FRAME (B1). No staging wrapper: the surface fills the pane and the map
+          takes what the rows above it leave, so nothing here scrolls as a whole. C1 still redesigns
+          the PHONE composition of it.
           The player half excludes `/replays`: that address renders the shared-replays page (below),
           and without the exclusion the live table stacked on top of it — the census's one
           stacking anomaly, which the lock forces fixed (the audit's player `/replays` row is its
           regression check). */}
-      {((mode === "player" && playerView === "table" && route.segments[0] !== "replays" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view pane-stage scroll-y${showDocked ? " docked" : ""}`}>
-        <section className="table" ref={measureTablePanel}>
+      {((mode === "player" && playerView === "table" && route.segments[0] !== "replays" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view scroll-y${showDocked ? " docked" : ""}`}>
+        <section className="table">
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
               Guarded on the field, not just the mode - the first state after login can still be
               player-projected (no scenes) until the session join lands. */}

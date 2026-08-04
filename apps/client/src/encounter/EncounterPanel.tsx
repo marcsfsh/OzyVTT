@@ -604,6 +604,14 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           entirely behind the "My sheet" view). It clears itself the moment they roll (their id leaves
           pendingInitiative). */}
       {myId !== null && (combat.pendingInitiative ?? []).includes(myId) && <InitiativePrompt actorId={myId} />}
+      {/* THE TRACKER'S REGION (B1). In combat this panel is the tallest thing in the sidebar — measured
+          at 819px inside a 676px column at 1280x720 — and it had no scroller of its own, so it pushed
+          the whole surface past the pane instead of scrolling its own turn order. The topbar above and
+          the roll prompt stay pinned as the region's header; everything that can grow lives in here.
+          `.scroll-y` is in the markup because that is the marker check (h) accepts.
+          The auto-scroll anchors below now scroll THIS region rather than the page, which is the
+          behaviour they always wanted. */}
+      <div className="encounter-region scroll-y">
       {view === "sheet" && myActor
         ? <CharacterSheet actor={myActor} role="player" state={props.state} embedded combat={{ revision: props.state.revision, active: combat.active, myTurn, playerDamageMode: combat.playerDamageMode, targets: combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name })) }} onJumpToInitiative={() => { setView("initiative"); setReturnToSheetAfterAttack(true); }} onClose={() => setView("initiative")} />
         : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
@@ -623,6 +631,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={rollMode} />}
         </li>;
       })}</ol>}
+      </div>
       <DockPicker dock={props.dock} />
     </section>;
   }
@@ -1026,6 +1035,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         <span>Waiting on {state.combat.pendingInitiative.length} player{state.combat.pendingInitiative.length === 1 ? "" : "s"} to roll initiative{state.combat.playerInitiativeMode === "wait" ? " - turns begin once everyone has" : ""}.</span>
         <button type="button" className="encounter-primary" disabled={busy} onClick={() => { setBusy(true); socket.emit("initiative:roll-remaining", { commandId: newId() }, (result: MutationResult) => { setBusy(false); setMessage(result.ok ? "Rolled initiative for the rest of the table." : result.message ?? "Initiative could not be rolled."); }); }}>Roll for the rest</button>
       </div>}
+      {/* The GM's tracker region — same reason as the player's: the turn order is the part that grows,
+          so it scrolls itself rather than growing the surface. The topbar, the start/stop controls and
+          the initiative-gathering notice above stay pinned as the region's header. */}
+      <div className="encounter-region scroll-y">
       <ol className="initiative-list gm">{orderedInitiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;
@@ -1086,6 +1099,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           {actor && (state.combat.pendingDamage ?? []).filter((proposal) => proposal.targetActorId === actor.id).map((proposal) => <PendingDamagePrompt key={proposal.id} proposal={proposal} onFeedback={setMessage} />)}
         </li>;
       })}</ol>
+      </div>
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}
     {/* Mid-fight reinforcements: ONE command puts the monster on the roster AND in the turn order,

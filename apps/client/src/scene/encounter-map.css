@@ -1,4 +1,7 @@
-.encounter-map-interaction { margin-top: .5rem; position: relative; }
+/* The map is the canvas of the table frame: it takes whatever the rows above it leave, rather than
+   asking for a fraction of the viewport and letting the surface grow past its pane. `.enlarged` below
+   has always worked this way — this is that shape, made the normal one. */
+.encounter-map-interaction { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
 /* The tray floats over the map's top edge rather than reflowing the whole map when it appears (for a
    drag or unplaced tokens), so grabbing a token no longer shoves the map down (report #5). */
 .encounter-map-interaction:not(.enlarged) .encounter-token-tray { position: absolute; z-index: 4; top: 0; left: 0; right: 0; margin-bottom: 0; }
@@ -23,8 +26,13 @@
 .tray-token.npc { background: color-mix(in srgb, var(--surface-3) 58%, var(--indigo)); }
 .tray-token.npc > span { background: color-mix(in srgb, var(--indigo) 48%, var(--void)); }
 .tray-token.hidden { border-style: dashed; opacity: .76; }
-.encounter-map-stage { --dock-side-width: 22rem; position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); touch-action: none; }
-.encounter-map-stage svg { display: block; width: 100%; max-height: min(72vh, 680px); background: var(--void); user-select: none; }
+.encounter-map-stage { --dock-side-width: 22rem; position: relative; flex: 1; min-height: 12rem; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); touch-action: none; }
+/* No viewport cap. `max-height: min(72vh, 680px)` was the single biggest reason the table outgrew its
+   pane: 72vh of MAP plus the rows above and below it is more than 100vh of surface, so the taller the
+   screen the worse it got. The stage takes the frame's leftover height and the svg fills it; the
+   viewBox keeps the map's own aspect ratio, so filling cannot stretch the art. The floor drops from
+   20rem to 12rem — it is a floor for a short frame now, not a target height. */
+.encounter-map-stage svg { display: block; width: 100%; height: 100%; background: var(--void); user-select: none; }
 .encounter-map-stage > p { padding: 2rem; text-align: center; }
 .encounter-token { outline: none; }
 .encounter-token.movable { cursor: grab; }

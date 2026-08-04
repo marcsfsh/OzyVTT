@@ -665,7 +665,6 @@ const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phas
   ["apps/client/src/codex/codex.css", "72vh", "B"],
   ["apps/client/src/codex/codex.css", "68vh", "B"],
   ["apps/client/src/codex/codex.css", "52vh", "B"],
-  ["apps/client/src/encounter/encounter-panel.css", "72vh", "B"],
   ["apps/client/src/encounter/encounter-panel.css", "78vh", "B/C"],
   ["apps/client/src/homebrew/homebrew.css", "64vh", "B"],
   ["apps/client/src/homebrew/homebrew.css", "50vh", "B"],
@@ -673,7 +672,6 @@ const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phas
   ["apps/client/src/homebrew/homebrew.css", "50dvh", "B"],
   ["apps/client/src/replay/replay.css", "68vh", "B"],
   ["apps/client/src/replay/replay.css", "50vh", "B"],
-  ["apps/client/src/scene/encounter-map.css", "72vh", "B"],
   ["apps/client/src/styles.css", "52vh", "B"],
   ["apps/client/src/viewer/viewer-controls.css", "54vh", "B"],
   ["apps/client/src/viewer/viewer-controls.css", "50vh", "B"]
@@ -791,7 +789,7 @@ const SCROLL_DECL = /overflow(?:-y)?\s*:\s*(?:auto|scroll)/g;
 const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/codex/codex.css", 8],
   ["apps/client/src/encounter/combat-log.css", 1],
-  ["apps/client/src/encounter/encounter-panel.css", 6],
+  ["apps/client/src/encounter/encounter-panel.css", 5],
   ["apps/client/src/homebrew/homebrew.css", 3],
   ["apps/client/src/maps/map-picker.css", 1],
   ["apps/client/src/scene/encounter-map.css", 5],

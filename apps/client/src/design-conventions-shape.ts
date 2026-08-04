@@ -209,8 +209,8 @@ export const CONVENTION_SHAPE = {
    * `100dvh`/paired/`:fullscreen` allows and counts occurrences, not lines) — then −1 file
    * the same day, when the styleguide's lone bare `100vh` took the lock unit instead.
    */
-  viewportLegacyFiles: 7,
-  viewportLegacyTotal: 27,
+  viewportLegacyFiles: 6,
+  viewportLegacyTotal: 25,
 
   // ─────────────────────────── (h) declared scroll regions ───────────────────────────
   /**
@@ -227,7 +227,7 @@ export const CONVENTION_SHAPE = {
    * → one more than the count here; one hit is a codex.css comment the strip removes.
    */
   scrollAllowFiles: 11,
-  scrollAllowSites: 30,
+  scrollAllowSites: 29,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**

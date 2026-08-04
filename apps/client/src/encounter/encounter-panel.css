@@ -19,10 +19,21 @@
    the scroll trap, because its internal scroll region only existed above 980px. Every list in the
    new panel caps and scrolls itself at EVERY width, so the buttons below them are always on screen. */
 @media (min-width: 980px) {
-  /* Still bottom-aligned with the map beside it; `max-height` rather than `height`, since the panel
-     is now naturally short and should not be stretched to fill. `--setup-h` is measured in main.tsx. */
-  .table-sidebar > .encounter-panel.setup { display: flex; flex-direction: column; max-height: var(--setup-h, calc(min(72vh, 680px) + 7rem)); overflow-y: auto; }
+  /* The panel takes its share of the sidebar's height and scrolls inside it. It used to wear a
+     `max-height: var(--setup-h, ...)` fed by a ResizeObserver measuring the map panel across the grid;
+     that whole apparatus existed because neither column had a real height. The frame gives them one.
+     The scroller is marked in the markup with `.scroll-y`, which is what check (h) accepts — a bare
+     `overflow-y` here would be an undeclared region. */
+  .table-sidebar > .encounter-panel.setup { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 }
+/* In combat the tracker is the sidebar's main event, so it takes the column's leftover height and
+   scrolls its turn order inside itself. Every width, not just ≥980: a short laptop window is where
+   this bites hardest. */
+.table-sidebar > .encounter-panel.combat-active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+/* The region the tracker scrolls. overscroll-behavior because the page behind it is locked and
+   rubber-banding a dead page reads as breakage; scroll-padding so an auto-scrolled row does not land
+   flush against the pinned header above it. */
+.encounter-region { flex: 1; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
 .initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
 /* Why Start is unavailable, said where the button is rather than as a disabled mystery. */
 .encounter-start-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }

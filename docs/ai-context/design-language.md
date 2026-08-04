@@ -397,7 +397,7 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 | Surface | Grade | Frame | Regions (scroll marked ▤) |
 |---|---|---|---|
 | App shell | **done (A1)** — unlocked all below | connection row · tab bar | content pane (canvas for the active surface; unconverted surfaces ride a staged `.pane-stage` ▤ until their phase) |
-| Table, GM — laptop | recompose | tab bar · scene row · party strip | **map canvas** (flex-fill; the `72vh` cap and the `--setup-h` map-measuring plumbing retire) · side dock: turn tracker ▤ / dice ▤ / log ▤ — one flexes, the others collapse (the in-combat `<details>` idiom, made deliberate) |
+| Table, GM — laptop | **frame done (B1)**; dock accordion still to come | tab bar · scene row · party strip | **map canvas** flex-fills — the `72vh` cap and the `--setup-h` map-measuring plumbing are gone, and the stage takes the frame's leftover height (849px at 1920×1080 where the cap allowed 680) · the in-combat tracker has its own ▤ region for the first time, so the turn order scrolls instead of the surface · dice ▤ / log ▤ still use the `<details>` idiom, which the accordion replaces |
 | Table, GM — phone | **redesign** | tab bar · slim scene/party row | map as a fixed **band**; beneath it one tabbed sheet: Turn ▤ / Dice ▤ / Log ▤ (three stacked panels cannot share 844px with a map) |
 | Table, player | recompose / phone follows GM pattern | tab bar · YouArePlaying | claim picker or sheet pane ▤ · map canvas · shelf ▤ |
 | Feed panels | trivial | — | roll list ▤ and log list ▤ go `flex:1` inside the dock |
