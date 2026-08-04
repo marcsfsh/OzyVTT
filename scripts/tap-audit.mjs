@@ -1,5 +1,15 @@
 /**
- * Codex tap-target audit — the reproducible form of acceptance criterion **A-3**.
+ * Tap-target audit — the reproducible form of acceptance criterion **A-3**, grown to the
+ * play shell: the Codex in both roles (its original scope) plus the shell's phase-A
+ * surfaces (table, scenes, maps, roster, replays, settings, builder — GM and player).
+ *
+ * THE RUNNER IS PER-SURFACE ROOT/READY AWARE. A surface entry may carry `root` (the
+ * measurement root, default the pass's rootSelector) and `ready` (the selector awaited
+ * before measuring, default `<root> .codex-shell-content` — the codex gate). That is what
+ * makes design-language.md §6b step 4's "a new address is one line" true for play routes,
+ * which have no `.codex-shell-content`. Play surfaces measure the app as the server has it
+ * (a live fight if one is running) — like the codex passes, this audits a dev server's
+ * state, it does not create one.
  *
  * WHY THIS FILE EXISTS. A-3 asks that every interactive Codex control meet the 44px floor, and the
  * spec's own preamble wants that "countable, not asserted". It was first downgraded to a source-level
@@ -296,7 +306,17 @@ const SURFACES = [
       await prep.scrollIntoViewIfNeeded();
       try { await prep.click({ timeout: 4_000 }); } catch { await prep.dispatchEvent("click"); }
       await page.waitForTimeout(700);
-    } }
+    } },
+  // ---- The play shell + its phase-A surfaces. `root: "main"` measures the whole shell
+  // (tab bar included); each `ready` is the surface's own render root, since none of these
+  // has a `.codex-shell-content`. One line per address, as §6b step 4 wants. ----
+  { name: "play-table", path: "/table", root: "main", ready: ".table-layout" },
+  { name: "play-scenes", path: "/scenes", root: "main", ready: ".scene-gallery-hub" },
+  { name: "play-maps", path: "/scenes/maps", root: "main", ready: ".scenes-maps-view" },
+  { name: "play-roster", path: "/roster", root: "main", ready: ".party-heading-actions" },
+  { name: "play-replays", path: "/replays", root: "main", ready: ".replay-panel" },
+  { name: "play-settings", path: "/settings", root: "main", ready: ".settings-group" },
+  { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" }
 ];
 
 /**
@@ -334,7 +354,11 @@ const PLAYER_SURFACES = [
       await opener.scrollIntoViewIfNeeded();
       try { await opener.click({ timeout: 4_000 }); } catch { await opener.dispatchEvent("click"); }
       await page.waitForTimeout(700);
-    } }
+    } },
+  // ---- The player's own play shell (see the GM `play-*` block above). ----
+  { name: "player-play-table", path: "/table", root: "main", ready: ".table-layout" },
+  { name: "player-play-replays", path: "/replays", root: "main", ready: ".replay-panel" },
+  { name: "player-play-settings", path: "/settings", root: "main", ready: ".settings-group" }
 ];
 
 const report = [];
@@ -343,10 +367,22 @@ let totalControls = 0, totalBad = 0, unmeasured = 0;
 async function walk(page, surfaces, rootSelector) {
   for (const surface of surfaces) {
     if (surface.narrowOnly && width >= 761) { report.push(`### ${surface.name}: not present at ${width}px (>=761)`); continue; }
+    // Per-surface root/ready: codex surfaces keep the pass default (`rootSelector` and its
+    // `.codex-shell-content` gate); a play surface names its own root and render gate.
+    const root = surface.root ?? rootSelector;
+    const ready = surface.ready ?? `${root} .codex-shell-content`;
     // Addresses, not tabs. A hard `goto` would drop the memory-only GM token, so this drives the router
-    // the way the address bar does inside a live SPA.
-    await page.evaluate((target) => { history.pushState(null, "", target); dispatchEvent(new PopStateEvent("popstate", { state: null })); }, surface.path);
-    try { await page.waitForSelector(`${rootSelector} .codex-shell-content`, { timeout: 15_000 }); }
+    // the way the address bar does inside a live SPA. The popstate is dispatched TWICE on purpose:
+    // router.ts's transient mechanism absorbs the first pop whenever a transient overlay (nav drawer,
+    // palette) is still registered — it closes the overlay and the route stands — so a single dispatch
+    // right after such a surface navigates nowhere. The second dispatch finds no transient and routes;
+    // with none registered, it re-routes to the same path, which the router treats as a no-op.
+    await page.evaluate((target) => {
+      history.pushState(null, "", target);
+      dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      dispatchEvent(new PopStateEvent("popstate", { state: null }));
+    }, surface.path);
+    try { await page.waitForSelector(ready, { timeout: 15_000 }); }
     catch { report.push(`### ${surface.name}: ${surface.path} DID NOT RENDER - NOT MEASURED`); unmeasured += 1; continue; }
     await page.waitForTimeout(900);
     if (surface.open) {
@@ -357,7 +393,7 @@ async function walk(page, surfaces, rootSelector) {
     }
     // A string `pageFunction` is evaluated as an EXPRESSION and never receives `arg`, so the call is
     // built into the expression instead of passed alongside it.
-    const { out, error } = await page.evaluate(`${MEASURE}(${JSON.stringify(rootSelector)})`);
+    const { out, error } = await page.evaluate(`${MEASURE}(${JSON.stringify(root)})`);
     if (error) { report.push(`### ${surface.name}: ${error} - NOT MEASURED`); unmeasured += 1; continue; }
     const bad = out.filter((c) => c.h < 44 || c.w < 44);
     const stolen = out.filter((c) => c.h >= 44 && c.w >= 44 && c.reach > 0 && c.reach < c.h - 2);

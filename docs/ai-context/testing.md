@@ -93,8 +93,15 @@ automated does.**
   `/viewer.html` and confirm nothing GM-only appears. For Codex changes, use the GM's player
   preview (`POST /api/v1/codex/preview-session`) rather than reasoning about it.
 - **Touch targets:** `node scripts/tap-audit.mjs 375` measures the 44px floor across GM and
-  player surfaces and exits non-zero if anything is sub-floor *or* any surface goes
+  player surfaces — the Codex and the play shell's routes; a new address is one line in its
+  surface tables — and exits non-zero if anything is sub-floor *or* any surface goes
   unmeasured. Quote its output; do not quote a number from a document.
+- **The layout law (design-language.md §7):** `node scripts/no-scroll-audit.mjs` drives the
+  route × role table (landing, viewer entry, a real GM session, a real player session) at
+  1280×900, 1280×720 and 390×844 and exits non-zero if any route's document scrolls on
+  either axis *or* any route goes unmeasured. Same terms as the tap audit: needs a browser
+  and a live dev server, so it is a thing you run, not a thing that runs. While the refresh
+  is in flight, unconverted surfaces are expectedly red — each phase drains its rows.
 
 Say what you ran and what you saw. A tier you did not execute is not verification, and
 "should work now" is not a result.
