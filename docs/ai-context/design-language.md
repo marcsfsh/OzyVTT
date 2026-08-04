@@ -141,7 +141,9 @@ a hand-typed `px`. Eyebrows/small-caps and display headings each have a tracking
 a tracking value — that is the same role rendered four slightly different ways.
 
 **Breakpoints are a fixed ladder, not per-file taste: 760 / 650 / 560**, plus
-`min-width: 850/980` where a layout earns a third column. Full rationale in `mobile-ux.md`.
+`min-width: 850/980/1280` where a layout earns another column — 1280 (added 2026-08-04)
+is the laptop rung where two-column compositions spend a 1080p width: settings, the
+shared-screen controls. Full rationale in `mobile-ux.md`.
 A new number means two components change shape at widths a few dozen pixels apart for no
 reason — reuse a rung, or change the ladder deliberately for everyone. **The ladder is
 currently violated in several stylesheets**; see for yourself before adding to the pile:
@@ -295,9 +297,9 @@ them, and that the two steps no test can demand are remembered.
 8. **The surface fits the locked viewport and declares its scroll regions** (§7). The page
    never scrolls; every region either fits or scrolls itself via `.scroll-y`. Run
    `node scripts/no-scroll-audit.mjs` against your route at 1280×720-class and 390×844
-   before calling it done. *(Status: standard adopted 2026-08-04; enforced today for the
-   landing, the shared-screen viewer, the wizard layer and every Modal/Drawer; app-wide
-   enforcement lands with the refresh — see §10.)*
+   before calling it done. *(Status: standard adopted 2026-08-04; conforming today: the
+   landing, the shared-screen viewer, the wizard layer, every Modal/Drawer. The ratchet
+   checks and the route audit are in repo — §10; other surfaces convert phase by phase.)*
 
 ---
 
@@ -436,21 +438,28 @@ lock.
 
 ---
 
-## 10. Enforcement & migration *(plan — nothing here weakens an existing check)*
+## 10. Enforcement & migration *(in force since 2026-08-04 — nothing here weakens an existing check)*
 
-- **In repo today:** `scripts/no-scroll-audit.mjs` — drives routes at 1280×900/720 and
-  390×844 and fails on `scrollHeight > innerHeight` at the document. Run per-surface during
-  the refresh; joins `npm test`'s browser-tier docs once the shell locks (same terms as
-  `tap-audit.mjs`: needs a browser, so scripted-manual, honestly outside vitest).
-- **Static checks (land with the refresh, ratchet style):** new `design-conventions`
-  checks — (e) no `100vh`/`min-height: NNvh` in app CSS outside the conforming set
-  (shrink-only allowlist seeded from the census); (f) `overflow-y` in app CSS only via
-  `.scroll-y` or an allowlisted legacy site. Both follow the existing CHECK_SHAPE pin
-  discipline.
-- **Phase order (the refresh, when the client releases it):** A — the shell lock + every
-  *trivial* surface (one commit-sized region each); B — the *recompose* surfaces (table
-  laptop, codex, homebrew, replay viewer, viewer-controls); C — the two *redesigns* (table
-  phone, map calibration). Checks land with A; docs and ledger move per commit, as always.
+- **In repo:** `scripts/no-scroll-audit.mjs` — a real GM login and a real player join, then
+  the route × role table (19 rows: landing, viewer entry, every GM address including
+  resolved `/replays/:id` and `/characters/:id(/level)`, the player's four) at 1280×900,
+  1280×720 and 390×844, failing (exit non-zero) on any document scroll, either axis, or any
+  unmeasured route. Scripted-manual on the same terms as `tap-audit.mjs` (needs a browser
+  and a live dev server, honestly outside vitest) — `docs/ai-context/testing.md` has the
+  row. Unconverted surfaces are expectedly red until their phase lands; converted surfaces
+  going red again is the regression the gate exists for.
+- **Static checks (in repo, ratchet style):** `design-conventions.test.ts` — **(g)**
+  viewport units in app CSS: `100dvh`/`100svh` and paired/`:fullscreen` `100vh` are
+  structural; every other occurrence answers to a reasoned `VIEWPORT_CONFORMING` row or a
+  phase-tagged, shrink-only `VIEWPORT_LEGACY` row (target 0); **(h)** declared scroll
+  regions: a bare `overflow(-y): auto|scroll` in app CSS must be a `SCROLL_ALLOW` legacy
+  site (shrink-only, target 0 — the end state is every region carrying `.scroll-y` in
+  markup). Both follow the `design-conventions-shape.ts` pin discipline.
+- **Phase order (the refresh):** A — the shell lock + every *trivial* surface (one
+  commit-sized region each); B — the *recompose* surfaces (table laptop, codex, homebrew,
+  replay viewer, viewer-controls); C — the two *redesigns* (table phone, map calibration).
+  The checks and audits above landed at A's foundation; docs and ledger move per commit,
+  as always.
 - The styleguide's Layout sections mirror §7–§9 for authors; the census and the refresh
   plan live in the engagement record until implementation, then their durable facts land
   here.

@@ -153,15 +153,20 @@ export const CONVENTION_SHAPE = {
 
   // ─────────────────────────── (f) the breakpoint ladder ───────────────────────────
   /**
-   * The ladder, by direction — `design-language.md:134-139`. `max` carries the three rungs
-   * plus the exact max-complements of the two `min` rungs; `min` carries the two rungs plus
+   * The ladder, by direction — `design-language.md` §3. `max` carries the three rungs
+   * plus the exact max-complements of the 850/980 `min` rungs; `min` carries the rungs plus
    * the exact min-complements of the three `max` rungs. DIRECTION MATTERS: `max-width: 850px`
    * is off-ladder even though 850 is a rung, and that is not pedantry —
    * `maps/map-manager.css:95` is a `max-width: 850px` that double-fires with the three
    * `min-width: 850px` queries at exactly 850px.
+   *
+   * 1280 joined `min` 2026-08-04 (the refresh's laptop rung: two-column compositions —
+   * settings, shared-screen controls — spend a 1080p width there). Its 1279 max-complement
+   * is deliberately NOT pre-blessed: no query needs it yet, and an unused allowance is a
+   * hole. Add it beside a real use, in one commit with the doc.
    */
   ladderMax: [560, 650, 760, 849, 979] as readonly number[],
-  ladderMin: [561, 651, 761, 850, 980] as readonly number[],
+  ladderMin: [561, 651, 761, 850, 980, 1280] as readonly number[],
   /**
    * Floor on the `@media` width conditions parsed. Measured 2026-08-03: **57** (47 on-ladder,
    * 10 off). The parse is media-query-only on purpose: the doc's self-audit grep also catches
@@ -171,6 +176,51 @@ export const CONVENTION_SHAPE = {
   ladderConditionFloor: 50,
   /** Off-ladder `@media` conditions: **10** rows (2026-08-03). */
   ladderOffRows: 9,
+
+  // ─────────────────────────── (g) viewport units in app CSS ───────────────────────────
+  /**
+   * Floor on the CLIENT stylesheets checks (g) and (h) read. Client only, deliberately:
+   * `packages/ui` holds zero of the cap idiom, and its `dvh` usages ARE the lock machinery
+   * (Modal's full-sheet, WizardShell's layer) — scanning them would force permanent
+   * allowlist rows, a floor the down-only header above cannot honor. Measured 2026-08-04:
+   * **25** (`find apps/client/src -name '*.css' | wc -l`); same ~10%-under discipline as
+   * the other floors.
+   */
+  appCssSourceFloor: 22,
+  /**
+   * (g) CONFORMING viewport-unit occurrences — reasoned rows, the (d) discipline: every
+   * row carries a why, and the pin does not follow the list up without a commit message
+   * that argues the new occurrence. Measured 2026-08-04 by the check's own scan: **8
+   * occurrences across 3 files** — three landing `clamp()` mid-terms (styles.css), four
+   * overlay caps bounding fixed/modal layers (encounter-panel.css), one shared-screen
+   * portrait band (viewer.css).
+   */
+  viewportConformingFiles: 3,
+  viewportConformingTotal: 8,
+  /**
+   * (g) LEGACY viewport-fraction caps on in-flow content — the pre-standard substitute
+   * for a frame that design-language.md §7 rule 2 retires. SHRINK-ONLY, target **0** by
+   * the end of the refresh's phase C; every row is tagged with the phase whose recompose
+   * drains it. Measured 2026-08-04 by the check's own scan: **28 occurrences across 8
+   * files** (raw grep says 30 lines with 44 unit tokens; the scan excludes the structural
+   * `100dvh`/paired/`:fullscreen` allows and counts occurrences, not lines).
+   */
+  viewportLegacyFiles: 8,
+  viewportLegacyTotal: 28,
+
+  // ─────────────────────────── (h) declared scroll regions ───────────────────────────
+  /**
+   * (h) bare `overflow:`/`overflow-y:` `auto|scroll` sites in app CSS — undeclared scroll
+   * regions. The end state is every scrolling region carrying `.scroll-y` in its MARKUP
+   * (the utility in design-tokens.css owns the quiet scrollbar and the stable gutter) and
+   * the CSS declaration deleted, so this is SHRINK-ONLY with target **0**. `overflow-x`
+   * is deliberately not counted — the wide-content rule (§7) requires it. Measured
+   * 2026-08-04: **33 sites across 13 files**. Command:
+   * `grep -roE 'overflow(-y)?: *(auto|scroll)' apps/client/src --include='*.css' | wc -l`
+   * → 34 raw; one is a codex.css comment the strip removes.
+   */
+  scrollAllowFiles: 13,
+  scrollAllowSites: 33,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**
@@ -319,6 +369,16 @@ export function stylesheets(): Source[] {
     ...walk(CLIENT_SRC, css).map((rel) => source(CLIENT_SRC, rel, clientPath)),
     ...walk(UI_SRC, css).map((rel) => source(UI_SRC, rel, uiPath))
   ].filter((s) => !s.path.endsWith("design-tokens.css"));
+}
+
+/**
+ * Client-only stylesheets — checks (g)/(h)'s scope, §10's "in app CSS". `packages/ui` is
+ * deliberately out (see `appCssSourceFloor`): its `dvh` locks are the blessed machinery,
+ * and `design-tokens.css` lives there, so `.scroll-y`'s own `overflow-y: auto` can never
+ * trip check (h).
+ */
+export function appStylesheets(): Source[] {
+  return walk(CLIENT_SRC, (n) => /\.css$/.test(n)).map((rel) => source(CLIENT_SRC, rel, clientPath));
 }
 
 /**

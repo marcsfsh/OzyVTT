@@ -52,7 +52,7 @@ Three client suites enforce things a reviewer used to have to notice. They are o
 |---|---|
 | `apps/client/src/play-vocabulary.test.ts` | A retired word in user copy anywhere under `apps/client/src` (minus a pinned exclusion list) or in `packages/ui/src/primitives`. Also pins the structured copy the scan cannot see: `CLAIM_WORD`, `ROLL_VISIBILITY_WORD`, `SETTINGS_GROUPS`, the rules dial, the GM tab labels. |
 | `apps/client/src/codex/vocabulary.test.ts` | The same, for the Codex's own glossary. Both read one scanner, `apps/client/src/copy-scan.ts`. |
-| `apps/client/src/design-conventions.test.ts` | A text glyph where an icon belongs, a raw `<input type="search"\|number">`, a second `.eyebrow`, a hand-typed colour, an inline feedback banner, an off-ladder breakpoint. |
+| `apps/client/src/design-conventions.test.ts` | A text glyph where an icon belongs, a raw `<input type="search"\|number">`, a second `.eyebrow`, a hand-typed colour, an inline feedback banner, an off-ladder breakpoint, a viewport-fraction cap on in-flow content, an undeclared scroll region (a bare `overflow-y: auto` in app CSS). |
 
 Every allowlist in those files is **shrink-only**, and its size is pinned in
 `apps/client/src/design-conventions-shape.ts` — so fixing a violation costs a deleted row plus

@@ -97,8 +97,8 @@ which reads **everything under `apps/client/src` minus a pinned exclusion list**
 `packages/ui/src/primitives`, so a new directory is born locked. A retired word ("actor", "combatant",
 "Encounter" the place, the five dice phrasings) fails `npm run test` with the replacement named;
 exemptions are (file, string) pairs and die when they rescue nothing; the words D28 KEEPS are asserted
-present. `design-conventions.test.ts` does the same for glyphs, raw inputs, colours, feedback and
-breakpoints — allowlists shrink-only, sized in `design-conventions-shape.ts`. The judgement half —
+present. `design-conventions.test.ts` does the same for glyphs, raw inputs, colours, feedback,
+breakpoints, viewport units and undeclared scroll regions — shrink-only, sized in `design-conventions-shape.ts`. The judgement half —
 skills, subagents, path-scoped rules and hooks — is under `.claude/`, roster in `.claude/README.md`.
 
 **Table viewer / second screen.** Pairing codes exchanged for a hashed cookie session, an SSE feed, and
@@ -121,13 +121,13 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **This branch (`claude/ozyvtt-play-facing-unify-j0vhj3`)** unifies the play-facing half.
-- **Server-held character drafts (builder Phase 3).** The wizard parks drafts in `localStorage` behind
-  `loadDraft`/`saveDraft`/`clearDraft`; the swap to a server-held store is designed and deliberately
-  not built (`apps/client/src/builder/draft.ts`).
-- **Rules engine follow-ups.** Difficult terrain and a server-authoritative movement preview are
-  unimplemented, and the reaction trigger vocabulary is still `["hit-by-attack", "leaves-reach"]`
-  (`packages/domain/src/index.ts`), so damage-taken and AC-response reactions are out.
+- **"The screen is the page" refresh (this branch, phase A opened 2026-08-04).** Square standard and
+  layout tokens/utilities are in; ratchets (g) viewport units + (h) declared scroll regions and the
+  route×role `scripts/no-scroll-audit.mjs` hold the line. Shell lock + recomposes follow (A→B→C).
+- **Server-held character drafts (builder Phase 3).** `localStorage`-parked; the server-held swap is
+  designed, deliberately not built (`apps/client/src/builder/draft.ts`).
+- **Rules engine follow-ups.** Difficult terrain, a server-authoritative movement preview, and
+  damage-taken/AC-response reaction triggers (`packages/domain/src/index.ts`) are unimplemented.
 
 No phase exit gate has been claimed. `BUILD_PLAN.md` carries the roadmap.
 

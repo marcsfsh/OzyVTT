@@ -1427,3 +1427,32 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   reworked under this entry; the refresh is a separate, client-gated engagement. Reference
   implementations already conforming: the landing, the shared-screen viewer, the wizard layer,
   Modal/Drawer.
+- **2026-08-04 — THE SQUARE STANDARD: surface radii are zero; pills survive; big choices wear the
+  chamfer.** Part of the client-approved "screen is the page" refresh (phase A foundation).
+  `--radius-sm/md/lg` flipped to 0 in `design-tokens.css` — the whole app squares off at once, which
+  is the intended blast radius; the tokens survive so reversing is one edit. `--radius-pill` is
+  deliberately untouched: gauges stay gauges (HP/progress bars, status pills, chips, token rings —
+  all pill sites read the token). The landing doors' cut is generalized as the `.chamfer` utility
+  (`--chamfer-cut` polygon + `--glow-drop-*` filter twins of the glow set, because box-shadow and
+  the outer focus ring cannot follow a clip-path cut — chamfered controls glow by filter and focus
+  by inset outline) and applied to the Button primitive's primary/destructive variants. One scoped
+  exception, and the reason is a hard invariant: `sm` buttons keep the plain square because
+  clip-path clips hit-testing and would destroy their `.tap-target` ::after hit area — the 44px
+  floor outranks the cut.
+- **2026-08-04 — Scene scope: where the sky may shine, and where only texture may.** Ruling for the
+  refresh's look: content-light surfaces (settings, roster, scenes, replays list, and the codex
+  everywhere — editors at higher glass opacity) get sky + scene-tier glass; the landing keeps its
+  full drive; **the table gets texture only** (grid/noise per theme) — the sky never renders behind
+  combat, though in-map docks may use scene-tier glass over the MAP, which is their canvas. The
+  scene tier shipped as `.surface-glass` beside `.surface-frost` (two tiers of one glass treatment,
+  never a third), with the reduced-transparency fallback going solid. Consumers arrive with the
+  surface phases; the tier itself is foundation.
+- **2026-08-04 — View-level motion, three flourishes, and nothing on scroll.** Motion for the
+  refresh stays at the view level (tab swap = `anim-view`, layers = `sheet-up`/`dialog-in`, drawers
+  = `--ease-drawer`) plus exactly three additions, all shipped as tokens/utilities riding the
+  existing anim vocabulary so the global reduced-motion kill covers them unchanged: the view-swap
+  **cascade** (`.anim-cascade`, capped stagger, containers never list items), the **theme-switch
+  sky moment** (`.theme-switching` + `--dur-theme` 400ms cross-fade recipe, deliberately not
+  !important so the reduced-motion kill always wins), and the one-shot **landing→app entry
+  transition** (`entry-dip`/`entry-settle` keyframes; the shell wires them when it locks). Still
+  ruled out, no reversals: scroll parallax and ambient loops.

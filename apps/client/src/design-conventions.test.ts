@@ -2,13 +2,15 @@
  * The design conventions of `docs/ai-context/design-language.md`, enforced as test failures
  * rather than as a page nobody re-reads before typing `<span>✕</span>`.
  *
- * Six rules, each mechanically detectable, each violated on the tree today:
+ * Eight rules, each mechanically detectable, each violated on the tree today:
  *   (a) primitives and play surfaces never render a glyph as text (design-language.md:41-45)
  *   (b) no raw `<input type="search">` / `type="number">` where a primitive exists (:36-40)
  *   (c) one `.eyebrow`, and it lives in `packages/ui` (:36-40, the "do not hand-roll" rule)
  *   (d) no hand-typed colours outside `design-tokens.css` (:46-47)
  *   (e) one feedback channel — `useToast`, not a per-component inline banner
- *   (f) one breakpoint ladder, not per-file taste (:134-139)
+ *   (f) one breakpoint ladder, not per-file taste (§3)
+ *   (g) no viewport-fraction caps on in-flow content in app CSS (§7 rule 2)
+ *   (h) every scroll region in app CSS is declared — `.scroll-y`, not a bare overflow (§7)
  *
  * **Every one of these already has offenders, so every check ships with an allowlist of the
  * CURRENT population and fails on a NEW one.** That is the only shape that can land before the
@@ -30,6 +32,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONVENTION_SHAPE,
   PLAY_EXCLUDED,
+  appStylesheets,
   assertRoots,
   eyebrowScanned,
   lineOf,
@@ -588,7 +591,7 @@ describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
     }
     expect(
       offenders,
-      `The ladder is max-width 760/650/560 and min-width 850/980, plus the exact complements 761/651/561 and 849/979 — nothing else.\n` +
+      `The ladder is max-width 760/650/560 and min-width 850/980/1280, plus the exact complements 761/651/561 and 849/979 — nothing else.\n` +
         `Fix: reuse a rung. A new number means two components change shape at widths a few dozen pixels apart for no reason a user could name.\n` +
         `If the ladder itself is wrong, change it for everyone in design-language.md AND in CONVENTION_SHAPE.ladderMax/ladderMin, in one commit.`
     ).toEqual([]);
@@ -604,6 +607,248 @@ describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
       `LADDER_ALLOW holds ${LADDER_ALLOW.length} rows; design-conventions-shape.ts pins ${CONVENTION_SHAPE.ladderOffRows}.\n` +
         `Fix: the pin follows the list down as replay/homebrew/encounter-panel/tokens CSS are rebuilt onto the ladder.`
     ).toBe(CONVENTION_SHAPE.ladderOffRows);
+  });
+});
+
+// ─────────────────────────── (g) viewport units in app CSS ───────────────────────────
+
+/**
+ * A viewport-fraction cap on in-flow content (`max-height: 64vh`, `min-height: 40vh`) is
+ * the codebase's pre-standard substitute for a frame — design-language.md §7 rule 2
+ * retires the idiom, and this check holds the line while the refresh drains it surface by
+ * surface (the phase tag on each legacy row names the lane that owes the drain).
+ *
+ * STRUCTURAL ALLOWS, needing no rows: `100dvh`/`100svh` anywhere — the lock unit itself;
+ * and `100vh` when the same line also carries a `dvh` value (the fallback-pair idiom, the
+ * standalone sheet) or the declaring selector contains `:fullscreen` (the OS-fullscreen
+ * map). Everything else — including a bare `100vh` — answers to a row: CONFORMING with a
+ * reason (overlay caps, landing clamp() mid-terms), or LEGACY, which only shrinks.
+ *
+ * Scope is CLIENT CSS only (`appStylesheets()`): `packages/ui`'s dvh usages ARE the
+ * blessed lock machinery, and permanent rows for them would be a floor the shape file's
+ * down-only header cannot honor.
+ */
+const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
+
+/** Reasoned survivors — the (d) discipline: rows carry a why, growth must argue out loud. */
+const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
+  ["apps/client/src/encounter/encounter-panel.css", ["85vh", "52vh", "94vh", "92vh"],
+    "overlay caps bounding fixed/modal layers (⋯-menu, sheet modal + its capped picker, monster browser) — §8 reference implementations"],
+  ["apps/client/src/styles.css", ["4vh", "3.5vh", "4.5vh"],
+    "landing clamp() mid-terms — fluid spacing inside the locked hero, rem-bounded, cannot grow the page"],
+  ["apps/client/src/viewer/viewer.css", ["32vh"],
+    "the conforming shared-screen viewer's portrait initiative band"]
+];
+
+/**
+ * The cap idiom's measured population, one row per occurrence, matched by (file, value)
+ * WITH multiplicity — the LADDER_ALLOW consumption pattern — so a SECOND 62vh in
+ * codex.css fails while the first four stay excused. The phase column names the refresh
+ * lane that drains the row (A = shell/trivials, B = recomposes, C = redesigns).
+ */
+const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phase: string]> = [
+  ["apps/client/src/codex/codex.css", "64vh", "B"],
+  ["apps/client/src/codex/codex.css", "50vh", "B"],
+  ["apps/client/src/codex/codex.css", "84vh", "B"],
+  ["apps/client/src/codex/codex.css", "40vh", "B"],
+  ["apps/client/src/codex/codex.css", "40vh", "B"],
+  ["apps/client/src/codex/codex.css", "64vh", "B"],
+  ["apps/client/src/codex/codex.css", "62vh", "B"],
+  ["apps/client/src/codex/codex.css", "50vh", "B"],
+  ["apps/client/src/codex/codex.css", "46vh", "B"],
+  ["apps/client/src/codex/codex.css", "62vh", "B"],
+  ["apps/client/src/codex/codex.css", "62vh", "B"],
+  ["apps/client/src/codex/codex.css", "62vh", "B"],
+  ["apps/client/src/codex/codex.css", "72vh", "B"],
+  ["apps/client/src/codex/codex.css", "68vh", "B"],
+  ["apps/client/src/codex/codex.css", "52vh", "B"],
+  ["apps/client/src/encounter/encounter-panel.css", "72vh", "B"],
+  ["apps/client/src/encounter/encounter-panel.css", "78vh", "B/C"],
+  ["apps/client/src/homebrew/homebrew.css", "64vh", "B"],
+  ["apps/client/src/homebrew/homebrew.css", "50vh", "B"],
+  ["apps/client/src/homebrew/homebrew.css", "40vh", "B"],
+  ["apps/client/src/homebrew/homebrew.css", "50dvh", "B"],
+  ["apps/client/src/replay/replay.css", "68vh", "B"],
+  ["apps/client/src/replay/replay.css", "50vh", "B"],
+  ["apps/client/src/scene/encounter-map.css", "72vh", "B"],
+  ["apps/client/src/styleguide/styleguide.css", "100vh", "A"],
+  ["apps/client/src/styles.css", "52vh", "B"],
+  ["apps/client/src/viewer/viewer-controls.css", "54vh", "B"],
+  ["apps/client/src/viewer/viewer-controls.css", "50vh", "B"]
+];
+
+interface ViewportHit { path: string; line: number; value: string }
+
+function viewportHits(sources: readonly Source[]): ViewportHit[] {
+  const hits: ViewportHit[] = [];
+  for (const source of sources) {
+    const src = stripBlockComments(source.read());
+    const lines = src.split("\n");
+    for (const match of src.matchAll(VIEWPORT_UNIT)) {
+      const value = match[0];
+      if (value === "100dvh" || value === "100svh") continue;
+      const line = lineOf(src, match.index);
+      if (value === "100vh") {
+        // The fallback pair: `height: 100vh; height: 100dvh;` on one line.
+        if (/\b\d+(?:\.\d+)?dvh\b/.test(lines[line - 1] ?? "")) continue;
+        // The `:fullscreen` selector: walk back to this declaration block's selector text.
+        const open = src.lastIndexOf("{", match.index);
+        const boundary = Math.max(src.lastIndexOf("}", open), src.lastIndexOf("{", open - 1));
+        if (src.slice(boundary + 1, open).includes(":fullscreen")) continue;
+      }
+      hits.push({ path: source.path, line, value });
+    }
+  }
+  return hits;
+}
+
+describe("(g) no viewport-fraction caps on in-flow content — design-language.md §7 rule 2", () => {
+  const sources = appStylesheets();
+  const hits = viewportHits(sources);
+
+  it("reads enough app stylesheets to be worth trusting", () => {
+    expect(
+      sources.length,
+      `the viewport-unit scan found ${sources.length} client stylesheets; the floor is ${CONVENTION_SHAPE.appCssSourceFloor}.\n` +
+        `Fix: restore appStylesheets() in design-conventions-shape.ts, or lower CONVENTION_SHAPE.appCssSourceFloor in the same commit as the deletion that justifies it.`
+    ).toBeGreaterThanOrEqual(CONVENTION_SHAPE.appCssSourceFloor);
+  });
+
+  it("adds no viewport-fraction value that no row answers for", () => {
+    // Consumption with multiplicity: every hit spends a row; leftover hits are offenders,
+    // leftover rows are dead. Conforming is consulted first — no (file, value) key appears
+    // in both lists today, and a future collision should land on the reasoned side.
+    const remainingConforming = VIEWPORT_CONFORMING.flatMap(([file, values]) => values.map((value) => `${file} ${value}`));
+    const remainingLegacy = VIEWPORT_LEGACY.map(([file, value]) => `${file} ${value}`);
+    const offenders: string[] = [];
+    for (const hit of hits) {
+      const key = `${hit.path} ${hit.value}`;
+      const conforming = remainingConforming.indexOf(key);
+      if (conforming >= 0) { remainingConforming.splice(conforming, 1); continue; }
+      const legacy = remainingLegacy.indexOf(key);
+      if (legacy >= 0) { remainingLegacy.splice(legacy, 1); continue; }
+      offenders.push(cite(hit.path, hit.line, `${hit.value} on in-flow content`));
+    }
+    expect(
+      offenders,
+      `A viewport-fraction cap on in-flow content is the pre-standard substitute for a frame (design-language.md §7 rule 2).\n` +
+        `Fix: put the region in a real column and let it flex — \`flex: 1; min-height: 0\` (the .frame-col/.frame-fill utilities) — or,\n` +
+        `if this is a fixed overlay's bound, say so in VIEWPORT_CONFORMING with the reason and raise the pins in the same commit.\n` +
+        `Do NOT add a VIEWPORT_LEGACY row: that list only shrinks.`
+    ).toEqual([]);
+    expect(
+      remainingConforming,
+      `VIEWPORT_CONFORMING excuses values that no longer occur.\nFix: delete them (and the row, if empty) and drop CONVENTION_SHAPE.viewportConformingTotal/Files to match, in the same commit.`
+    ).toEqual([]);
+    expect(
+      remainingLegacy,
+      `VIEWPORT_LEGACY excuses caps that no longer exist.\nFix: delete those rows and lower CONVENTION_SHAPE.viewportLegacyTotal (and viewportLegacyFiles if a file emptied) in the same commit. This is the ratchet working.`
+    ).toEqual([]);
+  });
+
+  it("keeps both allowlists the size design-conventions-shape.ts says they are, and every conforming row says why", () => {
+    expect(VIEWPORT_CONFORMING.length, "VIEWPORT_CONFORMING file count").toBe(CONVENTION_SHAPE.viewportConformingFiles);
+    expect(
+      VIEWPORT_CONFORMING.reduce((n, [, values]) => n + values.length, 0),
+      `VIEWPORT_CONFORMING totals a different occurrence count than CONVENTION_SHAPE.viewportConformingTotal (${CONVENTION_SHAPE.viewportConformingTotal}).\n` +
+        `Fix: the pin follows the list down. It does not follow it up without a commit message that argues the new occurrence.`
+    ).toBe(CONVENTION_SHAPE.viewportConformingTotal);
+    for (const [file, , why] of VIEWPORT_CONFORMING) {
+      expect(why.trim().length, `VIEWPORT_CONFORMING row for ${file} has no reason attached.\nFix: say why these caps are structural, or take the row out and convert them.`).toBeGreaterThan(15);
+    }
+    expect(VIEWPORT_LEGACY.length, `VIEWPORT_LEGACY holds ${VIEWPORT_LEGACY.length} rows; design-conventions-shape.ts pins ${CONVENTION_SHAPE.viewportLegacyTotal}.`).toBe(CONVENTION_SHAPE.viewportLegacyTotal);
+    expect(
+      new Set(VIEWPORT_LEGACY.map(([file]) => file)).size,
+      "VIEWPORT_LEGACY distinct-file count vs CONVENTION_SHAPE.viewportLegacyFiles"
+    ).toBe(CONVENTION_SHAPE.viewportLegacyFiles);
+    for (const [file, , phase] of VIEWPORT_LEGACY) {
+      expect(/^[ABC](\/[ABC])?$/.test(phase), `VIEWPORT_LEGACY row for ${file} carries no drain phase (A, B, C or a pair).`).toBe(true);
+    }
+  });
+});
+
+// ─────────────────────────── (h) declared scroll regions ───────────────────────────
+
+/**
+ * A bare `overflow-y: auto` (or `overflow: auto|scroll`) in app CSS is an undeclared
+ * scroll region — design-language.md §7 makes `.scroll-y` in the MARKUP the one blessed
+ * scroll treatment (quiet thin scrollbar, stable gutter), so the CSS declaration is the
+ * tell of a region the standard has not reached. The seed is the measured population; it
+ * only shrinks, and it reaching 0 is the refresh's phase-C exit condition.
+ *
+ * `overflow-x` is deliberately unmatched: the wide-content rule (§7) REQUIRES an
+ * `overflow-x` container per wide table/strip. `hidden|clip|visible` are not scrolling.
+ *
+ * HONEST LIMIT (the (d) pattern): this reads CSS, so an inline
+ * `style={{ overflowY: "auto" }}` or a future styled-component is invisible to it. The
+ * runtime scroller probe planned for the no-scroll audit (phase B) is the other half.
+ */
+const SCROLL_DECL = /overflow(?:-y)?\s*:\s*(?:auto|scroll)/g;
+
+/** The measured population, per file — the FEEDBACK_ALLOW shape. */
+const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
+  ["apps/client/src/builder/character-builder.css", 1],
+  ["apps/client/src/codex/codex.css", 8],
+  ["apps/client/src/encounter/combat-log.css", 1],
+  ["apps/client/src/encounter/encounter-panel.css", 7],
+  ["apps/client/src/homebrew/homebrew.css", 3],
+  ["apps/client/src/maps/map-picker.css", 1],
+  ["apps/client/src/scene/encounter-map.css", 5],
+  ["apps/client/src/scenes/scene-prep.css", 1],
+  ["apps/client/src/scenes/staging-tray.css", 1],
+  ["apps/client/src/styleguide/styleguide.css", 1],
+  ["apps/client/src/styles.css", 1],
+  ["apps/client/src/viewer/viewer-controls.css", 1],
+  ["apps/client/src/viewer/viewer.css", 2]
+];
+
+describe("(h) every scroll region is declared — design-language.md §7", () => {
+  const sources = appStylesheets();
+  const counts = new Map<string, number>();
+  for (const source of sources) {
+    const n = [...stripBlockComments(source.read()).matchAll(SCROLL_DECL)].length;
+    if (n > 0) counts.set(source.path, n);
+  }
+  const allowed = new Map(SCROLL_ALLOW);
+
+  it("reads enough app stylesheets to be worth trusting", () => {
+    expect(
+      sources.length,
+      `the scroll-region scan found ${sources.length} client stylesheets; the floor is ${CONVENTION_SHAPE.appCssSourceFloor}.\n` +
+        `Fix: restore appStylesheets() in design-conventions-shape.ts, or lower CONVENTION_SHAPE.appCssSourceFloor in the same commit as the deletion that justifies it.`
+    ).toBeGreaterThanOrEqual(CONVENTION_SHAPE.appCssSourceFloor);
+  });
+
+  it("declares no new undeclared scroller, anywhere", () => {
+    const offenders = [...counts]
+      .filter(([file, n]) => n > (allowed.get(file) ?? 0))
+      .map(([file, n]) => `${file}  ${n} bare overflow(-y) scroller(s), ${allowed.get(file) ?? 0} allowed`);
+    expect(
+      offenders,
+      `A bare \`overflow-y: auto\` in app CSS is an undeclared scroll region (design-language.md §7).\n` +
+        `Fix: mark the region with .scroll-y in the markup — the utility in design-tokens.css owns the quiet scrollbar and the\n` +
+        `stable gutter — and delete this declaration; if the box also needs overflow-x, declare only the x-axis here.\n` +
+        `Do NOT add a row to SCROLL_ALLOW: that list only shrinks.`
+    ).toEqual([]);
+  });
+
+  it("has no allowlist row that rescues nothing", () => {
+    for (const [file, count] of SCROLL_ALLOW) {
+      expect(
+        counts.get(file) ?? 0,
+        `SCROLL_ALLOW excuses ${count} scroller(s) in ${file}, which now has ${counts.get(file) ?? 0}.\n` +
+          `Fix: lower or delete the row and drop CONVENTION_SHAPE.scrollAllowSites (and scrollAllowFiles if the row went) to match, in the same commit. This is the ratchet working.`
+      ).toBe(count);
+    }
+  });
+
+  it("keeps the allowlist the size design-conventions-shape.ts says it is", () => {
+    expect(SCROLL_ALLOW.length, "SCROLL_ALLOW file count").toBe(CONVENTION_SHAPE.scrollAllowFiles);
+    expect(
+      SCROLL_ALLOW.reduce((n, [, count]) => n + count, 0),
+      `SCROLL_ALLOW's totals do not match CONVENTION_SHAPE.scrollAllowSites (${CONVENTION_SHAPE.scrollAllowSites}).\n` +
+        `Fix: the pin follows the list down as each region takes .scroll-y in markup. It reaching 0 is the refresh's exit condition.`
+    ).toBe(CONVENTION_SHAPE.scrollAllowSites);
   });
 });
 
