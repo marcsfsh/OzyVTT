@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
 import { IconButton, IconX } from "@vtt/ui";
@@ -8,6 +8,9 @@ import { socket } from "../socket";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 
 type Actor = GmActor | PlayerActor;
+
+/** Breathing room between the menu and the viewport edge, on every side. */
+const MARGIN = 8;
 
 /**
  * Right-click / long-press actions on a token. GM acts on any token; a player only ever opens it on
@@ -31,6 +34,30 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
   const [library, setLibrary] = useState(false);
+  const [box, setBox] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
+
+  // Measured, not guessed: the menu's real height decides where it sits and whether it needs to scroll.
+  // Runs before paint (and again on resize/rotate) so the corrected box is the first one drawn.
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = ref.current;
+      if (!el) return;
+      const room = window.innerHeight - MARGIN * 2;
+      // Measure the natural height: an earlier pass may have capped it, and a menu that has since
+      // gained room should get it back rather than stay stuck at a stale cap.
+      const previous = el.style.maxHeight;
+      el.style.maxHeight = "none";
+      const height = el.offsetHeight;
+      const width = el.offsetWidth;
+      el.style.maxHeight = previous;
+      const left = Math.max(MARGIN, Math.min(x, window.innerWidth - width - MARGIN));
+      const top = height > room ? MARGIN : Math.max(MARGIN, Math.min(y, window.innerHeight - height - MARGIN));
+      setBox({ left, top, maxHeight: room });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [x, y, library, role]);
 
   useEffect(() => {
     const onPointer = (event: PointerEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) onClose(); };
@@ -91,13 +118,23 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   // The image picker replaces the menu while open; closing it dismisses the whole flow.
   if (library && gmToken) return <TokenLibrary actorId={actor.id} actorName={actor.name} definitionId={actor.definitionId ?? null} currentAssetId={actor.tokenAssetId ?? null} gmToken={gmToken} onClose={onClose} />;
 
-  // Clamp so the menu stays on-screen near the pointer.
-  const style: React.CSSProperties = { left: Math.max(8, Math.min(x, window.innerWidth - 240)), top: Math.max(8, Math.min(y, window.innerHeight - 340)) };
+  // Clamp so the menu stays on-screen near the pointer. The old clamp guessed the menu's height at a
+  // hard-coded 340px; the menu is 412-458px depending on role and token state, so at a 720px-tall
+  // viewport its last actions ("Use reaction", "Return to tray") sat below the fold with nothing to
+  // scroll them into reach. Measure instead, pull the box back up so its BOTTOM fits, and when even a
+  // full-height menu cannot fit, give it the viewport column and let it scroll itself — §7's rule is
+  // that a thing fits its box or scrolls itself, and this used to do neither. `.encounter-menu` next
+  // door already worked this way; this is the same behaviour, measured rather than assumed.
+  const style: React.CSSProperties = box
+    ? { left: box.left, top: box.top, maxHeight: box.maxHeight }
+    // First paint, before measurement: the pointer position, clamped to the viewport's own edges. The
+    // layout effect corrects it in the same frame, so this is never what the eye sees.
+    : { left: Math.max(MARGIN, Math.min(x, window.innerWidth - MARGIN)), top: Math.max(MARGIN, Math.min(y, window.innerHeight - MARGIN)), visibility: "hidden" };
 
   // In fullscreen, only the fullscreen element's subtree renders - portal into it (not document.body,
   // which is hidden) so the menu is visible. Falls back to body when not in fullscreen.
   return createPortal(
-    <div ref={ref} className="token-context-menu anim-popover" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
+    <div ref={ref} className="token-context-menu anim-popover scroll-y" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
       <div className="token-context-head"><strong>{actor.name}</strong><IconButton label="Close menu" size="sm" onClick={onClose}><IconX /></IconButton></div>
       {role === "gm" && <div className="token-context-hp" role="group" aria-label="Adjust hit points">
         <input type="number" min="1" max="1000" placeholder="HP" aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />

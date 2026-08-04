@@ -170,13 +170,13 @@ export const CONVENTION_SHAPE = {
   ladderMax: [560, 650, 760, 849, 979] as readonly number[],
   ladderMin: [561, 651, 761, 850, 980, 1280] as readonly number[],
   /**
-   * Floor on the `@media` width conditions parsed. Measured 2026-08-03: **57** (47 on-ladder,
-   * 10 off). The parse is media-query-only on purpose: the doc's self-audit grep also catches
+   * Floor on the `@media` width conditions parsed. Measured 2026-08-04: **62** (53 on-ladder,
+   * 9 off). The parse is media-query-only on purpose: the doc's self-audit grep also catches
    * *property* `max-width`s that are not breakpoints at all — `codex.css:827`'s 820px and a
    * `min-width: 320px` both vanish here, and neither belongs in an allowlist.
    */
   ladderConditionFloor: 50,
-  /** Off-ladder `@media` conditions: **10** rows (2026-08-03). */
+  /** Off-ladder `@media` conditions: **9** rows (2026-08-04). */
   ladderOffRows: 9,
 
   // ─────────────────────────── (g) viewport units in app CSS ───────────────────────────

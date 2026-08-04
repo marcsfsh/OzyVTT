@@ -86,7 +86,10 @@
 }
 .nh-modal-close:hover { color: var(--text); border-color: var(--line-strong); }
 
-.nh-modal-body { padding: var(--space-6); overflow-y: auto; }
+/* overscroll-behavior: a flick past this region's end must chain nowhere — the app's page is locked
+   behind it, and rubber-banding a dead page reads as breakage. Every app-side region carries this;
+   the two primitive scrollers were the gap. */
+.nh-modal-body { padding: var(--space-6); overflow-y: auto; overscroll-behavior: contain; }
 .nh-modal-foot {
   display: flex;
   justify-content: flex-end;

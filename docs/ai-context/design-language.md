@@ -428,9 +428,11 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
   (`apps/client/src/styles.css`) paint a work-screen sky: one vertical wash off the theme's own
   surface ramp and a single brand bloom — no sun, no horizon, no stars, and no hand-typed
   colour, so all three themes come free and daybreak drops the CRT by the utility's own rule.
-  Settings, the roster, the scenes gallery and the replays list stand on it with
-  `.surface-glass` panels; **the table never does** (texture only — the sky must not render
-  behind combat). An empty state on such a surface is a scene moment, not a dashed box:
+  Settings, the roster, the scenes gallery and the replays list stand on it; **the table never
+  does** (texture only — the sky must not render behind combat). `.surface-glass` is worn by
+  settings' panels alone today — the other three put plain `.nh-card`s on the sky, because a
+  gallery of cards reads as glass-on-glass when every card is translucent. Whether those three
+  should take the tier is an open look question, not a settled rule. An empty state on such a surface is a scene moment, not a dashed box:
   `.scene-empty` is one line and, where there is an action to offer, one chamfered primary
   door (a surface that fills itself, like the replays list, offers none).
 - **Scanline tile.** A full-viewport `repeating-linear-gradient` rasterizes unevenly; the

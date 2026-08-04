@@ -83,7 +83,8 @@
 }
 .nh-drawer-close:hover { color: var(--text); border-color: var(--line-strong); }
 
-.nh-drawer-body { flex: 1; min-height: 0; padding: var(--space-5); overflow-y: auto; }
+/* overscroll-behavior: see `.nh-modal-body` — a drawer over a locked page must not chain its scroll. */
+.nh-drawer-body { flex: 1; min-height: 0; padding: var(--space-5); overflow-y: auto; overscroll-behavior: contain; }
 
 /* Full-width sheet at the repo's phone/tablet split. `width: min(24rem, 100vw)` alone
    still leaves a 384px panel with a dead strip beside it on a 700px tablet, so the sheet
