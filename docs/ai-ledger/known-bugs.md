@@ -291,6 +291,21 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   circle; these rules predate it), spotted during M7. CI-8's new `.is-focus` rule scopes itself off the
   hit circle correctly, so the pattern to copy is already in the file.
 
+- **[ui/Badge] `Badge tone="info"` fails AA on its own surfaces, worst in the sunset hour.** `--indigo`
+  (#5B6EF5 dark / dusk) as 11px/700 text measures **3.57:1 on dark `--surface-3` (#292145)** and
+  **2.45:1 on dusk `--surface-3` (#443381)**; light is fine at 5.36. Measured in Chromium 2026-08-04 by
+  sampling the composited pixel behind the live badge on `/settings` (the *Advise* rules badge is the
+  reachable instance). Pre-existing and provably unrelated to the scene sky: sampled with the sky
+  removed the numbers are byte-identical, because the badge stands on an opaque surface token.
+  `--indigo` has no readable `-hi` twin the way `--danger`/`--caution` do, which is the actual gap —
+  D21 #1 fixed exactly this shape for `--text-muted`.
+
+- **[scenes] `.scene-live-note` ("● Live now") measures 4.07:1 in the sunset hour.** `--magenta`
+  (#FF2E9A) as 11px/700 text on dusk `--surface-1` (#2E2160); dark reads 5.32 and light 5.17, so dusk
+  alone is under. Same measurement run and the same proof of independence as the entry above (identical
+  with the sky removed — an opaque card, not the sky). The label is not colour-alone (it carries the
+  word "Live"), so this is a contrast defect rather than a semantics one.
+
 ## Unverified — needs a browser, a contrast check, or a runtime repro
 
 These entries could not be confirmed *or* refuted by reading the code, so they are held here
