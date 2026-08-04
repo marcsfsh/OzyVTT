@@ -146,16 +146,18 @@
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.50) 100%);
   --landing-scanline: rgba(0, 0, 0, 0.26);
   --landing-noise-opacity: 0.05;
-  /* The sign: SILVER chrome, violet-tinted — the reference chrome is blue-steel silver,
-     not a hue — with SMOOTH, designed transitions: thirteen blended stops, one gently
-     softened mirror meet (50 -> 54%), no hard jump anywhere. The chrome STRUCTURE (light
-     crown, deepening body, mirror meet, flash, dark base) carries legibility over sky and
-     sun alike, with a hairline stroke and one solid extrusion + one tight halo. */
-  --landing-sign: linear-gradient(180deg, #FDFDFF 0%, #EFECFA 12%, #D8D3EE 24%, #B7AFD9 36%, #8D84BC 44%, #59517F 47%, #4E4678 50%, #F4F2FD 54%, #E0DBF3 62%, #B9B1DC 72%, #8D83C0 82%, #5C529A 92%, #453C82 100%);
-  --landing-stroke: rgba(46, 16, 84, 0.65);
+  /* The sign: BLUE-STEEL chrome (client insight: every reference title wears a metal the
+     scene does not — cold blue on this warm magenta/violet drive, so it stands out AND
+     belongs). Smooth by design: thirteen blended stops, one gently softened mirror meet
+     (50 -> 54%), no hard jump anywhere. The chrome structure (light crown, deepening body,
+     mirror meet, flash, dark base) carries legibility over sky and sun alike, with a
+     hairline navy stroke, one solid extrusion, one tight magenta halo. Night and the
+     sunset hour share this steel — the contrast is the point; daybreak depth-tunes it. */
+  --landing-sign: linear-gradient(180deg, #F7FCFF 0%, #E3F1FC 10%, #BFDCF5 22%, #8FBAE8 34%, #5C8FD2 44%, #33619F 47%, #274F86 50%, #F0F8FF 54%, #D6EAFB 62%, #9FC6EE 72%, #6B9BDC 82%, #3D69AF 92%, #27498A 100%);
+  --landing-stroke: rgba(12, 32, 72, 0.78);
   --landing-title-glow:
-    drop-shadow(0 3px 0 rgba(30, 10, 50, 0.85))
-    drop-shadow(0 0 10px rgba(255, 46, 154, 0.38));
+    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85))
+    drop-shadow(0 0 10px rgba(255, 46, 154, 0.42));
   /* The doors. Chamfered arcade panels clipped with clip-path, so their glow rides
      drop-shadow filters (which follow the cut) rather than box-shadow (which cannot). */
   /* The doors live in the scene's own language (client note, final round): deep-violet
@@ -671,15 +673,14 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-grid-y: rgba(255, 46, 154, 0.50);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
   --landing-scanline: rgba(10, 0, 10, 0.22);
-  --landing-sign: linear-gradient(180deg, #FFFDF9 0%, #F4EDE9 12%, #E2D6DC 24%, #C4B4CC 36%, #9A88AF 44%, #6E5E8C 47%, #5E5080 50%, #FBF7F2 54%, #EBDFE8 62%, #C8B6D6 72%, #9886BC 84%, #6A5A9E 94%, #4E4288 100%);
   --landing-planet: radial-gradient(circle at 35% 30%, #FFD9A6 0%, #C86AD9 55%, #7A35B8 100%);
   --landing-planet-ring: rgba(255, 193, 92, 0.7);
   --landing-planet-glow: 0 0 16px 2px rgba(255, 150, 80, 0.4);
   --landing-planet-opacity: 0.4;
-  --landing-stroke: rgba(40, 10, 40, 0.60);
+  --landing-stroke: rgba(12, 32, 72, 0.72);
   --landing-title-glow:
-    drop-shadow(0 3px 0 rgba(40, 8, 36, 0.8))
-    drop-shadow(0 0 10px rgba(255, 150, 80, 0.40));
+    drop-shadow(0 3px 0 rgba(8, 20, 48, 0.8))
+    drop-shadow(0 0 10px rgba(255, 150, 80, 0.42));
 }
 [data-theme="light"] {
   --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #E6E2F9 24%, #EFDFF6 42%, #F6DAEC 56%, #FBD9E4 68%, #FDD8CE 84%, #FFD6B4 100%);
@@ -700,12 +701,12 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #F1EEF9 14%, #DCD6EE 28%, #BBB2D8 40%, #9187BC 47%, #6B6198 50%, #F8F6FE 54%, #E6E1F5 63%, #C1B8E0 75%, #9187C2 87%, #6A5FA6 100%);
+  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #EAF3FC 12%, #C9DEF4 26%, #9CBEE6 38%, #6E93CC 47%, #4A6BA6 50%, #F4FAFF 54%, #DCEBFA 63%, #A9C8EC 75%, #7396CE 87%, #4A67A8 100%);
   --landing-planet-opacity: 0;
-  --landing-stroke: rgba(70, 40, 110, 0.50);
+  --landing-stroke: rgba(20, 40, 90, 0.55);
   --landing-title-glow:
-    drop-shadow(0 2px 0 rgba(90, 50, 130, 0.5))
-    drop-shadow(0 0 8px rgba(226, 76, 156, 0.28));
+    drop-shadow(0 2px 0 rgba(30, 50, 100, 0.5))
+    drop-shadow(0 0 8px rgba(226, 76, 156, 0.30));
   /* Daybreak doors: pale glass with deep-inked rims and labels — sunlit panels for a
      sunlit sky, not the night's carried into the morning. Hover brightens; the labels
      stay deep and readable. */
