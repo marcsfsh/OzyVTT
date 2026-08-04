@@ -114,7 +114,7 @@ html:has(.landing), body:has(.landing) { overflow: hidden; }
 .landing .home-hero-title .nh-wordmark {
   display: block; font-size: clamp(3.4rem, 16vw, 10.5rem); line-height: .92;
   background: var(--landing-sign); -webkit-background-clip: text; background-clip: text; color: transparent;
-  -webkit-text-stroke: 1px var(--landing-stroke);
+  -webkit-text-stroke: 0.5px var(--landing-stroke);
   filter: var(--landing-title-glow);
 }
 

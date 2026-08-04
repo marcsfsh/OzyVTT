@@ -153,7 +153,7 @@
      mirror meet, flash, dark base) carries legibility over sky and sun alike, with a
      hairline navy stroke, one solid extrusion, one tight magenta halo. Night and the
      sunset hour share this steel — the contrast is the point; daybreak depth-tunes it. */
-  --landing-sign: linear-gradient(180deg, #F7FCFF 0%, #E3F1FC 10%, #BFDCF5 22%, #8FBAE8 34%, #5C8FD2 44%, #33619F 47%, #274F86 50%, #F0F8FF 54%, #D6EAFB 62%, #9FC6EE 72%, #6B9BDC 82%, #3D69AF 92%, #27498A 100%);
+  --landing-sign: linear-gradient(180deg, #FAFDFF 0%, #EDF6FE 10%, #C6E0F7 22%, #93BEEA 34%, #5E92D4 44%, #2F5C9C 47%, #1F4276 50%, #FBFEFF 54%, #E2F1FC 61%, #A6CBF0 71%, #6FA0DF 82%, #3E6BB1 92%, #254789 100%);
   --landing-stroke: rgba(12, 32, 72, 0.78);
   --landing-title-glow:
     drop-shadow(0 3px 0 rgba(8, 20, 48, 0.85))
@@ -701,7 +701,7 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #EAF3FC 12%, #C9DEF4 26%, #9CBEE6 38%, #6E93CC 47%, #4A6BA6 50%, #F4FAFF 54%, #DCEBFA 63%, #A9C8EC 75%, #7396CE 87%, #4A67A8 100%);
+  --landing-sign: linear-gradient(180deg, #FFFFFF 0%, #EFF6FD 12%, #CBE0F5 26%, #9DBFE7 38%, #6E93CC 47%, #40619E 50%, #FBFDFF 54%, #E2EEFA 63%, #ABCAED 75%, #7396CE 87%, #47649F 100%);
   --landing-planet-opacity: 0;
   --landing-stroke: rgba(20, 40, 90, 0.55);
   --landing-title-glow:
