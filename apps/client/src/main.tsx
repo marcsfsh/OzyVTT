@@ -167,22 +167,52 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   /**
-   * The landing→app ENTRY TRANSITION (§7.7, one-shot): the door answers → the scene dips
-   * away (the landing stays mounted alone for one beat, wearing .anim-entry-dip) → the
-   * frame settles up with the cascade (main wears .anim-cascade; the pane's leg of it is
-   * opacity-led — the pane-in rule in styles.css). The classes are STATE, dropped when the
-   * entry lands, so no animation is retained to trap a fixed overlay later (refresh risk
-   * #2) and later tab navigation never replays it. Reduced motion skips the phases
-   * entirely — the swap is instant, which is also what the global animation kill would
-   * collapse them to.
+   * The landing→app ENTRY DRIVE (§7.7, one-shot). The door answers, and the title screen drives:
+   * the doors travel past the camera down the grid road, the sun rises out from behind the horizon
+   * and its flare clears the frame — and the app is already there behind it (client brief,
+   * 2026-08-04). The scene's own choreography is CSS (the .landing--drive block in styles.css);
+   * this is only the clock.
+   *
+   * Two phases, because they own different elements: `drive` keeps the landing mounted as a fixed
+   * curtain over the frame for its 900ms beat, then `settle` hands the beat to the app, which
+   * cascades up (main wears .anim-cascade; the pane's leg is opacity-led — the pane-in rule).
+   * The 900 matches the CSS beat exactly: shorter and the curtain would drop mid-drive, longer and
+   * the settled app would sit behind a transparent curtain doing nothing.
+   *
+   * Both classes are STATE and both are dropped when the entry lands, so nothing is retained to
+   * trap a fixed overlay afterwards (refresh risk #2) and later tab navigation never replays it.
+   * Reduced motion declines the state machine outright — the swap is instant, which is what the
+   * global animation kill would collapse the drive to anyway, and an instant swap is honest where
+   * a frozen mid-drive frame would just look broken.
    */
-  const [entry, setEntry] = useState<"dip" | "settle" | null>(null);
+  const [entry, setEntry] = useState<"drive" | "settle" | null>(null);
   const entryTimers = useRef<number[]>([]);
-  const beginEntry = () => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    setEntry("dip");
-    entryTimers.current.push(window.setTimeout(() => setEntry("settle"), 200));
-    entryTimers.current.push(window.setTimeout(() => setEntry(null), 700));
+  /**
+   * `commit` is the caller's auth state change — the one that mounts the whole app. It is handed in
+   * rather than run alongside, because ORDER is the whole difference between a drive and a stall.
+   *
+   * Committing in the same React batch as the drive class costs the first ~450ms of the beat, and
+   * that is measured, not guessed: the curtain's keyframes cannot start until style and layout are
+   * computed, and the app's first render/layout/paint sits in front of them on the main thread. The
+   * probe showed the road at 0px until t≈500ms and only 143px of its 560px travelled by the time the
+   * curtain dropped — the title screen simply sat there and then jumped.
+   *
+   * So: paint the curtain, let its animations actually begin, and only then mount the app behind it.
+   * Two frames rather than one because the first only guarantees the style is computed; by the second
+   * the compositor owns the animations, and since every one of them is transform/opacity it keeps
+   * running through the mount jank instead of waiting for it.
+   */
+  const beginEntry = (commit: () => void) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { commit(); return; }
+    setEntry("drive");
+    // rAF does not fire in a background tab, and a half-entered app is a far worse failure than a
+    // skipped animation — so a timeout races it and whichever arrives first commits, once.
+    let committed = false;
+    const once = () => { if (!committed) { committed = true; commit(); } };
+    requestAnimationFrame(() => requestAnimationFrame(once));
+    entryTimers.current.push(window.setTimeout(once, 120));
+    entryTimers.current.push(window.setTimeout(() => setEntry("settle"), 900));
+    entryTimers.current.push(window.setTimeout(() => setEntry(null), 1400));
   };
   useEffect(() => () => { entryTimers.current.forEach(clearTimeout); }, []);
   /** Keyboard safety is shell plumbing: installed once, for every region on every surface. */
@@ -307,7 +337,7 @@ function App() {
       if (!result.ok) fail(result.message ?? "Couldn't join the table. Please try again.");
       else {
         if (result.token) localStorage.setItem(PLAYER_TOKEN_KEY, result.token);
-        setMode("player"); setConnection("online"); setNotice(null); beginEntry();
+        beginEntry(() => { setMode("player"); setConnection("online"); setNotice(null); });
       }
     });
   };
@@ -318,7 +348,7 @@ function App() {
       setGmToken(token); socket.auth = { token }; socket.connect();
       socket.emit("session:join", { token }, (result: SessionJoinResult) => {
         setBusy(false);
-        result.ok ? (setMode("gm"), setConnection("online"), setPassword(""), setNotice(null), beginEntry()) : fail(result.message ?? "Couldn't sign in as GM.");
+        result.ok ? beginEntry(() => { setMode("gm"); setConnection("online"); setPassword(""); setNotice(null); }) : fail(result.message ?? "Couldn't sign in as GM.");
       });
     } catch (error) { setBusy(false); fail((error as Error).message); }
   };
@@ -412,9 +442,11 @@ function App() {
    * than the app appearing to change identity between two halves of the same decision.
    */
   const preAuth = mode === "home" || (mode === "gm" && !gmToken);
-  /** The post-auth shell — rows 2-3's content. Suppressed for one beat while the landing
-      plays the entry dip, so the frame then arrives all at once with the cascade. */
-  const shellVisible = !preAuth && state !== null && entry !== "dip";
+  /** The post-auth shell — rows 2-3's content. It is deliberately NOT suppressed during the entry
+      drive any more: the drive is a fixed, opaque curtain over the whole viewport, so the frame can
+      mount and settle behind it and be finished by the time the flare clears. That is the point of
+      a curtain — the old dip had to hide the shell because it did not cover it. */
+  const shellVisible = !preAuth && state !== null;
   /**
    * THE FRAME (§7 — the screen is the page): <main> is a 100dvh grid, rows
    * [connection strip][tab bar][content pane], and the page never scrolls. Every in-flow
@@ -471,7 +503,7 @@ function App() {
         `.pane-stage scroll-y` region inside it — the staging rule (styles.css); each
         wrapper below names the refresh phase that drains it. */}
     <div className="app-pane">
-    {(preAuth || entry === "dip") && <div className={entry === "dip" ? "landing anim-entry-dip" : "landing"}>
+    {(preAuth || entry === "drive") && <div className={entry === "drive" ? "landing landing--drive" : "landing"}>
       {/* D30's full statement — the 80s retro-cyber title screen, layer by layer: star field, the
           slatted sun rising behind the horizon line, the grid rolling toward the viewer, analog
           grain, and the CRT vignette + scanlines the `.landing` pseudo-elements paint over it all.
@@ -483,9 +515,13 @@ function App() {
         <span className="landing-planet" /><span className="landing-horizon" /><span className="landing-grid" />
         <span className="landing-noise" />
       </div>
+      {/* Dormant at rest; the entry drive blooms it to clear the frame. A sibling of the scene rather
+          than a layer inside it, because it has to paint over the CRT dressing and the content both,
+          and the scene layer is its own stacking context. */}
+      <span className="landing-flare" aria-hidden="true" />
       <header className="home-hero anim-view">
         {/* The one bold thing on the view: no eyebrow, no subtext, nothing beside it (D30). */}
-        <h1 className="home-hero-title"><Wordmark>OzyVTT</Wordmark></h1>
+        <h1 className="home-hero-title"><Wordmark>OZYVTT</Wordmark></h1>
       </header>
       {mode === "home" && <section className="choices anim-view">
         <Button variant="primary" size="md" lift onClick={joinPlayer} disabled={busy}>{busy ? "Connecting…" : "Join as Player"}<IconArrow className="nav-arrow" /></Button>

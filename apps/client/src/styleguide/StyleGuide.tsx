@@ -784,7 +784,7 @@ export function StyleGuide() {
       <div className="sg">
         <header className="sg-header surface-frost">
           <div className="sg-header-brand">
-            <Wordmark>OzyVTT</Wordmark>
+            <Wordmark>OZYVTT</Wordmark>
             <Eyebrow>Design system reference</Eyebrow>
           </div>
           <ThemeToggle />
@@ -853,7 +853,7 @@ export function StyleGuide() {
 
           <Section id="type" title="Typography" blurb="Arcade voice is fenced to the wordmark and top titles; body and mono stay neutral and legible.">
             <div className="sg-type-rows">
-              <div className="sg-type-row"><Wordmark>OzyVTT</Wordmark><code>--font-wordmark · wordmark only</code></div>
+              <div className="sg-type-row"><Wordmark>OZYVTT</Wordmark><code>--font-wordmark · wordmark only</code></div>
               <div className="sg-type-row"><span className="sg-display">Display / dice totals</span><code>--font-display · Russo One</code></div>
               <div className="sg-type-row"><span className="sg-body-sample">Body — stat blocks, chat, forms, controls stay in the neutral body face.</span><code>--font-body · Manrope</code></div>
               <div className="sg-type-row"><span className="tabular sg-mono-sample">2d6+3 · HP 42/58 · +5</span><code>--font-mono · Space Mono, tabular</code></div>

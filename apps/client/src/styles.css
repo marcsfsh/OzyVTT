@@ -259,7 +259,10 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
   padding: clamp(1.25rem, 4vh, 3rem) 1rem 4rem; text-align: center;
   background: var(--landing-sky);
 }
-.landing > *:not(.landing-scene) { position: relative; z-index: 3; width: 100%; }
+/* The flare is excluded because it is neither scene nor content: it has to paint OVER the vignette
+   and the scanlines (z-2) and over the content (z-3), which a child of the z-0 scene layer could
+   never do — that layer is its own stacking context. */
+.landing > *:not(.landing-scene):not(.landing-flare) { position: relative; z-index: 3; width: 100%; }
 /* CRT dressing over the whole scene, under the content: vignette then scanlines. */
 .landing::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--landing-vignette); }
 .landing::after {
@@ -323,6 +326,126 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
    opacity token, because the .static-noise utility is display:none in light and daybreak
    still wants a whisper of it. */
 .landing-noise { position: absolute; inset: 0; background-image: var(--noise); background-size: 140px 140px; opacity: var(--landing-noise-opacity); mix-blend-mode: screen; }
+
+/* The sun's own light, held at the horizon until the drive needs it. Dormant at rest (scale 0,
+   transparent) so the title screen is unchanged; the entry blooms it to clear the frame. Its colour
+   is the scene's, not a new one — the star white at the core through the brand magenta, both tokens,
+   because check (d) allows no hand-typed literal here or anywhere. */
+/* Centred on where the sun ARRIVES, not where it starts, so the bloom belongs to the sun rather than
+   to the camera — this is the sun's corona opening, not a flash. Deliberately restrained: an earlier
+   pass peaked near-opaque and whited the whole frame, which drowned the road the drive is supposed to
+   be about and made a full-viewport luminance jump on a dark theme. It stays a bloom you can see
+   through, and the curtain's own fade does the actual reveal. */
+.landing-flare {
+  position: absolute; left: 50%; top: 52%; z-index: 4; pointer-events: none;
+  width: 12vmax; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0); opacity: 0;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--landing-star) 62%, transparent) 0%,
+    color-mix(in srgb, var(--magenta) 46%, transparent) 30%,
+    color-mix(in srgb, var(--violet) 26%, transparent) 56%,
+    transparent 76%);
+}
+
+/* ================= THE ENTRY DRIVE — landing → app (§7.7) =================
+   The brief, in the client's words: the doors travel past the screen as if you were driving down
+   the grid road, the sun rises above you, and that clears the space for the app to appear.
+
+   Four things move on one 900ms beat, and they are deliberately NOT synchronised — the road and the
+   doors go first, the sun answers a quarter-beat later, the flare last, so it reads as one continuous
+   move rather than four things starting at once.
+
+   It becomes a fixed CURTAIN for its beat. The frame's chrome rows mount the instant auth lands, and
+   without the cover you would watch the tab bar pop in beneath a scene that is still driving. z-70
+   clears the tallest thing in the app (the token menu at 60); nothing here survives, because the
+   whole subtree unmounts when the beat ends.
+
+   Everything animated is transform/opacity — compositor work, no layout, no repaint of the gradients
+   themselves. The subtree unmounting is also what keeps `perspective` safe: a perspective (like a
+   transform) makes a containing block for position:fixed descendants, which is the trap that made the
+   pane's own entrance opacity-led (refresh risk #2). Nothing fixed lives inside the landing, and none
+   of this outlives the beat.
+
+   Reduced motion never reaches here — main.tsx declines to enter the state at all, so the swap is
+   instant rather than frozen mid-drive. */
+.landing--drive {
+  position: fixed; inset: 0; z-index: 70; pointer-events: none;
+  perspective: 900px; perspective-origin: 50% 42%;
+  animation: entry-clear 900ms linear forwards;
+}
+/* These are large elements painting gradients, and the app mounts behind the curtain while they run,
+   so they are promoted deliberately: on the compositor a transform/opacity keyframe keeps its own
+   time instead of queueing behind the mount's layout on the main thread. Scoped to the drive, and
+   the subtree unmounts when the beat ends, so nothing is left holding a layer — or a containing
+   block — afterwards.
+   Honest caveat: the stall this answers was measured on a machine that was also running several
+   headless browsers, at ~10fps. The promotion is right on its own terms, but how much of that stall
+   was main-thread contention and how much was the box being busy has NOT been separated. Re-measure
+   the beat on an idle machine before trusting any timing number attached to it. */
+.landing--drive > *,
+.landing--drive .landing-sun,
+.landing--drive .landing-stars,
+.landing--drive .landing-stars-far,
+.landing--drive .landing-horizon { will-change: transform, opacity; }
+/* The content — wordmark, doors, or the GM's sign-in card, whichever the door answered from —
+   accelerates INTO the camera. `translateZ` against the container's perspective is what makes it
+   grow and slide off-frame the way a thing you drive past does; an ease-in curve is the acceleration.
+   The rule outranks `.anim-view`'s entrance on the same elements, which has already finished. */
+.landing--drive > *:not(.landing-scene):not(.landing-flare) {
+  animation: entry-pass 620ms cubic-bezier(.55, .06, 1, .5) forwards;
+}
+/* The road. The texture streams; the PLANE stays anchored at the horizon. Translating the plane was
+   the first attempt and it is wrong for exactly one reason: the plane's far edge is the horizon, so
+   sliding it toward the camera opens a widening void where the road used to meet the sky — measured
+   at ~254px of empty gradient by two-thirds of the beat, which is precisely when "driving down the
+   road" should be at its most convincing. Streaming the background instead keeps road arriving out of
+   the horizon for the whole beat. 560px is ten of the 56px cells, so it starts and ends in step. */
+.landing--drive .landing-grid { animation: entry-road 900ms cubic-bezier(.42, 0, .78, .96) forwards; }
+/* The sun rises out from behind the horizon — the skyband still clips it, so it climbs INTO the sky
+   rather than floating free of the scene — and brightens as it comes. */
+.landing--drive .landing-sun { animation: entry-sunrise 760ms cubic-bezier(.22, .58, .3, 1) 220ms forwards; }
+.landing--drive .landing-horizon { animation: entry-horizon 900ms ease-in forwards; }
+/* Parallax: the near field opens faster than the far one, which is the whole of the depth cue. */
+.landing--drive .landing-stars { animation: entry-stars 900ms cubic-bezier(.5, 0, .9, .8) forwards; }
+.landing--drive .landing-stars-far { animation: entry-stars-far 900ms cubic-bezier(.5, 0, .9, .8) forwards; }
+.landing--drive .landing-flare { animation: entry-flare 700ms cubic-bezier(.3, 0, .25, 1) 260ms forwards; }
+
+@keyframes entry-pass {
+  from { transform: translateZ(0); opacity: 1; }
+  55% { opacity: 1; }
+  to { transform: translateZ(640px); opacity: 0; }
+}
+@keyframes entry-road {
+  from { background-position: 0 0; }
+  to { background-position: 0 560px; }
+}
+@keyframes entry-sunrise {
+  from { transform: translateX(-50%) translateY(0) scale(1); }
+  to { transform: translateX(-50%) translateY(-46%) scale(1.28); }
+}
+@keyframes entry-horizon {
+  from { transform: scaleX(1); opacity: 1; }
+  to { transform: scaleX(1.4); opacity: 0; }
+}
+@keyframes entry-stars {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+@keyframes entry-stars-far {
+  from { transform: scale(1); opacity: .5; }
+  to { transform: scale(1.18); opacity: 0; }
+}
+@keyframes entry-flare {
+  from { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  50% { opacity: .52; }
+  to { transform: translate(-50%, -50%) scale(11); opacity: 0; }
+}
+/* The curtain holds opaque while the drive happens and only lets go at the very end, once the flare
+   has washed the frame — so what appears underneath is the settled app, never the swap itself. */
+@keyframes entry-clear {
+  0%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 /* ---- The sign. The banded sunset fill is RE-ASSERTED here because the light theme swaps
    `.wordmark-name` to solid ink — right everywhere else in the app, wrong on this scene.
