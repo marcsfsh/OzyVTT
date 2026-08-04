@@ -1556,7 +1556,7 @@ Force-releases a claimed character (GM-grade only) - the recovery path for a los
 
 ### `POST /api/v1/game/actors/{actorId}/token-image`
 
-Sets or clears (null) a combatant's token image from the uploaded token library (GM-grade only).
+Sets or clears (null) a combatant's token image from the uploaded token library: the GM for any combatant, a player for their own claimed character (D18).
 
 **Auth:** Integration credential with `actor:write` · GM session
 
