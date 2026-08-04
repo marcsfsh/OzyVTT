@@ -1,0 +1,49 @@
+/* Settings — one scrolling page, three groups (D24). No tabs inside a tab: the groups are stacked
+   sections with Eyebrow headers, so a phone scrolls one column and a laptop reads the same order. */
+
+.settings-page { display: flex; flex-direction: column; gap: 1.4rem; max-width: 56rem; margin: 0 auto; padding-bottom: 2rem; }
+.settings-head h2 { margin: 0; font: 700 1.4rem/1.2 var(--font-display); }
+.settings-head p { margin: .3rem 0 0; color: var(--text-dim); font-size: .92rem; }
+
+.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: 1rem 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.settings-group > .nh-eyebrow { margin-bottom: .6rem; }
+
+.settings-row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: .8rem 0; border-top: 1px solid var(--line); }
+.settings-group > .settings-row:first-of-type { border-top: 0; padding-top: .2rem; }
+.settings-row.stacked { flex-direction: column; align-items: stretch; }
+.settings-row-text { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.settings-row-title { font-weight: 600; font-size: .95rem; }
+.settings-row-help { color: var(--text-dim); font-size: .82rem; }
+.settings-row-control { display: flex; flex-direction: column; gap: .6rem; align-items: flex-start; }
+.settings-row.stacked .settings-row-control { width: 100%; }
+.settings-row:not(.stacked) .settings-row-control { align-items: flex-end; }
+
+.settings-note { margin: 0; color: var(--text-muted); font-size: .78rem; }
+.settings-subhead { font: 700 .78rem/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+.settings-inline { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.settings-inline-label { color: var(--text-dim); font-size: .85rem; }
+
+.settings-exceptions { display: flex; flex-direction: column; gap: .45rem; width: 100%; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.settings-exception { display: flex; gap: .6rem; align-items: center; justify-content: space-between; }
+.settings-methods { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; }
+
+.settings-subsection { display: flex; flex-direction: column; gap: .8rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.settings-session { display: flex; flex-wrap: wrap; gap: .6rem; }
+
+.settings-empty { margin: 0; padding: 1.2rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .9rem; }
+.settings-players { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.settings-player { display: flex; gap: .7rem; align-items: center; padding: .6rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.settings-player-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.settings-player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-player-meta { color: var(--text-dim); font-size: .78rem; }
+.settings-player-actions { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: flex-end; }
+
+@media (max-width: 650px) {
+  /* Every row stacks: a control pushed to the right edge of a 390px screen is a control with no room
+     for its own label, and the segmented dials here are three words wide. */
+  .settings-row { flex-direction: column; align-items: stretch; }
+  .settings-row:not(.stacked) .settings-row-control { align-items: stretch; }
+  .settings-player { flex-wrap: wrap; }
+  .settings-player-actions { width: 100%; justify-content: flex-start; }
+  .settings-player-actions > * { flex: 1 1 auto; }
+}

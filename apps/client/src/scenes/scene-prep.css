@@ -1,0 +1,21 @@
+/* The shared prep panel (D1): the same parts behind both doors. No @media rules — every region is
+   either full-width or a wrapping flex row, so a 390px phone and a laptop run the same layout. */
+.scene-prep { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.scene-prep > * { min-width: 0; }
+.scene-prep-heading { margin: 0; font-family: var(--font-display); font-size: 1rem; letter-spacing: .02em; }
+.scene-prep-map { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; }
+.scene-prep-map-name { color: var(--text-dim); font-size: .78rem; }
+.scene-prep-map-name strong { color: var(--text); }
+/* Two equal buttons: on a phone they stay side by side at 44px each rather than stacking into a
+   column that pushes the primary action below the fold. */
+.scene-prep-adds { display: flex; flex-wrap: wrap; gap: .4rem; }
+.scene-prep-adds > * { flex: 1 1 9rem; justify-content: center; }
+.scene-prep-picklist { display: flex; flex-direction: column; gap: .2rem; max-height: 13rem; overflow-y: auto; overscroll-behavior: contain; padding: .3rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
+.scene-prep-pick { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; min-height: var(--tap-min); padding: .3rem .5rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; }
+.scene-prep-pick:hover { border-color: var(--line-hover); background: var(--surface-2); }
+.scene-prep-pick strong { font-size: .8rem; }
+.scene-prep-pick small { color: var(--text-muted); font-size: .68rem; }
+.scene-prep-recent > summary { min-height: var(--tap-min); display: flex; align-items: center; color: var(--text-dim); font-size: .76rem; font-weight: 800; cursor: pointer; }
+.scene-prep-recent[open] > summary { margin-bottom: .3rem; }
+.scene-prep-note { margin: 0; padding: .3rem .1rem; color: var(--text-muted); font-size: .72rem; }
+.scene-prep-footer { display: flex; flex-direction: column; gap: .45rem; padding-top: .2rem; border-top: 1px solid var(--line); }

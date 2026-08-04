@@ -549,11 +549,17 @@ export function EncounterMap({
   return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onContextMenu={onContextMenu}>
     {/* No permanent tutorial captions (ux-principles: if it needs a banner, redesign it) - the tray
         appears only while it has tokens to place or a drag could drop one back in. */}
-    {trayShown && <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Unplaced token tray">
-      <div><strong>Token tray</strong><span>{unplaced.length ? "Drag onto the map, click to place near its center, or press Enter." : "Drag a token here to take it off the map."}</span></div>
+    {/* The staging tray, map side (D2/D3): the same list the prep panel shows, as the things you can
+        actually grab. Everything added lands here first and is explicitly NOT on the map until it is
+        dragged out — or tapped, which drops it at the centre, which is the touch and keyboard route. */}
+    {trayShown && <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Staging tray">
+      <div><strong>Staging tray</strong><span>{unplaced.length ? "Drag one onto the map, or tap it to drop it at the centre." : "Drag a token here to take it off the map."}</span></div>
       <div className="encounter-token-tray-list">{unplaced.map((encounterToken) => {
         const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
-        return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${actor.visibility === "gm-only" ? " hidden" : ""}`} disabled={busyActorId !== null} onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
+        const gmOnly = actor.visibility === "gm-only";
+        return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${gmOnly ? " hidden" : ""}`} disabled={busyActorId !== null}
+          title={gmOnly ? `${actor.name} · GM only` : `${actor.name} · Shown to players`}
+          onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
       })}</div>
     </div>}
     <div className={`encounter-map-stage${dock?.node ? ` has-dock has-dock-${dock.position}` : ""}`} ref={stageRef} style={{ ...(dock?.node ? { "--dock-side-width": `${dock.width}px` } : {}), ...(trayHeight > 0 ? { "--tray-height": `${Math.round(trayHeight)}px` } : {}) } as React.CSSProperties} aria-busy={image.status !== "ready"}>
@@ -594,7 +600,7 @@ export function EncounterMap({
           onNotificationsMutedChange={setNotificationsMuted}
         />
 
-        <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>
+        <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive tokens are layered above this map.`}>
           <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
 
           {/* Shapes render below tokens; measurements render above tokens (further down) so they read over the pieces. */}

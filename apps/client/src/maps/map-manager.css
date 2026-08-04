@@ -11,11 +11,6 @@
 .map-upload button:disabled, .grid-wizard button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
 .map-feedback { min-height: 1.4rem; color: var(--text-dim); }
 .map-workspace { display: grid; grid-template-columns: minmax(12rem, .32fr) minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
-.map-list { display: flex; flex-direction: column; gap: .55rem; }
-.map-list button { padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: inherit; text-align: left; cursor: pointer; }
-.map-list button.selected { border-color: var(--cyan); box-shadow: inset 3px 0 var(--cyan); }
-.map-list strong, .map-list span, .map-list small { display: block; }
-.map-list span, .map-list small { margin-top: .2rem; color: var(--text-muted); font-size: .73rem; }
 .map-calibration { min-width: 0; }
 .grid-mode-choice { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem; margin-bottom: .7rem; }
 .grid-mode-choice button { padding: .75rem; border: 1px solid var(--line); background: var(--surface-2); text-align: left; }
@@ -92,16 +87,18 @@
 .verification.accepted { border-color: var(--success); color: var(--cyan-hi); }
 .verification.rejected { border-color: var(--danger); color: var(--danger-hi); }
 .map-empty { padding: 2rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); }
-@media (max-width: 850px) { .map-upload { grid-template-columns: 1fr 1fr; } .map-workspace { grid-template-columns: 1fr; } .map-list { display: grid; grid-template-columns: repeat(2, 1fr); } .adjustment-groups { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .map-manager-heading { display: block; } .map-manager-heading p { margin-top: .6rem; text-align: left; } .map-upload, .wizard-fields, .map-list, .adjustment-groups, .grid-mode-choice { grid-template-columns: 1fr; } .point-summary { align-items: stretch; flex-direction: column; } .grid-wizard-actions { flex-direction: column; } }
+@media (max-width: 850px) { .map-upload { grid-template-columns: 1fr 1fr; } .map-workspace { grid-template-columns: 1fr; } .adjustment-groups { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .map-manager-heading { display: block; } .map-manager-heading p { margin-top: .6rem; text-align: left; } .map-upload, .wizard-fields, .adjustment-groups, .grid-mode-choice { grid-template-columns: 1fr; } .point-summary { align-items: stretch; flex-direction: column; } .grid-wizard-actions { flex-direction: column; } }
 
 .map-list-column { display: flex; flex-direction: column; gap: .8rem; min-width: 0; }
 .map-list-filters { display: flex; flex-direction: column; gap: .5rem; }
 .map-list-filters input { margin-top: 0; }
 .map-list-empty { margin: 0; padding: 1rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .85rem; }
-.map-folder-group { display: grid; gap: .5rem; }
-.map-folder-group + .map-folder-group { margin-top: .6rem; }
-.map-folder-label { margin: 0; font: 700 .68rem/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+/* Folders up front (D5): one scrolling chip row above the picture grid. The grid itself is the
+   embedded picker's `.map-picker-grid` - one collection, one look, one stylesheet. */
+.map-folder-chips { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
+.map-folder-chips > * { flex: none; }
+.map-list-column .map-picker-grid { max-height: none; }
 .map-folder-move { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .map-folder-move span { color: var(--text-muted); font-size: .8rem; }
 .map-folder-move select { width: auto; margin-top: 0; }

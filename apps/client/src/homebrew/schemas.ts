@@ -411,7 +411,7 @@ const FEAT_SCHEMA: HomebrewSchema = {
         // An open slug in `FeatReferenceSchema`, so a closed select meant a category the table
         // has never used before was unauthorable from the form that exists to author new things.
         { key: "category", label: "Category", required: true, placeholder: "general", suggestions: (ctx) => ctx.featCategories.map((option) => option.value) },
-        { key: "repeatable", label: "Can be taken more than once", kind: "switch" },
+        { key: "repeatable", label: "Can be chosen more than once", kind: "switch" },
         {
           key: "prerequisite",
           label: "Prerequisites",
@@ -807,7 +807,7 @@ const MONSTER_SCHEMA: HomebrewSchema = {
       fields: [
         { key: "armorClass", label: "Armour class", kind: "number", required: true, min: 1, max: 40 },
         { key: "hitPoints.maximum", label: "Hit points", kind: "number", required: true, min: 1, max: 1000 },
-        { key: "hitPoints.formula", label: "Hit dice", placeholder: "19d12 + 133", validate: diceValidate, help: "Like 19d12 + 133. Without it, short rests give this creature no hit dice." },
+        { key: "hitPoints.formula", label: "Hit dice", placeholder: "19d12 + 133", validate: diceValidate, help: "Like 19d12 + 133. Without it, short rests give this monster no hit dice." },
         { key: "proficiencyBonus", label: "Proficiency bonus", kind: "number", min: 0, max: 12 },
         { key: "initiativeBonus", label: "Initiative bonus", kind: "number", min: -20, max: 30, allowNegative: true },
         { key: "damageResistances", label: "Damage resistances", kind: "tags", suggestions: (ctx) => ctx.damageTypes },

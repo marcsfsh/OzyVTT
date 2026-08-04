@@ -118,10 +118,10 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
           <option value="aura">Health aura</option>
         </select>
       </label>}
-      {role === "gm" && healthOverride && healthOverride.style !== "band" && <label className="token-context-size">Show to
+      {role === "gm" && healthOverride && healthOverride.style !== "band" && <label className="token-context-size">Health is
         <select value={healthOverride.audience} disabled={busy} onChange={(event) => setHealthDisplay({ style: healthOverride.style, audience: event.target.value as "gm" | "all" })}>
           <option value="gm">GM only</option>
-          <option value="all">Everyone</option>
+          <option value="all">Shown to players</option>
         </select>
       </label>}
       <details className="token-context-conditions">

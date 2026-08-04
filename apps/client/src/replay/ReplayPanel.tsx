@@ -1,36 +1,56 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CombatLogEntry, GameState } from "@vtt/domain";
-import { Button } from "@vtt/ui";
+import type { CombatLogEntry, GameState, PlayerCombatView, PlayerHp } from "@vtt/domain";
+import { Button, GmOnlyTag, IconChevronLeft, IconChevronRight, IconDownload, IconPlay, Menu, MenuItem, RevealSwitch, useToast } from "@vtt/ui";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph } from "../scene/annotationGlyph";
 import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
+import { useConfirm } from "../components/feedback";
+import { newId } from "../lib/ids";
+import { socket } from "../socket";
 import "./replay.css";
 
 /**
- * GM-only encounter replay (the Time Machine's study mode): pick an archived fight and step through
- * it turn by turn - the map and tokens exactly as they stood at each boundary, the initiative order
- * with hit points and conditions, and everything that was narrated during that turn (movement,
- * damage, saves, GM-only lines included). Data comes from the GM-gated archive endpoints; nothing
- * here is reachable by players or the shared viewer.
+ * **Replays (A8 / D25–D27).** Every finished fight, kept — and now reachable by both roles.
+ *
+ * The GM gets the list (with the per-replay reveal control, hidden by default), the viewer, and
+ * *Launch from here*. A player gets exactly the replays the GM shared, rendered from the **player
+ * replay projection** the server computes (`apps/server/src/replay-projection.ts`): the client never
+ * receives the GM archive, so hidden combatants and GM-only narration are absent from the document
+ * rather than filtered out of it here. One URL serves both — the server decides which document you get.
  */
 
-type ArchiveSummary = Readonly<{ id: number; archivedAt: string; startedAt: string | null; endedAt: string; turnCount: number }>;
+type ArchiveSummary = Readonly<{ id: number; archivedAt: string; startedAt: string | null; endedAt: string; turnCount: number; playerVisible: boolean }>;
 type ArchiveTurn = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string; state: GameState }>;
 type ArchiveDocument = Readonly<{ archiveSchemaVersion: number; startedAt: string | null; endedAt: string; turnCount: number; turns: readonly ArchiveTurn[]; log: readonly CombatLogEntry[]; finalState?: GameState }>;
+/** The player-projected document, mirrored from `PlayerReplayDocument` (server-owned shape). */
+type PlayerReplayActor = Readonly<{ id: string; name: string; hp: PlayerHp; conditions: readonly string[] }>;
+type PlayerReplayTurn = Readonly<{ index: number; at: string; label: string; combat: PlayerCombatView; actors: readonly PlayerReplayActor[]; log: readonly CombatLogEntry[] }>;
+type PlayerReplayDocument = Readonly<{ id: number; startedAt: string | null; endedAt: string; turnCount: number; turns: readonly PlayerReplayTurn[]; attribution: string | null }>;
+
 type Step = Readonly<{ label: string; at: string; state: GameState; from: number; to: number }>;
 
-async function gmApi(path: string, token: string) {
-  const response = await fetch(path, { headers: { authorization: `Bearer ${token}` } });
+async function readApi(path: string, bearer: string, init: RequestInit = {}) {
+  const response = await fetch(path, { ...init, headers: { authorization: `Bearer ${bearer}`, ...init.headers } });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error?.message ?? "The replay could not be loaded.");
+  if (!response.ok) throw new Error(body?.error?.message ?? "That replay could not be loaded.");
   return body;
 }
 
 const when = (iso: string | null) => <span className="tabular">{iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "-"}</span>;
+const dateOnly = (iso: string) => new Date(iso).toLocaleDateString([], { dateStyle: "medium" });
 
-/** Save an archive document as a JSON file - the same machine-readable record the API serves, for spreadsheets, scripts, or archiving outside the host. */
-function exportDocument(id: number, endedAt: string, document: ArchiveDocument) {
+/** How long the fight ran, said the way a person would say it. Null when the archive has no start. */
+function durationOf(startedAt: string | null, endedAt: string): string | null {
+  if (!startedAt) return null;
+  const minutes = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60000));
+  if (minutes < 1) return "under a minute";
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+/** Save an archive document as JSON — the same machine-readable record the API serves. */
+function exportDocument(id: number, endedAt: string, document: unknown) {
   const stamp = endedAt.slice(0, 16).replace("T", "-").replaceAll(":", "");
   const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
   const anchor = window.document.createElement("a");
@@ -41,10 +61,9 @@ function exportDocument(id: number, endedAt: string, document: ArchiveDocument) 
 }
 
 /**
- * A replay step is one recorded boundary: its state is the table AT that moment, and its log slice
- * is what happened between it and the next boundary. Version-1 archives (no finalState) simply end
- * on the last boundary; version-2 archives add an "aftermath" step showing the fight's last live
- * picture with everything narrated after the final boundary.
+ * A replay step is one recorded boundary: its state is the table AT that moment, and its log slice is
+ * what happened between it and the next. Version-1 archives (no finalState) end on the last boundary;
+ * later ones add an "aftermath" step showing the fight's last live picture.
  */
 function stepsOf(document: ArchiveDocument): readonly Step[] {
   const steps: Step[] = document.turns.map((turn, index) => ({
@@ -62,44 +81,67 @@ function stepsOf(document: ArchiveDocument): readonly Step[] {
   return steps;
 }
 
-function ReplayStage({ state, gmToken }: Readonly<{ state: GameState; gmToken: string }>) {
-  const image = useAuthorizedMapImage(state.combat.mapAssetId, gmToken);
-  const placed = state.combat.tokens.filter((token) => token.position !== null);
-  if (image.status === "error") return <div className="replay-stage replay-stage-missing"><strong>Map unavailable</strong><span>{image.message} The turn data on the right still applies.</span></div>;
+// ───────────────────────────────── the stage ─────────────────────────────────
+
+function Stage({ mapAssetId, bearer, tokens, label, actorFor }: Readonly<{
+  mapAssetId: string | null;
+  bearer: string;
+  tokens: ReadonlyArray<{ actorId: string; position: { x: number; y: number } | null; sizePx: number }>;
+  label: string;
+  /** Everything the stage needs about one token's creature — already role-appropriate. */
+  actorFor: (actorId: string) => Readonly<{ name: string; tokenAssetId: string | null; hidden: boolean; band: "healthy" | "bloodied" | "down"; conditions: readonly string[]; active: boolean }> | null;
+}>) {
+  const image = useAuthorizedMapImage(mapAssetId, bearer);
+  const placed = tokens.filter((token) => token.position !== null);
+  if (image.status === "error") return <div className="replay-stage replay-stage-missing"><strong>Map unavailable</strong><span>{image.message} The turn data beside this still applies.</span></div>;
   if (image.status !== "ready") return <div className="replay-stage replay-stage-missing"><span>Loading the battlefield…</span></div>;
   return <div className="replay-stage">
-    <svg viewBox={`0 0 ${image.width} ${image.height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Replayed battle map">
+    <svg viewBox={`0 0 ${image.width} ${image.height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={label}>
       <image href={image.url} width={image.width} height={image.height} />
-      {state.combat.annotations.filter((annotation) => annotation.expiresAt === null).map((annotation) => (
-        <g key={annotation.id} className="annotation-shape visibility-public">
-          <AnnotationGlyph data={{ kind: annotation.kind === "shape" ? "shape" : "measurement", shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} color={annotation.color} />
-        </g>
-      ))}
       {placed.map((token) => {
-        const actor = state.actors.find((candidate) => candidate.id === token.actorId);
+        const actor = actorFor(token.actorId);
         if (!actor || !token.position) return null;
-        const active = state.combat.turnActorId === actor.id;
-        return <g key={token.actorId} className={`replay-token${actor.visibility === "gm-only" ? " replay-token-hidden" : ""}`} transform={`translate(${token.position.x} ${token.position.y})`}>
-          <AuthorizedTokenGlyph assetId={actor.tokenAssetId ?? null} token={gmToken} sizePx={token.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={token.sizePx * 0.72} initialsStyle={{ fontSize: Math.max(10, token.sizePx * 0.34) }} nameStyle={{ fontSize: Math.max(9, token.sizePx * 0.23) }} />
-          <TokenStatusBadges sizePx={token.sizePx} health={healthBandFor(actor.hp)} conditions={actor.conditions.map((condition) => ({ id: condition.id, label: conditionBadgeLabel(condition) }))} />
+        return <g key={token.actorId} className={`replay-token${actor.hidden ? " replay-token-hidden" : ""}`} transform={`translate(${token.position.x} ${token.position.y})`}>
+          <AuthorizedTokenGlyph assetId={actor.tokenAssetId} token={bearer} sizePx={token.sizePx} name={actor.name} active={actor.active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={token.sizePx * 0.72} initialsStyle={{ fontSize: Math.max(10, token.sizePx * 0.34) }} nameStyle={{ fontSize: Math.max(9, token.sizePx * 0.23) }} />
+          <TokenStatusBadges sizePx={token.sizePx} health={actor.band} conditions={actor.conditions.map((id) => ({ id, label: id }))} />
         </g>;
       })}
     </svg>
   </div>;
 }
 
-function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; summary: ArchiveSummary; onBack: () => void }>) {
+/** Prev / play / next / scrubber — one control group, shared by both viewers. */
+function Transport({ index, count, playing, onMove, onPlay, onSeek }: Readonly<{
+  index: number; count: number; playing: boolean;
+  onMove: (delta: number) => void; onPlay: () => void; onSeek: (index: number) => void;
+}>) {
+  return <div className="replay-transport" role="group" aria-label="Replay controls">
+    <Button variant="secondary" size="sm" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Previous turn"><IconChevronLeft /></Button>
+    <Button variant="secondary" size="sm" onClick={onPlay} aria-label={playing ? "Pause" : "Play"}>{playing ? "Pause" : <IconPlay />}</Button>
+    <Button variant="secondary" size="sm" onClick={() => onMove(1)} disabled={index >= count - 1} aria-label="Next turn"><IconChevronRight /></Button>
+    <input type="range" min={0} max={Math.max(0, count - 1)} value={index} onChange={(event) => onSeek(Number(event.target.value))} aria-label="Turn position" />
+    <span className="replay-position tabular">{index + 1} / {count}</span>
+  </div>;
+}
+
+// ───────────────────────────────── the GM viewer ─────────────────────────────────
+
+function GmViewer({ gmToken, archiveId, onBack, onLaunched }: Readonly<{ gmToken: string; archiveId: number; onBack: () => void; onLaunched: () => void }>) {
   const [document, setDocument] = useState<ArchiveDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const containerRef = useRef<HTMLElement | null>(null);
+  const { confirm, dialog } = useConfirm();
+  const { toast } = useToast();
 
   useEffect(() => {
-    gmApi(`/api/v1/encounters/${summary.id}`, gmToken)
+    setDocument(null); setError(null);
+    readApi(`/api/v1/encounters/${archiveId}`, gmToken)
       .then((body) => { setDocument(body.data.document as ArchiveDocument); setIndex(0); })
       .catch((cause: Error) => setError(cause.message));
-  }, [summary.id, gmToken]);
+  }, [archiveId, gmToken]);
 
   const steps = useMemo(() => (document ? stepsOf(document) : []), [document]);
   const step = steps[index];
@@ -112,40 +154,74 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
   }, [playing, index, steps.length]);
   useEffect(() => { containerRef.current?.focus(); }, [document]);
 
-  if (error) return <section className="card replay-panel"><h2>Encounter replay</h2><p className="replay-error">{error}</p><Button variant="secondary" onClick={onBack}>Back to replays</Button></section>;
-  if (!document || !step) return <section className="card replay-panel"><h2>Encounter replay</h2><p>Loading the recording…</p></section>;
+  if (error) return <section className="card replay-panel"><h2>Replay</h2><p className="replay-error">{error}</p><Button variant="secondary" onClick={onBack}>Back to replays</Button></section>;
+  if (!document || !step) return <section className="card replay-panel"><h2>Replay</h2><p>Loading the replay…</p></section>;
 
   const turnLog = document.log.filter((entry) => entry.revision > step.from && entry.revision <= step.to);
   const move = (delta: number) => { setPlaying(false); setIndex((current) => Math.max(0, Math.min(steps.length - 1, current + delta))); };
+
+  /**
+   * D25 launch-from-here, and R3's whole point: this is ONE table. The confirm says the live scene is
+   * *parked* — the same motion as switching scenes — never that a second table is opening somewhere.
+   */
+  const launch = async () => {
+    const ok = await confirm({
+      title: "Launch from this moment?",
+      body: `The table becomes this fight at turn ${index + 1}. Your live scene is parked in Scenes — resume it anytime.`,
+      confirmLabel: "Launch"
+    });
+    if (!ok) return;
+    setLaunching(true);
+    socket.emit("replay:launch", { commandId: newId(), archiveId, turnIndex: index }, (result: { ok: boolean; message?: string }) => {
+      setLaunching(false);
+      if (!result.ok) { toast(result.message ?? "That moment could not be launched.", { tone: "error" }); return; }
+      toast("The table is live on that moment. Your previous scene is parked in Scenes.", { tone: "success" });
+      onLaunched();
+    });
+  };
 
   return <section
     className="card replay-panel"
     ref={containerRef}
     tabIndex={0}
-    aria-label="Encounter replay"
+    aria-label="Replay"
     onKeyDown={(event) => {
       if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); }
       if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
     }}
   >
     <div className="replay-header">
-      <Button variant="secondary" onClick={onBack}>← All replays</Button>
+      <Button variant="ghost" onClick={onBack}><IconChevronLeft /> Replays</Button>
       <div>
-        <h2>Encounter replay</h2>
-        <p className="replay-meta">{when(document.startedAt)} → {when(document.endedAt)} · {document.turns.length} recorded turns</p>
+        <h2>Replay</h2>
+        <p className="replay-meta">{when(document.startedAt)} to {when(document.endedAt)} · {document.turns.length} turns</p>
       </div>
-      <Button variant="secondary" className="replay-export" onClick={() => exportDocument(summary.id, summary.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks.">⬇ Export JSON</Button>
+      <div className="replay-header-actions">
+        <Button variant="primary" onClick={launch} disabled={launching}>{launching ? "Launching…" : "Launch from here"}</Button>
+        <Button variant="secondary" onClick={() => exportDocument(archiveId, document.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks."><IconDownload /> Download JSON</Button>
+      </div>
     </div>
-    <div className="replay-transport" role="group" aria-label="Replay controls">
-      <button onClick={() => move(-1)} disabled={index === 0} aria-label="Previous turn">⏮ Prev</button>
-      <button onClick={() => (playing ? setPlaying(false) : (index >= steps.length - 1 && setIndex(0), setPlaying(true)))}>{playing ? "⏸ Pause" : "▶ Play"}</button>
-      <button onClick={() => move(1)} disabled={index >= steps.length - 1} aria-label="Next turn">Next ⏭</button>
-      <input type="range" min={0} max={steps.length - 1} value={index} onChange={(event) => { setPlaying(false); setIndex(Number(event.target.value)); }} aria-label="Turn position" />
-      <span className="replay-position">{index + 1} / {steps.length}</span>
-    </div>
+    <Transport index={index} count={steps.length} playing={playing} onMove={move} onPlay={() => (playing ? setPlaying(false) : (index >= steps.length - 1 && setIndex(0), setPlaying(true)))} onSeek={(next) => { setPlaying(false); setIndex(next); }} />
     <p className="replay-step-label"><strong>{step.label}</strong> · {when(step.at)}</p>
     <div className="replay-layout">
-      <ReplayStage state={step.state} gmToken={gmToken} />
+      <Stage
+        mapAssetId={step.state.combat.mapAssetId}
+        bearer={gmToken}
+        tokens={step.state.combat.tokens}
+        label="Replayed battle map"
+        actorFor={(actorId) => {
+          const actor = step.state.actors.find((candidate) => candidate.id === actorId);
+          if (!actor) return null;
+          return {
+            name: actor.name,
+            tokenAssetId: actor.tokenAssetId ?? null,
+            hidden: actor.visibility === "gm-only",
+            band: healthBandFor(actor.hp),
+            conditions: actor.conditions.map(conditionBadgeLabel),
+            active: step.state.combat.turnActorId === actor.id
+          };
+        }}
+      />
       <aside className="replay-side">
         <h3>Turn order</h3>
         <ol className="replay-initiative">
@@ -154,10 +230,10 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
             if (!actor) return null;
             const active = step.state.combat.turnActorId === actor.id;
             return <li key={entry.actorId} className={active ? "active" : ""} aria-current={active ? "step" : undefined}>
-              <span className="replay-init-name">{actor.name}{actor.visibility === "gm-only" && <em className="replay-hidden-tag">hidden</em>}</span>
-              <span className="replay-init-hp">{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? ` +${actor.hp.temporary}` : ""} hp</span>
+              <span className="replay-init-name">{actor.name}{actor.visibility === "gm-only" && <GmOnlyTag />}</span>
+              <span className="replay-init-hp tabular">{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? ` +${actor.hp.temporary}` : ""} hp</span>
               {actor.conditions.length > 0 && <span className="replay-init-conditions">{actor.conditions.map(conditionBadgeLabel).join(" · ")}</span>}
-              <strong>{entry.score}</strong>
+              <strong className="tabular">{entry.score}</strong>
             </li>;
           })}
         </ol>
@@ -165,67 +241,210 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
         {turnLog.length === 0
           ? <p className="replay-log-empty">Nothing was logged during this turn.</p>
           : <ol className="replay-log">{turnLog.map((entry) => <li key={entry.id} className={`log-${entry.kind}${entry.gmOnly ? " replay-log-gm" : ""}`}>
-              <span>{entry.text}</span>{entry.gmOnly && <em className="replay-hidden-tag">GM only</em>}
+              <span>{entry.text}</span>{entry.gmOnly && <GmOnlyTag />}
             </li>)}</ol>}
+      </aside>
+    </div>
+    {dialog}
+  </section>;
+}
+
+// ───────────────────────────────── the player viewer ─────────────────────────────────
+
+function PlayerViewer({ token, archiveId, onBack }: Readonly<{ token: string; archiveId: number; onBack: () => void }>) {
+  const [document, setDocument] = useState<PlayerReplayDocument | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    setDocument(null); setError(null);
+    readApi(`/api/v1/encounters/${archiveId}`, token)
+      .then((body) => { setDocument(body.data.document as PlayerReplayDocument); setIndex(0); })
+      .catch((cause: Error) => setError(cause.message));
+  }, [archiveId, token]);
+
+  const turns = document?.turns ?? [];
+  const turn = turns[index];
+  useEffect(() => {
+    if (!playing) return;
+    if (index >= turns.length - 1) { setPlaying(false); return; }
+    const timer = setTimeout(() => setIndex((current) => Math.min(turns.length - 1, current + 1)), 2500);
+    return () => clearTimeout(timer);
+  }, [playing, index, turns.length]);
+
+  if (error) return <section className="card replay-panel"><h2>Replay</h2><p className="replay-error">{error}</p><Button variant="secondary" onClick={onBack}>Back</Button></section>;
+  if (!document || !turn) return <section className="card replay-panel"><h2>Replay</h2><p>Loading the replay…</p></section>;
+
+  const move = (delta: number) => { setPlaying(false); setIndex((current) => Math.max(0, Math.min(turns.length - 1, current + delta))); };
+  const bandOf = (hp: PlayerHp) => hp.kind === "band" ? hp.band : hp.current <= 0 ? "down" as const : hp.current * 2 <= hp.maximum ? "bloodied" as const : "healthy" as const;
+  const hpText = (hp: PlayerHp) => hp.kind === "exact" ? `${hp.current}/${hp.maximum} hp` : hp.band === "down" ? "down" : hp.band === "bloodied" ? "bloodied" : "healthy";
+
+  return <section className="card replay-panel">
+    <div className="replay-header">
+      <Button variant="ghost" onClick={onBack}><IconChevronLeft /> Back</Button>
+      <div>
+        <h2>Replay</h2>
+        <p className="replay-meta">You&rsquo;re watching this fight as the party saw it.</p>
+      </div>
+    </div>
+    <Transport index={index} count={turns.length} playing={playing} onMove={move} onPlay={() => (playing ? setPlaying(false) : (index >= turns.length - 1 && setIndex(0), setPlaying(true)))} onSeek={(next) => { setPlaying(false); setIndex(next); }} />
+    <p className="replay-step-label"><strong>{turn.label}</strong> · {when(turn.at)}</p>
+    <div className="replay-layout">
+      <Stage
+        mapAssetId={turn.combat.mapAssetId}
+        bearer={token}
+        tokens={turn.combat.tokens}
+        label="Replayed battle map"
+        actorFor={(actorId) => {
+          const actor = turn.actors.find((candidate) => candidate.id === actorId);
+          if (!actor) return null;
+          return { name: actor.name, tokenAssetId: null, hidden: false, band: bandOf(actor.hp), conditions: actor.conditions, active: turn.combat.turnActorId === actor.id };
+        }}
+      />
+      <aside className="replay-side">
+        <h3>Turn order</h3>
+        <ol className="replay-initiative">
+          {turn.combat.initiative.map((entry) => {
+            const actor = turn.actors.find((candidate) => candidate.id === entry.actorId);
+            const active = turn.combat.turnActorId === entry.actorId;
+            return <li key={entry.actorId} className={active ? "active" : ""} aria-current={active ? "step" : undefined}>
+              <span className="replay-init-name">{entry.name}</span>
+              {actor && <span className="replay-init-hp">{hpText(actor.hp)}</span>}
+              {actor && actor.conditions.length > 0 && <span className="replay-init-conditions">{actor.conditions.join(" · ")}</span>}
+            </li>;
+          })}
+        </ol>
+        <h3>During this turn</h3>
+        {turn.log.length === 0
+          ? <p className="replay-log-empty">Nothing was logged during this turn.</p>
+          : <ol className="replay-log">{turn.log.map((entry) => <li key={entry.id} className={`log-${entry.kind}`}><span>{entry.text}</span></li>)}</ol>}
       </aside>
     </div>
   </section>;
 }
 
-export function ReplayPanel({ gmToken, openArchiveId = null, onOpenedArchive = () => {} }: Readonly<{ gmToken: string; openArchiveId?: number | null; onOpenedArchive?: () => void }>) {
+/** One URL, two documents. The role decides which reader runs; the server decides what it may read. */
+export function ReplayViewer({ role, token, archiveId, onBack, onLaunched }: Readonly<{
+  role: "gm" | "player"; token: string; archiveId: number; onBack: () => void; onLaunched?: () => void;
+}>) {
+  return role === "gm"
+    ? <GmViewer gmToken={token} archiveId={archiveId} onBack={onBack} onLaunched={onLaunched ?? onBack} />
+    : <PlayerViewer token={token} archiveId={archiveId} onBack={onBack} />;
+}
+
+// ───────────────────────────────── the list ─────────────────────────────────
+
+/**
+ * A hook rather than a component, because the same fetch feeds the full list and the player's shelf.
+ * A player's listing is server-filtered to shared replays, so an empty answer here is the truth about
+ * what the GM has shared — never a client-side filter over a longer list.
+ */
+export function useReplays(token: string | null): Readonly<{ archives: readonly ArchiveSummary[] | null; error: string | null; refresh: () => void }> {
   const [archives, setArchives] = useState<readonly ArchiveSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<ArchiveSummary | null>(null);
-  const [exporting, setExporting] = useState<number | null>(null);
-  const handledArchiveRef = useRef<number | null>(null);
-
-  const refresh = () => {
-    setError(null);
-    gmApi("/api/v1/encounters", gmToken)
-      .then((body) => setArchives(body.data.encounters as readonly ArchiveSummary[]))
-      .catch((cause: Error) => { setArchives([]); setError(cause.message); });
-  };
-  useEffect(refresh, [gmToken]);
-  // Arriving from a Codex combat entry ("Open replay"): jump straight into that archive once the list
-  // has loaded, then clear the request so a later manual Back doesn't re-open it.
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (openArchiveId === null || !archives || handledArchiveRef.current === openArchiveId) return;
-    // Latch the id locally as well as asking the caller to clear it: without this, a caller that passes
-    // `openArchiveId` and no `onOpenedArchive` would re-open the viewer every time Back refreshes the list.
-    handledArchiveRef.current = openArchiveId;
-    const match = archives.find((archive) => archive.id === openArchiveId);
-    if (match) setOpen(match); // No match (e.g. the archive was deleted) => the GM simply lands on the list.
-    onOpenedArchive();
-  }, [openArchiveId, archives, onOpenedArchive]);
+    if (!token) { setArchives([]); return; }
+    let cancelled = false;
+    readApi("/api/v1/encounters", token)
+      .then((body) => { if (!cancelled) { setArchives(body.data.encounters as readonly ArchiveSummary[]); setError(null); } })
+      .catch((cause: Error) => { if (!cancelled) { setArchives([]); setError(cause.message); } });
+    return () => { cancelled = true; };
+  }, [token, tick]);
+  return { archives, error, refresh: () => setTick((value) => value + 1) };
+}
 
-  const exportArchive = async (archive: ArchiveSummary) => {
-    setExporting(archive.id); setError(null);
+export function ReplayList({ role, token, onOpen }: Readonly<{ role: "gm" | "player"; token: string; onOpen: (archiveId: number) => void }>) {
+  const { archives, error, refresh } = useReplays(token);
+  const { confirm, dialog } = useConfirm();
+  const { toast } = useToast();
+  const [busy, setBusy] = useState<number | null>(null);
+
+  const setShared = async (archive: ArchiveSummary, shared: boolean) => {
+    setBusy(archive.id);
     try {
-      const body = await gmApi(`/api/v1/encounters/${archive.id}`, gmToken);
-      exportDocument(archive.id, archive.endedAt, body.data.document as ArchiveDocument);
-    } catch (cause) { setError((cause as Error).message); }
-    finally { setExporting(null); }
+      await readApi(`/api/v1/encounters/${archive.id}/visibility`, token, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ playerVisible: shared }) });
+      refresh();
+    } catch (cause) { toast((cause as Error).message, { tone: "error" }); }
+    finally { setBusy(null); }
   };
 
-  if (open) return <ReplayViewer gmToken={gmToken} summary={open} onBack={() => { setOpen(null); refresh(); }} />;
+  const download = async (archive: ArchiveSummary) => {
+    setBusy(archive.id);
+    try { const body = await readApi(`/api/v1/encounters/${archive.id}`, token); exportDocument(archive.id, archive.endedAt, body.data.document); }
+    catch (cause) { toast((cause as Error).message, { tone: "error" }); }
+    finally { setBusy(null); }
+  };
+
+  /** Triad Delete: permanent, confirmed, and the confirm says so in those words. */
+  const remove = async (archive: ArchiveSummary) => {
+    const ok = await confirm({
+      title: "Delete this replay?",
+      body: `The replay of the fight that ended ${dateOnly(archive.endedAt)} is gone — every turn, every roll, every line. This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true
+    });
+    if (!ok) return;
+    setBusy(archive.id);
+    try { await readApi(`/api/v1/encounters/${archive.id}`, token, { method: "DELETE" }); toast("Replay deleted.", { tone: "success" }); refresh(); }
+    catch (cause) { toast((cause as Error).message, { tone: "error" }); }
+    finally { setBusy(null); }
+  };
 
   return <section className="card replay-panel">
-    <h2>Encounter replays</h2>
-    <p>Every finished encounter is recorded automatically. Open one to step through it turn by turn and study how the fight unfolded - positions, hit points, and everything that was narrated, including GM-only lines.</p>
+    <h2>Replays</h2>
+    <p>{role === "gm" ? "Every finished fight, kept." : "The fights your GM has shared with the party."}</p>
     {error && <p className="replay-error">{error}</p>}
-    {archives === null && <p>Loading recordings…</p>}
-    {archives !== null && archives.length === 0 && !error && <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎬</span><span className="nh-empty-title">No recordings yet</span><span className="nh-empty-text">Finish an encounter and its replay appears here to step through turn by turn.</span></div>}
-    {archives !== null && archives.length > 0 && <table className="replay-list">
-      <thead><tr><th>Fought</th><th>Ended</th><th>Turns</th><th aria-label="Actions" /></tr></thead>
-      <tbody>{archives.map((archive) => <tr key={archive.id}>
-        <td>{when(archive.startedAt)}</td>
-        <td>{when(archive.endedAt)}</td>
-        <td>{archive.turnCount}</td>
-        <td className="replay-row-actions">
-          <Button variant="secondary" onClick={() => setOpen(archive)}>▶ Watch</Button>
-          <Button variant="secondary" onClick={() => exportArchive(archive)} disabled={exporting === archive.id} title="Download the full machine-readable record as JSON.">{exporting === archive.id ? "Exporting…" : "⬇ Export"}</Button>
-        </td>
-      </tr>)}</tbody>
-    </table>}
+    {archives === null && <p>Loading replays…</p>}
+    {archives !== null && archives.length === 0 && !error && <div className="nh-empty">
+      <span className="nh-empty-title">{role === "gm" ? "No replays yet" : "Nothing here yet."}</span>
+      {role === "gm" && <span className="nh-empty-text">When a fight ends it&rsquo;s saved here automatically.</span>}
+    </div>}
+    {archives !== null && archives.length > 0 && <ul className="replay-rows">
+      {archives.map((archive) => {
+        const duration = durationOf(archive.startedAt, archive.endedAt);
+        return <li key={archive.id} className="nh-card replay-row">
+          <div className="replay-row-text">
+            <span className="replay-row-title">{dateOnly(archive.endedAt)}</span>
+            <span className="replay-row-meta tabular">{archive.turnCount} turns{duration ? ` · ${duration}` : ""}</span>
+          </div>
+          {role === "gm" && <RevealSwitch
+            revealed={archive.playerVisible}
+            ariaLabel="Show this replay to players"
+            disabled={busy === archive.id}
+            onChange={(shared) => void setShared(archive, shared)}
+          />}
+          <div className="replay-row-actions">
+            <Button variant="secondary" size="sm" onClick={() => onOpen(archive.id)}>Watch</Button>
+            {role === "gm" && <Menu trigger="More" label="More actions for this replay" align="end">
+              <MenuItem onClick={() => void download(archive)}>Download JSON</MenuItem>
+              <MenuItem tone="danger" onClick={() => void remove(archive)}>Delete replay</MenuItem>
+            </Menu>}
+          </div>
+        </li>;
+      })}
+    </ul>}
+    {dialog}
+  </section>;
+}
+
+/**
+ * The player's shelf (§B4.4): the same shared replays, as a quiet section under their sheet. Renders
+ * nothing at all when the GM has shared none — an empty shelf is not a thing to look at.
+ */
+export function ReplayShelf({ token, onOpen }: Readonly<{ token: string; onOpen: (archiveId: number) => void }>) {
+  const { archives } = useReplays(token);
+  if (!archives || archives.length === 0) return null;
+  return <section className="replay-shelf">
+    <h3>Replays</h3>
+    <ul>
+      {archives.map((archive) => <li key={archive.id}>
+        <button type="button" className="replay-shelf-row" onClick={() => onOpen(archive.id)}>
+          <span>{dateOnly(archive.endedAt)}</span>
+          <span className="replay-shelf-meta tabular">{archive.turnCount} turns</span>
+        </button>
+      </li>)}
+    </ul>
   </section>;
 }

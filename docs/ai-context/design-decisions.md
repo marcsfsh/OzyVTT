@@ -205,5 +205,19 @@ reveal-ahead warning names both dates, the kind-change confirm names each field
 at risk and softens its recovery promise when version history is off. Cut the
 flourish, keep the fact.
 
-The glossary in `apps/client/src/codex/vocabulary.test.ts` fails the build on
-retired words. Reaching for a plainer phrase is exactly when one slips back in.
+**One product, one set of words (D28).** The playable thing is a **character**, a
+**monster** or an **NPC** — never an "actor" or a "combatant". The list is **Turn
+order** and **Initiative** is the score. The event is a **fight**; the place is the
+**Table**. Visibility is **Shown to players / Hidden from players / GM only**,
+everywhere, in that spelling. Claim states are **Available / Claimed / Your
+character**; the verbs are **Claim / Release**. The verb triad means what it says:
+**Delete** is permanent and its confirm says "This cannot be undone", **Archive** is
+reversible and its copy offers the way back, **Remove** takes a thing out of one list
+and the thing survives. Wire names are not copy and keep their spelling.
+
+Two glossaries fail the build on a retired word, off one shared scanner
+(`apps/client/src/copy-scan.ts`): `codex/vocabulary.test.ts` for the Codex's dialect
+and `apps/client/src/play-vocabulary.test.ts` for everything else — the play lock
+reads the whole client tree minus a pinned exclusion list, so a new surface is scanned
+without being registered anywhere. Reaching for a plainer phrase is exactly when a
+retired word slips back in.

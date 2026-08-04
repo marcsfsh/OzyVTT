@@ -898,6 +898,14 @@ export interface ClientToServerEvents {
   "character:create": (payload: { commandId: string; name: string; speciesId: string; backgroundId: string; classId: string; level: number; subclassId?: string; abilityMethod: BuilderAbilityMethod; baseScores: Record<AbilityId, number>; backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>; hp: { mode: "average" | "entries"; entries?: readonly number[] }; choices: ReadonlyArray<{ level: number; classId?: string; kind: string; id: string; payload?: Record<string, unknown> }>; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   /** GM sets the character-builder table policy (decision 10): allowed ability methods + the custom roll formula. */
   "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; maxLevel?: number; playerBuilder?: "open" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /**
+   * Rebuild one character at a new level (up or down) or respec it (D13/D14). Same input as
+   * `character:create` minus the name; the GM may rebuild anyone, a player only their own claimed
+   * character while the table's builder is open.
+   */
+  "character:rebuild": (payload: { commandId: string; actorId: string; speciesId: string; backgroundId: string; classId: string; level: number; subclassId?: string; abilityMethod: BuilderAbilityMethod; baseScores: Record<AbilityId, number>; backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>; hp: { mode: "average" | "entries"; entries?: readonly number[] }; choices: ReadonlyArray<{ level: number; classId?: string; kind: string; id: string; payload?: Record<string, unknown> }>; expectedRevision?: number }, acknowledgement: (result: MutationResult & { actorId?: string }) => void) => void;
+  /** Roll six ability scores server-side for the builder (D14); the set lands in the table feed. */
+  "builder:roll-abilities": (payload: { commandId: string; method: "roll" | "custom"; expectedRevision?: number }, acknowledgement: (result: MutationResult & { scores?: readonly number[]; dice?: ReadonlyArray<readonly number[]>; rollId?: string }) => void) => void;
   /** GM sets the STANDING rules policy every new fight inherits (D7): the dial plus per-family exceptions. Omitted `exceptions` keeps the stored ones. */
   "rules:set-policy": (payload: { commandId: string; dial: RuleMode; exceptions?: RuleExceptions; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   /**
@@ -988,6 +996,12 @@ export interface ClientToServerEvents {
   "scene:rename": (payload: { commandId: string; sceneId: string; name: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:remove": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:activate": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /**
+   * Launch one recorded moment of an archived fight onto the live table (D25). Parks the current
+   * scene exactly as `scene:activate` does and goes live on the restored moment; the combatants are
+   * CLONED under new ids, so tonight's characters are never rewritten. GM only.
+   */
+  "replay:launch": (payload: { commandId: string; archiveId: number; turnIndex: number; expectedRevision?: number }, acknowledgement: (result: MutationResult & { sceneId?: string; actorIds?: readonly string[] }) => void) => void;
   "scene:set-combatants": (payload: { commandId: string; sceneId: string; combatantIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:duplicate": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: SceneCreateResult) => void) => void;
   "scene:reorder": (payload: { commandId: string; order: readonly string[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

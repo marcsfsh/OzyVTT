@@ -139,6 +139,9 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `scene.set-combatants` | `scene:write` |
 | `scene.duplicate` | `scene:write` |
 | `scene.reorder` | `scene:write` |
+| `replay.launch` | `combat:write` |
+| `character.rebuild` | `actor:write` |
+| `builder.roll-abilities` | `actor:write` |
 | `fog.set-enabled` | `scene:write` |
 | `fog.paint` | `scene:write` |
 | `fog.reset` | `scene:write` |
@@ -1187,9 +1190,9 @@ Sets a character's identity (class/level/race/background/feats) on its editable 
 
 ### `POST /api/v1/game/characters`
 
-Creates a character from CHOICES rather than a finished sheet (GM-grade only in this phase): identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.
+Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open (D13), in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.
 
-**Auth:** Integration credential with `actor:write` · GM session
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
 
 **Request body** (JSON):
 
@@ -1223,6 +1226,64 @@ Creates a character from CHOICES rather than a finished sheet (GM-grade only in 
 | `choices[].kind` | string (pattern) | yes |  |
 | `choices[].id` | string (pattern) | yes |  |
 | `choices[].payload` | object (free-form) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/rebuild`
+
+Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `speciesId` | string (pattern) | yes |  |
+| `backgroundId` | string (pattern) | yes |  |
+| `classId` | string (pattern) | yes |  |
+| `level` | integer (1–20) | yes | The level to rebuild AT - lower than the current level is a level-down, and is supported |
+| `subclassId` | string (pattern) | no |  |
+| `abilityMethod` | `standard-array` \| `point-buy` \| `roll` \| `custom` | yes |  |
+| `baseScores` | object | yes |  |
+| `baseScores.str` | integer (1–30) | yes |  |
+| `baseScores.dex` | integer (1–30) | yes |  |
+| `baseScores.con` | integer (1–30) | yes |  |
+| `baseScores.int` | integer (1–30) | yes |  |
+| `baseScores.wis` | integer (1–30) | yes |  |
+| `baseScores.cha` | integer (1–30) | yes |  |
+| `backgroundBonusAllocation` | object[] | yes |  |
+| `backgroundBonusAllocation[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `backgroundBonusAllocation[].amount` | integer (1–3) | yes |  |
+| `hp` | object | yes |  |
+| `hp.mode` | `average` \| `entries` | yes |  |
+| `hp.entries` | integer (1–12)[] | no |  |
+| `choices` | object[] | yes |  |
+| `choices[].level` | integer (1–20) | yes |  |
+| `choices[].classId` | string (pattern) | no |  |
+| `choices[].kind` | string (pattern) | yes |  |
+| `choices[].id` | string (pattern) | yes |  |
+| `choices[].payload` | object (free-form) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/builder/ability-rolls`
+
+Rolls six ability scores SERVER-SIDE for the character builder (D14), through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed. Character creation still bound-checks submitted scores rather than binding them to this roll: physical dice at the table stay a supported path.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `method` | `roll` \| `custom` | yes | roll = the SRD 4d6kh3; custom = the GM's configured formula |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -2166,7 +2227,7 @@ Permanent, machine-readable records of ended encounters - see the archive docume
 
 ### `GET /api/v1/encounters`
 
-Permanent records of ended encounters, newest first (GM sessions and integration credentials only - never player sessions).
+Permanent records of ended encounters, newest first. ROLE-AWARE (D26): a GM sees every archive, a player session sees only the ones the GM has shared (`playerVisible`).
 
 **Auth:** Integration credential with `combat:read` · GM session
 
@@ -2174,7 +2235,7 @@ Permanent records of ended encounters, newest first (GM sessions and integration
 
 ### `GET /api/v1/encounters/{id}`
 
-One archive's full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. GM-grade data - hidden combatants included; never reaches player sessions.
+One archive, projected for the caller. A GM receives the full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. A PLAYER session receives a computed player replay instead - per-turn player projections, public rolls only, no journal, no raw states, no stat blocks, no session ids - and only for an archive the GM has shared; an unshared or missing archive is 404 either way, never 403.
 
 **Auth:** Integration credential with `combat:read` · GM session
 
@@ -2194,7 +2255,7 @@ Permanently deletes one archived encounter (GM session or an admin-scoped creden
 
 ### `POST /api/v1/encounters/{id}/visibility`
 
-Shares (or un-shares) one archived encounter with players (GM sessions and integration credentials only). Hidden by default - an ended fight is the GM's record until the GM says otherwise. This stores the decision; the archive read endpoints are still GM-grade at this version, so sharing does not yet expose a document to a player session.
+Shares (or un-shares) one archived encounter with players (GM sessions and integration credentials only). Hidden by default - an ended fight is the GM's record until the GM says otherwise. Sharing makes the archive appear in a player's `GET /encounters` list and lets `GET /encounters/{id}` answer them with the computed player replay; un-sharing takes both away again.
 
 **Auth:** Integration credential with `combat:write` · GM session
 
@@ -2207,6 +2268,24 @@ Shares (or un-shares) one archived encounter with players (GM sessions and integ
 | `playerVisible` | boolean | yes | true shares this archived fight with players; false hides it again (the default) |
 
 **Responses:** `200` The stored visibility - envelope of `EncounterArchiveVisibilityData` · errors `400` `401` `403` `404`
+
+### `POST /api/v1/encounters/{id}/launch`
+
+Launch-from-here (D25): parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it. The moment's combatants are CLONED under new ids (tonight's characters are never rewritten) and the parked scene resumes any time through scene.activate. GM-grade only.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Parameters:** `id` (path) - integer (≥ 1)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no | Idempotency identity; the server mints one when omitted |
+| `turnIndex` | integer (≥ 0) | yes | Index into the archive document's turns array - the moment to make live |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` The launched scene and the cloned combatants - envelope of `EncounterArchiveLaunchData` · errors `400` `401` `403` `404` `409`
 
 ## Map assets & calibration
 
@@ -3074,6 +3153,7 @@ Creates a session. Every field is optional - an empty POST opens a blank `planne
 | `status` | `planned` \| `played` | no |  |
 | `revealedToPlayers` | boolean | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
+| `sceneIds` | string (uuid)[] | no | Prepared scenes staged for this session (D31). Capped at the table's scene cap. |
 | `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401` `403`
@@ -3107,6 +3187,7 @@ Edits a session; an omitted field is left alone. `expectedRev` rejects a stale w
 | `recapBody` | string | no |  |
 | `status` | `planned` \| `played` | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
+| `sceneIds` | string (uuid)[] | no | Prepared scenes staged for this session (D31); replaces the stored list. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the session moved on. |
 | `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
@@ -4323,6 +4404,7 @@ One play session: the GM's prep for an evening at the table, and the recap of it
 | `sessionNumber` | integer \| null | yes | "Session 12" - the session's DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID (D9) and resolve this live, so renumbering a session relabels every one of its entries with no journal write. |
 | `realDate` | string \| null | yes | The real-world date the group played, as the GM typed it. Free text, not a calendar instant - a session sits on the real calendar, never the world's, which is why sessions are their own route and not rows on `/codex/timeline`. |
 | `attendees` | string[] | yes | Who was at the table. GM-only; absent from a player projection. |
+| `sceneIds` | string (uuid)[] | yes | D31: the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS - stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then. |
 | `prepBody` | string | yes | GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not - revealing a session publishes its recap, never its prep. |
 | `recapBody` | string | yes | The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`. |
 | `revealedToPlayers` | boolean | yes | GM-only field; absent from a player projection (a player only ever receives revealed sessions). |
@@ -4725,6 +4807,15 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | --- | --- | --- | --- |
 | `id` | integer (≥ 1) | yes |  |
 | `document` | object (free-form) | yes | archiveSchemaVersion 3 (additive over 1 and 2): { archiveSchemaVersion, startedAt, endedAt, turnCount, turns[{index,kind,label,revision,at,state}], log[], journal[{seq,commandId,type,actorId,principal,payload,revision,at}], finalState, postEncounterState, rolls[], definitions[{id,source,definition}], attribution } |
+
+### `EncounterArchiveLaunchData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revision` | integer (≥ 0) | yes |  |
+| `duplicate` | boolean | yes |  |
+| `sceneId` | string | yes | The new live scene holding the restored moment |
+| `actorIds` | string[] | yes | The cloned combatants, so a client can offer to remove them with the replay scene |
 
 ### `EncounterArchiveListData`
 
@@ -5202,6 +5293,8 @@ A rollable action a feature adds to the sheet (Second Wind, Channel Divinity, Br
 | `reaction.response` | const `"half-damage"` | yes |  |
 | `legendary` | object | no | SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool. Pairs with activation "other" |
 | `legendary.cost` | integer (1–5) | yes |  |
+| `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
+| `spellSlot.level` | integer (1–9) | yes |  |
 | `attack` | HomebrewFeatureAttack | no |  |
 | `save` | HomebrewFeatureSave | no |  |
 | `damageByLevel` | object[] | no | Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite) |
@@ -5952,6 +6045,8 @@ A stat block's action, in the exact `ActionSchema` vocabulary the live rules eng
 | `reaction.response` | const `"half-damage"` | yes |  |
 | `legendary` | object | no | SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool. Pairs with activation "other" |
 | `legendary.cost` | integer (1–5) | yes |  |
+| `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
+| `spellSlot.level` | integer (1–9) | yes |  |
 | `attack` | object | no | A printed to-hit bonus - the stat block knows its own numbers |
 | `attack.bonus` | integer | yes |  |
 | `attack.reachFeet` | integer (≥ 1) | no |  |

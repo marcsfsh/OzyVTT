@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readSource, scanCopy } from "../copy-scan";
 import { SECTION_TITLE, GM_SIDEBAR, PLAYER_SIDEBAR } from "./routes";
 import { CHRONICLE_KIND_META } from "./chronicle";
 
@@ -100,54 +101,25 @@ const ALLOWED = new Set<string>([
   "Secret agenda"
 ]);
 
-type Found = Readonly<{ file: string; line: number; text: string }>;
-
+/**
+ * The scanner itself now lives in `apps/client/src/copy-scan.ts`, because the play surfaces
+ * needed the same one and two copies of it would drift — the exact disease these locks exist
+ * to catch, inside the enforcement layer. It moved verbatim: the props list, the calls list and
+ * all three extraction branches are the ones written here, unchanged, and every floor and pin
+ * below is the number it measured before the move. That is the proof the extraction changed
+ * nothing. `play-vocabulary.test.ts` reads the same function over the play directories with its
+ * own glossary.
+ */
 function codexSources(): readonly string[] {
   return readdirSync(CODEX_DIR)
     .filter((file) => /\.tsx?$/.test(file) && !file.includes(".test."))
     .sort();
 }
 
-/** The props that carry copy. Both spellings — `help="…"` in JSX and `help: "…"` in a confirm/meta object. */
-const COPY_PROPS = [
-  "aria-label", "ariaLabel", "label", "placeholder", "title", "empty", "emptyLabel", "heading",
-  "help", "hint", "body", "summary", "confirmLabel", "cancelLabel", "removeLabel", "maxReachedReason"
-].join("|");
-/** The three calls that put a sentence on screen with no prop to hang it on. */
-const COPY_CALLS = "setError|setNotice|toast";
-
-/** JSX text nodes, label-ish props and message calls — the strings a person actually reads. */
-function userFacingStrings(file: string): readonly Found[] {
-  const found: Found[] = [];
-  readFileSync(`${CODEX_DIR}${file}`, "utf8").split("\n").forEach((line, index) => {
-    // `[:=]` catches the object-literal half, and the backtick branch catches template literals —
-    // between them, `confirm({ title: "Delete marker", body: \`…\` })` becomes visible for the first
-    // time. The two branches are separate so a template literal may contain a double quote of its own,
-    // which the atlas's `Delete map "${name}"?` does.
-    const quoted = `(?:"([^"\\n]+)"|\`([^\`\\n]+)\`)`;
-    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_PROPS})\\s*[:=]\\s*\\{?${quoted}`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
-    }
-    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_CALLS})\\(\\s*${quoted}`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
-    }
-    // A JSX text node runs from the `>` that closed a tag up to the next `<` or `{`. The old form
-    // required a literal `<` to close it, so any sentence interrupted by an interpolation vanished
-    // whole — including MarkerInspector's "is hidden from them. Players cannot see either.{onRevealMap …".
-    // `(?<!=)` is what keeps that widening honest: without it every arrow function's `=>` opens a
-    // "text node" and the body of the Codex's own code is scanned as copy.
-    for (const match of line.matchAll(/(?<!=)>([^<>{}\n]*[A-Za-z][^<>{}\n]*)(?=[<{])/g)) {
-      const text = match[1].trim();
-      // A backtick is the tell for the other thing a `>` closes: a generic type argument, as in
-      // `request<{ marker: CodexMarker }>(token, \`/markers/…\`)`. No sentence a GM reads has one.
-      if (text.length > 1 && !text.includes("`")) found.push({ file, line: index + 1, text });
-    }
-  });
-  return found;
-}
-
 describe("The canonical glossary (D5)", () => {
-  const strings = codexSources().flatMap(userFacingStrings);
+  const strings = scanCopy(
+    codexSources().map((file) => ({ file, read: readSource(`${CODEX_DIR}${file}`) }))
+  );
 
   it("reads enough of the Codex to be worth trusting", () => {
     // A guard that silently matched nothing would pass forever. This is the tripwire on the tripwire:

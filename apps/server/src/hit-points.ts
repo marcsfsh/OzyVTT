@@ -3,6 +3,7 @@ import { adjustDamageParts, damageWhileDying, droppedToZero, type DamagePart } f
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { applyConditionDirect, endConcentrationSustainedBy, endEffectsSustainedBy, effectDamageDefenses, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog } from "./equipment-derivation.js";
 
 /** Who is asking: the GM may adjust anyone; a player only their own claimed character. */
 export type ActorScope = { role: "gm" } | { role: "player"; sessionId: string };
@@ -36,6 +37,13 @@ export type DamageDeps = Readonly<{
   newId?: () => string;
   /** Injected clock (ISO string) for the prompt's createdAt; falls back to wall time. */
   now?: () => string;
+  /**
+   * The item catalog, so an item's GRANTED resistances and immunities reach the damage math. A Ring
+   * of Fire Resistance authored as `grants.damageResistances` was derived and then read by nobody:
+   * the pipeline saw the definition and the active effects only. Absent = the pre-item behavior
+   * (a legacy direct caller with no catalog in hand), never an error.
+   */
+  catalog?: EquipmentCatalog;
 }>;
 export type DamageOutcome = Readonly<{ application: DamageApplication; events: EffectNarration[] }>;
 
@@ -65,27 +73,44 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
     const innate = definitionDefenses(definition);
     const fromEffects = effectDamageDefenses(actor);
+    // Item grants: derived whole from (definition, inventory, catalog) like every other item
+    // contribution, so taking the ring off removes the resistance on the very next hit.
+    const fromItems = deps?.catalog ? deriveEquipment(actor, definition, deps.catalog) : EMPTY_DERIVATION;
+    const itemResistances = fromItems.damageResistances.map((entry) => entry.id);
+    const itemImmunities = fromItems.damageImmunities.map((entry) => entry.id);
+    const itemSourceOf = (type: string): string | null => {
+      const source = fromItems.damageImmunities.find((entry) => entry.id.toLowerCase() === type)
+        ?? fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type);
+      if (!source) return null;
+      return fromItems.sources.find((row) => row.itemId === source.sourceItemId)?.itemName ?? source.sourceItemId;
+    };
     // SRD Petrified: resistance to all damage + immunity to poison, on top of innate/effect defenses.
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
     const adjusted = adjustDamageParts(input.parts, {
-      resistances: [...innate.resistances, ...fromEffects.resistances, ...(underwater ? ["fire"] : [])],
-      immunities: petrified ? [...innate.immunities, "poison"] : innate.immunities,
+      resistances: [...innate.resistances, ...fromEffects.resistances, ...itemResistances, ...(underwater ? ["fire"] : [])],
+      immunities: [...(petrified ? [...innate.immunities, "poison"] : innate.immunities), ...itemImmunities],
       vulnerabilities: innate.vulnerabilities,
       resistAll: petrified
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
       const effectSource = part.adjustment === "resistance" ? fromEffects.sources.get(type) ?? null : null;
+      const innateHas = (list: readonly string[]) => list.map((entry) => entry.toLowerCase()).includes(type);
       const petrifiedSource = petrified
-        && ((part.adjustment === "resistance" && !innate.resistances.map((entry) => entry.toLowerCase()).includes(type) && effectSource === null)
-          || (part.adjustment === "immunity" && type === "poison" && !innate.immunities.map((entry) => entry.toLowerCase()).includes(type)))
+        && ((part.adjustment === "resistance" && !innateHas(innate.resistances) && effectSource === null)
+          || (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
         ? "Petrified" : null;
       const underwaterSource = underwater && part.adjustment === "resistance" && type === "fire"
-        && !innate.resistances.map((entry) => entry.toLowerCase()).includes(type) && effectSource === null && petrifiedSource === null
+        && !innateHas(innate.resistances) && effectSource === null && petrifiedSource === null
         ? "Underwater" : null;
-      return { ...part, adjustmentSource: effectSource ?? petrifiedSource ?? underwaterSource };
+      // The item's NAME on the damage line, so a halved hit explains itself ("Ring of Fire
+      // Resistance") the same way an effect-sourced one does.
+      const itemSource = part.adjustment !== null && effectSource === null && petrifiedSource === null && underwaterSource === null
+        && !innateHas(part.adjustment === "immunity" ? innate.immunities : innate.resistances)
+        ? itemSourceOf(type) : null;
+      return { ...part, adjustmentSource: effectSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
     });
     totalRequested = input.parts.reduce((sum, part) => sum + part.amount, 0);
     totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);

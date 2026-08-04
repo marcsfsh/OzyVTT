@@ -51,7 +51,7 @@ export function applyFilters(records: readonly HomebrewRecordSummary[], filters:
     heavy in the red-pink-magenta band and reserves violet for GM-only, so hue can
     never be the thing that carries the meaning. */
 function StateBadge({ record }: Readonly<{ record: HomebrewRecordSummary }>) {
-  if (record.deletedAt) return <Badge tone="neutral">Removed</Badge>;
+  if (record.deletedAt) return <Badge tone="neutral">Archived</Badge>;
   if (record.state === "draft") return <Badge tone="caution">Draft</Badge>;
   if (record.visibleToPlayers) return <Badge tone="success">Shown</Badge>;
   return <GmOnlyTag />;

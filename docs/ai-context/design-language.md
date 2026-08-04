@@ -168,7 +168,7 @@ unmeasured. Run it at 320px too: the narrower width is the worse case, not the b
 | Control | Why it is still open |
 |---|---|
 | `DicePanel`'s two `<summary>` disclosures | Unclassed `<summary>` in `apps/client/src/dice/`, which has no stylesheet of its own; needs a scoped rule there. |
-| Raw `<input type="checkbox">` outside the named labels | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
+| Raw `<input type="checkbox">` — now exactly two: `.manual-nat20` (`encounter/EncounterPanel.tsx`) and `.integration-scope` (`integrations/IntegrationsPanel.tsx`) | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. Narrowed 2026-08-03 — the monster browser's GM-only checkbox went with D2's tray-level reveal control, so this row names its whole remaining population rather than a class. |
 | `.codex-graph-node` (Connection graph) | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. The number of sub-floor nodes is data-dependent and width-dependent — it scales with the campaign, so it is a tool output, never a constant in a document. |
 
 An earlier version of this section quoted a single measured total for both widths and a
@@ -251,4 +251,28 @@ outward from the control's centre until it stops returning the control.
 5. For a UI-affecting change, look at it running (`npm run dev`) at a desktop
    width and a narrow/touch viewport, and cycle the themes.
 6. If you are writing words a user reads, `design-decisions.md` §Voice and copy is the
-   standard, and `apps/client/src/codex/vocabulary.test.ts` fails the build on retired words.
+   standard, and two locks fail the build on a retired word off one shared scanner
+   (`apps/client/src/copy-scan.ts`): `codex/vocabulary.test.ts` for the Codex, and
+   `apps/client/src/play-vocabulary.test.ts` for everything else.
+
+## 6b. Adding a new play surface (the seven lines that stop re-fragmentation)
+
+A new surface is where a design system quietly forks. Most of this list is already a test —
+the point of writing it down is that you meet the checks on purpose instead of discovering
+them, and that the two steps no test can demand are remembered.
+
+1. **Words from the glossary** (`design-decisions.md` §Voice and copy). `play-vocabulary.test.ts`
+   scans everything under `apps/client/src` minus a pinned exclusion list, so your new directory
+   is scanned the moment it exists — there is no list to join.
+2. **Compose from `@vtt/ui`.** A new primitive goes to `packages/ui` *and* to `/styleguide`; the
+   completeness check fails on an export with no demo. A hand-rolled lookalike fails
+   `design-conventions.test.ts` (glyphs, raw inputs, `.eyebrow`, hex, inline feedback).
+3. **Every "who sees this" decision is the Reveal family** — `RevealSwitch` / `VisibilityBadge`
+   from `@vtt/ui`, never the words re-typed. Feedback is a toast, not a per-component banner.
+   Confirms use the verb triad and mean it.
+4. **Give it an address**: the router table, the `router.test.ts` lock, **and one line in
+   `scripts/tap-audit.mjs`'s route list** — that last one is the step no test can demand, which
+   is why it is written here.
+5. **Breakpoints from the ladder** (§3). An off-ladder query fails with the nearest rung named.
+6. **A narrow-viewport and touch pass before you call it done** (§4, `mobile-ux.md`).
+7. **Docs in the same commit** — the brief whose behaviour you changed, and the ledger.

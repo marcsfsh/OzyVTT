@@ -60,7 +60,7 @@ export const TYPE_WORDS: Readonly<Record<HomebrewType, TypeWords>> = {
   // `ContentEquipmentSummary` and `equipmentSummaries` already say). The GM-facing
   // word stays "item", because that is what a GM calls a longsword.
   equipment: { label: "item", plural: "Items" },
-  monster: { label: "creature", plural: "Creatures" }
+  monster: { label: "monster", plural: "Monsters" }
 };
 
 export function typeLabel(type: HomebrewType): string {
@@ -88,5 +88,5 @@ export const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string 
   { value: "all", label: "Drafts and published" },
   { value: "draft", label: "Drafts" },
   { value: "published", label: "Published" },
-  { value: "removed", label: "Removed" }
+  { value: "removed", label: "Archived" }
 ];

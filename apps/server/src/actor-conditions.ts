@@ -1,5 +1,7 @@
 import type { GameState } from "@vtt/domain";
+import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { adjustableActor, type ActorScope } from "./hit-points.js";
 import { applyExhaustionDeath, endConcentrationSustainedBy, releaseGrapplesHeldBy, type EffectNarration } from "./effects.js";
 import { conditionLabel, effectiveSpeedFeet, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
@@ -12,7 +14,7 @@ import { effectiveModeFor, familyModeFor, overrideCovers, rememberOverride } fro
  * for the caller to log. `level` is exhaustion's 1-6; other conditions carry none. Setting an
  * already-active condition updates its level; clearing an absent one is a no-op.
  */
-export function setCondition(state: GameState, actorId: string, conditionId: string, active: boolean, level: number | undefined, scope: ActorScope, options?: Readonly<{ override?: { reason?: string } | null }>): EffectNarration[] {
+export function setCondition(state: GameState, actorId: string, conditionId: string, active: boolean, level: number | undefined, scope: ActorScope, options?: Readonly<{ override?: { reason?: string } | null; resolveDefinition?: (definitionId: string) => ActorDefinition | undefined; catalog?: EquipmentCatalog }>): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (level !== undefined && conditionId !== "exhaustion") throw new CommandRejectedError("Only exhaustion has levels.");
   const remaining = actor.conditions.filter((condition) => condition.id !== conditionId);
@@ -41,7 +43,16 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
   }
   // Immunity: skip-with-narration rather than blocking - this is a manual GM command, and telling
   // the table WHY nothing happened beats a rejection dialog (SRD condition immunity).
-  if (actor.conditionImmunities.includes(conditionId)) {
+  //
+  // The bearer's INNATE immunities and the ones an active item GRANTS read the same here: a Periapt
+  // of Wound Closure authored with `grants.conditionImmunities` used to be derived and dropped, so
+  // the condition landed anyway. The catalog is optional - callers that have one plumb it, and one
+  // that does not keeps exactly the pre-item behavior.
+  const granted = options?.catalog
+    ? deriveEquipment(actor, actor.definitionId ? options.resolveDefinition?.(actor.definitionId) : undefined, options.catalog).conditionImmunities
+    : [];
+  const grantedImmunity = granted.find((entry) => entry.id === conditionId);
+  if (actor.conditionImmunities.includes(conditionId) || grantedImmunity) {
     return [{ kind: "condition", text: `${actor.name} is immune to ${conditionLabel(conditionId)} - not applied.`, actorId: actor.id }];
   }
   if (remaining.length >= 20) throw new CommandRejectedError("That combatant already has too many conditions.");

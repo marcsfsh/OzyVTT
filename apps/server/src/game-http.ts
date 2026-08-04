@@ -12,6 +12,8 @@ import {
 } from "@vtt/api-contract";
 import { CommandRejectedError, RevisionConflictError, RulesBlockedError, TimelineConfirmationRequired, type EncounterArchiveSummary } from "./game-store.js";
 import { GameAccessDeniedError, GameInputError, isGmGrade, type GameCommandDescriptor, type GameOperations, type GamePrincipal } from "./game-operations.js";
+import type { EncounterArchiveDocument } from "./encounter-archive.js";
+import { projectPlayerReplay } from "./replay-projection.js";
 
 /**
  * The public HTTP adapter over the shared game operations (ADR-0016). Every write here runs the
@@ -271,6 +273,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetProficiencies), ...command("character.set-proficiencies", actorIdParam));
   router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
+  router.post(expressPath(GAME_PATHS.characterRebuild), ...command("character.rebuild", (req) => ({ actorId: req.params.actorId })));
+  router.post(expressPath(GAME_PATHS.builderRollAbilities), ...command("builder.roll-abilities"));
   router.post(expressPath(GAME_PATHS.builderPolicy), ...command("builder.set-policy"));
   router.post(expressPath(GAME_PATHS.rulesPolicy), ...command("rules.set-policy"));
   router.post(expressPath(GAME_PATHS.actionUse), ...command("action.use"));
@@ -347,7 +351,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Encounter archives (Time Machine v2) ----------
 
-  /** Archives hold full state + GM-only narration: GM sessions and integrations yes, player sessions never. */
+  /** Archive MANAGEMENT (visibility, delete) stays GM-grade; the two reads below are role-aware (D26). */
   function requireGmGradePrincipal(res: Response): GamePrincipal | null {
     const principal = res.locals.principal as GamePrincipal;
     if (!isGmGrade(principal)) {
@@ -367,20 +371,40 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     return id;
   }
 
+  /**
+   * ROLE-AWARE, one URL (the `ops.view` precedent): the GM gets the verbatim document, a player gets
+   * the computed player replay, and an archive the GM has not shared is a 404 for a player - never a
+   * 403. A 403 would confirm the recording exists, which is the existence oracle the Codex rule
+   * forbids; "not found" is the same answer for a missing id and an unshared one.
+   */
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.collection), authorize("combat:read"), (_req, res) => {
-    if (!requireGmGradePrincipal(res)) return;
+    const principal = res.locals.principal as GamePrincipal;
+    if (!isGmGrade(principal)) return sendData(res, { encounters: options.archives.list().filter((entry) => entry.playerVisible) });
     return sendData(res, { encounters: options.archives.list() });
   });
 
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("combat:read"), (req, res) => {
-    if (!requireGmGradePrincipal(res)) return;
+    const principal = res.locals.principal as GamePrincipal;
     const id = archiveIdParam(req, res);
     if (id === null) return;
+    if (!isGmGrade(principal)) {
+      const shared = options.archives.list().some((entry) => entry.id === id && entry.playerVisible);
+      const stored = shared ? options.archives.get(id) : null;
+      // Missing and unshared are indistinguishable on purpose.
+      if (stored === null) return sendError(res, 404, "not_found", "No such encounter archive.");
+      let document: EncounterArchiveDocument;
+      try { document = JSON.parse(stored) as EncounterArchiveDocument; }
+      catch { return sendError(res, 404, "not_found", "No such encounter archive."); }
+      return sendData(res, { id, document: projectPlayerReplay(id, document) });
+    }
     const document = options.archives.get(id);
     if (document === null) return sendError(res, 404, "not_found", "No such encounter archive.");
     // The stored JSON is spliced in verbatim - no parse/re-serialize round trip on a potentially large document.
     return res.type("application/json").send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
   });
+
+  /** Launch-from-here (D25). The registry supplies the scope and the handler, like every typed route. */
+  router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.launch), ...command("replay.launch", (req) => ({ archiveId: Number(req.params.id) })));
 
   /**
    * Per-replay sharing (D26). GM-grade only, like every other archive route: this stores the GM's

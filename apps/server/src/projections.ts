@@ -3,8 +3,14 @@ import { healthBandOf } from "./hit-points.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
 
-/** Party members stay exact for each other; monster/NPC hit points reach players only as a coarse band. */
-function playerHp(actor: GameState["actors"][number]): PlayerHp {
+/**
+ * Party members stay exact for each other; monster/NPC hit points reach players only as a coarse band.
+ *
+ * EXPORTED so the replay projection (`replay-projection.ts`) applies the identical rule to an
+ * archived state instead of restating it. No field is added or widened by the export - the point is
+ * that there is ONE definition of what a player may know about a creature's hit points.
+ */
+export function playerHp(actor: GameState["actors"][number]): PlayerHp {
   return actor.kind === "player-character"
     ? { kind: "exact", current: actor.hp.current, maximum: actor.hp.maximum, temporary: actor.hp.temporary }
     : { kind: "band", band: healthBandOf(actor.hp) };

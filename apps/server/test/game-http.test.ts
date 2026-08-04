@@ -502,8 +502,22 @@ describe("public game API over /api/v1", () => {
       ]
     };
 
-    // GM-only in phase 2: the player seat is refused outright.
+    // D13: the TABLE'S POLICY decides whether a player may build. Closed, the player seat is refused.
+    const methods = ["standard-array", "point-buy", "roll", "custom"];
+    expect((await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: methods, playerBuilder: "gm-only" })).status).toBe(200);
     expect((await post(base, GAME_PATHS.characters, playerToken, create)).status).toBe(403);
+
+    // Open, the same player builds their own character - and it is AUTO-CLAIMED by them, so there is
+    // no window in which someone else could take it.
+    expect((await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: methods, playerBuilder: "open" })).status).toBe(200);
+    const playerCommandId = randomUUID();
+    const playerCreated = await post(base, GAME_PATHS.characters, playerToken, { ...create, commandId: playerCommandId, name: "Player Built" });
+    expect(playerCreated.status).toBe(200);
+    const afterPlayerCreate = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(gmToken) })).json();
+    const playerActor = afterPlayerCreate.data.game.actors.find((entry: { id: string }) => entry.id === playerCommandId);
+    expect(playerActor.ownerSessionId).not.toBeNull();
+    // One character each: the claim rule the roster already enforces also bounds the builder.
+    expect((await post(base, GAME_PATHS.characters, playerToken, { ...create, commandId: randomUUID(), name: "Second Try" })).status).toBe(409);
 
     const created = await post(base, GAME_PATHS.characters, gmToken, create);
     expect(created.status).toBe(200);
@@ -580,9 +594,25 @@ describe("public game API over /api/v1", () => {
     expect(list.data.encounters).toHaveLength(1);
     const id = list.data.encounters[0].id;
 
-    // Player sessions are shut out entirely (the document holds hidden-combatant state).
-    expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(playerToken) })).status).toBe(403);
-    expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(playerToken) })).status).toBe(403);
+    // D26 - hidden until shared. A player's list is empty and the record itself is 404: never 403,
+    // which would confirm a recording exists that the GM has not shared (the Codex no-oracle rule).
+    const hiddenList = EncounterArchiveListResponseSchema.parse(await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(playerToken) })).json());
+    expect(hiddenList.data.encounters).toEqual([]);
+    expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(playerToken) })).status).toBe(404);
+
+    // Shared: the same URL now answers, with the COMPUTED player replay - never the stored document.
+    await post(base, ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", String(id)), gmToken, { playerVisible: true });
+    const sharedList = EncounterArchiveListResponseSchema.parse(await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(playerToken) })).json());
+    expect(sharedList.data.encounters.map((entry) => entry.id)).toEqual([id]);
+    const playerDocument = await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(playerToken) })).json();
+    expect(playerDocument.ok).toBe(true);
+    expect(playerDocument.data.document.turns.length).toBeGreaterThan(0);
+    const playerJson = JSON.stringify(playerDocument);
+    for (const forbidden of ["journal", "finalState", "postEncounterState", "initiatorSessionId", "ownerSessionId", "Unrevealed Tyrant", "Secret lair"]) {
+      expect(playerJson).not.toContain(forbidden);
+    }
+    await post(base, ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", String(id)), gmToken, { playerVisible: false });
+    expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(playerToken) })).status).toBe(404);
 
     const documentResponse = await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { headers: bearer(reader.token) });
     expect(documentResponse.status).toBe(200);
@@ -848,7 +878,11 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.sceneReorder, "post", "scene.reorder"],
       [GAME_PATHS.fogEnabled, "post", "fog.set-enabled"],
       [GAME_PATHS.fogPaint, "post", "fog.paint"],
-      [GAME_PATHS.fogReset, "post", "fog.reset"]
+      [GAME_PATHS.fogReset, "post", "fog.reset"],
+      [GAME_PATHS.characterRebuild, "post", "character.rebuild"],
+      [GAME_PATHS.builderRollAbilities, "post", "builder.roll-abilities"],
+      // The one typed route outside GAME_PATHS: launch-from-here lives on the archive it replays.
+      [ENCOUNTER_ARCHIVE_PATHS.launch, "post", "replay.launch"]
     ];
     // Every cataloged command has exactly one typed route in this table...
     expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMAND_SCOPES).sort());

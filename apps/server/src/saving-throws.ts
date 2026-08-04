@@ -122,6 +122,22 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
 }
 
 /**
+ * Whether an item GRANTS proficiency in this save, and the sheet does not already have it.
+ *
+ * `grants.saves` was collected by the derivation and read by nothing: a Cloak of Protection
+ * authored as a save-proficiency grant changed no roll anywhere. It rides on TOP of the base the
+ * way an item skill grant does (`effectiveSkillTier`) - the base rung, whatever it is, describes
+ * the character, and the loadout adds to it - and it is suppressed when the sheet is already
+ * proficient so the bonus is never paid twice.
+ */
+export function saveProficiencyFromItems(definition: ActorDefinition | undefined, derivation: EquipmentDerivation, ability: AbilityId): number {
+  if (!definition) return 0;
+  if (!derivation.saves.some((entry) => entry.id === ability)) return 0;
+  if (definition.proficiencies?.saves.includes(ability)) return 0;
+  return definition.proficiencyBonus;
+}
+
+/**
  * THE save total: the one function the sheet's chip and `answerSave`'s roll both read, so they
  * cannot drift. Cover is deliberately NOT here - it is per-save (an attacker's line of sight), not a
  * property of the character, so a chip tapped from the sheet has no cover to know about.
@@ -130,6 +146,7 @@ export function saveTotalFor(
   definition: ActorDefinition | undefined, actor: Actor | undefined, ability: AbilityId, derivation: EquipmentDerivation
 ): number {
   return saveModifierFor(definition, ability)
+    + saveProficiencyFromItems(definition, derivation, ability)
     + (actor ? exhaustionPenalty(actor) : 0)
     + saveRiderBonus(derivation, ability);
 }
@@ -285,13 +302,13 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   let appliedDamage = 0;
   let conditionApplied = false;
   if (outcomeDamage > 0) {
-    const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId), newId: deps.newRollId, now: deps.now });
+    const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId), newId: deps.newRollId, now: deps.now, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
     appliedDamage = outcome.application.totalApplied;
     events.push(...outcome.events);
   }
   if (outcomeCondition && pending.conditionId) {
     // setCondition narrates immunity skips; whether the condition actually landed is read back.
-    events.push(...setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }));
+    events.push(...setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId), ...(deps.catalog ? { catalog: deps.catalog } : {}) }));
     conditionApplied = target.conditions.some((condition) => condition.id === pending.conditionId);
   }
   // A committed FAILED concentration check ends the sustained effects (SRD Concentration);

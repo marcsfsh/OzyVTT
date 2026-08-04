@@ -570,7 +570,7 @@ export function FeatureEditor({
             <div className="hb-field">
               <Switch
                 checked={repeatable}
-                label="The same option can be taken more than once"
+                label="The same option can be chosen more than once"
                 onChange={(on) => setChoice({ repeatable: on })}
               />
             </div>

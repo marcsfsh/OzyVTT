@@ -94,12 +94,9 @@ const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/encounter/RollControls.tsx", "✕"],
   ["apps/client/src/integrations/ApiReference.tsx", "✓⬇"],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", "🔌"],
-  ["apps/client/src/main.tsx", "←▾🎬"],
   ["apps/client/src/maps/MapManager.tsx", "←↑→↓"],
-  ["apps/client/src/replay/ReplayPanel.tsx", "←→⏭⏮⏸▶⬇🎬"],
   ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
   ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🎬🗑🗺"],
-  ["apps/client/src/tokens/TokenLibrary.tsx", "🎴"],
   ["apps/client/src/viewer/ViewerControls.tsx", "●"],
   ["apps/client/src/viewer/ViewerPreviewPanel.tsx", "✕"],
   // packages/ui — the four primitives that break their own rule.
@@ -200,8 +197,7 @@ const rawInput = (type: string) => new RegExp(`<input\\b[^>]*type="${type}"`, "g
  * The allowlist reaches 0 with them, which is a two-line change whenever someone picks it up.
  */
 const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/encounter/equipment.tsx", 1],
-  ["apps/client/src/tokens/TokenLibrary.tsx", 1]
+  ["apps/client/src/encounter/equipment.tsx", 1]
 ];
 
 /**
@@ -216,7 +212,8 @@ const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = 
  */
 const RAW_NUMBER_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/CharacterSheet.tsx", 3],
-  ["apps/client/src/encounter/EncounterPanel.tsx", 3],
+  // 2, not 3, since the scene-prep rebuild: the setup list's per-combatant Initiative field is gone.
+  ["apps/client/src/encounter/EncounterPanel.tsx", 2],
   ["apps/client/src/scene/TokenContextMenu.tsx", 1],
   // Two on one line (the X and Y of a calibration point) plus the focus-zoom field.
   ["apps/client/src/viewer/ViewerControls.tsx", 3]
@@ -486,7 +483,7 @@ const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/scene/TokenContextMenu.tsx", 6],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
   ["apps/client/src/scenes/ScenePanel.tsx", 3],
-  ["apps/client/src/tokens/TokenLibrary.tsx", 7],
+  ["apps/client/src/tokens/TokenLibrary.tsx", 6],
   ["apps/client/src/viewer/ViewerApp.tsx", 4],
   ["apps/client/src/viewer/ViewerControls.tsx", 6]
 ];
@@ -552,8 +549,7 @@ const LADDER_ALLOW: ReadonlyArray<readonly [file: string, kind: "min" | "max", w
   ["apps/client/src/integrations/api-reference.css", "max", 700],
   // Off-ladder AND double-firing with min-width: 850px at exactly 850px.
   ["apps/client/src/maps/map-manager.css", "max", 850],
-  ["apps/client/src/replay/replay.css", "max", 900],
-  ["apps/client/src/tokens/tokens.css", "max", 640]
+  ["apps/client/src/replay/replay.css", "max", 900]
 ];
 
 describe("(f) one breakpoint ladder — design-language.md:134-139", () => {

@@ -288,9 +288,9 @@ export function RecordDetail({
     // `danger: false` on purpose: nothing is lost, so this is caution, not danger.
     // Rose-red is reserved for actual destruction.
     const confirmed = await confirm({
-      title: "Remove from pickers",
-      body: `"${name}" stops appearing in the character builder, the encounter picker and inventory lists. Characters already built from it are unaffected. You can restore it later.`,
-      confirmLabel: "Remove",
+      title: "Archive this?",
+      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.`,
+      confirmLabel: "Archive",
       danger: false
     });
     if (!confirmed) return;
@@ -340,7 +340,7 @@ export function RecordDetail({
         </h2>
 
         <div className="hb-state">
-          {removed ? <Badge tone="neutral">Removed</Badge> : published ? <Badge tone="neutral">Published</Badge> : <Badge tone="caution">Draft</Badge>}
+          {removed ? <Badge tone="neutral">Archived</Badge> : published ? <Badge tone="neutral">Published</Badge> : <Badge tone="caution">Draft</Badge>}
           {/* No `GmOnlyTag` here, deliberately: the `RevealSwitch` a few inches to the
               right already renders the literal words "GM only", and stamping the pill
               beside it puts the same constraint on one line twice (readiness rule 4).

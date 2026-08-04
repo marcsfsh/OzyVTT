@@ -154,6 +154,8 @@ type EconomyPlan = Readonly<{
   spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
   spendLegendary: Readonly<{ cost: number }> | null;
+  /** Spell slot the action spends from the bearer's own pool (an item cast with `consumesSpellSlot`). */
+  spendSpellSlot: Readonly<{ level: number }> | null;
 }>;
 
 /**
@@ -315,6 +317,19 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     spendLegendary = { cost };
   }
 
+  // An item cast authored with `consumesSpellSlot` spends the WEARER's own slot on top of the
+  // item's charges (SRD staffs and the "expend a spell slot" wording). A creature with no pool at
+  // that level is refused here rather than mid-resolution, in the same voice as an empty charge.
+  let spendSpellSlot: EconomyPlan["spendSpellSlot"] = null;
+  if (action.spellSlot) {
+    const level = action.spellSlot.level;
+    const slot = attacker.spellSlots?.find((entry) => entry.level === level);
+    if (!slot || slot.remaining <= 0) {
+      violations.push({ rule: "feature.no-spell-slot", message: `${action.name} spends a level-${level} spell slot - ${attacker.name} has none left.` });
+    }
+    spendSpellSlot = { level };
+  }
+
   // Targeting restrictions the definition declares (Tail can't target the creature this crocodile grapples).
   if (action.targetRules?.includes("not-grappled-by-source")) {
     for (const targetId of targetIds) {
@@ -377,7 +392,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     }
   }
 
-  return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse, spendLegendary }, proseMultiattack, notes };
+  return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse, spendLegendary, spendSpellSlot }, proseMultiattack, notes };
 }
 
 /**
@@ -665,7 +680,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // and a self-only feature needs no target either. Without both carve-outs the counter the builder
   // now assembles could be displayed but never decremented (the same dead end 34 bundled monster
   // actions with `uses` and no roll already sit in).
-  const spendsALimitedUse = action.uses !== undefined;
+  // A spell slot is the same kind of counter, so an item cast that spends one (and nothing else)
+  // resolves for exactly the same reason a charge does.
+  const spendsALimitedUse = action.uses !== undefined || action.spellSlot !== undefined;
   const structuredWithoutTargets = (action.grants !== undefined && action.grants.target !== "target") || action.multiattack !== undefined || spendsALimitedUse || input.builtin === true;
   if (targets.length === 0 && !structuredWithoutTargets && action.grants?.target !== "target") throw new CommandRejectedError("Choose at least one target.");
   if (!action.attack && !action.save && action.damage.length === 0 && action.grants === undefined && !spendsALimitedUse && input.builtin !== true) {
@@ -1105,6 +1122,12 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   if (overridden) rememberOverride(state, overridden.rule);
   if (plan.spendLegendary) {
     state.combat = { ...state.combat, legendaryUsed: { ...state.combat.legendaryUsed, [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost } };
+  }
+  if (plan.spendSpellSlot) {
+    const level = plan.spendSpellSlot.level;
+    // Clamped, never negative: the economy pass above already refused an empty pool unless the GM
+    // overrode it, and an override spends what is there rather than going into debt.
+    attacker.spellSlots = (attacker.spellSlots ?? []).map((entry) => entry.level === level ? { ...entry, remaining: Math.max(0, entry.remaining - 1) } : entry);
   }
   if (plan.spendUse) {
     if (plan.spendUse.per === "turn") {

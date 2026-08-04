@@ -276,7 +276,8 @@ export class GameStore {
   /**
    * Share (or un-share) one archived fight with players (D26). Returns false when no such archive
    * exists so the caller can 404 rather than silently succeeding. The player-facing READ projection is
-   * a separate, later change - this is the stored decision, and nothing serves a player an archive yet.
+   * The read endpoints consume this: a shared archive reaches a player as a COMPUTED replay projection
+   * (`replay-projection.ts`), never as this stored document.
    */
   setEncounterArchiveVisibility(id: number, playerVisible: boolean): boolean {
     const result = this.requireDatabase().prepare("UPDATE encounter_archives SET player_visible = ? WHERE id = ?").run(playerVisible ? 1 : 0, id);

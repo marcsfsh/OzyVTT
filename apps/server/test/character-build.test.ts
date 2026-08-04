@@ -157,7 +157,11 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     // The origin feat (Savage Attacker), the versatile pick (Alert), the fighting style (Defense),
     // and the level-4 ASI-as-feat all record on the sheet's feat list.
     expect(definition.character?.feats.map((feat) => feat.id).sort()).toEqual(["ability-score-improvement", "alert", "defense", "savage-attacker"]);
-    expect(definition.character?.choices).toEqual(fighterInput().choices);
+    // The ledger is the input's rows VERBATIM, plus the rolled hit points the build consumed (D14) -
+    // the rows that make a level-down/level-up round trip land on the same maximum.
+    expect(definition.character?.choices.filter((row) => row.kind !== "hp-roll")).toEqual(fighterInput().choices);
+    expect(definition.character?.choices.filter((row) => row.kind === "hp-roll"))
+      .toEqual((fighterInput().hp.entries ?? []).map((roll, index) => ({ level: index + 2, kind: "hp-roll", id: "hp", payload: { roll } })));
     expect(definition.summary).toContain("Level 5 Human Fighter (Champion)");
     expect(definition.spellcasting).toBeUndefined();
   });

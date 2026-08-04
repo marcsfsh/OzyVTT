@@ -43,6 +43,29 @@ for p in "hides all presentation content while disabled" "rejects non-GM control
   grep -qF "$p" docs/ai-context/viewer-mode.md || echo "MISSING: $p"; done
 ```
 
+## The checks that fail on a design or vocabulary regression
+
+Three client suites enforce things a reviewer used to have to notice. They are ordinary
+`npm test` failures — there is no separate command — and each names the fix in its message.
+
+| Suite | What fails |
+|---|---|
+| `apps/client/src/play-vocabulary.test.ts` | A retired word in user copy anywhere under `apps/client/src` (minus a pinned exclusion list) or in `packages/ui/src/primitives`. Also pins the structured copy the scan cannot see: `CLAIM_WORD`, `ROLL_VISIBILITY_WORD`, `SETTINGS_GROUPS`, the rules dial, the GM tab labels. |
+| `apps/client/src/codex/vocabulary.test.ts` | The same, for the Codex's own glossary. Both read one scanner, `apps/client/src/copy-scan.ts`. |
+| `apps/client/src/design-conventions.test.ts` | A text glyph where an icon belongs, a raw `<input type="search"\|number">`, a second `.eyebrow`, a hand-typed colour, an inline feedback banner, an off-ladder breakpoint. |
+
+Every allowlist in those files is **shrink-only**, and its size is pinned in
+`apps/client/src/design-conventions-shape.ts` — so fixing a violation costs a deleted row plus
+a decremented number, and *weakening* a check costs two deliberate edits in two files. The
+dead-entry detectors mean a fixed violation fails until its row is removed. Do not add a row to
+go green; the failure message tells you what to type instead.
+
+Two limits, so a green run is not over-read: the scan reads copy, not code, so a literal inside
+a JSX expression (`{claimed ? "Claimed" : "Available"}`) is invisible — those cases are pinned
+at their definition instead; and a regex matches tokens, not senses, which is why the terms D28
+KEEPS (fog Reveal/Hide, Initiative the score, Save the throw, Claim/Release) are asserted
+PRESENT rather than merely left un-ruled.
+
 ## What CI runs
 
 `.github/workflows/ci.yml` (job "Test, type-check, and build"), Node 24:

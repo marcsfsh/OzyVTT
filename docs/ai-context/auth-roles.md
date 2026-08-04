@@ -87,11 +87,25 @@ the router. Full rules in `codex.md`.
 - Players **cannot**: claim a non-PC or already-claimed actor, own two characters, make
   gm-only rolls, or see other sessions' `ownerSessionId` / `notes` / private rolls / hidden
   actors / hidden turns / other players' parked rules questions.
+- **What a player MAY now do on their own character** (D13/D18), each gated by the same
+  `canInitiateForActor` check every other player command uses, never by the UI: set its token
+  image from the library or their own upload (`actor.set-token-image`), build one when the
+  table's `builderPolicy.playerBuilder` is `open` (`character.create`, auto-claimed, with a
+  per-session daily cap and a definitions-headroom refusal), and level it up or down or respec
+  it (`character.rebuild`). The builder's ability dice are the server's
+  (`builder.roll-abilities`) and land in the table feed like any other roll.
 - **A blocked player is never a silent dead end.** A rules refusal reaches them as a
   machine-readable `blocked`, and `rules.ask` parks it for the GM (`combat.pendingRuleAsks`).
   A player sees only their OWN ask, and never its parked `command` payload — that can name
   target ids they may not know. Only a GM-grade principal may `rules.answer`.
 - Role derives from the **signed token, not network position**.
+
+**The token library is curated, not policed** (D18 / ruling R1). A player browses the library and
+uploads their own image with no approval gate; the GM's control is a per-entry `hidden` flag
+(`token-catalog.ts`) that decides what the shared shelf OFFERS, applied in the store's `list()` so
+no route can forget it. Every management route (rename, delete, folder visibility) stays GM-only,
+and a player upload lands in one "Player uploads" folder under the map-asset discipline: 6 MiB,
+real image validation, content-hash dedupe, plus a per-session daily upload cap.
 
 ## Gotchas
 

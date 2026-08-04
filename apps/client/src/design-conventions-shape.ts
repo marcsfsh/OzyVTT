@@ -68,8 +68,8 @@ export const CONVENTION_SHAPE = {
    * Both must reach 0 — the icons exist (`packages/ui/src/primitives/icons.tsx`), the remaining
    * call sites have not migrated yet.
    */
-  glyphAllowFiles: 19,
-  glyphAllowPairs: 52,
+  glyphAllowFiles: 16,
+  glyphAllowPairs: 40,
 
   // ─────────────────────────── (b) raw form elements ───────────────────────────
   /**
@@ -82,16 +82,18 @@ export const CONVENTION_SHAPE = {
    * Raw `<input type="search">`: **2** sites in **2** files (2026-08-03). Command:
    * `grep -rn '<input[^>]*type="search"' apps/client/src --include=*.tsx`
    */
-  rawSearchFiles: 2,
-  rawSearchSites: 2,
+  rawSearchFiles: 1,
+  rawSearchSites: 1,
   /**
-   * Raw `<input type="number">`: **10** sites in **4** files (2026-08-03). Note this is not
-   * the number a naive `grep '<input type="number"'` reports (8): it misses
-   * `EncounterPanel.tsx:1036`, where `className` precedes `type`, and it counts
+   * Raw `<input type="number">`: **9** sites in **4** files. Was 10 (2026-08-03); the scene-prep
+   * rebuild (D1/D2) deleted the encounter setup list's per-combatant Initiative field, so
+   * `EncounterPanel.tsx` costs 2 rather than 3 — the staging tray asks for no scores and the server
+   * rolls them. Note this is not the number a naive `grep '<input type="number"'` reports: it misses
+   * the `EncounterPanel.tsx` site where `className` precedes `type`, and it counts
    * `ViewerControls.tsx:157` once when that line holds two.
    */
   rawNumberFiles: 4,
-  rawNumberSites: 10,
+  rawNumberSites: 9,
 
   // ─────────────────────────── (c) the second eyebrow ───────────────────────────
   /**
@@ -108,8 +110,8 @@ export const CONVENTION_SHAPE = {
    * `\b` matches at a hyphen and sweeps in the different classes `viewer-eyebrow` (x4) and
    * `viewer-tools-eyebrow` (x1). Those are the viewer rebuild's problem, not this scan's.
    */
-  eyebrowUses: 15,
-  eyebrowFiles: 14,
+  eyebrowUses: 13,
+  eyebrowFiles: 12,
   /**
    * `.eyebrow` selectors still in `apps/client/src/styles.css`: **1** — the declaration alone.
    * The second, `.you-are-playing .eyebrow`, went when the player bar moved to `<Eyebrow>`. The
@@ -147,7 +149,7 @@ export const CONVENTION_SHAPE = {
    * reaches 0, which is a structurally stronger assertion than any string match.
    */
   feedbackAllowFiles: 13,
-  feedbackAllowSites: 103,
+  feedbackAllowSites: 102,
 
   // ─────────────────────────── (f) the breakpoint ladder ───────────────────────────
   /**
@@ -168,7 +170,29 @@ export const CONVENTION_SHAPE = {
    */
   ladderConditionFloor: 50,
   /** Off-ladder `@media` conditions: **10** rows (2026-08-03). */
-  ladderOffRows: 10,
+  ladderOffRows: 9,
+
+  // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
+  /**
+   * Floor on the play `.ts`/`.tsx` files `play-vocabulary.test.ts` reads (the scanned set,
+   * `.ts` included because copy lives in tables as well as in JSX, plus
+   * `packages/ui/src/primitives`). Measured 2026-08-03: **128**. Same ~10%-under discipline as
+   * `codex/vocabulary.test.ts:155-156`.
+   */
+  playSourceFloor: 115,
+  /**
+   * Floor on the user-facing strings that scan yields. Measured 2026-08-03: **1763** (1797 raw,
+   * 34 of them dropped by `looksLikeCode`; the Codex corpus, for scale, is 919 over 47 files).
+   * Command: the test's own scan — `playCopySources()` through `scanCopy`, minus the artifacts.
+   */
+  playCorpusFloor: 1580,
+  /**
+   * (file, string) exemptions in `play-vocabulary.test.ts`: **2** — SRD's "creature type" in the
+   * homebrew rider form, and the English verb "taken" in the feature editor's repeatability help.
+   * SHRINK-ONLY. A third exemption is a word this product decided it could not say consistently,
+   * and the commit that adds one has to say so out loud.
+   */
+  playExemptions: 2,
 
   // ─────────────────────────── (1.4) styleguide completeness ───────────────────────────
   /**
@@ -192,10 +216,12 @@ export const CONVENTION_SHAPE = {
    * discovers every client test that imports THIS module and requires the two sets to be
    * equal, so deleting a row here fails while the file it named is still importing.
    *
-   * §2.1's `play-vocabulary.test.ts` joins this list when that track lands.
+   * `play-vocabulary.test.ts` is the D28 lock and reads the same scanned set through
+   * `playCopySources()`.
    */
   checkFiles: [
     "src/design-conventions.test.ts",
+    "src/play-vocabulary.test.ts",
     "src/styleguide/styleguide-completeness.test.ts"
   ] as readonly string[]
 } as const;
@@ -245,6 +271,31 @@ export function uiPrimitiveTsx(): Source[] {
   return walk(`${UI_SRC}/primitives`, (n) => /\.tsx$/.test(n) && !n.includes(".test.")).map((rel) =>
     source(`${UI_SRC}/primitives`, rel, (r) => uiPath(`primitives/${r}`))
   );
+}
+
+/**
+ * What the D28 vocabulary lock reads: the scanned set with `.ts` included, plus the primitives.
+ *
+ * `.ts` and not only `.tsx`, because copy lives in tables as often as in JSX — `DIAL_COPY`,
+ * `SETTINGS_GROUPS`, `CLAIM_WORD` and the feed's row labels are all plain modules. The glyph and
+ * raw-input scans stay `.tsx`-only because a glyph in a `.ts` constant is still rendered through
+ * a component that the `.tsx` scan already reads; a WORD is not, and a word rule that stopped at
+ * the JSX boundary would miss the exact files where vocabulary is centralised.
+ *
+ * Comments are stripped: a comment is not user-facing, and a brief that names a retired word in
+ * order to say it is retired must not fail the rule that retired it.
+ */
+export function playCopySources(): { file: string; read: () => string }[] {
+  const keep = (n: string) => /\.tsx?$/.test(n) && !n.includes(".test.") && !n.endsWith(".d.ts");
+  return [
+    ...walk(CLIENT_SRC, keep)
+      .filter((rel) => !excluded(rel))
+      .map((rel) => ({ file: clientPath(rel), read: () => stripComments(readFileSync(`${CLIENT_SRC}/${rel}`, "utf8")) })),
+    ...walk(`${UI_SRC}/primitives`, keep).map((rel) => ({
+      file: uiPath(`primitives/${rel}`),
+      read: () => stripComments(readFileSync(`${UI_SRC}/primitives/${rel}`, "utf8"))
+    }))
+  ];
 }
 
 /** The scanned set plus `codex/` — (c)'s scope, because the composite class lives there. */

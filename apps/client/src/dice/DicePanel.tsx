@@ -8,6 +8,35 @@ import { socket } from "../socket";
 const PURPOSE_LABELS: Record<RollPurpose, string> = { manual: "Roll", attack: "Attack", damage: "Damage", save: "Save", check: "Check" };
 const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
 
+/**
+ * **D28's visibility words, for dice.** One roll audience used to have five names in one
+ * component — "Everyone", "Just me (GM)", "Just me", "Just me and the GM", "Just the GM" — none
+ * of which were the words every other surface in the product uses for the same decision. They
+ * are the reveal words now, and this is the one table, so the picker and the roll-meta line
+ * cannot say different things about the same roll.
+ *
+ * Keyed by every wire value, not just the offered ones: the meta line labels rolls it did not
+ * make (a GM reads a player's `blind` roll), and before this table it fell through to printing
+ * the raw wire string.
+ */
+export const ROLL_VISIBILITY_WORD: Readonly<Record<RollVisibility, string>> = {
+  public: "Shown to players",
+  "gm-only": "GM only",
+  "self-only": "Hidden from players",
+  blind: "GM only — you won't see it"
+};
+
+/**
+ * Who may choose what. The GM is offered two, not three: for a GM roller `self-only` and
+ * `gm-only` reach the same eyes (`apps/server/src/combat-log.ts:58` — a `self-only` row is
+ * gated on the roller's session, and the roller IS the GM), so the third option was a second
+ * name for one audience. That is exactly the drift this table exists to end.
+ */
+const VISIBILITY_OPTIONS: Readonly<Record<"gm" | "player", readonly RollVisibility[]>> = {
+  gm: ["public", "gm-only"],
+  player: ["public", "self-only", "blind"]
+};
+
 function modifierSuffix(modifier: number) { return modifier === 0 ? "" : modifier > 0 ? `+${modifier}` : `${modifier}`; }
 function modifierLabel(modifier: number) { return modifier === 0 ? "±0" : modifier > 0 ? `+${modifier}` : `−${Math.abs(modifier)}`; }
 
@@ -26,11 +55,9 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
   // The one per-browser dice-input preference, shared with the sheet and every combat roll surface.
   const { rollInput, bonusMode, setRollInput, setBonusMode } = useRollPreference();
   // A player's "self-only" roll is seen by the roller AND the GM (the GM view carries every roll), but no
-  // other player - i.e. "Just me and the GM". "blind" hides the result from the roller too (GM only).
-  const visibilityOptions: Array<{ value: RollVisibility; label: string }> = role === "gm"
-    ? [{ value: "public", label: "Everyone" }, { value: "gm-only", label: "Just me (GM)" }, { value: "self-only", label: "Just me" }]
-    : [{ value: "public", label: "Everyone" }, { value: "self-only", label: "Just me and the GM" }, { value: "blind", label: "Just the GM" }];
-  const visibilityLabel = (value: RollVisibility) => visibilityOptions.find((option) => option.value === value)?.label ?? value;
+  // other player - so it is hidden from players. "blind" hides the result from the roller too.
+  const visibilityOptions = VISIBILITY_OPTIONS[role];
+  const visibilityLabel = (value: RollVisibility) => ROLL_VISIBILITY_WORD[value] ?? value;
 
   const submit = (rollFormula: string, rollPurpose: RollPurpose) => {
     setFeedback("Rolling…");
@@ -75,7 +102,7 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
   return <section className="dice-proof" aria-labelledby="dice-proof-heading">
     <div className="dice-heading">
       <div><span className="eyebrow">DICE</span><h2 id="dice-proof-heading">Roll dice</h2></div>
-      <label className="dice-visibility">Who sees it?<Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
+      <label className="dice-visibility">Who sees it?<Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>{visibilityOptions.map((value) => <option key={value} value={value}>{ROLL_VISIBILITY_WORD[value]}</option>)}</Select></label>
     </div>
     {/* The per-browser roll-input preference, mirrored from (and in lockstep with) the character sheet's
         toggle - so a player sets "digital vs physical dice" once and every surface obeys it. */}

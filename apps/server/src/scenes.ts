@@ -178,6 +178,49 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
 }
 
 /**
+ * How many scene slots a park-and-go-live needs right now: one for the new scene, plus one more when
+ * a pre-scenes encounter is running unbound and would have to be preserved as an implicit scene.
+ * Callers that MINT the scene they go live on (replay launch) pre-check with this so the refusal
+ * arrives before anything is built, rather than half-way through.
+ */
+export function sceneSlotsNeededToGoLive(state: GameState): number {
+  const parksImplicitly = state.combat.activeSceneId === null && state.combat.mapAssetId !== null && (state.combat.active || state.combat.initiative.length > 0);
+  return 1 + (parksImplicitly ? 1 : 0);
+}
+
+export function sceneHeadroom(state: GameState): number {
+  return MAX_SCENES - state.combat.scenes.length;
+}
+
+/**
+ * Park the current table and go live on a NEW scene carrying `combat`.
+ *
+ * This is `activateScene`'s motion with the target CREATED rather than resumed, and it exists so
+ * launching a replay is the same park/resume the GM already knows (D25/R3) instead of a second
+ * table concept: the current fight parks into its slot exactly as it does on a scene switch, the
+ * new scene goes live, and the parked one resumes any time through `scene.activate`.
+ */
+export function activateNewScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string | null; combat: SceneCombat }>, implicitSceneId: string): Scene {
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before switching scenes.");
+  if (state.combat.scenes.some((scene) => scene.id === input.sceneId)) throw new CommandRejectedError("That scene already exists.");
+  if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
+    throw new CommandRejectedError("Remove a prepared scene first - launching needs room to park the table and stage the replay.");
+  }
+
+  let scenes = state.combat.scenes;
+  if (state.combat.activeSceneId !== null) {
+    const parkedId = state.combat.activeSceneId;
+    scenes = scenes.map((scene) => scene.id === parkedId ? { ...scene, combat: snapshotSceneCombat(state.combat) } : scene);
+  } else if (state.combat.mapAssetId !== null && (state.combat.active || state.combat.initiative.length > 0)) {
+    scenes = [...scenes, { id: implicitSceneId, name: "Current encounter", mapAssetId: state.combat.mapAssetId, combat: snapshotSceneCombat(state.combat) }];
+  }
+  // The live scene's own slot stays EMPTY by invariant - its live copy is the top-level combat.
+  const scene: Scene = { id: input.sceneId, name: input.name, mapAssetId: input.mapAssetId ?? state.combat.mapAssetId ?? "", combat: emptySceneCombat() };
+  state.combat = { ...input.combat, mapAssetId: scene.mapAssetId, scenes: [...scenes, scene], activeSceneId: scene.id, historyCursor: null, historyDirty: false };
+  return scene;
+}
+
+/**
  * One-shot startup migration for states created before scenes existed: if an encounter/map is present
  * but no scenes are, bind the current live combat to a single implicit active scene (whose own slot
  * stays empty - the live copy remains the top-level combat). Additive, so players/viewer are unaffected.

@@ -258,6 +258,25 @@ export const CharacterCreateSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 /**
+ * Level a character up or down, or respec it outright (D13/D14). The shape is `CharacterCreateSchema`
+ * minus the name (kept from the live actor) plus the actor to rebuild: level change and respec are
+ * the same motion - the whole build is re-run from the ledger the client prefilled, and the server
+ * re-validates all of it exactly as it validates a fresh create.
+ */
+export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.string().uuid() }).strict();
+
+/**
+ * Roll six ability scores SERVER-SIDE (D14). The builder used to roll them in the browser, which is
+ * a rule-2 violation the ledger has carried for months; the dice now come from the same authority
+ * every other roll does, and land in the table feed like any other roll.
+ */
+export const BuilderRollAbilitiesSchema = z.object({
+  commandId: z.string().uuid(),
+  method: z.enum(["roll", "custom"]),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
  * GM sets the character-builder table policy (decision 10). `customFormula` semantics: omitted =
  * keep the stored formula, null = clear it, a string = validate through `validateAbilityFormula`
  * (the same dice grammar every other roll uses) and store it. Duplicated methods are rejected.
@@ -290,6 +309,11 @@ export const SceneNameSchema = z.string().trim().min(1).max(120);
 export const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), activate: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneRenameSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), name: SceneNameSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneIdSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * Make one recorded moment live (D25). `turnIndex` is an index into the archive document's `turns`
+ * array - the same list the replay viewer scrubs through - not a timeline revision.
+ */
+export const ReplayLaunchSchema = z.object({ commandId: z.string().uuid(), archiveId: z.number().int().positive(), turnIndex: z.number().int().min(0).max(999), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneSetCombatantsSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Reorder the prepared-scene list to a permutation of the current scene ids (GM). Bounded by the domain scenes cap (20). */
 export const SceneReorderSchema = z.object({ commandId: z.string().uuid(), order: z.array(z.string().uuid()).min(1).max(20), expectedRevision: z.number().int().nonnegative().optional() }).strict();

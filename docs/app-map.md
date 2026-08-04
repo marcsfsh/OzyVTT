@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 10 GameState fields · 82 commands · 186 HTTP paths
+- 10 GameState fields · 85 commands · 189 HTTP paths
 
 ## GameState shape
 
@@ -33,7 +33,7 @@ pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map
 operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`
 route -> projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `rules`, `save`, `scene`, `table`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rules`, `save`, `scene`, `table`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -64,10 +64,12 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `annotation.set-color` | `combat:write` |
 | `annotation.set-movable` | `combat:write` |
 | `annotation.set-visibility` | `combat:write` |
+| `builder.roll-abilities` | `actor:write` |
 | `builder.set-policy` | `actor:write` |
 | `character.claim` | `actor:write` |
 | `character.create` | `actor:write` |
 | `character.force-release` | `actor:write` |
+| `character.rebuild` | `actor:write` |
 | `character.release` | `actor:write` |
 | `character.resolve-import` | `actor:write` |
 | `character.set-currency` | `actor:write` |
@@ -100,6 +102,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `initiative.set` | `combat:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
+| `replay.launch` | `combat:write` |
 | `rules.answer` | `combat:write` |
 | `rules.ask` | `combat:write` |
 | `rules.set-policy` | `combat:write` |
@@ -191,6 +194,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/content/subclasses`
 - `GET /api/v1/encounters`
 - `DELETE GET /api/v1/encounters/{id}`
+- `POST /api/v1/encounters/{id}/launch`
 - `POST /api/v1/encounters/{id}/visibility`
 - `GET /api/v1/game`
 - `POST /api/v1/game/actions/resolve`
@@ -212,6 +216,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/inventory`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/proficiencies`
+- `POST /api/v1/game/actors/{actorId}/rebuild`
 - `POST /api/v1/game/actors/{actorId}/rest`
 - `POST /api/v1/game/actors/{actorId}/sheet-preview`
 - `POST /api/v1/game/actors/{actorId}/size`
@@ -229,6 +234,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/annotations/{id}/visibility`
 - `POST /api/v1/game/annotations/clear`
 - `POST /api/v1/game/annotations/ping`
+- `POST /api/v1/game/builder/ability-rolls`
 - `POST /api/v1/game/builder/policy`
 - `POST /api/v1/game/character-imports`
 - `POST /api/v1/game/character-imports/{importId}/resolve`

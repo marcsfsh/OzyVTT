@@ -9,14 +9,15 @@ import { navigate } from "../router";
  * differently would confirm the surface exists. Same family as the 404-not-403 rule the record routes
  * keep, one axis up.
  */
-export function NotFoundView({ role }: Readonly<{ role: "gm" | "player" }>) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function NotFoundView({ role: _role }: Readonly<{ role: "gm" | "player" }>) {
   return (
     <div className="codex-main-empty anim-view" role="status">
       <h3>Nothing lives at this address.</h3>
       <p>Check the link, or head back to the table.</p>
       <div className="codex-notfound-actions">
         <Button variant="primary" onClick={() => navigate("/codex")}>Go to the Codex</Button>
-        <Button variant="secondary" onClick={() => navigate(role === "gm" ? "/encounter" : "/table")}>Go to the table</Button>
+        <Button variant="secondary" onClick={() => navigate("/table")}>Go to the table</Button>
       </div>
     </div>
   );

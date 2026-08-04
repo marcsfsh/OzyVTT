@@ -13,6 +13,45 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-03 — One Language: the play glossary, and where it is kept honest
+
+The play-facing unification (D1–D33; the full decision record is the engagement's master plan,
+off-repo — what the repo must remember is here). The product had grown three vocabularies and no
+mechanism to keep them apart, so these are the words plus the thing that fails when they drift.
+
+- **The glossary, by concept (D28).** The playable thing is a **character**, a **monster** or an
+  **NPC** — never an "actor", a "combatant", or "creature" used as a generic. The list they act in
+  is **Turn order**; **Initiative** stays the score. The event is a **fight**; the place is the
+  **Table**. Visibility is **Shown to players / Hidden from players / GM only** — one pair of words
+  everywhere, which retired the five phrasings one `<select>` had for one roll audience. Claim states
+  are **Available / Claimed / Your character**, and the verbs are **Claim / Release**. A finished
+  fight's record is a **Replay**. Wire names are NOT copy and keep their spelling: `encounter.*`,
+  `strict|assisted|freeform`, `gm-only`, `battlemap`. The rejected alternative was a style guide —
+  the Codex had already proved that a paragraph nobody re-reads loses to a hurried label.
+- **The verb triad, and each verb's promise. Delete** is permanent, always confirmed, and the
+  confirm says "This cannot be undone." **Archive** is reversible and its copy offers the way back.
+  **Remove** takes something out of one list and the thing survives. A dialog whose verb and whose
+  consequence disagree is the defect this rule exists to name.
+- **Vocabulary is enforced as a test, over an EXCLUSION list.** `apps/client/src/copy-scan.ts` is the
+  one scanner (extracted from the Codex's, which now imports it — two copies would be the exact drift
+  the locks exist to catch). `play-vocabulary.test.ts` reads **everything under `apps/client/src`
+  minus a pinned exclusion list**, plus `packages/ui/src/primitives`. An include list was rejected:
+  this engagement alone added `settings/`, `builder/` and `replay/`, and every one of them would have
+  been born unlocked. Exemptions are **(file, string) pairs**, not global strings — SRD's "creature
+  type" is right in the homebrew monster form and was drift in the token picker — and an exemption
+  that stops rescuing anything fails until it is deleted.
+- **What the lock deliberately cannot do, so nobody mistakes green for proof.** It reads copy, not
+  code: a literal inside a JSX expression (`{claimed ? "Claimed" : "Available"}`) is invisible,
+  because widening the scan to every string literal would flag every wire value in the tree. The
+  classes that matter are pinned at their DEFINITION instead (`CLAIM_WORD`, `ROLL_VISIBILITY_WORD`,
+  `SETTINGS_GROUPS`, `DIAL_COPY`), which is stronger than pinning a rendering of them. And a regex
+  matches tokens, not senses — so the terms D28 keeps (fog Reveal/Hide, Initiative the score, Save
+  the throw, Claim/Release, the shared screen's Present) are asserted PRESENT, not merely un-ruled.
+- **The GM's roll picker lost its third option.** For a GM roller `self-only` and `gm-only` reach the
+  same eyes (`apps/server/src/combat-log.ts` gates a `self-only` row on the roller's session, and the
+  roller is the GM), so two of the five phrasings were two names for one audience. The wire value is
+  untouched and still labelled where a GM READS a player's roll; only the GM's own picker collapsed.
+
 ## 2026-08-01 — Codex final polish: five durable rules
 
 Settled while closing the decision-fidelity gaps and the client-reported sidebar bug. Each is a

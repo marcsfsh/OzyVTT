@@ -575,6 +575,15 @@ export const ActionSchema = z.object({
   requiresEffectTag: EffectTagSchema.optional(),
   /** Limited uses; see ActionUsesSchema. */
   uses: ActionUsesSchema.optional(),
+  /**
+   * Resolving this action ALSO spends one of the bearer's own spell slots of this level - the
+   * mechanical half of an item cast authored with `consumesSpellSlot` ("expend a spell slot to
+   * cast it from the staff"). Absent = the action spends nothing but its own charges, which is
+   * every action that existed before this field. The slot is checked and spent by the same economy
+   * pass that owns limited uses, so a preview never spends and a refusal reads like every other
+   * "no uses remaining".
+   */
+  spellSlot: z.object({ level: z.number().int().min(1).max(9) }).strict().optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
   reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional(),
   /** SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool (definition `legendary.actionsPerRound`) that refills when the creature's own turn starts. Pairs with activation "other". */

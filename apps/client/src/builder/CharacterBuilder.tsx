@@ -48,6 +48,16 @@ export type CharacterBuilderProps = Readonly<{
   connection?: "online" | "reconnecting" | "offline";
   onClose: () => void;
   onCreated: (name: string) => void;
+  /**
+   * LEVEL / RESPEC mode (D13). The same wizard, aimed at a character that already exists: seeded from
+   * that character's own choice ledger, its identity locked (a level-up is not a chance to become a
+   * different person), and submitted as `character.rebuild` instead of `character.create`.
+   *
+   * Reusing the wizard rather than writing a second one is the point: the offers, the cap preview, the
+   * server-thrown dice and every blocked reason are the create flow's, so a level-up cannot drift from
+   * a build. Only the destination command and the title differ.
+   */
+  rebuild?: Readonly<{ actorId: string; name: string; seed: BuilderDraft; startStep?: StepId; notice?: ReactNode }>;
 }>;
 
 /** How long Create waits for the table's answer before offering the (idempotent) retry. */
@@ -333,11 +343,11 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
   </section>;
 }
 
-export function CharacterBuilder({ state, sessionKey, connection = "online", onClose, onCreated }: CharacterBuilderProps) {
+export function CharacterBuilder({ state, sessionKey, connection = "online", onClose, onCreated, rebuild }: CharacterBuilderProps) {
   const catalogs = useBuilderCatalogs();
   const { toast } = useToast();
   const policy = state.builderPolicy;
-  const [draft, setDraft] = useState<BuilderDraft>(() => emptyDraft());
+  const [draft, setDraft] = useState<BuilderDraft>(() => rebuild?.seed ?? emptyDraft());
   const [stepIndex, setStepIndex] = useState(0);
   /**
    * The furthest step the player has actually REACHED. Position alone cannot tell a rail whether a
@@ -353,6 +363,9 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       silent server are different messages but the SAME surface - one alert, in one place, found. */
   const [rejection, setRejection] = useState<{ title: string; text: string } | null>(null);
   const [resumable, setResumable] = useState<StoredDraft | null>(() => {
+    // A rebuild is not a draft: it starts from a character that already exists, so a half-built
+    // create draft must not be offered here (resuming it would silently retarget the rebuild).
+    if (rebuild) return null;
     const stored = loadDraft(sessionKey);
     return stored && draftHasProgress(stored.draft) ? stored : null;
   });
@@ -398,9 +411,9 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   // auto-dismissing on the first pick: a pending question that would destroy work has to keep being
   // asked, and its copy says exactly which two answers release the store.
   useEffect(() => {
-    if (resumable) return;
+    if (resumable || rebuild) return;
     if (draftHasProgress(draft)) saveDraft(sessionKey, draft);
-  }, [draft, sessionKey, resumable]);
+  }, [draft, sessionKey, resumable, rebuild]);
 
   // Server-thrown rolls come back through the roll HISTORY (dice.roll acks with an id, not a total),
   // which is exactly what makes them auditable: the number the wizard uses is the number the table
@@ -510,6 +523,19 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       setSubmitting(false);
       setRejection({ title: "The table has not answered", text: "Press Create character again. It resends the same request, so it cannot make a second character." });
     }, CREATE_ACK_TIMEOUT_MS);
+    if (rebuild) {
+      // The rebuild keeps the live character's NAME (the server ignores any other), so the wizard
+      // sends the payload minus it; `onCreated` still announces the character it changed.
+      const { name: _typed, ...rest } = payload;
+      socket.emit("character:rebuild", { commandId, actorId: rebuild.actorId, ...rest }, (result) => {
+        if (ackTimer.current !== null) { clearTimeout(ackTimer.current); ackTimer.current = null; }
+        setSubmitting(false);
+        if (!result.ok) { setRejection({ title: "The server rejected this change", text: result.message ?? "That level change could not be applied." }); return; }
+        onCreated(rebuild.name);
+        onClose();
+      });
+      return;
+    }
     socket.emit("character:create", { commandId, ...payload }, (result) => {
       if (ackTimer.current !== null) { clearTimeout(ackTimer.current); ackTimer.current = null; }
       if (!result.ok) { setSubmitting(false); setRejection({ title: "The server rejected this character", text: result.message ?? "The character could not be created." }); return; }
@@ -748,8 +774,13 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
               {/* No readout: the `Stepper` below IS the readout, and it is the control as well. */}
               <h3 className="cb-offer-title">Level</h3>
             </div>
-            <p className="cb-offer-help">Your GM grants the level; every choice it opens is yours to make.</p>
-            <Stepper value={draft.level} min={1} max={20} aria-label="Character level" onChange={(level) => patch({ level, hpEntries: draft.hpEntries.slice(0, Math.max(0, level - 1)) })} />
+            <p className="cb-offer-help">{policy.maxLevel < 20
+              ? `Your GM has set the party's level cap to ${policy.maxLevel}.`
+              : "Your GM grants the level; every choice it opens is yours to make."}</p>
+            {/* D13: the cap IS the control's maximum, so it cannot be typed past — and when the cap is
+                20 the helper above says nothing about it (nothing unnecessary). */}
+            <Stepper value={Math.min(draft.level, policy.maxLevel)} min={1} max={policy.maxLevel} aria-label="Character level" onChange={(level) => patch({ level, hpEntries: draft.hpEntries.slice(0, Math.max(0, level - 1)) })} />
+            {draft.level >= policy.maxLevel && <p className="cb-note">At the table&rsquo;s level cap ({policy.maxLevel}).</p>}
           </section>
           {stepOffers("class").map(renderOffer)}
         </>;
@@ -843,7 +874,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
             {/* Said to the PLAYER, about their character. The rule is the same one `character-build.ts`
                 applies ("max-of-both"); the wizard just does not tell a player at a table that there
                 is a server, or make them reason about which machine keeps which number. */}
-            <p className="cb-offer-help">Level 1 is always the full die. From level 2 up, take the average or roll — a roll below the average is topped up to it, so rolling can only help.</p>
+            <p className="cb-offer-help">Level 1 is always the full die. From level 2 up, take the average or roll — a roll below the average is topped up to it, so rolling can only help. Rolled HP is remembered — leveling down and back up restores it.</p>
             <SegmentedControl
               ariaLabel="How to gain hit points"
               value={draft.hpMode}
@@ -1041,7 +1072,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
 
   return <div className="cb-page" ref={pageRef}>
     <WizardShell
-      title="Create a character"
+      title={rebuild ? `Level ${rebuild.name}` : "Create a character"}
       eyebrow="Character builder"
       steps={stepsForShell}
       current={stepIndex}
@@ -1056,7 +1087,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
         ? <Button variant="secondary" onClick={() => goTo(STEP_IDS.length - 1)}>Back to review</Button>
         : undefined}
       onNext={() => { if (isLast) submit(); else { setFurthest((reached) => Math.max(reached, stepIndex + 1)); goTo(stepIndex + 1); } }}
-      nextLabel={isLast ? "Create character" : "Next"}
+      nextLabel={isLast ? (rebuild ? `Apply level ${draft.level}` : "Create character") : "Next"}
       blockedReason={reasonNode}
       busy={submitting}
       /* The ONE way out. The draft is parked on every change, so a second "leave without saving"
@@ -1090,6 +1121,7 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     >
       <div className="cb-step">
         {!catalogs.loaded && <p className="cb-note" role="status">Loading the character catalogs…</p>}
+        {rebuild?.notice}
         {body()}
       </div>
     </WizardShell>

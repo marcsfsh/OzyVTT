@@ -49,31 +49,93 @@ import {
 // from the matching shape is assignable to these, so nothing changes when they arrive.
 // ---------------------------------------------------------------------------------------------
 
-/** The rider block every carrier shares (`featureRiders`), as this module reads it. */
+/**
+ * The rider block every carrier shares (`featureRiders`), as this module reads it.
+ *
+ * `grants` names ALL TEN keys `FeatureGrantsSchema` offers. It used to name six, and the other four
+ * (armor, weapons, damageImmunities, conditionImmunities) were authored in the homebrew editor,
+ * stored on the record, and dropped here without a trace - the reading surface was the whole
+ * silence. Every key below has a consumer; see `takeGrants` and its callers.
+ */
 export type RiderBlockLike = Readonly<{
   modifiers?: readonly RiderModifier[];
   grants?: Readonly<{
     skills?: readonly string[]; expertise?: readonly string[]; tools?: readonly string[];
     languages?: readonly string[]; saves?: readonly string[]; damageResistances?: readonly string[];
+    armor?: readonly string[]; weapons?: readonly string[];
+    damageImmunities?: readonly string[]; conditionImmunities?: readonly string[];
   }>;
   actions?: readonly RiderActionLike[];
+  /** Standing effects the item carries while active (see `itemEffectCarrier`). */
+  effects?: readonly ItemEffectLike[];
   uses?: Readonly<{ limit: number; per: string; pool?: string; recharge?: number }>;
 }>;
-/** A `FeatureAction` as synthesised here - only the fields an item action can carry. */
+/**
+ * A `FeatureAction` as synthesised here.
+ *
+ * `attack` and `save` carry the TEMPLATE forms (`FeatureAttackSchema` / `FeatureSaveSchema`): a
+ * content record cannot know the bearer's ability scores, so it names the ability and the number is
+ * derived at read time - exactly what `character-build.ts`'s `interpretAction` does at build time
+ * for a feature. Both halves were authored-and-dropped before this: an item action resolved as a
+ * damage-only prompt with no to-hit and no save, while the SAME authored shape on a class feature
+ * became a real attack.
+ */
 export type RiderActionLike = Readonly<{
   id: string; name: string; description?: string;
   activation?: "action" | "bonus-action" | "reaction" | "other";
+  attack?: Readonly<{
+    ability: RiderAbility | "spellcasting"; proficient?: boolean;
+    reachFeet?: number; rangeFeet?: number; rangeNormalFeet?: number; count?: number; criticalBonusDice?: number;
+  }>;
+  save?: Readonly<{ ability: RiderAbility; dc: FeatureSaveDcLike }>;
   damage?: readonly Readonly<{ formula: string; type: string }>[];
   uses?: Readonly<{ limit: number; per: string; pool?: string; recharge?: number }>;
 }>;
+/** `FeatureSaveDcSchema`'s three printed forms: the character's own spell DC, a flat number, or `base + ability (+ PB)`. */
+export type FeatureSaveDcLike = "spellcasting" | number | Readonly<{ base?: number; ability: RiderAbility; proficiencyBonus?: boolean }>;
+/**
+ * One effect an item carries (`EffectGrantSchema`, the actor-side vocabulary). Read as a STANDING
+ * rider carrier while the item is active rather than written onto the actor: an item effect is not
+ * a live effect anyone cast, it is a property of wearing the thing, and writing it would need an
+ * un-write on unequip - the exact accumulation this module exists to avoid.
+ */
+export type ItemEffectLike = Readonly<{
+  name?: string;
+  tags?: readonly string[];
+  modifiers?: readonly ItemEffectModifierLike[];
+}>;
+/** An `EffectModifier` structurally: the rider fields plus `damageTypes`, which only the effect vocabulary carries. */
+export type ItemEffectModifierLike = RiderModifier & Readonly<{ damageTypes?: readonly string[] }>;
 export type EquipmentRecordLike = RiderBlockLike & Readonly<{
   id: string; name: string; category?: string;
   slot?: string;
   isMagic?: boolean;
   attunement?: Readonly<{ required?: boolean; restrictedTo?: readonly string[] }> | null;
   cursed?: boolean;
-  casts?: readonly Readonly<{ spellId: string; uses?: Readonly<{ limit: number; per: string; pool?: string }> }>[];
+  casts?: readonly ItemSpellCastLike[];
   grantsFeatIds?: readonly string[];
+}>;
+/** `ItemSpellCastSchema` in full - all five fields, not just the two that used to be read. */
+export type ItemSpellCastLike = Readonly<{
+  spellId: string;
+  /** Cast at this slot level; absent = the spell's own level. */
+  atLevel?: number;
+  /** Which ability powers it; absent = the wielder's own spellcasting ability. */
+  ability?: RiderAbility;
+  /** A flat printed DC ("save DC 15"), overriding any derivation. */
+  saveDc?: number;
+  /** Whether casting it also spends one of the bearer's own spell slots. */
+  consumesSpellSlot?: boolean;
+  uses?: Readonly<{ limit: number; per: string; pool?: string }>;
+}>;
+/** The catalog's spell record, as the cast synthesis reads it (`SpellReference`). */
+export type SpellRecordLike = Readonly<{
+  id: string; name: string; level: number;
+  attackRoll?: boolean;
+  damage?: Readonly<{ roll: string | null; types: readonly string[] }>;
+  save?: RiderAbility | null;
+  description?: string;
+  castingOptions?: readonly Readonly<{ type: string; damageRoll: string | null; targetCount: number | null }>[];
 }>;
 export type FeatRecordLike = Readonly<{ id: string; name: string; feature: RiderBlockLike }>;
 
@@ -112,9 +174,11 @@ const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES)
 export type EquipmentCatalog = Readonly<{
   equipmentRecord: (id: string) => EquipmentRecordLike | undefined;
   featRecord?: (id: string) => FeatRecordLike | undefined;
+  /** The spell an item's `casts` entry names, so the synthesised cast can resolve real damage/attack/save. */
+  spellRecord?: (id: string) => SpellRecordLike | undefined;
 }>;
 
-type CatalogSource = Readonly<{ equipmentRecord: (id: string) => unknown; featRecord: (id: string) => unknown }>;
+type CatalogSource = Readonly<{ equipmentRecord: (id: string) => unknown; featRecord: (id: string) => unknown; spellRecord?: (id: string) => unknown }>;
 const ADAPTED = new WeakMap<CatalogSource, EquipmentCatalog>();
 
 /**
@@ -132,7 +196,8 @@ export function equipmentCatalogOf(view: CatalogSource): EquipmentCatalog {
   if (cached) return cached;
   const adapted: EquipmentCatalog = {
     equipmentRecord: (id) => view.equipmentRecord(id) as EquipmentRecordLike | undefined,
-    featRecord: (id) => view.featRecord(id) as FeatRecordLike | undefined
+    featRecord: (id) => view.featRecord(id) as FeatRecordLike | undefined,
+    ...(view.spellRecord ? { spellRecord: (id: string) => view.spellRecord!(id) as SpellRecordLike | undefined } : {})
   };
   ADAPTED.set(view, adapted);
   return adapted;
@@ -152,6 +217,14 @@ export type EquipmentDerivation = Readonly<{
   tools: readonly Sourced[];
   languages: readonly Sourced[];
   damageResistances: readonly Sourced[];
+  /** Damage the bearer ignores entirely while the item is active; read by the damage pipeline beside the definition's own. */
+  damageImmunities: readonly Sourced[];
+  /** Conditions the item refuses; `setCondition` narrates the skip exactly as it does for an innate immunity. */
+  conditionImmunities: readonly Sourced[];
+  /** Armor training the item grants - a rider gate input (`proficient-with`) and the sheet's provenance. */
+  armorProficiencies: readonly Sourced[];
+  /** Weapon training the item grants; `weaponAction` adds the proficiency bonus for a weapon it covers. */
+  weaponProficiencies: readonly Sourced[];
   /** Feat ids the active items grant, depth 1. Their riders are already folded into this same block. */
   featIds: readonly Readonly<{ id: string; name: string; sourceItemId: string }>[];
   armorClass: number; initiative: number; speed: number;
@@ -176,7 +249,8 @@ export type EquipmentDerivation = Readonly<{
 }>;
 
 export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
-  skills: [], saves: [], tools: [], languages: [], damageResistances: [], featIds: [],
+  skills: [], saves: [], tools: [], languages: [], damageResistances: [], damageImmunities: [],
+  conditionImmunities: [], armorProficiencies: [], weaponProficiencies: [], featIds: [],
   armorClass: 0, initiative: 0, speed: 0, saveBonus: 0, checkBonus: 0,
   spellSaveDc: [], spellAttackBonus: [], spellSlots: [], resourceBonus: [],
   carriers: [], context: {}, actions: [], sources: []
@@ -196,8 +270,15 @@ export function itemIsActive(item: InventoryItem, record: EquipmentRecordLike | 
   return requiresAttunement ? item.attuned : true;
 }
 
-/** The bearer's static/dynamic facts, flattened once so every trigger reads plain values. */
-function bearerContext(actor: Actor, definition: ActorDefinition | undefined, active: readonly ActiveItem[]): Omit<RiderContext, "moment"> {
+/**
+ * The bearer's static/dynamic facts, flattened once so every trigger reads plain values.
+ *
+ * `granted` folds the item-granted training and the tags an item's own effects carry INTO the same
+ * context the definition's training feeds, so a rider gated on "proficient with martial weapons"
+ * fires for training the gauntlets handed over, and one gated on an effect tag fires for an effect
+ * the item carries. Grants are additive to the sheet's own training and never replace it.
+ */
+function bearerContext(actor: Actor, definition: ActorDefinition | undefined, active: readonly ActiveItem[], granted: Readonly<{ weapons: readonly string[]; armor: readonly string[]; tools: readonly string[]; effectTags: readonly string[] }>): Omit<RiderContext, "moment"> {
   const worn = active.filter((entry) => entry.item.armor !== undefined);
   const bodyArmor = worn.find((entry) => effectiveSlot(slotView(entry)) === "armor");
   const identity = definition?.character;
@@ -208,11 +289,11 @@ function bearerContext(actor: Actor, definition: ActorDefinition | undefined, ac
     shieldEquipped: worn.some((entry) => effectiveSlot(slotView(entry)) === "shield"),
     classIds: (identity?.classes ?? []).map((entry) => entry.id),
     speciesId: identity?.race?.id ?? null,
-    proficientWeapons: proficiencies?.weapons ?? [],
-    proficientArmor: proficiencies?.armor ?? [],
-    proficientTools: proficiencies?.tools ?? [],
+    proficientWeapons: [...(proficiencies?.weapons ?? []), ...granted.weapons],
+    proficientArmor: [...(proficiencies?.armor ?? []), ...granted.armor],
+    proficientTools: [...(proficiencies?.tools ?? []), ...granted.tools],
     proficientSkills: (proficiencies?.skills ?? []).map((entry) => entry.id),
-    effectTags: actor.effects.flatMap((effect) => effect.tags),
+    effectTags: [...actor.effects.flatMap((effect) => effect.tags), ...granted.effectTags],
     hitPointFraction: actor.hp.maximum > 0 ? actor.hp.current / actor.hp.maximum : 0,
     bearerConditionIds: actor.conditions.map((condition) => condition.id)
   };
@@ -321,6 +402,11 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   const tools: Sourced[] = [];
   const languages: Sourced[] = [];
   const damageResistances: Sourced[] = [];
+  const damageImmunities: Sourced[] = [];
+  const conditionImmunities: Sourced[] = [];
+  const armorProficiencies: Sourced[] = [];
+  const weaponProficiencies: Sourced[] = [];
+  const itemEffectTags: string[] = [];
 
   const takeGrants = (block: RiderBlockLike, itemId: string) => {
     const grants = block.grants;
@@ -331,6 +417,30 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     for (const id of grants.tools ?? []) tools.push({ id, sourceItemId: itemId });
     for (const id of grants.languages ?? []) languages.push({ id, sourceItemId: itemId });
     for (const id of grants.damageResistances ?? []) damageResistances.push({ id, sourceItemId: itemId });
+    // The four that used to be dropped on the floor.
+    for (const id of grants.damageImmunities ?? []) damageImmunities.push({ id, sourceItemId: itemId });
+    for (const id of grants.conditionImmunities ?? []) conditionImmunities.push({ id, sourceItemId: itemId });
+    for (const id of grants.armor ?? []) armorProficiencies.push({ id, sourceItemId: itemId });
+    for (const id of grants.weapons ?? []) weaponProficiencies.push({ id, sourceItemId: itemId });
+  };
+
+  /** An item's own effects, read as standing riders (see `ItemEffectLike`). */
+  const takeEffects = (block: RiderBlockLike, itemId: string, itemLabel: string) => {
+    for (const effect of block.effects ?? []) {
+      const label = effect.name ? `${effect.name} (${itemLabel})` : itemLabel;
+      for (const tag of effect.tags ?? []) itemEffectTags.push(tag);
+      const modifiers: RiderModifier[] = [];
+      for (const modifier of effect.modifiers ?? []) {
+        // `damage-resistance` is the effect vocabulary's own shape (a LIST of types, no amount); it
+        // is a defense, not a rider, so it joins the resistance grants rather than the collector.
+        if (modifier.type === "damage-resistance") {
+          for (const id of modifier.damageTypes ?? []) damageResistances.push({ id, sourceItemId: itemId });
+          continue;
+        }
+        modifiers.push(...asRiderModifiers(modifier));
+      }
+      if (modifiers.length > 0) carriers.push({ label, modifiers, sourceItemId: itemId });
+    }
   };
 
   for (const entry of active) {
@@ -340,8 +450,9 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     if (record) {
       carriers.push({ label, modifiers: record.modifiers ?? [], sourceItemId: item.id, isWeapon });
       takeGrants(record, item.id);
-      for (const declared of record.actions ?? []) actions.push(itemAction(item.id, declared, label));
-      for (const cast of record.casts ?? []) actions.push(castAction(item.id, cast, label));
+      takeEffects(record, item.id, label);
+      for (const declared of record.actions ?? []) actions.push(itemAction(item.id, declared, label, definition));
+      for (const cast of record.casts ?? []) actions.push(castAction(item.id, cast, label, definition, catalog));
       // Depth 1: the feat's riders join THIS block, so unequipping removes them in one recomputation.
       for (const featId of record.grantsFeatIds ?? []) {
         // The bearer already took this feat in the builder, where it is ALREADY a carrier (and its
@@ -352,24 +463,32 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
         featIds.push({ id: feat.id, name: feat.name, sourceItemId: item.id });
         carriers.push({ label: `${feat.name} (${label})`, modifiers: feat.feature.modifiers ?? [], sourceItemId: item.id });
         takeGrants(feat.feature, item.id);
+        takeEffects(feat.feature, item.id, `${feat.name} (${label})`);
       }
-      if ((record.modifiers?.length ?? 0) > 0 || record.grants || (record.grantsFeatIds?.length ?? 0) > 0) {
+      if ((record.modifiers?.length ?? 0) > 0 || record.grants || (record.effects?.length ?? 0) > 0 || (record.grantsFeatIds?.length ?? 0) > 0) {
         sources.push({ itemId: item.id, itemName: label, summary: summarise(record) });
       }
     }
   }
-  // Weapon attacks come from the EQUIPPED list, not the active one (see above).
+  // Weapon attacks come from the EQUIPPED list, not the active one (see above). Item-granted weapon
+  // training is collected above, so a gauntlet that grants martial weapons pays the proficiency
+  // bonus on the axe in the same recomputation.
+  const grantedWeaponIds = weaponProficiencies.map((entry) => entry.id);
   for (const entry of equipped) {
-    const weaponAttack = weaponAction(entry.item, definition);
+    const weaponAttack = weaponAction(entry.item, definition, grantedWeaponIds);
     if (weaponAttack) actions.push(weaponAttack);
   }
 
   // The STANDING + CONDITIONAL pass: riders naming no moment whose static and dynamic gates pass.
-  const context = bearerContext(actor, definition, equipped);
+  const context = bearerContext(actor, definition, equipped, {
+    weapons: grantedWeaponIds, armor: armorProficiencies.map((entry) => entry.id),
+    tools: tools.map((entry) => entry.id), effectTags: itemEffectTags
+  });
   const standing = collectRiders(carriers, { ...context, moment: null });
   return {
     context,
-    skills, saves, tools, languages, damageResistances, featIds,
+    skills, saves, tools, languages, damageResistances, damageImmunities, conditionImmunities,
+    armorProficiencies, weaponProficiencies, featIds,
     armorClass: sumRiders(standing, "armor-class"),
     initiative: sumRiders(standing, "initiative"),
     speed: sumRiders(standing, "speed"),
@@ -393,8 +512,46 @@ function amountsWithClass(riders: readonly ResolvedRider[], type: string) {
 function summarise(record: EquipmentRecordLike): string {
   const parts = (record.modifiers ?? []).map((modifier) => modifier.type);
   if (record.grants) parts.push("proficiencies");
+  if ((record.effects?.length ?? 0) > 0) parts.push("effects");
   if ((record.grantsFeatIds?.length ?? 0) > 0) parts.push("feat");
   return parts.join(", ");
+}
+
+/**
+ * One effect modifier, in the RIDER vocabulary the collector reads.
+ *
+ * The two vocabularies overlap by construction (`attack-bonus`, `extra-damage` and `roll-mode` are
+ * literally the same three schemas, declared once in @vtt/schemas), so those pass through untouched.
+ * The six legacy advantage/disadvantage variants say the same thing in the older shape and are
+ * normalised into `roll-mode` here - the same normalisation `toRollModes` does on the actor side,
+ * restated structurally because this module imports no schema package.
+ *
+ * `damage-bonus` (a flat +N to the bearer's damage, whatever type the weapon deals) has NO rider
+ * equivalent - `extra-damage` needs its own formula AND type - so an item effect carrying one
+ * contributes nothing here. That is stated rather than silently dropped: authoring it as an
+ * `extra-damage` modifier on the item itself is the supported way to say it.
+ */
+function asRiderModifiers(modifier: ItemEffectModifierLike): readonly RiderModifier[] {
+  const gate = { ...(modifier.when ? { when: modifier.when } : {}), ...(modifier.scope ? { scope: modifier.scope } : {}) };
+  const rollMode = (roll: RiderModifier["roll"], mode: "advantage" | "disadvantage"): RiderModifier => ({
+    type: "roll-mode", roll, mode, ...gate,
+    // `save-advantage` narrows by ability; the rider vocabulary says that with an `ability-is`
+    // FILTER, and a filter is only ever evaluated inside a moment pass (the standing pass skips
+    // anything filtered). So the moment has to be named alongside it or the rider fires in neither.
+    ...(modifier.ability
+      ? { when: [...(modifier.when ?? []), { type: roll === "save" ? "on-saving-throw" : "on-attack-roll" }, { type: "ability-is", abilities: [modifier.ability] }] }
+      : {})
+  });
+  switch (modifier.type) {
+    case "attack-advantage": return [rollMode("attack", "advantage")];
+    case "attack-disadvantage": return [rollMode("attack", "disadvantage")];
+    case "incoming-attack-advantage": return [rollMode("incoming-attack", "advantage")];
+    case "incoming-attack-disadvantage": return [rollMode("incoming-attack", "disadvantage")];
+    case "save-advantage": return [rollMode("save", "advantage")];
+    case "save-disadvantage": return [rollMode("save", "disadvantage")];
+    case "damage-bonus": return [];
+    default: return [modifier];
+  }
 }
 
 /** The bearer's total skill tier: the better of the definition's base and any item grant (criterion 11). */
@@ -459,26 +616,114 @@ function usesOf(uses: RiderBlockLike["uses"]): ActorAction["uses"] | undefined {
   return { limit: uses.limit, per, ...(uses.pool ? { pool: uses.pool } : {}), ...(uses.recharge !== undefined ? { recharge: uses.recharge } : {}) };
 }
 
-function itemAction(itemId: string, declared: RiderActionLike, itemName: string): ActorAction {
+/**
+ * The bearer's own spellcasting ability, and the numbers derived from it. An item that names
+ * `"spellcasting"` (or omits its ability entirely) borrows the wielder's; a bare token or a sheet
+ * with no casting falls back to the bare ability modifier, never to a thrown error - the same
+ * fail-open every other derivation path takes.
+ */
+function casterNumbers(definition: ActorDefinition | undefined) {
+  const casting = definition?.spellcasting;
+  return {
+    ability: (casting?.ability ?? null) as RiderAbility | null,
+    saveDc: casting?.saveDc ?? null,
+    attackBonus: casting?.attackBonus ?? null,
+    proficiencyBonus: definition?.proficiencyBonus ?? 0
+  };
+}
+const scoreModifierOf = (definition: ActorDefinition | undefined, ability: RiderAbility | null): number =>
+  definition && ability ? abilityModifier(definition.abilityScores[ability]) : 0;
+
+/**
+ * An item action, with its ATTACK and SAVE halves resolved.
+ *
+ * The authored shapes are the feature templates (an item record cannot know the bearer's ability
+ * scores), so this is the read-time twin of `character-build.ts`'s build-time `interpretAction`:
+ * `attack.ability` + `proficient` become a to-hit bonus, and `save.dc`'s three printed forms become
+ * one number. Both used to be dropped, which is why an item-granted action resolved as a
+ * damage-only prompt while the identical authored shape on a class feature became a real attack.
+ */
+function itemAction(itemId: string, declared: RiderActionLike, itemName: string, definition: ActorDefinition | undefined): ActorAction {
+  const caster = casterNumbers(definition);
+  let attack: ActorAction["attack"];
+  if (declared.attack) {
+    const { ability, proficient, ...rest } = declared.attack;
+    const resolved = ability === "spellcasting" ? caster.ability : ability;
+    // A spell-powered item attack on a non-caster keeps the item's printed reach/range and the
+    // bare modifier: display-only degradation beats refusing to derive the action at all.
+    const bonus = ability === "spellcasting" && caster.attackBonus !== null
+      ? caster.attackBonus
+      : scoreModifierOf(definition, resolved) + (proficient === false ? 0 : caster.proficiencyBonus);
+    attack = { bonus, ...rest };
+  }
+  const save = declared.save ? { ability: declared.save.ability, dc: resolveSaveDc(declared.save.dc, definition) } : undefined;
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
     activation: declared.activation ?? "action",
     description: declared.description ?? `${itemName}.`,
+    ...(attack ? { attack } : {}),
+    ...(save ? { save } : {}),
     damage: (declared.damage ?? []).map((part) => ({ ...part })),
     ...(usesOf(declared.uses) ? { uses: usesOf(declared.uses)! } : {})
   };
 }
 
-/** Criterion 4: "cast Message once per day while attuned" is a synthesised action with its own charges. */
-function castAction(itemId: string, cast: { spellId: string; uses?: RiderBlockLike["uses"] }, itemName: string): ActorAction {
-  return {
+/** `FeatureSaveDcSchema`'s three forms, resolved against the bearer. Clamped to the action schema's 1-40. */
+function resolveSaveDc(dc: FeatureSaveDcLike, definition: ActorDefinition | undefined): number {
+  const caster = casterNumbers(definition);
+  if (dc === "spellcasting") return clampDc(caster.saveDc ?? 8 + scoreModifierOf(definition, caster.ability) + caster.proficiencyBonus);
+  if (typeof dc === "number") return clampDc(dc);
+  return clampDc((dc.base ?? 8) + scoreModifierOf(definition, dc.ability) + (dc.proficiencyBonus === false ? 0 : caster.proficiencyBonus));
+}
+const clampDc = (value: number) => Math.max(1, Math.min(40, Math.round(value)));
+
+/**
+ * Criterion 4: "cast Message once per day while attuned" is a synthesised action with its own charges
+ * - and, since the cast details stopped being inert, with the SPELL's own mechanics.
+ *
+ * `atLevel` picks the SRD upcast row (`castingOptions` "slot_level_N", the same rows the sheet's
+ * cast-at control reads), so a Wand of Fireballs at level 5 rolls 10d6 rather than 8d6. `ability`
+ * and `saveDc` override the derivation the way a printed item line does ("save DC 15"), and
+ * `consumesSpellSlot` rides the additive `ActionSchema.spellSlot` field the resolver's economy
+ * checks and spends. A spell the catalog cannot resolve degrades to today's name-only action rather
+ * than failing the whole derivation - a GM may have deleted the homebrew spell an item names.
+ */
+function castAction(itemId: string, cast: ItemSpellCastLike, itemName: string, definition: ActorDefinition | undefined, catalog: EquipmentCatalog): ActorAction {
+  const spell = catalog.spellRecord?.(cast.spellId);
+  const spellName = spell?.name ?? cast.spellId.replace(/-/g, " ");
+  const level = cast.atLevel ?? spell?.level ?? 0;
+  const base: ActorAction = {
     id: itemActionId(itemId, `cast-${cast.spellId}`),
-    name: `Cast ${cast.spellId.replace(/-/g, " ")} (${itemName})`,
+    name: `Cast ${spellName} (${itemName})`,
     activation: "action",
-    description: `Cast ${cast.spellId.replace(/-/g, " ")} from ${itemName}.`,
+    description: spell?.description ?? `Cast ${spellName} from ${itemName}.`,
     damage: [],
-    ...(usesOf(cast.uses) ? { uses: usesOf(cast.uses)! } : {})
+    ...(usesOf(cast.uses) ? { uses: usesOf(cast.uses)! } : {}),
+    // The bearer's OWN slot, on top of the item's charges, when the item says so.
+    ...(cast.consumesSpellSlot === true && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {})
+  };
+  if (!spell) return base;
+
+  const caster = casterNumbers(definition);
+  // An authored `ability` powers the item ("Intelligence, save DC 15"); absent, the wielder's own.
+  const ability = cast.ability ?? caster.ability;
+  const upcast = level > spell.level
+    ? spell.castingOptions?.find((option) => option.type === `slot_level_${level}`)?.damageRoll ?? null
+    : null;
+  const formula = upcast ?? spell.damage?.roll ?? null;
+  const damageType = spell.damage?.types?.[0] ?? "force";
+  const attackBonus = cast.ability !== undefined || caster.attackBonus === null
+    ? scoreModifierOf(definition, ability) + caster.proficiencyBonus
+    : caster.attackBonus;
+  const saveDc = cast.saveDc ?? (cast.ability !== undefined || caster.saveDc === null
+    ? 8 + scoreModifierOf(definition, ability) + caster.proficiencyBonus
+    : caster.saveDc);
+  return {
+    ...base,
+    ...(spell.attackRoll === true ? { attack: { bonus: attackBonus } } : {}),
+    ...(spell.save ? { save: { ability: spell.save, dc: clampDc(saveDc) } } : {}),
+    ...(formula ? { damage: [{ formula, type: damageType }] } : {})
   };
 }
 
@@ -494,7 +739,7 @@ function castAction(itemId: string, cast: { spellId: string; uses?: RiderBlockLi
  * Absent `proficiencies.weapons` means "not recorded", NOT "untrained", so proficiency is assumed -
  * which keeps every existing sheet's number exactly where it is.
  */
-export function weaponAction(item: InventoryItem, definition: ActorDefinition | undefined): ActorAction | null {
+export function weaponAction(item: InventoryItem, definition: ActorDefinition | undefined, grantedWeapons: readonly string[] = []): ActorAction | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
   const properties = weapon.properties ?? [];
@@ -503,7 +748,8 @@ export function weaponAction(item: InventoryItem, definition: ActorDefinition | 
   const ranged = weapon.rangeFeet !== null && !properties.includes("thrown");
   const modifier = properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
   const trained = definition.proficiencies?.weapons;
-  const proficient = trained === undefined || trained.includes(weapon.category) || trained.includes(item.id);
+  const granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id);
+  const proficient = granted || trained === undefined || trained.includes(weapon.category) || trained.includes(item.id);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const damageFormula = `${weapon.damageDice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
   return {

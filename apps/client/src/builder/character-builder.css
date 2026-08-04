@@ -128,3 +128,20 @@
   .cb-asi-rows { flex-direction: column; align-items: stretch; }
   .cb-asi-row { justify-content: space-between; }
 }
+
+/* ── Level flow (D13): the rail, the two directions, and the level-down preview. ───────────── */
+.cb-level { display: flex; flex-direction: column; gap: 1.1rem; max-width: 46rem; margin: 0 auto; padding: 1.4rem 1rem 3rem; }
+.cb-level-head h2 { margin: .2rem 0 0; font: 700 1.5rem/1.15 var(--font-display); }
+.cb-level-head p { margin: .25rem 0 0; color: var(--text-dim); }
+.cb-level-rail { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; padding: 0; list-style: none; }
+.cb-level-pip { display: grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: 0 .35rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); font: 600 .8rem/1 var(--font-body); }
+.cb-level-pip.reached { color: var(--text); border-color: var(--line-strong); }
+.cb-level-pip.current { background: var(--primary); border-color: var(--primary); color: var(--text-on-neon); box-shadow: var(--glow-magenta); }
+.cb-level-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.cb-level-actions > * { flex: 1 1 12rem; }
+.cb-level-preview { padding: .9rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
+.cb-level-preview h3 { margin: 0 0 .35rem; font: 700 .95rem/1 var(--font-body); }
+.cb-level-preview p { margin: 0; color: var(--text-dim); font-size: .9rem; }
+.cb-level-gate { padding: 1.4rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
+.cb-level-gate h2 { margin: 0; font: 700 1.2rem/1.2 var(--font-display); }
+.cb-level-gate p { margin: 0; color: var(--text-dim); }

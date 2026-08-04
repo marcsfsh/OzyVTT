@@ -200,9 +200,17 @@
    corners so a saved right-dock can never stack the scene cluster on top of the toolbar. */
 @media (max-width: 560px) {
   .encounter-map-stage { min-height: 14rem; }
-  /* A full tray must not eat a phone's whole map. Capped and scrollable, so every unplaced token is
-     still reachable while the battlefield and the bottom-left toolbar keep their room. */
+  /* A full tray must not eat a phone's whole map. The tray floats over the map's top edge, so every
+     row of it is map you cannot drop onto: measured at 390px with five unplaced tokens it covered
+     136px of a 245px-tall map, and a drop in the upper half read as "back to the tray". One
+     non-wrapping row that scrolls sideways holds the same tokens in ~60px. */
   .encounter-token-tray { max-height: 8.5rem; overflow-y: auto; }
+  .encounter-token-tray { gap: .3rem; }
+  .encounter-token-tray-list { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
+  .encounter-token-tray-list > .tray-token { flex: none; }
+  /* The standing hint wraps to three lines at this width and costs more map than it is worth: the
+     prep panel below already says "drag them from the tray above the map to place them". */
+  .encounter-token-tray > div:first-child span { display: none; }
   .encounter-token-name { display: none; }
   .encounter-shape-editor { width: 12rem; }
   .encounter-map-zoom, .encounter-map-zoom.zoom-dock-right { right: .7rem; left: auto; justify-content: flex-end; max-width: calc(100% - 8rem); }

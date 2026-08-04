@@ -13,12 +13,27 @@ const formatChallenge = (rating: number) => {
 };
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 
-export function MonsterBrowser({ onClose, onAdded }: Readonly<{ onClose: () => void; onAdded?: (actorId: string) => void }>) {
+/**
+ * The bestiary browser. It adds; it does not decide who sees what.
+ *
+ * It used to carry its own "Add as GM-only" checkbox — a visibility decision made inside a modal,
+ * away from the list it applied to, and available on no other add path. The staging tray owns that
+ * decision now (D2/D28) and passes it in, so every add — browser, Recent, party — obeys one control.
+ * `joinEncounter` is the other half: mid-fight, the roster add and the fight join are ONE command,
+ * closing the two-step trap where this button promised a reinforcement it did not deliver.
+ */
+export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEncounter = false }: Readonly<{
+  onClose: () => void;
+  onAdded?: (actorId: string) => void;
+  /** The staging tray's current "New tokens" state. */
+  visibility?: "public" | "gm-only";
+  /** True while a fight is running: the new monster lands in the roster AND in the turn order. */
+  joinEncounter?: boolean;
+}>) {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[] | null>(null);
   const [attribution, setAttribution] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [hidden, setHidden] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -39,17 +54,19 @@ export function MonsterBrowser({ onClose, onAdded }: Readonly<{ onClose: () => v
 
   const add = (monster: ContentMonsterSummary) => {
     setBusyId(monster.id);
-    socket.emit("actor:add-from-definition", { commandId: newId(), definitionId: monster.id, visibility: hidden ? "gm-only" : "public" }, (result) => {
+    socket.emit("actor:add-from-definition", { commandId: newId(), definitionId: monster.id, visibility, ...(joinEncounter ? { joinEncounter: true } : {}) }, (result) => {
       setBusyId(null);
       if (result.ok && result.actorId) onAdded?.(result.actorId);
-      setFeedback(result.ok ? `Added ${monster.name}${hidden ? " (GM-only)" : ""} to the roster.` : result.message ?? "The monster could not be added.");
+      setFeedback(result.ok
+        ? `${monster.name} is in the staging tray${visibility === "gm-only" ? ", GM only" : ""}.`
+        : result.message ?? "The monster could not be added.");
     });
   };
 
   return <Modal open onClose={onClose} size="lg" className="monster-browser" title="Add monsters" ariaLabel="Add monsters from the SRD bestiary">
     <div className="monster-browser-controls">
       <Input type="search" placeholder="Search by name or type…" aria-label="Search monsters" value={search} onChange={(event) => setSearch(event.target.value)} autoFocus />
-      <label className="monster-browser-hidden"><input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} />Add as GM-only (hidden from players)</label>
+      <p className="monster-browser-target">Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong></p>
     </div>
     {error && <p className="monster-browser-status" role="alert">{error}</p>}
     {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}

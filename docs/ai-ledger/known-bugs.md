@@ -147,16 +147,6 @@ Format: `[area] — description — suspected cause / status`.
   which the inspector now meets; re-ordering or collapsing the icon picker is a layout redesign that was
   not part of the approved milestone. Carrying forward.
 
-- **[character-builder] No server-side builder roll command.** `DiceInputRow` covers manual-entry and
-  auto-roll client-side, but nothing server-side accepts a typed builder result the way
-  `initiative.roll-self` accepts `natural`. Without it the client owns the roll (violates server
-  authority).
-- **[character-builder] No GM-facing editor for `builder.set-policy`.** The command and the
-  `PlayerView.builderPolicy` projection both exist and the wizard honours the policy (it offers only
-  the permitted ability methods, and "custom" only when a formula is configured), but nothing in the
-  UI lets the GM *set* it — so the table is stuck on the default (all four methods, no custom
-  formula). Small VTT-Setup panel; decision 10 is not fully delivered until it lands.
-
 ### Homebrew system — open items (2026-07-27)
 
 - **[homebrew] Editing a PUBLISHED record can still demote it mid-keystroke.** `HomebrewStore.update`
@@ -205,8 +195,11 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   currently reproducible in the wizard's own flows, but the shape is the classic one (a second patch
   in the same tick loses the first). Fixing it properly is a state-model change, not a polish edit.
 - **[ui] The `→` glyph has no font coverage** — no loaded Manrope subset declares U+2192, so every
-  arrow falls back. The fix is an `IconArrow` primitive plus 7 call sites, and it is all-or-none
-  (mixing a drawn arrow with a fallback glyph is worse than either).
+  arrow falls back. **Half-fixed 2026-08-03:** `IconArrow` exists and is exported
+  (`packages/ui/src/primitives/icons.tsx`), and the landing doors and `Button arrow` use it; four
+  play call sites still type the character. That mixed state is the bad one this entry warned about,
+  so it stays open until the last row leaves `GLYPH_ALLOW`
+  (`apps/client/src/design-conventions.test.ts`, whose sizes are pinned and shrink-only).
 - **[character-builder] Skill/tool/language uniqueness is enforced client-side only.** `479cb80`
   makes held proficiencies arrive greyed with their provenance ("Already granted by Soldier"), which
   stops the silent double-spend in the UI — but the **server's duplicate guard is still per-offer**,
@@ -223,12 +216,6 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   step. `5c32df9` fixed the *answered* state (24,222px → 1,933px at L20) and that fix is real; the
   arrival state is untouched. Cutting it means progressive disclosure — a design change, not a
   density fix.
-- **[testing] `packages/ui` has no test script and no test files.** Its `package.json` declares
-  `check` only, so the root `npm run test` (`--if-present`) skips it silently and a green run says
-  nothing about the shared primitives every surface composes from. `apps/client` no longer shares
-  this gap — it gained a Vitest + jsdom suite in the Codex overhaul — but a jsdom suite cannot prove
-  layout or pointer geometry either way (`docs/ai-context/testing.md`).
-
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device
@@ -239,9 +226,9 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   non-null `gameId` is permanently unusable (generic 403) and `rotate` can't clear it. Predates
   the game API; harmless while everyone leaves it null (this is a single-game product). Either
   thread a real game id through verification or drop the field in a future contract pass.
-  Found by architecture review 2026-07-18. **Mitigated 2026-07-18:** the VTT Setup credential
-  form no longer offers the field, so the footgun is API-only; the contract keeps accepting it
-  for now.
+  Found by architecture review 2026-07-18. **Mitigated 2026-07-18:** the credential form (now
+  Settings → The table → Access & integrations) no longer offers the field, so the footgun is
+  API-only; the contract keeps accepting it for now.
 
 - **[codex/ux] Switching a page's entity type silently drops the old type's field values.** Since M5 the
   server prunes fields to the effective type (CD-2), and `PageEditor` filters the draft the instant the
@@ -352,10 +339,14 @@ for a layout or pointer claim, a contrast calculator against
 
 - **[mobile] The encounter *replay viewer* overflows horizontally at 390px (~99px).** **Pre-existing, not
   introduced by the Codex overhaul** — proven by measuring both paths at 390px: opening a replay via the
-  existing "▶ Watch" button on the Replays list (`ReplayPanel.tsx:221`) gives the same 99px as arriving via
+  existing "Watch" button on the Replays list gives the same 99px as arriving via
   the new Codex "Open replay" link. The Replays *list* itself is clean (0px), as are all Codex surfaces.
   `ReplayPanel`/`ReplayViewer` is a combat-pillar surface and outside the Codex overhaul's approved scope,
   so M2 deliberately did not fix it. Worth noting that M2 makes the screen considerably easier to reach.
+  **Status 2026-08-03:** the panel was rebuilt for A8 (card rows, per-replay reveal control, launch-from-here,
+  a player viewer) and the LIST measures 0px at 390px. The **viewer** measurement has not been redone —
+  it needs an archived fight, which the rebuild pass did not stage — so this entry stays open until
+  someone measures the viewer itself. The line numbers above are from the pre-rebuild file.
 
 - **[a11y] `--text-muted` fails AA at small sizes** (3.61:1 dark) — affects `.nh-choice-meta`,
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;

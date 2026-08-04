@@ -1,0 +1,25 @@
+/* The embedded map picker (D5): folders, then art, then the flow you were already in.
+   No @media rules on purpose — the grid is auto-fill, so a 390px phone gets one column and a laptop
+   gets four without a breakpoint deciding anything. */
+.map-picker { display: flex; flex-direction: column; gap: .5rem; min-width: 0; padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+/* One scrolling chip row, never a wrapping block that pushes the grid off-screen on a phone. */
+.map-picker-folders { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
+.map-picker-folders > * { flex: none; }
+.map-picker-search { width: 100%; }
+.map-picker-grid { display: grid; min-width: 0; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: .5rem; margin: 0; padding: 0; list-style: none; max-height: 21rem; overflow-y: auto; overscroll-behavior: contain; }
+.map-tile { display: flex; flex-direction: column; gap: .2rem; width: 100%; min-height: var(--tap-min); padding: .35rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; }
+.map-tile:hover { border-color: var(--line-hover); }
+.map-tile.is-selected { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+/* Cap the art: a one-column grid inside a 390px modal would otherwise give each tile a 4:3 slab
+   ~280px tall, and three maps would be a page of scrolling. */
+.map-tile-art { display: grid; place-items: center; aspect-ratio: 4 / 3; max-height: 5.5rem; overflow: hidden; border-radius: var(--radius-sm); background: var(--void); }
+.map-tile-art img { width: 100%; height: 100%; object-fit: cover; }
+.map-tile-art-empty { width: 100%; height: 100%; background: var(--grad-horizon); opacity: .25; }
+.map-tile-name { font-size: .78rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-tile-meta { color: var(--text-muted); font-size: .68rem; }
+.map-tile--upload { border-style: dashed; }
+.map-tile--upload .map-tile-art { color: var(--cyan); background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); }
+/* The real input stays in the DOM (the tile clicks it) but never takes layout or focus order. */
+.map-picker-file { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.map-picker-empty, .map-picker-note { margin: 0; color: var(--text-dim); font-size: .74rem; }
+.map-picker-note strong { color: var(--text); }

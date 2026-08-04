@@ -14,39 +14,18 @@
 .encounter-dock-choice { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: 1rem; line-height: 1; cursor: pointer; }
 .encounter-dock-choice:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-dock-choice[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
-.encounter-map { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; margin: 1rem 0; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.encounter-map span { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.encounter-map select { flex: 1 1 12rem; margin: 0; font-size: var(--fs-sm); color: var(--text); }
-/* Undocked setup at desktop: the panel is the EXACT height of the map/scene panel to its left (its
-   bottom lines up), and the Party/Recent/Search combatant lists scroll internally instead of a long
-   roster pushing the panel past the map. `--setup-h` is measured live from the map panel (main.tsx);
-   the fallback keeps a sane cap before it resolves. The map picker above and the Add monsters / Start
-   buttons below stay pinned. Docked panels (inside .encounter-map-dock, not the sidebar) and the
-   single-column mobile layout are unaffected. */
+/* Setup is the quick-start door now (D1): map line, staging tray, the two Add buttons, Recent and
+   Start, all from `scenes/ScenePrepPanel`. The checkbox roster it replaced lived here — and so did
+   the scroll trap, because its internal scroll region only existed above 980px. Every list in the
+   new panel caps and scrolls itself at EVERY width, so the buttons below them are always on screen. */
 @media (min-width: 980px) {
-  .table-sidebar > .encounter-panel.setup { display: flex; flex-direction: column; height: var(--setup-h, calc(min(72vh, 680px) + 7rem)); }
-  .encounter-panel.setup .combatant-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: .35rem; }
+  /* Still bottom-aligned with the map beside it; `max-height` rather than `height`, since the panel
+     is now naturally short and should not be stretched to fill. `--setup-h` is measured in main.tsx. */
+  .table-sidebar > .encounter-panel.setup { display: flex; flex-direction: column; max-height: var(--setup-h, calc(min(72vh, 680px) + 7rem)); overflow-y: auto; }
 }
-.combatant-scroll { display: flex; flex-direction: column; }
-.combatant-setup { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.combatant-search { width: 100%; margin-top: .1rem; padding: .5rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); }
-.combatant-setup li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .75rem 0; border-bottom: 1px solid var(--line); }
-.combatant-tools { display: flex; align-items: center; gap: .5rem; }
-.combatant-tools .initiative-score { width: 8rem; }
-/* Icon button: compact paint, 44px hit area from the `.tap-target` recipe (§4 route 2). The 6.8px of
-   overhang per side clears its neighbours — .combatant-tools gaps by 8px, rows by 24px. */
-.combatant-remove { position: relative; flex: none; width: 1.9rem; height: 1.9rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); cursor: pointer; }
-.combatant-remove::after { content: ""; position: absolute; top: 50%; left: 50%; width: max(100%, var(--tap-min)); height: max(100%, var(--tap-min)); transform: translate(-50%, -50%); }
-.combatant-remove:hover:not(:disabled) { border-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 80%, var(--danger)); color: var(--danger-hi); }
-/* The <label> wraps the box, so the whole row IS the control's hit area — that is what carries the
-   44px floor here (a bare checkbox can't take a ::after; it's a replaced element). The box itself
-   grows to 1.5rem so it is legible next to the name, not just tappable. */
-.combatant-choice { display: flex; gap: .7rem; align-items: center; min-height: var(--tap-min); cursor: pointer; }
-.combatant-choice input { flex: none; width: 1.5rem; height: 1.5rem; accent-color: var(--magenta); }
-.combatant-choice span, .combatant-choice strong, .combatant-choice small { display: block; }
-.combatant-choice small, .initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
-.initiative-score { color: var(--text-dim); font-size: var(--fs-sm); }
-.initiative-score input { width: 100%; margin-top: .3rem; padding: .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
+.initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
+/* Why Start is unavailable, said where the button is rather than as a disabled mystery. */
+.encounter-start-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }
 .encounter-primary, .turn-controls button { padding: .7rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); cursor: pointer; }
 .encounter-primary, .turn-controls .encounter-primary { background: var(--primary); color: var(--text-on-neon); border-color: transparent; }
 .encounter-primary:hover:not(:disabled), .turn-controls .encounter-primary:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
@@ -271,7 +250,7 @@
 .action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 /* "Final total" manual mode: a compact Natural 20 (crit) checkbox under the total field - a rolled die can't
    be read off a hand-computed total, so the crit is declared. Overrides the column's full-width input sizing. */
-/* Label = hit area (see .combatant-choice), so the 44px floor is real paint on the row. */
+/* Label = hit area, so the 44px floor is real paint on the row. */
 .action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: .5rem; align-self: flex-start; min-height: var(--tap-min); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-preview .manual-nat20 input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; padding: 0; accent-color: var(--magenta); }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
@@ -307,9 +286,6 @@
    and bottom margin so it sits clearly above the turn order / sheet in either view. */
 .initiative-prompt { margin: 0 0 .6rem; padding: .55rem .7rem; border-color: color-mix(in srgb, var(--line-strong) 45%, var(--cyan)); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); }
 /* GM encounter-setup opt-in for player-rolled initiative. */
-/* Label = hit area (see .combatant-choice), so the 44px floor is real paint on the row. */
-.encounter-players-roll-init { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 0; min-height: var(--tap-min); font-size: var(--fs-sm); color: var(--text-dim); cursor: pointer; }
-.encounter-players-roll-init input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--magenta); }
 /* GM "waiting on players to roll initiative" banner above the initiative list, with the roll-for-the-rest action. */
 .initiative-gathering { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .5rem; padding: .5rem .65rem; border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); font-size: var(--fs-sm); color: var(--text); }
 .initiative-gathering span { flex: 1 1 12rem; }
@@ -697,8 +673,9 @@
 /* Monster browser renders in the shared Modal, sized for a scrollable list. */
 .monster-browser-controls { display: flex; flex-direction: column; gap: .5rem; margin-top: .2rem; }
 .monster-browser-controls input[type="search"] { margin-top: 0; padding: .6rem .8rem; }
-.monster-browser-hidden { display: flex; align-items: center; gap: .5rem; color: var(--text-dim); font-size: var(--fs-sm); cursor: pointer; }
-.monster-browser-hidden input { width: 1.05rem; height: 1.05rem; margin: 0; accent-color: var(--magenta); }
+/* Where an add lands and what it will be — read-only here; the staging tray owns the decision. */
+.monster-browser-target { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.monster-browser-target strong { color: var(--text); }
 .monster-browser-list { flex: 1 1 auto; overflow-y: auto; list-style: none; margin: .8rem 0 0; padding: 0 .25rem 0 0; border-top: 1px solid var(--line); }
 .monster-browser-list li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .1rem; border-bottom: 1px solid var(--line); }
 .monster-browser-name { min-width: 0; }
@@ -710,7 +687,7 @@
 .monster-browser-status { color: var(--text-dim); margin: 1rem 0 0; }
 .monster-browser-feedback { min-height: 1.2rem; margin: .6rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .monster-browser-attribution { margin: .5rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
-@media (max-width: 560px) { .combatant-setup li { grid-template-columns: 1fr; } .combatant-tools { justify-content: space-between; } .combatant-tools .initiative-score { flex: 1; } .initiative-score { width: 100%; } .monster-browser { max-height: 92vh; } }
+@media (max-width: 560px) { .monster-browser { max-height: 92vh; } }
 
 .scene-switch { display: flex; align-items: center; gap: .5rem; margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
 .scene-switch select { width: auto; margin-top: 0; flex: 1 1 auto; text-transform: none; letter-spacing: normal; font-size: var(--fs-body); color: var(--text); }

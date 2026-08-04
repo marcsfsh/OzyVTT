@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Input, SegmentedControl, Select } from "@vtt/ui";
+import { Button, Chip, Input, SegmentedControl, Select } from "@vtt/ui";
 import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
+import { MapTile } from "./MapPicker";
 import "./map-manager.css";
 import { usePrompt } from "../components/feedback";
 
@@ -98,6 +99,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [uploadFolder, setUploadFolder] = useState("");
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | MapKind>("all");
+  const [folderChip, setFolderChip] = useState<"all" | string | null>("all");
   const [points, setPoints] = useState<Point[]>([]);
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [dragCurrent, setDragCurrent] = useState<Point | null>(null);
@@ -126,12 +128,13 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const selected = maps.find((map) => map.id === selectedId) ?? null;
   const folderNames = Array.from(new Set(maps.map((map) => map.folder).filter((folder): folder is string => folder !== null))).sort((a, b) => a.localeCompare(b));
   const needle = search.trim().toLowerCase();
-  const filteredMaps = maps.filter((map) => (kindFilter === "all" || map.kind === kindFilter) && (needle === "" || map.name.toLowerCase().includes(needle)));
-  // Group the (filtered) maps by folder, unfiled last, so the GM can organize a large library.
-  const groupedMaps = [...folderNames, null].flatMap((folder) => {
-    const group = filteredMaps.filter((map) => map.folder === folder);
-    return group.length ? [{ folder, maps: group }] : [];
-  });
+  // Folders are a chip row up front (D5), not a heading buried under a list: pick one, the grid filters.
+  // `undefined` = All; `null` = Unfiled.
+  const folderFilter = folderChip === "all" ? undefined : folderChip;
+  const filteredMaps = maps.filter((map) =>
+    (kindFilter === "all" || map.kind === kindFilter)
+    && (needle === "" || map.name.toLowerCase().includes(needle))
+    && (folderFilter === undefined || map.folder === folderFilter));
 
   const refresh = async (preferId?: string) => {
     const data = await api("/api/v1/map-assets", gmToken);
@@ -303,7 +306,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   });
   const acceptWizardData = (data: any) => { setWizardId(data.wizardId); setWizard(data.state); setOverlay(data.overlay ?? []); setPendingArea(null); if (data.overlayWarning) setMessage(data.overlayWarning); };
   const startAreaWizard = (start: Point, end: Point) => run(async () => {
-    if (!selected) throw new Error("Select a battlemap first.");
+    if (!selected) throw new Error("Select a battle map first.");
     setLastArea({ start, end });
     const data = await api(`/api/v1/map-assets/${selected.id}/calibration/wizards`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ start, end, cellsAcross: 3, cellsDown: 3, distancePerCell }) });
     acceptWizardData(data);
@@ -346,11 +349,11 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
 
   return <>
     <section className="map-manager" aria-labelledby="map-manager-heading">
-      <div className="map-manager-heading"><div><span className="eyebrow">GM MAP LIBRARY</span><h2 id="map-manager-heading">Maps and grid setup</h2></div><p>Upload an image, align its printed grid, then present it to the shared screen.</p></div>
+      <div className="map-manager-heading"><div><span className="eyebrow">GM MAP LIBRARY</span><h2 id="map-manager-heading">Maps</h2></div><p>One collection: the same maps the scene-prep picker offers. Upload an image, set its grid, then use it in a scene.</p></div>
       <form className="map-upload" onSubmit={upload}>
         <label>Map image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !name) setName(next.name.replace(/\.[^.]+$/, "")); }} /></label>
         <label>Map name <span className="map-upload-optional">(optional)</span><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Ruined Keep" /></label>
-        <label>Map type<Select value={kind} onChange={(event) => setKind(event.target.value as MapKind)}><option value="battlemap">Battlemap</option><option value="regional">Regional map</option><option value="world">World map</option></Select></label>
+        <label>Map type<Select value={kind} onChange={(event) => setKind(event.target.value as MapKind)}><option value="battlemap">Battle map</option><option value="regional">Regional map</option><option value="world">World map</option></Select></label>
         <label>Folder<Input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="map-folder-list" /></label>
         <datalist id="map-folder-list">{folderNames.map((folder) => <option key={folder} value={folder} />)}</datalist>
         <Button variant="primary" type="submit" disabled={busy || !file}>Upload map</Button>
@@ -365,16 +368,22 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
               size="sm"
               value={kindFilter}
               onChange={(value) => setKindFilter(value as typeof kindFilter)}
-              options={[{ value: "all", label: "All" }, { value: "battlemap", label: "Battlemaps" }, { value: "regional", label: "Regional" }, { value: "world", label: "World" }]}
+              options={[{ value: "all", label: "All" }, { value: "battlemap", label: "Battle maps" }, { value: "regional", label: "Regional" }, { value: "world", label: "World" }]}
             />
           </div>
-          <nav className="map-list" aria-label="Uploaded maps">
-            {groupedMaps.length === 0 && <p className="map-list-empty">No maps match this filter.</p>}
-            {groupedMaps.map((group) => <div key={group.folder ?? "__unfiled"} className="map-folder-group">
-              <p className="map-folder-label">{group.folder ?? "Unfiled"}</p>
-              {group.maps.map((map) => <button key={map.id} className={`lift${map.id === selectedId ? " selected" : ""}`} onClick={() => setSelectedId(map.id)}><strong>{map.name}</strong><span>{map.kind} · {map.width}×{map.height}</span><small>{map.calibration ? "Grid calibrated" : map.scale ? `Scale ${map.scale.distancePerPixel.toPrecision(3)} ${map.scale.unit}/px` : "Needs scale setup"}</small></button>)}
-            </div>)}
-          </nav>
+          {/* Folders up front, one scrolling chip row (D5) - the same shape the embedded picker uses. */}
+          <div className="map-folder-chips" role="group" aria-label="Folders">
+            <Chip pressed={folderChip === "all"} onClick={() => setFolderChip("all")}>All</Chip>
+            {folderNames.map((folder) => <Chip key={folder} pressed={folderChip === folder} onClick={() => setFolderChip(folder)}>{folder}</Chip>)}
+            {maps.some((map) => map.folder === null) && <Chip pressed={folderChip === null} onClick={() => setFolderChip(null)}>Unfiled</Chip>}
+          </div>
+          {/* Picture first: the same tile as the embedded picker, so one collection reads one way. */}
+          <ul className="map-picker-grid" aria-label="Uploaded maps">
+            {filteredMaps.map((map) => <MapTile key={map.id} map={{ id: map.id, name: map.name, kind: map.kind, folder: map.folder, width: map.width, height: map.height, calibration: map.calibration, scale: map.scale }}
+              token={gmToken} selected={map.id === selectedId} onSelect={() => setSelectedId(map.id)}
+              meta={`${map.calibration ? "Grid set" : map.scale ? "Gridless" : "No grid yet"} · ${map.width}×${map.height}`} />)}
+          </ul>
+          {filteredMaps.length === 0 && <p className="map-list-empty">No maps match this filter.</p>}
         </div>
         {selected && <div className="map-calibration">
           <div className="map-folder-move" role="group" aria-label="Organize this map">
@@ -385,7 +394,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
             </Select>
             <Button variant="secondary" type="button" disabled={busy} onClick={async () => { const folder = await prompt({ title: "New folder", body: "Move this map to a new folder.", placeholder: "Folder name", confirmLabel: "Move" }); if (folder) moveToFolder(folder); }}>New folder…</Button>
           </div>
-          {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battlemap grid type"><button className="lift" aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale and position.</span></button><button className="lift" aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battlemap</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
+          {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battle map grid type"><button className="lift" aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale and position.</span></button><button className="lift" aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battle map</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
           <div className="calibration-instruction" id="calibration-instruction" role="status">
             <span>{squareMode ? "SQUARE GRID" : selected.kind === "battlemap" ? "GRIDLESS SCALE" : "MAP SCALE"}</span>
             <p>{instruction}</p>

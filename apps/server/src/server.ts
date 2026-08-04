@@ -282,6 +282,9 @@ export function createServer(options: CreateServerOptions) {
     playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
     random: (sides) => randomInt(1, sides + 1),
     newId: randomUUID,
+    // The archives live in the game store's own table, not in GameState; `replay.launch` reads one
+    // document through this narrow hook rather than being handed the store.
+    archiveDocument: (id) => store.getEncounterArchive(id),
     onEncounterArchived: ({ sceneId, turnCount }) => {
       // Combat-history bridge: log the fight to the codex timeline, pinned to its location marker if one links this scene.
       try {
@@ -447,6 +450,8 @@ export function createServer(options: CreateServerOptions) {
     assets: tokenAssets,
     catalog: tokenCatalog,
     authorizeGm,
+    // D18: a joined player may browse the library the GM offers and upload their own token image.
+    playerSession: (token) => auth.verifyPlayer(token),
     authorizePlayer: (token, assetId) => auth.verifyPlayer(token) !== null && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
     authorizeViewer: (token, assetId) => {
       if (!token) return false;
@@ -608,6 +613,8 @@ export function createServer(options: CreateServerOptions) {
     socket.on("character:resolve-import", (payload, acknowledge) => respond(acknowledge, "Only the GM can approve imported sheets.", "The import could not be resolved.", (principal) => operations.characterResolveImport(principal, payload)));
     socket.on("character:create", (payload, acknowledge) => respond(acknowledge, "Only the GM can create characters directly.", "The character could not be created.", (principal) => operations.characterCreate(principal, payload)));
     socket.on("builder:set-policy", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the character-builder policy.", "The builder policy could not be changed.", (principal) => operations.builderSetPolicy(principal, payload)));
+    socket.on("character:rebuild", (payload, acknowledge) => respond(acknowledge, "You can only rebuild your own character.", "That character could not be rebuilt.", (principal) => operations.characterRebuild(principal, payload)));
+    socket.on("builder:roll-abilities", (payload, acknowledge) => respond(acknowledge, "Your GM builds the characters at this table.", "The ability scores could not be rolled.", (principal) => operations.builderRollAbilities(principal, payload)));
     socket.on("actor:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove combatants.", "The combatant could not be removed.", (principal) => operations.actorRemove(principal, payload)));
     socket.on("actor:set-token-image", (payload, acknowledge) => respond(acknowledge, "Only the GM can set token images.", "The token image could not be set.", (principal) => operations.actorSetTokenImage(principal, payload)));
     socket.on("actor:set-size", (payload, acknowledge) => respond(acknowledge, "Only the GM can resize tokens.", "The token could not be resized.", (principal) => operations.actorSetSize(principal, payload)));
@@ -683,6 +690,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("scene:rename", (payload, acknowledge) => respond(acknowledge, "Only the GM can rename scenes.", "The scene could not be renamed.", (principal) => operations.sceneRename(principal, payload)));
     socket.on("scene:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove scenes.", "The scene could not be removed.", (principal) => operations.sceneRemove(principal, payload)));
     socket.on("scene:activate", (payload, acknowledge) => respond(acknowledge, "Only the GM can switch scenes.", "The scene could not be switched.", (principal) => operations.sceneActivate(principal, payload)));
+    socket.on("replay:launch", (payload, acknowledge) => respond(acknowledge, "Only the GM can launch a replay.", "That recorded moment could not be launched.", (principal) => operations.replayLaunch(principal, payload)));
     socket.on("scene:set-combatants", (payload, acknowledge) => respond(acknowledge, "Only the GM can change a scene's combatants.", "The scene could not be updated.", (principal) => operations.sceneSetCombatants(principal, payload)));
     socket.on("scene:duplicate", (payload, acknowledge) => respond(acknowledge, "Only the GM can duplicate scenes.", "The scene could not be duplicated.", (principal) => operations.sceneDuplicate(principal, payload)));
     socket.on("scene:reorder", (payload, acknowledge) => respond(acknowledge, "Only the GM can reorder scenes.", "The scenes could not be reordered.", (principal) => operations.sceneReorder(principal, payload)));

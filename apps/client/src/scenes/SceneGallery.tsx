@@ -70,8 +70,9 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
     const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
     if (next && next !== scene.name) emit("scene:rename", { sceneId: scene.id, name: next }, "The scene could not be renamed.");
   };
+  // Triad **Delete**: a scene is gone for good, so it is named for what it does and says so (D28).
   const remove = async (scene: Scene) => {
-    if (await confirm({ title: "Remove scene?", body: `Remove “${scene.name}”?`, confirmLabel: "Remove", danger: true })) {
+    if (await confirm({ title: "Delete scene?", body: `Delete “${scene.name}”? Its staged tokens and fog go with it. This cannot be undone.`, confirmLabel: "Delete", danger: true })) {
       if (scene.id === previewingSceneId) setPreviewScene(null);
       emit("scene:remove", { sceneId: scene.id }, "The scene could not be removed.");
     }
@@ -143,7 +144,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
     {!hideHeading && <div className="scene-gallery-head">
       <span className="eyebrow">GM PREP</span>
       <h2 id="scene-gallery-heading">Scenes</h2>
-      <p>Build your encounters ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>
+      <p>Build your fights ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>
     </div>}
     {scenes.length > 0 && <div className="scene-gallery-bar">
       <Button variant="primary" arrow onClick={onNewScene}>New scene</Button>
@@ -153,7 +154,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
       ? <div className="nh-empty">
           <span className="nh-empty-icon" aria-hidden="true">🎬</span>
           <span className="nh-empty-title">No scenes yet</span>
-          <span className="nh-empty-text">Prepare your first scene — choose a battlemap and who’s in it, then go live when your table is ready.</span>
+          <span className="nh-empty-text">Prepare your first scene — choose a battle map and who’s in it, then go live when your table is ready.</span>
           <Button variant="primary" arrow onClick={onNewScene}>New scene</Button>
         </div>
       : <ul className="nh-gallery" ref={galleryRef}>
@@ -165,7 +166,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
               <div className="nh-card-thumb"><SceneThumb mapAssetId={scene.mapAssetId} token={token} /></div>
               <div className="nh-card-body">
                 <h3 className="nh-card-title">{scene.name}</h3>
-                <span className="nh-card-meta">{mapName(scene.mapAssetId)} · {count} combatant{count === 1 ? "" : "s"}</span>
+                <span className="nh-card-meta">{mapName(scene.mapAssetId)} · {count} character{count === 1 ? "" : "s"} &amp; monster{count === 1 ? "" : "s"}</span>
               </div>
               {(live || staging) && <span className="nh-card-status">{live ? <Badge tone="primary" solid>LIVE</Badge> : <Badge>Staging</Badge>}</span>}
               <div className="nh-card-tools">
@@ -176,7 +177,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
                   <MenuItem icon="→" disabled={index === ordered.length - 1} onClick={() => move(scene.id, 1)}>Move later</MenuItem>
                   <MenuItem icon="✎" onClick={() => void rename(scene)}>Rename</MenuItem>
                   <MenuItem icon="⧉" onClick={() => emit("scene:duplicate", { sceneId: scene.id }, "The scene could not be duplicated.")}>Duplicate</MenuItem>
-                  {!live && <MenuItem icon="🗑" tone="danger" onClick={() => void remove(scene)}>Remove</MenuItem>}
+                  {!live && <MenuItem icon="🗑" tone="danger" onClick={() => void remove(scene)}>Delete scene</MenuItem>}
                 </Menu>
               </div>
               {live

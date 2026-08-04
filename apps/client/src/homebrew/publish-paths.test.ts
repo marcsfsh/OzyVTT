@@ -253,7 +253,7 @@ describe("the checklist and the store agree", () => {
     // The one place the list is deliberately truncated: twenty schema issues on a record created
     // three seconds ago is a wall, and every one of them is downstream of "it has no name yet".
     expect(issuesFor("equipment", blankDraft("equipment"))).toEqual(["Give this item a name."]);
-    expect(issuesFor("monster", blankDraft("monster"))).toEqual(["Give this creature a name."]);
+    expect(issuesFor("monster", blankDraft("monster"))).toEqual(["Give this monster a name."]);
   });
 });
 

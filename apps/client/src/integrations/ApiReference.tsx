@@ -109,7 +109,7 @@ const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }>
   { title: "Player sessions", match: (path) => path.startsWith("/api/v1/sessions") },
   { title: "Live game", match: (path) => path.startsWith("/api/v1/game") },
   { title: "Reference content", match: (path) => path.startsWith("/api/v1/content") },
-  { title: "Encounter archives (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
+  { title: "Fight replays (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
   { title: "Map assets & calibration", match: (path) => path.startsWith("/api/v1/map-assets") },
   { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") },
   // Title follows the Codex glossary ("pages", "atlas", "journal", "calendar") so the API panel and the
@@ -117,7 +117,7 @@ const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }>
   // codex surface grows: it renders the live document, so new paths, scopes and role-projected `oneOf`
   // shapes appear on their own, and `ungrouped` below catches anything a matcher misses.
   { title: "Codex (pages, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") },
-  { title: "Homebrew authoring (GM-only)", match: (path) => path.startsWith("/api/v1/homebrew") }
+  { title: "Homebrew authoring (GM only)", match: (path) => path.startsWith("/api/v1/homebrew") }
 ];
 
 /**
