@@ -95,16 +95,19 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
    still wants a whisper of it. */
 .landing-noise { position: absolute; inset: 0; background-image: var(--noise); background-size: 140px 140px; opacity: var(--landing-noise-opacity); mix-blend-mode: screen; }
 
-/* ---- The sign. The chrome fill and fringe are RE-ASSERTED here because the light theme
-   swaps `.wordmark-name` to solid ink and kills `.chromatic` — right everywhere else in the
-   app, wrong on the scene the --landing-* tokens skin per theme. The dark text-stroke is the
-   legibility guarantee: chrome over the sun's bright crown sank on laptop screens without it. */
+/* ---- The sign. The banded sunset fill is RE-ASSERTED here because the light theme swaps
+   `.wordmark-name` to solid ink — right everywhere else in the app, wrong on this scene.
+   Legibility comes from the BAND PLACEMENT (client refs): the warm top half stands on dark
+   sky, the violet bottom half stands on the sun's bright crown, so the outline drops to a
+   hairline and the glow to one solid extrusion + one tight halo — crisp, not hazy. The
+   skew is the reference lettering's forward lean. ---- */
 .landing .home-hero { padding-bottom: clamp(1rem, 3.5vh, 2rem); }
 .landing .home-hero-title .nh-wordmark {
   display: block; font-size: clamp(3.4rem, 16vw, 10.5rem); line-height: .92;
-  background: var(--landing-chrome); -webkit-background-clip: text; background-clip: text; color: transparent;
-  -webkit-text-stroke: 2px var(--landing-stroke);
-  filter: var(--landing-title-glow); text-shadow: var(--landing-fringe);
+  transform: skewX(-6deg);
+  background: var(--landing-sign); -webkit-background-clip: text; background-clip: text; color: transparent;
+  -webkit-text-stroke: 1px var(--landing-stroke);
+  filter: var(--landing-title-glow);
 }
 
 /* ---- The doors: two arcade choices, magenta and cyan. Chamfered HUD panels (clip-path cuts

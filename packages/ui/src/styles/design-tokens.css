@@ -133,27 +133,30 @@
   --landing-star-dim: rgba(199, 155, 255, 0.6);
   --landing-sun: linear-gradient(180deg, #FFE7F6 0%, #FF5CB8 26%, #FF2E9A 52%, #A45CFF 84%, #5B6EF5 100%);
   --landing-sun-glow:
-    0 0 48px 14px rgba(255, 46, 154, 0.50),
-    0 0 150px 60px rgba(164, 92, 255, 0.38);
+    0 0 40px 12px rgba(255, 46, 154, 0.46),
+    0 0 110px 40px rgba(164, 92, 255, 0.30);
   --landing-slat: rgba(6, 4, 18, 0.92);
   --landing-horizon: linear-gradient(90deg, transparent 0%, rgba(45, 226, 255, 0.9) 22%, rgba(255, 92, 184, 0.95) 50%, rgba(45, 226, 255, 0.9) 78%, transparent 100%);
   --landing-horizon-glow:
     0 0 14px 3px rgba(45, 226, 255, 0.85),
-    0 0 52px 14px rgba(255, 46, 154, 0.55);
+    0 0 52px 14px rgba(255, 46, 154, 0.55),
+    0 0 26px 8px rgba(255, 158, 74, 0.22);
   --landing-grid-x: rgba(255, 46, 154, 0.55);
   --landing-grid-y: rgba(45, 226, 255, 0.50);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 58%, rgba(2, 1, 8, 0.50) 100%);
   --landing-scanline: rgba(0, 0, 0, 0.26);
   --landing-noise-opacity: 0.05;
-  /* The sign is chrome over WHATEVER is behind it, so the stroke is what guarantees the read:
-     a dark ink outline between the gradient fill and the sun (client note: at laptop sizes the
-     unstroked chrome sank into the sun's crown). */
-  --landing-stroke: rgba(8, 4, 20, 0.95);
+  /* The sign (client refs, 2026-08-04): a BANDED sunset fill — warm cream-to-orange upper
+     half, hard stop, violet lower half — does the legibility work the heavy black stroke
+     was doing, because the warm top sits on dark sky and the violet bottom sits on the
+     sun's bright crown. The stroke drops to a hairline; the glow drops from a four-layer
+     haze to one solid extrusion offset plus one tight neon halo. The warm band is also the
+     dusk-orange hint the night carries. */
+  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFC896 28%, #FF9E4A 50%, #B77CFF 50%, #7A3FD6 78%, #4E2596 100%);
+  --landing-stroke: rgba(46, 16, 84, 0.65);
   --landing-title-glow:
-    drop-shadow(0 2px 0 rgba(6, 4, 16, 0.9))
-    drop-shadow(0 0 12px rgba(255, 46, 154, 0.60))
-    drop-shadow(0 0 36px rgba(255, 46, 154, 0.36))
-    drop-shadow(0 0 64px rgba(45, 226, 255, 0.30));
+    drop-shadow(0 3px 0 rgba(30, 10, 50, 0.85))
+    drop-shadow(0 0 10px rgba(255, 46, 154, 0.38));
   /* The doors. Chamfered arcade panels clipped with clip-path, so their glow rides
      drop-shadow filters (which follow the cut) rather than box-shadow (which cannot). */
   --landing-neon-magenta: #FF2E9A;
@@ -166,8 +169,6 @@
   --landing-door-glow-m-strong: drop-shadow(0 0 8px rgba(255, 46, 154, 0.8)) drop-shadow(0 0 30px rgba(255, 46, 154, 0.55));
   --landing-door-glow-c: drop-shadow(0 0 6px rgba(45, 226, 255, 0.5)) drop-shadow(0 0 20px rgba(45, 226, 255, 0.32));
   --landing-door-glow-c-strong: drop-shadow(0 0 8px rgba(45, 226, 255, 0.75)) drop-shadow(0 0 30px rgba(45, 226, 255, 0.5));
-  --landing-chrome: linear-gradient(180deg, #FFE7F6 0%, #FF5CB8 34%, #A45CFF 62%, #2DE2FF 100%);
-  --landing-fringe: -1px 0 rgba(255, 46, 154, 0.55), 1px 0 rgba(45, 226, 255, 0.55);
 
   /* Texture sizing + noise tile */
   --grid-cell: 34px;
@@ -657,15 +658,14 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-grid-y: rgba(255, 46, 154, 0.50);
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 55%, rgba(16, 4, 20, 0.55) 100%);
   --landing-scanline: rgba(10, 0, 10, 0.22);
-  --landing-stroke: rgba(22, 6, 26, 0.95);
+  --landing-sign: linear-gradient(180deg, #FFF6DC 0%, #FFD27A 30%, #FF9E4A 50%, #E86AB8 50%, #A445E0 78%, #5B2EA8 100%);
+  --landing-stroke: rgba(40, 10, 40, 0.60);
   --landing-title-glow:
-    drop-shadow(0 2px 0 rgba(20, 6, 20, 0.9))
-    drop-shadow(0 0 12px rgba(255, 46, 154, 0.55))
-    drop-shadow(0 0 36px rgba(255, 140, 60, 0.40))
-    drop-shadow(0 0 64px rgba(255, 46, 154, 0.30));
+    drop-shadow(0 3px 0 rgba(40, 8, 36, 0.8))
+    drop-shadow(0 0 10px rgba(255, 150, 80, 0.40));
 }
 [data-theme="light"] {
-  --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #EFDFF6 40%, #FBD9E4 66%, #FFDFC8 100%);
+  --landing-sky: linear-gradient(180deg, #DCE6FB 0%, #EFDFF6 38%, #FBD9E4 62%, #FFD6B4 100%);
   /* Daybreak: no stars. Transparent star inks keep the layers (and their markup) inert. */
   --landing-star: rgba(255, 255, 255, 0);
   --landing-star-dim: rgba(255, 255, 255, 0);
@@ -683,11 +683,11 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   --landing-vignette: radial-gradient(125% 100% at 50% 44%, transparent 60%, rgba(120, 90, 140, 0.28) 100%);
   --landing-scanline: rgba(60, 40, 80, 0.07);
   --landing-noise-opacity: 0.02;
-  --landing-stroke: rgba(40, 20, 60, 0.85);
+  --landing-sign: linear-gradient(180deg, #FFE9B8 0%, #FFB86B 50%, #9A5BD6 50%, #6A34B0 100%);
+  --landing-stroke: rgba(70, 40, 110, 0.50);
   --landing-title-glow:
-    drop-shadow(0 1px 0 rgba(40, 20, 60, 0.8))
-    drop-shadow(0 0 10px rgba(200, 29, 128, 0.35))
-    drop-shadow(0 0 28px rgba(255, 150, 80, 0.30));
+    drop-shadow(0 2px 0 rgba(90, 50, 130, 0.5))
+    drop-shadow(0 0 8px rgba(226, 76, 156, 0.28));
   /* Daybreak doors: inked neon on white glass, ring glows — legibility outranks bloom here. */
   --landing-neon-magenta: #C81D80;
   --landing-neon-magenta-hi: #9E1263;
