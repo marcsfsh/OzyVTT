@@ -759,16 +759,17 @@ describe("(g) no viewport-fraction caps on in-flow content — design-language.m
  */
 const SCROLL_DECL = /overflow(?:-y)?\s*:\s*(?:auto|scroll)/g;
 
-/** The measured population, per file — the FEEDBACK_ALLOW shape. */
-const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  // Phase C drained the other seven files (2026-08-05). What is left is the ONE case where the
-  // declaration is still right: `.map-picker-grid`'s cap serves the EMBEDDED picker, which is not
-  // a frame and has no height to inherit. The maps rail does not use it — the rail neutralises the
-  // cap (`.map-rail .map-picker-grid { max-height: none }`) and scrolls a `.scroll-y` WRAPPER
-  // around the `<ul>`, because a grid with a definite block size stops sizing its auto rows from
-  // its cards. Draining this last row means giving the embedded picker a frame, not deleting a line.
-  ["apps/client/src/maps/map-picker.css", 1]
-];
+// EMPTY as of 2026-08-05 (Phase C). **Do not add a row** — an undeclared scroller is now a failure,
+// not a debt. The last one out was `map-picker.css`'s `.map-picker-grid`, and the reason it survived
+// a whole phase is worth keeping: this list said draining it "means giving the embedded picker a
+// frame, not deleting a line", which conflated this check with (g). It counts UNDECLARED scrollers,
+// and §7's drain is `.scroll-y` in the MARKUP — so the cap stayed and only the declaration moved.
+// The scene-gallery lesson (a `.scroll-y` belongs on a grid's WRAPPER, never the grid) was the other
+// half of the fear, and it does not apply: that lesson is about a DEFINITE block size, and a
+// `max-height` is not one. Measured at the drain — tile boxes byte-identical at 320/375/560/561, and
+// at 1280 the row followed the cards 146.33 -> 145.27 as `scrollbar-gutter: stable` narrowed the
+// content box, which is the auto row still sizing from its tiles rather than from the container.
+const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [];
 
 describe("(h) every scroll region is declared — design-language.md §7", () => {
   const sources = appStylesheets();

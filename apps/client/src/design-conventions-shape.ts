@@ -259,8 +259,8 @@ export const CONVENTION_SHAPE = {
    * five were declarations that scrolled NOTHING: `.codex-campaign` and `.codex-audit` had no
    * height to overflow, and three sat on selectors with no `.tsx` consumer at all.
    */
-  scrollAllowFiles: 1,
-  scrollAllowSites: 1,
+  scrollAllowFiles: 0,
+  scrollAllowSites: 0,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**
