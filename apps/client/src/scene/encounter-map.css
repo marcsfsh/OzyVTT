@@ -54,8 +54,9 @@
 .encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
 /* Keep the scene cluster clear of a left/right docked panel by moving it to the opposite corner. */
 .encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
-/* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize. */
-.encounter-map-dock { position: absolute; z-index: 2; overflow: auto; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
+/* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize.
+   It scrolls itself, and `.scroll-y` says so in EncounterMap's markup (check (h)). */
+.encounter-map-dock { position: absolute; z-index: 2; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
 /* THE DOCK EDGE TAKES THE LINEWORK (§9, director ruling). The table gets no sky — a horizon
    behind a battle map competes with the map, and the map is the canvas — but its CHROME speaks
    the same language, and the dock's inner edge is the one boundary on this surface that is
@@ -92,7 +93,12 @@
 /* "Enlarge map" is an in-tab overlay (not the OS Fullscreen API): the whole interaction area floats
    over the page so the map physically grows, with the stage flex-filling the space so the SVG scales
    up. Dismissed by "Shrink map". */
-.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); overflow: auto; }
+/* It scrolls NOTHING, so it no longer says it does (check (h)). Measured with the map ready and the
+   tracker docked inside it: scrollHeight === clientHeight at 375, 390 and 1280, dock left and right —
+   the stage is `flex: 1; min-height: 0`, the tray and the saving line are floated over it, and the
+   docked panel is absolutely positioned inside the stage and carries its own `.scroll-y`. A declared
+   scroller that never scrolls is a claim a reader has to check by hand. */
+.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); }
 .encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
 .encounter-map-interaction.enlarged .encounter-map-stage svg { max-height: none; height: 100%; }
 .encounter-map-saving { margin: .5rem 0 0; color: var(--text-dim); font-size: .85rem; }
@@ -146,8 +152,9 @@
 .map-toolbar-caret { display: grid; place-items: center; font-size: .8rem; color: var(--text-muted); transition: transform .16s ease; }
 .map-toolbar-caret.open { transform: rotate(180deg); }
 /* One open group at a time, in one bounded surface: never a second row of floating icons. It
-   shrinks to whatever height the stage leaves and scrolls inside itself. */
-.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: .5rem; padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overflow-y: auto; overscroll-behavior: contain; }
+   shrinks to whatever height the stage leaves and scrolls inside itself — `.scroll-y` in
+   MapToolbar's markup declares that (check (h)); the `inset` on the overlay gives it the height. */
+.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: .5rem; padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
 .map-toolbar-panel-title { margin: 0; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
 .map-toolbar-panel .nh-field, .map-toolbar-panel-body .nh-field { gap: .2rem; }
 .map-toolbar-field { font-size: .78rem; }
@@ -174,7 +181,7 @@
 /* The phone rail: the same three tools and the same three groups, every row icon + words. */
 .map-toolbar-toggle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 92%, transparent); color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .map-toolbar-toggle[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
-.map-toolbar-rail { min-height: 0; width: min(17rem, 100%); display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overflow-y: auto; overscroll-behavior: contain; }
+.map-toolbar-rail { min-height: 0; width: min(17rem, 100%); display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
 .map-toolbar-rail-tools { display: flex; flex-direction: column; gap: .15rem; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
 .map-toolbar-rail-section + .map-toolbar-rail-section { border-top: 1px solid var(--line); }
 .map-toolbar-row { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.75rem; padding: .3rem .5rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; text-align: left; cursor: pointer; }
@@ -183,8 +190,9 @@
 .map-toolbar-row-icon { display: grid; place-items: center; font-size: 1.1rem; }
 .map-toolbar-rail-head .map-toolbar-caret { margin-left: auto; }
 .map-toolbar-panel-body { display: flex; flex-direction: column; gap: .5rem; padding: .1rem .5rem .5rem; }
-/* The rail scrolls when the stage is shorter than it is (a 390px phone leaves ~210px of map). The
-   section a tap just opened is scrolled to, so its contents are never left below the fold. */
+/* The rail scrolls when the stage is shorter than it is (a 390px phone leaves ~210px of map) —
+   `.scroll-y` in the markup carries it. The section a tap just opened is scrolled to, so its
+   contents are never left below the fold. */
 .map-toolbar-rail { scroll-behavior: smooth; }
 /* Icon + word inside a real Button (the scene cluster, the staging pair). */
 .map-button-icon { display: inline-grid; place-items: center; margin-right: .35rem; font-size: 1rem; vertical-align: -.15em; }
@@ -230,12 +238,17 @@
 @media (max-width: 560px) {
   .encounter-map-stage { min-height: 14rem; }
   /* A full tray must not eat a phone's whole map. The tray floats over the map's top edge, so every
-     row of it is map you cannot drop onto: measured at 390px with five unplaced tokens it covered
-     136px of a 245px-tall map, and a drop in the upper half read as "back to the tray". One
-     non-wrapping row that scrolls sideways holds the same tokens in ~60px. */
-  .encounter-token-tray { max-height: 8.5rem; overflow-y: auto; }
-  .encounter-token-tray { gap: .3rem; }
-  .encounter-token-tray-list { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
+     row of it is map you cannot drop onto — and the ≤650 rule above turns it into a COLUMN, which is
+     what made it 92px of a 224px band (41%) with the list already `nowrap` beneath the label. Taking
+     the column back off puts label and list on one line: 92px -> ~58px, 41% -> ~26%. The tray's own
+     `min-height: 3.6rem` then bounds it exactly, which is why the `max-height: 8.5rem` + `overflow-y`
+     pair that used to sit here is gone rather than converted — measured with five unplaced tokens at
+     390 and 375, the tray is one 58px row and scrollHeight === clientHeight. Decision Q4: the BAND
+     does not grow while the tray is up (a map that jumps under the GM's finger mid-setup is worse
+     than a smaller tray), so the tray is what gives. */
+  .encounter-token-tray { flex-direction: row; align-items: center; gap: .3rem; }
+  .encounter-token-tray > div:first-child { flex: 0 0 auto; }
+  .encounter-token-tray-list { flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
   .encounter-token-tray-list > .tray-token { flex: none; }
   /* The standing hint wraps to three lines at this width and costs more map than it is worth: the
      prep panel below already says "drag them from the tray above the map to place them". */
@@ -326,17 +339,35 @@
   .encounter-map-dock.dock-right, .encounter-map-dock.dock-left { width: min(var(--dock-side-width), 62vw); }
 }
 
-/* ============ THE MAP IS A BAND BELOW THE 980 RUNG ============
+/* ============ THE MAP IS A BAND BELOW THE 980 RUNG (C1) ============
    Above the rung the table is two columns sharing one height and the map flex-fills what the rows
-   above it leave — the leftover is real, because the frame has a height to leave some of. Below it
-   the columns stack into one tall column that scrolls itself (`.table-layout`, in styles.css), and
-   there is no leftover to fill: the column is as tall as its contents.
+   above it leave. Below it the same rows stack into one frame (`.table-layout`, in styles.css) whose
+   map half is `flex: 0 0 auto` — so the band is a row that states its own height, and the sheet under
+   it takes everything else.
 
-   So state the phone height instead of inheriting it. Flex-filling a column that has no height of
-   its own would fall back to `min-height: 12rem`, and that number is a FLOOR for a short frame (see
-   the note above), not a height anyone chose for a phone. 14rem is chosen: tall enough to read the
-   fight, short enough that the dock below it is still on screen. C1 formalises this shape. */
+   THE INTERACTION OWNS THE NUMBER, not the stage. The interim shape stated `height: 14rem` on the
+   STAGE and `flex: none` on the interaction, which pinned the stage and let the tray and the feedback
+   line add themselves on top: 224 + 92 + 27 = 343px of "14rem band". Now the interaction is the
+   14rem — `flex: 0 1 14rem`, so it may shrink toward its 9rem floor on a short frame — and the stage
+   goes back to being the thing that fills it (`flex: 1; min-height: 0`), which is the same rule it
+   obeys everywhere else. The tray floats over it and no longer columns (above), and the feedback line
+   floats too (below), so the band is 224px of MAP.
+
+   14rem is arithmetic, not a vh fraction (check (g) forbids new ones): the shortest supported phone
+   is 375x667, whose pane is 623px after the tab bar; a 44px top line, a status line and a sheet that
+   is still worth opening leave a ceiling of ~254px, and 224 sits under it with room for the frame's
+   gaps. It is the same number at 844px tall, deliberately — a band that grew with the screen is what
+   `min(52vh, 30rem)` used to do to the empty state, and the sheet is what should get the extra. */
 @media (max-width: 979px) {
-  .encounter-map-interaction:not(.enlarged) { flex: none; }
-  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: none; height: 14rem; }
+  .encounter-map-interaction:not(.enlarged) { flex: 0 1 14rem; min-height: 9rem; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: 1; min-height: 0; height: auto; }
+  /* The status line FOLDS instead of floating. `min-height: 1.25rem` reserves 27px against a layout
+     jump that a laptop column can afford and a 224px band cannot; `:empty` is the resting state (the
+     message is "" almost always), so below the rung it costs nothing until there is something to
+     read. When it does appear it comes out of the SHEET, never the band — it sits after the stage in
+     flow and the band's height is stated, so the map neither moves nor resizes under a finger. It
+     keeps its `role="status"`, which is the reason this is a fold and not a `display: none`; floating
+     it over the stage was the other candidate and would land on the compact toolbar's own corner. */
+  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback { min-height: 0; margin: .25rem 0 0; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty { display: none; }
 }

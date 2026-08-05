@@ -625,8 +625,13 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .party-strip-empty { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
 .party-strip-empty p { margin: 0; font-size: .85rem; }
 
-/* ---- The player's pre-claim picker (B4.2) ---- */
-.claim-view { margin-bottom: 1.2rem; }
+/* ---- The player's pre-claim picker (B4.2) ----
+   It is a REGION, not a row: 539px of cards measured at 390x844, which is more than the whole map
+   band's allowance. `.scroll-y` rides it in the markup at every width — above the rung that stops it
+   shoving the map down its own column, and below the rung it IS the sheet's body (decision Q3: the
+   picker takes the sheet, and the band stays live above it, because an unclaimed player in a running
+   fight still gets a map and hiding one is worse than making them scroll a picker). */
+.claim-view { min-height: 0; margin-bottom: 1.2rem; }
 .claim-heading h2 { font-size: var(--fs-h2); }
 .claim-heading p { margin: 0 0 1rem; font-size: .9rem; }
 .claim-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .8rem; margin: 0; padding: 0; list-style: none; }
@@ -667,7 +672,10 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* Roll-list header (Table/Mine filter now renders as a SegmentedControl from @vtt/ui). */
 .roll-list-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: 1rem; }
 .roll-list-title { margin: 0; font: 800 var(--fs-xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
-.roll-list { display: grid; gap: .4rem; max-height: 19rem; overflow-y: auto; padding-right: .25rem; margin-top: .5rem; }
+/* The feed is a declared region: `.scroll-y` rides it in DicePanel's markup (check (h) — a scroller
+   the stylesheet declares on its own is a scroller no reader of the component can see). The cap stays
+   for the standalone panel; inside the dock accordion `max-height: none` hands it the section instead. */
+.roll-list { display: grid; gap: .4rem; max-height: 19rem; padding-right: .25rem; margin-top: .5rem; }
 .roll-card { padding: .5rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 /* v6 #4: the roll's KIND leads (a badge), the roller/audience is a muted footer, and faces · formula = total
    read as one left-to-right unit instead of being flung to four corners. */
@@ -705,7 +713,11 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .integration-form label { display: block; color: var(--text-dim); font-size: .8rem; }
 .integration-form fieldset { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: var(--radius-md); padding: .8rem 1rem; display: flex; flex-wrap: wrap; gap: .6rem .9rem; }
 .integration-form legend { padding: 0 .4rem; color: var(--text-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
-.integration-scope { display: flex; align-items: center; gap: .4rem; width: auto; font-size: .85rem; color: var(--text); }
+/* Route 1 (design-language §4), and the route that section's exception table already names for this
+   control: the box is a replaced `<input type="checkbox">` that cannot take `::after`, so the WRAPPING
+   LABEL carries the floor. It measured 19.2px around a 13x13 box. The scopes wrap in a flex row with a
+   .6rem cross-gap, so a taller label steals no neighbour's taps. */
+.integration-scope { display: flex; align-items: center; gap: .4rem; width: auto; min-height: var(--tap-min); font-size: .85rem; color: var(--text); }
 .integration-scope input { width: auto; margin: 0; }
 .integration-form button[type="submit"] { grid-column: 1 / -1; background: var(--primary); color: var(--text-on-neon); border: 0; padding: .85rem 1.2rem; }
 .integration-form button[type="submit"]:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
@@ -780,25 +792,19 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
    card, token library) now render through the shared @vtt/ui Modal primitive - no bespoke backdrops. */
 
-/* "You're playing" bar (v5 #7): always shown below the roster and above the dice/combat panels; your
-   claimed character = cyan selection accent. Head (name + HP) · labelled Conditions · HP tracker · buttons. */
-.you-are-playing { display: flex; align-items: center; justify-content: space-between; gap: 1rem 1.4rem; flex-wrap: wrap; margin-top: 1.3rem; padding: .9rem 1.2rem; border: 1px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--glow-cyan); }
-.you-are-playing-head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
-.you-are-playing-label { color: var(--cyan-hi); }
-.you-are-playing-head strong { font: 400 1.3rem var(--font-display); color: var(--text); }
-.you-are-playing-conditions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-/* v5 #7.1: the conditions control needs an explicit label so its "+ Add" isn't ambiguous. */
-.you-are-playing-cond-label { color: var(--text-muted); font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.you-are-playing-buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
-.you-are-playing button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
+/* "You're playing" — ONE ROW (C1, decision Q2). It was a 349px card: an eyebrow over the name, a
+   labelled Conditions editor, a damage/heal/temp tracker and two buttons, stacked. On a phone that is
+   40% of the pane spent on controls that all exist somewhere else — conditions are on the Turn tab's
+   own initiative row, and damage/heal/temp are on the sheet (CharacterSheet.tsx) one tap away. What is
+   left is the one thing nothing else says: WHO you are playing, and how they are doing. Avatar, name,
+   HP, and the door to the sheet, at the 44px floor by paint.
+   Your claimed character stays the cyan selection accent (§6.6). */
+.you-are-playing { display: flex; align-items: center; gap: .5rem; min-height: var(--tap-min); margin-top: 0; padding: .25rem .5rem; border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
+.you-are-playing-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 1.05rem/1.2 var(--font-display); color: var(--text); }
+.you-are-playing .nh-btn { flex: 0 0 auto; }
 .you-badge { margin-left: .5rem; vertical-align: middle; }
 
-.own-hp { color: var(--cyan-hi); font-size: .85rem; font-weight: 700; }
-.own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
-.own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
-/* Damage/Heal/Temp now render as <Button size="sm"> (@vtt/ui); the flex row above places them.
-   Rests and Hit Dice live on the sheet (one tap from here and from the party strip), which is where
-   the GM already had them — the roster's second copy went with the roster. */
+.own-hp { flex: 0 0 auto; color: var(--cyan-hi); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .8rem; font-weight: 700; }
 
 /* THE TABLE IS A FRAME (§7). It fills the pane exactly and never scrolls as a whole — the map takes
    the space that is left over, and anything that can outgrow its share scrolls inside its own region.
@@ -808,11 +814,11 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    afford to look away. Measured before the change; the same probe reads 0 after it.
    `margin-top: 2.5rem` went with the staging wrapper that used to supply the page column. */
 .table-layout { display: grid; gap: 1.5rem; height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; }
-/* `.scroll-y` is on this element in the markup, and above the 980 rung it never has anything to
-   scroll — the frame fits, measured. It earns its place BELOW the rung, where the two columns stack
-   into one tall phone column: that composition legitimately scrolls itself, which is the law's other
-   half ("fits its box or scrolls itself"). C1 replaces it with the map band and the tabbed sheet;
-   until then this is the honest shape rather than a surface that quietly overflows the pane. */
+/* `.scroll-y` used to ride this element in the markup — never scrolling above the rung (the frame
+   fits, measured) and scrolling a 3,000-10,000px document below it. C1 took the class off, because
+   both halves of the surface are frames now: above the rung two columns share one height, below it
+   the same rows stack (the phone block further down). Nothing here scrolls as a whole any more, so
+   nothing here declares that it does. */
 /* (The `.table-layout.anim-view { animation-fill-mode: backwards }` patch that kept a settled
    transform from trapping the enlarged-map overlay is gone: pane-level entrances are
    opacity-led now — the `pane-in` rule with the shell frame at the top of this file.) */
@@ -821,23 +827,55 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    the map underneath them is the one thing that grows. */
 .table-layout > .table { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; min-height: 0; }
-/* BELOW THE RUNG THE STACK IS NOT A FRAME. Two columns side by side share one height and each takes
-   what it is given; stacked, they are a queue in the region that scrolls itself, and each takes what
-   it needs. Leaving the fixed-height grid in place is what broke the phone, and the mechanism is
-   worth keeping written down because it is invisible from the markup: `min-height: 0` on both columns
-   (which the two-column frame needs, so the map can shrink) makes each grid row shrinkable to zero,
-   so the grid squeezed the two auto rows into the pane — resolved `grid-template-rows: 410.75px
-   360.75px` at 390x844 — while `section.table` still held 833px of content and its `overflow: visible`
-   let the surplus paint over whatever was beneath. Measured: the section ended at y=459, the map
-   rendered 631-855, and `elementFromPoint` on the player's own action row returned the map, so their
-   own actions could not be tapped. The document never scrolled (0/0), which is why
-   `scripts/no-scroll-audit.mjs` passed the entire time — it measures document scroll, not occlusion.
-   A flex column says the true thing: nothing shrinks, the region scrolls. C1 replaces it with the map
-   band and the tabbed sheet. */
+/* ============ THE PHONE TABLE IS A FRAME TOO (C1) ============
+   The interim block this replaces named itself a placeholder, and the measurements are why. At
+   390x844, with the dock's sections opened one at a time, `.table-layout` scrollHeight read
+   2921 / 3692 / 9803px inside an 800px pane (Turn order / Dice / Combat log); at 375x667 it read
+   3078 / 3692 / 10122 inside 623. `document.scrollHeight` stayed exactly `innerHeight` in every one
+   of those states — the shell lock holds — which is why `scripts/no-scroll-audit.mjs` never saw any
+   of it: the whole overflow lived INSIDE the pane, and that script measures the document.
+
+   Three rows, and the flex each takes is arithmetic, not taste:
+   - `section.table` is the map half — a 44px top line, the band, the status line. `flex: 0 0 auto`,
+     because every one of those is a STATED size and it must never trade one away. Shrink is split in
+     proportion to flex-basis, and against a sheet whose content basis runs to thousands of pixels a
+     shrinkable map half loses most of itself: the first cut of this rule (`flex: 0 1 auto`) resolved
+     the ~300px row to 86px at 390x844, which is a band with no map in it.
+   - `.table-sheet` is the only shrinkable row, so the deficit lands there in full and the three rows
+     total the pane exactly. It is B2's frame: Tabs over one scrolling body, styled in
+     encounter-panel.css. Everything here is the ROW, never its contents.
+   - `overflow: hidden` on the column is the guarantee, not the fix — the rows are sized so nothing
+     needs clipping, and the clip is what stops a regression from becoming a scrolling document again.
+     It also un-scrolls the container that `EncounterPanel`'s `activeRow.scrollIntoView()` was reaching
+     through on mount: `scrollIntoView` walks EVERY scrollable ancestor, so the initiative row scrolled
+     the whole table 202px on a player's first paint, hiding the heading above it. Measured, not
+     inferred (the call was instrumented); the fix is structural and no `overflow-anchor` is involved. */
 @media (max-width: 979px) {
-  .table-layout { display: flex; flex-direction: column; }
-  .table-layout > .table, .table-layout > .table-sidebar { flex: none; }
+  .table-layout { display: flex; flex-direction: column; gap: .5rem; min-height: 0; overflow: hidden; }
+  /* The card chrome goes: a phone has no room to spend 24px a side plus a rule on a container that
+     is the surface rather than a panel standing on it. */
+  .table-layout > .table { flex: 0 0 auto; padding: .75rem; border: 0; border-radius: 0; background: none; }
+  .table-layout > .table-sheet { flex: 1 1 auto; min-height: 0; gap: .5rem; }
+  /* ONE 44px TOP LINE. `display: contents` above the rung (below) leaves the laptop composition
+     byte-identical — this wrapper exists only so the phone can put the scene door, the player's own
+     character and the party on one line instead of three. It wraps rather than crushes: at 375px the
+     player's own row and the party strip take a line each, which is still 88px against 405px before. */
+  .table-topline { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .table-topline > .scenes-open-row { flex: 0 0 auto; margin-bottom: 0; }
+  .table-topline > .party-strip { flex: 1 1 8rem; min-width: 0; margin: 0; }
+  .table-topline > .you-are-playing { flex: 1 1 14rem; }
+  /* Route 1 (design-language §4): the strip is a scrolling list of pills, so the floor is PAINT.
+     56px was a comfortable laptop row; 44 is the floor and the phone needs the other 12px. */
+  .party-strip-entry { min-height: var(--tap-min); }
+  .table-status { margin: 0 0 .5rem; }
+  /* The empty state stands in for the map, so it takes the map's band rather than the map's leftover. */
+  .map-empty-hero { flex: 0 1 14rem; min-height: 9rem; margin-top: 0; }
+  /* Q3: the picker IS the sheet below the rung — main.tsx renders it in this row instead of the dock. */
+  .table-sheet > .claim-view { flex: 1 1 auto; min-height: 0; margin: 0; }
 }
+/* The wrapper is invisible above the rung: its children go on being `section.table`'s own rows. */
+@media (min-width: 980px) { .table-topline { display: contents; } }
+.table-topline:empty { display: none; }
 @media (min-width: 980px) {
   .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(var(--dock-w), 27rem); }
   /* `.dice-proof { margin-top: auto }` and the `.docked` stretch pair retired here: both existed to
@@ -1017,9 +1055,15 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .home-hero-title .nh-wordmark { display: block; font-size: clamp(3rem, 13vw, 8rem); line-height: .95; }
 
 /* Empty map = the hero moment built from grid + line + color, not an object (§6.5). It stands in for a
-   loaded battlemap, so it's sized like one — this also drives the map panel (and the --setup-h-matched
-   encounter panel beside it) to a comfortable height instead of a short stub. */
-.map-empty-hero { position: relative; overflow: hidden; min-height: min(52vh, 30rem); }
+   loaded battlemap, so it is sized like one — LITERALLY like one, since C1: it takes the frame's
+   leftover exactly as `.encounter-map-interaction` does, with the same 12rem floor, and below the rung
+   the band rule in encounter-map.css gives it the same 14rem band. `min-height: min(52vh, 30rem)` is
+   what that replaces, and the cap had gone wrong twice over: a viewport FRACTION on in-flow content
+   (check (g)), and a MIN that grew with the screen — 439px of empty state at 844px tall, which is more
+   than the phone band's whole allowance. (The `--setup-h-matched` panel this comment used to say it
+   drove has not existed since the ResizeObserver plumbing retired — main.tsx names its removal. There
+   is no paired height to re-check.) */
+.map-empty-hero { position: relative; overflow: hidden; flex: 1; min-height: 12rem; }
 .map-empty-hero > :not(.empty-atmos) { position: relative; z-index: 1; }
 .map-empty-hero .home-hero-bloom { top: 8%; height: 42%; opacity: .22; }
 .map-empty-hero .home-hero-grid { bottom: -14%; height: 58%; opacity: .55; }

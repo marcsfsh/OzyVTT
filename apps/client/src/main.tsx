@@ -65,6 +65,27 @@ function installKeyboardFocusHelper(): () => void {
   return () => document.removeEventListener("focusin", onFocusIn);
 }
 
+/**
+ * THE PHONE TABLE (C1), as a fact the components can read. Below the 980 rung the table is a frame
+ * whose map is a fixed band and whose sheet takes the rest, and three of its arrangements are
+ * genuinely not expressible in CSS: which ROW the pre-claim picker belongs to, and whether a
+ * side-dock — 242px of a 330px band at 390px — may be offered or chosen at all. Same rung as the
+ * stylesheet's, and it is the ladder's (design-language §breakpoints), not a fourth number.
+ */
+const PHONE_TABLE_QUERY = "(max-width: 979px)";
+function usePhoneTable(): boolean {
+  const [phone, setPhone] = useState(() => typeof window !== "undefined" && (window.matchMedia?.(PHONE_TABLE_QUERY).matches ?? false));
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia(PHONE_TABLE_QUERY);
+    const onChange = () => setPhone(query.matches);
+    onChange();
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return phone;
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { headers: { "content-type": "application/json", ...init?.headers }, ...init });
   const body = await response.json();
@@ -165,6 +186,7 @@ function App() {
     const stored = Number(localStorage.getItem("vtt.dock-width"));
     return Number.isFinite(stored) && stored >= 240 ? stored : 352; // 22rem default
   });
+  const phoneTable = usePhoneTable();
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   /**
@@ -389,8 +411,20 @@ function App() {
    */
   const playerHasClaimed = mode === "player" && !!state
     && (state as PlayerView).actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
-  const showDocked = combatMapActive && dockPosition !== "sidebar";
-  const encounterDock = combatMapActive ? { position: dockPosition, onChange: setDockPosition } : undefined;
+  /**
+   * BELOW THE RUNG THERE IS NOWHERE TO DOCK (C1). A side dock takes `min(22rem, 62vw)` — 242px of a
+   * 330px map band at 390px — and `showDocked` renders the panels as a bare unbounded stack with no
+   * accordion at all, so a saved `left`/`right` from a laptop session arrived on the phone as a map
+   * you cannot read beside a column that cannot scroll. So the phone forces `sidebar` and offers no
+   * picker: neither the panel's three 28x28 dock buttons nor the map toolbar's View-group field
+   * render, because there is no choice to make there.
+   *
+   * The STORED preference is untouched — `dockPosition` is what the localStorage effect writes, and
+   * this only overrides what the table DOES with it — so rotating a tablet back over the rung, or
+   * opening the same table on the laptop, still finds the dock where the GM left it.
+   */
+  const showDocked = combatMapActive && !phoneTable && dockPosition !== "sidebar";
+  const encounterDock = combatMapActive && !phoneTable ? { position: dockPosition, onChange: setDockPosition } : undefined;
   const encounterPanel = state
     ? (mode === "gm"
       ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} mapLibrary={mapLibrary} onSelectMap={setSelectedMap} dock={encounterDock} />
@@ -398,7 +432,7 @@ function App() {
     : null;
   // The map dock is present whenever combat is running (even in sidebar mode) so its in-map dock
   // control is reachable from inside the enlarged map; `node` is only the panel when actually docked.
-  const mapDock = combatMapActive
+  const mapDock = combatMapActive && !phoneTable
     ? { position: dockPosition, onChange: setDockPosition, width: dockWidth, onWidthChange: setDockWidth, node: showDocked ? encounterPanel : null }
     : undefined;
   // GM-private scene staging: when the GM is previewing a prepared scene, the table map renders THAT
@@ -606,31 +640,41 @@ function App() {
           and from a genuinely unknown address (invariant §3.2). */}
       {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundPage role="player" />}
 
-      {/* THE TABLE OWNS ITS FRAME (B1). No staging wrapper: the surface fills the pane and the map
-          takes what the rows above it leave, so nothing here scrolls as a whole. C1 still redesigns
-          the PHONE composition of it.
+      {/* THE TABLE OWNS ITS FRAME (B1), at every width since C1. No staging wrapper and no
+          `.scroll-y`: above the rung two columns share one height and the map takes what the rows
+          above it leave; below it the same rows stack into a frame whose map is a fixed band and
+          whose sheet takes the rest. Nothing here scrolls as a whole in either shape.
           The player half excludes `/replays`: that address renders the shared-replays page (below),
           and without the exclusion the live table stacked on top of it — the census's one
           stacking anomaly, which the lock forces fixed (the audit's player `/replays` row is its
           regression check). */}
-      {((mode === "player" && playerView === "table" && route.segments[0] !== "replays" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view scroll-y${showDocked ? " docked" : ""}`}>
+      {((mode === "player" && playerView === "table" && route.segments[0] !== "replays" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
         <section className="table">
-          {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
-              Guarded on the field, not just the mode - the first state after login can still be
-              player-projected (no scenes) until the session join lands. */}
-          {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <div className="scenes-open-row">
-            <Button variant="secondary" className="scenes-open" aria-label={activeScene ? `Scenes — ${activeScene.name} is live` : "Scenes"} onClick={() => setScenesModalOpen(true)}><IconScene className="scenes-open-icon" />{activeSceneName}<IconChevron className="scenes-open-caret" /></Button>
-          </div>}
-          {/* D15/D32 — the party is part of the TABLE. A player who has claimed nobody gets the picker
-              (never stranded by the roster's removal); a player who has claimed leads with their own
-              character; and out of combat both roles get the slim strip, because in combat the turn
-              order already carries the same people. */}
-          {mode === "player" && (playerHasClaimed
-            ? <YouArePlaying state={state as PlayerView} />
-            : <ClaimCharacter state={state as PlayerView} />)}
-          {!previewScene && !state.combat.active && (mode === "gm"
-            ? <PartyStrip role="gm" state={state as GmView} onOpenRoster={() => navigate(pathForGmTab("roster"))} />
-            : playerHasClaimed ? <PartyStrip role="player" state={state as PlayerView} /> : null)}
+          {/* THE TOP LINE. One 44px row below the rung — the scene door or your own character, and the
+              party beside it — and `display: contents` above it, so the laptop keeps the separate rows
+              it already had. The wrapper exists for that one job, and hides itself when it is empty
+              (an unclaimed player in combat has nothing to put in it). */}
+          <div className="table-topline">
+            {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
+                Guarded on the field, not just the mode - the first state after login can still be
+                player-projected (no scenes) until the session join lands. */}
+            {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <div className="scenes-open-row">
+              <Button variant="secondary" className="scenes-open" aria-label={activeScene ? `Scenes — ${activeScene.name} is live` : "Scenes"} onClick={() => setScenesModalOpen(true)}><IconScene className="scenes-open-icon" />{activeSceneName}<IconChevron className="scenes-open-caret" /></Button>
+            </div>}
+            {/* D15/D32 — the party is part of the TABLE. A player who has claimed leads with their own
+                character; and out of combat both roles get the slim strip, because in combat the turn
+                order already carries the same people. */}
+            {mode === "player" && playerHasClaimed && <YouArePlaying state={state as PlayerView} />}
+            {!previewScene && !state.combat.active && (mode === "gm"
+              ? <PartyStrip role="gm" state={state as GmView} onOpenRoster={() => navigate(pathForGmTab("roster"))} />
+              : playerHasClaimed ? <PartyStrip role="player" state={state as PlayerView} /> : null)}
+          </div>
+          {/* A player who has claimed nobody gets the picker, never stranded by the roster's removal.
+              WHERE it goes is the one thing about it that changed (decision Q3): 539px of cards is more
+              than a phone's whole map band, so below the rung it is the SHEET's body (rendered in the
+              sheet row below) and the band stays live above it — an unclaimed player in a running fight
+              still gets a map, and hiding a fight to show a picker is the worse trade. */}
+          {mode === "player" && !playerHasClaimed && !phoneTable && <ClaimCharacter state={state as PlayerView} />}
           {previewScene ? <>
             <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> — GM only. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
             <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} fog={previewScene.combat.fog} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} healthDisplay={previewScene.combat.healthDisplay} state={state} />
@@ -660,9 +704,16 @@ function App() {
           </>}
           {mode === "gm" && gmToken && !previewScene && <Button variant="secondary" className="viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</Button>}
         </section>
-        <div className="table-sidebar">
+        {/* THE SHEET ROW (C1). Above the rung this is the sidebar column it has always been; below it,
+            it is the one row that takes the leftover height and holds everything the band does not —
+            `.table-sheet` is the frame class B1 owns and B2's tabbed sheet builds inside. */}
+        <div className="table-sidebar table-sheet">
           {previewScene
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} stagingDefaults={(state as GmView).stagingDefaults} />
+            /* Q3 again: on a phone an unclaimed player's sheet IS the picker. There is nothing else it
+               could usefully be — you cannot take a turn, and the dice belong to a character. */
+            : mode === "player" && !playerHasClaimed && phoneTable
+              ? <ClaimCharacter state={state as PlayerView} />
             /* THE DOCK IS ONE ACCORDION (B1), in combat and out of it alike. Three headers always
                visible, one section holding the column's height. It replaces two different idioms that
                used to fight for the same space: a tracker that took what it wanted with dice and log

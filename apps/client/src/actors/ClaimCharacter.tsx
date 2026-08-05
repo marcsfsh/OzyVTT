@@ -38,7 +38,10 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
     });
   };
 
-  return <section className="claim-view" aria-labelledby="claim-heading">
+  /* A REGION, not a row (§7): 539px of cards at 390x844. `.scroll-y` declares it at every width —
+     above the rung it stops the picker shoving the map down its own column, and below the rung it is
+     the sheet's whole body (decision Q3), with the map band still live above it. */
+  return <section className="claim-view scroll-y" aria-labelledby="claim-heading">
     <div className="claim-heading">
       <h2 id="claim-heading">Choose your character</h2>
       <p>Pick who you'll play at the table.</p>

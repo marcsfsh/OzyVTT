@@ -144,7 +144,7 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
           <h3 className="roll-list-title">Recent rolls</h3>
           {mineActorId && <SegmentedControl size="sm" ariaLabel="Filter rolls" value={rollFilter} onChange={(value) => setRollFilter(value as "all" | "mine")} options={[{ value: "all", label: "Table" }, { value: "mine", label: "Mine" }]} />}
         </div>
-        <div className="roll-list" aria-label="Recent rolls">
+        <div className="roll-list scroll-y" aria-label="Recent rolls">
           {rolls.length === 0 && <p>{rollFilter === "mine" ? "No rolls from this character yet." : "No rolls yet."}</p>}
           {rolls.slice(-30).reverse().map((roll) => <article className="roll-card" key={roll.id}>
         <div className="roll-card-top"><span className={`roll-badge roll-badge--${roll.purpose}`} title={PURPOSE_LABELS[roll.purpose]}>{roll.label ?? PURPOSE_LABELS[roll.purpose]}</span><span className="roll-meta">{roll.initiatorLabel ?? "Unknown roller"} · {visibilityLabel(roll.visibility)}</span></div>

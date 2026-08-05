@@ -66,9 +66,10 @@
 .nh-modal.scenes-modal { max-width: min(100vw - 2rem, 68rem); }
 .scenes-modal .nh-gallery { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
 
-/* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). */
-.scenes-maps-view { display: flex; flex-direction: column; gap: var(--space-3); }
-.scenes-back { align-self: flex-start; }
+/* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). Since C2
+   that surface owns its own frame, so `.scenes-maps-view` is `MapManager`'s root class and its
+   rules live in `maps/map-manager.css` — including the back row, which is a row IN the frame now
+   rather than a button stranded above a staged region. Nothing for this file to say about it. */
 
 /* Drag-to-reorder handle (pointer + touch); keyboard reorder uses the ⋯ menu's Move earlier/later.
    It matches its neighbour the ⋯ trigger by construction: same 1.75rem square paint, same 44px hit

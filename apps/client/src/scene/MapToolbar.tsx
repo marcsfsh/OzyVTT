@@ -208,7 +208,7 @@ export function MapToolbar(props: MapToolbarProps) {
     // one and a half rows. The RESTING toolbar never overlaps anything — only the open menu does,
     // which is what a menu is for.
     return <div className={`encounter-map-overlay compact${railOpen ? " open" : ""}`} ref={rootRef}>
-      {railOpen && <div className="map-toolbar-rail" id={`${baseId}-rail`} ref={railRef} role="group" aria-label="Map tools">
+      {railOpen && <div className="map-toolbar-rail scroll-y" id={`${baseId}-rail`} ref={railRef} role="group" aria-label="Map tools">
         <div className="map-toolbar-rail-tools">
           {constantTools.map((entry) => <button key={entry.id} type="button" className="map-toolbar-row" aria-pressed={tool === entry.id} disabled={entry.blocked} title={entry.title} onClick={() => pickTool(entry.id)}>
             <span className="map-toolbar-row-icon" aria-hidden="true">{entry.icon}</span>{entry.label}
@@ -241,7 +241,7 @@ export function MapToolbar(props: MapToolbarProps) {
         <span className={`map-toolbar-caret${openGroup === group ? " open" : ""}`} aria-hidden="true"><IconChevron /></span>
       </button>)}
     </div>
-    {openGroup && <div className="map-toolbar-panel anim-popover" id={`${baseId}-${openGroup}`} role="group" aria-label={GROUP_LABEL[openGroup]}>
+    {openGroup && <div className="map-toolbar-panel scroll-y anim-popover" id={`${baseId}-${openGroup}`} role="group" aria-label={GROUP_LABEL[openGroup]}>
       <p className="map-toolbar-panel-title">{GROUP_LABEL[openGroup]}</p>
       {groupBody(openGroup)}
     </div>}

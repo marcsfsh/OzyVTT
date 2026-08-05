@@ -685,7 +685,7 @@ export function EncounterMap({
         })()}
 
         {dock?.node && <>
-          <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>
+          <div className={`encounter-map-dock scroll-y dock-${dock.position}`}>{dock.node}</div>
           <div className={`encounter-map-dock-resize dock-resize-${dock.position}`} role="separator" aria-label="Drag to resize the docked tracker" title="Drag to resize" onPointerDown={beginDockResize} />
         </>}
 
