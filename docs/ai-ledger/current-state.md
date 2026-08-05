@@ -24,8 +24,8 @@ table) each fight inherits at `encounter.start`, plus per-family exceptions (`co
 `effectiveModeFor` in `rules-families.ts`) so "don't police movement" doesn't also switch off the
 action economy. A GM override is one tap, remembered per family for the turn. `rules.ask` parks the
 exact command in `combat.pendingRuleAsks` (`rule-asks.ts`) and `rules.answer` replays or declines it;
-a player sees only their own ask, without its payload. B1 built the client half this lacked while the
-entry claimed it shipped (Ask row, waiting rows, GM Allow/Deny) — not browser-driven (`known-bugs.md`).
+a player sees only their own ask, without its payload. B1's client half (Ask row, waiting rows, GM
+Allow/Deny) is driven both ways; the parked command commits (`apps/client/src/encounter/rule-ask.test.tsx`).
 
 **One table feed** (D11). The combat-log store IS the feed (`apps/server/src/combat-log.ts`): every
 roll lands there as a `kind: "roll"` row carrying the whole `RollRecord`, attributed to its character,
