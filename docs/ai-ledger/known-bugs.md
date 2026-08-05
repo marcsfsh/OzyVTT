@@ -363,16 +363,15 @@ for a layout or pointer claim, a contrast calculator against
   which produced two convincing false findings (a "broken" mobile pin drag, an "unreachable" drawer close)
   before the reviewer caught it. Anyone writing automated mobile tests against this app will hit it.
 
-- **[mobile] The encounter *replay viewer* overflows horizontally at 390px (~99px).** **Pre-existing, not
-  introduced by the Codex overhaul** — proven by measuring both paths at 390px: opening a replay via the
-  existing "Watch" button on the Replays list gives the same 99px as arriving via
-  the new Codex "Open replay" link. The Replays *list* itself is clean (0px), as are all Codex surfaces.
-  `ReplayPanel`/`ReplayViewer` is a combat-pillar surface and outside the Codex overhaul's approved scope,
-  so M2 deliberately did not fix it. Worth noting that M2 makes the screen considerably easier to reach.
-  **Status 2026-08-03:** the panel was rebuilt for A8 (card rows, per-replay reveal control, launch-from-here,
-  a player viewer) and the LIST measures 0px at 390px. The **viewer** measurement has not been redone —
-  it needs an archived fight, which the rebuild pass did not stage — so this entry stays open until
-  someone measures the viewer itself. The line numbers above are from the pre-rebuild file.
+- **[replay/player] A player watching a shared replay sees "Map unavailable — you don't have access to
+  this map".** Measured 2026-08-05 (B3), GM and player side by side on the same archive at
+  `/replays/3`: the GM's stage renders the battle map, the player's renders `.replay-stage-missing` at
+  every viewport. The player replay projection carries `combat.mapAssetId`, but the asset read behind
+  `useAuthorizedMapImage` refuses a player session for a map that is not the live one — so the turn
+  order and log arrive and the picture never does. **Not a viewer-safety leak** (the failure is
+  closed, not open) and not introduced by the frame recompose, which measured it in both directions
+  before and after. Server-side: the fix is in the archive's asset authorization, not in
+  `replay/ReplayPanel.tsx`.
 
 - **[a11y] `--text-muted` fails AA at small sizes** (3.61:1 dark) — affects `.nh-choice-meta`,
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;

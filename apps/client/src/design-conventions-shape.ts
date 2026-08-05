@@ -177,8 +177,11 @@ export const CONVENTION_SHAPE = {
    * `min-width: 320px` both vanish here, and neither belongs in an allowlist.
    */
   ladderConditionFloor: 50,
-  /** Off-ladder `@media` conditions: **9** rows (2026-08-04). */
-  ladderOffRows: 9,
+  /**
+   * Off-ladder `@media` conditions: **9** rows (2026-08-04), **8** since B3 moved the replay
+   * viewer's `max-width: 900px` onto the 849 rung.
+   */
+  ladderOffRows: 8,
 
   // ─────────────────────────── (g) viewport units in app CSS ───────────────────────────
   /**
@@ -208,9 +211,11 @@ export const CONVENTION_SHAPE = {
    * files** (raw grep says 30 lines with 44 unit tokens; the scan excludes the structural
    * `100dvh`/paired/`:fullscreen` allows and counts occurrences, not lines) — then −1 file
    * the same day, when the styleguide's lone bare `100vh` took the lock unit instead.
+   * **−2 occurrences / −1 file (B3):** the replay viewer's stage caps (`68vh`, and the narrow
+   * arm's `50vh`) became the frame's leftover height, emptying `replay/replay.css`.
    */
-  viewportLegacyFiles: 6,
-  viewportLegacyTotal: 25,
+  viewportLegacyFiles: 5,
+  viewportLegacyTotal: 23,
 
   // ─────────────────────────── (h) declared scroll regions ───────────────────────────
   /**

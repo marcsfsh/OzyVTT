@@ -1,27 +1,59 @@
-/* The generic .card caps at 32rem; a replay needs the room the table gets. */
-.card.replay-panel { max-width: none; outline: none; }
-.replay-panel { outline: none; }
-.replay-panel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
-.replay-header { display: flex; align-items: flex-start; gap: 1rem; }
-.replay-header .replay-export { margin-left: auto; white-space: nowrap; }
+/* ---- THE REPLAY VIEWER'S FRAME (§7, refresh B3) ----
+   The viewer is the pane's one child: `.replay-header`, the transport and the step label are
+   chrome rows that never move, and `.replay-layout` is the one region row that takes the
+   leftover height. It used to ride the shell's staged `.pane-stage` scroller inside a `.card`,
+   and the card was three separate mistakes at once — a 32rem cap this surface had to undo, a
+   2.5rem top margin the frame already owns, and `.card button` (styles.css) repainting every
+   @vtt/ui Button in here as a primary regardless of its variant.
+
+   NO SKY. The standing ruling that keeps the table off the scene tier is "a horizon behind a
+   battle map competes with the map", and this surface IS a battle map with a transport under it.
+   The replays LIST (below) is the content-light half of the pair and stands on the sky. */
+.replay-viewer { gap: var(--space-2); outline: none; }
+/* The frame is full-bleed to the pane, so an OUTER focus ring would be clipped at the edges. */
+.replay-viewer:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring-color); }
+/* `.pane-frame` gives no bottom padding (its region normally owns that); the region here runs to
+   the pane's edge, so the frame keeps the last list row off it. Two classes to win on specificity
+   rather than on bundle order. */
+.replay-viewer.pane-frame { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
+.replay-notice { gap: var(--space-3); align-items: flex-start; }
+
+/* THE PHONE X-OVERFLOW FIX. Three nowrap children in a nowrap row, and the third —
+   `.replay-header-actions`, two long buttons — had no rule in any stylesheet at all. Measured
+   before: the row itself ran 134px past its box at 390x844 (known-bugs.md's "~99px", which was
+   the staged region's 93px). It wraps now, and the actions wrap inside it. */
+.replay-header { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.replay-header-text { flex: 1 1 12rem; min-width: 0; }
+.replay-header-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
 .replay-row-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
 .replay-header h2 { margin: 0; }
 .replay-meta { margin: 0.15rem 0 0; opacity: 0.75; font-size: 0.9rem; }
 .replay-error { color: var(--danger-hi); }
 
-.replay-transport { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0 0.25rem; flex-wrap: wrap; }
+.replay-transport { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .replay-transport input[type="range"] { flex: 1; min-width: 8rem; }
 .replay-position { font-family: var(--font-mono); font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
-.replay-step-label { margin: 0.25rem 0 0.75rem; }
+.replay-step-label { margin: 0; }
 
-.replay-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr); gap: 1rem; align-items: start; }
-.replay-stage svg { width: 100%; height: auto; max-height: 68vh; display: block; border-radius: var(--radius-md); background: var(--void); }
-.replay-stage-missing { display: grid; gap: 0.35rem; place-content: center; min-height: 14rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); padding: 1rem; text-align: center; opacity: 0.85; }
+/* The region row. `stretch`, not `start`: both columns are full height now, and the row is a
+   definite `1fr` so a long turn order cannot lengthen the surface. */
+.replay-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-3); align-items: stretch; }
+/* The stage, on the shared-screen viewer's shape (`.viewer-stage`, viewer.css): a centring grid
+   whose svg fills it and letterboxes by `preserveAspectRatio`. This is what replaced the
+   `max-height: 68vh` cap — measured binding EXACTLY at 1920x1080 (734px of an available 849). */
+.replay-stage { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; overflow: hidden; }
+.replay-stage svg { width: 100%; height: 100%; display: block; border-radius: var(--radius-md); background: var(--void); }
+.replay-stage-missing { display: grid; gap: 0.35rem; place-content: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); padding: 1rem; text-align: center; opacity: 0.85; }
 .replay-token-hidden { opacity: 0.65; }
 .replay-token-hidden .encounter-token-body { stroke-dasharray: 4 3; }
 
-.replay-side h3 { margin: 0.25rem 0 0.4rem; font-size: 0.95rem; }
-.replay-initiative, .replay-log { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.3rem; }
+/* The side lists: one declared region (`.scroll-y` in the markup) holding both. The tab strip is
+   the narrow arm's control and is display:none until the rung below. */
+.replay-side { min-width: 0; gap: var(--space-2); }
+.replay-side-tabs { display: none; }
+.replay-side-scroll { display: flex; flex-direction: column; gap: var(--space-3); }
+.replay-side h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+.replay-initiative, .replay-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
 .replay-initiative li { display: grid; grid-template-columns: 1fr auto; gap: 0 0.5rem; padding: 0.35rem 0.55rem; border-radius: var(--radius-sm); background: var(--surface-2); }
 .replay-initiative li.active { background: color-mix(in srgb, var(--magenta) 18%, transparent); box-shadow: inset 2px 0 0 var(--magenta), var(--glow-magenta-strong); }
 .replay-initiative li > strong { grid-column: 2; grid-row: 1; font-family: var(--font-mono); }
@@ -49,7 +81,18 @@
 .replay-row-meta { color: var(--text-muted); font-size: var(--fs-xs); }
 @media (max-width: 560px) { .nh-card.replay-row { flex-wrap: wrap; } .replay-row-text { flex: 1 0 100%; } }
 
-@media (max-width: 900px) {
-  .replay-layout { grid-template-columns: 1fr; }
-  .replay-stage svg { max-height: 50vh; }
+/* THE 850 RUNG (§3 — this was an off-ladder `max-width: 900px`). Below it the two columns become
+   one: the map keeps a band and the side lists take the rest AS TABS, one at a time. That is the
+   dock accordion's bargain (`encounter/DockAccordion.tsx`) at its smallest — every choice stays
+   visible, exactly one body holds the space — and it is what replaced the second viewport cap
+   (`max-height: 50vh` on the stage svg). The rows are a 2:3 split with a 6rem floor under the map,
+   so the stage never collapses to nothing on a short phone. */
+@media (max-width: 849px) {
+  .replay-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(6rem, 2fr) minmax(0, 3fr); }
+  .replay-side-tabs { display: flex; }
+  .replay-side-tabs .nh-segmented-option { flex: 1 1 0; }
+  /* The tab says which list this is; the heading inside it would only say it twice. */
+  .replay-side-pane > h3 { display: none; }
+  .replay-side.is-order .replay-side-log,
+  .replay-side.is-log .replay-side-order { display: none; }
 }

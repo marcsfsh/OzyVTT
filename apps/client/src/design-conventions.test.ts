@@ -552,8 +552,7 @@ const LADDER_ALLOW: ReadonlyArray<readonly [file: string, kind: "min" | "max", w
   ["apps/client/src/integrations/api-reference.css", "max", 700],
   ["apps/client/src/integrations/api-reference.css", "max", 700],
   // Off-ladder AND double-firing with min-width: 850px at exactly 850px.
-  ["apps/client/src/maps/map-manager.css", "max", 850],
-  ["apps/client/src/replay/replay.css", "max", 900]
+  ["apps/client/src/maps/map-manager.css", "max", 850]
 ];
 
 describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
@@ -670,8 +669,6 @@ const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phas
   ["apps/client/src/homebrew/homebrew.css", "50vh", "B"],
   ["apps/client/src/homebrew/homebrew.css", "40vh", "B"],
   ["apps/client/src/homebrew/homebrew.css", "50dvh", "B"],
-  ["apps/client/src/replay/replay.css", "68vh", "B"],
-  ["apps/client/src/replay/replay.css", "50vh", "B"],
   ["apps/client/src/styles.css", "52vh", "B"],
   ["apps/client/src/viewer/viewer-controls.css", "54vh", "B"],
   ["apps/client/src/viewer/viewer-controls.css", "50vh", "B"]

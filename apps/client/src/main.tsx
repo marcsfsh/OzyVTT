@@ -562,16 +562,15 @@ function App() {
       onClose={() => navigate(`/characters/${layer.actorId}`)}
       onDone={() => navigate(`/characters/${layer.actorId}`)}
     />}
-    {/* staged region — B3 (replay viewer recompose) drains it */}
-    {shellVisible && state && layer?.kind === "replay" && mapToken && <div className="anim-view replay-page pane-stage scroll-y">
-      <ReplayViewer
-        role={mode === "gm" ? "gm" : "player"}
-        token={mapToken}
-        archiveId={layer.archiveId}
-        onBack={() => navigate("/replays")}
-        onLaunched={() => navigate("/table")}
-      />
-    </div>}
+    {/* The replay viewer owns its frame (§7, B3): header + transport + step label above one
+        region row, so it takes the pane directly — the staging wrapper drained with it. */}
+    {shellVisible && state && layer?.kind === "replay" && mapToken && <ReplayViewer
+      role={mode === "gm" ? "gm" : "player"}
+      token={mapToken}
+      archiveId={layer.archiveId}
+      onBack={() => navigate("/replays")}
+      onLaunched={() => navigate("/table")}
+    />}
     {shellVisible && state && layer?.kind === "sheet" && (() => {
       const actor = state.actors.find((entry) => entry.id === layer.actorId);
       // A player asking for someone else's sheet gets the not-found view: their projection does not
