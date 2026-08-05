@@ -13,6 +13,34 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
+- **[encounter/ask] A denied question reaches the player only through the combat log, and a waiting one
+  is invisible while they are anywhere but the tracker.** Driven 2026-08-05 with two live sessions.
+  `DockAccordion` unmounts a collapsed body, so with the player on **Dice** the pinned `MyPendingAsks`
+  row is not in the DOM at all (measured: 0 nodes) and nothing else stands in for it — the three headers
+  read "Turn order / Dice / Combat log" with no count on any of them. The half that is right is the
+  important half: **focus is never stolen**. `document.activeElement` was byte-identical before and after
+  the GM answered, on both the Dice and the Combat log section, and the open section never changed. An
+  **Allow** does reach them anywhere, because an allowed move now really happens and the table event
+  toasts ("Lyra Emberwise used Dagger." was measured on the player's page while they sat on Dice); a
+  **Deny** produces no toast, no badge and no row — only a combat-log line, which the player sees only if
+  they happen to have the Log open. Not a correctness defect (the player asked the question, and the
+  state is right on both sides); it is the attention model the accordion's unmount cost, and the fix is a
+  count on the section header rather than a new surface.
+
+- **[table/mobile] At 390×844 the battle map paints over the player's dock, and their own actions cannot
+  be tapped.** Measured 2026-08-05 on a genuine phone-width first paint, not a resize. `section.table`
+  ends at y=459, but `.encounter-map-stage` renders at **460–684** — it is `position: relative`, so it
+  paints above the sidebar's static content — while `.dock-accordion` occupies 483–776 and the open
+  `.dock-section-body` 527–672. `elementFromPoint` at the centre of the player's own "Dagger" row returns
+  the map's `<image>`, and a real `touchscreen.tap` there opens nothing (the targeting card never
+  appears). The cause is above the stage: the "YOU'RE PLAYING …" banner wraps to roughly 390px tall and
+  eats the whole map column, so the stage overflows below its own section, whose `overflow` is `visible`.
+  **The page itself never scrolls** (0/0 both axes), so `scripts/no-scroll-audit.mjs` passes while the
+  surface is unusable — it measures document scroll, not occlusion. Found while verifying ask-the-GM,
+  which is downstream of it: a refusal renders inside the tracker, so it is covered too. Belongs to the
+  table recompose rather than the ask flow, and it is why that flow's phone pass had to open the block at
+  laptop width before measuring (`docs/ai-context/mobile-ux.md`).
+
 - **[codex/export] A large backup bundle is one synchronous serialization on the GM's request
   thread.** The restore path itself shipped (`POST /codex/import` → `store.importBundle`), and
   migration v17 bounded revision growth with a global switch plus a coalescing window, with
@@ -398,6 +426,16 @@ for a layout or pointer claim, a contrast calculator against
 
 ## Gotchas that look like bugs (but aren't)
 
+- **[encounter/ask] A parked question survives the turn advancing, and a late Allow resolves the move
+  out of turn.** Driven 2026-08-05: with the question waiting, "Next turn" moved the fight to the next
+  character and left the row on both screens; the GM's Allow then rolled and applied the parked Dagger
+  for the previous character. That is the design, not a leak — nothing expires the queue on advance, the
+  replay runs under GM authority with an injected override, and "not your turn" is itself an overridable
+  economy rule. A combatant **cannot** leave a running fight (`actor:remove` refuses with "End the
+  encounter before removing a combatant who is in it"), so the parked target cannot vanish underneath the
+  question; the failure branch that remains is a question already answered, covered by
+  `apps/server/test/rules-ask.test.ts`.
+
 - **[codex, viewer safety] Auto-linking a session number to players is fixed, twice over —
   do not re-solve it.** A revealed record must not carry an unrevealed session's number, and both
   the projection and the linker enforce it now. The full history and the reasoning are in
@@ -421,22 +459,3 @@ designed but surprising, it belongs under **Gotchas** so nobody "fixes" it by ac
 needs a browser, a contrast calculator or a runtime repro before anyone can say, it goes under
 **Unverified** with the reason. **Nothing fixed stays in any of the three** — delete it, and
 let the regression test carry the memory.
-
-### [verification gap] ask-the-GM has never been driven end to end in a browser
-
-**Where:** `apps/client/src/encounter/RuleAsk.tsx`, wired at `EncounterPanel.tsx` (player runner,
-player pinned rows, GM queue above the turn order).
-
-**What is unverified:** the two-session flow — a player driven into a real Enforce block, asking, and
-the GM allowing and denying. Static gates all pass (typecheck, 157 test files, the play-vocabulary
-scanner) and the server half is covered by `apps/server/test/rules-ask.test.ts`, but the client half
-has not been exercised against a live block. The probe could not get a character claimed and an action
-refused in the same session; that is a limitation of the probe, not a known defect in the flow.
-
-**Why it is written down rather than assumed fine:** this exact feature was recorded as shipping while
-it had no interface at all. It does not get a second unverified claim.
-
-**Next:** drive it with two live sessions — Enforce, a fight, a claimed character, a spent action, then
-Ask → Allow and Ask → Deny; confirm a pending ask survives a turn advancing (the server does not expire
-one) and that a stale Allow fails visibly with the question left parked; confirm the public viewer
-carries nothing.
