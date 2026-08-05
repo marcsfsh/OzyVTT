@@ -42,7 +42,7 @@ export function CombatLogPanel() {
     <div className="combat-log-heading"><span className="eyebrow">LOG</span><h2 id="combat-log-heading">Combat log</h2></div>
     {log.length === 0
       ? <p className="combat-log-empty">No combat events yet.</p>
-      : <ol className="combat-log-list" ref={listRef} aria-live="polite">
+      : <ol className="combat-log-list scroll-y" ref={listRef} aria-live="polite">
           {log.map((entry) => <li key={entry.id} className={`combat-log-entry log-${entry.kind}`}><span className="combat-log-text">{entry.text}</span></li>)}
         </ol>}
   </section>;

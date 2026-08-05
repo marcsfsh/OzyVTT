@@ -394,7 +394,7 @@ export function PlayerActionRunner({ actorId, definition, extraActions = [], rev
     </>}
     {picking && !result?.preview && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
       <p className="action-targeting-head"><strong>{picking.action.name}</strong> - {picking.mode === "single" ? "choose one target" : "choose targets"}</p>
-      <ul className="action-target-list">{targets.filter((target) => target.actorId !== actorId).map((target) => {
+      <ul className="action-target-list scroll-y">{targets.filter((target) => target.actorId !== actorId).map((target) => {
         const checked = picking.selected.includes(target.actorId);
         return <li key={target.actorId}>
           <label className="action-target">
@@ -619,7 +619,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           `.scroll-y` is in the markup because that is the marker check (h) accepts.
           The auto-scroll anchors below now scroll THIS region rather than the page, which is the
           behaviour they always wanted. */}
-      <div className="encounter-region scroll-y">
+      <div className={`encounter-region scroll-y${view === "sheet" ? " is-sheet" : ""}`}>
       {view === "sheet" && myActor
         ? <CharacterSheet actor={myActor} role="player" state={props.state} embedded combat={{ revision: props.state.revision, active: combat.active, myTurn, playerDamageMode: combat.playerDamageMode, targets: combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name })) }} onJumpToInitiative={() => { setView("initiative"); setReturnToSheetAfterAttack(true); }} onClose={() => setView("initiative")} />
         : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
@@ -973,7 +973,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         <button type="button" ref={menuButtonRef} className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Fight options - rules assistant, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && createPortal(<>
           <div className="encounter-menu-backdrop" onPointerDown={() => setMenuOpen(false)} />
-          <div className="encounter-menu anim-dialog" role="menu" aria-label="Fight options" style={menuPos ? { top: menuPos.top, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
+          <div className="encounter-menu anim-dialog scroll-y" role="menu" aria-label="Fight options" style={menuPos ? { top: menuPos.top, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
             <label className="rules-mode-control">Rules assistant
               <Select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.` : result.message ?? "The rules assistant could not be changed.")); }}>
                 <option value="strict">Enforce - blocks illegal moves; you can allow them</option>
@@ -1077,7 +1077,13 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             </button>
             {editing
               ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
-              : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative - click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
+              /* Route 2 (design-language §4): the score is a quiet inline number beside a name and an
+                 HP readout, and growing its PAINT to 44px would put a chunky button in every row of a
+                 dense tracker. The budget is measured and it fits: the paint is 30.4x34.3, so the
+                 centred `::after` overhangs 6.8px horizontally into a 12px row gap and 4.85px
+                 vertically into 13.4px between rows (two neighbours = 9.7px). Its one horizontal
+                 neighbour, `.initiative-expand`, is 45.1px tall and carries no extension of its own. */
+              : <button type="button" className="initiative-score-value tap-target" disabled={busy} title="Initiative - click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
           </div>
           {expanded && actor && <>
             <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); }} />

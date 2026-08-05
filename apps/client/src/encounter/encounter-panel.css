@@ -1,3 +1,45 @@
+/* ============ THE PHONE'S TABBED SHEET (C1/B2) ============
+   Below the 980 rung the dock is not a column, so it cannot be an accordion: the map is a fixed band
+   and this is the sheet under it (design-language.md:401 — "three stacked panels cannot share 844px
+   with a map"). `DockAccordion.tsx` renders the same three choices as one `Tabs` bar over one body.
+   The row this stands in is `.table-sheet` in styles.css (`flex: 1 1 auto; min-height: 0`); everything
+   here is what goes INSIDE it.
+
+   Each panel then either FILLS the body or FLOWS in it, and which one is a measurement, not a taste:
+   - The tracker and the log FILL it, so their own feed is the scroller. That is what keeps the combat
+     log pinned to the newest line: `CombatLog.tsx` writes `scrollTop = scrollHeight` to
+     `.combat-log-list`, so that element has to be the thing that scrolls or the log opens at the top.
+   - Encounter setup and the dice FLOW, and the body scrolls them, because their chrome does not fit.
+     Measured at 390x844: the dice panel's heading, roll-input preference, six quick dice, advantage
+     row, two disclosures and feedback line still come to 398px against a 412px body AFTER the trims
+     below, so pinning them would leave the roll list single digits tall. Flowing gives the feed its
+     full height and puts its first card — the newest roll — at y=830 in an 844px window, on screen.
+     GM setup measures the same way out of combat: 723px of panel in a 348px body. */
+.dock-tabs { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.dock-tabs-bar { flex: none; }
+.dock-tabs-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
+/* Inside the sheet these are the body's contents, not cards standing in a column: they drop the
+   standalone card's outer margin, and the two that can fill hand their scrolling to the list that grows. */
+.dock-tabs-body > .encounter-panel, .dock-tabs-body > .dice-proof, .dock-tabs-body > .combat-log { margin-top: 0; }
+.dock-tabs-body > .encounter-panel.combat-active, .dock-tabs-body > .combat-log { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.dock-tabs-body .combat-log-list { flex: 1; min-height: 0; max-height: none; }
+/* Dice keeps no card chrome here — the tab bar is the frame — and no cap on the feed, so the tab is
+   one region rather than a scroller inside a scroller. */
+.dock-tabs-body > .dice-proof { padding: .1rem 0 0; border: 0; background: transparent; }
+.dock-tabs-body .roll-list { max-height: none; }
+/* Tighten the gaps BETWEEN the dice controls (not the controls, which are all at the 44px floor).
+   Dropping the card's 24px padding already put the six quick dice on one row instead of two — 98.6px
+   to 45.3 — and these four margins take the roll list's first card from 25px below the fold to above
+   it, which is the difference between "you rolled and nothing changed" and seeing your result. */
+.dock-tabs-body > .dice-proof .dice-quick,
+.dock-tabs-body > .dice-proof .dice-custom,
+.dock-tabs-body > .dice-proof .roll-list-head { margin-top: .5rem; }
+.dock-tabs-body > .dice-proof .dice-feedback { margin-top: .4rem; }
+/* The count of questions waiting on the GM, on the header that is still on screen when the body that
+   would have shown them is unmounted (known-bugs.md). Caution, not danger: nothing has gone wrong —
+   a move is simply not allowed yet, and someone is waiting on a call (§2). */
+.dock-waiting-count { display: inline-grid; place-items: center; min-width: 1.3rem; margin-left: .4rem; padding: 0 .3rem; border-radius: var(--radius-pill); background: var(--caution); color: var(--text-on-neon); font: 800 var(--fs-2xs)/1.7 var(--font-mono); vertical-align: baseline; }
+
 .encounter-panel { margin-top: 2.5rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .encounter-panel.compact { padding-block: 1.1rem; }
 /* Live-combat hue shift (§6.10): a quiet magenta tint while an encounter runs. Higher specificity than
@@ -11,7 +53,10 @@
 /* Dock picker sits on its own compact row so it never competes with the title for width. */
 .encounter-dock-picker { display: flex; align-items: center; gap: .3rem; margin-top: .7rem; }
 .encounter-dock-label { margin-right: .1rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
-.encounter-dock-choice { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: 1rem; line-height: 1; cursor: pointer; }
+/* Route 1 (design-language §4). The three sit 4.8px apart in one row, and a `.tap-target` on a 28px
+   square overhangs 8px a side — the later chip would take the earlier one's taps. There is no room to
+   buy with a bigger gap either, so the paint grows. */
+.encounter-dock-choice { display: grid; place-items: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: 1rem; line-height: 1; cursor: pointer; }
 .encounter-dock-choice:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-dock-choice[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
 /* Setup is the quick-start door now (D1): map line, staging tray, the two Add buttons, Recent and
@@ -110,7 +155,10 @@
 /* One control bar, one control height: the round pill, ‹, Next, +, and ⋯ all line up as equal-height
    pills with their glyph/text centered, so nothing reads as an odd shape (report #1). */
 /* Kept deliberately compact - turn nav is frequent but shouldn't dominate the panel (feedback #3.3). */
-.encounter-topbar { --control-h: 2rem; position: relative; display: flex; align-items: center; gap: .35rem; margin-top: .6rem; }
+/* One token, one row: `--control-h` is the height of every control on this bar, so the 44px floor is a
+   single edit here rather than five. It was 2rem, which put the round pill, ‹, Next turn, + and ⋯ all
+   at 32px — the busiest bar in a running fight, all of it under the floor. */
+.encounter-topbar { --control-h: var(--tap-min); position: relative; display: flex; align-items: center; gap: .35rem; margin-top: .6rem; }
 .encounter-topbar > .encounter-round { display: inline-flex; align-items: center; height: var(--control-h); margin: 0; padding: 0 .7rem; }
 .encounter-topbar .turn-controls { flex: 1 1 auto; margin-top: 0; display: grid; grid-template-columns: var(--control-h) 1fr; gap: .35rem; }
 .encounter-topbar .turn-controls button { height: var(--control-h); padding: 0 .6rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: var(--fs-sm); }
@@ -131,7 +179,9 @@
    menu reads as a popover, not a modal. Above the enlarged map (z-40); the menu sits above it. */
 .encounter-menu-backdrop { position: fixed; inset: 0; z-index: 41; }
 /* Anchored under the ⋯ button via inline top/left/width/max-height computed from the button rect. */
-.encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); overflow-y: auto; display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* `.scroll-y` rides this in EncounterPanel's markup (check (h)). The 85vh cap stays: this is a fixed
+   overlay layer, which is the one place §7 rule 2 keeps the idiom. */
+.encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
 /* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
 .encounter-menu .rules-mode-control { flex-direction: column; align-items: stretch; gap: .3rem; margin: 0; }
 .encounter-menu .rules-mode-control select { width: 100%; }
@@ -178,7 +228,9 @@
 /* Turn economy: pressed = spent. */
 .turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .45rem; padding: .3rem .45rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .turn-economy-name { margin-right: .15rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
-.economy-slot { padding: .24rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+/* Route 1: the slots wrap in a .3rem-gap row, which is 4.8px against the 4.85px a side a `.tap-target`
+   would overhang at their measured 34.3px — the pills would steal each other's taps. */
+.economy-slot { min-height: var(--tap-min); padding: .24rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .economy-slot:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .economy-slot[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); text-decoration: line-through; }
 /* Same pill shape + size as the Action/Bonus/Reaction slots, keeping the primary magenta fill. */
@@ -200,7 +252,10 @@
 /* Rollable stat-block actions read as real buttons (report #6): a border + raised fill + magenta left
    accent so it's obvious they're tappable. The name sits on its own line with the mechanics stacked as
    bullets beneath it, so nothing is crammed onto one truncated line (owner feedback). */
-.action-row { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: .3rem; padding: .55rem .65rem; border: 1px solid var(--line); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: left; cursor: pointer; }
+/* Route 1 is not a choice here: this is a stacked list, and design-language §4 forbids route 2 in one —
+   overlapping invisible `::after` boxes in a vertical list steal their neighbours' taps. The rollable
+   rows are already well past the floor; it is the flat reference rows below that were 39.9px. */
+.action-row { width: 100%; min-height: var(--tap-min); display: flex; flex-direction: column; align-items: stretch; gap: .3rem; padding: .55rem .65rem; border: 1px solid var(--line); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: left; cursor: pointer; }
 .action-row:hover:not(:disabled) { background: var(--surface-3); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); border-left-color: var(--magenta-hi); }
 .action-row-name { font-size: var(--fs-body); font-weight: 800; color: var(--text); }
 .action-row-summary { list-style: none; margin: 0; padding: 0; display: grid; gap: .18rem; }
@@ -212,7 +267,9 @@
 .action-row .action-hint { display: block; margin-top: .05rem; font-size: var(--fs-xs); }
 /* Reference-only actions (no structured attack/save/damage): flat, quiet, and single-line so the
    button-styled rollable actions above stand out. Tap to reveal the rules text. */
-.action-row-static { flex-direction: row; align-items: baseline; gap: .5rem; border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
+/* `align-items: center`, not baseline: the row carries the 44px floor now, and a baseline in a box
+   taller than its one line of text parks the text at the top with the rest of the target empty below. */
+.action-row-static { flex-direction: row; align-items: center; gap: .5rem; border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
 .action-row-static:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; border-left-color: var(--line-strong); }
 .action-row-static[aria-expanded="true"] { background: var(--surface-2); opacity: 1; }
 .action-row-static strong { flex: none; font-size: var(--fs-sm); }
@@ -220,7 +277,10 @@
 .action-reference-text { margin: .35rem 0 .1rem; padding: .5rem .65rem; border-left: 2px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .action-targeting { margin-top: .4rem; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .action-targeting-head { margin: 0 0 .45rem; font-size: var(--fs-sm); color: var(--text-dim); }
-.action-target-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; max-height: 11rem; overflow-y: auto; }
+/* The scroll is declared in the MARKUP (`.scroll-y`, both call sites — ActionRunner and the player's
+   own runner in EncounterPanel): check (h) reads that class, and a bare `overflow-y` here would be a
+   region no reader of either component can see. */
+.action-target-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; max-height: 11rem; }
 .action-target { display: flex; align-items: center; gap: .5rem; font-size: var(--fs-sm); cursor: pointer; }
 .action-target input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--magenta); }
 .action-targeting-buttons { display: flex; gap: .5rem; margin-top: .6rem; }
@@ -266,8 +326,10 @@
 .action-preview .manual-nat20 input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; padding: 0; accent-color: var(--magenta); }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
-.action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
-.action-apply { width: 100%; margin-top: .5rem; padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 78%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; cursor: pointer; }
+/* .65rem, not .55rem: the pair measured 42.1px, 1.9px under the floor, and they sit in a stretch row
+   so the field and the button have to grow together or they stop matching. */
+.action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .65rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
+.action-apply { width: 100%; margin-top: .5rem; padding: .65rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 78%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; cursor: pointer; }
 .action-apply:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 .action-applied { color: var(--cyan-hi); font-size: var(--fs-sm); font-weight: 700; }
 .action-save-targets { list-style: none; margin: .45rem 0 0; padding: 0; display: grid; gap: .3rem; }
@@ -283,9 +345,14 @@
 .save-prompt-roll { flex: 0 0 auto; }
 .save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; flex: 1 1 12rem; }
 .save-prompt-actions input { flex: 1 1 auto; min-width: 7rem; width: auto; margin: 0; padding: .4rem .6rem; text-align: left; }
-.save-prompt-actions button, .save-prompt-confirm button { padding: .4rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
+/* Route 1 across the owed-answer widget: it is a wrapping .4rem-gap row, so 4.85px of `::after` a side
+   from each of two neighbours (9.7px) would not fit the 6.4px between them. */
+.save-prompt-actions button, .save-prompt-confirm button { min-height: var(--tap-min); padding: .4rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .save-prompt-actions button:hover:not(:disabled), .save-prompt-confirm button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.save-prompt-dismiss { flex: none; margin-left: auto; width: 1.8rem; height: 1.8rem; display: grid !important; place-items: center; padding: 0 !important; line-height: 1; background: transparent !important; color: var(--text-muted) !important; }
+/* Route 1, and it costs nothing: the control is transparent, so growing the PAINT from 28.8px to the
+   floor grows an invisible box. A `.tap-target` here would overhang 7.6px a side into a wrapping
+   .4rem-gap row of prompt buttons — nine of these were measured under the floor in one running fight. */
+.save-prompt-dismiss { flex: none; margin-left: auto; min-width: var(--tap-min); min-height: var(--tap-min); display: grid !important; place-items: center; padding: 0 !important; line-height: 1; background: transparent !important; color: var(--text-muted) !important; }
 .save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .economy-movement { font-size: var(--fs-xs); color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
 /* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler indigo accent so the two owed-answer kinds read apart. */
@@ -338,7 +405,7 @@
 /* At-a-glance health band (design language §6) under the HP readout; number stays the primary display. */
 .sheet-hp-meter { margin: .3rem 0 .1rem; }
 .sheet-hp-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
-.sheet-hp-controls input { width: 2.9rem; margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
+.sheet-hp-controls input { width: 2.9rem; min-height: var(--tap-min); margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
 /* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
 .sheet-hp-controls input:disabled { opacity: .5; cursor: default; }
 /* Dmg/Heal/Temp/Set now render as <Button size="sm"> (Dmg destructive). */
@@ -385,7 +452,16 @@
 .sheet-rollable:disabled { cursor: default; opacity: .75; }
 .sheet-roll-row { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .4rem 0 0; }
 .sheet-roll-label { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-.sheet-roll-chip { padding: .22rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
+/* THE DENSITY DECISION (C1/B2). 28 of these were under the floor — 18 in the skill list at 24.6px, the
+   rest on the saves/checks rows at 25.9px — and they are the single biggest population of sub-44px
+   controls in the app. Route 2 is not available: in the skill list the rows sit ~9px apart and a
+   `.tap-target` on a 24.6px chip overhangs 9.7px a SIDE, so every chip would take its neighbour's taps
+   — the exact failure design-language §4 forbids in a stacked list. So the paint grows, and the cost is
+   paid back where it is cheapest: the skill row's own padding drops from .28rem to .14rem, which turns
+   a +19.4px-per-row change into +15px. Measured at 390x844, one column of 18: 603.6px -> 872.4px in a
+   pane that already scrolls. That is the honest trade — these are the sheet's primary play controls on
+   a phone, and a 24.6px roll chip is not one you can hit while holding the phone in one hand. */
+.sheet-roll-chip { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .22rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
 .sheet-roll-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); }
 .sheet-roll-chip:disabled { cursor: default; opacity: .6; }
 .sheet-entry p { margin: 0 0 .3rem; }
@@ -409,7 +485,9 @@
 .sheet-inv-head span { color: var(--text-muted); font: 800 .54rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; text-align: center; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
 .sheet-inv-head .sheet-item-name { text-align: left; }
 .sheet-inv-row .sheet-inv-qty, .sheet-inv-row .sheet-toggle-btn, .sheet-inv-row .sheet-remove { justify-self: center; }
-.sheet-toggle-btn { min-width: 4.8rem; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
+/* Route 1: inventory rows are a stacked list 9.6px apart, and 11.2px of `::after` a side would have
+   each row's Equip/Attune reaching into the row above and below it. */
+.sheet-toggle-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 4.8rem; min-height: var(--tap-min); padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
 .sheet-toggle-btn:hover:not(:disabled) { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-toggle-btn.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 18%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
 .sheet-toggle-btn:disabled { opacity: .55; cursor: default; }
@@ -421,7 +499,7 @@
 /* v6 #5: a derived-from-equipment weapon action - a quiet meta line marking it as one, not a stat-block action. */
 .sheet-weapon-meta { color: var(--text-muted); font-size: var(--fs-xs); font-style: normal; }
 .sheet-add-item { display: flex; gap: .4rem; margin: .55rem 0 0; }
-.sheet-add-item input { flex: 1; min-width: 0; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
+.sheet-add-item input { flex: 1; min-width: 0; min-height: var(--tap-min); padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
 /* Add / Browse SRD gear / Save coins now render as <Button size="sm">. */
 /* Inventory rows now carry the catalog category as a subtle badge after the name. */
 .sheet-item-name { display: inline-flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
@@ -432,7 +510,10 @@
 .sheet-picker-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
 .sheet-picker-chip { padding: .22rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
 .sheet-picker-chip.is-active { color: var(--text); background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
-.sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; overflow-y: auto; }
+/* `.scroll-y` rides this in equipment.tsx's markup — check (h): a scroller the stylesheet declares on
+   its own is a scroller no reader of the component can see. The 52vh cap stays: it bounds a MODAL
+   layer, which §7 rule 2 allows and the (g) allowlist already reasons about. */
+.sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; }
 /* v3 #2.9.1: comfortable row padding so names/buttons aren't jammed against the edges. */
 .sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .5rem .4rem; border-bottom: 1px solid var(--line); }
 .sheet-picker-item { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
@@ -463,8 +544,14 @@
 
 /* --- sheet v2: readability + tap targets --- */
 .sheet-ability { display: flex; flex-direction: column; align-items: center; gap: .1rem; }
-.sheet-ability-rolls { display: flex; gap: .25rem; margin-top: .2rem; }
-.sheet-ability-rolls button { padding: .12rem .38rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
+/* `align-self: stretch` so the pair spans the ability cell rather than hugging its own text — that is
+   where the width half of the floor comes from; `flex-wrap` so a cell too narrow for two 44px buttons
+   stacks them instead of overflowing. */
+.sheet-ability-rolls { display: flex; flex-wrap: wrap; align-self: stretch; gap: .25rem; margin-top: .2rem; }
+/* The smallest controls in the app — 12 of them at 18.5px tall. Route 1: they sit 4px apart in a pair
+   inside a 6.4px-gap grid, and a `.tap-target` on an 18.5x27.6 chip overhangs 12.75px vertically and
+   8.2px horizontally, so each one would swallow its partner and the ability cell above it. */
+.sheet-ability-rolls button { display: inline-flex; align-items: center; justify-content: center; flex: 1 1 auto; min-width: var(--tap-min); min-height: var(--tap-min); padding: .12rem .38rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
 .sheet-ability-rolls button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .sheet-ability-rolls button.prof { color: var(--magenta); }
 .sheet-ability-rolls button.prof em { font-style: normal; font-size: .62em; opacity: .8; margin-left: .1em; vertical-align: super; }
@@ -475,7 +562,10 @@
    roomier rows; a lettered P/E bubble; the roll chip is the read-first value. */
 .sheet-skill-cols { display: block; columns: 15rem 2; column-gap: 1.5rem; }
 .sheet-editor .sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .5rem; break-inside: avoid; -webkit-column-break-inside: avoid; padding: .28rem 0; }
+/* .14rem, not .28rem: the roll chip carries the 44px floor as real paint now (see .sheet-roll-chip),
+   so the row's own padding is where the density is bought back. The chip's border is what separates
+   one row from the next, which a 9px gutter was doing before it. */
+.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .5rem; break-inside: avoid; -webkit-column-break-inside: avoid; padding: .14rem 0; }
 .sheet-skill-list li .sheet-roll-chip { min-width: 3rem; text-align: center; padding: .3rem .5rem; font-size: var(--fs-sm); }
 /* v6 #6: editor rows are name (fills) + a fixed-width toggle pinned to the right, so every skill's toggle
    lines up in a column instead of drifting with the skill-name length. */
@@ -635,7 +725,10 @@
 
 /* Optional dice dock (opt-in, desktop only): pin the log beside the sheet as a fixed side panel so rolls
    stay visible while you act. Off by default (the toggle collapses it); a phone has no room — stays toggle. */
-@media (min-width: 681px) {
+/* The 650/651 rung, not 681/680 (§ the one breakpoint ladder). The pair MUST move together — one is
+   the exact complement of the other, and a gap or an overlap between them is a width where the dock
+   toggle is both offered and impossible. */
+@media (min-width: 651px) {
   .character-sheet.has-log.docked { max-width: min(100vw - 2rem, 68rem); }
   .sheet-workspace.has-log.docked .sheet-workspace-cols { flex-direction: row; }
   .sheet-workspace.has-log.docked.show-sheet .log-pane { display: block; }
@@ -646,7 +739,7 @@
   .sheet-workspace.has-log.docked .sheet-last-roll { display: none; }
 }
 /* No room to dock two panes on a phone — hide the control there (it stays the Sheet/Dice toggle). */
-@media (max-width: 680px) { .sheet-dock-btn { display: none; } }
+@media (max-width: 650px) { .sheet-dock-btn { display: none; } }
 
 /* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). The
    unified header doubles as the drag handle (.sheet-header--drag), so there is no separate title bar. */
@@ -654,8 +747,39 @@
 .sheet-float-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%); }
 
 /* Embedded inline in a panel (v4 #8): fills its container, panel chrome, no modal. */
-.sheet-embedded { display: flex; flex-direction: column; min-height: 0; max-height: 78vh; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); overflow: hidden; }
+/* The `max-height: 78vh` here was a frame missing its parent's height contract, not a cap anyone
+   wanted: the box was already a `min-height: 0` flex column that clips, so all the viewport fraction
+   did was guess at a height its container was not giving it. The container gives it one now — the
+   region it stands in becomes a flex column while the sheet is showing (`.encounter-region.is-sheet`),
+   and this fills it. Where the region has no definite height of its own (the tracker docked into the
+   map), it sizes to content and that dock scrolls, which is the honest answer rather than a fraction
+   of a viewport nobody measured. */
+.sheet-embedded { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); overflow: hidden; }
+/* While the player's own sheet is the tracker's content it IS the region — one child, taking all of it. */
+.encounter-region.is-sheet { display: flex; flex-direction: column; }
 .sheet-embedded .sheet-workspace { flex: 1; min-height: 0; }
+/* Inside the tracker on a phone the sheet is a PANE, not a document, and its modal header is a title
+   block written for one. Measured at 390x844 once the region gave it a real height: header 170.5 +
+   rollbar 81.4 + last roll 44.2 = 296px of a 312px region, leaving the sheet itself 40px. The name is
+   already on the row above (`.you-are-playing`) and the sub-line repeats the sheet's own identity
+   block, so here the header is a row: one line of name, the controls, and the way back. */
+@media (max-width: 979px) {
+  /* The name is the sheet's subject and it was losing to the tool row. `.sheet-header-id` is
+     `min-width: 0`, so at 390 it shrank below a single word: the modal rendered "M" on one line with
+     the rest of "Mirena Dawnbright" running under Sheet/Dice · Pop out · New tab · ✕. Give the name
+     its own line below the rung and let the tools have theirs. The embedded presentation opts out
+     just below — there the name is one small line and the row is the point. */
+  .sheet-header { flex-wrap: wrap; }
+  .sheet-header-id { flex: 1 1 100%; }
+  .sheet-embedded .sheet-header { flex-wrap: nowrap; }
+  .sheet-embedded .sheet-header-id { flex: 1 1 auto; }
+  .sheet-embedded .sheet-header { align-items: center; gap: .4rem; padding: .3rem var(--space-3); }
+  .sheet-embedded .sheet-name { font: 400 var(--fs-body)/1.2 var(--font-display); }
+  .sheet-embedded .sheet-header-sub { display: none; }
+  .sheet-embedded .sheet-rollbar { padding: .2rem var(--space-3); }
+  .sheet-embedded .sheet-last-roll { padding-inline: var(--space-3); }
+  .sheet-embedded .sheet-pane { padding: var(--space-3); }
+}
 /* Player map view: Initiative / My sheet toggle (v4 #8). */
 .player-view-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
 .player-view-toggle button { padding: .22rem .7rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
@@ -708,7 +832,9 @@
 /* Where an add lands and what it will be — read-only here; the staging tray owns the decision. */
 .monster-browser-target { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .monster-browser-target strong { color: var(--text); }
-.monster-browser-list { flex: 1 1 auto; overflow-y: auto; list-style: none; margin: .8rem 0 0; padding: 0 .25rem 0 0; border-top: 1px solid var(--line); }
+/* `.scroll-y` rides this in MonsterBrowser's markup (check (h)); the modal's own height contract is
+   what gives the region something to fill. */
+.monster-browser-list { flex: 1 1 auto; list-style: none; margin: .8rem 0 0; padding: 0 .25rem 0 0; border-top: 1px solid var(--line); }
 .monster-browser-list li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .1rem; border-bottom: 1px solid var(--line); }
 .monster-browser-name { min-width: 0; }
 .monster-browser-name strong { display: block; }
@@ -724,11 +850,9 @@
 .scene-switch { display: flex; align-items: center; gap: .5rem; margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
 .scene-switch select { width: auto; margin-top: 0; flex: 1 1 auto; text-transform: none; letter-spacing: normal; font-size: var(--fs-body); color: var(--text); }
 
-.encounter-add-combatant { margin-top: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); padding: .5rem .75rem; }
-.encounter-add-combatant summary { cursor: pointer; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; }
-.add-combatant-list { list-style: none; margin: .6rem 0; padding: 0; display: grid; gap: .35rem; max-height: 14rem; overflow-y: auto; }
-.add-combatant-list li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: var(--fs-sm); }
-.add-combatant-list button { flex: 0 0 auto; padding: .35rem .8rem; background: var(--primary); color: var(--text-on-neon); border: 0; border-radius: var(--radius-sm); text-align: center; font-weight: 700; }
+/* (The `.encounter-add-combatant` disclosure and its `.add-combatant-list` were deleted: the markup
+   became `.menu-add-list` / `.menu-add-row` inside the ⋯ menu, and the only surviving mention of the
+   old name is the COMMAND `"encounter:add-combatant"`, which is a wire word, not a class.) */
 
 .encounter-heading-tools { display: flex; align-items: center; gap: .5rem; flex: none; }
 .encounter-scenes-toggle { flex: none; padding: .45rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; white-space: nowrap; }
@@ -783,7 +907,10 @@
 /* The shared builtin catalog as one wrapped chip cluster — never 16 full rows. */
 .builtin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin-top: .4rem; }
 .builtin-actions-label { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin-right: .15rem; }
-.builtin-chip { padding: .16rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+/* Route 1: the cluster wraps at a .25rem gap (4px), and 6.35px a side of `::after` from two adjacent
+   chips needs 12.7px. The precedent that gets away with route 2 — the condition-chip row — buys its
+   overhang with a `var(--space-3)` gap; there is no equivalent room in a six-chip common-actions row. */
+.builtin-chip { display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: .16rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .builtin-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .builtin-chip.hinted { opacity: .55; }
 
@@ -824,7 +951,8 @@
 .rt-table th, .rt-table td { border: 1px solid var(--line); padding: .22rem .55rem; text-align: left; vertical-align: top; }
 .rt-table th { background: var(--surface-3); color: var(--text-dim); white-space: nowrap; }
 .action-reference-group { margin-top: .35rem; }
-.action-reference-group > summary { padding: .25rem .2rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+/* Route 1 — design-language §4 names disclosure summaries explicitly, and it is a stacked row besides. */
+.action-reference-group > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: .25rem .2rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-reference-group > summary:hover { color: var(--text-dim); }
 .action-reference-group .action-list { margin-top: .25rem; }
 
@@ -852,7 +980,8 @@
 /* Legendary actions (SRD): a one-tap console switch per off-turn legendary creature, and the
    off-turn console variant showing the per-round pool instead of the turn actor's economy. Violet = special. */
 .legendary-strip { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
-.legendary-offer { padding: .28rem .6rem; border: 1px dashed var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+/* Route 1: a .35rem-gap wrapping strip leaves 5.6px, against 6.8px a side of overhang at 30.4px. */
+.legendary-offer { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .28rem .6rem; border: 1px dashed var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .legendary-offer:hover:not(:disabled) { border-color: var(--violet-hi); border-style: solid; }
 .legendary-offer:disabled { color: var(--text-muted); border-color: var(--line); cursor: default; }
 .acting-console.legendary-acting { border-left-color: var(--violet); border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); background: color-mix(in srgb, var(--surface-2) 86%, var(--violet)); }

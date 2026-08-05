@@ -70,7 +70,7 @@ export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEn
     </div>
     {error && <p className="monster-browser-status" role="alert">{error}</p>}
     {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}
-    {monsters && <ol className="monster-browser-list">
+    {monsters && <ol className="monster-browser-list scroll-y">
       {shown.map((monster) => <li key={monster.id}>
         <div className="monster-browser-name"><strong>{monster.name}</strong><small>CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}</small></div>
         <button type="button" className="monster-browser-add" disabled={busyId !== null} onClick={() => add(monster)}>{busyId === monster.id ? "Adding…" : "Add"}</button>
