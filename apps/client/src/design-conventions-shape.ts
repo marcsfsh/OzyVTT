@@ -144,7 +144,7 @@ export const CONVENTION_SHAPE = {
    * row — the white A/B labels, which must read over arbitrary map art.
    */
   colorAllowFiles: 11,
-  colorAllowTotal: 50,
+  colorAllowTotal: 49,
 
   // ─────────────────────────── (e) one feedback channel ───────────────────────────
   /**

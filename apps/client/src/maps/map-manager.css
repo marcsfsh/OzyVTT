@@ -39,8 +39,13 @@
 .map-upload label { display: flex; flex-direction: column; flex: 1 1 9rem; gap: .3rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
 .map-upload-optional { color: var(--text-muted); }
 .map-upload-file { flex: 0 1 auto; max-width: 100%; gap: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The real input stays in the DOM (the button clicks it) but never takes layout or focus order. */
-.map-upload-input { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); }
+/* The real input stays in the DOM (the button clicks it) but never takes layout or focus order.
+   `width`/`height: 1px` is NOT enough on its own for `type="file"`: Chromium gives the input an
+   intrinsic size from its shadow "Choose File" button, so the border box measured 27.59px while
+   `clip-path` and `position` from this same rule applied normally — the tap audit saw a 27.6px
+   control with reach 0 and could not tell it from a real one. `min-*: 0` plus zeroed padding and
+   border collapse the intrinsic contribution, so the box is the 1px this rule always claimed. */
+.map-upload-input { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; border: 0; clip-path: inset(50%); }
 
 /* ─────────────────────────────── the body ─────────────────────────────── */
 /* One row, one or two columns. Below the 850 rung the rail and the pane share the single column

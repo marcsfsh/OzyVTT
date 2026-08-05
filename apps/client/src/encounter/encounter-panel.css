@@ -622,27 +622,39 @@
 /* A player's own castable list flattens the "cast at" controls into the SAME row grid (v5 #2): the effect
    helper, the slot dropdown (or the cantrip "At will" tag), and the Cast button are three fixed columns,
    so on every row the helper / dropdown / Cast sit on identical vertical lines - cantrips included. */
-.sheet-spell-list.castable li { grid-template-columns: 5rem minmax(0, 1fr) 3.7rem 6.8rem 3.8rem; }
-/* ...and BELOW THE 760 RUNG it stacks onto two lines, because the five fixed tracks do not fit a
-   phone. 80 + 59.2 + 108.8 + 60.8 plus four .5rem gaps is 340.8px, which is exactly the row's own
-   content width at both 320px and 390px - so `minmax(0, 1fr)`, the spell NAME, resolved to 0px and
-   the name button overflowed its empty cell UNDER the effect chip painted beside it: measured
-   2026-08-05, `elementFromPoint` at the name's centre returned the chip and reach was 0 on six of
-   seven rows. (The row also overflowed its 320px container by 32px, since its min-content width is
-   352px.) Two lines keep the trio's cross-row alignment - the tracks are still fixed - while giving
-   the name a real column and a real tap. */
-@media (max-width: 760px) {
-  .sheet-spell-list.castable li {
-    grid-template-columns: 5rem minmax(0, 1fr) 3.8rem;
-    grid-template-areas: "prep name name" "effect slot cast";
-    row-gap: .3rem;
+/* TWO LINES BY DEFAULT, one line only where the row demonstrably fits (below). The single five-track
+   row was 80 + 59.2 + 108.8 + 60.8 wide plus four .5rem gaps = 340.8px, which is EXACTLY the row's own
+   content width at 320px and 390px - so `minmax(0, 1fr)`, the spell NAME, resolved to 0px and the name
+   button overflowed its empty cell UNDER the effect chip painted beside it: measured 2026-08-05,
+   `elementFromPoint` at the name's centre returned the chip and reach was 0 on six of seven rows. The
+   row also overflowed its 320px container by 32px.
+   Stacked is the DEFAULT rather than a `max-width` query because the worst container is not the
+   narrowest viewport: the player's own sheet rides the dock (`.table-layout`'s
+   `minmax(var(--dock-w), 27rem)` in styles.css), which is 352-432px wide at ANY viewport - at a 980px
+   viewport it sits at exactly its 22rem floor. A viewport query cannot see that, and defaulting the
+   other way would leave the one sheet a player actually plays from as the one sheet still broken.
+   The name track floors at `--tap-min` so it can never be crushed below the tap floor it now carries. */
+.sheet-spell-list.castable li {
+  grid-template-columns: 5rem minmax(var(--tap-min), 1fr) 3.8rem;
+  grid-template-areas: "prep name name" "effect slot cast";
+  row-gap: .3rem;
+}
+.sheet-spell-list.castable li > .sheet-prep-tag { grid-area: prep; }
+.sheet-spell-list.castable li > .sheet-spell-name { grid-area: name; }
+.sheet-spell-list.castable li > .sheet-cast-effect { grid-area: effect; }
+.sheet-spell-list.castable li > .sheet-cast-select,
+.sheet-spell-list.castable li > .sheet-cast-slot { grid-area: slot; }
+.sheet-spell-list.castable li > .sheet-cast-btn { grid-area: cast; }
+/* One line for the two mounts whose container IS the page - the `/characters/:id` page and the modal
+   (`CharacterSheet.tsx:907`/`:921`; the third mount, `.sheet-embedded`, is the dock) - above the 760
+   rung, where the five tracks' 396px min-content fits with room. This is the v5 #2 alignment: the
+   helper, the dropdown and Cast sit on identical vertical lines across every row, cantrips included. */
+@media (min-width: 761px) {
+  :is(.sheet-standalone, .character-sheet) .sheet-spell-list.castable li {
+    grid-template-columns: 5rem minmax(var(--tap-min), 1fr) 3.7rem 6.8rem 3.8rem;
+    grid-template-areas: none;
   }
-  .sheet-spell-list.castable li > .sheet-prep-tag { grid-area: prep; }
-  .sheet-spell-list.castable li > .sheet-spell-name { grid-area: name; }
-  .sheet-spell-list.castable li > .sheet-cast-effect { grid-area: effect; }
-  .sheet-spell-list.castable li > .sheet-cast-select,
-  .sheet-spell-list.castable li > .sheet-cast-slot { grid-area: slot; }
-  .sheet-spell-list.castable li > .sheet-cast-btn { grid-area: cast; }
+  :is(.sheet-standalone, .character-sheet) .sheet-spell-list.castable li > * { grid-area: auto; }
 }
 /* v4 #6: hover lights the whole row so it's obvious which dropdown/CAST belongs to which spell. */
 .sheet-spell-list li:hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }

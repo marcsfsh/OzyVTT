@@ -66,10 +66,9 @@ default), *Launch from here* whose confirm says the live scene is **parked**, an
 own store, router and change ping (`homebrew-store.ts`, `homebrew-http.ts`); D&D Beyond PDF ingestion
 (`packages/dndbeyond-pdf`, ADR-0018). The example party are ordinary characters.
 
-
 **The screen is the page** (D15/D30, refresh A1). `body` is locked and `<main>` is a 100dvh grid —
 [connection row][tab bar][content pane] (`apps/client/src/styles.css`); layers render in the pane,
-unconverted surfaces scroll a phase-tagged `.pane-stage` region, post-auth notices ride the toast.
+every surface owns a real frame (staging retired in Phase C), post-auth notices ride the toast.
 `/` is the title screen (per-theme `--landing-*` skies); the party is the table's, not the shell's.
 **And the app wears a sky** (§9 reversal, decision log 2026-08-04): `.pane-scene` + a `.pane-sky` child
 paint a literal scene — starfield, a sun cresting a lit horizon, a receding grid floor — off one
@@ -123,13 +122,14 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **"The screen is the page" refresh (this branch, 2026-08-05). A, B and C are all in.** C1 gave the
-  phone table a map band + a tabbed Turn/Dice/Log sheet (`.table-layout` was 9803px inside an 800px
-  pane, now 800); C2 made calibration four steps with the canvas always mounted (0px on screen at a
-  1280×720 landing, now 374 in every step). Ratchets: ladder **0**, viewport-legacy **0**, undeclared
-  scrollers **1** (`map-picker.css` serves the embedded picker, which has no frame to take height from).
-- **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
-  rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
+- **"The screen is the page" refresh (this branch, 2026-08-05). A, B and C are all in.** C1: phone
+  table = map band + tabbed Turn/Dice/Log sheet (`.table-layout` was 9803px in an 800px pane, now 800).
+  C2: calibration is four steps, canvas always mounted (0px on screen at a 1280×720 landing, now 374
+  in every step). Ratchets — ladder 0, viewport-legacy 0, undeclared scrollers 1 (`map-picker.css`
+  serves the embedded picker, which has no frame to take height from). Tap floor **124 → 9** of 1223,
+  0 unreachable: 8 are §4 exceptions, 1 a 1×1 hidden input. **No QA stage ran — self-consistent, not
+  independently verified.**
+- **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`); rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
 - **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.
 
 ## Known broken

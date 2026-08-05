@@ -47,7 +47,8 @@ there is no reduced mobile mode, and a mouse-only control is a bug.
   lock + the `<main>` grid frame). Keep the two resets separate.
 - Keyboard safety under the locked shell: a `focusin` helper in `apps/client/src/main.tsx`
   nudges the focused field into view within its own scrolling region, and regions carry
-  `scroll-padding` + safe-area bottoms (`.pane-stage`; the wizard layer's own padding).
+  `scroll-padding` + safe-area bottoms (`.pane-frame > .scroll-y`; the wizard layer's own
+  padding).
   Verified in emulation only — the physical-device pass is still GAP-001.
 - **Card grids halve their density at the 560 rung.** The scenes gallery is the pattern
   (`apps/client/src/scenes/scene-gallery.css`): the 1:1 card a laptop shows becomes a two-column

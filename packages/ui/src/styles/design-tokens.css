@@ -647,7 +647,7 @@ button, a, .interactive, [role="button"], summary {
    compensating for a sticky header only the styleguide entry has; under the locked shell the
    SPA page cannot scroll at all, so anchors and scroll-padding belong to the REGION that
    scrolls — §7 rule 3. The styleguide keeps its own copy in styleguide.css; the wizard layer
-   and the shell's `.pane-stage` already carry region scroll-padding.) */
+   and the shell's `.pane-frame > .scroll-y` already carry region scroll-padding.) */
 
 /* House transition recipe. Never `all` (7.2). `filter` is in the list because chamfered
    surfaces glow through drop-shadow filters (see .chamfer) and their glow should ease

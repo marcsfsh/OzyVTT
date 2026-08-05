@@ -2,10 +2,10 @@
    The viewer is the pane's one child: `.replay-header`, the transport and the step label are
    chrome rows that never move, and `.replay-layout` is the one region row that takes the
    leftover height. It used to ride the shell's staged scroller (`.pane-stage`, retired in Phase C
-   once nothing was left staging) inside a `.card`, and the card was three separate mistakes at
-   once — a 32rem cap this surface had to undo, a
-   2.5rem top margin the frame already owns, and `.card button` (styles.css) repainting every
-   @vtt/ui Button in here as a primary regardless of its variant.
+   once nothing was left staging) inside a `.card`, and the card was three separate mistakes at once
+   — a 32rem cap this surface had to undo, a 2.5rem top margin the frame already owns, and
+   `.card button` (styles.css) repainting every @vtt/ui Button in here as a primary regardless of
+   its variant.
 
    NO SKY. The standing ruling that keeps the table off the scene tier is "a horizon behind a
    battle map competes with the map", and this surface IS a battle map with a transport under it.

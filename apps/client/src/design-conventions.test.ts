@@ -384,7 +384,7 @@ const COLOR = /#[0-9a-fA-F]{3,8}\b|%23[0-9a-fA-F]{3,6}|rgba?\(|hsla?\(/g;
 
 /** Per-file counts, each with the reason those literals are there. Measured 2026-08-03: 51 across 11 files. */
 const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: string]> = [
-  ["apps/client/src/actors/pdf-import.css", 6, "import-status hues (amber/red/violet) that never became tokens"],
+  ["apps/client/src/actors/pdf-import.css", 5, "import-status hues (amber/red/violet) that never became tokens"],
   ["apps/client/src/codex/codex.css", 1, "graph node-icon fill over arbitrary map art"],
   ["apps/client/src/maps/map-manager.css", 11, "SVG-context paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG-context paint: annotation strokes over image content"],

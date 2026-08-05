@@ -186,6 +186,7 @@ unmeasured. Run it at 320px too: the narrower width is the worse case, not the b
 | Raw `<input type="checkbox">` — now exactly one: `.manual-nat20` (`encounter/EncounterPanel.tsx`) | A replaced element cannot take `::after`; it needs its wrapping `<label>` to carry `min-height`. Narrowed twice: 2026-08-03 the monster browser's GM-only checkbox went with D2's tray-level reveal control, and 2026-08-05 `.integration-scope` took `min-height: var(--tap-min)` on its label — which cleared **14** audit rows at once, because the audit measures `max(el, closest("label"))`. This row names its whole remaining population rather than a class. |
 | `.api-reference-intro a` (`integrations/ApiReference.tsx`) | **Accepted, not deferred.** An inline link inside a sentence, not a control. Route 1 is *inert* on it — `display: inline`, and `min-height` does not apply to non-replaced inline boxes (CSS 2.1 §10.5) — so meeting the floor would mean making it `inline-block`, changing how it wraps mid-sentence. Route 2 measurably steals taps: with `.tap-target` the `::after` becomes 133.9×44 against a 21.6px line-height, and `elementFromPoint` at ±14px and ±18px starts returning the link instead of the prose, capturing ~58% of each adjacent line box (measured 2026-08-05). The floor-compliant route to the same artifact already exists in the same panel — `.api-export-spec`, 195.7×44, which downloads the document the sentence cites. |
 | `.encounter-token` (battle map) | **Accepted, not deferred**, and for a reason the graph row below does not have: a token's size is `sizePx` in **image-pixel space** (`apps/server/src/token-placement.ts`), scaled to the screen by the SVG `viewBox` — so growing it to 44px would draw a Large token where a Medium one stands. That changes what the *game state means*, not the chrome, which is a different and worse trade than any other row here. Mitigated the way the graph is: the map pans and zooms, so a token grows into the floor when you zoom in, and nothing steals the tap — the audit measured reach 21 against a token's own 15.8px box at 375px. |
+| `input.map-upload-input` (`maps/MapManager.tsx`) | **Not a control at all — counted, not excused.** It is `type="file"`, `aria-hidden="true"`, `tabIndex={-1}`, clipped, and clicked only by the visible "Add map…" button, which is itself at the floor. It was measured at **27.59px** and *did* look like a real control: `width/height: 1px` does not collapse a file input, because Chromium gives it an intrinsic size from its shadow "Choose File" button, while `clip-path` and `position` from the same rule applied normally. Fixed 2026-08-05 with `min-*: 0` and zeroed padding/border, so the box is now genuinely **1×1**. It still appears in the audit's sub-floor list, and the audit is right to count every rendered control rather than trust an attribute — the honest reading is "1 of the 9 is a 1×1 hidden input", not a narrowed scope. |
 | `.codex-graph-node` (Connection graph) | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. The number of sub-floor nodes is data-dependent and width-dependent — it scales with the campaign, so it is a tool output, never a constant in a document. |
 
 An earlier version of this section quoted a single measured total for both widths and a
@@ -301,8 +302,8 @@ them, and that the two steps no test can demand are remembered.
    `node scripts/no-scroll-audit.mjs` against your route at 1280×720-class and 390×844
    before calling it done. *(Status: standard adopted 2026-08-04; the shell lock is in
    force — the body is locked and `<main>` is the frame — so no surface can scroll the
-   document; a surface not yet recomposed scrolls one staged `.pane-stage` region until its
-   phase lands. The ratchet checks and the route audit are in repo — §10.)*
+   document, and since Phase C every surface has recomposed into a real frame of its own.
+   The ratchet checks and the route audit are in repo — §10.)*
 
 ---
 
@@ -312,10 +313,10 @@ them, and that the two steps no test can demand are remembered.
 > `body` holds `height: 100dvh; overflow: hidden` and `<main>` is the frame
 > (`apps/client/src/styles.css`); the standalone shared-screen viewer
 > (`apps/client/src/viewer/viewer-page.css`), the standalone sheet entry and the
-> Modal/Drawer primitives were already conforming. **The document never scrolls; a surface
-> not yet recomposed scrolls one temporary pane region** (`.pane-stage` + `.scroll-y`,
-> phase-tagged per wrapper in `apps/client/src/main.tsx`) until its phase lands. Sections
-> marked *(refresh)* below describe the standard those surfaces adopt as B/C implement them.
+> Modal/Drawer primitives were already conforming. **The document never scrolls, and since
+> Phase C every surface owns a real frame** — the temporary staged pane region A1 bought the
+> lock with (`.pane-stage` + `.scroll-y`, phase-tagged per wrapper) drained with the last of
+> them and the class is deleted. Sections marked *(refresh)* below describe that standard.
 
 **The law.** The app page never scrolls. A surface is a **frame** (chrome that never moves:
 tab bar, headers, toolbars, transport rows) plus **regions**, and every region either fits
@@ -357,7 +358,8 @@ it the frame stays fixed and regions scroll harder, and nothing may become unrea
 3. Anchors and `scroll-padding` belong to regions, not the root: the
    `html { scroll-behavior… scroll-padding-top }` recipe is retired from the shared tokens —
    the styleguide entry keeps its own copy (`styleguide.css`), and scrolling regions declare
-   their own padding (the wizard layer and `.pane-stage` do). `--header-h` retired with it.
+   their own padding (the wizard layer and `.pane-frame > .scroll-y` do). `--header-h`
+   retired with it.
 4. Density: `comfortable` rows are ≥44px (`--tap-min`) and the default everywhere;
    `compact` (36px paint, `.tap-target` route 2) exists only inside GM data regions
    (initiative rows, level tables, log lines) and never on a phone *(the pair is the
@@ -365,8 +367,8 @@ it the frame stays fixed and regions scroll harder, and nothing may become unrea
 5. Keyboard: a focused input inside a locked region must stay visible above the on-screen
    keyboard — the region scrolls to it; the frame never moves. A shell-level `focusin`
    helper (`apps/client/src/main.tsx`) nudges the focused field into view within its own
-   region, and regions carry `scroll-padding` + safe-area bottoms (`.pane-stage`, the
-   wizard/Modal practice). iOS/Android remain unverified on device (GAP-001).
+   region, and regions carry `scroll-padding` + safe-area bottoms (`.pane-frame > .scroll-y`,
+   the wizard/Modal practice). iOS/Android remain unverified on device (GAP-001).
 6. Gestures: `touch-action: none` on draggables stands (mobile-ux.md). New rule — once a
    draggable's *container* scrolls, re-verify drag-vs-scroll at 390px; a drag that used to
    rubber-band the dead page now fights a live scroller.
@@ -398,13 +400,13 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 
 | Surface | Grade | Frame | Regions (scroll marked ▤) |
 |---|---|---|---|
-| App shell | **done (A1)** — unlocked all below | connection row · tab bar | content pane (canvas for the active surface; unconverted surfaces ride a staged `.pane-stage` ▤ until their phase) |
+| App shell | **done (A1)** — unlocked all below | connection row · tab bar | content pane (canvas for the active surface; every surface now stands in it as its own frame — the staged `.pane-stage` ▤ that carried the unconverted ones drained with the last of them in Phase C and the class is deleted) |
 | Table, GM — laptop | **done (B1)** — frame and dock accordion both | tab bar · scene row · party strip | **map canvas** flex-fills — the `72vh` cap and the `--setup-h` map-measuring plumbing are gone, and the stage takes the frame's leftover height (849px at 1920×1080 where the cap allowed 680) · the dock is one accordion (`apps/client/src/encounter/DockAccordion.tsx`, landed in `cb43140`): three headers always visible, exactly one body holding the flex and scrolling ▤, and the `<details>` idiom the dice and log used to hide behind is gone. Measured 1280×900: `.dock-accordion` 856px tall, three `.dock-section-head`, the open body overflowing +1518 inside its own region, document scroll 0 |
 | Table, GM — phone | **done (C1)** | tab bar · slim scene/party row | map as a fixed **band** (`flex: 0 1 14rem; min-height: 9rem` on the stage — the box that is only ever map, so a tray drop cannot shrink it under the finger), beneath it one tabbed sheet: Turn ▤ / Dice ▤ / Log ▤. `Tabs`, not `SegmentedControl`, because the primitive paints a real 44px instead of reaching the floor with a `::after` that would extend up into the band's `touch-action: none` drag surface — verified by walking `elementFromPoint` down the seam, `.nh-tab` answers only from y=388 with the band ending at 379. Inactive bodies **unmount** (not `display: none`): `CombatLog` pins itself with `scrollTop = scrollHeight` and a hidden element measures 0. Measured 390×844: `.table-layout` was 2921/3692/**9803** in an 800px pane depending on the open section, and is **800 in every tab, both roles, in and out of combat** |
 | Table, player | **done (C1)** — follows the GM pattern | tab bar · slim `YouArePlaying` row | the 349px identity card became a 44px row (avatar · name · HP · Release · My sheet); the pre-claim picker is the sheet's region with the band still live above it. The table also stopped arriving pre-scrolled: `EncounterPanel`'s `activeRowRef.scrollIntoView({block:"nearest"})` walks **every** scrollable ancestor, so the initiative row scrolled the whole table (measured 202px on a genuine first paint, and the GM saw 25–202px too). The frame conversion removes it structurally — `.table-layout` is no longer a scroller — measured `scrollTop = 0` across 26 states |
 | Feed panels | trivial | — | roll list ▤ and log list ▤ go `flex:1` inside the dock |
 | Scenes gallery | **done (A2)** | heading · command bar | card grid ▤ — the region is the grid's WRAPPER, never the grid (a grid with a definite block size stops sizing its auto rows from its cards); ≤560 goes two compact columns instead of 1:1 squares; the ⋯ menu's Move earlier/later is the reorder route a scrolling grid cannot autoscroll to |
-| Scene prep / staging | trivial | — | already capped lists; rides the table dock |
+| Scene prep / staging | **done (C1)** | head row | one declared region ▤ · feedback row **outside** it, so an error cannot be scrolled away from. Regraded from "trivial · rides the table dock": once the phone table became a frame, the staging panel was the one thing in the sheet row that was not a frame column — 681px of content in a 413px box at 390×844, held up by a conditional `.scroll-y` on that one arm. Now `frame-col frame-fill`, so the row is uniform across arms and the panel scrolls itself (306 client / 540 scroll). Below the 979 rung the head drops its "Players see none of this…" sentence: pinning the head cost 117px of a 236px row at 375×667, and that line is the third statement of GM-only-ness on the screen (the staging banner over the map and the ARRANGING · GM ONLY eyebrow both remain) |
 | Maps library + calibration | **done (C2)** | back · heading · upload row | list rail ▤ · calibration pane as a four-step layout on `Steps` (mode → canvas → fields → verify), with the canvas mounted **once** as the pane's only flex-filling child — never inside a step panel, never conditionally unmounted. Measured 1280×720: the canvas had **0px** on screen at landing, 5px with a map selected and 215px (32%) while the fine-tune fields were focused; it is **374px in every step** now, and 734px at 1920×1080 with the rail pinned to `--rail-w`. Gridless/regional get a *review* step, never a verification — the server has no verification for the scale path, only `PUT …/scale`, and a badge no server computed would be a lie. The phone upload row collapses 376px → 44px (CSS-only reveal at the 560 rung), which is what makes the pane reachable at all: `.map-calibration` used to start at y=1215 |
 | Roster | **done (A2)** | heading · actions | queue + gallery + archived ▤ (cards take a 15rem cell so a claimed character's three actions fit; the archived `<summary>` carries the 44px floor) |
 | Codex shell | recompose | its own top bar | sidebar (sticky already) · main pane ▤ — per-view `NNvh` caps convert; the body editor owns its height (`resize: vertical` retires) |
