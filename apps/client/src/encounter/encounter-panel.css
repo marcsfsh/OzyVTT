@@ -54,8 +54,8 @@
    intrinsic widths they spend 331.3px on six buttons plus 40px of gaps = 371.3, which fits a 375px
    tab body with 3.7px to spare and does not fit 320 at all (measured at HEAD: two rows there, one
    row at 375 and 390) — so any side gutter at all wrapped 375 as well. As equal shares of the row
-   with the 44px tap floor as their basis they fit every width: measured 45.34px each at 320, 54.52
-   at 375, 57.02 at 390, all six on one row, and the row now fits the 320 floor it never did. The
+   with the 44px tap floor as their basis they fit every width: measured 46.67px each at 320, 55.84
+   at 375, 58.34 at 390, all six on one row, and the row now fits the 320 floor it never did. The
    tighter gap is the slack that buys the floor: 6x44 + 5x4.8 = 288 inside the 304px content box a
    320px phone has, and inside the 294px a 320px DESKTOP window has — that one is 10px narrower
    because a classic scrollbar takes its width from `.dock-tabs-body`'s content box where a phone's
