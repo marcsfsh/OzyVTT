@@ -37,10 +37,12 @@
  * user could actually perform. No equivalent inert stretch is known on the Y axis.
  *
  * READING THE OUTPUT: the shell lock (refresh A1) took the whole table green — the document
- * cannot scroll anywhere, because every unconverted surface scrolls one staged `.pane-stage`
- * region inside the locked frame instead. Any red cell is therefore a REGRESSION now. The
- * remaining conversion debt (staged regions becoming real per-surface frames) is carried by
- * the (g)/(h) ratchets in design-conventions.test.ts, not by this table.
+ * cannot scroll anywhere, because scrolling belongs to REGIONS inside the locked frame and
+ * never to the page. Phase A1 bought that with one temporary staged scroller per unconverted
+ * surface (`.pane-stage`); Phase C drained the last of them, so every surface now owns a real
+ * frame and the staging class is gone. Any red cell is therefore a REGRESSION now, and what
+ * still polices the shape of those frames is the (g)/(h) ratchets in
+ * design-conventions.test.ts, not this table.
  */
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_CORE ?? "playwright-core");

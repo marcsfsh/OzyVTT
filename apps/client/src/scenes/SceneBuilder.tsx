@@ -5,6 +5,9 @@ import { socket } from "../socket";
 import { useMapCatalog } from "../maps/map-catalog";
 import { ScenePrepPanel } from "./ScenePrepPanel";
 import "./scene-panel.css";
+// The frame rules for this panel live beside the room they wrap, not in scene-panel.css: that file
+// is the two prep surfaces' chrome, and `.scene-builder-body` IS the prep room's region.
+import "./scene-prep.css";
 import { usePrompt } from "../components/feedback";
 
 /**
@@ -15,6 +18,14 @@ import { usePrompt } from "../components/feedback";
  * the tokens it creates sit unplaced in the tray until the GM drags them onto the staged map.
  *
  * Making the scene live is the map cluster's button, not a second copy here — one action, one place.
+ *
+ * THE PANEL IS A FRAME (§7), and that is what lets it sit in the phone table's sheet row. It is the
+ * row's one child, so it takes the row's height (`frame-col frame-fill`, the @vtt/ui utilities): the
+ * head is a fixed row, the prep room below it is the ONE region — `.scroll-y` in the MARKUP, the
+ * blessed marker — and the feedback line is the bottom row, so an error is never scrolled away from.
+ * Before this it rendered at natural height (84 + 540 = 681px inside a 413px row at 390x844) and the
+ * sheet ROW carried a `.scroll-y` bridge to keep the overflow reachable; the bridge is gone with it,
+ * and every arm of that row is a frame column again.
  */
 export function SceneBuilder({ scene, actors, revision, stagingDefaults }: Readonly<{
   scene: Scene;
@@ -59,29 +70,31 @@ export function SceneBuilder({ scene, actors, revision, stagingDefaults }: Reado
     });
   };
 
-  return <section className="scene-builder" aria-labelledby="scene-builder-heading">
+  return <section className="scene-builder frame-col frame-fill" aria-labelledby="scene-builder-heading">
     <div className="scene-builder-head"><span className="eyebrow">ARRANGING · GM ONLY</span>
       <h2 id="scene-builder-heading">{scene.name}
         <button type="button" className="scene-rename" disabled={busy} title="Rename this scene" aria-label={`Rename ${scene.name}`} onClick={() => void rename()}>✎</button>
       </h2>
       <p>Players see none of this until you make the scene live.</p></div>
-    <ScenePrepPanel
-      heading="In this scene"
-      actors={actors}
-      staged={staged}
-      placedIds={placedIds}
-      onAdd={stageAdd}
-      onRemove={(actorId) => setCombatants(staged.filter((id) => id !== actorId))}
-      mapName={mapName}
-      // A scene owns its map for life: there is no command to swap it, and its staged token positions
-      // are in that map's pixels. Prepare another scene to use another map.
-      mapLocked
-      selectedMapId={scene.mapAssetId}
-      stagingRevealed={(stagingDefaults?.visibility ?? "public") !== "gm-only"}
-      combatActive={false}
-      busy={busy}
-      emptyNote="No one in this scene yet. The party is added the moment you tap Add characters; monsters come from the browser."
-    />
+    <div className="scene-builder-body scroll-y frame-fill">
+      <ScenePrepPanel
+        heading="In this scene"
+        actors={actors}
+        staged={staged}
+        placedIds={placedIds}
+        onAdd={stageAdd}
+        onRemove={(actorId) => setCombatants(staged.filter((id) => id !== actorId))}
+        mapName={mapName}
+        // A scene owns its map for life: there is no command to swap it, and its staged token positions
+        // are in that map's pixels. Prepare another scene to use another map.
+        mapLocked
+        selectedMapId={scene.mapAssetId}
+        stagingRevealed={(stagingDefaults?.visibility ?? "public") !== "gm-only"}
+        combatActive={false}
+        busy={busy}
+        emptyNote="No one in this scene yet. The party is added the moment you tap Add characters; monsters come from the browser."
+      />
+    </div>
     {message && <p className="scene-builder-feedback" role="status">{message}</p>}
     {dialog}
   </section>;

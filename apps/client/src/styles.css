@@ -35,26 +35,14 @@ main {
    <dialog>) take no box here. */
 .app-pane { grid-row: 3; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .app-pane > * { flex: 1 1 auto; min-width: 0; min-height: 0; }
-/* THE STAGING RULE (refresh hazard H1). A surface that has not adopted the locked frame yet
-   must not strand content below a clipped pane, so its arm wraps in ONE temporary scroll
-   region: this class plus `.scroll-y` in the markup — the blessed marker, so check (h)
-   gains no bare-overflow site. The padding is the retired page column's. Every wrapper in
-   main.tsx names the phase that drains it (A2/B1/B2/B3/C1/C2); when a surface recomposes
-   into a real frame its wrapper drops this class and the surface owns its regions.
-   overscroll-behavior: a drag past the region's end must chain nowhere — the page behind it
-   is locked, and rubber-banding a dead page reads as breakage (refresh risk #7).
-   scroll-padding + the safe-area bottom keep a keyboard-focused field clear of the region's
-   bottom edge (§7.5; the focusin helper in main.tsx does the nudging). */
-.pane-stage {
-  padding: var(--space-4) var(--pane-gutter) calc(clamp(1.5rem, 5vw, 4rem) + env(safe-area-inset-bottom));
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--space-6);
-}
-/* A CONVERTED SURFACE'S FRAME. What every surface that has drained its `.pane-stage` shares:
-   it is the pane's one child, so it is a `.frame-col` (@vtt/ui) whose chrome rows sit above one
-   `.scroll-y .frame-fill` region. This class carries only what the staging wrapper used to hand
-   out for free — the page column's inline gutter, the top breathing room — so a surface's own
-   file is left saying what is different about it, not repeating the frame. The REGION carries
+/* EVERY SURFACE'S FRAME. The staging rule that used to sit here (`.pane-stage`, refresh hazard
+   H1) is RETIRED as of Phase C: it wrapped a surface that had not adopted the locked frame yet
+   in one temporary scroll region so the clipped pane could not strand content below it, and the
+   last surface riding it — the Scenes arm — recomposed in C2. Nothing stages any more, so this
+   is what EVERY surface is: the pane's one child, a `.frame-col` (@vtt/ui) whose chrome rows sit
+   above one `.scroll-y .frame-fill` region. This class carries only what the staging wrapper used
+   to hand out for free — the page column's inline gutter, the top breathing room — so a surface's
+   own file is left saying what is different about it, not repeating the frame. The REGION carries
    the bottom padding, the safe area and the scroll behaviour, because those belong to the thing
    that actually scrolls (§7.5, refresh risk #7). */
 .pane-frame { padding: var(--space-4) var(--pane-gutter) 0; }
@@ -640,18 +628,18 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .claim-card-action { margin-top: auto; }
 .claim-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
 
-.renderer-proof { margin-top: 3rem; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-1); }
-.proof-heading { padding: 1.25rem 1.5rem .8rem; display: flex; justify-content: space-between; gap: 1rem; align-items: end; }
-.proof-heading h2 { font-size: var(--fs-h2); }
-.proof-heading p { margin: 0; max-width: 24rem; font-size: .85rem; text-align: right; }
-.proof-canvas { height: min(58vw, 430px); min-height: 280px; touch-action: none; outline: none; }
-.proof-canvas:focus-visible { box-shadow: var(--glow-cyan); }
-
 /* Dice */
 .dice-proof h2 { font-size: var(--fs-h2); }
 .dice-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.dice-visibility { display: flex; align-items: center; gap: .5rem; color: var(--text-dim); font-size: var(--fs-sm); }
-.dice-visibility select { width: auto; margin-top: 0; }
+.dice-visibility { display: flex; align-items: center; gap: .5rem; min-width: 0; white-space: nowrap; color: var(--text-dim); font-size: var(--fs-sm); }
+/* A `<select>`'s min-content width is its WIDEST OPTION, and the longest roll audience is
+   "Hidden from players — you and the GM see it" (349px at 390). Left unshrinkable it made the
+   QUESTION the only thing that could give: measured at 390x844, `.dice-visibility` overflowed
+   its heading by 5.8px and "Who sees it?" broke onto THREE lines of 29px. `min-width: 0` lets
+   the control shrink (the UA truncates the chosen option, which is a readout — the full text is
+   in the open list), `white-space: nowrap` above keeps the question on one line, and the label
+   is what the row is FOR. */
+.dice-visibility select { flex: 1 1 auto; width: auto; min-width: 0; margin-top: 0; }
 .dice-quick { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; align-items: center; }
 .dice-quick button { padding: .65rem 1rem; text-align: center; background: var(--surface-2); }
 .dice-quick button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
@@ -747,9 +735,8 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
   .choices .nh-btn { flex: 1 1 100%; }
   .party-queue-actions { width: 100%; margin-left: 0; }
   .party-queue-actions .nh-btn { flex: 1 1 auto; }
-  .roster-heading, .proof-heading { display: block; }
-  .roster-heading p, .proof-heading p { text-align: left; margin-top: .8rem; }
-  .proof-canvas { height: 68vw; min-height: 310px; }
+  .roster-heading { display: block; }
+  .roster-heading p { text-align: left; margin-top: .8rem; }
   .dice-form { grid-template-columns: 1fr; }
   .gm-session-controls { flex-direction: column; }
   .gm-session-controls button { width: 100%; }
@@ -802,9 +789,19 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* `min-width: 0` is load-bearing, not defensive: a flex item's automatic minimum is its MIN-CONTENT,
    and this row's is avatar + HP + two buttons + gaps = 412px. Left at `auto` the row refused to fit a
    366px phone column and "My sheet" was clipped by the frame — measured. The name is the only piece
-   that may give, and it gives by ellipsis. */
-.you-are-playing { display: flex; align-items: center; gap: .5rem; min-width: 0; min-height: var(--tap-min); margin-top: 0; padding: .25rem .5rem; border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
-.you-are-playing-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 1.05rem/1.2 var(--font-display); color: var(--text); }
+   that may give, and it gives by ellipsis.
+   THE NAME HAS A FLOOR, because "gives by ellipsis" ran out of road at the 320px floor: the four
+   fixed pieces plus the gaps come to 281.7px against 280px of content box, so the name — the only
+   shrinkable item — was handed a NEGATIVE share and rendered at 0px. Identity survived in the
+   avatar's initials and the row's aria-label, but a name that paints nothing is a bug.
+   The floor is `flex-basis: 3.25rem` AND `min-width: 3.25rem`, and `flex-wrap` is what pays for it:
+   line breaking uses the BASIS, so 3.25rem is also what the name asks for when the line is being
+   packed. At 375 and up the whole row still fits on one line and the name grows straight back to the
+   width it had (measured: 51.4px -> 53.4px at 375, unchanged at 390); at 320 the row cannot hold, so
+   "My sheet" takes a second line and the name reads in full instead of vanishing. Wrapping is the
+   escape hatch, never the resting state. */
+.you-are-playing { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-width: 0; min-height: var(--tap-min); margin-top: 0; padding: .25rem .5rem; border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
+.you-are-playing-name { flex: 1 1 3.25rem; min-width: 3.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 1.05rem/1.2 var(--font-display); color: var(--text); }
 .you-are-playing .nh-btn { flex: 0 0 auto; }
 .you-badge { margin-left: .5rem; vertical-align: middle; }
 
@@ -860,13 +857,33 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      is the surface rather than a panel standing on it. */
   .table-layout > .table { flex: 0 0 auto; padding: .75rem; border: 0; border-radius: 0; background: none; }
   .table-layout > .table-sheet { flex: 1 1 auto; min-height: 0; gap: .5rem; }
-  /* ONE 44px TOP LINE. `display: contents` above the rung (below) leaves the laptop composition
-     byte-identical — this wrapper exists only so the phone can put the scene door, the player's own
-     character and the party on one line instead of three. It wraps rather than crushes: at 375px the
-     player's own row and the party strip take a line each, which is still 88px against 405px before. */
+  /* ONE 44px TOP LINE, and since the basis work below it is one line in fact and not just in name.
+     `display: contents` above the rung (below) leaves the laptop composition byte-identical — this
+     wrapper exists only so the phone can put the scene door, the player's own character and the
+     party on one line instead of three. `wrap` stays as the escape hatch: nothing here may be
+     crushed, so a line that genuinely cannot hold breaks instead of clipping. */
   .table-topline { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-  .table-topline > .scenes-open-row { flex: 0 0 auto; margin-bottom: 0; }
-  .table-topline > .party-strip { flex: 1 1 8rem; min-width: 0; margin: 0; }
+  /* THE DOOR IS THE LINE'S GUEST, NOT ITS OWNER. `flex: 0 0 auto` handed the scene door its whole
+     natural width, and a long scene name makes that 227px: 227 + .5rem + the strip's 8rem basis is
+     363px against 351px of line at 375x667, so the strip wrapped and the ONE 44px row this wrapper
+     exists to make became two — 100px, and 56px of it came out of the sheet, which is the row that
+     absorbs every deficit (the sheet ran to 169px in the GM's out-of-combat cell, the worst on the
+     phone). Capped and shrinkable, the door yields instead. The cap is a PERCENTAGE because both
+     ends of the phone band have to clear it: 70% leaves 5rem of basis for the strip at 375 and at
+     the 320 floor alike, and it does not bite today's door at all (245.7px of room for 227px of
+     button) — it is the ceiling that keeps tomorrow's longer name from taking the line. */
+  .table-topline > .scenes-open-row { flex: 0 1 auto; min-width: 0; max-width: 70%; margin-bottom: 0; }
+  /* Ellipsis needs a BLOCK CONTAINER. `.nh-btn` is a flex container and the scene name is a bare
+     text run in main.tsx, so it becomes an ANONYMOUS flex item — unselectable, and `text-overflow`
+     is not inherited, so it has nowhere to land. Block layout with a floated caret is the shape that
+     does work: a right float leaves the line box, so the ellipsis lands before the caret instead of
+     eating the one glyph that says this button opens something. `line-height` is the 44px floor
+     doing arithmetic (12px padding + 20 + 12), because block layout has no `align-items` to centre
+     with. Scoped to the topline — the Scenes gallery's own door (scene-gallery.css) is untouched. */
+  .table-topline > .scenes-open-row > .scenes-open { display: block; overflow: hidden; text-overflow: ellipsis; text-align: left; line-height: 20px; }
+  .table-topline > .scenes-open-row > .scenes-open > .scenes-open-icon { float: left; margin-top: 2px; }
+  .table-topline > .scenes-open-row > .scenes-open > .scenes-open-caret { float: right; margin-top: 4px; }
+  .table-topline > .party-strip { flex: 1 1 5rem; min-width: 0; margin: 0; }
   .table-topline > .you-are-playing { flex: 1 1 14rem; }
   /* Route 1 (design-language §4): the strip is a scrolling list of pills, so the floor is PAINT.
      56px was a comfortable laptop row; 44 is the floor and the phone needs the other 12px. The

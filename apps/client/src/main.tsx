@@ -49,8 +49,8 @@ const PLAYER_TOKEN_KEY = "vtt.player-token";
  * page). Twice: immediately, for fields parked under a region's edge; and again after the
  * on-screen keyboard has had time to land, because the keyboard resizes the viewport AFTER
  * focus. `block: "nearest"` keeps the correction minimal, and the regions' own
- * scroll-padding (`.pane-stage`, the wizard layer) keeps the landing spot clear of sticky
- * chrome and the home bar.
+ * scroll-padding (`.pane-frame > .scroll-y` in styles.css, each converted surface's own
+ * region, the wizard layer) keeps the landing spot clear of sticky chrome and the home bar.
  */
 const FOCUS_NUDGE_TARGETS = "input, textarea, select, [contenteditable=''], [contenteditable='true']";
 function installKeyboardFocusHelper(): () => void {
@@ -523,9 +523,10 @@ function App() {
       }}
     /></div>}
     {/* Row 3 — the pane: one always-rendered element owning the canvas for whatever the
-        address says. A surface that has not adopted the frame yet rides a temporary
-        `.pane-stage scroll-y` region inside it — the staging rule (styles.css); each
-        wrapper below names the refresh phase that drains it. */}
+        address says. Every surface below owns its frame now (§7): it is the pane's one child,
+        a `.frame-col` whose chrome rows sit above one `.scroll-y` region, so the pane hands
+        out its height and the surface divides it. Nothing here wraps a surface in a staged
+        scroller any more — the temporary staging rule the refresh shipped with is drained. */}
     <div className="app-pane">
     {(preAuth || entry === "drive") && <div className={entry === "drive" ? "landing landing--drive" : "landing"}>
       {/* D30's full statement — the 80s retro-cyber title screen, layer by layer: star field, the
@@ -707,12 +708,13 @@ function App() {
         {/* THE SHEET ROW (C1). Above the rung this is the sidebar column it has always been; below it,
             it is the one row that takes the leftover height and holds everything the band does not —
             `.table-sheet` is the frame class B1 owns and B2's tabbed sheet builds inside.
-            The staging arm is the one thing in it that is not a frame column of its own:
-            `SceneBuilder` renders its head, the prep panel and the tray at natural height, and measured
-            at 390x844 that is 681px inside a 360px row. Until it adopts the frame the ROW declares the
-            region instead (`.scroll-y`, the blessed marker — no new stylesheet scroller), so the GM's
-            staging scrolls itself rather than being clipped by the frame above it. */}
-        <div className={`table-sidebar table-sheet${previewScene ? " scroll-y" : ""}`}>
+            The row is UNIFORM: every arm of it is a frame column that takes the row's height and
+            divides it into its own regions, so the row itself never declares a scroll and no arm is
+            special-cased. The staging arm was the last exception — `SceneBuilder` rendered its head,
+            the prep panel and the tray at natural height (681px inside a 413px row at 390x844) and the
+            ROW carried a conditional `.scroll-y` so the overflow stayed reachable. The panel is a
+            frame now (`SceneBuilder.tsx`) and that bridge is gone. */}
+        <div className="table-sidebar table-sheet">
           {previewScene
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} stagingDefaults={(state as GmView).stagingDefaults} />
             /* Q3 again: on a phone an unclaimed player's sheet IS the picker. There is nothing else it
@@ -741,8 +743,8 @@ function App() {
 
       {/* The Scenes tab is two addresses in one arm, and since C2 both own their own frame: the
           gallery (`surface`), and the map library (back row · heading · upload row over a
-          rail | calibration body). The staging wrapper drained with it — this was `.pane-stage`'s
-          last consumer in this file. */}
+          rail | calibration body). The staging wrapper drained with it — this arm was the last thing
+          in this file to ride the retired staged scroller. */}
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && (scenesView === "maps"
         ? <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} onBack={() => navigate(pathForGmTab("scenes"))} />
         : <SceneGallery surface scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => navigate("/scenes/maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={failToast} />)}

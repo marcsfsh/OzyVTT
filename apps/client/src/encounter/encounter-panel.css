@@ -198,12 +198,10 @@
 .menu-add-row button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-menu .encounter-add-monsters { margin: 0; }
 .encounter-menu .encounter-end { margin-top: 0; }
-.initiative-hp { flex: none; padding: .2rem .3rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: var(--fs-sm); font-weight: 700; text-align: right; cursor: pointer; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.initiative-hp small { margin-left: .2rem; font-size: var(--fs-xs); color: var(--violet-hi); }
-.initiative-hp.hp-healthy { color: var(--cyan-hi); }
-.initiative-hp.hp-bloodied { color: var(--magenta-hi); }
-.initiative-hp.hp-down { color: var(--danger-hi); }
-.initiative-hp:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* `.initiative-hp` lived here and is GONE: the row renders `.initiative-hp-text` (a span, below with
+   the Foundry-style row) and nothing has emitted the bare class since. Verified 2026-08-05 by
+   searching the whole tree outside node_modules/dist - the only hits were this stylesheet's own six
+   declarations plus two compound selectors it shared with the live `.initiative-score-value`. */
 .hp-editor { display: flex; gap: .35rem; }
 .hp-editor input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
 .hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
@@ -317,8 +315,14 @@
 .action-preview .save-prompt-manual { flex: none; display: flex; flex-direction: column; gap: .3rem; }
 .action-preview .manual-actions { flex: none; align-self: flex-end; display: inline-flex; gap: .3rem; }
 .action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
-.action-preview .save-prompt-manual input { width: 100%; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
-.action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+/* Route 1 on both. The fixed 1.9rem put the typed-d20 field and its raw <button>s at 30.4px tall -
+   measured 2026-08-05 at 390px, driving Dagger -> target -> Roll with the dice preference on Manual.
+   Route 2 does not fit: (44-30.4)/2 = 6.8px a side, against 5.6px of column gap above the field (the
+   "manual entry" caption) and 4.8px below it (the button row), so its ::after would steal from both.
+   The `Re-roll` beside them is an `nh-btn`, whose own min-height already beat this height and left the
+   pair mismatched at 44 vs 30.4 - one floor for the row fixes the theft and the mismatch together. */
+.action-preview .save-prompt-manual input { width: 100%; min-width: 0; min-height: var(--tap-min); margin: 0; padding: 0 .6rem; box-sizing: border-box; }
+.action-preview .save-prompt-manual button { flex: none; min-height: var(--tap-min); margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 /* "Final total" manual mode: a compact Natural 20 (crit) checkbox under the total field - a rolled die can't
    be read off a hand-computed total, so the crit is declared. Overrides the column's full-width input sizing. */
 /* Label = hit area, so the 44px floor is real paint on the row. */
@@ -596,10 +600,20 @@
 .sheet-spell-group-head h4 { margin: 0; font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
 /* Spell-slot pips (v6 #3): clean capsule "charges" - filled = available, hollow = spent - instead of the
    old flat MS-paint circles. Same click target (spend/restore a slot). */
-.sheet-slot-pips { display: inline-flex; align-items: center; gap: .3rem; }
-.sheet-pip { width: 1.15rem; height: .58rem; padding: 0; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); background: var(--surface-2); cursor: pointer; transition: background var(--dur-hover) ease, border-color var(--dur-hover) ease, box-shadow var(--dur-hover) ease; }
-.sheet-pip.filled { border-color: var(--cyan); background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 88%, var(--cyan-hi)), var(--cyan)); box-shadow: 0 0 4px color-mix(in srgb, var(--cyan) 45%, transparent); }
-.sheet-pip:hover:not(:disabled) { border-color: var(--magenta); }
+.sheet-slot-pips { display: inline-flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+/* Route 1 (design-language §4), and route 2 is arithmetically impossible here: the pips sit .3rem
+   (4.8px) apart, so a `.tap-target` on an 18.4x9.3 capsule would overhang 12.8px a side horizontally
+   and each pip would swallow both its neighbours' taps. So the BUTTON BOX carries the floor and the
+   capsule is painted by ::before - the charge bar reads the same, the hit area is real, and nothing
+   overlaps. Measured 2026-08-05 at 9.3x18.4 with ten pips on one sheet.
+   It is grown rather than excepted because none of §4's accepted-exception rationales fit: a pip's
+   size is chrome, not game state (unlike `.encounter-token`), it is not force-laid (unlike
+   `.codex-graph-node`), and there is NO other route to the same action - tapping a pip is the only
+   way to spend or restore a slot by hand, which is what a table does after a long rest. */
+.sheet-pip { display: grid; align-items: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: 0 .2rem; border: 0; background: none; cursor: pointer; }
+.sheet-pip::before { content: ""; display: block; height: .58rem; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); background: var(--surface-2); transition: background var(--dur-hover) ease, border-color var(--dur-hover) ease, box-shadow var(--dur-hover) ease; }
+.sheet-pip.filled::before { border-color: var(--cyan); background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 88%, var(--cyan-hi)), var(--cyan)); box-shadow: 0 0 4px color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-pip:hover:not(:disabled)::before { border-color: var(--magenta); }
 .sheet-pip:disabled { cursor: default; opacity: .7; }
 .sheet-slot-count { color: var(--text-muted); font: 700 var(--fs-2xs) var(--font-mono); }
 .sheet-spell-list { grid-template-columns: 1fr; }
@@ -609,11 +623,39 @@
    helper, the slot dropdown (or the cantrip "At will" tag), and the Cast button are three fixed columns,
    so on every row the helper / dropdown / Cast sit on identical vertical lines - cantrips included. */
 .sheet-spell-list.castable li { grid-template-columns: 5rem minmax(0, 1fr) 3.7rem 6.8rem 3.8rem; }
+/* ...and BELOW THE 760 RUNG it stacks onto two lines, because the five fixed tracks do not fit a
+   phone. 80 + 59.2 + 108.8 + 60.8 plus four .5rem gaps is 340.8px, which is exactly the row's own
+   content width at both 320px and 390px - so `minmax(0, 1fr)`, the spell NAME, resolved to 0px and
+   the name button overflowed its empty cell UNDER the effect chip painted beside it: measured
+   2026-08-05, `elementFromPoint` at the name's centre returned the chip and reach was 0 on six of
+   seven rows. (The row also overflowed its 320px container by 32px, since its min-content width is
+   352px.) Two lines keep the trio's cross-row alignment - the tracks are still fixed - while giving
+   the name a real column and a real tap. */
+@media (max-width: 760px) {
+  .sheet-spell-list.castable li {
+    grid-template-columns: 5rem minmax(0, 1fr) 3.8rem;
+    grid-template-areas: "prep name name" "effect slot cast";
+    row-gap: .3rem;
+  }
+  .sheet-spell-list.castable li > .sheet-prep-tag { grid-area: prep; }
+  .sheet-spell-list.castable li > .sheet-spell-name { grid-area: name; }
+  .sheet-spell-list.castable li > .sheet-cast-effect { grid-area: effect; }
+  .sheet-spell-list.castable li > .sheet-cast-select,
+  .sheet-spell-list.castable li > .sheet-cast-slot { grid-area: slot; }
+  .sheet-spell-list.castable li > .sheet-cast-btn { grid-area: cast; }
+}
 /* v4 #6: hover lights the whole row so it's obvious which dropdown/CAST belongs to which spell. */
 .sheet-spell-list li:hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
 /* v6 #2: names hug the left of their column (like the equipment list), not centred in a wide sheet -
-   justify-self:start shrinks the item to content at the cell start regardless of any inherited text-align. */
-.sheet-spell-name { justify-self: start; text-align: left; color: var(--text); font-size: var(--fs-sm); }
+   justify-self:start shrinks the item to content at the cell start regardless of any inherited text-align.
+   Route 1 for the floor: `.sheet-spell-link` is a BUTTON (it opens the spell's rules card) and measured
+   19.5px tall at 1280px on all seven rows, 2026-08-05. Route 2 would overhang (44-19.5)/2 = 12.25px a
+   side into a .3rem-gap stacked list - five times the 2.4px each row may claim - so the paint grows and
+   the text stays centred in it. The WIDTH needs the floor too, because `justify-self: start` shrinks the
+   box to its text and a short name misses it - "Shield" measured 37.1px and "Fireball" 42.7px. Growing
+   it steals nothing: the name's own grid track is 112px at 320px and 878px at 1280px, so `min-width`
+   only claims empty space inside the track the name already owns. */
+.sheet-spell-name { justify-self: start; display: flex; align-items: center; min-width: var(--tap-min); min-height: var(--tap-min); text-align: left; color: var(--text); font-size: var(--fs-sm); }
 /* Clickable spell name opens its SRD rules card (v3 #2.8.2); dashed underline signals it's clickable (v4 #5.2). */
 .sheet-spell-link { border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: var(--text); font-size: var(--fs-sm); cursor: pointer; text-decoration: underline; text-decoration-style: dashed; text-decoration-color: color-mix(in srgb, var(--text-muted) 65%, transparent); text-underline-offset: 3px; }
 .sheet-spell-link:hover { color: var(--cyan-hi); text-decoration-style: solid; text-decoration-color: currentColor; }
@@ -622,13 +664,18 @@
    identical box-sizing, height, radius, 1px border, and vertical centring. Only the fill/border TINT
    varies by role. The old version left the helper unbordered with a smaller radius, and the native
    <select> kept its taller UA min-height, so the three sat at different heights and shapes; here every
-   cell is border-box 1.9rem with the same radius, and the select is `appearance:none` (custom caret) so
-   its height is fully CSS-controlled and lines up with the chips exactly. Verified in a headless render. */
+   cell is border-box `--tap-min` with the same radius, and the select is `appearance:none` (custom caret)
+   so its height is fully CSS-controlled and lines up with the chips exactly. Verified in a headless render.
+   ROUTE 1 (design-language §4): the shared height was a fixed 1.9rem, which put `.sheet-cast-btn` (x7)
+   and `.sheet-cast-select` (x6) at 30.4px tall on every castable row - measured 2026-08-05 at 320px,
+   390px and 1280px. Route 2 is unavailable: these are rows in a stacked list gapped .3rem (4.8px), and a
+   `.tap-target` overhangs (44-30.4)/2 = 6.8px a side, so each row's ::after would reach 4.4px into both
+   neighbours. The whole matched set takes the floor together, spans included, or the set stops matching. */
 .sheet-cast-effect,
 .sheet-cast-select,
 .sheet-cast-slot,
 .sheet-cast-btn {
-  box-sizing: border-box; justify-self: stretch; width: 100%; height: 1.9rem; min-height: 1.9rem; margin: 0;
+  box-sizing: border-box; justify-self: stretch; width: 100%; min-height: var(--tap-min); margin: 0;
   display: flex; align-items: center; justify-content: center;
   padding: 0 .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md);
   background: var(--surface-2); color: var(--text); font: 700 var(--fs-2xs)/1 var(--font-mono);
@@ -652,7 +699,12 @@
 .sheet-cast-btn { border-color: color-mix(in srgb, var(--violet) 55%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 20%, var(--surface-2)); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
 .sheet-cast-btn:hover:not(:disabled) { border-color: var(--violet); background: color-mix(in srgb, var(--violet) 30%, var(--surface-2)); }
 .sheet-cast-btn:disabled { opacity: .5; cursor: default; }
-.sheet-prep-tag { min-width: 4.8rem; text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
+/* Route 1 again, and it is applied to the whole tag family rather than just `.toggle`: the tag is one
+   column across every spell row, so growing only the pressable variant would leave "Prepared" at 44px
+   beside "Always"/"Cantrip" at 19.8px in the same column. Measured 2026-08-05: `.sheet-prep-tag.toggle`
+   is a button at 19.8x80 on six rows, and the same .3rem row gap that rules route 2 out for the cast
+   set rules it out here. The spans cost nothing - they were already stretched by the grid. */
+.sheet-prep-tag { display: flex; align-items: center; justify-content: center; min-width: 4.8rem; min-height: var(--tap-min); text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
 .sheet-prep-tag.on { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 /* v6 #1: "Always" (always-prepared, permanent, not toggleable) reads distinctly from the cyan toggleable
    "Prepared" - a violet fill + accent so the two are never confused. Cantrip gets its own dim treatment. */
@@ -990,7 +1042,7 @@
 .save-legendary:hover:not(:disabled) { border-color: var(--violet); }
 
 /* Row hover keeps the plain score/HP tappable-looking without permanent chrome. */
-.initiative-score-value:hover:not(:disabled), .initiative-hp:hover:not(:disabled) { background: var(--surface-2); }
+.initiative-score-value:hover:not(:disabled) { background: var(--surface-2); }
 /* Minimal per-row markers: condition dots + a dim R only when the reaction is SPENT. */
 .condition-dots { display: inline-flex; align-items: center; gap: .2rem; margin-left: .1rem; }
 .condition-dot { width: .44rem; height: .44rem; border-radius: var(--radius-pill); background: var(--violet-hi); box-shadow: 0 0 0 1px var(--surface-3); }
@@ -1018,7 +1070,7 @@
 @media (pointer: coarse) {
   .initiative-list.gm > li, .initiative-list.player > li { padding-top: .42rem; padding-bottom: .42rem; }
   .initiative-expand { padding-top: .4rem; padding-bottom: .4rem; }
-  .initiative-hp, .initiative-score-value { padding-top: .4rem; padding-bottom: .4rem; }
+  .initiative-score-value { padding-top: .4rem; padding-bottom: .4rem; }
   .builtin-chip, .economy-slot { padding-top: .4rem; padding-bottom: .4rem; }
   .action-row { padding-top: .6rem; padding-bottom: .6rem; }
 }

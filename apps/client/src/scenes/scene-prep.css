@@ -1,5 +1,6 @@
-/* The shared prep panel (D1): the same parts behind both doors. No @media rules — every region is
-   either full-width or a wrapping flex row, so a 390px phone and a laptop run the same layout. */
+/* The shared prep panel (D1): the same parts behind both doors. The ROOM carries no @media rule —
+   every region in it is either full-width or a wrapping flex row, so a 390px phone and a laptop run
+   the same layout. The one rung in this file belongs to the staging DOOR's frame, at the bottom. */
 .scene-prep { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
 .scene-prep > * { min-width: 0; }
 .scene-prep-heading { margin: 0; font-family: var(--font-display); font-size: 1rem; letter-spacing: .02em; }
@@ -20,3 +21,24 @@
 .scene-prep-recent[open] > summary { margin-bottom: .3rem; }
 .scene-prep-note { margin: 0; padding: .3rem .1rem; color: var(--text-muted); font-size: .72rem; }
 .scene-prep-footer { display: flex; flex-direction: column; gap: .45rem; padding-top: .2rem; border-top: 1px solid var(--line); }
+
+/* ============ THE STAGING DOOR'S FRAME (§7) ============
+   `SceneBuilder` wraps this room and is a frame column that fills whatever row it is given
+   (`frame-col frame-fill` in its markup, @vtt/ui). Its head is a fixed row, its feedback line is the
+   bottom row, and the room in between is its ONE region. The scroll itself is `.scroll-y` in the
+   MARKUP — never a bare `overflow` here, which is check (h) in design-conventions.test.ts — so this
+   rule carries only what the utility does not: containment, so a drag past the end chains nowhere
+   (the shell behind it is locked), and the scroll-padding that keeps a keyboard-focused field off the
+   region's own edges (§7.5, the focusin helper in main.tsx).
+   Before this the panel rendered at natural height — 84 + 540 = 681px inside a 413px sheet row at
+   390x844 — and the ROW carried a `.scroll-y` bridge so the overflow stayed reachable. */
+.scene-builder-body { overscroll-behavior: contain; scroll-padding-block: var(--space-6); }
+/* A FIXED ROW IS PAID FOR EVERY SCROLL, so below the phone rung the head is the panel's identity and
+   nothing else — the eyebrow and the scene name. The sentence under it ("Players see none of this
+   until you make the scene live") is the THIRD statement of GM-only-ness on the same screen: the
+   staging banner over the map reads "Staging {name} — GM only. Drag tokens from the tray…", and the
+   eyebrow reads "ARRANGING · GM ONLY". Inside a scrolling panel it cost nothing; as a pinned row it
+   cost 53.6px of a 236px sheet row at 375x667 — measured, and nearly half the head. Above the rung
+   the panel stands beside the map in an 856px column, where the line is free and worth having for a
+   GM meeting the two-layer model for the first time. The rung is the phone table's own (styles.css). */
+@media (max-width: 979px) { .scene-builder-head p { display: none; } }

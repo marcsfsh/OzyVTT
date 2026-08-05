@@ -9,9 +9,6 @@
    shrink/jitter the map every time a token is grabbed (the tray mounts on pointer-down). Float it over
    the stage top here too, inset to match the enlarged container's 1rem padding. */
 .encounter-map-interaction.enlarged .encounter-token-tray { position: absolute; z-index: 4; top: 1rem; left: 1rem; right: 1rem; margin-bottom: 0; }
-.encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .4rem; padding: .4rem .7rem; border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); font-size: .82rem; }
-.encounter-map-help strong { color: var(--text); }
-.encounter-map-help span { color: var(--text-dim); font-size: .78rem; text-align: right; }
 .encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; padding: .5rem .7rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); transition: border-color .15s, background .15s; }
 .encounter-token-tray.receiving { border-color: var(--cyan); background: color-mix(in srgb, var(--surface-2) 84%, var(--cyan)); }
 .encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
@@ -231,7 +228,7 @@
 .encounter-move-guide { pointer-events: none; }
 .encounter-move-line { stroke: var(--cyan); stroke-width: 3; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 
-@media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
+@media (max-width: 650px) { .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-token-tray-list { justify-content: flex-start; } }
 /* The phone form of the map (§E). The toolbar collapses to its `Tools` button in JS at the same
    rung (MapToolbar's COMPACT_QUERY); these rules keep the two floating clusters in OPPOSITE bottom
    corners so a saved right-dock can never stack the scene cluster on top of the toolbar. */
