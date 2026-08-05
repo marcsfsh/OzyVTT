@@ -361,8 +361,8 @@ function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: Gm
  * So guard the FIELDS, not the role, exactly as the scenes row guards `combat.scenes` with
  * `Array.isArray`: a state that does not carry the GM's own policy is not a `GmView` yet, whatever
  * the token says. The cost is one frame of a page with only *Mine* on it; the next state has the
- * fields and the GM groups mount. These three are the GM-only fields the two groups below actually
- * read — a projection either carries all of them or is not the GM's.
+ * fields and the GM groups mount. The three checked here are exactly the GM-only fields `TableGroup`
+ * dereferences — a projection either carries all of them or is not the GM's.
  */
 function gmViewOrNull(state: GmView | PlayerView | null): GmView | null {
   const view = state as GmView | null;

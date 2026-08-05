@@ -962,13 +962,21 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      adds no specificity — without it the hero kept its 12rem and overflowed its own box by 27px. */
   .table-layout .map-empty-hero { flex: 0 1 14rem; min-height: 9rem; margin-top: 0; }
   /* Q3: the picker IS the sheet below the rung — main.tsx renders it in this row instead of the dock.
-     `flex: 1 1 0` for the same reason the sheet itself takes it: the picker's basis is 539px of
-     cards, and with `auto` that basis is what the shrink is split by, so the box that IS the sheet
-     was handed the whole deficit and resolved to 0px at 320x568 — Claim buttons laid out at y 545
-     and 755 and clipped out of existence, which is an unclaimed player who cannot join the table at
-     all. It already carries `.scroll-y` in the markup (ClaimCharacter.tsx); it only ever needed a
-     box with a height. */
-  .table-sheet > .claim-view { flex: 1 1 0; min-height: 0; margin: 0; }
+     So it takes the SHEET'S OWN FLOOR, for the sheet's own reason. `flex: 1 1 0` first: the picker's
+     basis is 539px of cards, and with `auto` that basis is what shrink is split by, so the box that
+     is the whole body was handed the entire deficit. And a floor after it, because `1 1 0` only ever
+     takes what is LEFT — out of combat the sheet also holds the replays shelf (171px) and "Leave
+     table" (44px), which between them leave nothing, and the picker resolved to **0px** at 320x568,
+     375x667 and every landscape phone: Claim buttons at y 545 and 755, clipped out of existence,
+     `elementFromPoint` returning the shelf. That is an unclaimed player who cannot join the table at
+     all, in the most ordinary state there is — someone opening the table before the fight starts.
+     With the floor the picker is 132px in all of those and the Claim button hit-tests; what no
+     longer fits comes out of the bottom of the sheet, which is the LAST row of the frame, so it
+     lands in the frame's declared scroll instead of on top of anything (measured: 0 spill over
+     `section.table` in every cell, and the frame's own overflow grows by exactly the floor).
+     The picker already carries `.scroll-y` in the markup (ClaimCharacter.tsx) — its 539px of cards
+     scroll inside it — so all it ever needed was a box with a height. */
+  .table-sheet > .claim-view { flex: 1 1 0; min-height: 8.25rem; margin: 0; }
 }
 /* The wrapper is invisible above the rung: its children go on being `section.table`'s own rows. */
 @media (min-width: 980px) { .table-topline { display: contents; } }
