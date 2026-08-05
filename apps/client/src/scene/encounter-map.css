@@ -31,7 +31,9 @@
    pane: 72vh of MAP plus the rows above and below it is more than 100vh of surface, so the taller the
    screen the worse it got. The stage takes the frame's leftover height and the svg fills it; the
    viewBox keeps the map's own aspect ratio, so filling cannot stretch the art. The floor drops from
-   20rem to 12rem — it is a floor for a short frame now, not a target height. */
+   20rem to 12rem — it is a floor for a short frame now, not a target height. Below the ladder's 980
+   rung there is no frame to take a leftover from, so the map states its own height there instead of
+   riding this floor — the band rule at the bottom of this file. */
 .encounter-map-stage svg { display: block; width: 100%; height: 100%; background: var(--void); user-select: none; }
 .encounter-map-stage > p { padding: 2rem; text-align: center; }
 .encounter-token { outline: none; }
@@ -322,4 +324,19 @@
    650 is this file's documented narrow step (mobile-ux.md), not a fourth number. */
 @media (max-width: 650px) {
   .encounter-map-dock.dock-right, .encounter-map-dock.dock-left { width: min(var(--dock-side-width), 62vw); }
+}
+
+/* ============ THE MAP IS A BAND BELOW THE 980 RUNG ============
+   Above the rung the table is two columns sharing one height and the map flex-fills what the rows
+   above it leave — the leftover is real, because the frame has a height to leave some of. Below it
+   the columns stack into one tall column that scrolls itself (`.table-layout`, in styles.css), and
+   there is no leftover to fill: the column is as tall as its contents.
+
+   So state the phone height instead of inheriting it. Flex-filling a column that has no height of
+   its own would fall back to `min-height: 12rem`, and that number is a FLOOR for a short frame (see
+   the note above), not a height anyone chose for a phone. 14rem is chosen: tall enough to read the
+   fight, short enough that the dock below it is still on screen. C1 formalises this shape. */
+@media (max-width: 979px) {
+  .encounter-map-interaction:not(.enlarged) { flex: none; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: none; height: 14rem; }
 }

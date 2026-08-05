@@ -6,7 +6,8 @@ check you're not re-discovering a known issue or tripping a known gap.
 **Every entry under *Known gaps* is reproducible at HEAD.** Add one when you find a real
 defect, with the evidence that it is real. **When you fix one, delete the entry** — the
 regression test is the memory, not a line here (D9). Resolved entries are in
-`docs/archive/ai-ledger/known-bugs-resolved-2026-08-01.md`. If a claim here and the code
+`docs/archive/ai-ledger/known-bugs-resolved-2026-08-01.md` and
+`docs/archive/ai-ledger/known-bugs-resolved-2026-08-05.md`. If a claim here and the code
 disagree, the code wins and the entry is a defect: fix it or delete it in the same change.
 
 Format: `[area] — description — suspected cause / status`.
@@ -26,20 +27,6 @@ Format: `[area] — description — suspected cause / status`.
   they happen to have the Log open. Not a correctness defect (the player asked the question, and the
   state is right on both sides); it is the attention model the accordion's unmount cost, and the fix is a
   count on the section header rather than a new surface.
-
-- **[table/mobile] At 390×844 the battle map paints over the player's dock, and their own actions cannot
-  be tapped.** Measured 2026-08-05 on a genuine phone-width first paint, not a resize. `section.table`
-  ends at y=459, but `.encounter-map-stage` renders at **460–684** — it is `position: relative`, so it
-  paints above the sidebar's static content — while `.dock-accordion` occupies 483–776 and the open
-  `.dock-section-body` 527–672. `elementFromPoint` at the centre of the player's own "Dagger" row returns
-  the map's `<image>`, and a real `touchscreen.tap` there opens nothing (the targeting card never
-  appears). The cause is above the stage: the "YOU'RE PLAYING …" banner wraps to roughly 390px tall and
-  eats the whole map column, so the stage overflows below its own section, whose `overflow` is `visible`.
-  **The page itself never scrolls** (0/0 both axes), so `scripts/no-scroll-audit.mjs` passes while the
-  surface is unusable — it measures document scroll, not occlusion. Found while verifying ask-the-GM,
-  which is downstream of it: a refusal renders inside the tracker, so it is covered too. Belongs to the
-  table recompose rather than the ask flow, and it is why that flow's phone pass had to open the block at
-  laptop width before measuring (`docs/ai-context/mobile-ux.md`).
 
 - **[codex/export] A large backup bundle is one synchronous serialization on the GM's request
   thread.** The restore path itself shipped (`POST /codex/import` → `store.importBundle`), and

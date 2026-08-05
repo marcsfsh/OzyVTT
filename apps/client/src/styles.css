@@ -821,6 +821,23 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    the map underneath them is the one thing that grows. */
 .table-layout > .table { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; min-height: 0; }
+/* BELOW THE RUNG THE STACK IS NOT A FRAME. Two columns side by side share one height and each takes
+   what it is given; stacked, they are a queue in the region that scrolls itself, and each takes what
+   it needs. Leaving the fixed-height grid in place is what broke the phone, and the mechanism is
+   worth keeping written down because it is invisible from the markup: `min-height: 0` on both columns
+   (which the two-column frame needs, so the map can shrink) makes each grid row shrinkable to zero,
+   so the grid squeezed the two auto rows into the pane — resolved `grid-template-rows: 410.75px
+   360.75px` at 390x844 — while `section.table` still held 833px of content and its `overflow: visible`
+   let the surplus paint over whatever was beneath. Measured: the section ended at y=459, the map
+   rendered 631-855, and `elementFromPoint` on the player's own action row returned the map, so their
+   own actions could not be tapped. The document never scrolled (0/0), which is why
+   `scripts/no-scroll-audit.mjs` passed the entire time — it measures document scroll, not occlusion.
+   A flex column says the true thing: nothing shrinks, the region scrolls. C1 replaces it with the map
+   band and the tabbed sheet. */
+@media (max-width: 979px) {
+  .table-layout { display: flex; flex-direction: column; }
+  .table-layout > .table, .table-layout > .table-sidebar { flex: none; }
+}
 @media (min-width: 980px) {
   .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(var(--dock-w), 27rem); }
   /* `.dice-proof { margin-top: auto }` and the `.docked` stretch pair retired here: both existed to
