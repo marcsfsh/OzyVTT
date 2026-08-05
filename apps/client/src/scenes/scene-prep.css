@@ -10,7 +10,8 @@
    column that pushes the primary action below the fold. */
 .scene-prep-adds { display: flex; flex-wrap: wrap; gap: .4rem; }
 .scene-prep-adds > * { flex: 1 1 9rem; justify-content: center; }
-.scene-prep-picklist { display: flex; flex-direction: column; gap: .2rem; max-height: 13rem; overflow-y: auto; overscroll-behavior: contain; padding: .3rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
+/* Declared region (§7): the cap is here, the scroll is `.scroll-y` in the markup. */
+.scene-prep-picklist { display: flex; flex-direction: column; gap: .2rem; max-height: 13rem; overscroll-behavior: contain; padding: .3rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
 .scene-prep-pick { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; min-height: var(--tap-min); padding: .3rem .5rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; }
 .scene-prep-pick:hover { border-color: var(--line-hover); background: var(--surface-2); }
 .scene-prep-pick strong { font-size: .8rem; }

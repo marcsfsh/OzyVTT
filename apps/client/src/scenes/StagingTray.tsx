@@ -60,7 +60,7 @@ export function StagingTray({ entries, revealNew, onRevealNewChange, onRevealEnt
     </header>
     {entries.length === 0
       ? <p className="staging-tray-empty">{emptyNote}</p>
-      : <ul className="staging-tray-list">
+      : <ul className="staging-tray-list scroll-y">
           {entries.map((entry) => <li key={entry.actorId} className={`staging-row${entry.placed ? " is-placed" : ""}`}>
             <span className="staging-row-name">
               <strong>{entry.name}</strong>

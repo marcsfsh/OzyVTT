@@ -332,6 +332,39 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   with the sky removed — an opaque card, not the sky). The label is not colour-alone (it carries the
   word "Live"), so this is a contrast defect rather than a semantics one.
 
+- **[codex/ui] An open `Drawer` paints over the shell behind it, the control that opened it included.**
+  Re-measured 2026-08-05 at both widths on the GM's `/codex`, by the same method
+  `scripts/tap-audit.mjs` uses for its layer split: scroll each control to the viewport centre, then
+  ask `elementFromPoint` what answers there. At **375px** the session-prep panel is
+  `min(420px, 85vw)` — 318.75px, anchored right (`apps/client/src/codex/codex.css:1174`) — and **27 of
+  the 30** hit-testable controls under `.codex-root` answer with the drawer. The three that do not are
+  its own Close and "Open Sessions" plus the top-left "Codex sections" button, which survives only
+  because it sits in the 56px strip the panel leaves. The nav drawer is the full 375px and covers **28
+  of 43**; the player's drawer covers **19 of 30**. At **1280px** the same panel is 420px on the right
+  and covers **18 of 43** — less of the shell, but still the opener: at both widths the "Session prep"
+  button reports `aria-expanded="true"` while its own centre resolves to `.nh-drawer-body`, so a second
+  press is intercepted and the open-drawer count stays at 1.
+  **This is the primitive's design, not a touch-target defect.** `packages/ui/src/primitives/Drawer.tsx:24-34`
+  states there is deliberately no scrim, no focus trap and no scroll lock — so a non-modal console can
+  sit beside a working view — and a panel that paints over the shell follows directly. Nor is it a
+  trap: Close is visible and carries `aria-label="Close"`, and Escape with focus inside leaves 0 open
+  drawers at both widths. What is open is the UX question underneath: at a width where the panel takes
+  85% of the screen and leaves one shell control reachable, should it become a `Modal` — or should the
+  opener stop presenting itself as a toggle it cannot untoggle?
+
+- **[codex/verify] `scripts/tap-audit.mjs` returns no reach verdict for 187 of its 1259 controls.**
+  Its own footer at 375px reads 1259 measured, 124 below the 44px floor, **0 unreachable in the active
+  layer**, and reach not judged for 187: 130 behind an open overlay — 56 under a modal `<dialog>`,
+  which the platform makes inert by spec, and 74 under an open non-modal `Drawer` (the entry above) —
+  and 57 inside a closed `<details>`. All 187 are still sized and still counted in the 124-below-floor
+  total; only the reach verdict is withheld. So nothing measures whether those controls are reachable
+  once their own layer becomes the active one, and that is the gap.
+  This entry used to blame the old "unresolved" column on SVG children and on controls that could not
+  be scrolled to the viewport centre. **Both causes measure zero.** SVG controls resolve —
+  `g.encounter-token` walks out to reach 21 against its own 15.8px box, `g.codex-graph-node` to 29-31 —
+  and each control is scrolled to the centre before hit-testing (`scripts/tap-audit.mjs:185-187`). The
+  "25-59 per surface" range this entry quoted described a column that no longer exists.
+
 ## Unverified — needs a browser, a contrast check, or a runtime repro
 
 These entries could not be confirmed *or* refuted by reading the code, so they are held here
@@ -342,14 +375,6 @@ it: `node scripts/tap-audit.mjs 375` for a touch-floor claim, `scripts/browser-v
 for a layout or pointer claim, a contrast calculator against
 `packages/ui/src/styles/design-tokens.css` for a ratio. If it reproduces, move it up to
 *Known gaps* with what you saw. If it does not, delete it and say so.
-
-- **[codex/ui] The session-prep drawer covers the top-bar control that opens it.** Measured 2026-08-01
-  at 1280px: with the drawer open, a click on "Session prep" is intercepted by the drawer itself, so
-  the control that opened it cannot close it. **Not a trap** — the drawer's own Close is visible and
-  labelled, and Escape closes it with focus inside (both asserted in the browser pass) — but the
-  top-bar button carries `aria-expanded` and reads as a toggle while behaving as an opener. Found by
-  the new both-directions toggle check; left alone because moving or offsetting a shipped drawer is a
-  layout change with no user complaint behind it, at the end of a polish pass.
 
 - **[repo/tooling] A pin cannot be selected reliably by a synthesized click at 375px.** `MapSurface`
   resolves a tap from `pointerdown`/`pointerup` on the whole `<svg>` (so it can tell tap from drag from
@@ -363,12 +388,6 @@ for a layout or pointer claim, a contrast calculator against
   nine false failures before it was understood. The browser pass therefore runs its two pin checks at
   desktop only and says why; pin reachability on a phone is the tap audit's job, where it is measured
   rather than clicked.
-
-- **[codex/verify] `tap-audit.mjs`'s "unresolved" column over-reports at narrow widths.** `reach === 0`
-  means `elementFromPoint` never resolved to the control — for an SVG child, or for anything that could
-  not be scrolled to the viewport centre. Because of the shell-stacking entry above, 25–59 controls per
-  surface report unresolved at 375px while being perfectly reachable. It is a pointer to investigate,
-  never a verdict; the `below 44px` column is the number that means something.
 
 - **[replay/player] A player watching a shared replay sees "Map unavailable — you don't have access to
   this map".** Measured 2026-08-05 (B3), GM and player side by side on the same archive at

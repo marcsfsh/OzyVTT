@@ -127,7 +127,7 @@ export function ScenePrepPanel({
       <Button variant="secondary" disabled={busy} aria-expanded={addingCharacters} onClick={() => setAddingCharacters((open) => !open)}><IconPlus /> Add characters</Button>
       <Button variant="secondary" disabled={busy} onClick={() => setBrowsing(true)}><IconPlus /> Add monsters</Button>
     </div>
-    {addingCharacters && <div className="scene-prep-picklist" role="group" aria-label="Add characters">
+    {addingCharacters && <div className="scene-prep-picklist scroll-y" role="group" aria-label="Add characters">
       {addableCharacters.length === 0
         ? <p className="scene-prep-note">Everyone on the roster is already staged.</p>
         : addableCharacters.map((actor) => <button key={actor.id} type="button" className="scene-prep-pick" disabled={busy} onClick={() => onAdd(actor.id)}>
@@ -140,7 +140,7 @@ export function ScenePrepPanel({
       <summary>Recent{recent.length > 0 ? ` (${recent.length})` : ""}</summary>
       {recent.length === 0
         ? <p className="scene-prep-note">Monsters you have used before show up here.</p>
-        : <div className="scene-prep-picklist">{recent.map((actor) => <button key={actor.id} type="button" className="scene-prep-pick" disabled={busy} onClick={() => onAdd(actor.id)}>
+        : <div className="scene-prep-picklist scroll-y">{recent.map((actor) => <button key={actor.id} type="button" className="scene-prep-pick" disabled={busy} onClick={() => onAdd(actor.id)}>
             <strong>{actor.name}</strong><small>{actor.visibility === "gm-only" ? "GM only" : "Shown to players"}</small>
           </button>)}</div>}
     </details>

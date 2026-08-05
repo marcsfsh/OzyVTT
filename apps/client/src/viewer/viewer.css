@@ -37,9 +37,13 @@
 .viewer-distance { left: 50%; bottom: 2rem; transform: translateX(-50%); }
 .viewer-ping-label { top: 2rem; left: 50%; transform: translateX(-50%); color: var(--magenta-hi); }
 /* Drag-resizable column: the panel holds a pinned resize handle at its left edge; the content scrolls
-   inside a wrapper so the handle never scrolls away. */
+   inside a wrapper so the handle never scrolls away. The panel is a frame (`.frame-col` in the
+   markup) and the wrapper is its canvas (`.frame-fill .scroll-y`) — §7's declared region. Sizing the
+   wrapper by flex rather than `height: 100%` is what lets the SAME element scroll at both aspects:
+   the portrait block below caps the panel at 32vh and the canvas takes the clamped height, so the
+   scroll never has to be handed outward. */
 .viewer-initiative { position: relative; overflow: hidden; border-left: 1px solid var(--line); background: var(--surface-1); }
-.viewer-initiative-scroll { height: 100%; overflow: auto; padding: 0 clamp(.6rem, 1.4vw, 1.4rem) clamp(.6rem, 1.4vw, 1.4rem); }
+.viewer-initiative-scroll { padding: 0 clamp(.6rem, 1.4vw, 1.4rem) clamp(.6rem, 1.4vw, 1.4rem); }
 .viewer-initiative-resize { position: absolute; z-index: 3; left: 0; top: 0; bottom: 0; width: 14px; cursor: col-resize; touch-action: none; }
 .viewer-initiative-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--line); transition: background .15s, width .15s; }
 .viewer-initiative-resize:hover::before, .viewer-initiative-resize:active::before { background: var(--cyan); width: 4px; }
@@ -64,7 +68,7 @@
 .viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-2) 66%, var(--cyan)); color: var(--text); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-connection.reconnecting { background: color-mix(in srgb, var(--surface-2) 66%, var(--caution)); }
 @keyframes viewer-pulse { from { opacity: 1; transform: scale(.45); } to { opacity: 0; transform: scale(1.25); } }
-@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; overflow: auto; border-left: 0; border-top: 1px solid var(--line); } .viewer-initiative-scroll { height: auto; overflow: visible; } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid var(--line); } .viewer-connection { right: 1rem; } }
+@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; border-left: 0; border-top: 1px solid var(--line); } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid var(--line); } .viewer-connection { right: 1rem; } }
 @media (prefers-reduced-motion: reduce) { .viewer-ping circle { animation: none; } }
 /* Health band + conditions on the shared screen (bands only, never exact numbers). */
 .viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem .5rem; border-radius: var(--radius-pill); font: 800 .55em/1.6 var(--font-body); letter-spacing: .05em; vertical-align: middle; }

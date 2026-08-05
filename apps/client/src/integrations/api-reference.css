@@ -49,7 +49,6 @@
 .api-lang-tabs { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .api-lang-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
 .api-export-spec { margin-left: auto; padding: 0.45rem 0.9rem; text-align: center; white-space: nowrap; }
-@media (max-width: 700px) { .api-export-spec { margin-left: 0; } }
 .api-response { padding: 0.35rem 0 0.35rem 0.6rem; border-left: 2px solid var(--line); }
 .api-response + .api-response { margin-top: 0.4rem; }
 .api-response-ok { border-left-color: var(--success); }
@@ -57,4 +56,6 @@
 .api-response p { margin: 0 0 0.3rem; font-size: 0.82rem; }
 .api-response-code { font-weight: 800; color: var(--text); }
 .api-response-schema { color: var(--text-dim); font-style: normal; }
-@media (max-width: 700px) { .api-auth { margin-left: 0; width: 100%; } .api-field-table td:nth-child(2) { white-space: normal; } }
+/* The ladder's 760 rung (§3), one block for the whole file: below it nothing in this panel keeps a
+   right-hand column — the auth chips, the export button and the type column all give up their gutter. */
+@media (max-width: 760px) { .api-auth { margin-left: 0; width: 100%; } .api-field-table td:nth-child(2) { white-space: normal; } .api-export-spec { margin-left: 0; } }
