@@ -259,10 +259,16 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
   padding: clamp(1.25rem, 4vh, 3rem) 1rem 4rem; text-align: center;
   background: var(--landing-sky);
 }
-/* The flare is excluded because it is neither scene nor content: it has to paint OVER the vignette
-   and the scanlines (z-2) and over the content (z-3), which a child of the z-0 scene layer could
-   never do — that layer is its own stacking context. */
-.landing > *:not(.landing-scene):not(.landing-flare) { position: relative; z-index: 3; width: 100%; }
+/* Two exclusions, and both are load-bearing.
+   The FLARE is neither scene nor content: it has to paint OVER the vignette and the scanlines (z-2)
+   and over the content (z-3), which a child of the z-0 scene layer could never do — that layer is
+   its own stacking context.
+   The THEME SWITCH is excluded because this rule would otherwise size and position it. It parks
+   itself in the corner (`position: absolute`, below), and every `:not()` here ADDS specificity —
+   adding the flare's raised this rule above the switch's own and dragged it into the middle of the
+   scene, on top of the doors. Naming the switch takes it out of this rule's reach entirely, which is
+   the fix rather than an arms race of counter-specificity. */
+.landing > *:not(.landing-scene):not(.landing-flare):not(.home-theme-switch) { position: relative; z-index: 3; width: 100%; }
 /* CRT dressing over the whole scene, under the content: vignette then scanlines. */
 .landing::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--landing-vignette); }
 .landing::after {
