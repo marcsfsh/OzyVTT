@@ -29,10 +29,24 @@ Something does not work. The fix restores intended behaviour; no new design is r
 |---|---|---|
 | A1 | **Fullscreen map is broken.** The map tools bar blows up to an enormous size covering the whole map. | `apps/client/src/scene/MapToolbar.tsx`, `apps/client/src/scene/encounter-map.css` |
 | A2 | **The health ring is broken.** With health display set to the ring, the entire token becomes a solid colour instead of just the ring. GM and player both. | `apps/client/src/scene/EncounterMap.tsx` |
-| A3 | **A player cannot create a character** even with the player-builder policy open. If a player has no claimed character and the feature is enabled, the door should exist. | `apps/client/src/main.tsx`, `apps/client/src/builder/CharacterBuilder.tsx` |
 | A4 | **The Codex sidebar's collapse control is off-centre** (towards the right) while the sidebar is collapsed. | `apps/client/src/codex/CodexShell.tsx`, `apps/client/src/codex/codex.css` |
 | A5 | **Adding a monster gives no feedback.** The screen jumps slightly and reads as a glitch, so a GM may add the same monster several times before noticing the first one worked. | `apps/client/src/encounter/MonsterBrowser.tsx` |
 | A6 | **The full API reference should open in a new browser tab.** At half width it is very hard to read. | `apps/client/src/integrations/ApiReference.tsx` |
+
+**Recon outcome (2026-08-05).** All items confirmed in category except **A3, which moved A → D**:
+the character-creation door does not exist, nothing is broken. `/builder` works perfectly when typed
+into the address bar, both gates are open, and the only `navigate("/builder")` in the client is
+GM-gated. It is a placement decision — see D12.
+
+**A1 and two of C5's three symptoms are one bug.** Two descendant selectors in
+`apps/client/src/scene/encounter-map.css` (`:34`, `:89`) match every `<svg>` in the stage, not just
+the map's own. Scoping them to the direct child fixes the fullscreen blow-up, the 2.5× toolbar icon
+mismatch, and the "mis-coloured border" (which is not a border — it is an opaque `--void` tile behind
+each glyph). **Fix as one change, not two lanes.**
+
+**A2 is four call sites, not one.** The ring defect (`.hp-fill-*` beating `fill: none` at equal
+specificity, declared later) is duplicated in `apps/client/src/viewer/viewer.css`, and the **bar**
+has the identical mirror defect with `stroke`. One change, four sites.
 
 **A-deferred:** fullscreen does nothing at all on mobile. The client said to hold off if fixing it is
 significant work — treat as out of scope for round 2 unless A1's diagnosis makes it nearly free.
@@ -88,6 +102,7 @@ Real estate and structure. **Needs discovery.**
 | D8 | **Shared screen: a revoked session should move to a revoked-displays list.** The paired-displays list should show only active pairings. |
 | D9 | **Players need a "My character" tab** — the first tab, before Table. It holds their sheet, shows the other (non-archived) party members, and lets them open **read-only** versions of other players' sheets. A GM setting disables that visibility; **default is that players can see them.** |
 | D10 | **Two buttons say "My sheet"** on the player's table — one inside an Initiative/My sheet toggle, one on the character bar. Remove the toggle; leave a single "My sheet" button in the initiative area that opens the sheet the way the character bar's button does today. |
+| D12 | **Where does a player's create-a-character door live?** (was A3.) The wizard works and both gates are open; there is simply no link. `apps/client/src/actors/ClaimCharacter.tsx:72` already puts one self-serve path — the D&D Beyond PDF import — on the exact screen where this belongs. Same question applies to levelling (`apps/client/src/builder/LevelFlow.tsx:67` gates on the same policy). |
 | D11 | **The player's character bar over the map eats a lot of real estate** (and its teal bubble border is a C1 instance). D9 is the preferred fix rather than merely restyling the bar. |
 
 ---
