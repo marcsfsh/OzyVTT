@@ -333,7 +333,7 @@ export function RecordDetail({
   const published = doc.state === "published";
 
   return (
-    <article className="hb-detail">
+    <article className="hb-detail scroll-y">
       <header className="hb-detail-head">
         <h2 className="hb-detail-title" tabIndex={-1} ref={titleRef}>
           {nameOf(draft).trim() || `Untitled ${typeLabel(doc.type)}`}

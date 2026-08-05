@@ -42,7 +42,9 @@ export function SidebarNav({ groups, activePath, collapsed = false, onNavigate, 
   return (
     <nav className={`codex-sidebar${collapsed ? " is-rail" : ""}`} aria-label="Codex sections">
       {header && <div className="codex-sidebar-head">{header}</div>}
-      <div className="codex-sidebar-groups">
+      {/* The rail's own region (§7): thirteen destinations and three eyebrows do not fit a 720p laptop,
+          and the ones that fall off the end are Tools — where Settings and Backup live. */}
+      <div className="codex-sidebar-groups scroll-y">
         {groups.map((group, index) => (
           <div key={group.label ?? `group-${index}`} className={`codex-sidebar-group${group.label === "Tools" ? " is-tools" : ""}`}>
             {group.label && !collapsed && <span className="codex-sidebar-grouplabel eyebrow">{group.label}</span>}

@@ -21,7 +21,14 @@
 .nh-mdeditor-letter--strike { text-decoration: line-through; font-weight: 600; }
 
 .nh-mdeditor-frame { position: relative; min-width: 0; }
-.nh-mdeditor-input { width: 100%; min-height: 14rem; resize: vertical; font-family: var(--font-body); line-height: 1.6; }
+/* THE PRIMITIVE OWNS THE HEIGHT, and `resize: none` is stated rather than merely omitted. `Textarea`
+   renders `.nh-input .nh-textarea .nh-mdeditor-input`, and `forms.css`'s `.nh-textarea` ALSO sets
+   `resize: vertical` at the same specificity (0,0,1,0) — so deleting the declaration here would leave
+   the outcome to import order, which is luck, not a rule. The grab handle goes because every mount is
+   inside a locked pane now (§7): dragging the field taller only lengthens the region's scroll, and on a
+   phone the corner is a mis-tap magnet sitting on the text you were writing. The floor below is the one
+   height authority — the `rows` each call site passes (3 to 8) has never exceeded it. */
+.nh-mdeditor-input { width: 100%; min-height: 14rem; resize: none; font-family: var(--font-body); line-height: 1.6; }
 
 .nh-mdeditor-preview {
   position: relative;
@@ -42,7 +49,9 @@
   padding: var(--space-1);
   list-style: none;
   min-width: 14rem;
-  max-height: 15rem;
+  /* Never taller than the frame it opens inside: it is bottom-anchored, so a 15rem list in a 14rem
+     field would run off the top of the editor — and on a phone with the keyboard up, off the region. */
+  max-height: min(15rem, 100%);
   overflow-y: auto;
   background: var(--surface-2);
   border: 1px solid var(--line-strong);

@@ -6,6 +6,9 @@
    single-pane swap and 900px is "no hover on touch". Homebrew is the second surface
    using the same two numbers, so they stay two numbers rather than four. */
 
+/* THE HOMEBREW FRAME (design-language §7). `.pane-frame` / `.pane-scene` / `.frame-col` are on this
+   element in the markup: the modebar is the chrome row that never moves and the workspace below it is
+   the fill. Nothing here scrolls — the rail's list and the detail pane each scroll themselves. */
 .hb-root { display: flex; flex-direction: column; gap: 0; }
 
 /* ---- Modebar: derived counts on the left, library-wide ops on the right.
@@ -22,18 +25,25 @@
 
 .hb-unavailable-text { margin: 0 0 var(--space-3); }
 
-/* ---- Master-detail ---- */
+/* ---- Master-detail ----
+   `.frame-fill` in the markup: the workspace takes what the modebar leaves rather than asking for
+   64vh of a viewport it cannot see (measured 691px inside a 1036px pane, 461px inside a 676px one).
+   The bottom padding is the frame's breathing room, not §9's horizon reserve — both panes below are
+   opaque `--surface-1` cards that cover the band edge to edge, so nothing bare stands in it. */
 .hb-workspace {
   display: grid;
   grid-template-columns: minmax(220px, 300px) 1fr;
   gap: var(--space-4);
-  min-height: 64vh;
+  min-height: 0;
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
   align-items: stretch;
 }
 
+/* `min-height: 0`: a grid item's automatic minimum size is its content's, so without it the list
+   below could not shrink and the rail would stretch the workspace instead of scrolling inside it. */
 .hb-rail {
   display: flex; flex-direction: column; gap: var(--space-3);
-  min-width: 0;
+  min-width: 0; min-height: 0;
   border: 1px solid var(--line); border-radius: var(--radius-lg);
   background: var(--surface-1); padding: var(--space-3);
 }
@@ -57,7 +67,10 @@
 }
 .hb-filter { min-width: 0; }
 
-.hb-list { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; min-height: 0; }
+/* THE RAIL'S REGION (`.scroll-y` in the markup). `flex: 1` is the half that was missing: with
+   `min-height: 0` alone the list hugged its content — measured 274x67 inside a 461px rail — so a long
+   library scrolled the page rather than the list. */
+.hb-list { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-height: 0; position: relative; }
 .hb-group { display: flex; flex-direction: column; gap: 2px; }
 /* Never a bare <h3>: `h1,h2,h3 { font-weight: 400 }` in the app global would
    synthesise faux-bold on the single-weight display face. The full `font:`
@@ -93,20 +106,34 @@
 
 .hb-rail-foot { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
-.hb-main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-/* A keyboard-focused field must never land under the sticky tab bar above. */
-.hb-main { scroll-padding-top: var(--space-6); scroll-padding-bottom: var(--space-6); }
+/* The detail COLUMN is a frame: the back link (single-pane only) is its chrome row and `.hb-detail`
+   below is the region. `scroll-padding` moved off this element and onto `.hb-detail` with the scroll
+   itself — a scroll-padding on a box that does not scroll nudges nothing. */
+.hb-main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; min-height: 0; }
 
 /* The back control only exists in the single-pane layout. */
 .hb-back { display: none; align-self: flex-start; }
 .hb-back-icon { display: inline-flex; transform: rotate(90deg); font-size: 1.05em; }
 
-/* ---- Detail ---- */
+/* ---- Detail ----
+   THE DETAIL PANE'S REGION (`.scroll-y` in the markup). A class editor is ~4,900px of form; it scrolls
+   inside its own card now, so the rail beside it stays put and the frame never grows. The
+   scroll-padding is what keeps a keyboard-focused field off this region's own top and bottom edges —
+   it belongs to the thing that scrolls, which used to be neither this nor `.hb-main`. */
 .hb-detail {
   display: flex; flex-direction: column; gap: var(--space-4);
   border: 1px solid var(--line); border-radius: var(--radius-lg);
   background: var(--surface-1); padding: var(--space-4);
-  min-width: 0;
+  min-width: 0; min-height: 0; flex: 1 1 auto;
+  /* `position: relative` is load-bearing, not tidy: `.pane-scene` on `.hb-root` makes the surface a
+     positioned ancestor, so an unpositioned region is NOT the containing block for its own
+     absolutely-positioned descendants — and a box is only clipped by a scroll container its
+     containing block sits inside. MEASURED in the Codex, whose regions have the same shape:
+     `@vtt/ui`'s 1x1 `.nh-sr-only` span escaped the region, was placed against the surface instead,
+     and grew the document by 4,735px. */
+  position: relative;
+  overscroll-behavior: contain;
+  scroll-padding-top: var(--space-6); scroll-padding-bottom: var(--space-6);
 }
 .hb-detail-head { display: flex; flex-direction: column; gap: var(--space-3); max-width: none; }
 .hb-detail-title {
@@ -235,8 +262,10 @@
 /* The `choose × grants` readout. Words, not a colour: it is arithmetic, not a state. */
 .hb-picks { margin: 0; color: var(--text); font-size: var(--fs-sm); }
 
-/* ---- Catalog picker ---- */
-.hb-catalog-grid { max-height: 50vh; overflow-y: auto; }
+/* ---- Catalog picker ----
+   No cap and no scroller: this sits in a `Modal`, whose body IS the declared region
+   (`.nh-modal-body.scroll-y`) inside a surface already capped at min(88vh, 48rem). */
+.hb-catalog-grid { min-width: 0; }
 .hb-catalog-foot { margin-top: var(--space-3); }
 
 /* ---- Level table ----
@@ -316,23 +345,28 @@
 
 /* ---- Create modal ---- */
 .hb-create-body { display: flex; flex-direction: column; gap: var(--space-4); }
-/* The duplicate catalog scrolls inside the sheet rather than growing it, so the
-   footer's Create button never leaves the viewport. `dvh` at the narrow end because
-   `vh` ignores the mobile URL bar. */
-.hb-create-grid { max-height: 40vh; overflow-y: auto; }
+/* The `Create` button lives in `.nh-modal-foot`, OUTSIDE the modal's scrolling body, so it never
+   leaves the sheet whatever this grid does — which is what makes the 40vh/50dvh cap that used to sit
+   here unnecessary rather than merely convertible. The body is the region; this is content in it. */
+.hb-create-grid { min-width: 0; }
 
-@media (max-width: 900px) {
-  /* No hover on touch: anything hover-revealed becomes permanently visible. Nothing on
-     this surface is hover-revealed today (row actions are a menu in the detail pane);
-     the rule is stated so a later slice adding one inherits it rather than reinventing it. */
-  .hb-detail [data-hover-reveal] { opacity: 1; }
-}
+/* (The off-ladder 900px query that stood here is gone — written without its `@media (…)` spelling
+   on purpose, because check (f) parses this file for breakpoints and does not strip comments, so
+   naming the rung in prose would re-declare the very rung being retired. Its one rule dressed
+   `[data-hover-reveal]`, an attribute this repo has never used on any element — the block was written
+   for a later slice that never came, and an unused rule is not worth an off-ladder rung. Homebrew's
+   row actions are a menu in the detail pane, which needs no hover to reach.) */
 
 @media (max-width: 760px) {
-  .hb-workspace { grid-template-columns: 1fr; min-height: 0; }
+  /* THE SINGLE-PANE SWAP, unchanged in what it does and re-stated in the frame's terms: a grid with a
+     fixed height would give two auto rows a share each, so the column is a FLEX one here and the
+     visible pane takes the fill. */
+  .hb-workspace { display: flex; flex-direction: column; }
+  .hb-rail { flex: 1 1 auto; }
+  .hb-main { flex: 0 1 auto; }
   .hb-workspace.has-selection .hb-rail { display: none; }
+  .hb-workspace.has-selection .hb-main { flex: 1 1 auto; }
   .hb-workspace.has-selection .hb-back { display: inline-flex; }
-  .hb-create-grid { max-height: 50dvh; }
 
   /* ---- Level table: one card per level.
      Folds at 760, not the allocator's 650, and the arithmetic is why: seven columns of

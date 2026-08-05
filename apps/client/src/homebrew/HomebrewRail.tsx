@@ -185,7 +185,7 @@ export function HomebrewRail({
         </Field>
       </div>
 
-      <nav className="hb-list" aria-label="Homebrew records">
+      <nav className="hb-list scroll-y" aria-label="Homebrew records">
         {shown.length === 0
           ? empty()
           : groups

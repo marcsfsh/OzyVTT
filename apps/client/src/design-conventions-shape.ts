@@ -186,9 +186,11 @@ export const CONVENTION_SHAPE = {
   ladderConditionFloor: 50,
   /**
    * Off-ladder `@media` conditions: **9** rows (2026-08-04), **8** since B3 moved the replay
-   * viewer's `max-width: 900px` onto the 849 rung.
+   * viewer's `max-width: 900px` onto the 849 rung, **7** since B2 deleted homebrew's — the block
+   * held one rule, dressing a `[data-hover-reveal]` attribute that appears on no element in this
+   * repo, so it was an off-ladder rung bought for a slice that never arrived.
    */
-  ladderOffRows: 8,
+  ladderOffRows: 7,
 
   // ─────────────────────────── (g) viewport units in app CSS ───────────────────────────
   /**
@@ -222,9 +224,19 @@ export const CONVENTION_SHAPE = {
    * arm's `50vh`) and the shared-screen controls' preview pair (`54vh` on the box, `50vh` on the
    * svg) all became a frame's leftover height, emptying `replay/replay.css` and
    * `viewer/viewer-controls.css`.
+   * **−19 occurrences / −2 files (2026-08-05, B2):** the Codex's fifteen and Homebrew's four went
+   * at once, because they were one idea repeated — "about two thirds of a screen", written by a
+   * box that could not see the screen. Both shells are frames now: the two-pane workspaces fill
+   * their region (`64vh` x2), the atlas and graph canvases take the leftover (`62vh` x3 GM,
+   * `52vh` x3 player, `64vh` + `62vh` + `68vh` graph), the details column stopped being a sticky
+   * window (`84vh`), the pin inspector became a region (`72vh`), five modal caps gave way to the
+   * `Modal` body that was already the declared region beneath them (`50vh`, `46vh`, `50vh`,
+   * `40vh`, `50dvh`), and the dead selectors deleted alongside took their `40vh`/`50vh` floors
+   * with them. What remains is the encounter panel's overlay cap and the landing's clamp, neither
+   * in a phase-B lane.
    */
-  viewportLegacyFiles: 4,
-  viewportLegacyTotal: 21,
+  viewportLegacyFiles: 2,
+  viewportLegacyTotal: 2,
 
   // ─────────────────────────── (h) declared scroll regions ───────────────────────────
   /**
@@ -241,9 +253,14 @@ export const CONVENTION_SHAPE = {
    * → one more than the count here; one hit is a codex.css comment the strip removes.
    * **−1 site / −1 file (2026-08-05, B3):** the shared-screen preview's `overflow: auto` retired
    * with the cap it bounded — a letterboxed svg has nothing left to scroll to.
+   * **−11 sites / −2 files (2026-08-05, B2):** `codex.css` (8) and `homebrew.css` (3) are empty.
+   * Six were real regions that took `.scroll-y` in the markup instead — the notebook/session/quest
+   * rails, the details column, the pin inspector, the homebrew library and its detail pane — and
+   * five were declarations that scrolled NOTHING: `.codex-campaign` and `.codex-audit` had no
+   * height to overflow, and three sat on selectors with no `.tsx` consumer at all.
    */
-  scrollAllowFiles: 10,
-  scrollAllowSites: 28,
+  scrollAllowFiles: 8,
+  scrollAllowSites: 17,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**

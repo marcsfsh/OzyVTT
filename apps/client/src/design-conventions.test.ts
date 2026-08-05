@@ -548,7 +548,6 @@ const LADDER_ALLOW: ReadonlyArray<readonly [file: string, kind: "min" | "max", w
   ["apps/client/src/actors/pdf-import.css", "max", 480],
   ["apps/client/src/encounter/encounter-panel.css", "min", 681],
   ["apps/client/src/encounter/encounter-panel.css", "max", 680],
-  ["apps/client/src/homebrew/homebrew.css", "max", 900],
   ["apps/client/src/integrations/api-reference.css", "max", 700],
   ["apps/client/src/integrations/api-reference.css", "max", 700],
   // Off-ladder AND double-firing with min-width: 850px at exactly 850px.
@@ -649,26 +648,7 @@ const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonl
  * lane that drains the row (A = shell/trivials, B = recomposes, C = redesigns).
  */
 const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phase: string]> = [
-  ["apps/client/src/codex/codex.css", "64vh", "B"],
-  ["apps/client/src/codex/codex.css", "50vh", "B"],
-  ["apps/client/src/codex/codex.css", "84vh", "B"],
-  ["apps/client/src/codex/codex.css", "40vh", "B"],
-  ["apps/client/src/codex/codex.css", "40vh", "B"],
-  ["apps/client/src/codex/codex.css", "64vh", "B"],
-  ["apps/client/src/codex/codex.css", "62vh", "B"],
-  ["apps/client/src/codex/codex.css", "50vh", "B"],
-  ["apps/client/src/codex/codex.css", "46vh", "B"],
-  ["apps/client/src/codex/codex.css", "62vh", "B"],
-  ["apps/client/src/codex/codex.css", "62vh", "B"],
-  ["apps/client/src/codex/codex.css", "62vh", "B"],
-  ["apps/client/src/codex/codex.css", "72vh", "B"],
-  ["apps/client/src/codex/codex.css", "68vh", "B"],
-  ["apps/client/src/codex/codex.css", "52vh", "B"],
   ["apps/client/src/encounter/encounter-panel.css", "78vh", "B/C"],
-  ["apps/client/src/homebrew/homebrew.css", "64vh", "B"],
-  ["apps/client/src/homebrew/homebrew.css", "50vh", "B"],
-  ["apps/client/src/homebrew/homebrew.css", "40vh", "B"],
-  ["apps/client/src/homebrew/homebrew.css", "50dvh", "B"],
   ["apps/client/src/styles.css", "52vh", "B"]
 ];
 
@@ -782,10 +762,8 @@ const SCROLL_DECL = /overflow(?:-y)?\s*:\s*(?:auto|scroll)/g;
 
 /** The measured population, per file — the FEEDBACK_ALLOW shape. */
 const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/codex/codex.css", 8],
   ["apps/client/src/encounter/combat-log.css", 1],
   ["apps/client/src/encounter/encounter-panel.css", 5],
-  ["apps/client/src/homebrew/homebrew.css", 3],
   ["apps/client/src/maps/map-picker.css", 1],
   ["apps/client/src/scene/encounter-map.css", 5],
   ["apps/client/src/scenes/scene-prep.css", 1],

@@ -201,7 +201,7 @@ export function PagesView({
               ariaLabel="Filter by tag" placeholder="Filter by tag" />
           </div>
         )}
-        <nav className="codex-list" aria-label="Campaign pages">
+        <nav className="codex-list scroll-y" aria-label="Campaign pages">
           {filtering && !search.trim() ? (
             <>
               <div className="codex-filter-chips">
@@ -232,7 +232,7 @@ export function PagesView({
         </nav>
       </aside>
 
-      <section className="codex-main">
+      <section className="codex-main scroll-y">
         {selectedId && (
           /* D25/G17: the bespoke `.codex-back` link becomes the ghost Button primitive, which carries the
              44px floor itself (route 2, `.nh-btn--sm` + `.tap-target`). */

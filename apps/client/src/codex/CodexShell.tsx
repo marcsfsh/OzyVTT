@@ -325,7 +325,10 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
   );
 
   return (
-    <div className={`codex-root codex-shell${collapsed ? " is-rail" : ""}`}>
+    /* THE FRAME (§7). The shell IS the pane: a rail column beside a column of chrome rows over one
+       scrolling region, standing on the scene sky. Nothing outside `.codex-shell-content` moves. */
+    <div className={`codex-root codex-shell pane-frame pane-scene scanlines anim-view${collapsed ? " is-rail" : ""}`}>
+      <div className="pane-sky" aria-hidden="true" />
       {/* ≥761px: the sidebar is in the layout. ≤760px it is a Drawer, opened from the top bar. */}
       <aside className="codex-shell-side">{nav(collapsed)}</aside>
       <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">
@@ -333,7 +336,8 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
       </Drawer>
 
       <div className="codex-shell-main">
-        <div className="codex-topbar">
+        {/* The beam marks the frame's boundary against its region — §9's own use for it. */}
+        <div className="codex-topbar neon-beam">
           <IconButton label="Codex sections" className="codex-topbar-menu" onClick={openDrawer}>
             <CodexIcon iconId="menu" className="codex-navitem-icon" />
           </IconButton>
@@ -352,7 +356,8 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
         {error && <Alert tone="danger" title="Couldn't load the Codex">{error}</Alert>}
         {previewError && <Alert tone="danger">{previewError}</Alert>}
 
-        <div className="codex-shell-content">
+        {/* THE REGION (§7): the one thing on this surface that scrolls, whichever section is on screen. */}
+        <div className="codex-shell-content scroll-y frame-fill">
           {section === null && <NotFoundView role="gm" />}
 
           {section === "home" && (
@@ -501,7 +506,10 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
           onChanged={refreshList} />
       )}
 
-      <Modal open={!!previewToken} onClose={() => setPreviewToken(null)} size="full" title="What players see" ariaLabel="Player Codex preview">
+      {/* `codex-preview-modal` makes the sheet's body a FRAME rather than a document, so the embedded
+          shell inside it gets a real height and behaves exactly like the player's own pane — including
+          the atlas, whose map fills its region and would otherwise have nothing to fill. */}
+      <Modal open={!!previewToken} onClose={() => setPreviewToken(null)} size="full" title="What players see" ariaLabel="Player Codex preview" className="codex-preview-modal">
         <p className="codex-inspector-hint">This is the real player Codex, read through a player session. Anything hidden from players is absent here, not dimmed.</p>
         {previewToken && <PlayerCodex token={previewToken} embedded />}
       </Modal>

@@ -123,7 +123,7 @@ export function CommandPalette({ gmToken, onOpenHit, onCreatePage, onCreateSessi
           else if (event.key === "Escape") { event.preventDefault(); onClose(); }
         }}
       />
-      <ul className="codex-palette-list">
+      <ul className="codex-palette-list scroll-y">
         {state.status === "loading" && <li className="codex-palette-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</li>}
         {state.status === "error" && <li><Alert tone="danger" title="Search failed">{state.message}</Alert></li>}
         {actions.length === 0 && state.status === "ready" && <li className="codex-palette-empty">No matches.</li>}

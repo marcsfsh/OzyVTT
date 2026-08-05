@@ -593,8 +593,9 @@ function App() {
           here — indistinguishable on purpose (invariant §3.2). */}
       {mode === "gm" && gmToken && gmAddressUnknown && <NotFoundPage role="gm" />}
 
-      {/* staged region — B2 (codex recompose) drains it */}
-      {mode === "player" && playerView === "codex" && mapToken && <div className="anim-view codex-anim pane-stage scroll-y"><PlayerCodex token={mapToken} /></div>}
+      {/* THE CODEX OWNS ITS FRAME (B2), player half. No staging wrapper: the shell is a rail beside a
+          column of chrome rows over one scrolling region, and it stands on its own sky. */}
+      {mode === "player" && playerView === "codex" && mapToken && <PlayerCodex token={mapToken} />}
       {/* D24 — one Settings surface, one component, both roles. A player is handed no GM group at
           all: `SettingsPage` renders `TableGroup`/`PlayersGroup` only for a GM token, so the GM-only
           controls are absent from the tree rather than hidden in it.
@@ -706,16 +707,17 @@ function App() {
           it). Unshared ids are 404 at the server, so the list is the truth. */}
       {mode === "player" && playerView === "table" && route.segments[0] === "replays" && mapToken &&
         <ReplayList role="player" token={mapToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} onBack={() => navigate("/table")} />}
-      {/* staged region — B2 (codex recompose) drains it */}
-      {mode === "gm" && gmToken && route.segments[0] === "codex" && <div className="anim-view codex-anim pane-stage scroll-y"><CodexShell gmToken={gmToken}
+      {/* THE CODEX OWNS ITS FRAME (B2), GM half — same shell, same regions, one more section list. */}
+      {mode === "gm" && gmToken && route.segments[0] === "codex" && <CodexShell gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
         actors={(state as GmView | null)?.actors?.map((actor) => ({ id: actor.id, name: actor.name })) ?? []}
         activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
         onActivateScene={(sceneId: string) => { makeSceneLive(sceneId); navigate(pathForGmTab("table")); }}
-        onOpenReplay={(archiveId: number) => navigate(`/replays/${archiveId}`)} /></div>}
+        onOpenReplay={(archiveId: number) => navigate(`/replays/${archiveId}`)} />}
 
-      {/* staged region — B2 (homebrew recompose) drains it */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "homebrew" && <div className="anim-view pane-stage scroll-y"><HomebrewPanel gmToken={gmToken} /></div>}
+      {/* HOMEBREW OWNS ITS FRAME (B2): a modebar row over a master-detail workspace whose two panes
+          each scroll themselves. */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "homebrew" && <HomebrewPanel gmToken={gmToken} />}
 
       {mode === "gm" && gmToken && showViewerPreview &&<ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 

@@ -95,7 +95,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
             </Select>
           </div>
           {listError && <Alert tone="danger">{listError}</Alert>}
-          <nav className="codex-list" aria-label="Quests">
+          <nav className="codex-list scroll-y" aria-label="Quests">
             {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
             {!loading && quests.length === 0 && !error && <p className="codex-list-empty">No quests yet. Create one to start tracking objectives.</p>}
             {!loading && quests.length > 0 && shown.length === 0 && <p className="codex-list-empty">No quests match.</p>}
@@ -113,7 +113,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
           </nav>
         </aside>
 
-        <section className="codex-main">
+        <section className="codex-main scroll-y">
           {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenQuest(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All quests</Button>}
           {/* R4: this surface's own failure. The log reads one feed; a silent one is an empty log that
               looks exactly like a campaign that has never had a quest. */}
