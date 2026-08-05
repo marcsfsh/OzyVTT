@@ -347,6 +347,30 @@ function PlayersGroup({ state, gmToken, onPreviewPlayers }: Readonly<{ state: Gm
 
 // ───────────────────────────────── The page ─────────────────────────────────
 
+/**
+ * **A GM token is not yet a GM view.** `main.tsx` names this race where the table's scenes row
+ * guards it: "the first state after login can still be player-projected ... until the session join
+ * lands". On a COLD DEEP LINK to `/settings` that window is the first paint — the address
+ * authenticates, a state arrives, and the join that upgrades the projection has not happened yet.
+ * `PlayerView` carries `builderPolicy` verbatim but no `rulesPolicy`, no `stagingDefaults` and no
+ * `combat.healthDisplay`, so `TableGroup` read `state.rulesPolicy.dial` on undefined and took the
+ * whole page into the error boundary: "Cannot read properties of undefined (reading 'dial')",
+ * reproduced 8/8 at 375x667 and 1280x900 (in-SPA navigation never hit it — by then the join has
+ * landed).
+ *
+ * So guard the FIELDS, not the role, exactly as the scenes row guards `combat.scenes` with
+ * `Array.isArray`: a state that does not carry the GM's own policy is not a `GmView` yet, whatever
+ * the token says. The cost is one frame of a page with only *Mine* on it; the next state has the
+ * fields and the GM groups mount. These three are the GM-only fields the two groups below actually
+ * read — a projection either carries all of them or is not the GM's.
+ */
+function gmViewOrNull(state: GmView | PlayerView | null): GmView | null {
+  const view = state as GmView | null;
+  if (!view) return null;
+  const projected = view.rulesPolicy !== undefined && view.stagingDefaults !== undefined && view.combat?.healthDisplay !== undefined;
+  return projected ? view : null;
+}
+
 export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut, onRevokeAll, busy = false }: Readonly<{
   role: "gm" | "player";
   state: GmView | PlayerView | null;
@@ -357,7 +381,7 @@ export function SettingsPage({ role, state, gmToken, onPreviewPlayers, onSignOut
   onRevokeAll?: () => void;
   busy?: boolean;
 }>) {
-  const gm = role === "gm" && gmToken ? (state as GmView | null) : null;
+  const gm = role === "gm" && gmToken ? gmViewOrNull(state) : null;
   /* THE FRAME (§7): the heading never moves, and the groups are the one region that scrolls.
      Settings no longer rides the shell's staged pane — it owns its column, its sky, and its
      scroller. */

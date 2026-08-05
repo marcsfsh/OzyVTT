@@ -122,13 +122,11 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **"The screen is the page" refresh (this branch, 2026-08-05). A, B and C are all in.** C1: phone
-  table = map band + tabbed Turn/Dice/Log sheet (`.table-layout` was 9803px in an 800px pane, now 800).
-  C2: calibration is four steps, canvas always mounted (0px on screen at a 1280×720 landing, now 374
-  in every step). Ratchets — ladder 0, viewport-legacy 0, undeclared scrollers 1 (`map-picker.css`
-  serves the embedded picker, which has no frame to take height from). Tap floor **124 → 9** of 1223,
-  0 unreachable: 8 are §4 exceptions, 1 a 1×1 hidden input. **No QA stage ran — self-consistent, not
-  independently verified.**
+- **"The screen is the page" refresh (this branch, 2026-08-05). A, B and C are in, and QA has run.**
+  C1: the phone table is a frame that yields **sheet-first** — free space to the sheet, a deficit out of the sheet down to an 8.25rem floor (44px tab bar + 88px body), and below that `.table-layout` **declares a scroll** rather than clipping. Clipping was the bug QA found: a 0px dock body and a `null` tab bar on every landscape phone mid-fight, a 0px claim picker at 320×568 (an unclaimed player could not join at all), "Leave table" off the bottom. Portrait is unchanged — GM 390×844 = section 336 / band 224 / sheet 456 / body 412, `.table-layout` 800 in every tab. Landscape is usable, not good (it scrolls 36–200px); it wants a map-beside-sheet composition, which needs a height axis the ladder does not have. A floored map half was measured and **rejected**: it spills 91.6px where the top line wraps.
+  **Docked at ≥980 the sidebar scrolls its own column** (`DicePanel` alone is 787–850px in an ~856px column, so no flex arrangement fits); dropping that had cost 114–429px of PAGE scroll, stuck to the device by `localStorage`.
+  C2: calibration is four steps, canvas always mounted (0px on screen at a 1280×720 landing, now 374 in every step).
+  Ratchets — ladder 0, viewport-legacy 0, undeclared scrollers 1 (`map-picker.css` serves the embedded picker, which has no frame to take height from). Tap floor **124 → 9** of 1223, 0 unreachable: 8 are §4 exceptions, 1 a 1×1 hidden input.
 - **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`); rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
 - **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.
 

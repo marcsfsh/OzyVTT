@@ -1,8 +1,26 @@
 /**
  * The no-scroll audit — the reproducible form of §7's law (design-language.md): THE PAGE
- * NEVER SCROLLS. It drives the app's route × role table at three viewports — 1280×900,
- * 1280×720 (the "1280×720-class" floor §6b names) and 390×844 — and FAILS (exit non-zero)
- * on any route whose document scrolls, either axis, or that it could not measure at all.
+ * NEVER SCROLLS. It drives the app's route × role table at eight viewports — three laptop
+ * shapes and five phone ones, portrait AND LANDSCAPE — and FAILS (exit non-zero) on any
+ * route whose document scrolls, either axis, or that it could not measure at all.
+ *
+ * IT ALSO MEASURES THE PANE, NOT ONLY THE DOCUMENT, and it docks. Both are here because
+ * the document probe alone missed three CRITICAL defects and one regression that shipped
+ * past it:
+ *  - The document check is weak evidence and this repo's own history proves it: a phone
+ *    `/table` whose `.table-layout` scrolled several THOUSAND pixels inside an 800px pane
+ *    passed it green, because the overflow lived inside the pane. So `/table` now also
+ *    asserts `.table-layout.scrollHeight - clientHeight` against its own overflow budget
+ *    and HIT-TESTS the dock's tab bar (and a Claim button when the picker is up):
+ *    `document.elementFromPoint` at the control's own centre must return that control.
+ *    A 0px dock body under a tab bar that responds to nothing is invisible to any
+ *    height-only probe — it was measured at 0 in every landscape phone cell.
+ *  - It never docked, because `dockPosition` defaults to `sidebar`. The docked arm at ≥980
+ *    is a different composition, and it scrolled the PAGE by 114-429px on every laptop
+ *    width. Two cells now seed `localStorage['vtt.dock-position']` before load.
+ *  - It had no landscape and no short pane. A phone in landscape (or portrait with the
+ *    soft keyboard up) is where the frame's floors stop fitting, and it is the state the
+ *    whole table went unusable in.
  *
  * Same terms as `tap-audit.mjs`: it needs a browser and a running dev server, so it is a
  * scripted manual audit, deliberately NOT wired into `npm test`. `playwright-core` is
@@ -43,6 +61,21 @@
  * frame and the staging class is gone. Any red cell is therefore a REGRESSION now, and what
  * still polices the shape of those frames is the (g)/(h) ratchets in
  * design-conventions.test.ts, not this table.
+ *
+ * WHAT A GREEN RUN IS STILL NOT WORTH. It proves the document does not scroll, that the
+ * table's own frame stays inside its budget, and that two named controls hit-test — at the
+ * viewports and in the states a route list opens. It remains blind to occlusion in general,
+ * to every control behind a collapsed tab or a closed disclosure, and to any state this
+ * script cannot reach (a claimed player, a populated replays shelf). Read it as a floor.
+ *
+ * THE RUN IS RED ON ITS FIRST EXTENDED PASS (2026-08-05), and the red is the point rather
+ * than a broken script: adding landscape and short-pane cells found 14 of them, on five
+ * surfaces none of which is `/table` — `/scenes`, `/scenes/maps`, `/roster`, `/homebrew`,
+ * `/replays/:id` and the player's `/replays` scroll the DOCUMENT by 1-92px somewhere in
+ * 844×390 / 667×375 / 390×400 / 320×568. Those are §7 violations that were simply never
+ * looked for. **Do not delete a viewport to go green** — the widths and heights here are a
+ * claim about what the app supports (ADR-0014), and narrowing the claim to fit the code is
+ * the one move this file exists to prevent.
  */
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_CORE ?? "playwright-core");
@@ -50,7 +83,17 @@ const EXEC = process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome
 const BASE = process.env.AUDIT_URL ?? "http://localhost:5173/";
 const PASSWORD = process.env.AUDIT_PASSWORD ?? "testpassword123";
 
-const VIEWPORTS = [[1280, 900], [1280, 720], [390, 844]];
+/**
+ * Four laptop shapes, two phone portraits, three short panes. The short ones are the point:
+ * 844×390 and 667×375 are a 14-Pro and an SE ROTATED, and 390×400 stands in for the same phone
+ * with the Android soft keyboard up (the layout viewport shrinks and the frame gets a ~400px
+ * pane). Every one of those was a state no audit opened, and every one of them was broken.
+ * The first four are ≥980 — the docked pass below uses exactly those, because below the rung
+ * there is nowhere to dock and `phoneTable` forces `sidebar`.
+ */
+const VIEWPORTS = [[1920, 1080], [1280, 900], [1280, 720], [1024, 667], [390, 844], [320, 568], [844, 390], [667, 375], [390, 400]];
+/** How many leading VIEWPORTS columns sit above the 980 rung. */
+const LAPTOP_CELLS = 4;
 
 const browser = await chromium.launch({ executablePath: EXEC, args: ["--no-sandbox"], timeout: 60_000 });
 const at = (path) => `${BASE}${path.replace(/^\//, "")}`.replace(/([^:])\/\//g, "$1/");
@@ -69,9 +112,80 @@ const MEASURE = `(() => {
   return { yDelta, xMax };
 })()`;
 
-async function newPage(width = 1280, height = 900) {
+/**
+ * THE PANE PROBE — the half the document check cannot see (docblock at the top).
+ *
+ * Three structural assertions about `/table`'s own frame, none of which depends on what this
+ * dev server happens to hold:
+ *  (1) overflow must be REACHABLE. A frame shorter than its content is fine — a landscape
+ *      phone genuinely cannot hold the rows — but only if the user can scroll to it. Content
+ *      behind an `overflow: hidden` is not content.
+ *  (2) the dock's tab bar, when it renders, must HIT-TEST: `elementFromPoint` at its own
+ *      centre returns it, at rest or once the frame is scrolled to the bottom.
+ *  (3) the dock's BODY must not be 0px while its bar is up — a tab bar that responds and
+ *      shows nothing is the defect no height-only probe catches.
+ * The claim picker gets (2) as well when it is on screen: an unclaimed player whose Claim
+ * button is clipped out of existence cannot join the table at all.
+ */
+const PANE = `(() => {
+  const tl = document.querySelector(".table-layout");
+  if (!tl) return null;
+  const over = tl.scrollHeight - tl.clientHeight;
+  const oy = getComputedStyle(tl).overflowY;
+  const scrollable = oy === "auto" || oy === "scroll";
+  const hit = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return "-";
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return "ZERO-BOX";
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return "OFFSCREEN";
+    const at = document.elementFromPoint(x, y);
+    if (!at) return "NULL";
+    return (el.contains(at) || at.contains(el)) ? "OK" : "BLOCKED";
+  };
+  // "Reachable" means reachable THE WAY A THUMB REACHES IT: scrollIntoView walks every
+  // scrollable ancestor, which is the frame here and the picker's own .scroll-y region one
+  // level in. What it cannot rescue is the failure this probe exists for - a box with no
+  // height, or content behind a clip - because no scroll position reveals those.
+  const both = (sel) => {
+    const rest = hit(sel);
+    if (rest === "OK" || rest === "-") return rest;
+    const el = document.querySelector(sel);
+    const restore = [];
+    for (let n = el.parentElement; n; n = n.parentElement) restore.push([n, n.scrollTop]);
+    el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+    const after = hit(sel);
+    for (const [n, top] of restore) n.scrollTop = top;
+    return after === "OK" ? "OK-SCROLLED" : after;
+  };
+  const body = document.querySelector(".dock-tabs-body");
+  return {
+    over, scrollable,
+    reached: over > 0 ? (tl.scrollTop = 1e6, tl.scrollTop > 0 ? (tl.scrollTop = 0, true) : false) : true,
+    tab: both(".dock-tabs-bar"),
+    claim: both(".claim-card-action"),
+    body: document.querySelector(".dock-tabs-bar") ? (body ? body.clientHeight : -1) : null
+  };
+})()`;
+
+/** Reads a PANE result into a cell fragment plus a pass/fail verdict. */
+function paneVerdict(p) {
+  if (!p) return { text: "", bad: [] };
+  const bad = [];
+  if (p.over > 0 && !(p.scrollable && p.reached)) bad.push(`pane+${p.over} UNREACHABLE`);
+  if (p.tab !== "OK" && p.tab !== "OK-SCROLLED" && p.tab !== "-") bad.push(`tabbar ${p.tab}`);
+  if (p.claim !== "OK" && p.claim !== "OK-SCROLLED" && p.claim !== "-") bad.push(`claim ${p.claim}`);
+  if (p.body !== null && p.body <= 0) bad.push(`dock body ${p.body}px`);
+  return { text: p.over > 0 ? ` pane+${p.over}` : "", bad };
+}
+
+async function newPage(width = 1280, height = 900, storage) {
   const page = await browser.newPage({ viewport: { width, height } });
   page.setDefaultTimeout(20_000);
+  // Seeded BEFORE any script runs, so the app boots with the preference already in place —
+  // which is the only way to reach the docked composition (`dockPosition` defaults to sidebar).
+  if (storage) await page.addInitScript((kv) => { for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v); }, storage);
   return page;
 }
 
@@ -91,8 +205,8 @@ async function go(page, path, ready) {
 }
 
 /** GM login at /table (tap-audit's flow: auth lands on the address that asked for it). */
-async function gmPage() {
-  const page = await newPage();
+async function gmPage(storage) {
+  const page = await newPage(1280, 900, storage);
   await page.goto(at("table"), { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.getByText("Enter as GM").click({ timeout: 15_000 });
   const pw = page.locator('input[type="password"]').first();
@@ -105,8 +219,8 @@ async function gmPage() {
 }
 
 /** A real player session — the landing's Join door, not any GM preview. */
-async function playerPage() {
-  const page = await newPage();
+async function playerPage(storage) {
+  const page = await newPage(1280, 900, storage);
   await page.goto(at("/"), { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.getByText("Join as Player").click({ timeout: 15_000 });
   await page.waitForSelector(".player-view-tabs, .table-layout", { timeout: 25_000 });
@@ -224,11 +338,54 @@ async function auditRoutes(page, role, routes) {
       await page.setViewportSize({ width: w, height: h });
       await page.waitForTimeout(500);
       const m = await page.evaluate(MEASURE);
-      const cell = cellOf(m);
-      if (cell !== "PASS") failures += 1;
+      // The pane probe rides the same cell, and only `/table` has a `.table-layout` to probe.
+      const verdict = paneVerdict(await page.evaluate(PANE));
+      const doc = cellOf(m);
+      const cell = doc === "PASS" && verdict.bad.length === 0
+        ? `PASS${verdict.text}`
+        : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad].filter(Boolean).join(" ")}`;
+      if (cell.startsWith("FAIL")) failures += 1;
       cells.push(cell);
     }
     rows.push({ route: route.path, role, cells });
+  }
+}
+
+/**
+ * THE DOCKED COMPOSITION. `dockPosition` is a persisted preference the route list never sets,
+ * so the arm the GM actually uses mid-fight — panels docked into the map, the sidebar holding a
+ * bare dice+log stack — was audited exactly never. It scrolled the PAGE at every width ≥980
+ * (114-429px) with `localStorage` making it stick to the device. Both roles, both sides.
+ */
+async function auditDocked() {
+  for (const [role, side] of [["gm", "left"], ["player", "right"]]) {
+    let page;
+    try {
+      page = await (role === "gm" ? gmPage : playerPage)({ "vtt.dock-position": side });
+      await go(page, "/table", ".table-layout");
+      const out = [];
+      for (const [w, h] of VIEWPORTS.slice(0, LAPTOP_CELLS)) {
+        await page.setViewportSize({ width: w, height: h });
+        await page.waitForTimeout(600);
+        const m = await page.evaluate(MEASURE);
+        const docked = await page.evaluate(() => document.querySelector(".table-layout.docked") !== null);
+        const verdict = paneVerdict(await page.evaluate(PANE));
+        const doc = cellOf(m);
+        // A cell that never reached the docked composition proves nothing — say so rather than pass.
+        // (It needs a live map: `showDocked` is gated on `combat.mapAssetId`, which is what the
+        // in-combat seed above provides.)
+        const cell = !docked ? "NOT MEASURED" : (doc === "PASS" && verdict.bad.length === 0 ? `PASS${verdict.text}` : `FAIL ${[doc === "PASS" ? null : doc.replace("FAIL ", ""), ...verdict.bad].filter(Boolean).join(" ")}`);
+        if (cell === "NOT MEASURED") unmeasured += 1; else if (cell.startsWith("FAIL")) failures += 1;
+        out.push(cell);
+      }
+      rows.push({ route: `/table docked-${side}`, role, cells: VIEWPORTS.map((v, i) => (i < LAPTOP_CELLS ? out[i] : "-")) });
+    } catch (error) {
+      rows.push({ route: `/table docked-${side}`, role, cells: VIEWPORTS.map(() => "NOT MEASURED") });
+      unmeasured += 1;
+      console.error(`  /table docked ${side} (${role}): NOT MEASURED - ${String(error).split("\n")[0].slice(0, 90)}`);
+    } finally {
+      if (page) await page.close();
+    }
   }
 }
 
@@ -282,6 +439,8 @@ try {
   unmeasured += PLAYER_ROUTES.length;
 }
 
+await auditDocked();
+
 await browser.close();
 
 const headers = ["route", "role", ...VIEWPORTS.map(([w, h]) => `${w}x${h}`)];
@@ -290,5 +449,8 @@ const line = (cols) => cols.map((c, i) => c.padEnd(widths[i])).join("  ");
 console.log(`\n===== no-scroll audit (the page never scrolls - design-language.md §7) =====`);
 console.log(line(headers));
 for (const r of rows) console.log(line([r.route, r.role, ...r.cells]));
-console.log(`\n${rows.length} route rows; ${failures} viewport cells with document scroll; ${unmeasured} NOT MEASURED.`);
+console.log(`\nA cell reads PASS when the DOCUMENT does not scroll on either axis AND the table's own`);
+console.log(`frame keeps every overflow reachable, its dock body non-zero and its named controls`);
+console.log(`hit-testable. "pane+N" on a PASS is a frame that overflows by N and can be scrolled to.`);
+console.log(`\n${rows.length} route rows; ${failures} failing viewport cells; ${unmeasured} NOT MEASURED.`);
 process.exit(failures === 0 && unmeasured === 0 ? 0 : 1);

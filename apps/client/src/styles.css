@@ -811,19 +811,35 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 
 .own-hp { flex: 0 0 auto; color: var(--cyan-hi); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .8rem; font-weight: 700; }
 
-/* THE TABLE IS A FRAME (§7). It fills the pane exactly and never scrolls as a whole — the map takes
-   the space that is left over, and anything that can outgrow its share scrolls inside its own region.
-   That is the difference the client could feel: the surface used to be a document that happened to be
-   about the height of a screen, so at 1920x1080 it overflowed its pane by 51px, at 1280x720 by 411,
-   and a player at 1080p by 211 — "scroll a little bit to see it all" on the one tab where you cannot
-   afford to look away. Measured before the change; the same probe reads 0 after it.
-   `margin-top: 2.5rem` went with the staging wrapper that used to supply the page column. */
-.table-layout { display: grid; gap: 1.5rem; height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; }
-/* `.scroll-y` used to ride this element in the markup — never scrolling above the rung (the frame
-   fits, measured) and scrolling a 3,000-10,000px document below it. C1 took the class off, because
-   both halves of the surface are frames now: above the rung two columns share one height, below it
-   the same rows stack (the phone block further down). Nothing here scrolls as a whole any more, so
-   nothing here declares that it does. */
+/* THE TABLE IS A FRAME (§7). It fills the pane exactly, the map takes the space that is left over,
+   and anything that can outgrow its share scrolls inside its own region. That is the difference the
+   client could feel: the surface used to be a document that happened to be about the height of a
+   screen, so at 1920x1080 it overflowed its pane by 51px, at 1280x720 by 411, and a player at 1080p
+   by 211 — "scroll a little bit to see it all" on the one tab where you cannot afford to look away.
+   Measured before the change; the same probe reads 0 after it, at every laptop width and in portrait.
+   `margin-top: 2.5rem` went with the staging wrapper that used to supply the page column.
+   `scrollbar-gutter: auto` overrides the `stable` that `.scroll-y` carries, and it is deliberate on
+   THIS box: the class here is a backstop that never engages above the rung (measured 0 at 980/1000/
+   1280/1440/1920, sidebar and docked alike), so a reserved gutter would be a permanent 10px tax on
+   the map column to prevent a jump that cannot happen. The arm that really scrolls — `.table-sidebar`
+   when docked — keeps the stable gutter, because there the scrollbar is real. */
+.table-layout { display: grid; gap: 1.5rem; height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; scrollbar-gutter: auto; }
+/* `.scroll-y` RIDES THIS ELEMENT IN THE MARKUP, and what it is for is narrow: on most cells the
+   frame fits and this class declares a scroll nothing uses. C1 took it off on exactly that
+   reasoning — both halves are frames now — and two arrangements proved it wrong, each by a
+   measurement:
+   - THE DOCKED ARM AT >=980 is not the accordion. `showDocked` renders a bare
+     `<DicePanel/><CombatLogPanel/>` stack (main.tsx), and `DicePanel` alone is 787px for a GM and
+     850px for a player inside an ~856px column: no flex arrangement fits it (the accordion's own
+     shape — dice rigid, log filling, `.combat-log-list` scrolling — was tried and still left
+     10-140px over), so the column has to declare a scroll. `.table-sidebar` takes `.scroll-y` there
+     for that reason and contains it; this class is the backstop. Without either, the PAGE scrolled
+     — 294px at 1280x900 for a GM, 429 for a player, 114 at 1920x1080 — which is the one invariant
+     the refresh exists to hold, and `dockPosition` persists in localStorage, so it stayed broken on
+     that device.
+   - BELOW THE RUNG a pane shorter than the frame's floors — a phone in landscape, or the same
+     phone with the soft keyboard up — genuinely cannot hold the rows. A scroll is the difference
+     between content one flick away and content that does not exist (the phone block below). */
 /* (The `.table-layout.anim-view { animation-fill-mode: backwards }` patch that kept a settled
    transform from trapping the enlarged-map overlay is gone: pane-level entrances are
    opacity-led now — the `pane-in` rule with the shell frame at the top of this file.) */
@@ -833,35 +849,68 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .table-layout > .table { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; min-height: 0; }
 /* ============ THE PHONE TABLE IS A FRAME TOO (C1) ============
-   The interim block this replaces named itself a placeholder, and the measurements are why. At
-   390x844, with the dock's sections opened one at a time, `.table-layout` scrollHeight read
-   2921 / 3692 / 9803px inside an 800px pane (Turn order / Dice / Combat log); at 375x667 it read
-   3078 / 3692 / 10122 inside 623. `document.scrollHeight` stayed exactly `innerHeight` in every one
-   of those states — the shell lock holds — which is why `scripts/no-scroll-audit.mjs` never saw any
-   of it: the whole overflow lived INSIDE the pane, and that script measures the document.
+   The interim block this replaces named itself a placeholder, and the measurements are why: with the
+   dock's sections opened one at a time, `.table-layout` scrollHeight ran to several THOUSAND pixels
+   inside an 800px pane, while `document.scrollHeight` stayed exactly `innerHeight` in every one of
+   those states — the shell lock held, which is why `scripts/no-scroll-audit.mjs` never saw any of
+   it: the whole overflow lived INSIDE the pane, and that script measures the document. (The precise
+   before-triple is deliberately not quoted here. Three records of it disagree, and only the AFTER —
+   800px in every tab, both roles — was re-measured; reverting is the only way to reproduce a before.)
 
-   Three rows, and the flex each takes is arithmetic, not taste:
-   - `section.table` is the map half — a 44px top line, the band, the status line. `flex: 0 0 auto`,
+   TWO ROWS AND AN ORDER OF YIELDING: free space goes to the sheet, a deficit comes out of the sheet
+   down to a STATED floor, and below that floor the frame scrolls rather than clipping.
+   - `section.table` is the map half — the top line, the band, the status line. `flex: 0 0 auto`,
      because every one of those is a STATED size and it must never trade one away. Shrink is split in
      proportion to flex-basis, and against a sheet whose content basis runs to thousands of pixels a
-     shrinkable map half loses most of itself: the first cut of this rule (`flex: 0 1 auto`) resolved
-     the ~300px row to 86px at 390x844, which is a band with no map in it.
-   - `.table-sheet` is the only shrinkable row, so the deficit lands there in full and the three rows
-     total the pane exactly. It is B2's frame: Tabs over one scrolling body, styled in
-     encounter-panel.css. Everything here is the ROW, never its contents.
-   - `overflow: hidden` on the column is the guarantee, not the fix — the rows are sized so nothing
-     needs clipping, and the clip is what stops a regression from becoming a scrolling document again.
-     It also un-scrolls the container that `EncounterPanel`'s `activeRow.scrollIntoView()` was reaching
-     through on mount: `scrollIntoView` walks EVERY scrollable ancestor, so the initiative row scrolled
-     the whole table 202px on a player's first paint, hiding the heading above it. Measured, not
-     inferred (the call was instrumented); the fix is structural and no `overflow-anchor` is involved. */
+     shrinkable map half loses most of itself: `flex: 0 1 auto` on its own resolved the 336px row to
+     107px at 390x844, with the sheet painting over the band.
+     A FLOORED version was measured and REJECTED, and the number is the reason. `flex: 0 1 auto;
+     min-height: 16rem` is a real gain in landscape — at 844x390 the section takes 256 instead of
+     336, the band reaches the 9rem floor it already declares, and the tab bar comes back on screen
+     — but a flat floor cannot be right for a section whose rigid rows vary by role and by whether
+     the top line wraps (44px, 82px in combat at the 320 floor, 138px out of it). Where the rigid
+     rows total more than the floor the children paint straight through the box: measured spill of
+     91.6px of the empty-state hero over the sheet at 320x420 and 320x380 for a claimed player out
+     of combat, 32.4px at 390x375, 15.2px at 568x320 — zero in all 45 probed cells without it. A
+     landscape phone wants a different COMPOSITION (map beside sheet, both at the pane's full
+     height), which is a phase and not a floor.
+   - `.table-sheet` is the shrinkable row, and `flex: 1 1 0` is the load-bearing part: a basis of
+     ZERO means it takes the leftover by GROWING and contributes nothing to the shrink distribution,
+     so a deficit is never handed to it in proportion to a content basis it cannot honour.
+     `min-height: 8.25rem` is the floor it can honour — 44px of tab bar plus 88px of body, two
+     initiative rows. Without it the sheet went to 0 FIRST and the rest became clipped, unreachable
+     content: 2px of sheet and a 0px body at 844x390, 0 and 0 at 667x375 and at 568x320, with
+     `elementFromPoint` at the tab bar's own centre returning `null` — no turn order, no dice, no
+     log, and no control to reach them, during a fight. It is B2's frame: Tabs over one scrolling
+     body, styled in encounter-panel.css. Everything here is the ROW, never its contents.
+   - THE FRAME DECLARES A SCROLL (`.scroll-y`, in main.tsx) for whatever is left below those floors.
+     `overflow: hidden` stood here and was called "the guarantee, not the fix" — the rows were sized
+     so nothing needed clipping, and the clip would stop a regression becoming a scrolling document
+     again. It did the opposite: under every pane the rows could not fit, the deficit became
+     UNREACHABLE content instead of a scroll. It also did not do the second job credited to it. The
+     claim was that it un-scrolls the container `EncounterPanel`'s `activeRow.scrollIntoView()`
+     reaches through on mount; it does not — `overflow: hidden` still creates a scroll container and
+     `scrollIntoView` still walks it (caught live at 667x375, first paint at scrollTop 13 with no
+     way back). What actually keeps that call harmless is the rows FITTING: where
+     `scrollHeight === clientHeight` there is nothing to scroll, and where they do not fit, a scroll
+     the user can undo beats a clip they cannot. */
 @media (max-width: 979px) {
-  .table-layout { display: flex; flex-direction: column; gap: .5rem; min-height: 0; overflow: hidden; }
+  /* The `scrollbar-gutter: auto` above matters most here, and the arithmetic is why. `stable`
+     reserves the scrollbar's width whether or not anything scrolls — 10px of a phone's content box,
+     measured — against a top line whose own arithmetic (the `.you-are-playing` block above)
+     documents ~7px of slack at 375. Measured with the gutter reserved: a claimed player's top line
+     at 375x667 went 44px -> 82px, the row wrapped, and 38px came out of the sheet on the phase's
+     own shortest supported phone. A phone's scrollbar is an overlay and costs nothing anyway. */
+  .table-layout { display: flex; flex-direction: column; gap: .5rem; min-height: 0; }
   /* The card chrome goes: a phone has no room to spend 24px a side plus a rule on a container that
      is the surface rather than a panel standing on it. */
   .table-layout > .table { flex: 0 0 auto; padding: .75rem; border: 0; border-radius: 0; background: none; }
-  .table-layout > .table-sheet { flex: 1 1 auto; min-height: 0; gap: .5rem; }
-  /* ONE 44px TOP LINE, and since the basis work below it is one line in fact and not just in name.
+  .table-layout > .table-sheet { flex: 1 1 0; min-height: 8.25rem; gap: .5rem; }
+  /* ONE 44px TOP LINE — at 375 and up, and the exception is stated rather than wished away: at the
+     320 floor a claimed player's row is 82px in combat (the "You're playing" pill wraps) and 138px
+     out of it (the party strip drops below the pill), and the GM's is 100px out of combat. That
+     extra height is real INPUT to the frame's arithmetic, not a rounding error — it is the largest
+     single reason a 320px phone runs out of pane.
      `display: contents` above the rung (below) leaves the laptop composition byte-identical — this
      wrapper exists only so the phone can put the scene door, the player's own character and the
      party on one line instead of three. `wrap` stays as the escape hatch: nothing here may be
@@ -912,8 +961,14 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      `.table-layout` is on the selector because the base rule is LATER in this file and a media query
      adds no specificity — without it the hero kept its 12rem and overflowed its own box by 27px. */
   .table-layout .map-empty-hero { flex: 0 1 14rem; min-height: 9rem; margin-top: 0; }
-  /* Q3: the picker IS the sheet below the rung — main.tsx renders it in this row instead of the dock. */
-  .table-sheet > .claim-view { flex: 1 1 auto; min-height: 0; margin: 0; }
+  /* Q3: the picker IS the sheet below the rung — main.tsx renders it in this row instead of the dock.
+     `flex: 1 1 0` for the same reason the sheet itself takes it: the picker's basis is 539px of
+     cards, and with `auto` that basis is what the shrink is split by, so the box that IS the sheet
+     was handed the whole deficit and resolved to 0px at 320x568 — Claim buttons laid out at y 545
+     and 755 and clipped out of existence, which is an unclaimed player who cannot join the table at
+     all. It already carries `.scroll-y` in the markup (ClaimCharacter.tsx); it only ever needed a
+     box with a height. */
+  .table-sheet > .claim-view { flex: 1 1 0; min-height: 0; margin: 0; }
 }
 /* The wrapper is invisible above the rung: its children go on being `section.table`'s own rows. */
 @media (min-width: 980px) { .table-topline { display: contents; } }

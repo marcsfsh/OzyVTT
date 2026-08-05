@@ -338,13 +338,27 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   85% of the screen and leaves one shell control reachable, should it become a `Modal` — or should the
   opener stop presenting itself as a toggle it cannot untoggle?
 
-- **[codex/verify] `scripts/tap-audit.mjs` returns no reach verdict for 187 of its 1259 controls.**
-  Its own footer at 375px reads 1259 measured, 124 below the 44px floor, **0 unreachable in the active
-  layer**, and reach not judged for 187: 130 behind an open overlay — 56 under a modal `<dialog>`,
-  which the platform makes inert by spec, and 74 under an open non-modal `Drawer` (the entry above) —
-  and 57 inside a closed `<details>`. All 187 are still sized and still counted in the 124-below-floor
-  total; only the reach verdict is withheld. So nothing measures whether those controls are reachable
-  once their own layer becomes the active one, and that is the gap.
+- **[codex/verify] `scripts/tap-audit.mjs` withholds its reach verdict for every control outside the
+  active layer — and never opens some layers at all.** At HEAD (2026-08-05) the footer at 375px reads
+  **1223 controls measured, 9 below the 44px floor, 0 unreachable in the active layer**. Reach is
+  *not judged* for the controls that sit behind an open overlay (a modal `<dialog>`, which the
+  platform makes inert by spec, or an open non-modal `Drawer` — the entry above) or inside a closed
+  `<details>`. They are still sized and still counted in the below-floor total; only the reach verdict
+  is withheld, so nothing measures whether they are reachable once their own layer becomes the active
+  one. That is the gap.
+  **The split is quoted with its provenance, because this entry once carried a stale one as if it were
+  current.** The last measured breakdown is `765e232`'s: **184 unjudged — 130 behind an open overlay,
+  54 inside a closed disclosure**. It has not been re-measured since; the phase that followed cleared
+  115 sub-floor controls and deleted a `<details>` whose contents were surfaced, so the population
+  moved and only the totals above were re-read. `node scripts/tap-audit.mjs 375` settles it. (The
+  numbers this entry used to quote — 187 unjudged of 1259 measured, 124 below the floor — were a
+  phase-opening snapshot, and 187 was `765e232`'s 184 mis-added as 130+57.)
+  **A second, larger blind spot is the state the audit opens a surface IN.** "9" means nine on the
+  surfaces its route list opens, as it finds them. Controls behind a collapsed tab or a closed
+  disclosure are never measured at all: `.dice-custom > summary` x2 at 19.5x375 (the phone sheet
+  mounts one tab's body at a time and the audit only ever measures the default tab) and
+  `button.api-copy` at 27.3x48.9 inside a closed `details.api-reference` on `/settings`. Both are
+  pre-existing and both are real sub-floor controls that would raise the 9 if the audit drove them.
   This entry used to blame the old "unresolved" column on SVG children and on controls that could not
   be scrolled to the viewport centre. **Both causes measure zero.** SVG controls resolve —
   `g.encounter-token` walks out to reach 21 against its own 15.8px box, `g.codex-graph-node` to 29-31 —

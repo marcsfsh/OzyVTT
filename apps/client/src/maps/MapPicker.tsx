@@ -97,7 +97,10 @@ export function MapPicker({ token, kind = "battlemap", selectedId, onSelect, fal
       {folders.map((name) => <Chip key={name} pressed={folder === name} onClick={() => setFolder(name)}>{name}</Chip>)}
     </div>
     <Input type="search" className="map-picker-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search maps" aria-label="Search maps" />
-    <ul className="map-picker-grid">
+    {/* The grid caps itself at 21rem and scrolls (map-picker.css) — declared here, in the markup,
+        because that is the marker check (h) reads. The maps rail lifts the cap and scrolls its own
+        wrapper instead, so this class is inert there. */}
+    <ul className="map-picker-grid scroll-y">
       <li>
         <button type="button" className="map-tile map-tile--upload" disabled={busy} onClick={() => fileRef.current?.click()}>
           <span className="map-tile-art"><IconPlus /></span>

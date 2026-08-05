@@ -23,14 +23,45 @@
 .dock-tabs-body > .encounter-panel, .dock-tabs-body > .dice-proof, .dock-tabs-body > .combat-log { margin-top: 0; }
 .dock-tabs-body > .encounter-panel.combat-active, .dock-tabs-body > .combat-log { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .dock-tabs-body .combat-log-list { flex: 1; min-height: 0; max-height: none; }
-/* Dice keeps no card chrome here — the tab bar is the frame — and no cap on the feed, so the tab is
-   one region rather than a scroller inside a scroller. */
-.dock-tabs-body > .dice-proof { padding: .1rem 0 0; border: 0; background: transparent; }
-.dock-tabs-body .roll-list { max-height: none; }
-/* Tighten the gaps BETWEEN the dice controls (not the controls, which are all at the 44px floor).
-   Dropping the card's 24px padding already put the six quick dice on one row instead of two — 98.6px
-   to 45.3 — and these four margins take the roll list's first card from 25px below the fold to above
-   it, which is the difference between "you rolled and nothing changed" and seeing your result. */
+/* THE TRACKER'S FLOOR. `flex: 1; min-height: 0` alone lets the body starve the panel to nothing, and
+   what is left standing is the panel's own pinned head (round chip + the player's Initiative/My sheet
+   pair), because that head is not shrinkable and `.encounter-region` is. Measured at HEAD on a GM in
+   combat: a 136px body at 320x568 left the region 48px, and an 88px body in landscape (844x390 and
+   667x375 with the frame's sheet floor) left it 0 against 2040px of turn order — 0 rows readable
+   mid-fight. 11rem is arithmetic, not taste: 32px of the panel's own padding + the 56px head + the
+   region's own 5.5rem floor below = 176. Whatever the pane cannot pay lands on `.dock-tabs-body`,
+   which is a DECLARED scroller (`DockAccordion.tsx` puts `.scroll-y` on it), so a deficit becomes a
+   short scroll instead of a collapsed region — and the panel's own tinted box grows with it rather
+   than having the turn order paint outside it (measured: 86.6px outside the card without this rule).
+   The `.dock-tabs >` step is not decoration: the sheet row carries BOTH `table-sidebar` and
+   `table-sheet` (main.tsx), so `.table-sidebar .encounter-panel.combat-active` further down this
+   file matches here too, at the same specificity and later — it re-zeroed this floor when the rule
+   was written with one class fewer (measured: the floor silently did nothing). */
+.dock-tabs > .dock-tabs-body > .encounter-panel.combat-active { min-height: 11rem; }
+/* Dice keeps no card chrome here — the tab bar is the frame — but it keeps the SIDE gutter: zeroing
+   the horizontal padding too put "Who sees it?", Digital/Manual and the d4-d20 row flush against x=0
+   and x=width while Turn kept 17.6px and Log 16px. .5rem is what the quick-dice row can afford (see
+   the row's own rule below). The feed keeps the shared 19rem cap it wears everywhere else: without a
+   cap the roll list stood at its full 2498px and the BODY scrolled 2431-2896px, so the dice form
+   scrolled away above the feed and rolling again meant scrolling back up. Capped, the feed scrolls
+   itself and the body's scroll drops to 237px at 390x844 and 702px at 320x568 — a scroller inside a
+   scroller, deliberately, because the alternative was measured: pinning the feed to the body's
+   leftover (the >=980 accordion's shape) leaves it 67px at 390x844 and 0px at 320x568 and in
+   landscape, which is the trade the dice panel's own note at the top of this file describes. */
+.dock-tabs-body > .dice-proof { padding: .1rem .5rem 0; border: 0; background: transparent; }
+/* THE SIX QUICK DICE FIT BY SHARING THE ROW, not by being handed their text's width. Left to their
+   intrinsic widths they spend 331.3px on six buttons plus 40px of gaps = 371.3, which fits a 375px
+   tab body with 3.7px to spare and does not fit 320 at all (measured at HEAD: two rows there, one
+   row at 375 and 390) — so any side gutter at all wrapped 375 as well. As equal shares of the row
+   with the 44px tap floor as their basis they fit every width: 44.0px each at 320, 53.6 at 375,
+   56.1 at 390, all six on one row, and the row now fits the 320 floor it never did. The tighter gap
+   is the slack: 6x44 + 5x6.4 = 296 inside 304px of content box at 320. `padding-inline` comes down
+   with them or a 44px-wide button has 10px left for "d20" after its own 1rem-a-side padding. */
+.dock-tabs-body > .dice-proof .dice-quick { gap: .4rem; }
+.dock-tabs-body > .dice-proof .dice-quick > button { flex: 1 1 0; min-width: var(--tap-min); padding-inline: .25rem; }
+/* Tighten the gaps BETWEEN the dice controls (not the controls, which are all at the 44px floor):
+   these four margins take the roll list's first card from 25px below the fold to above it, which is
+   the difference between "you rolled and nothing changed" and seeing your result. */
 .dock-tabs-body > .dice-proof .dice-quick,
 .dock-tabs-body > .dice-proof .dice-custom,
 .dock-tabs-body > .dice-proof .roll-list-head { margin-top: .5rem; }
@@ -77,8 +108,15 @@
 .table-sidebar .encounter-panel.combat-active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 /* The region the tracker scrolls. overscroll-behavior because the page behind it is locked and
    rubber-banding a dead page reads as breakage; scroll-padding so an auto-scrolled row does not land
-   flush against the pinned header above it. */
-.encounter-region { flex: 1; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
+   flush against the pinned header above it.
+   `min-height: 0` was the whole floor, and a floor of zero is what let the head above it take the
+   region's last pixel: two rows is the least a turn order can be and still answer "whose turn is
+   it", so 5.5rem is stated here rather than assumed from whatever is left. It is a floor, not a
+   size — everywhere there is room (147px at 375x667, 324 at 390x844, 565 at 1280x900) it is inert,
+   and the panel's own floor above is sized to hold it. Where the pinned header grows past what that
+   floor budgeted (a roll prompt, a parked question) this one still holds and the panel's box is what
+   gives, into a scroller: it is better to reach the turn order past a card edge than not at all. */
+.encounter-region { flex: 1; min-height: 5.5rem; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
 .initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
 /* Why Start is unavailable, said where the button is rather than as a disabled mystery. */
 .encounter-start-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }

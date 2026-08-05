@@ -22,8 +22,12 @@ type MapAsset = Readonly<{
   calibration: Readonly<{ calibration: Readonly<{ origin: Point; cellSizePx: number; rotationRadians: number; distancePerCell: number }>; verificationErrorPx: number }> | null;
   scale: Readonly<{ kind: "image-scale"; distancePerPixel: number; unit: string }> | null;
 }>;
+/** What this component READS off the server's wizard state — not a mirror of the server's own
+    type. It deliberately carries no `step`: the server's machine is
+    `measure → refine → verify → complete` and this surface never reads which one it is on (the UI
+    step index is `Math.min(rawStep, maxStep)`, see THE STEP INDEX below). A `step` field lived
+    here narrowing that union to three members, which was both unread and wrong. */
 type WizardState = Readonly<{
-  step: "refine" | "verify" | "complete";
   calibration: Readonly<{ origin: Point; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
   verification: Readonly<{ errorPx: number; tolerancePx: number; accepted: boolean }> | null;
 }>;
@@ -59,10 +63,15 @@ async function api(path: string, gmToken: string, init: RequestInit = {}) {
 /**
  * Snaps a raw drag point to an axis-aligned square from the start corner: equal side length on
  * both axes (side = the larger of the two deltas), sign preserved so it follows the drag
- * direction, clamped so the square stays inside the map. This makes the calibration drag a true
- * square (0°/90° aligned) - dragging a corner grows/shrinks both sides at the same rate - which is
- * what the server's `deriveSquareGridFromArea` expects (it reads start/end as opposite corners of
- * an axis-aligned box and locks rotation to 0).
+ * direction, clamped so the square stays inside the map.
+ *
+ * THE SQUARE IS THIS CLIENT'S CONSTRAINT, NOT THE SERVER'S. `deriveSquareGridFromArea`
+ * (`grid-calibration.ts:99-113`) accepts a RECTANGLE: it reads start/end as opposite corners of
+ * an axis-aligned box, averages `width / cellsAcross` with `height / cellsDown`, and locks
+ * rotation to 0. All it refuses is a zero-width or zero-height box. Forcing the square is a
+ * PREVIEW decision — dragging a corner grows both sides at the same rate, so what the GM lines
+ * up against the printed art is the same shape the server will measure, instead of a rectangle
+ * whose two axes silently disagree and get averaged.
  */
 function squareCorner(start: Point, raw: Point, width: number, height: number): Point {
   const signX = raw.x < start.x ? -1 : 1;
@@ -122,8 +131,9 @@ function CrosshairOverlay({ points, width, height, color, opacity, dash }: Reado
  *
  * THE UI'S FOUR STEPS ARE NOT THE SERVER'S FOUR STEPS, and conflating them is the trap here.
  * The server's machine (`grid-calibration-wizard.ts`) is measure -> refine -> verify -> complete.
- * This component's step index is derived from local UI state plus `wizard.step`; it renames
- * nothing and adds nothing:
+ * This component's step index is derived from LOCAL UI STATE ALONE — `Math.min(rawStep, maxStep)`,
+ * where `maxStep` asks only whether a measurement exists. The server's own step name is never
+ * read; it renames nothing and adds nothing:
  *   UI 0 (mode)   — no server state exists yet.
  *   UI 1 (canvas) — ends with `POST .../calibration/wizards`, which the server answers by jumping
  *                   measure -> refine in one call.
@@ -131,8 +141,19 @@ function CrosshairOverlay({ points, width, height, color, opacity, dash }: Reado
  *   UI 3 (verify) — `POST .../actions {verify}` then `.../complete`.
  *
  * The server owns every number. `cellSizePx`, the origin, the rotation (locked at 0), the overlay
- * lines and `calibrationErrorPx` are all computed there and rendered here verbatim; the only math
- * in this file is preview-only and in image-pixel space (`squareCorner`, `imagePointFromClient`).
+ * lines and `calibrationErrorPx` are all computed there and rendered here verbatim.
+ *
+ * THREE PIECES OF MATH LIVE IN THIS FILE, and the third is not like the other two.
+ * `squareCorner` and `imagePointFromClient` are preview-only and in image-pixel space — they
+ * decide where a mark is drawn and never what anything measures. `distancePerPixel` (see the
+ * review step) is different: it is a SECOND COPY of a server formula,
+ * `deriveMapDistanceScale` (`map-measurement.ts:118-128`), reproduced so the review step can say
+ * what the save will produce before it produces it. `saveScale` still sends raw
+ * `{start, end, knownDistance, unit}`, so the server keeps authority over the stored value — but
+ * a second copy can drift, so it is written to mirror that function exactly, INCLUDING its
+ * refusals: the server calls `positiveFinite` on the pixel span, so a zero-length span has no
+ * scale here either, and the review prints nothing rather than a number the save would be
+ * rejected for.
  *
  * MODE IS A FUNCTION OF THE MAP KIND. A battle map chooses between a printed square grid (the
  * wizard path) and gridless distance (the `PUT .../scale` path); a regional or world map has only
@@ -210,7 +231,18 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange, onBack 
     setSelectedId((current) => preferId ?? (current && data.assets.some((map: MapAsset) => map.id === current) ? current : data.assets[0]?.id ?? null));
   };
   useEffect(() => { void refresh().catch((error) => toast(error.message, { tone: "error" })); }, [gmToken]);
-  useEffect(() => { if (preferredMapId && maps.some((map) => map.id === preferredMapId)) setSelectedId(preferredMapId); }, [preferredMapId, maps]);
+  /** The combat's map is an OPENING position, not a standing instruction. This effect also runs on
+      `maps` because the id arrives before the list does — but it must assert each id exactly ONCE,
+      or every `refresh()` (an upload, a folder move, the save at the end of a calibration) hands a
+      new array identity to the effect and yanks the GM back to the combat's map, off the one they
+      were working on. Observed live: "Map scale saved." followed by a silent jump to another map. */
+  const assertedPreferredId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!preferredMapId || assertedPreferredId.current === preferredMapId) return;
+    if (!maps.some((map) => map.id === preferredMapId)) return;
+    assertedPreferredId.current = preferredMapId;
+    setSelectedId(preferredMapId);
+  }, [preferredMapId, maps]);
   useEffect(() => {
     setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]); setPreviewCamera(null); setLastArea(null); setPendingArea(null); setExpired(false); setRawStep(0);
     if (!selected) { setPreviewUrl(null); return; }
@@ -382,6 +414,14 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange, onBack 
       const start = dragStart;
       const end = point ? squareCorner(start, point, selected.width, selected.height) : (dragCurrent ?? start);
       setDragStart(null); setDragCurrent(null);
+      // A TAP IS NOT A DRAG. `beginGridArea` seeds `dragCurrent = dragStart`, so committing every
+      // release armed `Measure this area` for `A 400,400 / C 400,400` — a `<rect width="0">` the
+      // server refuses outright ("Drag across the full calibration area before releasing.",
+      // `grid-calibration.ts:108`) and which stayed stuck until Start over. This is the SAME rule
+      // the server states, not a second threshold: it refuses a zero-width or zero-height box and
+      // judges everything else itself. On a phone an accidental tap on the map is the likeliest
+      // input there is, so a zero-side release leaves the step exactly as it found it.
+      if (end.x === start.x || end.y === start.y) return;
       setPendingArea({ start, end }); setPoints([start, end]);
       return;
     }
@@ -411,26 +451,47 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange, onBack 
     if (!selected || !wizardId) throw new Error("Start grid calibration first.");
     acceptWizardData(await api(`/api/v1/map-assets/${selected.id}/calibration/wizards/${wizardId}/actions`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(action) }));
   });
+  /** WHERE A FINISHED CALIBRATION LANDS (director's decision D3). Both paths used to run
+      `restartCalibration(); setRawStep(1)`, so the last press of a four-step flow returned the GM
+      to "Press on a grid intersection…" as if nothing had happened — a flow that ends by silently
+      restarting itself. It ends at the LIBRARY now, with the map it just calibrated still
+      selected and a toast saying so: below the 850 rung that is the one tap `narrowView` owns,
+      and above it the rail is already beside the pane, so the map simply reads "grid set". The
+      pane resets to the mode step, which is the honest start for calibrating it AGAIN — never to
+      an instruction for a drag the map no longer needs. */
+  const finished = (message: string) => { restartCalibration(); setPoints([]); setRawStep(0); setNarrowView("rail"); toast(message, { tone: "success" }); };
   const completeWizard = () => runWizard(async () => {
     if (!selected || !wizardId) throw new Error("Start grid calibration first.");
     await api(`/api/v1/map-assets/${selected.id}/calibration/wizards/${wizardId}/complete`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-    await refresh(selected.id); restartCalibration(); setRawStep(1);
-    toast("Grid calibration saved.", { tone: "success" });
+    await refresh(selected.id);
+    finished("Grid calibration saved.");
   });
   const saveScale = () => run(async () => {
     if (!selected || points.length < 2) throw new Error("Choose two points with a known real-world distance.");
     await api(`/api/v1/map-assets/${selected.id}/scale`, gmToken, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ start: points[0], end: points[1], knownDistance, unit }) });
-    await refresh(selected.id); setPoints([]); setRawStep(1);
-    toast("Map scale saved.", { tone: "success" });
+    await refresh(selected.id);
+    finished("Map scale saved.");
   });
 
   // ── THE STEP INDEX ────────────────────────────────────────────────────────────────────────
-  // Derived from local UI state plus `wizard.step`. `maxStep` is the frontier the flow will
-  // actually accept a jump to: past the canvas step needs a measurement to exist, and for the
-  // square path "a measurement exists" means the SERVER has one.
+  // Derived from local UI state alone — the server's own step name is never read. `maxStep` is
+  // the frontier the flow will actually accept a jump to: past the canvas step needs a
+  // measurement to exist, and for the square path "a measurement exists" means the SERVER has one.
   const canAdvancePastCanvas = squareMode ? wizard !== null : points.length >= 2;
   const maxStep = canAdvancePastCanvas ? 3 : 1;
   const step = Math.min(rawStep, maxStep);
+  /** THE RAIL'S JUMP IS A SECOND DOOR TO THE SAME STEP, so it goes through the same
+      reconciliation the first one does. The canvas step is a DRAG surface, and a live wizard
+      makes it inert by design — `beginGridArea` early-returns on a truthy `wizard`, the crosshair
+      is not drawn, and `Measure this area` is disabled because there is no `pendingArea`. "Redo
+      drag" has always handled that by restoring the placed area AND clearing the wizard
+      (`reopenArea`); a raw `setRawStep` did not, so jumping back with the rail landed the GM on
+      an instruction that lied ("Press on a grid intersection, drag diagonally…") with no drag
+      that worked and no primary that could be pressed. */
+  const goToStep = (index: number) => {
+    if (index === 1 && squareMode && wizard) { reopenArea(); return; }
+    setRawStep(index);
+  };
   // The verify step IS the "check a distant point" mode — it is not a button you have to find.
   const verifying = squareMode && step === 3 && wizard !== null;
   const showPoints = !wizard || verifying;
@@ -471,8 +532,16 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange, onBack 
       ? `${previewCamera.center.x - selected.width / previewCamera.zoom / 2} ${previewCamera.center.y - selected.height / previewCamera.zoom / 2} ${selected.width / previewCamera.zoom} ${selected.height / previewCamera.zoom}`
       : `0 0 ${selected.width} ${selected.height}`)
     : "0 0 1 1";
-  const distancePerPixel = points.length >= 2 && knownDistance > 0
-    ? knownDistance / (Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) || 1)
+  /** THE REVIEW STEP'S ONE DERIVED NUMBER, and it mirrors `deriveMapDistanceScale`
+      (`map-measurement.ts:118-128`) exactly — the same `knownDistance / hypot(end - start)`, and
+      the same REFUSALS. The server calls `positiveFinite` on the pixel span and on the known
+      distance, so neither a zero-length span nor a non-positive distance has a scale, here or
+      there. There used to be a `|| 1` on the span: it turned a span the server had already
+      rejected into `Scale 50.0000 feet per pixel`, printed under the sentence "this is what
+      'Save map scale' will send", with Save enabled and a 400 waiting behind it. */
+  const scaleSpanPx = points.length >= 2 ? Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) : 0;
+  const distancePerPixel = scaleSpanPx > 0 && Number.isFinite(scaleSpanPx) && knownDistance > 0
+    ? knownDistance / scaleSpanPx
     : null;
 
   const modeOptions = selected?.kind === "battlemap"
@@ -513,7 +582,11 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange, onBack 
         secondary: <Button variant="secondary" disabled={busy} onClick={() => setRawStep(2)}>Fine-tune again</Button>
       }
       : {
-        primary: <Button variant="primary" disabled={busy || points.length < 2} onClick={saveScale}>Save map scale</Button>,
+        // Armed only for an input the server can actually accept. `distancePerPixel` is null for
+        // exactly the two spans `deriveMapDistanceScale` refuses (a zero-length span, a
+        // non-positive distance) and the unit check is the third: `measurementUnit` refuses an
+        // empty string. The rail can jump straight here, so this gate cannot be left to step 2's.
+        primary: <Button variant="primary" disabled={busy || points.length < 2 || distancePerPixel === null || unit.trim() === ""} onClick={saveScale}>Save map scale</Button>,
         secondary: <Button variant="secondary" disabled={busy} onClick={() => setRawStep(2)}>Change the distance</Button>
       };
   })();
@@ -602,7 +675,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange, onBack 
             </div>
           </div>
 
-          <Steps className="map-steps" steps={stepItems} current={step} maxSelectable={maxStep} onStepSelect={setRawStep} ariaLabel="Grid calibration" />
+          <Steps className="map-steps" steps={stepItems} current={step} maxSelectable={maxStep} onStepSelect={goToStep} ariaLabel="Grid calibration" />
           {/* ONE status channel. This surface used to run three at once — a `role="status"`
               instruction card, a `role="status"` feedback paragraph and a static example line —
               and two live regions on one surface is an accessibility defect, not untidiness.
@@ -731,13 +804,21 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange, onBack 
               </> : <>
                 {/* A REVIEW, not a verification. The scale path has no server-side check — only
                     `PUT .../scale` — so this step reads back exactly what will be saved. There is
-                    deliberately no "verified" badge here: no server computed one. */}
-                <p className="map-step-hint">Nothing is saved yet. This is what “Save map scale” will send.</p>
+                    deliberately no "verified" badge here: no server computed one.
+                    AND IT NEVER READS BACK SOMETHING THE SAVE WOULD BE REJECTED FOR: when the
+                    span or the distance is one the server refuses, the sentence says which, and
+                    the Scale row stays empty rather than printing an authoritative-looking
+                    number for an input that cannot land. */}
+                <p className="map-step-hint">{distancePerPixel !== null
+                  ? "Nothing is saved yet. This is what “Save map scale” will send."
+                  : scaleSpanPx > 0
+                    ? "The distance between A and C has to be more than zero before this can be saved."
+                    : "A and C are the same place, so there is no span to scale. Go back and put them on two different landmarks."}</p>
                 <dl className="map-review tabular">
                   <div><dt>Point A</dt><dd>{points[0] ? `${Math.round(points[0].x)}, ${Math.round(points[0].y)}` : "—"}</dd></div>
                   <div><dt>Point C</dt><dd>{points[1] ? `${Math.round(points[1].x)}, ${Math.round(points[1].y)}` : "—"}</dd></div>
                   <div><dt>Known distance</dt><dd>{knownDistance} {unit}</dd></div>
-                  <div><dt>Scale</dt><dd>{distancePerPixel ? `${distancePerPixel.toFixed(4)} ${unit} per pixel` : "—"}</dd></div>
+                  <div><dt>Scale</dt><dd>{distancePerPixel !== null ? `${distancePerPixel.toFixed(4)} ${unit} per pixel` : "—"}</dd></div>
                 </dl>
               </>}
             </div>}

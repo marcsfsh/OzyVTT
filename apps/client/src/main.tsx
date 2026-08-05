@@ -641,15 +641,21 @@ function App() {
           and from a genuinely unknown address (invariant §3.2). */}
       {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundPage role="player" />}
 
-      {/* THE TABLE OWNS ITS FRAME (B1), at every width since C1. No staging wrapper and no
-          `.scroll-y`: above the rung two columns share one height and the map takes what the rows
-          above it leave; below it the same rows stack into a frame whose map is a fixed band and
-          whose sheet takes the rest. Nothing here scrolls as a whole in either shape.
+      {/* THE TABLE OWNS ITS FRAME (B1), at every width since C1: above the rung two columns share one
+          height and the map takes what the rows above it leave; below it the same rows stack into a
+          frame whose map is a fixed band and whose sheet takes the rest.
+          `.scroll-y` IS THE FRAME'S ESCAPE HATCH, and on most cells it declares a scroll nothing
+          uses. C1 dropped it on the reasoning that a frame does not scroll, and two arrangements
+          disproved that: the docked arm below is a bare panel stack no flex arrangement fits (294px
+          of PAGE scroll at 1280x900, 429 for a player, until it came back), and below the rung a
+          pane shorter than the frame's floors — landscape, or a soft keyboard — cannot hold the
+          rows at all, where a scroll is the difference between content one flick away and content
+          that does not exist. See styles.css's phone block for the order of yielding.
           The player half excludes `/replays`: that address renders the shared-replays page (below),
           and without the exclusion the live table stacked on top of it — the census's one
           stacking anomaly, which the lock forces fixed (the audit's player `/replays` row is its
           regression check). */}
-      {((mode === "player" && playerView === "table" && route.segments[0] !== "replays" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
+      {((mode === "player" && playerView === "table" && route.segments[0] !== "replays" && !isGmOnlyPath(route.path) && isKnownPath(route.path)) || (mode === "gm" && !gmAddressUnknown && gmTab === "table" && route.segments[0] !== "codex")) && <div className={`table-layout anim-view scroll-y${showDocked ? " docked" : ""}`}>
         <section className="table">
           {/* THE TOP LINE. One 44px row below the rung — the scene door or your own character, and the
               party beside it — and `display: contents` above it, so the laptop keeps the separate rows
@@ -713,8 +719,14 @@ function App() {
             special-cased. The staging arm was the last exception — `SceneBuilder` rendered its head,
             the prep panel and the tray at natural height (681px inside a 413px row at 390x844) and the
             ROW carried a conditional `.scroll-y` so the overflow stayed reachable. The panel is a
-            frame now (`SceneBuilder.tsx`) and that bridge is gone. */}
-        <div className="table-sidebar table-sheet">
+            frame now (`SceneBuilder.tsx`) and that bridge is gone.
+            ONE ARM IS STILL NOT A FRAME, and it is the docked one: when the tracker is docked into
+            the map this column renders `<DicePanel/><CombatLogPanel/>` bare, and `DicePanel` alone
+            measures 787px (GM) / 850px (player) inside an ~856px column — no arrangement of flex
+            fits that, so the column declares a scroll instead of pretending to. It is the arm that
+            overflows, so it is the arm that scrolls: the map stays put and the dice+log column
+            moves, which is the arrangement the GM asked for by docking. */}
+        <div className={`table-sidebar table-sheet${showDocked ? " scroll-y" : ""}`}>
           {previewScene
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} stagingDefaults={(state as GmView).stagingDefaults} />
             /* Q3 again: on a phone an unclaimed player's sheet IS the picker. There is nothing else it
