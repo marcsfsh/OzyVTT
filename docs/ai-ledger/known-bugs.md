@@ -355,14 +355,6 @@ for a layout or pointer claim, a contrast calculator against
   surface report unresolved at 375px while being perfectly reachable. It is a pointer to investigate,
   never a verdict; the `below 44px` column is the number that means something.
 
-- **[codex/ui] A closed session-console drawer inflates `document.body.scrollWidth`.** `position: fixed;
-  translate: 100%` stretches the initial containing block, so `scrollWidth` reads 1648 at a 1280 viewport and
-  `innerWidth` reads 734 on a 375px phone. **Inert for users** — `canScrollRightBy: 0`, visual viewport scale
-  1, drawer `visibility: hidden`, and the only stretched element is `.app-texture` (`z-index: -1`,
-  `pointer-events: none`). But it desynchronises `getBoundingClientRect` from synthesized input coordinates,
-  which produced two convincing false findings (a "broken" mobile pin drag, an "unreachable" drawer close)
-  before the reviewer caught it. Anyone writing automated mobile tests against this app will hit it.
-
 - **[replay/player] A player watching a shared replay sees "Map unavailable — you don't have access to
   this map".** Measured 2026-08-05 (B3), GM and player side by side on the same archive at
   `/replays/3`: the GM's stage renders the battle map, the player's renders `.replay-stage-missing` at
