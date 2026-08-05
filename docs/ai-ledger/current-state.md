@@ -124,9 +124,9 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 ## In flight
 
 - **"The screen is the page" refresh (this branch, 2026-08-04).** Tokens, ratchets (g)/(h), the
-  route×role `scripts/no-scroll-audit.mjs` (19 rows green), A1's shell lock, A2's seven trivial
-  surfaces, the scene sky, and B1's table frame + dock accordion are in. Codex, homebrew, the replay
-  viewer, viewer-controls and calibration stage on, through B and C.
+  route×role `scripts/no-scroll-audit.mjs` (19 rows green), A1's shell lock, A2's seven trivials, the
+  scene sky, B1's table frame + dock accordion, and B3's replay viewer + shared screen (`(g)` 25→21,
+  `(h)` 29→28, ladder 9→8) are in. Codex, homebrew and calibration stage on, through B and C.
 - **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
   rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
 - **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.

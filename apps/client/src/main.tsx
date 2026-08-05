@@ -692,8 +692,10 @@ function App() {
           </div>
         : <SceneGallery surface scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => navigate("/scenes/maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={failToast} />)}
 
-      {/* staged region — B3 (viewer-controls recompose) drains it */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <div className="anim-view pane-stage scroll-y"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
+      {/* The shared-screen controls own their frame (§7, B3): a heading row over a body that is one
+          region below the laptop rung and two self-owning columns at it — the staging wrapper
+          drained with it. */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
 
       {/* The roster owns its frame (heading row + one region + its own sky), so it takes the pane
           directly — the staging wrapper drained with it. */}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, SegmentedControl, Select } from "@vtt/ui";
+import { Button, Eyebrow, SegmentedControl, Select } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient } from "../scene/mapImage";
@@ -98,6 +98,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
 
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!map || !map.previewUrl || busy || !svgRef.current) return;
+    // The click surface is the preview BOX, which is larger than the map once the map is
+    // letterboxed inside it. Only a click on the map itself is a point: without this a tap on the
+    // surround would be silently clamped onto the nearest edge.
+    if (!(event.target instanceof Node) || !svgRef.current.contains(event.target)) return;
     const raw = imagePointFromClient(svgRef.current, event.clientX, event.clientY);
     if (!raw) return;
     const point = clampPoint(raw, map.width, map.height);
@@ -121,51 +125,84 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     catch { setMessage("Copy was blocked by the browser. Select and copy the value manually."); }
   };
 
-  return <section className="viewer-controls" aria-labelledby="viewer-controls-title">
-    <div className="viewer-controls-heading"><div><span>SHARED DISPLAY</span><h2 id="viewer-controls-title">Table viewer</h2></div><strong className={connections.length ? "online" : ""}>{connections.length} connected</strong></div>
-    <p>Only explicitly presented, player-safe information appears on paired televisions and projectors.</p>
-    <div className="viewer-address"><span>Second-screen address</span>{viewerUrls.length > 1 ? <Select aria-label="Second-screen network address" value={viewerUrl} onChange={(event) => setSelectedViewerUrl(event.target.value)}>{viewerUrls.map((url) => <option key={url} value={url}>{url}</option>)}</Select> : <code>{viewerUrl}</code>}<Button variant="secondary" onClick={() => void copy(viewerUrl, "Viewer address copied.")}>Copy address</Button></div>
-    {!map && <p className="viewer-no-map-notice" role="status">Choose a map on the <strong>Maps</strong> tab first to present it here and unlock the focus/ping/measure tools below.</p>}
-    <div className="viewer-control-actions">
-      <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>Open viewer here</Button>
-      <Button variant="secondary" disabled={busy} onClick={() => void run(async () => { const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" }); setPairing(body.pairing); })}>Create pairing code</Button>
-      <Button variant="secondary" disabled={busy || !presentation || (!presentationHasMap && !map)} onClick={() => void run(() => presentationHasMap
-        ? command({ type: "viewer.enabled.set", enabled: false }).then(() => undefined)
-        : command({ type: "viewer.presentation.begin", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined)
-      )}>{presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Select a map to present"}</Button>
-      <Button variant="secondary" disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={() => void run(() => command({ type: "viewer.map.set", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined))}>{mapIsPresented ? "Current map is live" : "Switch viewer to current map"}</Button>
-    </div>
-    {pairing && <div className="viewer-pairing-code" role="status"><span>PAIRING CODE</span><strong className="tabular">{pairing.code}</strong><small>Expires <span className="tabular">{new Date(pairing.expiresAt).toLocaleTimeString()}</span></small><Button variant="secondary" onClick={() => void copy(pairing.code, "Pairing code copied.")}>Copy code</Button></div>}
+  /* THE FRAME (§7, refresh B3). The heading never moves; the body below it is the region row, and
+     at the 1280 rung it spends the width on TWO columns instead of one long scroll — the map you
+     are driving on the left, the screen you are driving it to on the right.
 
-    {map && <section className="viewer-tools" aria-labelledby="viewer-tools-title">
-      <div><span className="viewer-tools-eyebrow">LIVE PRESENTATION TOOLS</span><h3 id="viewer-tools-title">Focus, ping, and measure</h3><p>{mapIsPresented ? "Click the map, then send the selected action to every paired display." : "Present the current map to enable these tools."}</p></div>
-      <SegmentedControl
-        className="viewer-tool-tabs"
-        ariaLabel="Presentation tool"
-        value={tool}
-        onChange={(value) => setTool(value as typeof tool)}
-        options={[{ value: "focus", label: "Focus view" }, { value: "ping", label: "Ping point" }, { value: "measure", label: "Measure line" }]}
-      />
-      {map.previewUrl && <div className="viewer-tool-preview"><div className="viewer-tool-image" onClick={choosePoint} aria-label="Viewer presentation map. Click to choose a point; coordinate fields below are the keyboard alternative.">
-        <svg ref={svgRef} viewBox={`0 0 ${map.width} ${map.height}`} width={map.width} height={map.height} preserveAspectRatio="xMidYMid meet">
-          <image href={map.previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
-          {tool === "measure" && draftPoints.length === 2 && <line x1={draftPoints[0].x} y1={draftPoints[0].y} x2={draftPoints[1].x} y2={draftPoints[1].y} />}
-          {draftPoints.map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(5, Math.min(map.width, map.height) / 70)} /><text x={point.x} y={point.y}>{tool === "measure" ? (index ? "B" : "A") : "●"}</text></g>)}
-        </svg>
-      </div></div>}
-      <div className="viewer-tool-fields">
-        {Array.from({ length: requiredPointCount }, (_, index) => <fieldset key={index}><legend>{tool === "measure" ? (index ? "End B" : "Start A") : "Point"}</legend><label>X<input type="number" min="0" max={map.width} value={draftPoints[index]?.x ?? ""} onChange={(event) => updatePoint(index, "x", Number(event.target.value))} /></label><label>Y<input type="number" min="0" max={map.height} value={draftPoints[index]?.y ?? ""} onChange={(event) => updatePoint(index, "y", Number(event.target.value))} /></label></fieldset>)}
-        {tool === "focus" && <label>Zoom<input type="number" min="0.1" max="8" step="0.1" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>}
-        {tool === "measure" && <label>Displayed distance<input value={labelOverride} onChange={(event) => setLabelOverride(event.target.value)} maxLength={64} placeholder={suggestedLabel || "Choose two points"} /></label>}
+     THE PREVIEW IS PINNED VISIBLE, which is the whole point of the recompose. Measured before it:
+     at 1920x1080 the preview's top sat at 650px inside a 1036px pane while its X/Y fields sat at
+     1220 and the paired-display list at 1421 — so you could not see the map and type a coordinate
+     for it at the same time. It is now the tools column's flex-fill canvas, and the `54vh` cap
+     that stood in for one is gone. Click-to-place is untouched: `imagePointFromClient` reads the
+     svg's own `getScreenCTM`, so a resized, letterboxed svg maps clicks correctly for free. */
+  return <section className="viewer-controls pane-frame pane-scene scanlines frame-col anim-view" aria-labelledby="viewer-controls-title">
+    <div className="pane-sky" aria-hidden="true" />
+    <header className="viewer-controls-heading neon-beam">
+      <div className="viewer-controls-title">
+        <Eyebrow>Shared display</Eyebrow>
+        <h2 id="viewer-controls-title">Table viewer</h2>
+        <p>Only explicitly presented, player-safe information appears on paired televisions and projectors.</p>
       </div>
-      <div className="viewer-tool-actions"><Button variant="primary" disabled={busy || !mapIsPresented || draftPoints.length < requiredPointCount} onClick={sendTool}>{tool === "focus" ? "Send focus" : tool === "ping" ? "Send ping" : "Show measurement"}</Button>{tool === "measure" && <Button variant="secondary" disabled={busy || !presentation?.measurement} onClick={() => void run(() => command({ type: "viewer.measurement.clear" }))}>Clear measurement</Button>}</div>
-    </section>}
+      <strong className={connections.length ? "online" : ""}>{connections.length} connected</strong>
+    </header>
 
-    {message && <p className="viewer-control-feedback" role="status">{message}</p>}
-    {viewers.length > 0 && <div className="viewer-access-list"><h3>Paired displays</h3><ul>{viewers.map((viewer) => <li key={viewer.id}>
-      <div><strong>{viewer.name}</strong><span>{viewer.revokedAt ? "Revoked" : connectedIds.has(viewer.id) ? "Connected" : "Offline"}</span></div>
-      {!viewer.revokedAt && <Button variant="secondary" disabled={busy} onClick={async () => { if (await confirm({ title: `Revoke ${viewer.name}?`, body: "This display immediately loses access and stops receiving updates.", confirmLabel: "Revoke", danger: true })) void run(async () => { await api(`/api/v1/viewer/access/${viewer.id}`, gmToken, { method: "DELETE" }); }); }}>Revoke</Button>}
-    </li>)}</ul></div>}
+    <div className="viewer-controls-body scroll-y frame-fill">
+      <section className="viewer-col viewer-col-tools surface-glass" aria-labelledby={map ? "viewer-tools-title" : undefined} aria-label={map ? undefined : "Live presentation tools"}>
+        {!map && <p className="viewer-no-map-notice" role="status">Choose a map on the <strong>Maps</strong> tab first to present it here and unlock the focus/ping/measure tools.</p>}
+        {map && <>
+          <div className="viewer-tools-head">
+            <Eyebrow>Live presentation tools</Eyebrow>
+            <h3 id="viewer-tools-title">Focus, ping, and measure</h3>
+            <p>{mapIsPresented ? "Click the map, then send the selected action to every paired display." : "Present the current map to enable these tools."}</p>
+          </div>
+          <SegmentedControl
+            className="viewer-tool-tabs"
+            ariaLabel="Presentation tool"
+            value={tool}
+            onChange={(value) => setTool(value as typeof tool)}
+            options={[{ value: "focus", label: "Focus view" }, { value: "ping", label: "Ping point" }, { value: "measure", label: "Measure line" }]}
+          />
+          {/* The preview box IS the click surface — the `.viewer-tool-image` wrapper that used to sit
+              between it and the svg is gone, because an auto-height intermediate breaks the
+              percentage chain that lets the svg bound itself to the pinned canvas. */}
+          {map.previewUrl && <div className="viewer-tool-preview" onClick={choosePoint} aria-label="Viewer presentation map. Click to choose a point; coordinate fields below are the keyboard alternative.">
+            <svg ref={svgRef} viewBox={`0 0 ${map.width} ${map.height}`} width={map.width} height={map.height} preserveAspectRatio="xMidYMid meet">
+              <image href={map.previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
+              {tool === "measure" && draftPoints.length === 2 && <line x1={draftPoints[0].x} y1={draftPoints[0].y} x2={draftPoints[1].x} y2={draftPoints[1].y} />}
+              {draftPoints.map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(5, Math.min(map.width, map.height) / 70)} />{tool === "measure" && <text x={point.x} y={point.y}>{index ? "B" : "A"}</text>}</g>)}
+            </svg>
+          </div>}
+          <div className="viewer-tool-fields">
+            {Array.from({ length: requiredPointCount }, (_, index) => <fieldset key={index}><legend>{tool === "measure" ? (index ? "End B" : "Start A") : "Point"}</legend><label>X<input type="number" min="0" max={map.width} value={draftPoints[index]?.x ?? ""} onChange={(event) => updatePoint(index, "x", Number(event.target.value))} /></label><label>Y<input type="number" min="0" max={map.height} value={draftPoints[index]?.y ?? ""} onChange={(event) => updatePoint(index, "y", Number(event.target.value))} /></label></fieldset>)}
+            {tool === "focus" && <label>Zoom<input type="number" min="0.1" max="8" step="0.1" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>}
+            {tool === "measure" && <label>Displayed distance<input value={labelOverride} onChange={(event) => setLabelOverride(event.target.value)} maxLength={64} placeholder={suggestedLabel || "Choose two points"} /></label>}
+          </div>
+          <div className="viewer-tool-actions"><Button variant="primary" disabled={busy || !mapIsPresented || draftPoints.length < requiredPointCount} onClick={sendTool}>{tool === "focus" ? "Send focus" : tool === "ping" ? "Send ping" : "Show measurement"}</Button>{tool === "measure" && <Button variant="secondary" disabled={busy || !presentation?.measurement} onClick={() => void run(() => command({ type: "viewer.measurement.clear" }))}>Clear measurement</Button>}</div>
+        </>}
+      </section>
+
+      {/* The access column: where the screen is, how it pairs, and who is paired. It IS the declared
+          region at the two-column rung, so a long list of paired displays scrolls itself rather than
+          the surface; below the rung it rides the body's one scroller and this is inert. */}
+      <div className="viewer-col viewer-col-access surface-glass scroll-y">
+          <div className="viewer-address"><span>Second-screen address</span>{viewerUrls.length > 1 ? <Select aria-label="Second-screen network address" value={viewerUrl} onChange={(event) => setSelectedViewerUrl(event.target.value)}>{viewerUrls.map((url) => <option key={url} value={url}>{url}</option>)}</Select> : <code>{viewerUrl}</code>}<Button variant="secondary" onClick={() => void copy(viewerUrl, "Viewer address copied.")}>Copy address</Button></div>
+          <div className="viewer-control-actions">
+            <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>Open viewer here</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => void run(async () => { const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" }); setPairing(body.pairing); })}>Create pairing code</Button>
+            <Button variant="secondary" disabled={busy || !presentation || (!presentationHasMap && !map)} onClick={() => void run(() => presentationHasMap
+              ? command({ type: "viewer.enabled.set", enabled: false }).then(() => undefined)
+              : command({ type: "viewer.presentation.begin", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined)
+            )}>{presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Select a map to present"}</Button>
+            <Button variant="secondary" disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={() => void run(() => command({ type: "viewer.map.set", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined))}>{mapIsPresented ? "Current map is live" : "Switch viewer to current map"}</Button>
+          </div>
+          {pairing && <div className="viewer-pairing-code" role="status"><Eyebrow>Pairing code</Eyebrow><strong className="tabular">{pairing.code}</strong><small>Expires <span className="tabular">{new Date(pairing.expiresAt).toLocaleTimeString()}</span></small><Button variant="secondary" onClick={() => void copy(pairing.code, "Pairing code copied.")}>Copy code</Button></div>}
+          {message && <p className="viewer-control-feedback" role="status">{message}</p>}
+          {viewers.length > 0 && <div className="viewer-access-list"><h3>Paired displays</h3><ul>{viewers.map((viewer) => <li key={viewer.id}>
+            <div><strong>{viewer.name}</strong><span>{viewer.revokedAt ? "Revoked" : connectedIds.has(viewer.id) ? "Connected" : "Offline"}</span></div>
+            {!viewer.revokedAt && <Button variant="secondary" size="sm" disabled={busy} onClick={async () => { if (await confirm({ title: `Revoke ${viewer.name}?`, body: "This display immediately loses access and stops receiving updates.", confirmLabel: "Revoke", danger: true })) void run(async () => { await api(`/api/v1/viewer/access/${viewer.id}`, gmToken, { method: "DELETE" }); }); }}>Revoke</Button>}
+          </li>)}</ul></div>}
+      </div>
+    </div>
     {dialog}
   </section>;
 }

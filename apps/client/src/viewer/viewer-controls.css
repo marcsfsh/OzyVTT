@@ -1,52 +1,108 @@
-.viewer-controls { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+/* THE SHARED-SCREEN CONTROLS, AS A FRAME (§7, refresh B3).
+   The GM's controls for the television in the room. NOT loaded by the shared screen itself:
+   `viewer.html` -> `src/viewer-main.tsx` -> `@vtt/ui/styles.css` + `viewer/viewer-page.css`, and
+   `ViewerApp.tsx` -> `viewer/viewer.css`. `ViewerControls.tsx` is this file's only importer and it
+   renders only inside the GM's signed-in tab, so nothing here can reach a player's eyes.
+
+   The surface used to be one long card: heading, address, four buttons, the live tools with a
+   `54vh`-capped preview, then the paired-display list. Measured at 1920x1080 in a 1036px pane, the
+   preview's top was at 650px and its own X/Y fields at 1220 — below the fold, so you could not see
+   the map and type a coordinate for it at once. Now the heading is chrome that never moves and the
+   body is the region row; at the 1280 rung it becomes two columns and the preview is the tools
+   column's flex-fill canvas. */
+
+.viewer-controls { gap: var(--space-4); }
+/* `.pane-frame` gives no bottom padding — its region normally owns that — but at the two-column
+   rung the region does not scroll, so the panels would sit flush on the pane's bottom edge and
+   the last control in each would read as clipped. Two classes to win on specificity, not on
+   bundle order. */
+.viewer-controls.pane-frame { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
 .viewer-controls-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
-.viewer-controls-heading span, .viewer-pairing-code span { color: var(--text-muted); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.viewer-controls-title p { margin: .4rem 0 0; max-width: 44rem; color: var(--text-dim); font-size: .9rem; }
 .viewer-controls-heading h2 { margin: .25rem 0 0; font-family: var(--font-display); }
-.viewer-controls-heading > strong { color: var(--text-muted); font-size: .85rem; }
+.viewer-controls-heading > strong { color: var(--text-muted); font-size: .85rem; white-space: nowrap; }
 .viewer-controls-heading > strong.online { color: var(--cyan-hi); }
-.viewer-no-map-notice { margin-top: 1rem; padding: .8rem 1rem; border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); }
+
+/* The region row. One column and one scroller below the rung; two self-owning columns at it. */
+.viewer-controls-body { display: flex; flex-direction: column; gap: var(--space-4); }
+/* The two panels stand on the sky, so they take the scene tier's glass (§9) — that is the
+   structural half of the legibility guarantee, not decoration.
+   `flex: 0 0 auto` is load-bearing below the rung: the access panel carries `.scroll-y`, and a
+   flex item whose overflow is not `visible` loses its automatic content-based minimum — measured
+   collapsing to 34px inside the body's scroller before this line existed. */
+.viewer-col { display: flex; flex-direction: column; flex: 0 0 auto; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.viewer-tools-head h3 { margin: .2rem 0 0; font: 400 1.15rem var(--font-display); }
+.viewer-tools-head p { margin: .4rem 0 0; color: var(--text-dim); font-size: .85rem; }
+
+.viewer-no-map-notice { margin: 0; padding: .8rem 1rem; border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); }
 .viewer-no-map-notice strong { color: var(--text); }
-.viewer-address { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; margin-top: 1rem; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.viewer-address { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .viewer-address span { grid-column: 1 / -1; color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-address code { min-width: 0; overflow-wrap: anywhere; color: var(--cyan-hi); font-family: var(--font-mono); }
-.viewer-address select { min-width: 0; padding: .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
-.viewer-address button { padding: .55rem .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); cursor: pointer; }
-.viewer-control-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin-top: 1.25rem; }
-.viewer-control-actions button, .viewer-pairing-code button, .viewer-access-list button { padding: .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: center; cursor: pointer; }
-.viewer-control-actions button:hover, .viewer-pairing-code button:hover, .viewer-access-list button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.viewer-control-actions button:disabled, .viewer-access-list button:disabled { opacity: .5; cursor: not-allowed; }
-.viewer-pairing-code { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); }
-.viewer-pairing-code span, .viewer-pairing-code strong, .viewer-pairing-code small { grid-column: 1; }
+.viewer-control-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.viewer-pairing-code { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; padding: 1rem; border-left: 4px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); }
+.viewer-pairing-code .nh-eyebrow, .viewer-pairing-code strong, .viewer-pairing-code small { grid-column: 1; }
 .viewer-pairing-code strong { font: 700 clamp(1.5rem, 4vw, 2.25rem) var(--font-mono); letter-spacing: .08em; color: var(--text); }
 .viewer-pairing-code small { color: var(--text-muted); }
-.viewer-pairing-code button { grid-column: 2; grid-row: 1 / 4; }
-.viewer-control-feedback { color: var(--danger-hi); }
-.viewer-tools { margin-top: 1.25rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.viewer-tools h3 { margin: .2rem 0 0; font: 400 1.15rem var(--font-display); }
-.viewer-tools p { margin: .4rem 0 .8rem; color: var(--text-dim); font-size: .85rem; }
-.viewer-tools-eyebrow { color: var(--text-muted); font-size: .68rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
-.viewer-tool-tabs { margin: .75rem 0; }
-.viewer-tool-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
-.viewer-tool-actions button { padding: .6rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); cursor: pointer; }
-.viewer-tool-preview { display: grid; place-items: center; overflow: auto; min-height: 12rem; max-height: 54vh; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); }
-.viewer-tool-image { position: relative; display: inline-block; max-width: 100%; cursor: crosshair; line-height: 0; }
-.viewer-tool-image svg { display: block; max-width: 100%; max-height: 50vh; width: auto; height: auto; user-select: none; }
-.viewer-tool-image line { stroke: var(--cyan); stroke-width: 3; vector-effect: non-scaling-stroke; }
-.viewer-tool-image circle { fill: rgb(255 46 154 / 50%); stroke: var(--magenta-hi); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.viewer-tool-image text { fill: #fff; font: 800 14px var(--font-body); text-anchor: middle; dominant-baseline: central; }
-.viewer-tool-fields { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; margin-top: .75rem; }
+.viewer-pairing-code .nh-btn { grid-column: 2; grid-row: 1 / 4; }
+.viewer-control-feedback { margin: 0; color: var(--danger-hi); }
+
+.viewer-tool-tabs { margin: 0; }
+.viewer-tool-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+/* The preview. No `overflow` of its own any more (its one declared-scroll site retires with it):
+   the svg is bounded by its own max-width/max-height and letterboxes by `preserveAspectRatio`, so
+   there is nothing left to scroll to. Below the rung the map takes its natural size within a
+   44rem lane; at the rung the column's leftover height is the bound. */
+.viewer-tool-preview { display: grid; place-items: center; min-height: 8rem; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); cursor: crosshair; line-height: 0; }
+.viewer-tool-preview svg { display: block; max-width: min(100%, 44rem); width: auto; height: auto; user-select: none; }
+.viewer-tool-preview line { stroke: var(--cyan); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.viewer-tool-preview circle { fill: color-mix(in srgb, var(--magenta) 50%, transparent); stroke: var(--magenta-hi); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.viewer-tool-preview text { fill: #fff; font: 800 14px var(--font-body); text-anchor: middle; dominant-baseline: central; }
+.viewer-tool-fields { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
 .viewer-tool-fields fieldset { display: flex; gap: .45rem; margin: 0; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); }
 .viewer-tool-fields legend { color: var(--text-muted); font-size: .7rem; font-weight: 800; }
 .viewer-tool-fields label { color: var(--text-dim); font-size: .76rem; }
 .viewer-tool-fields input { display: block; width: 7rem; margin-top: .3rem; padding: .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
 .viewer-tool-fields > label:last-child input { width: min(18rem, 70vw); }
-.viewer-tool-actions button:first-child { border-color: transparent; background: var(--primary); color: var(--text-on-neon); }
-.viewer-tool-actions button:disabled { opacity: .45; cursor: not-allowed; }
-.viewer-access-list { margin-top: 1.25rem; }
-.viewer-access-list h3 { font: 400 1rem var(--font-display); }
+
+.viewer-access-list h3 { margin: 0; font: 400 1rem var(--font-display); }
 .viewer-access-list ul { list-style: none; margin: 0; padding: 0; }
 .viewer-access-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 0; border-top: 1px solid var(--line); }
 .viewer-access-list li strong, .viewer-access-list li span { display: block; }
 .viewer-access-list li span { margin-top: .15rem; color: var(--text-muted); font-size: .78rem; }
-.viewer-access-list button { padding: .5rem .8rem; }
-@media (max-width: 560px) { .viewer-controls-heading { display: block; } .viewer-controls-heading > strong { display: block; margin-top: .5rem; } .viewer-control-actions { grid-template-columns: 1fr; } .viewer-address { grid-template-columns: 1fr; } .viewer-address button { justify-self: start; } .viewer-tool-fields { display: grid; grid-template-columns: 1fr; } .viewer-tool-fields fieldset { display: grid; grid-template-columns: 1fr 1fr; } .viewer-tool-fields input, .viewer-tool-fields > label:last-child input { width: 100%; } }
+
+/* THE LAPTOP RUNG (§3, §7 "spend the width" — the same rung Settings uses). Two columns: the map
+   you are driving, and the screen you are driving it to. Each column owns its own height, so the
+   body's scroller goes quiet and the preview becomes the canvas — `flex: 1; min-height: 0`, which
+   is exactly what replaced the `54vh`/`50vh` pair. The bottom reserve `.pane-scene > .scroll-y`
+   adds is dropped here because nothing scrolls: the columns are glass panels standing over the
+   bright band rather than bare rows resting in it. */
+@media (min-width: 1280px) {
+  .viewer-controls-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(22rem, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  /* Three classes deliberately: `.pane-scene > .scroll-y` (styles.css) is two, and it must lose
+     here — its 176px horizon reserve is for a region putting bare rows over the bright band, and
+     nothing scrolls at this rung. */
+  .viewer-controls.pane-frame > .viewer-controls-body { padding-bottom: 0; }
+  .viewer-col { min-height: 0; }
+  /* The pinned canvas. Explicit tracks, not the auto row `place-items: center` would give: a
+     percentage max-height against a content-sized row is circular, and the preview measured
+     302px of overflow with the svg sizing the row that was supposed to bound it. */
+  .viewer-tool-preview { flex: 1; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+  .viewer-tool-preview svg { max-width: 100%; max-height: 100%; }
+}
+
+@media (max-width: 560px) {
+  .viewer-controls-heading { display: block; }
+  .viewer-controls-heading > strong { display: block; margin-top: .5rem; }
+  .viewer-control-actions { grid-template-columns: 1fr; }
+  .viewer-address { grid-template-columns: 1fr; }
+  .viewer-address .nh-btn { justify-self: start; }
+  .viewer-tool-fields { display: grid; grid-template-columns: 1fr; }
+  .viewer-tool-fields fieldset { display: grid; grid-template-columns: 1fr 1fr; }
+  .viewer-tool-fields input, .viewer-tool-fields > label:last-child input { width: 100%; }
+}

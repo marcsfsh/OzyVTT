@@ -101,7 +101,6 @@ const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/maps/MapManager.tsx", "←↑→↓"],
   ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
   ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🗑🗺"],
-  ["apps/client/src/viewer/ViewerControls.tsx", "●"],
   ["apps/client/src/viewer/ViewerPreviewPanel.tsx", "✕"],
   // packages/ui — the four primitives that break their own rule.
   ["packages/ui/src/primitives/Button.tsx", "→"],
@@ -297,9 +296,10 @@ describeRawInput("number", "NumberField", RAW_NUMBER_ALLOW, {
  *
  * **The token, not `\beyebrow\b`.** Measured 2026-08-03: the word-boundary form reports 35
  * hits on this tree because `\b` matches at a hyphen, so it also sweeps in the DIFFERENT
- * classes `viewer-eyebrow` (x4) and `viewer-tools-eyebrow` (x1). Those are the viewer
- * rebuild's convention problem, not this scan's, and a check that cannot tell them apart is a
- * check nobody will believe. Splitting a className value on non-class characters and comparing
+ * classes `viewer-eyebrow` (x4, the public shared screen) and `viewer-tools-eyebrow` — the
+ * latter retired 2026-08-05 when the shared-screen controls took `<Eyebrow>`. Those are the
+ * viewer rebuild's convention problem, not this scan's, and a check that cannot tell them
+ * apart is a check nobody will believe. Splitting a className value on non-class characters and comparing
  * for equality keeps `nh-eyebrow` and `viewer-eyebrow` out and cannot miss the composite
  * `className="codex-sidebar-grouplabel eyebrow"` (`codex/SidebarNav.tsx:48`).
  */
@@ -390,7 +390,7 @@ const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: str
   ["apps/client/src/scene/annotation.css", 3, "SVG-context paint: annotation strokes over image content"],
   ["apps/client/src/scene/encounter-map.css", 8, "SVG-context paint + the black/white pair a token ring needs against any map"],
   ["apps/client/src/styles.css", 2, "a two-stop black scrim"],
-  ["apps/client/src/viewer/viewer-controls.css", 2, "SVG-context paint over the projected map"],
+  ["apps/client/src/viewer/viewer-controls.css", 1, "the white A/B measurement labels, over arbitrary map art"],
   ["apps/client/src/viewer/viewer.css", 6, "SVG-context paint + scrim over the projected map"],
   ["packages/ui/src/primitives/Combobox.css", 1, "shadow over an arbitrary backdrop"],
   ["packages/ui/src/primitives/Tabs.css", 10, "ten black-alpha stops in one shadow ladder"],
@@ -669,9 +669,7 @@ const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phas
   ["apps/client/src/homebrew/homebrew.css", "50vh", "B"],
   ["apps/client/src/homebrew/homebrew.css", "40vh", "B"],
   ["apps/client/src/homebrew/homebrew.css", "50dvh", "B"],
-  ["apps/client/src/styles.css", "52vh", "B"],
-  ["apps/client/src/viewer/viewer-controls.css", "54vh", "B"],
-  ["apps/client/src/viewer/viewer-controls.css", "50vh", "B"]
+  ["apps/client/src/styles.css", "52vh", "B"]
 ];
 
 interface ViewportHit { path: string; line: number; value: string }
@@ -793,7 +791,6 @@ const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/scenes/scene-prep.css", 1],
   ["apps/client/src/scenes/staging-tray.css", 1],
   ["apps/client/src/styles.css", 1],
-  ["apps/client/src/viewer/viewer-controls.css", 1],
   ["apps/client/src/viewer/viewer.css", 2]
 ];
 

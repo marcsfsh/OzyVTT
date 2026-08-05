@@ -67,11 +67,14 @@ export const CONVENTION_SHAPE = {
    * gave the Roster tab an icon-free empty state, and put `IconArrow` on the landing's two doors.
    * −1 pair again (2026-08-04) when the scenes gallery's empty state became a scene moment: one
    * line and one door, so its decorative 🎬 has no call site left.
+   * −1 file / −1 pair again (2026-08-05, B3): the shared-screen preview's point marker was a
+   * white `●` drawn as SVG `<text>` on top of the `<circle>` that already marked the point — the
+   * text now renders only for measure's A/B labels, so `viewer/ViewerControls.tsx` is clean.
    * Both must reach 0 — the icons exist (`packages/ui/src/primitives/icons.tsx`), the remaining
    * call sites have not migrated yet.
    */
-  glyphAllowFiles: 16,
-  glyphAllowPairs: 39,
+  glyphAllowFiles: 15,
+  glyphAllowPairs: 38,
 
   // ─────────────────────────── (b) raw form elements ───────────────────────────
   /**
@@ -109,8 +112,9 @@ export const CONVENTION_SHAPE = {
    * (D30 removes the subtext outright), the deleted lobby roster's two, the Roster tab's, and
    * the player bar's, which renders `<Eyebrow>` now.
    * This is the TOKEN count, not `\beyebrow\b`, which measures 35 on the same tree because
-   * `\b` matches at a hyphen and sweeps in the different classes `viewer-eyebrow` (x4) and
-   * `viewer-tools-eyebrow` (x1). Those are the viewer rebuild's problem, not this scan's.
+   * `\b` matches at a hyphen and sweeps in the different class `viewer-eyebrow` (x4, the public
+   * shared screen). Its sibling `viewer-tools-eyebrow` retired 2026-08-05 when the shared-screen
+   * controls took `<Eyebrow>`. That one is the viewer rebuild's problem, not this scan's.
    */
   eyebrowUses: 13,
   eyebrowFiles: 12,
@@ -135,9 +139,12 @@ export const CONVENTION_SHAPE = {
    * reports 51 too, but it is a different 51: it counts `ChoiceCard.css:30`'s two `rgb(`s,
    * which sit inside a comment explaining a contrast ratio and which the real scan strips,
    * and it misses `forms.css`'s data-URI `%237C77A0` and `codex.css:606`'s `rgba(`.
+   * **−1 (2026-08-05, B3):** the shared-screen preview's point fill was `rgb(255 46 154 / 50%)`,
+   * which is exactly `color-mix(in srgb, var(--magenta) 50%, transparent)`. Its file keeps one
+   * row — the white A/B labels, which must read over arbitrary map art.
    */
   colorAllowFiles: 11,
-  colorAllowTotal: 51,
+  colorAllowTotal: 50,
 
   // ─────────────────────────── (e) one feedback channel ───────────────────────────
   /**
@@ -211,11 +218,13 @@ export const CONVENTION_SHAPE = {
    * files** (raw grep says 30 lines with 44 unit tokens; the scan excludes the structural
    * `100dvh`/paired/`:fullscreen` allows and counts occurrences, not lines) — then −1 file
    * the same day, when the styleguide's lone bare `100vh` took the lock unit instead.
-   * **−2 occurrences / −1 file (B3):** the replay viewer's stage caps (`68vh`, and the narrow
-   * arm's `50vh`) became the frame's leftover height, emptying `replay/replay.css`.
+   * **−4 occurrences / −2 files (B3):** the replay viewer's stage caps (`68vh`, and the narrow
+   * arm's `50vh`) and the shared-screen controls' preview pair (`54vh` on the box, `50vh` on the
+   * svg) all became a frame's leftover height, emptying `replay/replay.css` and
+   * `viewer/viewer-controls.css`.
    */
-  viewportLegacyFiles: 5,
-  viewportLegacyTotal: 23,
+  viewportLegacyFiles: 4,
+  viewportLegacyTotal: 21,
 
   // ─────────────────────────── (h) declared scroll regions ───────────────────────────
   /**
@@ -230,9 +239,11 @@ export const CONVENTION_SHAPE = {
    * `builder/character-builder.css` and the styleguide's bounded demo frame. Command:
    * `grep -roE 'overflow(-y)?: *(auto|scroll)' apps/client/src --include='*.css' | wc -l`
    * → one more than the count here; one hit is a codex.css comment the strip removes.
+   * **−1 site / −1 file (2026-08-05, B3):** the shared-screen preview's `overflow: auto` retired
+   * with the cap it bounded — a letterboxed svg has nothing left to scroll to.
    */
-  scrollAllowFiles: 11,
-  scrollAllowSites: 29,
+  scrollAllowFiles: 10,
+  scrollAllowSites: 28,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**
