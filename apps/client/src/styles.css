@@ -799,7 +799,11 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    left is the one thing nothing else says: WHO you are playing, and how they are doing. Avatar, name,
    HP, and the door to the sheet, at the 44px floor by paint.
    Your claimed character stays the cyan selection accent (§6.6). */
-.you-are-playing { display: flex; align-items: center; gap: .5rem; min-height: var(--tap-min); margin-top: 0; padding: .25rem .5rem; border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
+/* `min-width: 0` is load-bearing, not defensive: a flex item's automatic minimum is its MIN-CONTENT,
+   and this row's is avatar + HP + two buttons + gaps = 412px. Left at `auto` the row refused to fit a
+   366px phone column and "My sheet" was clipped by the frame — measured. The name is the only piece
+   that may give, and it gives by ellipsis. */
+.you-are-playing { display: flex; align-items: center; gap: .5rem; min-width: 0; min-height: var(--tap-min); margin-top: 0; padding: .25rem .5rem; border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
 .you-are-playing-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 1.05rem/1.2 var(--font-display); color: var(--text); }
 .you-are-playing .nh-btn { flex: 0 0 auto; }
 .you-badge { margin-left: .5rem; vertical-align: middle; }
@@ -865,11 +869,20 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
   .table-topline > .party-strip { flex: 1 1 8rem; min-width: 0; margin: 0; }
   .table-topline > .you-are-playing { flex: 1 1 14rem; }
   /* Route 1 (design-language §4): the strip is a scrolling list of pills, so the floor is PAINT.
-     56px was a comfortable laptop row; 44 is the floor and the phone needs the other 12px. */
-  .party-strip-entry { min-height: var(--tap-min); }
+     56px was a comfortable laptop row; 44 is the floor and the phone needs the other 12px. The
+     padding comes down with it or the avatar's own 2rem plus .5rem a side overshoots the floor and
+     the row costs 55px again — measured. */
+  .party-strip-entry { min-height: var(--tap-min); padding: .25rem .7rem .25rem .25rem; }
   .table-status { margin: 0 0 .5rem; }
-  /* The empty state stands in for the map, so it takes the map's band rather than the map's leftover. */
-  .map-empty-hero { flex: 0 1 14rem; min-height: 9rem; margin-top: 0; }
+  /* The staging banner is a frame ROW while the GM arranges a scene, and at this width its two
+     sentences wrapped to 127px — more than half the band. Tightened, not shortened: the copy is the
+     only instruction for a mode with no other chrome. (`.table-layout` on the selector for the same
+     reason as the empty hero above: the base rule is later in this file and @media adds no weight.) */
+  .table-layout .scene-preview-banner { gap: .4rem; margin-bottom: .5rem; padding: .4rem .6rem; font-size: .8rem; }
+  /* The empty state stands in for the map, so it takes the map's band rather than the map's leftover.
+     `.table-layout` is on the selector because the base rule is LATER in this file and a media query
+     adds no specificity — without it the hero kept its 12rem and overflowed its own box by 27px. */
+  .table-layout .map-empty-hero { flex: 0 1 14rem; min-height: 9rem; margin-top: 0; }
   /* Q3: the picker IS the sheet below the rung — main.tsx renders it in this row instead of the dock. */
   .table-sheet > .claim-view { flex: 1 1 auto; min-height: 0; margin: 0; }
 }
@@ -926,7 +939,12 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
   border-color: color-mix(in srgb, var(--magenta) 45%, var(--line));
   background: var(--surface-3); color: var(--text);
 }
-.dock-section-body { flex: 1; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
+/* `display: flex` is load-bearing, not tidiness. Without it this box is a block, so the
+   `flex: 1; min-height: 0` on `> .combat-log` below is inert: the LOG never scrolls and the BODY
+   does, which meant the accordion's Combat log opened scrolled to the top at >=980. Measured at
+   1280x900 before the fix: body scrollTop 0 of 8185, `.combat-log-list` scrollHeight ===
+   clientHeight, newest row at y=9039 against a body ending at y=900. */
+.dock-section-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
 /* Inside the accordion the panels are the section's contents, so they drop the standalone card's
    outer margin, fill the section, and hand their own scrolling to the list that actually grows. */
 .dock-section-body > .encounter-panel, .dock-section-body > .dice-proof, .dock-section-body > .combat-log {

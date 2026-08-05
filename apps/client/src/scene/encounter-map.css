@@ -248,7 +248,10 @@
      than a smaller tray), so the tray is what gives. */
   .encounter-token-tray { flex-direction: row; align-items: center; gap: .3rem; }
   .encounter-token-tray > div:first-child { flex: 0 0 auto; }
-  .encounter-token-tray-list { flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
+  /* `justify-content` stays flex-START here (the ≤650 rule sets it and this must not take it back):
+     with `nowrap` + `overflow-x`, flex-end pushes the overflow off the START edge, where `scrollLeft`
+     cannot reach it — measured, the first staged token sat at page x = -8 and could not be grabbed. */
+  .encounter-token-tray-list { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
   .encounter-token-tray-list > .tray-token { flex: none; }
   /* The standing hint wraps to three lines at this width and costs more map than it is worth: the
      prep panel below already says "drag them from the tray above the map to place them". */
@@ -345,13 +348,16 @@
    map half is `flex: 0 0 auto` — so the band is a row that states its own height, and the sheet under
    it takes everything else.
 
-   THE INTERACTION OWNS THE NUMBER, not the stage. The interim shape stated `height: 14rem` on the
-   STAGE and `flex: none` on the interaction, which pinned the stage and let the tray and the feedback
-   line add themselves on top: 224 + 92 + 27 = 343px of "14rem band". Now the interaction is the
-   14rem — `flex: 0 1 14rem`, so it may shrink toward its 9rem floor on a short frame — and the stage
-   goes back to being the thing that fills it (`flex: 1; min-height: 0`), which is the same rule it
-   obeys everywhere else. The tray floats over it and no longer columns (above), and the feedback line
-   floats too (below), so the band is 224px of MAP.
+   THE STAGE STATES THE 14rem, and the interaction wraps whatever else it is carrying. The plan for
+   this rule put the number on the INTERACTION and let the stage flex-fill it, which is the shape the
+   rest of the file uses — but on a phone the interaction also carries the status line, and measured,
+   that is a map that MOVES: a tray drop puts a message in flow and the stage went 224 -> 201px under
+   the finger that just dropped the token. So the number sits on the box that is only ever map. The
+   tray is not a counter-example — it has floated over the stage's top edge since report #5 (the rule
+   at the top of this file) and adds no height in either arrangement; the status line was the whole
+   difference, and it is the one thing that must not be paid for out of the map.
+   `flex: 0 1 14rem; min-height: 9rem` rather than a flat height so a shorter frame can still take it
+   down to a floor instead of overflowing.
 
    14rem is arithmetic, not a vh fraction (check (g) forbids new ones): the shortest supported phone
    is 375x667, whose pane is 623px after the tab bar; a 44px top line, a status line and a sheet that
@@ -359,15 +365,16 @@
    gaps. It is the same number at 844px tall, deliberately — a band that grew with the screen is what
    `min(52vh, 30rem)` used to do to the empty state, and the sheet is what should get the extra. */
 @media (max-width: 979px) {
-  .encounter-map-interaction:not(.enlarged) { flex: 0 1 14rem; min-height: 9rem; }
-  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: 1; min-height: 0; height: auto; }
+  .encounter-map-interaction:not(.enlarged) { flex: 0 1 auto; min-height: 0; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: 0 1 14rem; min-height: 9rem; height: auto; }
   /* The status line FOLDS instead of floating. `min-height: 1.25rem` reserves 27px against a layout
      jump that a laptop column can afford and a 224px band cannot; `:empty` is the resting state (the
      message is "" almost always), so below the rung it costs nothing until there is something to
-     read. When it does appear it comes out of the SHEET, never the band — it sits after the stage in
-     flow and the band's height is stated, so the map neither moves nor resizes under a finger. It
-     keeps its `role="status"`, which is the reason this is a fold and not a `display: none`; floating
-     it over the stage was the other candidate and would land on the compact toolbar's own corner. */
+     read. When it does appear it comes out of the SHEET, never the map — the stage's height is what
+     is stated, so this line grows the interaction around it instead of shrinking the map (verified by
+     dropping a token: the stage stayed 224px while the message was up). It keeps its `role="status"`,
+     which is why this is a fold and not a `display: none`; floating it over the stage was the other
+     candidate and would land on the compact toolbar's own bottom-left corner. */
   .encounter-map-interaction:not(.enlarged) .encounter-map-feedback { min-height: 0; margin: .25rem 0 0; }
   .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty { display: none; }
 }

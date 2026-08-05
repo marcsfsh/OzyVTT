@@ -14,20 +14,6 @@ Format: `[area] — description — suspected cause / status`.
 
 ## Known gaps
 
-- **[encounter/ask] A denied question reaches the player only through the combat log, and a waiting one
-  is invisible while they are anywhere but the tracker.** Driven 2026-08-05 with two live sessions.
-  `DockAccordion` unmounts a collapsed body, so with the player on **Dice** the pinned `MyPendingAsks`
-  row is not in the DOM at all (measured: 0 nodes) and nothing else stands in for it — the three headers
-  read "Turn order / Dice / Combat log" with no count on any of them. The half that is right is the
-  important half: **focus is never stolen**. `document.activeElement` was byte-identical before and after
-  the GM answered, on both the Dice and the Combat log section, and the open section never changed. An
-  **Allow** does reach them anywhere, because an allowed move now really happens and the table event
-  toasts ("Lyra Emberwise used Dagger." was measured on the player's page while they sat on Dice); a
-  **Deny** produces no toast, no badge and no row — only a combat-log line, which the player sees only if
-  they happen to have the Log open. Not a correctness defect (the player asked the question, and the
-  state is right on both sides); it is the attention model the accordion's unmount cost, and the fix is a
-  count on the section header rather than a new surface.
-
 - **[codex/export] A large backup bundle is one synchronous serialization on the GM's request
   thread.** The restore path itself shipped (`POST /codex/import` → `store.importBundle`), and
   migration v17 bounded revision growth with a global switch plus a coalescing window, with

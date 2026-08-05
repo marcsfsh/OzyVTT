@@ -116,8 +116,8 @@ export const CONVENTION_SHAPE = {
    * shared screen). Its sibling `viewer-tools-eyebrow` retired 2026-08-05 when the shared-screen
    * controls took `<Eyebrow>`. That one is the viewer rebuild's problem, not this scan's.
    */
-  eyebrowUses: 13,
-  eyebrowFiles: 12,
+  eyebrowUses: 11,
+  eyebrowFiles: 10,
   /**
    * `.eyebrow` selectors still in `apps/client/src/styles.css`: **1** — the declaration alone.
    * The second, `.you-are-playing .eyebrow`, went when the player bar moved to `<Eyebrow>`. The
@@ -157,8 +157,8 @@ export const CONVENTION_SHAPE = {
    * followed by `(`. When the surfaces land on `useToast`, the state itself goes and this
    * reaches 0, which is a structurally stronger assertion than any string match.
    */
-  feedbackAllowFiles: 13,
-  feedbackAllowSites: 102,
+  feedbackAllowFiles: 12,
+  feedbackAllowSites: 87,
 
   // ─────────────────────────── (f) the breakpoint ladder ───────────────────────────
   /**
@@ -190,7 +190,7 @@ export const CONVENTION_SHAPE = {
    * held one rule, dressing a `[data-hover-reveal]` attribute that appears on no element in this
    * repo, so it was an off-ladder rung bought for a slice that never arrived.
    */
-  ladderOffRows: 7,
+  ladderOffRows: 0,
 
   // ─────────────────────────── (g) viewport units in app CSS ───────────────────────────
   /**
@@ -235,8 +235,8 @@ export const CONVENTION_SHAPE = {
    * with them. What remains is the encounter panel's overlay cap and the landing's clamp, neither
    * in a phase-B lane.
    */
-  viewportLegacyFiles: 2,
-  viewportLegacyTotal: 2,
+  viewportLegacyFiles: 0,
+  viewportLegacyTotal: 0,
 
   // ─────────────────────────── (h) declared scroll regions ───────────────────────────
   /**
@@ -259,8 +259,8 @@ export const CONVENTION_SHAPE = {
    * five were declarations that scrolled NOTHING: `.codex-campaign` and `.codex-audit` had no
    * height to overflow, and three sat on selectors with no `.tsx` consumer at all.
    */
-  scrollAllowFiles: 8,
-  scrollAllowSites: 17,
+  scrollAllowFiles: 1,
+  scrollAllowSites: 1,
 
   // ─────────────────────────── (D28) the play vocabulary lock ───────────────────────────
   /**

@@ -36,7 +36,7 @@ import { NotFoundPage } from "./components/NotFoundView";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, IconArrow, IconChevron, IconChevronLeft, IconScene, Modal, Badge, Button, Input } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, IconArrow, IconChevron, IconScene, Modal, Badge, Button, Input } from "@vtt/ui";
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
@@ -706,8 +706,13 @@ function App() {
         </section>
         {/* THE SHEET ROW (C1). Above the rung this is the sidebar column it has always been; below it,
             it is the one row that takes the leftover height and holds everything the band does not —
-            `.table-sheet` is the frame class B1 owns and B2's tabbed sheet builds inside. */}
-        <div className="table-sidebar table-sheet">
+            `.table-sheet` is the frame class B1 owns and B2's tabbed sheet builds inside.
+            The staging arm is the one thing in it that is not a frame column of its own:
+            `SceneBuilder` renders its head, the prep panel and the tray at natural height, and measured
+            at 390x844 that is 681px inside a 360px row. Until it adopts the frame the ROW declares the
+            region instead (`.scroll-y`, the blessed marker — no new stylesheet scroller), so the GM's
+            staging scrolls itself rather than being clipped by the frame above it. */}
+        <div className={`table-sidebar table-sheet${previewScene ? " scroll-y" : ""}`}>
           {previewScene
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} stagingDefaults={(state as GmView).stagingDefaults} />
             /* Q3 again: on a phone an unclaimed player's sheet IS the picker. There is nothing else it
@@ -734,14 +739,12 @@ function App() {
         </div>
       </div>}
 
-      {/* The Scenes tab is two addresses in one arm: the gallery owns the pane's frame itself
-          (`surface`), while the map library below it still rides a staged region — C2 (maps and
-          calibration redesign) drains that one. */}
+      {/* The Scenes tab is two addresses in one arm, and since C2 both own their own frame: the
+          gallery (`surface`), and the map library (back row · heading · upload row over a
+          rail | calibration body). The staging wrapper drained with it — this was `.pane-stage`'s
+          last consumer in this file. */}
       {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && (scenesView === "maps"
-        ? <div className="anim-view pane-stage scroll-y scenes-maps-view">
-            <Button variant="ghost" className="scenes-back" onClick={() => navigate(pathForGmTab("scenes"))}><IconChevronLeft /> Back to scenes</Button>
-            <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />
-          </div>
+        ? <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} onBack={() => navigate(pathForGmTab("scenes"))} />
         : <SceneGallery surface scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => navigate("/scenes/maps")} onClose={() => navigate(pathForGmTab("table"))} onFeedback={failToast} />)}
 
       {/* The shared-screen controls own their frame (§7, B3): a heading row over a body that is one

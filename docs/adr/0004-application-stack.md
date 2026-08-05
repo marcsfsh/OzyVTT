@@ -16,7 +16,7 @@ The product is a single-host, browser-based, combat-first D&D 5e VTT for one GM 
 
 ## Decision
 
-Use TypeScript end to end in an npm workspace (`apps/*`, `packages/*`), Node.js 24+ as the server runtime, React 19 with Vite for the browser client, Express 5 and Socket.IO 4 on the server, Zod for runtime schema validation, and Node's built-in `node:sqlite` for persistence (ADR-006). PixiJS is the current renderer-spike dependency for the map/token canvas (ADR-003 remains open on renderer selection). Shared contracts — commands, events, projections, and actor/content schemas — live in `packages/domain`, `packages/schemas`, and `packages/rules-5e` and are imported by both `apps/client` and `apps/server`, never duplicated.
+Use TypeScript end to end in an npm workspace (`apps/*`, `packages/*`), Node.js 24+ as the server runtime, React 19 with Vite for the browser client, Express 5 and Socket.IO 4 on the server, Zod for runtime schema validation, and Node's built-in `node:sqlite` for persistence (ADR-006). The map/token canvas is SVG/DOM (ADR-0003, closed 2026-08-01); the PixiJS spike dependency it names was removed 2026-08-05 with the last file that imported it. Shared contracts — commands, events, projections, and actor/content schemas — live in `packages/domain`, `packages/schemas`, and `packages/rules-5e` and are imported by both `apps/client` and `apps/server`, never duplicated.
 
 ## Consequences and tradeoffs
 

@@ -123,10 +123,11 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 ## In flight
 
-- **"The screen is the page" refresh (this branch, 2026-08-04).** Tokens, ratchets (g)/(h), the
-  route×role `scripts/no-scroll-audit.mjs` (19 rows green), A1's shell lock, A2's seven trivials, the
-  scene sky, B1's table frame + dock accordion, B2's two Codex shells + Homebrew and B3's replay
-  viewer + shared screen (`(g)` 25→2, `(h)` 29→17, ladder 9→7) are in. Calibration stages on, in C.
+- **"The screen is the page" refresh (this branch, 2026-08-05). A, B and C are all in.** C1 gave the
+  phone table a map band + a tabbed Turn/Dice/Log sheet (`.table-layout` was 9803px inside an 800px
+  pane, now 800); C2 made calibration four steps with the canvas always mounted (0px on screen at a
+  1280×720 landing, now 374 in every step). Ratchets: ladder **0**, viewport-legacy **0**, undeclared
+  scrollers **1** (`map-picker.css` serves the embedded picker, which has no frame to take height from).
 - **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
   rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
 - **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.
@@ -136,12 +137,11 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 Individual defects are in `known-bugs.md` — every entry there is broken at HEAD or it is deleted.
 The structural gaps worth knowing before you plan:
 
-- **`apps/server/test/` is not typechecked.** `apps/server/tsconfig.json` has `"include": ["src"]`, so
-  `npm run check` never sees the server test suite; `apps/client/tsconfig.app.json` is the same shape.
+- **`apps/server/test/` is not typechecked** (`"include": ["src"]`; every server test sits outside it).
+  Adding it surfaces **46 errors in 10 of 91 files** (2026-08-05), all test-side fixture/signature
+  drift — its own task. The client's 47 test files live inside `src/`, so those ARE checked.
 - **No browser baseline and no physical-device pass.** No `browserslist`, no Vite `build.target`, no
   degraded-browser fallback, no iOS/Android acceptance run (BUILD_PLAN GAP-001).
-- **PixiJS is a dependency nothing renders.** `apps/client/src/scene/RendererProof.tsx` is its only
-  importer and has zero import sites; the map surface is SVG/DOM — that file is dead code.
 
 ## How to change this page
 

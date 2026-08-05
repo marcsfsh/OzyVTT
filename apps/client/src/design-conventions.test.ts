@@ -482,7 +482,9 @@ const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/EncounterPanel.tsx", 17],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", 9],
-  ["apps/client/src/maps/MapManager.tsx", 15],
+  // `maps/MapManager.tsx` (15) left this list on 2026-08-05: the C2 redesign collapsed three
+  // competing narration channels — two live `role="status"` regions and a third example line —
+  // into one per-step instruction, and routed errors to `useToast`. The state went with them.
   ["apps/client/src/scene/EncounterMap.tsx", 14],
   ["apps/client/src/scene/TokenContextMenu.tsx", 6],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
@@ -543,16 +545,11 @@ describe("(e) one feedback channel — useToast, not a second inline banner", ()
  * `maps/map-manager.css:95` shows why that is not pedantry: it is a `max-width: 850px` sitting
  * on top of three `min-width: 850px` queries, so at exactly 850px both sides fire.
  */
-const LADDER_ALLOW: ReadonlyArray<readonly [file: string, kind: "min" | "max", width: number]> = [
-  ["apps/client/src/actors/pdf-import.css", "max", 480],
-  ["apps/client/src/actors/pdf-import.css", "max", 480],
-  ["apps/client/src/encounter/encounter-panel.css", "min", 681],
-  ["apps/client/src/encounter/encounter-panel.css", "max", 680],
-  ["apps/client/src/integrations/api-reference.css", "max", 700],
-  ["apps/client/src/integrations/api-reference.css", "max", 700],
-  // Off-ladder AND double-firing with min-width: 850px at exactly 850px.
-  ["apps/client/src/maps/map-manager.css", "max", 850]
-];
+// EMPTY, and it reached empty on 2026-08-05 (Phase C). Every client `@media` width is now a rung:
+// 480->560 and 700->760 widened to the nearest rung, 681/680 became the exact 651/650 complement,
+// and `maps/map-manager.css`'s `max-width: 850px` — the double-fire this docblock describes —
+// became 849. **Do not add a row.** An off-ladder query is now a failure, not a debt.
+const LADDER_ALLOW: ReadonlyArray<readonly [file: string, kind: "min" | "max", width: number]> = [];
 
 describe("(f) one breakpoint ladder — design-language.md:134-139", () => {
   // `ladderStylesheets()`, not `stylesheets()`: (d)'s design-tokens.css exemption is about
@@ -647,10 +644,12 @@ const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonl
  * codex.css fails while the first four stay excused. The phase column names the refresh
  * lane that drains the row (A = shell/trivials, B = recomposes, C = redesigns).
  */
-const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phase: string]> = [
-  ["apps/client/src/encounter/encounter-panel.css", "78vh", "B/C"],
-  ["apps/client/src/styles.css", "52vh", "B"]
-];
+// EMPTY as of 2026-08-05 (Phase C). Both survivors were drained by giving the box a real height
+// contract instead of a viewport fraction: `.sheet-embedded`'s 78vh became `flex:1; min-height:0`
+// inherited from its containing region, and `.map-empty-hero`'s `min(52vh,30rem)` became
+// `flex:1; min-height:12rem`, banded to `flex:0 1 14rem` below the 979 rung so it mirrors the map
+// stage it stands in for. **Do not add a row.**
+const VIEWPORT_LEGACY: ReadonlyArray<readonly [file: string, value: string, phase: string]> = [];
 
 interface ViewportHit { path: string; line: number; value: string }
 
@@ -762,14 +761,13 @@ const SCROLL_DECL = /overflow(?:-y)?\s*:\s*(?:auto|scroll)/g;
 
 /** The measured population, per file — the FEEDBACK_ALLOW shape. */
 const SCROLL_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/encounter/combat-log.css", 1],
-  ["apps/client/src/encounter/encounter-panel.css", 5],
-  ["apps/client/src/maps/map-picker.css", 1],
-  ["apps/client/src/scene/encounter-map.css", 5],
-  ["apps/client/src/scenes/scene-prep.css", 1],
-  ["apps/client/src/scenes/staging-tray.css", 1],
-  ["apps/client/src/styles.css", 1],
-  ["apps/client/src/viewer/viewer.css", 2]
+  // Phase C drained the other seven files (2026-08-05). What is left is the ONE case where the
+  // declaration is still right: `.map-picker-grid`'s cap serves the EMBEDDED picker, which is not
+  // a frame and has no height to inherit. The maps rail does not use it — the rail neutralises the
+  // cap (`.map-rail .map-picker-grid { max-height: none }`) and scrolls a `.scroll-y` WRAPPER
+  // around the `<ul>`, because a grid with a definite block size stops sizing its auto rows from
+  // its cards. Draining this last row means giving the embedded picker a frame, not deleting a line.
+  ["apps/client/src/maps/map-picker.css", 1]
 ];
 
 describe("(h) every scroll region is declared — design-language.md §7", () => {

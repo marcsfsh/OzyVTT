@@ -821,8 +821,6 @@
 .roster-import { margin-top: 1rem; }
 .roster-import button { padding: .55rem .9rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); font-size: var(--fs-sm); color: var(--text-dim); text-align: center; }
 .roster-import button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
-.you-are-playing-buttons { display: flex; gap: .5rem; }
-.you-are-playing-buttons button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }
 .encounter-add-monsters { width: 100%; min-height: var(--tap-min); margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); color: var(--text); }
