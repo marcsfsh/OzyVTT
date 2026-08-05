@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, ContentActionSummary, RulesBlocked } from "@vtt/domain";
+import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, AskableCommand, ContentActionSummary, RulesBlocked } from "@vtt/domain";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -27,7 +27,16 @@ let busy = false;
  * state - because the resolve may come from the sidebar runner, the docked runner, OR the map's
  * confirm bar, and the override dialog must appear regardless of which surface rolled.
  */
-let blockedPrompt: { blocked: RulesBlocked; retry: (override: { reason: string }) => void } | null = null;
+let blockedPrompt: {
+  blocked: RulesBlocked;
+  retry: (override: { reason: string }) => void;
+  /**
+   * The exact command the server refused, kept verbatim so a PLAYER can ask the GM to allow THIS —
+   * `rules:ask` parks the command itself and the GM's Allow replays it. Reconstructing the payload at
+   * ask time would risk asking about a slightly different move than the one that was blocked.
+   */
+  asked: { type: AskableCommand; payload: unknown };
+} | null = null;
 const listeners = new Set<() => void>();
 const emit = () => { for (const listener of listeners) listener(); };
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -101,7 +110,7 @@ export function resolveTargeting(revision: number | undefined, onResult: (ok: bo
     if (response.ok && response.resolution) { result = response.resolution; if (!response.resolution.preview) session = null; }
     // Overridable rejection: keep the session (same targets) and surface the one-tap audited
     // override; the retry skips expectedRevision since it's an explicit human confirmation.
-    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveTargeting(undefined, onResult, { ...opts, override: confirmed }) };
+    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveTargeting(undefined, onResult, { ...opts, override: confirmed }), asked: { type: "action.resolve", payload } };
     emit();
     onResult(response.ok, response.blocked ? undefined : response.message);
   });
@@ -111,7 +120,7 @@ export function resolveTargeting(revision: number | undefined, onResult: (ok: bo
 export function resolveActionDirect(attackerId: string, actionId: string, revision: number | undefined, onResult: (ok: boolean, message?: string) => void, override?: { reason: string }) {
   socket.emit("action:resolve", { commandId: newId(), actorId: attackerId, actionId, ...(override ? { override } : {}), ...(revision !== undefined ? { expectedRevision: revision } : {}) }, (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
     if (response.ok && response.resolution) { result = response.resolution; session = null; }
-    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed) };
+    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed), asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId } } };
     emit();
     onResult(response.ok, response.blocked ? undefined : response.message);
   });

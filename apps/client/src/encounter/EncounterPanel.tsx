@@ -5,6 +5,7 @@ import type { MapSelection } from "../maps/MapManager";
 import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
+import { AskTheGmPrompt, MyPendingAsks, PendingAsksForGm } from "./RuleAsk";
 import { beginTargeting, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
 import { RollControls, type DieMode } from "./RollControls";
@@ -373,6 +374,10 @@ export function PlayerActionRunner({ actorId, definition, extraActions = [], rev
   const roll = (opts?: Parameters<typeof resolveTargeting>[2]) => resolveTargeting(revision, onOutcome, opts);
 
   return <div className="action-runner player-actions">
+    {/* The blocked prompt: on Enforce the resolve suppresses its own message (the GM's runner shows a
+        dialog instead), and this runner never read that store — so a blocked player used to get a
+        button that did nothing at all. Now the refusal is stated here, with the ask beside it. */}
+    <AskTheGmPrompt onFeedback={onFeedback} />
     {!picking && !result && <>
       <p className="player-actions-label">Your actions <span>· your turn</span></p>
       <ul className="action-list">
@@ -604,6 +609,9 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           entirely behind the "My sheet" view). It clears itself the moment they roll (their id leaves
           pendingInitiative). */}
       {myId !== null && (combat.pendingInitiative ?? []).includes(myId) && <InitiativePrompt actorId={myId} />}
+      {/* Questions this player has waiting. Pinned above the region with the roll prompt, for the same
+          reason: an answer you are waiting on should not be something you have to scroll to find. */}
+      <MyPendingAsks state={props.state} />
       {/* THE TRACKER'S REGION (B1). In combat this panel is the tallest thing in the sidebar — measured
           at 819px inside a 676px column at 1280x720 — and it had no scroller of its own, so it pushed
           the whole surface past the pane instead of scrolling its own turn order. The topbar above and
@@ -1031,6 +1039,11 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => { const pending = confirm; setConfirm(null); void runTurn(pending.run, pending.success); }}>Confirm</button>
         </div>
       </div>}
+      {/* Players' questions, pinned above the turn order: a blocked player is waiting on this, so it
+          does not belong somewhere the GM has to scroll to. Allow replays the parked command under GM
+          authority; an ask survives the turn advancing, so a replay can fail against current state —
+          when it does the question stays put and says so, rather than vanishing as if answered. */}
+      <PendingAsksForGm state={state} onFeedback={setMessage} />
       {(state.combat.pendingInitiative ?? []).length > 0 && <div className="initiative-gathering" role="status">
         <span>Waiting on {state.combat.pendingInitiative.length} player{state.combat.pendingInitiative.length === 1 ? "" : "s"} to roll initiative{state.combat.playerInitiativeMode === "wait" ? " - turns begin once everyone has" : ""}.</span>
         <button type="button" className="encounter-primary" disabled={busy} onClick={() => { setBusy(true); socket.emit("initiative:roll-remaining", { commandId: newId() }, (result: MutationResult) => { setBusy(false); setMessage(result.ok ? "Rolled initiative for the rest of the table." : result.message ?? "Initiative could not be rolled."); }); }}>Roll for the rest</button>

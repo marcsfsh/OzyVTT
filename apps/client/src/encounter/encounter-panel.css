@@ -24,12 +24,12 @@
      that whole apparatus existed because neither column had a real height. The frame gives them one.
      The scroller is marked in the markup with `.scroll-y`, which is what check (h) accepts — a bare
      `overflow-y` here would be an undeclared region. */
-  .table-sidebar > .encounter-panel.setup { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .table-sidebar .encounter-panel.setup { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 }
 /* In combat the tracker is the sidebar's main event, so it takes the column's leftover height and
    scrolls its turn order inside itself. Every width, not just ≥980: a short laptop window is where
    this bites hardest. */
-.table-sidebar > .encounter-panel.combat-active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.table-sidebar .encounter-panel.combat-active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 /* The region the tracker scrolls. overscroll-behavior because the page behind it is locked and
    rubber-banding a dead page reads as breakage; scroll-padding so an auto-scrolled row does not land
    flush against the pinned header above it. */
@@ -915,3 +915,18 @@
 .initiative-hpbar-fill.hp-bloodied { background: var(--magenta); }
 .initiative-hpbar-fill.hp-down { background: var(--danger); }
 .initiative-avatar.player-known { background: color-mix(in srgb, var(--surface-3) 55%, var(--cyan)); color: var(--text); }
+
+/* ============ ASKING THE GM (B1) ============
+   Three shapes of the same conversation: the player's refusal-and-ask, the player's waiting question,
+   and the GM's queue. Caution rather than danger throughout — nothing has gone wrong, a move is simply
+   not allowed yet, and the palette reserves the rose for actual loss (§2). */
+.rule-ask { padding: .6rem .75rem; border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); background: var(--surface-2); }
+.rule-ask + .rule-ask { margin-top: .4rem; }
+.rule-ask-list { list-style: none; margin: .5rem 0 0; padding: 0; }
+.rule-ask-reason { margin: 0; color: var(--text); font-size: var(--fs-sm); }
+.rule-ask-who { margin: 0 0 .2rem; color: var(--text-dim); font-size: var(--fs-xs); }
+.rule-ask-meta { margin: .3rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); }
+.rule-ask-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+/* The GM's queue is the one that is asking something OF you, so it leads with the brand's attention
+   colour rather than caution — it is a request, not a warning. */
+.rule-ask-question { border-left-color: var(--magenta); }

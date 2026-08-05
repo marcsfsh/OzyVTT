@@ -14,6 +14,7 @@ import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
 import { DicePanel } from "./dice/DicePanel";
 import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "./encounter/EncounterPanel";
 import { CombatLogPanel } from "./encounter/CombatLog";
+import { DockAccordion } from "./encounter/DockAccordion";
 import { CharacterSheet } from "./encounter/CharacterSheet";
 import { TokenLibrary } from "./tokens/TokenLibrary";
 import { MapManager, type MapSelection } from "./maps/MapManager";
@@ -662,17 +663,19 @@ function App() {
         <div className="table-sidebar">
           {previewScene
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} stagingDefaults={(state as GmView).stagingDefaults} />
-            : !showDocked && encounterPanel}
-          {/* Mid-fight the column belongs to the tracker; dice and the log sit one tap away. */}
-          {state.combat.active
-            ? <>
-                <details className="sidebar-collapsed"><summary>Dice</summary><DicePanel role={mode} state={state} /></details>
-                <details className="sidebar-collapsed"><summary>Combat log</summary><CombatLogPanel /></details>
-              </>
-            : <>
-                <DicePanel role={mode} state={state} />
-                <CombatLogPanel />
-              </>}
+            /* THE DOCK IS ONE ACCORDION (B1), in combat and out of it alike. Three headers always
+               visible, one section holding the column's height. It replaces two different idioms that
+               used to fight for the same space: a tracker that took what it wanted with dice and log
+               hidden behind `<details>` mid-fight, and three panels stacked end to end out of combat.
+               When the tracker is docked INTO the map the dock is not this column at all, so the
+               accordion stands down and the map owns the arrangement. */
+            : showDocked
+              ? <><DicePanel role={mode} state={state} /><CombatLogPanel /></>
+              : <DockAccordion role={mode === "gm" ? "gm" : "player"} inCombat={state.combat.active}
+                  turnLabel={state.combat.active ? "Turn order" : "The fight"}
+                  turn={encounterPanel}
+                  dice={<DicePanel role={mode} state={state} />}
+                  log={<CombatLogPanel />} />}
           {/* §B4.4 — the shelf: the fights the GM shared, under the player's own sheet, out of combat.
               Renders nothing when nothing has been shared, so an empty shelf is never a thing to read. */}
           {mode === "player" && !state.combat.active && mapToken && <ReplayShelf token={mapToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />}

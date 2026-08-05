@@ -834,6 +834,49 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .scene-prep-modal .scene-panel { margin-top: 0; }
 .empty-scene-prep { margin-top: 1rem; padding: .6rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
 
+/* ============ THE DOCK ACCORDION (B1) ============
+   Three headers, one body. The accordion itself is the sidebar's frame column: the open section takes
+   the leftover height and scrolls inside itself, and the two closed ones cost exactly one header row
+   each. That is what lets the dock hold a turn order, the dice and the log in a column that has only
+   one height to give — the arrangement the blueprint calls the `<details>` idiom "made deliberate". */
+.dock-accordion { display: flex; flex-direction: column; gap: .5rem; flex: 1; min-height: 0; }
+.dock-section { display: flex; flex-direction: column; min-height: 0; }
+/* The open one flexes; the closed ones are their header and nothing else. The 200ms is the handover
+   settling rather than a slide: `flex-grow` is the only thing that moves, so the sections trade height
+   instead of animating their contents, and reduced motion collapses it to an instant swap. */
+.dock-section.is-open { flex: 1; min-height: 0; }
+.dock-section { transition: flex-grow 200ms var(--ease-settle); }
+@media (prefers-reduced-motion: reduce) { .dock-section { transition: none; } }
+.dock-section-head { margin: 0; font: inherit; }
+/* The whole header row is the control, so the hit area is the row and not the words — `.tap-target`
+   carries the 44px floor. */
+.dock-section-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  /* The floor is met by the ROW's own height, not by an overlay: this is a real, always-visible
+     control in the busiest column on the surface, and it measured 42px on padding alone. */
+  width: 100%; min-height: var(--tap-min); padding: .55rem .8rem; border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--text-dim); font: 700 .82rem/1.3 var(--font-body); text-align: left; cursor: pointer;
+  transition: border-color var(--dur-hover), color var(--dur-hover), background var(--dur-hover);
+}
+.dock-section-toggle:hover { border-color: var(--line-strong); color: var(--text); }
+/* The open section's header reads as the live one — a quiet state marker, not a beam: neon marks what
+   is interactive, focused, selected or live (pillar 1), and three glowing headers would mark nothing. */
+.dock-section.is-open > .dock-section-head > .dock-section-toggle {
+  border-color: color-mix(in srgb, var(--magenta) 45%, var(--line));
+  background: var(--surface-3); color: var(--text);
+}
+.dock-section-body { flex: 1; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
+/* Inside the accordion the panels are the section's contents, so they drop the standalone card's
+   outer margin, fill the section, and hand their own scrolling to the list that actually grows. */
+.dock-section-body > .encounter-panel, .dock-section-body > .dice-proof, .dock-section-body > .combat-log {
+  margin-top: 0; display: flex; flex-direction: column; flex: 1; min-height: 0;
+}
+/* The feeds lose their fixed caps here. `max-height: 19rem` and `16rem` were each a guess at how much
+   of a column a feed deserves; inside a section that already has a height, the honest answer is "the
+   rest of it". They stay the scrolling elements, which is what keeps the log's pin-to-newest and the
+   roll list's own scrolling working — the effects write to these nodes by ref. */
+.dock-section-body .roll-list, .dock-section-body .combat-log-list { flex: 1; min-height: 0; max-height: none; }
+
 .sidebar-collapsed { margin-top: .8rem; }
 .sidebar-collapsed > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .sidebar-collapsed > summary:hover { border-color: var(--line-strong); color: var(--text); }

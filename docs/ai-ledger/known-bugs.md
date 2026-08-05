@@ -430,3 +430,22 @@ designed but surprising, it belongs under **Gotchas** so nobody "fixes" it by ac
 needs a browser, a contrast calculator or a runtime repro before anyone can say, it goes under
 **Unverified** with the reason. **Nothing fixed stays in any of the three** — delete it, and
 let the regression test carry the memory.
+
+### [verification gap] ask-the-GM has never been driven end to end in a browser
+
+**Where:** `apps/client/src/encounter/RuleAsk.tsx`, wired at `EncounterPanel.tsx` (player runner,
+player pinned rows, GM queue above the turn order).
+
+**What is unverified:** the two-session flow — a player driven into a real Enforce block, asking, and
+the GM allowing and denying. Static gates all pass (typecheck, 157 test files, the play-vocabulary
+scanner) and the server half is covered by `apps/server/test/rules-ask.test.ts`, but the client half
+has not been exercised against a live block. The probe could not get a character claimed and an action
+refused in the same session; that is a limitation of the probe, not a known defect in the flow.
+
+**Why it is written down rather than assumed fine:** this exact feature was recorded as shipping while
+it had no interface at all. It does not get a second unverified claim.
+
+**Next:** drive it with two live sessions — Enforce, a fight, a claimed character, a spent action, then
+Ask → Allow and Ask → Deny; confirm a pending ask survives a turn advancing (the server does not expire
+one) and that a stale Allow fails visibly with the question left parked; confirm the public viewer
+carries nothing.

@@ -22,10 +22,10 @@ rests, legendary actions, death saves (`apps/server/src/action-resolution.ts` an
 strictly it polices is a **standing table policy** (`GameState.rulesPolicy`, set in Settings → The
 table) each fight inherits at `encounter.start`, plus per-family exceptions (`combat.ruleExceptions`,
 `effectiveModeFor` in `rules-families.ts`) so "don't police movement" doesn't also switch off the
-action economy. A GM override is one tap, remembered per family for the turn. A blocked player is no
-dead end: `rules.ask` parks the exact command in `combat.pendingRuleAsks` (`rule-asks.ts`) and
-`rules.answer` replays it under GM authority with the override injected — or declines it; a player sees
-only their own ask, without its payload.
+action economy. A GM override is one tap, remembered per family for the turn. `rules.ask` parks the
+exact command in `combat.pendingRuleAsks` (`rule-asks.ts`) and `rules.answer` replays or declines it;
+a player sees only their own ask, without its payload. B1 built the client half this lacked while the
+entry claimed it shipped (Ask row, waiting rows, GM Allow/Deny) — not browser-driven (`known-bugs.md`).
 
 **One table feed** (D11). The combat-log store IS the feed (`apps/server/src/combat-log.ts`): every
 roll lands there as a `kind: "roll"` row carrying the whole `RollRecord`, attributed to its character,
@@ -125,8 +125,8 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 
 - **"The screen is the page" refresh (this branch, 2026-08-04).** Tokens, ratchets (g)/(h), the
   route×role `scripts/no-scroll-audit.mjs` (19 rows green), A1's shell lock, A2's seven trivial
-  surfaces (a frame + one declared region each) and the scene sky are in. The table, codex, homebrew,
-  replay viewer, viewer-controls and calibration stage on, through B and C.
+  surfaces, the scene sky, and B1's table frame + dock accordion are in. Codex, homebrew, the replay
+  viewer, viewer-controls and calibration stage on, through B and C.
 - **Parked, designed, not built:** server-held character drafts (`apps/client/src/builder/draft.ts`);
   rules follow-ups (`packages/domain/src/index.ts`) — difficult terrain, movement preview, reactions.
 - **No phase exit gate has been claimed.** `BUILD_PLAN.md` carries the roadmap.
