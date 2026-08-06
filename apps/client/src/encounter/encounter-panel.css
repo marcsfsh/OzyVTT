@@ -49,7 +49,7 @@
    the alternative was measured: pinning the feed to the body's leftover (the >=980 accordion's
    shape) leaves it 67px at 390x844 and 0px at 320x568 and in landscape, which is the trade the dice
    panel's own note at the top of this file describes. */
-.dock-tabs-body > .dice-proof { padding: .1rem .5rem 0; border: 0; background: transparent; }
+.dock-tabs-body > .dice-proof { padding: .1rem var(--space-2) 0; border: 0; background: transparent; }
 /* THE SIX QUICK DICE FIT BY SHARING THE ROW, not by being handed their text's width. Left to their
    intrinsic widths they spend 331.3px on six buttons plus 40px of gaps = 371.3, which fits a 375px
    tab body with 3.7px to spare and does not fit 320 at all (measured at HEAD: two rows there, one
@@ -63,27 +63,27 @@
    44px targets is this file's own phone spacing (the dock-choice chips, below). `padding-inline`
    comes down with them or a 44px-wide button has 10px left for "d20" after its 1rem-a-side padding. */
 .dock-tabs-body > .dice-proof .dice-quick { gap: .3rem; }
-.dock-tabs-body > .dice-proof .dice-quick > button { flex: 1 1 0; min-width: var(--tap-min); padding-inline: .25rem; }
+.dock-tabs-body > .dice-proof .dice-quick > button { flex: 1 1 0; min-width: var(--tap-min); padding-inline: var(--space-1); }
 /* Tighten the gaps BETWEEN the dice controls (not the controls, which are all at the 44px floor):
    these four margins take the roll list's first card from 25px below the fold to above it, which is
    the difference between "you rolled and nothing changed" and seeing your result. */
 .dock-tabs-body > .dice-proof .dice-quick,
 .dock-tabs-body > .dice-proof .dice-custom,
-.dock-tabs-body > .dice-proof .roll-list-head { margin-top: .5rem; }
+.dock-tabs-body > .dice-proof .roll-list-head { margin-top: var(--space-2); }
 .dock-tabs-body > .dice-proof .dice-feedback { margin-top: .4rem; }
 /* The count of questions waiting on the GM, on the header that is still on screen when the body that
    would have shown them is unmounted (known-bugs.md). Caution, not danger: nothing has gone wrong —
    a move is simply not allowed yet, and someone is waiting on a call (§2). */
 .dock-waiting-count { display: inline-grid; place-items: center; min-width: 1.3rem; margin-left: .4rem; padding: 0 .3rem; border-radius: var(--radius-pill); background: var(--caution); color: var(--text-on-neon); font: 800 var(--fs-2xs)/1.7 var(--font-mono); vertical-align: baseline; }
 
-.encounter-panel { margin-top: 2.5rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.encounter-panel { margin-top: var(--space-10); padding: var(--space-4) 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .encounter-panel.compact { padding-block: 1.1rem; }
 /* Live-combat hue shift (§6.10): a quiet magenta tint while an encounter runs. Higher specificity than
    the resting `.encounter-panel` surface so it wins; eases in/out, never pulses. */
 .encounter-panel.combat-active { background: color-mix(in srgb, var(--surface-1) 90%, var(--magenta)); border-color: color-mix(in srgb, var(--line) 65%, var(--magenta)); transition: background var(--dur-base) var(--ease-settle), border-color var(--dur-base) var(--ease-settle); }
 .encounter-panel h2 { margin: .2rem 0 0; }
 .encounter-panel > p { color: var(--text-dim); }
-.encounter-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.encounter-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .encounter-heading h2 { font-size: var(--fs-h2); line-height: var(--lh-tight); font-family: var(--font-display); }
 .encounter-round { flex: none; padding: .4rem .7rem; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--magenta-hi); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Dock picker sits on its own compact row so it never competes with the title for width. */
@@ -125,15 +125,15 @@
 .initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
 /* Why Start is unavailable, said where the button is rather than as a disabled mystery. */
 .encounter-start-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }
-.encounter-primary, .turn-controls button { padding: .7rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); cursor: pointer; }
+.encounter-primary, .turn-controls button { padding: .7rem var(--space-4); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); cursor: pointer; }
 .encounter-primary, .turn-controls .encounter-primary { background: var(--primary); color: var(--text-on-neon); border-color: transparent; }
 .encounter-primary:hover:not(:disabled), .turn-controls .encounter-primary:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .encounter-primary:disabled, .turn-controls button:disabled { opacity: .45; cursor: not-allowed; }
-.initiative-list { list-style: none; margin: 1rem 0 0; padding: 0; }
+.initiative-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
 /* Row rules target DIRECT children only (`> li`): the acting console now nests inside the active row,
    so a plain `.initiative-list li` would bleed this flex/border/padding onto the console's own <li>s
    (action summaries etc.). Keep every row selector scoped to the top-level combatant rows. */
-.initiative-list > li { display: flex; justify-content: space-between; gap: 1rem; padding: .8rem 1rem; border-top: 1px solid var(--line); }
+.initiative-list > li { display: flex; justify-content: space-between; gap: var(--space-4); padding: .8rem var(--space-4); border-top: 1px solid var(--line); }
 /* The active row is the bold combat moment: a rounded highlight with a magenta left accent bar and a
    steady stronger magenta glow (no motion, §6.9). The inset shadow is clipped by the radius so the
    accent reads as a rounded-off bar, not a sharp corner-to-corner rectangle. */
@@ -147,11 +147,11 @@
 .initiative-list > li.you.active { background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .22rem 0 0 var(--magenta); }
 .initiative-list > li > span { display: flex; align-items: center; }
 .initiative-list > li > strong { color: var(--text); font-family: var(--font-mono); }
-.your-turn { margin-top: 1rem; padding: .85rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--cyan); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); color: var(--text); }
+.your-turn { margin-top: var(--space-4); padding: .85rem var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--cyan); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); color: var(--text); }
 .your-turn strong { color: var(--cyan-hi); }
-.encounter-place-nudge { margin: .5rem 0 0; padding: 0; border: 0; background: transparent; color: var(--text-muted); font-size: var(--fs-xs); }
+.encounter-place-nudge { margin: var(--space-2) 0 0; padding: 0; border: 0; background: transparent; color: var(--text-muted); font-size: var(--fs-xs); }
 .initiative-list.gm { margin-top: .8rem; }
-.initiative-list.gm > li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .18rem .2rem; position: relative; }
+.initiative-list.gm > li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: .18rem .2rem; position: relative; }
 .initiative-name { display: flex; align-items: center; gap: .45rem; min-width: 0; }
 .initiative-name > span:not(.initiative-caret):not(.initiative-tag) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .initiative-caret { flex: none; color: var(--text-dim); font-size: var(--fs-xs); }
@@ -160,7 +160,7 @@
 .initiative-score-value:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .initiative-score-value:disabled { opacity: .7; cursor: default; }
 .initiative-score-edit { flex: none; width: 4.2rem; margin: 0; padding: .45rem; border: 1px solid var(--cyan); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-body); text-align: center; font-family: var(--font-mono); }
-.turn-controls { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: 1rem; }
+.turn-controls { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: var(--space-4); }
 /* End encounter is destructive, so it sits apart on its own row and stays visually quiet. */
 .encounter-end { width: 100%; margin-top: .6rem; padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .encounter-end:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
@@ -172,7 +172,7 @@
 .encounter-feedback { min-height: 1.3rem; color: var(--text-dim) !important; }
 /* HP tracking: GM rows carry an exact chip that expands an inline editor; players see bands. */
 .initiative-list.gm > li { flex-direction: column; align-items: stretch; }
-.initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .initiative-row-side { display: flex; align-items: center; gap: .4rem; flex: none; }
 /* Per-row reaction chip: reactions are off-turn resources, so every combatant gets a quick toggle. */
 .initiative-reaction { flex: none; width: 1.6rem; padding: .26rem 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 800; text-align: center; cursor: pointer; }
@@ -249,7 +249,7 @@
 .hp-editor input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
 .hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .hp-editor button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.health-chip { display: inline-block; margin-left: .5rem; padding: .1rem .45rem; border-radius: var(--radius-pill); font: 800 var(--fs-2xs)/1.5 var(--font-body); letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
+.health-chip { display: inline-block; margin-left: var(--space-2); padding: .1rem .45rem; border-radius: var(--radius-pill); font: 800 var(--fs-2xs)/1.5 var(--font-body); letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
 .health-bloodied { background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta)); color: var(--magenta-hi); }
 .health-down { background: color-mix(in srgb, var(--surface-3) 60%, var(--danger)); color: var(--danger-hi); }
 /* Conditions: tracked reference state — chips everywhere (violet-coded), a compact picker where editable. */
@@ -310,30 +310,30 @@
    button-styled rollable actions above stand out. Tap to reveal the rules text. */
 /* `align-items: center`, not baseline: the row carries the 44px floor now, and a baseline in a box
    taller than its one line of text parks the text at the top with the rest of the target empty below. */
-.action-row-static { flex-direction: row; align-items: center; gap: .5rem; border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
+.action-row-static { flex-direction: row; align-items: center; gap: var(--space-2); border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
 .action-row-static:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; border-left-color: var(--line-strong); }
 .action-row-static[aria-expanded="true"] { background: var(--surface-2); opacity: 1; }
 .action-row-static strong { flex: none; font-size: var(--fs-sm); }
 .action-row-static small { flex: 1 1 auto; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.action-reference-text { margin: .35rem 0 .1rem; padding: .5rem .65rem; border-left: 2px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
+.action-reference-text { margin: .35rem 0 .1rem; padding: var(--space-2) .65rem; border-left: 2px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .action-targeting { margin-top: .4rem; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .action-targeting-head { margin: 0 0 .45rem; font-size: var(--fs-sm); color: var(--text-dim); }
 /* The scroll is declared in the MARKUP (`.scroll-y`, both call sites — ActionRunner and the player's
    own runner in EncounterPanel): check (h) reads that class, and a bare `overflow-y` here would be a
    region no reader of either component can see. */
-.action-target-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; max-height: 11rem; }
-.action-target { display: flex; align-items: center; gap: .5rem; font-size: var(--fs-sm); cursor: pointer; }
+.action-target-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); max-height: 11rem; }
+.action-target { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); cursor: pointer; }
 .action-target input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--magenta); }
-.action-targeting-buttons { display: flex; gap: .5rem; margin-top: .6rem; }
-.action-targeting-buttons button { flex: 1; padding: .5rem; text-align: center; }
+.action-targeting-buttons { display: flex; gap: var(--space-2); margin-top: .6rem; }
+.action-targeting-buttons button { flex: 1; padding: var(--space-2); text-align: center; }
 .action-result { margin-top: .4rem; padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
-.action-result-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.action-result-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .action-result-actions { display: flex; align-items: center; gap: .4rem; flex: none; }
 /* Multiattack / Extra Attack: roll the same action again without dismissing the result first. */
 .action-again { flex: none; padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; white-space: nowrap; }
 .action-again:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .action-result-close { flex: none; width: 1.8rem; height: 1.8rem; padding: 0; display: grid; place-items: center; border-radius: var(--radius-sm); }
-.action-result-hint { margin: .5rem 0 0; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
+.action-result-hint { margin: var(--space-2) 0 0; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
 .action-result-hint strong { color: var(--text); }
 .action-outcome { margin: .4rem 0 0; font-size: var(--fs-sm); font-weight: 700; }
 .outcome-crit { color: var(--cyan-hi); }
@@ -343,7 +343,7 @@
 .action-damage { margin: .35rem 0 0; font-size: var(--fs-sm); color: var(--danger-hi); }
 .action-damage strong { font-size: 1rem; color: var(--danger-hi); }
 /* Attack preview: reuses the saving-throw widget's button row + manual field for a recognizable roll. */
-.action-preview { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding: .4rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.action-preview { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding: .4rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
 .roll-zone { display: flex; flex-direction: column; gap: .35rem; }
 .roll-zone-caption { align-self: center; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 /* A centered "or" flanked by a solid divider line, separating the auto-roll and manual-entry zones. */
@@ -365,27 +365,27 @@
    The `Re-roll` beside them is an `nh-btn`, whose own min-height already beat this height and left the
    pair mismatched at 44 vs 30.4 - one floor for the row fixes the theft and the mismatch together. */
 .action-preview .save-prompt-manual input { width: 100%; min-width: 0; min-height: var(--tap-min); margin: 0; padding: 0 .6rem; box-sizing: border-box; }
-.action-preview .save-prompt-manual button { flex: none; min-height: var(--tap-min); margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+.action-preview .save-prompt-manual button { flex: none; min-height: var(--tap-min); margin: 0; padding: 0 var(--space-4); box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 /* "Final total" manual mode: a compact Natural 20 (crit) checkbox under the total field - a rolled die can't
    be read off a hand-computed total, so the crit is declared. Overrides the column's full-width input sizing. */
 /* Label = hit area, so the 44px floor is real paint on the row. */
-.action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: .5rem; align-self: flex-start; min-height: var(--tap-min); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; min-height: var(--tap-min); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-preview .manual-nat20 input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; padding: 0; accent-color: var(--magenta); }
-.action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
+.action-apply-group { display: flex; gap: .4rem; margin-top: var(--space-2); align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
 /* .65rem, not .55rem: the pair measured 42.1px, 1.9px under the floor, and they sit in a stretch row
    so the field and the button have to grow together or they stop matching. */
-.action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .65rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
-.action-apply { width: 100%; margin-top: .5rem; padding: .65rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 78%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; cursor: pointer; }
+.action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .65rem var(--space-2); border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
+.action-apply { width: 100%; margin-top: var(--space-2); padding: .65rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 78%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; cursor: pointer; }
 .action-apply:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 .action-applied { color: var(--cyan-hi); font-size: var(--fs-sm); font-weight: 700; }
 .action-save-targets { list-style: none; margin: .45rem 0 0; padding: 0; display: grid; gap: .3rem; }
-.action-save-targets li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: var(--fs-sm); }
+.action-save-targets li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: var(--fs-sm); }
 .action-save-buttons { display: inline-flex; gap: .3rem; }
 .action-save-buttons button { padding: .35rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-save-buttons button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* Saving-throw prompts inside the target's initiative row (auto-apply on answer). */
-.save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
 .save-prompt-label { font-size: var(--fs-sm); color: var(--text-dim); }
 .save-prompt-label strong { color: var(--text); }
 .save-prompt-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
@@ -400,7 +400,7 @@
    floor grows an invisible box. A `.tap-target` here would overhang 7.6px a side into a wrapping
    .4rem-gap row of prompt buttons — nine of these were measured under the floor in one running fight. */
 .save-prompt-dismiss { flex: none; margin-left: auto; min-width: var(--tap-min); min-height: var(--tap-min); display: grid !important; place-items: center; padding: 0 !important; line-height: 1; background: transparent !important; color: var(--text-muted) !important; }
-.save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .economy-movement { font-size: var(--fs-xs); color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
 /* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler indigo accent so the two owed-answer kinds read apart. */
 .reaction-prompt { border-color: var(--indigo); background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo)); }
@@ -412,7 +412,7 @@
 .initiative-prompt { margin: 0 0 .6rem; padding: .55rem .7rem; border-color: color-mix(in srgb, var(--line-strong) 45%, var(--cyan)); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); }
 /* GM encounter-setup opt-in for player-rolled initiative. */
 /* GM "waiting on players to roll initiative" banner above the initiative list, with the roll-for-the-rest action. */
-.initiative-gathering { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .5rem; padding: .5rem .65rem; border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); font-size: var(--fs-sm); color: var(--text); }
+.initiative-gathering { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: var(--space-2); padding: var(--space-2) .65rem; border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); font-size: var(--fs-sm); color: var(--text); }
 .initiative-gathering span { flex: 1 1 12rem; }
 .reaction-prompt .save-prompt-label { color: var(--cyan-hi); }
 .reaction-prompt .save-prompt-label strong { color: var(--text); }
@@ -430,7 +430,7 @@
 .own-save-prompts { margin-top: .4rem; }
 /* Player initiative rows stack the name/score row above any owed-save prompts. */
 .initiative-list:not(.gm) > li { flex-direction: column; align-items: stretch; }
-.initiative-list:not(.gm) .initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.initiative-list:not(.gm) .initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .initiative-list:not(.gm) .initiative-row-main > span { display: flex; align-items: center; }
 .initiative-list:not(.gm) .initiative-row-main > strong { color: var(--text); font-family: var(--font-mono); }
 /* Character sheet: live state over the immutable stat block. Track, never build. */
@@ -441,7 +441,7 @@
 /* Vitals (v3 #2.3, v5 #8): compact stat chips, all with the SAME internal layout - a centred label above
    a centred value, tight padding, a thin border, no dead space. HP is the same chip, just wide enough to
    also hold its Dmg/Heal/Temp controls (#2.4). */
-.sheet-vitals { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; align-items: stretch; }
+.sheet-vitals { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: .9rem; align-items: stretch; }
 .sheet-vital { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .12rem; padding: .35rem .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); min-width: 3.2rem; text-align: center; }
 .sheet-vital span { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
 .sheet-vital strong { font: 700 1.15rem/1 var(--font-mono); color: var(--text); }
@@ -471,27 +471,27 @@
 /* Rolls bar: label + migrated SegmentedControls (roll-input / bonus-mode now use @vtt/ui). */
 .sheet-settings-label { color: var(--text-muted); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
 .sheet-abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: .4rem; margin-top: .9rem; }
-.sheet-ability { padding: .45rem .25rem; border-radius: var(--radius-md); background: var(--surface-3); text-align: center; }
+.sheet-ability { padding: .45rem var(--space-1); border-radius: var(--radius-md); background: var(--surface-3); text-align: center; }
 .sheet-ability span { display: block; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .05em; }
 .sheet-ability strong { display: block; font-size: 1rem; font-family: var(--font-mono); }
 .sheet-ability small { display: block; color: var(--text-dim); font-size: var(--fs-2xs); }
 .sheet-meta { display: grid; gap: .3rem; margin: .9rem 0 0; }
-.sheet-meta div { display: flex; gap: .5rem; font-size: var(--fs-sm); }
+.sheet-meta div { display: flex; gap: var(--space-2); font-size: var(--fs-sm); }
 .sheet-meta dt { flex: none; min-width: 7.5rem; color: var(--text-muted); font-weight: 700; }
 .sheet-meta dd { margin: 0; color: var(--text-dim); }
-.sheet-section { margin-top: 1rem; }
-.sheet-section h3 { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 0 .4rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); color: var(--text); font: 400 var(--fs-body) var(--font-display); }
+.sheet-section { margin-top: var(--space-4); }
+.sheet-section h3 { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: 0 0 .4rem; padding-bottom: var(--space-1); border-bottom: 1px solid var(--line); color: var(--text); font: 400 var(--fs-body) var(--font-display); }
 .sheet-section-edit { flex: none; }
 .sheet-entry { margin: 0 0 .55rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .sheet-entry strong { color: var(--text); font-style: italic; }
-.sheet-identity { margin: .25rem 0 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
-.sheet-skill-list, .sheet-item-list, .sheet-spell-list { list-style: none; margin: .25rem 0 0; padding: 0; display: grid; gap: .3rem; }
+.sheet-identity { margin: var(--space-1) 0 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
+.sheet-skill-list, .sheet-item-list, .sheet-spell-list { list-style: none; margin: var(--space-1) 0 0; padding: 0; display: grid; gap: .3rem; }
 .sheet-skill-list li, .sheet-item-list li, .sheet-spell-list li { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; font-size: var(--fs-sm); color: var(--text-dim); }
 .sheet-skill-list li span, .sheet-item-list li span, .sheet-spell-list li span { color: var(--text); }
 .sheet-skill-list li strong { color: var(--text); font-family: var(--font-mono); }
 .sheet-item-list li small, .sheet-spell-list li small { color: var(--text-muted); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
 .sheet-slots { display: flex; flex-wrap: wrap; gap: .4rem; margin: .55rem 0 0; }
-.sheet-slot { padding: .28rem .5rem; border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; }
+.sheet-slot { padding: .28rem var(--space-2); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; }
 .sheet-slot strong { color: var(--text); font-family: var(--font-mono); }
 .sheet-currency { margin: .55rem 0 0; color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); }
 .sheet-rollable { display: block; width: 100%; border: 1px solid transparent; font: inherit; cursor: pointer; transition: border-color var(--dur-hover) ease, background var(--dur-hover) ease; }
@@ -508,15 +508,15 @@
    a +19.4px-per-row change into +15px. Measured at 390x844, one column of 18: 603.6px -> 872.4px in a
    pane that already scrolls. That is the honest trade — these are the sheet's primary play controls on
    a phone, and a 24.6px roll chip is not one you can hit while holding the phone in one hand. */
-.sheet-roll-chip { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .22rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
+.sheet-roll-chip { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .22rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
 .sheet-roll-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); }
 .sheet-roll-chip:disabled { cursor: default; opacity: .6; }
 .sheet-entry p { margin: 0 0 .3rem; }
 /* inventory qty now renders as <Stepper> (.nh-stepper); the .sheet-inv-qty hook only places it in the row. */
-.sheet-prepare { padding: .18rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
+.sheet-prepare { padding: .18rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
 .sheet-prepare.is-prepared { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-prepare:disabled { opacity: .6; cursor: default; }
-.sheet-item-edit li { flex-wrap: wrap; gap: .35rem .5rem; }
+.sheet-item-edit li { flex-wrap: wrap; gap: .35rem var(--space-2); }
 .sheet-item-controls { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 /* .sheet-remove / .sheet-close now render as <IconButton> (visuals from .nh-iconbtn); the classes remain
    only as layout hooks (grid placement / header flex). */
@@ -534,25 +534,25 @@
 .sheet-inv-row .sheet-inv-qty, .sheet-inv-row .sheet-toggle-btn, .sheet-inv-row .sheet-remove { justify-self: center; }
 /* Route 1: inventory rows are a stacked list 9.6px apart, and 11.2px of `::after` a side would have
    each row's Equip/Attune reaching into the row above and below it. */
-.sheet-toggle-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 4.8rem; min-height: var(--tap-min); padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
+.sheet-toggle-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 4.8rem; min-height: var(--tap-min); padding: .3rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
 .sheet-toggle-btn:hover:not(:disabled) { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-toggle-btn.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 18%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
 .sheet-toggle-btn:disabled { opacity: .55; cursor: default; }
 /* Grouped actions (v3 #2.9.3): weapon/other, then spell actions by level. */
 .sheet-action-group + .sheet-action-group { margin-top: .9rem; }
-.sheet-action-head { margin: .1rem 0 .5rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--cyan-hi); }
+.sheet-action-head { margin: .1rem 0 var(--space-2); padding-bottom: var(--space-1); border-bottom: 1px solid var(--line); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--cyan-hi); }
 .sheet-action-subgroup { margin-top: .55rem; }
 .sheet-action-subhead { margin: 0 0 .35rem; font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
 /* v6 #5: a derived-from-equipment weapon action - a quiet meta line marking it as one, not a stat-block action. */
 .sheet-weapon-meta { color: var(--text-muted); font-size: var(--fs-xs); font-style: normal; }
 .sheet-add-item { display: flex; gap: .4rem; margin: .55rem 0 0; }
-.sheet-add-item input { flex: 1; min-width: 0; min-height: var(--tap-min); padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
+.sheet-add-item input { flex: 1; min-width: 0; min-height: var(--tap-min); padding: .3rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
 /* Add / Browse SRD gear / Save coins now render as <Button size="sm">. */
 /* Inventory rows now carry the catalog category as a subtle badge after the name. */
 .sheet-item-name { display: inline-flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
 .sheet-item-cat { color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
 /* Browse-and-add-from-catalog picker (Modal body). */
-.sheet-picker-controls { display: grid; gap: .5rem; margin-bottom: .6rem; }
+.sheet-picker-controls { display: grid; gap: var(--space-2); margin-bottom: .6rem; }
 .sheet-picker-search { width: 100%; padding: .4rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
 .sheet-picker-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
 .sheet-picker-chip { padding: .22rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
@@ -562,27 +562,27 @@
    layer, which §7 rule 2 allows and the (g) allowlist already reasons about. */
 .sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; }
 /* v3 #2.9.1: comfortable row padding so names/buttons aren't jammed against the edges. */
-.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .5rem .4rem; border-bottom: 1px solid var(--line); }
+.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: var(--space-2) .4rem; border-bottom: 1px solid var(--line); }
 .sheet-picker-item { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .sheet-picker-name { color: var(--text); font-size: var(--fs-sm); font-weight: 600; display: flex; align-items: baseline; gap: .4rem; }
 .sheet-picker-owned { color: var(--cyan); font: 700 var(--fs-2xs)/1 var(--font-mono); }
 .sheet-picker-meta { color: var(--text-muted); font-size: var(--fs-xs); }
 .sheet-picker-add { flex-shrink: 0; padding: .28rem .7rem; border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .sheet-picker-add:disabled { opacity: .6; cursor: default; }
-.sheet-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: 1rem 0; text-align: center; }
+.sheet-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--space-4) 0; text-align: center; }
 .sheet-picker-attribution { margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-2xs); line-height: 1.4; }
 .sheet-coins { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .4rem; margin: .55rem 0 0; }
 .sheet-coins label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; }
-.sheet-coins input { width: 4rem; padding: .25rem .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
-.sheet-identity-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .25rem 0 0; }
+.sheet-coins input { width: 4rem; padding: var(--space-1) .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
+.sheet-identity-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-1) 0 0; }
 /* Section Edit/Done + identity Edit now render as <Button variant="ghost" size="sm">. */
-.sheet-editor { margin: .5rem 0 0; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.sheet-editor { margin: var(--space-2) 0 0; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 /* v6 #6: the editor skill list lays out fully (no clipped inner scroll-in-a-scroll) and scrolls with the
    sheet body. Two columns of uniform rows. */
-.sheet-editor .sheet-skill-list { margin-top: .5rem; }
-.sheet-editor-hint { margin: 0 0 .5rem; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
+.sheet-editor .sheet-skill-list { margin-top: var(--space-2); }
+.sheet-editor-hint { margin: 0 0 var(--space-2); color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
 .sheet-editor-hint strong { color: var(--text-dim); }
-.sheet-id-editor { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
+.sheet-id-editor { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
 .sheet-id-editor label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .sheet-id-editor input { padding: .28rem .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); }
 .sheet-id-editor input[type=number] { width: 4rem; }
@@ -594,7 +594,7 @@
 /* `align-self: stretch` so the pair spans the ability cell rather than hugging its own text — that is
    where the width half of the floor comes from; `flex-wrap` so a cell too narrow for two 44px buttons
    stacks them instead of overflowing. */
-.sheet-ability-rolls { display: flex; flex-wrap: wrap; align-self: stretch; gap: .25rem; margin-top: .2rem; }
+.sheet-ability-rolls { display: flex; flex-wrap: wrap; align-self: stretch; gap: var(--space-1); margin-top: .2rem; }
 /* The smallest controls in the app — 12 of them at 18.5px tall. Route 1: they sit 4px apart in a pair
    inside a 6.4px-gap grid, and a `.tap-target` on an 18.5x27.6 chip overhangs 12.75px vertically and
    8.2px horizontally, so each one would swallow its partner and the ability cell above it. */
@@ -607,20 +607,20 @@
 /* dense skill grid: [bonus] [dot] [name] - value hugs the name, two columns on desktop */
 /* Skills (v3 #2.7): CSS multi-column fills top->bottom then left->right (A-I | J-R), not across-then-down;
    roomier rows; a lettered P/E bubble; the roll chip is the read-first value. */
-.sheet-skill-cols { display: block; columns: 15rem 2; column-gap: 1.5rem; }
+.sheet-skill-cols { display: block; columns: 15rem 2; column-gap: var(--space-6); }
 .sheet-editor .sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* .14rem, not .28rem: the roll chip carries the 44px floor as real paint now (see .sheet-roll-chip),
    so the row's own padding is where the density is bought back. The chip's border is what separates
    one row from the next, which a 9px gutter was doing before it. */
-.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .5rem; break-inside: avoid; -webkit-column-break-inside: avoid; padding: .14rem 0; }
-.sheet-skill-list li .sheet-roll-chip { min-width: 3rem; text-align: center; padding: .3rem .5rem; font-size: var(--fs-sm); }
+.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: var(--space-2); break-inside: avoid; -webkit-column-break-inside: avoid; padding: .14rem 0; }
+.sheet-skill-list li .sheet-roll-chip { min-width: 3rem; text-align: center; padding: .3rem var(--space-2); font-size: var(--fs-sm); }
 /* v6 #6: editor rows are name (fills) + a fixed-width toggle pinned to the right, so every skill's toggle
    lines up in a column instead of drifting with the skill-name length. */
 .sheet-skill-edit li { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: .2rem 0; }
 .sheet-skill-edit li > span { justify-self: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sheet-skill-edit li > .sheet-prepare { justify-self: end; min-width: 5.6rem; text-align: center; }
 .sheet-skill-name { color: var(--text); font-size: var(--fs-sm); }
-.sheet-skill-name em { color: var(--text-muted); font-style: normal; font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .03em; margin-left: .25rem; }
+.sheet-skill-name em { color: var(--text-muted); font-style: normal; font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .03em; margin-left: var(--space-1); }
 .sheet-prof-dot { width: 1.2rem; height: 1.2rem; border-radius: var(--radius-pill); border: 1.5px solid var(--line); display: grid; place-items: center; font: 800 var(--fs-2xs)/1 var(--font-mono); color: transparent; }
 .sheet-prof-dot.proficient { background: var(--cyan); border-color: var(--cyan); color: var(--text-on-neon); }
 .sheet-prof-dot.expertise { background: var(--magenta); border-color: var(--magenta); color: var(--text-on-neon); }
@@ -631,12 +631,12 @@
 
 /* spells grouped by level + clickable slot pips */
 /* Prominent spellcasting header fields (v3 #2.8.5). */
-.sheet-spellcast-fields { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 .7rem; }
+.sheet-spellcast-fields { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 .7rem; }
 /* v4 #4: bordered fields with centred label + value. */
 .sheet-spellcast-field { display: flex; flex-direction: column; align-items: center; padding: .32rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); min-width: 4.5rem; }
 .sheet-spellcast-field span { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .sheet-spellcast-field strong { margin-top: .1rem; font: 700 1rem/1 var(--font-mono); color: var(--text); }
-.sheet-spell-group { margin-top: .75rem; }
+.sheet-spell-group { margin-top: var(--space-3); }
 /* A subtle dashed divider between spell-level groups (v3 #2.8.4) - distinct from the solid section rules. */
 .sheet-spell-group + .sheet-spell-group { margin-top: .9rem; padding-top: .8rem; border-top: 1px dashed color-mix(in srgb, var(--line-strong) 55%, transparent); }
 .sheet-spell-group-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .1rem; }
@@ -661,7 +661,7 @@
 .sheet-slot-count { color: var(--text-muted); font: 700 var(--fs-2xs) var(--font-mono); }
 .sheet-spell-list { grid-template-columns: 1fr; }
 /* GM viewing a monster's spells: no cast controls, so just prep-tag + name. */
-.sheet-spell-list li { display: grid; grid-template-columns: 5rem minmax(0, 1fr); align-items: center; gap: .5rem; padding: .18rem .35rem; border-radius: var(--radius-sm); }
+.sheet-spell-list li { display: grid; grid-template-columns: 5rem minmax(0, 1fr); align-items: center; gap: var(--space-2); padding: .18rem .35rem; border-radius: var(--radius-sm); }
 /* A player's own castable list flattens the "cast at" controls into the SAME row grid (v5 #2): the effect
    helper, the slot dropdown (or the cantrip "At will" tag), and the Cast button are three fixed columns,
    so on every row the helper / dropdown / Cast sit on identical vertical lines - cantrips included. */
@@ -732,7 +732,7 @@
 .sheet-cast-btn {
   box-sizing: border-box; justify-self: stretch; width: 100%; min-height: var(--tap-min); margin: 0;
   display: flex; align-items: center; justify-content: center;
-  padding: 0 .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md);
+  padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md);
   background: var(--surface-2); color: var(--text); font: 700 var(--fs-2xs)/1 var(--font-mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -741,7 +741,7 @@
 .sheet-cast-effect { border-color: color-mix(in srgb, var(--violet) 38%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 13%, var(--surface-2)); }
 .sheet-cast-effect:empty { border-color: transparent; background: transparent; }
 /* Slot dropdown: neutral surface + a custom caret (appearance:none) so its height matches the chips. */
-.sheet-cast-select { appearance: none; -webkit-appearance: none; padding: 0 1.3rem 0 .5rem; text-align: center; text-align-last: center; cursor: pointer;
+.sheet-cast-select { appearance: none; -webkit-appearance: none; padding: 0 1.3rem 0 var(--space-2); text-align: center; text-align-last: center; cursor: pointer;
   /* Caret as two token-driven gradient halves: a data-URI stroke can't hold a var(), and the matched-set
      grid geometry rules out a masked pseudo-element, so draw the chevron from --text-dim (theme-aware). */
   background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
@@ -772,9 +772,9 @@
 /* inventory: cap the name column so controls hug it instead of drifting to the far edge */
 .sheet-item-edit li { display: grid; grid-template-columns: minmax(0, 12rem) 1fr; align-items: center; gap: .35rem .6rem; }
 @media (max-width: 560px) { .sheet-item-edit li { grid-template-columns: 1fr; } }
-.sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
+.sheet-attribution { margin: var(--space-4) 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
-.sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.sheet-feedback { min-height: 1.1rem; margin: var(--space-2) 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* ---- Sheet workspace (feedback #9 + v3): unified header, pinned rolls bar, two scrolling columns ---- */
 /* Direct-child selectors ONLY: the equipment picker and spell-rules card render inside the sheet's own
@@ -790,7 +790,7 @@
 .sheet-header--drag { cursor: move; touch-action: none; background: var(--surface-1); }
 .sheet-header-id { min-width: 0; flex: 1; }
 .sheet-name { display: block; font: 400 var(--fs-h1) / 1.1 var(--font-display); color: var(--text); }
-.sheet-header-sub { display: flex; align-items: baseline; gap: .5rem; margin-top: .2rem; flex-wrap: wrap; }
+.sheet-header-sub { display: flex; align-items: baseline; gap: var(--space-2); margin-top: .2rem; flex-wrap: wrap; }
 .sheet-idline { color: var(--cyan-hi); font: 700 var(--fs-sm)/1.2 var(--font-mono); }
 .sheet-header-controls { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 /* The Sheet/Dice toggle (a SegmentedControl) shows on every viewport now — it's how you reach the
@@ -798,7 +798,7 @@
 .sheet-close { flex: none; }
 
 /* Rolls bar (v3 #2.6): narrow, pinned under the header, always visible while the sheet scrolls. */
-.sheet-rollbar { display: flex; align-items: center; gap: .5rem; padding: .35rem var(--space-5); border-bottom: 1px solid var(--line); }
+.sheet-rollbar { display: flex; align-items: center; gap: var(--space-2); padding: .35rem var(--space-5); border-bottom: 1px solid var(--line); }
 
 /* One pane at a time: the sheet fills the workspace; when a shared dice log is available it swaps in
    behind the Sheet/Dice toggle instead of docking beside the sheet, so the sheet keeps its clean full
@@ -814,16 +814,16 @@
 /* The shared DicePanel blends into the pane (no nested card chrome). */
 .log-pane .dice-proof { margin: 0; padding: 0; border: 0; background: transparent; }
 .log-pane .dice-quick, .log-pane .dice-adv-row { gap: .4rem; margin-top: .7rem; }
-.log-pane .dice-quick button, .log-pane .dice-adv-row .secondary { padding: .5rem .7rem; }
+.log-pane .dice-quick button, .log-pane .dice-adv-row .secondary { padding: var(--space-2) .7rem; }
 .log-pane .roll-list { max-height: none; }
 
 /* Pinned "last roll" line (undocked): the most recent roll made from this sheet, so a tap-to-roll shows
    its result without leaving the Sheet pane. Hidden on the Dice pane and when the log is docked (visible). */
-.sheet-last-roll { display: flex; align-items: baseline; gap: .5rem; width: 100%; padding: .3rem var(--space-5); border: 0; border-bottom: 1px solid var(--line); background: var(--surface-1); color: var(--text-dim); text-align: left; cursor: pointer; }
+.sheet-last-roll { display: flex; align-items: baseline; gap: var(--space-2); width: 100%; padding: .3rem var(--space-5); border: 0; border-bottom: 1px solid var(--line); background: var(--surface-1); color: var(--text-dim); text-align: left; cursor: pointer; }
 .sheet-last-roll:hover { background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1)); }
 .sheet-last-roll-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 700 var(--fs-2xs)/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
 .sheet-last-roll-readout { display: inline-flex; align-items: baseline; gap: .35rem; margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
-.sheet-last-roll-faces { display: inline-flex; gap: .25rem; }
+.sheet-last-roll-faces { display: inline-flex; gap: var(--space-1); }
 .sheet-last-die { color: var(--text); }
 .sheet-last-die.out { opacity: .4; text-decoration: line-through; }
 .sheet-last-roll-formula { color: var(--text-muted); }
@@ -901,7 +901,7 @@
 /* The page-level doors: a frame row pinned under the sheet, above the home bar. Only the SPA passes
    any (CharacterSheet's `standaloneActions`), so this row does not exist in the standalone tab. */
 .sheet-standalone-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-5) calc(var(--space-3) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface-1); }
-.sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 2rem; color: var(--text-dim); font-size: var(--fs-body); text-align: center; }
+.sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: var(--space-8); color: var(--text-dim); font-size: var(--fs-body); text-align: center; }
 
 /* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab.
    (The surface's 72rem width cap moved onto its two frame rows in styles.css when the roster took
@@ -925,7 +925,7 @@
 .party-archived-head { margin: 1.4rem 0 .6rem; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
 .party-feedback { margin-top: .8rem; color: var(--text-dim); font-size: var(--fs-sm); }
 
-.roster-import { margin-top: 1rem; }
+.roster-import { margin-top: var(--space-4); }
 .roster-import button { padding: .55rem .9rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); font-size: var(--fs-sm); color: var(--text-dim); text-align: center; }
 .roster-import button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }
@@ -945,21 +945,21 @@
    check (h) requires and why it stays there. Precedent: `.codex-preview-modal .nh-modal-body`,
    codex.css:1114. */
 .monster-browser .nh-modal-body { display: flex; flex-direction: column; }
-.monster-browser-controls { display: flex; flex-direction: column; gap: .5rem; margin-top: .2rem; }
+.monster-browser-controls { display: flex; flex-direction: column; gap: var(--space-2); margin-top: .2rem; }
 .monster-browser-controls input[type="search"] { margin-top: 0; padding: .6rem .8rem; }
 /* Where an add lands and what it will be — read-only here; the staging tray owns the decision. */
 .monster-browser-target { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .monster-browser-target strong { color: var(--text); }
 /* `.scroll-y` rides this in MonsterBrowser's markup (check (h)); the modal's own height contract is
    what gives the region something to fill. */
-.monster-browser-list { flex: 1 1 auto; min-height: 0; list-style: none; margin: .8rem 0 0; padding: 0 .25rem 0 0; border-top: 1px solid var(--line); }
-.monster-browser-list li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .1rem; border-bottom: 1px solid var(--line); }
+.monster-browser-list { flex: 1 1 auto; min-height: 0; list-style: none; margin: .8rem 0 0; padding: 0 var(--space-1) 0 0; border-top: 1px solid var(--line); }
+.monster-browser-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: .55rem .1rem; border-bottom: 1px solid var(--line); }
 .monster-browser-name { min-width: 0; }
 .monster-browser-name strong { display: block; }
 .monster-browser-name small { display: block; margin-top: .15rem; color: var(--text-muted); }
 /* The row's own answer to "did my first click work?" — the confirmation line says WHICH monster
    landed, this says WHICH ROWS have. Quiet by construction: it must not read as a second Add. */
-.monster-browser-added { margin-inline-start: .5rem; color: var(--cyan); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.monster-browser-added { margin-inline-start: var(--space-2); color: var(--cyan); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 /* Reserve the wider of the two labels so the button does not slide. Measured 2026-08-06 in Chromium
    at 1920x1080: "Add" 59.7px, "Adding…" 90.4px — the left edge moved 30.8px out and back on every
    add, which is most of what read as "a glitch". 5.65rem = 90.4px at the 16px root, and rem rather
@@ -969,46 +969,46 @@
    exporting it trips the styleguide-completeness ratchet ("exported but not demoed: 0") and needs a
    StyleGuide demo. A shared-package change for one button width is out of proportion; when
    StableSwap is exported, this site should collect. */
-.monster-browser-add { flex: none; min-width: 5.65rem; padding: .5rem .95rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: center; cursor: pointer; }
+.monster-browser-add { flex: none; min-width: 5.65rem; padding: var(--space-2) .95rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: center; cursor: pointer; }
 .monster-browser-add:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .monster-browser-none { color: var(--text-muted); }
-.monster-browser-status { color: var(--text-dim); margin: 1rem 0 0; }
+.monster-browser-status { color: var(--text-dim); margin: var(--space-4) 0 0; }
 .monster-browser-feedback { min-height: 1.2rem; margin: .6rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
-.monster-browser-attribution { margin: .5rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
+.monster-browser-attribution { margin: var(--space-2) 0 0; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
 @media (max-width: 560px) { .monster-browser { max-height: 92vh; } }
 
-.scene-switch { display: flex; align-items: center; gap: .5rem; margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
+.scene-switch { display: flex; align-items: center; gap: var(--space-2); margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
 .scene-switch select { width: auto; margin-top: 0; flex: 1 1 auto; text-transform: none; letter-spacing: normal; font-size: var(--fs-body); color: var(--text); }
 
 /* (The `.encounter-add-combatant` disclosure and its `.add-combatant-list` were deleted: the markup
    became `.menu-add-list` / `.menu-add-row` inside the ⋯ menu, and the only surviving mention of the
    old name is the COMMAND `"encounter:add-combatant"`, which is a wire word, not a class.) */
 
-.encounter-heading-tools { display: flex; align-items: center; gap: .5rem; flex: none; }
+.encounter-heading-tools { display: flex; align-items: center; gap: var(--space-2); flex: none; }
 .encounter-scenes-toggle { flex: none; padding: .45rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; white-space: nowrap; }
 .encounter-scenes-toggle:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-scenes-toggle[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
-.encounter-scenes-panel .scene-panel { margin-top: 1rem; }
+.encounter-scenes-panel .scene-panel { margin-top: var(--space-4); }
 
 /* Turn time-travel (#12): the review banner, the confirm bar, and the player's paused notice. */
-.turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); border-radius: var(--radius-md); background: var(--surface-2); display: grid; gap: .25rem; }
+.turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); border-radius: var(--radius-md); background: var(--surface-2); display: grid; gap: var(--space-1); }
 .turn-review.dirty { border-left-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); }
 .turn-review strong { color: var(--text); font-size: var(--fs-body); }
 .turn-review span { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
 .turn-controls .encounter-primary.resume { background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); border-color: var(--cyan); }
-.turn-confirm { margin: .5rem 0 0; padding: .6rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: .5rem; }
+.turn-confirm { margin: var(--space-2) 0 0; padding: .6rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: var(--space-2); }
 .turn-confirm span { color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
-.turn-confirm-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+.turn-confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .turn-confirm-actions button { flex: 0 0 auto; padding: .4rem .9rem; }
-.table-rewound { margin: .4rem 0 0; padding: .5rem .7rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
+.table-rewound { margin: .4rem 0 0; padding: var(--space-2) .7rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* Rules engine (ADR-0020): effect chips, the dying tracker, the rules-mode control, and the
    action runner's availability hints / blocked-override bar. */
 .effect-chips { display: inline-flex; flex-wrap: wrap; gap: .3rem; margin: .3rem 0 0; }
 /* Effect pills are the shared Chip (info tone); only the trailing duration/DC note needs a quieter weight. */
 .effect-chips .nh-chip small { color: var(--text-muted); font-weight: 400; }
-.own-effect-row { margin-top: .25rem; }
-.dying-tracker { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .35rem 0 0; padding: .35rem .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 84%, var(--danger)); }
+.own-effect-row { margin-top: var(--space-1); }
+.dying-tracker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: .35rem 0 0; padding: .35rem .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 84%, var(--danger)); }
 /* The shared roll widget sits after the pips and wraps to its own line on a phone. */
 .dying-tracker .save-prompt-actions, .dying-tracker .save-prompt-confirm { flex: 1 1 12rem; }
 .dying-label { color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
@@ -1018,16 +1018,16 @@
 .pip.success.filled { background: var(--success); border-color: var(--success); }
 .pip.failure.filled { background: var(--danger); border-color: var(--danger); }
 .pip-divider { width: 1px; height: .7rem; background: var(--line); margin: 0 .2rem; }
-.own-dying { margin-top: .25rem; }
-.rules-mode-control { display: flex; align-items: center; gap: .5rem; margin: .4rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.own-dying { margin-top: var(--space-1); }
+.rules-mode-control { display: flex; align-items: center; gap: var(--space-2); margin: .4rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
 .rules-mode-control select { width: auto; flex: 1 1 auto; margin: 0; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); color: var(--text-dim); }
 .environment-control { align-self: start; margin: .35rem 0 0; }
 .action-hint { color: var(--text-dim); font-weight: 700; }
 .action-row-hinted { opacity: .82; }
 .action-instance-note { margin: .3rem 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
-.action-blocked { margin: .4rem 0; padding: .55rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: .5rem; }
+.action-blocked { margin: .4rem 0; padding: .55rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: var(--space-2); }
 .action-blocked span { color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
-.action-blocked-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+.action-blocked-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .action-blocked-actions button { flex: 0 0 auto; padding: .35rem .8rem; }
 .action-rollmode { margin: .2rem 0; color: var(--cyan-hi); font-size: var(--fs-sm); }
 .action-overridden { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; }
@@ -1035,12 +1035,12 @@
 .action-warning { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* The shared builtin catalog as one wrapped chip cluster — never 16 full rows. */
-.builtin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin-top: .4rem; }
+.builtin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-top: .4rem; }
 .builtin-actions-label { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin-right: .15rem; }
 /* Route 1: the cluster wraps at a .25rem gap (4px), and 6.35px a side of `::after` from two adjacent
    chips needs 12.7px. The precedent that gets away with route 2 — the condition-chip row — buys its
    overhang with a `var(--space-3)` gap; there is no equivalent room in a six-chip common-actions row. */
-.builtin-chip { display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: .16rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.builtin-chip { display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap-min); min-height: var(--tap-min); padding: .16rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .builtin-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .builtin-chip.hinted { opacity: .55; }
 
@@ -1051,7 +1051,7 @@
 .action-spellcasting-head span { color: var(--violet-hi); }
 /* Spellcasting prose: each line its own paragraph with breathing room; recognized spell names are
    buttons that open the spell's SRD rules in an in-tab card (owner feedback). */
-.spellcasting-text { margin: .35rem 0 .1rem; padding: .6rem .75rem; border-left: 2px solid var(--violet); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.spellcasting-text { margin: .35rem 0 .1rem; padding: .6rem var(--space-3); border-left: 2px solid var(--violet); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 .spellcasting-line { margin: 0; }
 .spellcasting-line + .spellcasting-line { margin-top: .55rem; }
 .spellcasting-bullet { padding-left: .4rem; }
@@ -1061,40 +1061,40 @@
 /* Spell rules card renders in the shared Modal (accent="violet" keeps its violet identity). */
 .spell-card-type { margin: -.2rem 0 0; color: var(--violet-hi); font-size: var(--fs-sm); font-style: italic; }
 .spell-card-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; margin: .9rem 0 0; }
-.spell-card-meta div { padding: .5rem .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
+.spell-card-meta div { padding: var(--space-2) .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
 .spell-card-meta dt { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .spell-card-meta dd { margin: .15rem 0 0; font-size: var(--fs-sm); color: var(--text); }
-.spell-card-desc { margin: 1rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.spell-card-desc { margin: var(--space-4) 0 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 .spell-card-higher { margin: .8rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .spell-card-higher strong { color: var(--violet-hi); }
-.spell-card-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
+.spell-card-attribution { margin: var(--space-4) 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
 @media (max-width: 560px) { .spell-card-meta { grid-template-columns: 1fr; } }
 /* Shared RichText blocks (spell cards + trait "click to read"): spaced paragraphs, bullets, and the
    flattened pipe tables a few spells carry (report #6). Callers wrap RichText in a block element. */
 .rt-line { margin: 0; }
-.rt-line + .rt-line, .rt-line + .rt-table-wrap, .rt-table-wrap + .rt-line, .rt-table-wrap + .rt-table-wrap { margin-top: .5rem; }
+.rt-line + .rt-line, .rt-line + .rt-table-wrap, .rt-table-wrap + .rt-line, .rt-table-wrap + .rt-table-wrap { margin-top: var(--space-2); }
 .rt-bullet { padding-left: .4rem; }
 .rt-line em { font-style: italic; }
-.rt-table-wrap { margin-top: .5rem; overflow-x: auto; }
+.rt-table-wrap { margin-top: var(--space-2); overflow-x: auto; }
 .rt-table { border-collapse: collapse; font-size: var(--fs-sm); }
 .rt-table caption { text-align: left; font-weight: 800; color: var(--text-dim); padding: .1rem .1rem .3rem; }
 .rt-table th, .rt-table td { border: 1px solid var(--line); padding: .22rem .55rem; text-align: left; vertical-align: top; }
 .rt-table th { background: var(--surface-3); color: var(--text-dim); white-space: nowrap; }
 .action-reference-group { margin-top: .35rem; }
 /* Route 1 — design-language §4 names disclosure summaries explicitly, and it is a stacked row besides. */
-.action-reference-group > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: .25rem .2rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.action-reference-group > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: var(--space-1) .2rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-reference-group > summary:hover { color: var(--text-dim); }
-.action-reference-group .action-list { margin-top: .25rem; }
+.action-reference-group .action-list { margin-top: var(--space-1); }
 
 /* The acting creature's console: its own labeled card BELOW the initiative order — the tracker
    stays a pure list. One quiet container with the active magenta accent; contents are flat. */
-.acting-console { margin-top: .7rem; padding: .75rem .8rem .85rem; border: 1px solid color-mix(in srgb, var(--magenta) 45%, var(--line)); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
+.acting-console { margin-top: .7rem; padding: var(--space-3) .8rem .85rem; border: 1px solid color-mix(in srgb, var(--magenta) 45%, var(--line)); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
 /* A down creature (0 HP): dim the console (the server blocks its actions; clicking one still surfaces
    the audited override), with its death saves / down note lifted above it. */
 .acting-console.down { opacity: .5; border-left-color: var(--danger); }
-.acting-down-note { margin: .5rem 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
+.acting-down-note { margin: var(--space-2) 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
 /* Row 1: name (left) and movement (right) share a line; row 2: the resource buttons, left-aligned. */
-.acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
+.acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: var(--space-2); }
 .acting-console-head strong { color: var(--text); font-size: var(--fs-sm); }
 .acting-console-title { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
 .acting-console-name { min-width: 0; line-height: 1.25; }
@@ -1134,7 +1134,7 @@
    player's own details grouped under their row, economy in its own quiet card below the list. */
 .initiative-list.player { margin-top: .6rem; }
 .initiative-list.player > li { flex-direction: column; align-items: stretch; gap: .1rem; padding: .18rem .2rem; }
-.initiative-list.player .initiative-row-main { gap: .5rem; }
+.initiative-list.player .initiative-row-main { gap: var(--space-2); }
 .initiative-score-plain { flex: none; min-width: 1.9rem; color: var(--text-dim); font-weight: 800; font-size: var(--fs-sm); text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .initiative-player-name { display: flex; align-items: center; gap: .4rem; min-width: 0; flex: 1 1 auto; overflow: hidden; }
 .player-health { flex: none; font-size: var(--fs-xs); font-weight: 800; font-family: var(--font-mono); }
@@ -1179,13 +1179,13 @@
    Three shapes of the same conversation: the player's refusal-and-ask, the player's waiting question,
    and the GM's queue. Caution rather than danger throughout — nothing has gone wrong, a move is simply
    not allowed yet, and the palette reserves the rose for actual loss (§2). */
-.rule-ask { padding: .6rem .75rem; border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); background: var(--surface-2); }
+.rule-ask { padding: .6rem var(--space-3); border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); background: var(--surface-2); }
 .rule-ask + .rule-ask { margin-top: .4rem; }
-.rule-ask-list { list-style: none; margin: .5rem 0 0; padding: 0; }
+.rule-ask-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
 .rule-ask-reason { margin: 0; color: var(--text); font-size: var(--fs-sm); }
 .rule-ask-who { margin: 0 0 .2rem; color: var(--text-dim); font-size: var(--fs-xs); }
 .rule-ask-meta { margin: .3rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); }
-.rule-ask-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+.rule-ask-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: var(--space-2); }
 /* The GM's queue is the one that is asking something OF you, so it leads with the brand's attention
    colour rather than caution — it is a request, not a warning. */
 .rule-ask-question { border-left-color: var(--magenta); }
