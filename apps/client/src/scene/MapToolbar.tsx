@@ -107,6 +107,14 @@ export interface MapToolbarProps {
   onRevealAll: () => void;
   onHideAll: () => void;
 
+  /**
+   * RULING 13 — the "Preview what players see" trigger, which used to be an anchor row under the map
+   * costing 53.6px of a phone's band. It is a TOOL, not a group: there is no panel behind it, because
+   * the payload is already a `position: fixed` draggable panel that never depended on the row that
+   * launched it. Absent ⇒ not offered (a player has nothing to preview).
+   */
+  viewerPreview?: Readonly<{ on: boolean; onToggle: () => void }>;
+
   /* View */
   onZoom: (factor: number) => void;
   onResetView: () => void;
@@ -140,7 +148,7 @@ function useCompact(): boolean {
 }
 
 export function MapToolbar(props: MapToolbarProps) {
-  const { role, tool, onToolChange, calibrated } = props;
+  const { role, tool, onToolChange, calibrated, viewerPreview } = props;
   const compact = useCompact();
   const [openGroup, setOpenGroup] = useState<GroupId | null>(null);
   const [railOpen, setRailOpen] = useState(false);
@@ -202,6 +210,14 @@ export function MapToolbar(props: MapToolbarProps) {
 
   const groupIcon = (group: GroupId) => (group === "draw" ? <IconDraw /> : group === "fog" ? <IconFog /> : <IconSearch />);
 
+  /**
+   * RULING 13's trigger, in both trees. It carries no caret because there is no panel behind it, and
+   * `aria-pressed` rather than `aria-expanded` because it toggles a surface rather than disclosing
+   * one. The visible word is short enough for the bar; the full sentence is the accessible name, and
+   * ruling 58's eye is the app's one "what players can see" glyph.
+   */
+  const previewTitle = viewerPreview?.on ? "Hide the preview of what players see" : "Preview what players see";
+
   if (compact) {
     // While the rail is OPEN it lifts above the floating token tray (z-index, see the stylesheet): a
     // 390px stage is ~232px tall and the tray takes 136px of it, so a rail painted underneath showed
@@ -222,6 +238,11 @@ export function MapToolbar(props: MapToolbarProps) {
           </button>
           {openGroup === group && <div className="map-toolbar-panel-body" id={`${baseId}-${group}`}>{groupBody(group)}</div>}
         </div>)}
+        {viewerPreview && <div className="map-toolbar-rail-section">
+          <button type="button" className="map-toolbar-row" aria-pressed={viewerPreview.on} title={previewTitle} onClick={() => { viewerPreview.onToggle(); setRailOpen(false); setOpenGroup(null); }}>
+            <span className="map-toolbar-row-icon" aria-hidden="true"><IconEye /></span>{previewTitle}
+          </button>
+        </div>}
       </div>}
       <button type="button" className="map-toolbar-toggle" aria-expanded={railOpen} aria-controls={`${baseId}-rail`} onClick={() => { setRailOpen((open) => !open); setOpenGroup(null); }}>
         Tools<span className={`map-toolbar-caret${railOpen ? " open" : ""}`} aria-hidden="true"><IconChevron /></span>
@@ -240,6 +261,10 @@ export function MapToolbar(props: MapToolbarProps) {
         <span className="map-toolbar-group-label">{GROUP_LABEL[group]}</span>
         <span className={`map-toolbar-caret${openGroup === group ? " open" : ""}`} aria-hidden="true"><IconChevron /></span>
       </button>)}
+      {viewerPreview && <button type="button" className="map-toolbar-group tap-target interactive" aria-pressed={viewerPreview.on} title={previewTitle} aria-label={previewTitle} onClick={viewerPreview.onToggle}>
+        <span className="map-toolbar-group-icon" aria-hidden="true"><IconEye /></span>
+        <span className="map-toolbar-group-label">Preview</span>
+      </button>}
     </div>
     {openGroup && <div className="map-toolbar-panel scroll-y anim-popover" id={`${baseId}-${openGroup}`} role="group" aria-label={GROUP_LABEL[openGroup]}>
       <p className="map-toolbar-panel-title">{GROUP_LABEL[openGroup]}</p>

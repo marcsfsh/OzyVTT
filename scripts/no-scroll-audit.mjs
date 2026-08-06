@@ -272,6 +272,9 @@ const GM_ROUTES = [
     }
   },
   { path: "/settings", ready: ".settings-group" },
+  // Ruling 61 — the API reference at its own address. A ~23,000px document inside one region: the
+  // cell this row exists to hold is that the PAGE still does not scroll, only the region does.
+  { path: "/settings/api", ready: ".api-reference-page" },
   { path: "/builder", ready: ".cb-page, .builder-gate" },
   {
     path: "/characters/:id", ready: null,
@@ -292,6 +295,8 @@ const GM_ROUTES = [
 
 const PLAYER_ROUTES = [
   { path: "/table", ready: ".table-layout" },
+  // D9 — the player's first tab, and the app's one player-only address.
+  { path: "/me", ready: ".my-character" },
   { path: "/codex", ready: ".codex-root" },
   // The player-/replays row doubles as the regression check for the list-stacks-under-the-table anomaly.
   { path: "/replays", ready: ".replay-panel" },

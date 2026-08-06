@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import {
-  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, lastLocationForTab, layerOf, litGmTab, navigate, pathForGmTab, redirectForRetiredPath,
+  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, isPlayerOnlyPath, lastLocation, lastLocationForTab, layerOf, litGmTab, navigate, pathForGmTab, redirectForRetiredPath,
   popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, useRoute, withQuery
 } from "./router";
 import { codexSectionOf } from "./codex/routes";
@@ -175,6 +175,30 @@ describe("Which addresses a player may reach (viewer safety, D3)", () => {
     expect(isGmOnlyPath("/characters/a1/level")).toBe(false);
     expect(isGmOnlyPath("/builder")).toBe(false);
   });
+
+  /**
+   * Ruling 61 — the API reference becomes a real address, and the head cannot decide who may have it:
+   * `/settings` is shared (a player gets the Mine group) while `/settings/api` is the GM's alone. A
+   * player asking for it gets the not-found view, indistinguishable from an unknown address.
+   */
+  it("keeps /settings shared and /settings/api GM-only", () => {
+    expect(isGmOnlyPath("/settings")).toBe(false);
+    expect(isGmOnlyPath("/settings/api")).toBe(true);
+  });
+
+  /**
+   * D9's mirror: the one address a GM may not reach. The My Character tab is about the character you
+   * claimed, and the GM claims nobody — so it is player-only rather than merely "not GM-only", which
+   * is what every shared address is.
+   */
+  it("marks the My Character tab player-only, and nothing else", () => {
+    expect(isPlayerOnlyPath("/me")).toBe(true);
+    for (const path of ["/table", "/settings", "/settings/api", "/codex", "/replays", "/characters/a1", "/builder", "/"]) {
+      expect(isPlayerOnlyPath(path), `${path} must not be player-only`).toBe(false);
+    }
+    // It is not GM-only either: the two answers are independent, and a player must not be refused it.
+    expect(isGmOnlyPath("/me")).toBe(false);
+  });
 });
 
 describe("The addresses D29 added", () => {
@@ -190,6 +214,10 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/scenes/s1")).toBe(true);
     expect(isKnownPath("/replays")).toBe(true);
     expect(isKnownPath("/replays/12")).toBe(true);
+    // D9's tab and ruling 61's reference — the two addresses round 2 added.
+    expect(isKnownPath("/me")).toBe(true);
+    expect(isKnownPath("/settings/api")).toBe(true);
+    expect(litGmTab("/settings/api")).toBe("settings");
 
     // Shapes that are NOT addresses: a sheet with no id, a third segment that is not the level flow,
     // a builder with a tail, and a replay id that is not an archive row id.
@@ -198,6 +226,9 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/builder/new")).toBe(false);
     expect(isKnownPath("/replays/abc")).toBe(false);
     expect(isKnownPath("/settings/table")).toBe(false);
+    // `/settings/api` is the ONE two-segment settings address; a length check would have opened all of them.
+    expect(isKnownPath("/settings/api/keys")).toBe(false);
+    expect(isKnownPath("/me/anything")).toBe(false);
     // The two addresses that retired stop existing, so a stale stored location self-heals.
     expect(isKnownPath("/encounter")).toBe(false);
     expect(isKnownPath("/setup")).toBe(false);

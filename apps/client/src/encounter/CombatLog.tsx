@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { CombatLogEntry } from "@vtt/domain";
+import { Drawer } from "@vtt/ui";
 import { socket } from "../socket";
 import "./combat-log.css";
 
@@ -34,16 +35,47 @@ if (socket.connected) load();
 
 function useCombatLog() { return useSyncExternalStore(subscribe, () => entries, () => entries); }
 
-export function CombatLogPanel() {
+/**
+ * THE LIST, AND THE PIN-TO-NEWEST TRAP IT CARRIES.
+ *
+ * `scrollTop = scrollHeight` is how this log stays on its newest line, and **a hidden element
+ * measures 0**, so that write lands on nothing and the log reopens scrolled to the TOP — the wrong
+ * end of the thing you opened it to read. `DockAccordion.tsx` documents the same trap and solves it
+ * the same way: the list is UNMOUNTED while it is not being read, so the effect re-runs on mount and
+ * the pin is computed against a box that has a height. Ruling 6 named this cost when it chose the
+ * drawer, because a `Drawer` stays mounted while closed (translated off-screen, `visibility: hidden`,
+ * `inert`) — mounting the LIST on open is what pays it.
+ */
+function CombatLogList() {
   const log = useCombatLog();
   const listRef = useRef<HTMLOListElement>(null);
   useEffect(() => { const element = listRef.current; if (element) element.scrollTop = element.scrollHeight; }, [log.length]);
+  if (log.length === 0) return <p className="combat-log-empty">No combat events yet.</p>;
+  return <ol className="combat-log-list scroll-y" ref={listRef} aria-live="polite">
+    {log.map((entry) => <li key={entry.id} className={`combat-log-entry log-${entry.kind}`}><span className="combat-log-text">{entry.text}</span></li>)}
+  </ol>;
+}
+
+/** The panel presentation — its own heading over the list. Used where the log has a column to stand in. */
+export function CombatLogPanel() {
   return <section className="combat-log" aria-labelledby="combat-log-heading">
     <div className="combat-log-heading"><span className="eyebrow">LOG</span><h2 id="combat-log-heading">Combat log</h2></div>
-    {log.length === 0
-      ? <p className="combat-log-empty">No combat events yet.</p>
-      : <ol className="combat-log-list scroll-y" ref={listRef} aria-live="polite">
-          {log.map((entry) => <li key={entry.id} className={`combat-log-entry log-${entry.kind}`}><span className="combat-log-text">{entry.text}</span></li>)}
-        </ol>}
+    <CombatLogList />
   </section>;
+}
+
+/**
+ * RULING 6 — the log as a DRAWER FROM THE RIGHT.
+ *
+ * `Drawer` is non-modal by design (no scrim, no focus trap, no scroll lock), so the table stays live
+ * behind it, which is the whole requirement: you read the log while the fight goes on. It takes an
+ * edge rather than floating, so it covers the dock instead of the map.
+ *
+ * **The list is mounted only while open** — see `CombatLogList` above. That is not an optimisation;
+ * it is the fix for the named cost this ruling accepted.
+ */
+export function CombatLogDrawer({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
+  return <Drawer open={open} onClose={onClose} side="right" title="Combat log" className="combat-log-drawer">
+    {open && <CombatLogList />}
+  </Drawer>;
 }

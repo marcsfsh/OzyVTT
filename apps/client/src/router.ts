@@ -295,9 +295,28 @@ export function litGmTab(path: string): GmTab | null {
 export function isGmOnlyPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
   if (segments[0] === "codex") return ["audit", "backup", "settings"].includes(segments[1] ?? "");
+  /**
+   * Ruling 61 — `/settings/api` is the API reference as a real address, and it is the GM's alone.
+   * Settings itself is shared (a player gets the Mine group), so the head cannot decide this: the
+   * SECOND segment does. A player asking for it gets the not-found view, indistinguishable from an
+   * address that means nothing, which is the same answer `/roster` gives them.
+   */
+  if (segments[0] === "settings") return segments[1] === "api";
   const tab = gmTabForPath(path);
   if (tab === null) return false;
   return tab !== "codex" && tab !== "table" && tab !== "settings" && tab !== "replay";
+}
+
+/**
+ * The mirror of `isGmOnlyPath`: an address only a PLAYER may reach.
+ *
+ * There is exactly one — `/me`, the My Character tab (D9) — and it is not a symmetry for its own
+ * sake. The tab is about the character you claimed, and the GM claims nobody; a GM who follows the
+ * address gets the same not-found card a player gets at `/roster`. Kept out of `isGmOnlyPath`'s
+ * negation because "not GM-only" means "shared", which is what every other address is.
+ */
+export function isPlayerOnlyPath(path: string): boolean {
+  return path.split("/").filter(Boolean)[0] === "me";
 }
 
 /**
@@ -322,6 +341,15 @@ export function isKnownPath(path: string): boolean {
     return segments.length === 3 && segments[2] === "level";
   }
   if (segments[0] === "scenes") return segments.length === 1 || (segments.length === 2 && segments[1].length > 0);
+  // D9 — the player's own tab. One segment, no records under it.
+  if (segments[0] === "me") return segments.length === 1;
+  /**
+   * Ruling 61 — `/settings/api` is the ONE two-segment settings address. `gmTabForPath` already
+   * answered "settings" for it (it reads the head), so the tab lit and the not-found card painted on
+   * top: the surface existed and the router denied it. Everything else under `/settings` stays
+   * unknown, which is why this is a single named segment rather than a length check.
+   */
+  if (segments[0] === "settings") return segments.length === 1 || (segments.length === 2 && segments[1] === "api");
   // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
   if (segments[0] === "replays") return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));
   return gmTabForPath(path) !== null && segments.length === 1;

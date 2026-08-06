@@ -18,6 +18,11 @@ import { socket } from "../socket";
  * `localStorage["vtt.dock-open"]`, and the same `defaultFor` recompute — resizing across the rung
  * lands you on the panel you were already reading, and a phone that rotates does not reset the dock.
  *
+ * **TWO SECTIONS SINCE RULING 6, NOT THREE — IN BOTH TREES.** The combat log left the dock and became
+ * a drawer from the right, so what stays here is the fight and the dice. The log's DOOR stays where
+ * its section was, because that is where a GM's hand already goes looking for it; it opens the drawer
+ * rather than expanding, which is why it is a plain button and not a third `aria-expanded` header.
+ *
  * WHY THE INACTIVE BODIES UNMOUNT — in BOTH trees. The combat log pins itself to the newest line by
  * setting `scrollTop = scrollHeight` whenever the log grows (CombatLog.tsx). An element that is merely
  * hidden still receives those updates, and a hidden element measures 0, so the write lands on nothing
@@ -25,11 +30,12 @@ import { socket } from "../socket";
  * Unmounting means the effect re-runs on mount and the log is where it should be, and it keeps a long
  * fight's DOM small. The replay viewer's phone tabs (replay/replay.css) use `display: none` for the
  * same shape; that half is deliberately NOT copied here. The cost is real and worth naming: a
- * half-typed custom dice formula does not survive a trip to the log and back. The log being at the
- * wrong end every time is the worse of the two.
+ * half-typed custom dice formula does not survive a trip to the dice tab and back. Being at the wrong
+ * end every time is the worse of the two — and the drawer inherits exactly this reasoning, which is
+ * the named cost ruling 6 accepted when it took the drawer.
  */
 
-export type DockKey = "turn" | "dice" | "log";
+export type DockKey = "turn" | "dice";
 
 const MEMORY_KEY = "vtt.dock-open";
 /** The rung at which the sidebar stops being a column. Paired with the `max-width: 979px` block in styles.css. */
@@ -94,18 +100,20 @@ function WaitingBadge({ count }: Readonly<{ count: number }>) {
   </span>;
 }
 
-export function DockAccordion({ role, inCombat, turnLabel, turn, dice, log }: Readonly<{
+export function DockAccordion({ role, inCombat, turnLabel, turn, dice, onOpenLog }: Readonly<{
   role: "gm" | "player";
   inCombat: boolean;
   /** The first section is the fight in combat and the staging of one out of it, so it is named twice. */
   turnLabel: string;
   turn: ReactNode;
   dice: ReactNode;
-  log: ReactNode;
+  /** Ruling 6: the log is a drawer now. The dock keeps its door, not its section. */
+  onOpenLog: () => void;
 }>) {
   const [open, setOpen] = useState<DockKey>(() => {
     const stored = localStorage.getItem(MEMORY_KEY);
-    return stored === "turn" || stored === "dice" || stored === "log" ? stored : defaultFor(role, inCombat);
+    // A dock that remembered "log" is a dock from before ruling 6; it falls through to the default.
+    return stored === "turn" || stored === "dice" ? stored : defaultFor(role, inCombat);
   });
   /**
    * A fight starting or ending changes which panel the table is ABOUT, so the default is recomputed
@@ -127,12 +135,12 @@ export function DockAccordion({ role, inCombat, turnLabel, turn, dice, log }: Re
   const sections: ReadonlyArray<{ key: DockKey; label: string; body: ReactNode }> = [
     { key: "turn", label: turnLabel, body: turn },
     { key: "dice", label: "Dice", body: dice },
-    { key: "log", label: "Combat log", body: log },
   ];
 
   if (sheet) {
     const active = sections.find((section) => section.key === open) ?? sections[0];
     return <div className="dock-tabs">
+      <div className="dock-tabs-head">
       {/* `Tabs`, not `SegmentedControl`: these switch whole panels (the primitive's own docblocks
           draw that line), and `Tabs` meets the 44px floor with real paint. A segmented control paints
           36px and reaches the floor with `.tap-target`'s centred `::after`, which would extend ~4px UP
@@ -148,6 +156,10 @@ export function DockAccordion({ role, inCombat, turnLabel, turn, dice, log }: Re
           label: <>{section.label}{section.key === "turn" && <WaitingBadge count={waitingAsks} />}</>
         }))}
       />
+      {/* The log's door, beside the two tabs rather than as a third one: it opens a drawer, and a
+          tab that does not switch the body underneath it would be a lie about what it does. */}
+      <button type="button" className="dock-log-door tap-target interactive" onClick={onOpenLog}>Log</button>
+      </div>
       {/* One body, mounted for the active tab only (see the unmount contract above). The scroll is
           declared in the MARKUP — check (h) reads `.scroll-y`, and a bare `overflow-y` in the
           stylesheet would be a region no reader of this component can see. */}
@@ -171,5 +183,14 @@ export function DockAccordion({ role, inCombat, turnLabel, turn, dice, log }: Re
         {isOpen && <div id={`dock-body-${section.key}`} className="dock-section-body scroll-y">{section.body}</div>}
       </section>;
     })}
+    {/* The log's door where its section used to be. It wears the header's paint so the column still
+        reads as one instrument, and it carries no `aria-expanded`, because nothing expands. */}
+    <section className="dock-section dock-section--door">
+      <h2 className="dock-section-head">
+        <button type="button" className="dock-section-toggle tap-target" onClick={onOpenLog}>
+          <span className="dock-section-label">Combat log</span>
+        </button>
+      </h2>
+    </section>
   </div>;
 }

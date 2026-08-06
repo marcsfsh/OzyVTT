@@ -131,7 +131,7 @@ const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: strin
   ["apps/client/src/encounter/EncounterPanel.tsx", "Initiative d20", "Initiative the SCORE keeps its D&D name; only the LIST is “Turn order”"],
   ["apps/client/src/encounter/EncounterPanel.tsx", "Saving throw for $", "Save the THROW, not the persist verb"],
   ["apps/client/src/actors/ClaimCharacter.tsx", "Claim", "the table's claim verb"],
-  ["apps/client/src/actors/YouArePlaying.tsx", "Release", "the table's release verb — never “Leave”"]
+  ["apps/client/src/actors/MyCharacter.tsx", "Release", "the table's release verb — never “Leave”"]
 ];
 
 // ───────────────────────────── the corpus ─────────────────────────────

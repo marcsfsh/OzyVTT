@@ -795,37 +795,13 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
    card, token library) now render through the shared @vtt/ui Modal primitive - no bespoke backdrops. */
 
-/* "You're playing" — ONE ROW (C1, decision Q2). It was a 349px card: an eyebrow over the name, a
-   labelled Conditions editor, a damage/heal/temp tracker and two buttons, stacked. On a phone that is
-   40% of the pane spent on controls that all exist somewhere else — conditions are on the Turn tab's
-   own initiative row, and damage/heal/temp are on the sheet (CharacterSheet.tsx) one tap away. What is
-   left is the one thing nothing else says: WHO you are playing, and how they are doing. Avatar, name,
-   HP, and the door to the sheet, at the 44px floor by paint.
-   Your claimed character stays the cyan selection accent (§6.6). */
-/* `min-width: 0` is load-bearing, not defensive: a flex item's automatic minimum is its MIN-CONTENT,
-   and this row's is avatar + HP + two buttons + gaps = 412px. Left at `auto` the row refused to fit a
-   366px phone column and "My sheet" was clipped by the frame — measured. The name is the only piece
-   that may give, and it gives by ellipsis.
-   THE NAME HAS A FLOOR, because "gives by ellipsis" ran out of road at the 320px floor: the four
-   fixed pieces plus the gaps come to 281.7px against 280px of content box, so the name — the only
-   shrinkable item — was handed a NEGATIVE share and rendered at 0px. Identity survived in the
-   avatar's initials and the row's aria-label, but a name that paints nothing is a bug.
-   The floor is `flex-basis` AND `min-width`, and `flex-wrap` is what pays for it: line breaking uses
-   the BASIS, so the floor is also what the name ASKS for while the line is being packed, and a line
-   that cannot seat everyone breaks instead of crushing anyone. 2.75rem is the measured largest safe
-   floor minus a margin — the content box is 333px at 375 (351 less .5rem of padding a side and the
-   1px cyan border a side, which is the part that makes this arithmetic and not taste), the four fixed
-   pieces plus gaps spend 281.7 of it, and a 3.25rem ask overshoots by 0.7px and wraps a phone that
-   fits. Probed at 320/375/390: 3.25rem wraps 375 (82px); 3rem, 2.75rem and 2.5rem all hold it at one
-   44px row with the name at exactly the 51.4px it had before this rule. 2.75rem takes the middle and
-   leaves ~7px for a wider HP readout. At the 320 floor the row genuinely cannot hold: "My sheet"
-   takes a second line and the name reads 87.1px — the whole of it — instead of nothing. */
-.you-are-playing { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; min-height: var(--tap-min); margin-top: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
-.you-are-playing-name { flex: 1 1 2.75rem; min-width: 2.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 1.05rem/1.2 var(--font-display); color: var(--text); }
-.you-are-playing .nh-btn { flex: 0 0 auto; }
-.you-badge { margin-left: var(--space-2); vertical-align: middle; }
+/* RULING 20 — THE CHARACTER BAR OVER THE MAP IS GONE, and with it 69px of a phone's map band.
+   It was `.you-are-playing`: a one-row pill saying who you are playing, how they are doing, and the
+   door to their sheet. All three facts live on the My character tab now (D9, actors/MyCharacter.tsx),
+   which is the player's FIRST tab — so nothing was lost and the map got the band back. Its teal
+   bubble border went with it, which is also a de-pilling instance (ruling 24).
+   The 69px is BANKED (ruling 32's fourth guardrail): a later pass may not hand it back as padding. */
 
-.own-hp { flex: 0 0 auto; color: var(--cyan-hi); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .8rem; font-weight: 700; }
 
 /* THE TABLE IS A FRAME (§7). It fills the pane exactly, the map takes the space that is left over,
    and anything that can outgrow its share scrolls inside its own region. That is the difference the
@@ -913,8 +889,8 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 @media (max-width: 979px) {
   /* The `scrollbar-gutter: auto` above matters most here, and the arithmetic is why. `stable`
      reserves the scrollbar's width whether or not anything scrolls — 10px of a phone's content box,
-     measured — against a top line whose own arithmetic (the `.you-are-playing` block above)
-     documents ~7px of slack at 375. Measured with the gutter reserved: a claimed player's top line
+     measured — against a top line that was measured with ~7px of slack at 375
+     when it still carried the character bar (ruling 20 deleted it). Measured with the gutter reserved: a claimed player's top line
      at 375x667 went 44px -> 82px, the row wrapped, and 38px came out of the sheet on the phase's
      own shortest supported phone. A phone's scrollbar is an overlay and costs nothing anyway. */
   .table-layout { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; }
@@ -932,36 +908,10 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      party on one line instead of three. `wrap` stays as the escape hatch: nothing here may be
      crushed, so a line that genuinely cannot hold breaks instead of clipping. */
   .table-topline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-  /* THE DOOR IS THE LINE'S GUEST, NOT ITS OWNER. `flex: 0 0 auto` handed the scene door its whole
-     natural width, and a long scene name makes that 227px: 227 + .5rem + the strip's 8rem basis is
-     363px against 351px of line at 375x667, so the strip wrapped and the ONE 44px row this wrapper
-     exists to make became two — 100px, and 56px of it came out of the sheet, which is the row that
-     absorbs every deficit (the sheet ran to 169px in the GM's out-of-combat cell, the worst on the
-     phone). Capped and shrinkable, the door yields instead. The cap is a PERCENTAGE because both
-     ends of the phone band have to clear it: 70% leaves 5rem of basis for the strip at 375 and at
-     the 320 floor alike, and at 375 it offers 245.7px against a door that lays out at 205.3 — so it
-     does not bite the scene names the table has, it is the ceiling that stops a longer one taking
-     the line (measured with a 37-character name: door 245.7px, still one 44px row, still ellipsed
-     before the caret). */
-  .table-topline > .scenes-open-row { flex: 0 1 auto; min-width: 0; max-width: 70%; margin-bottom: 0; }
-  /* Ellipsis needs a BLOCK CONTAINER. `.nh-btn` is a flex container and the scene name is a bare text
-     run in main.tsx, so it becomes an ANONYMOUS flex item — unselectable, and `text-overflow` is not
-     inherited, so it has nowhere to land. Block layout gives it one, and then the caret has to be got
-     out of the way of the ellipsis or it is what gets eaten. It is ABSOLUTE in a reserved right
-     gutter, not a right float: `text-overflow` truncates at the CONTENT box while `overflow` clips at
-     the PADDING box, so a padding gutter is the one place the caret can stand that the ellipsis stops
-     short of. (A right float was tried and measured wrong for a reason worth keeping: floats are
-     placed in document order, the caret follows the name, and a name too long to break pushed the
-     float onto a second line — a 59px door.) The leading scene glyph stays a LEFT float, which is
-     before the text and cannot be pushed. `line-height` is the 44px floor doing arithmetic, because
-     block layout has no `align-items` to centre with: 18 + 12px padding a side + the 1px border a
-     side IS 44, and a taller line box grows the door instead (20px measured it at 46).
-     Scoped to the topline — the Scenes gallery's own door (scene-gallery.css) is untouched. */
-  .table-topline > .scenes-open-row > .scenes-open { display: block; position: relative; overflow: hidden; text-overflow: ellipsis; text-align: left; line-height: 18px; padding-right: 1.9rem; }
-  .table-topline > .scenes-open-row > .scenes-open > .scenes-open-icon { float: left; margin-top: 1px; }
-  .table-topline > .scenes-open-row > .scenes-open > .scenes-open-caret { position: absolute; top: 50%; right: .7rem; margin: 0; translate: 0 -50%; }
+  /* RULING 12 — the top-left scenes row is GONE (56px back to the map), so the rules that taught it
+     to yield the line go with it. Its function is a "View all scenes" entry in the map's own Scenes
+     menu, bottom-right, where the GM's hand already is. The 56px is BANKED (ruling 32). */
   .table-topline > .party-strip { flex: 1 1 5rem; min-width: 0; margin: 0; }
-  .table-topline > .you-are-playing { flex: 1 1 14rem; }
   /* Route 1 (design-language §4): the strip is a scrolling list of pills, so the floor is PAINT.
      56px was a comfortable laptop row; 44 is the floor and the phone needs the other 12px. The
      padding comes down with it or the avatar's own 2rem plus .5rem a side overshoots the floor and
@@ -1002,7 +952,8 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
   /* `.dice-proof { margin-top: auto }` and the `.docked` stretch pair retired here: both existed to
      fake a shared height between two columns that were each sized by their own content. The frame
      gives them one height for real, so bottom-aligning by margin would now fight it. */
-  .viewer-preview-toggle { margin-top: .6rem; }
+  /* RULING 13 — the "Preview what players see" anchor row is gone (53.6px back to the map); its
+     trigger is a map-toolbar tool now, so it has no row of its own to space. */
 }
 
 .table-status { margin: 0 0 .8rem; color: var(--text-muted); font-size: .85rem; }
@@ -1063,6 +1014,10 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    rest of it". They stay the scrolling elements, which is what keeps the log's pin-to-newest and the
    roll list's own scrolling working — the effects write to these nodes by ref. */
 .dock-section-body .roll-list, .dock-section-body .combat-log-list { flex: 1; min-height: 0; max-height: none; }
+/* RULING 6 — the log's DOOR where its section used to be. It wears the section header's paint so the
+   column still reads as one instrument, and it never grows: a door has no body to hold the flex.
+   `.dock-section` carries `flex-grow` transitions, so `flex: none` is stated rather than inherited. */
+.dock-section--door { flex: none; }
 
 .sidebar-collapsed { margin-top: .8rem; }
 .sidebar-collapsed > summary { padding: var(--space-2) .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
@@ -1193,3 +1148,46 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .map-empty-hero > :not(.empty-atmos) { position: relative; z-index: 1; }
 .map-empty-hero .home-hero-bloom { top: 8%; height: 42%; opacity: .22; }
 .map-empty-hero .home-hero-grid { bottom: -14%; height: 58%; opacity: .55; }
+
+/* ═══════════ D9 — MY CHARACTER, the player's first tab (rulings 18, 20) ═══════════
+   The surface that replaced the 69px character bar over the map. It owns its frame (§7): a heading
+   row carrying the builder doors over one scrolling region, and it stands on its own sky like every
+   other tab-level surface. Same 72rem reading measure the Roster uses — this is a list of people,
+   not a reference to scan, so a full-bleed line length would be the wrong trade at a laptop width. */
+.my-character-head, .my-character-body { width: 100%; max-width: 72rem; margin-inline: auto; }
+.my-character-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); }
+.my-character-head h2 { margin: 0; }
+.my-character-head-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-left: auto; }
+/* The identity card: avatar, the three facts, the two doors. `min-width: 0` on the facts column for
+   the reason the deleted bar documented at length — a flex item's automatic minimum is its
+   min-content, and a long character name must give by ellipsis rather than pushing the doors off. */
+.my-character-card { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0 0; padding: var(--space-4); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-2); }
+.my-character-facts { display: flex; flex-direction: column; gap: .15rem; flex: 1 1 8rem; min-width: 0; }
+.my-character-name { font: 400 1.35rem/1.2 var(--font-display); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-character-line { color: var(--text-muted); font-size: .9rem; }
+.my-character-hp { color: var(--cyan-hi); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .85rem; font-weight: 700; }
+.my-character-doors { display: flex; flex-wrap: wrap; gap: .5rem; margin-left: auto; }
+.my-character-party { margin-top: var(--space-6); }
+.my-character-party-head { margin: 0 0 var(--space-2); font: 400 1.1rem/1.2 var(--font-display); color: var(--text-dim); }
+.my-character-party-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+/* Ruling 47 — list rows are hairline-ruled, not filled, and the row IS the control at the tiers
+   where a sheet can be opened. Route 1 (§4): the paint reaches the 44px floor, because these rows
+   stack and an invisible `::after` extension would reach over the neighbours and steal their taps. */
+.my-character-party-row { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--tap-min); padding: var(--space-1) var(--space-2); border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; }
+button.my-character-party-row { cursor: pointer; }
+button.my-character-party-row:hover { border-bottom-color: var(--line-hover); }
+.my-character-party-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.my-character-party-line { flex: 1 1 4rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: .85rem; text-align: right; }
+/* A party member's read-only sheet, inside the Modal's own body region. Nothing here is a control. */
+.party-sheet { display: grid; gap: var(--space-3); }
+.party-sheet-line { margin: 0; color: var(--text-dim); font-size: .9rem; }
+.party-sheet-stats { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: 0; }
+.party-sheet-stats dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.party-sheet-stats dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.05rem; font-weight: 700; }
+.party-sheet-abilities { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.party-sheet-abilities li { display: grid; place-items: center; gap: .1rem; min-width: 3.5rem; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); }
+.party-sheet-ability { color: var(--text-muted); font-size: var(--fs-2xs); letter-spacing: .08em; }
+.party-sheet-mod { color: var(--cyan-hi); font-family: var(--font-mono); font-size: .85rem; font-weight: 700; }
+
+/* RULING 6 — the log's door in the docked-into-the-map arm, which has no dock to hold one. */
+.dock-log-door-standalone { flex: none; align-self: flex-start; }

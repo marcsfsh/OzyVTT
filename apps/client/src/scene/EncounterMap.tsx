@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, GmView, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation, PlayerView } from "@vtt/domain";
-import { Button, IconArrow, IconChevronLeft, IconPlay, IconScene, Switch, useToastMute } from "@vtt/ui";
+import { Button, IconArrow, IconChevronLeft, IconPlay, IconScene, Menu, MenuItem, Switch, useToastMute } from "@vtt/ui";
 import { drawingAudienceOptions, MapToolbar, type MapTool } from "./MapToolbar";
 import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenHealthAura, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
@@ -83,7 +83,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, staging, healthDisplay, state
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, onViewAllScenes, activeSceneName, viewerPreview, staging, healthDisplay, state
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -102,6 +102,16 @@ export function EncounterMap({
   moveSceneId?: string;
   /** GM scene-prep entry (map button) - opens the scene picker. */
   onScenePrep?: () => void;
+  /**
+   * RULING 12 — the gallery's ONE door. The top-left scenes row is deleted (56px back to the map) and
+   * its function is an entry in this menu. Absent ⇒ the map button stays the single-action button it
+   * was, which is what a player and a staging view get.
+   */
+  onViewAllScenes?: () => void;
+  /** Which scene is live, said in the menu rather than on a row over the map — the fact the deleted row carried. */
+  activeSceneName?: string;
+  /** RULING 13 — the "Preview what players see" trigger, now a map-toolbar tool beside Draw / Fog / View. */
+  viewerPreview?: Readonly<{ on: boolean; onToggle: () => void }>;
   /** Present while staging a prepared scene privately - adds "back to live" / "make live" controls to the map. */
   staging?: Readonly<{ onBackToLive: () => void; onMakeLive: () => void }>;
   /** Table-wide health-display default (read only for the GM view; a token's own actor.healthDisplay overrides it). Players receive the resolved per-token style server-side, so this is unused for them. */
@@ -585,6 +595,7 @@ export function EncounterMap({
           onFogEnabledChange={(enabled) => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled, ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}
           onRevealAll={() => runFog(() => emitFogPaint({ commandId: newId(), op: "reveal", rect: { x: 0, y: 0, width: size.width, height: size.height }, ...fogTarget, expectedRevision: revision }), "The fog could not be revealed.")}
           onHideAll={() => runFog(() => emitFogReset({ commandId: newId(), ...fogTarget, expectedRevision: revision }), "The fog could not be reset.")}
+          {...(viewerPreview ? { viewerPreview } : {})}
           onZoom={zoomCenter}
           onResetView={resetView}
           enlarged={enlarged}
@@ -715,7 +726,22 @@ export function EncounterMap({
                 <Button variant="ghost" size="sm" onClick={staging.onBackToLive} title="Return to the scene players see"><span className="map-button-icon" aria-hidden="true"><IconChevronLeft /></span>Back to live</Button>
                 <Button variant="primary" size="sm" onClick={staging.onMakeLive} title="Make this the scene players see"><span className="map-button-icon" aria-hidden="true"><IconPlay /></span>Make live</Button>
               </span>
-            : onScenePrep && <Button variant="secondary" size="sm" title="Stage and switch scenes (GM only)" onClick={onScenePrep}><span className="map-button-icon" aria-hidden="true"><IconScene /></span>Scenes</Button>}
+            : onScenePrep && (onViewAllScenes
+              /* RULING 12 — ONE DOOR. The top-left scenes row is gone; the map's own Scenes button
+                 became the menu that holds both errands, and the live scene's name rides the menu
+                 rather than a row over the map, so the fact survives and the 56px does not come back. */
+              ? <Menu
+                  className="encounter-map-scene-menu"
+                  triggerClassName="encounter-map-scene-trigger"
+                  align="end"
+                  label={activeSceneName ? `Scenes — ${activeSceneName} is live` : "Scenes"}
+                  trigger={<><span className="map-button-icon" aria-hidden="true"><IconScene /></span>Scenes</>}
+                >
+                  {activeSceneName && <p className="encounter-map-scene-live-name">Live: <strong>{activeSceneName}</strong></p>}
+                  <MenuItem onClick={onViewAllScenes}>View all scenes</MenuItem>
+                  <MenuItem onClick={onScenePrep}>New scene…</MenuItem>
+                </Menu>
+              : <Button variant="secondary" size="sm" title="Stage and switch scenes (GM only)" onClick={onScenePrep}><span className="map-button-icon" aria-hidden="true"><IconScene /></span>Scenes</Button>)}
         </div>}
       </> : <p role="status">{image.status === "error" ? image.message : "Loading the battle map…"}</p>}
     </div>

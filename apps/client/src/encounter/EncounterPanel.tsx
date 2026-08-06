@@ -596,10 +596,14 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     return <section className="encounter-panel combat-active" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
-        {myActor && <div className="player-view-toggle" role="group" aria-label="Show turn order or your sheet">
-          <button type="button" className={view === "initiative" ? "on" : ""} aria-pressed={view === "initiative"} onClick={() => setView("initiative")}>Initiative</button>
-          <button type="button" className={view === "sheet" ? "on" : ""} aria-pressed={view === "sheet"} onClick={() => setView("sheet")}>My sheet</button>
-        </div>}
+        {/* D10 — ONE "My sheet", not two. This was an Initiative / My-sheet toggle, and the other copy
+            rode the character bar over the map that ruling 20 deleted. The Initiative half went with
+            the toggle: `setView("sheet")` here is the only route into the sheet view apart from the
+            post-attack jump, and the sheet already carries its own close back to initiative
+            (`onClose` on the embedded sheet below), so the way back exists without a second control.
+            Rendered only in the initiative view for that reason — in the sheet view it would be a
+            button that does nothing. */}
+        {myActor && view === "initiative" && <Button size="sm" variant="secondary" className="player-sheet-door" onClick={() => setView("sheet")}>My sheet</Button>}
         {myTurn && <span className="your-turn-flag" role="status">Your turn - act, then end it below</span>}
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}

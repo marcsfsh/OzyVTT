@@ -16,6 +16,15 @@
      full height and puts its first card — the newest roll — at y=830 in an 844px window, on screen.
      GM setup measures the same way out of combat: 723px of panel in a 348px body. */
 .dock-tabs { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+/* RULING 6 — the bar and the log's door share one row. Two tabs, then a door that OPENS THE DRAWER
+   rather than switching the body under it, which is why it is a button beside the bar and not a
+   third tab. The bar takes the line and the door keeps its natural width; both meet the 44px floor
+   by paint, because on a phone this row sits directly under a `touch-action: none` map band and an
+   invisible hit extension there would eat map drags (the note on `Tabs` below). */
+.dock-tabs-head { display: flex; align-items: stretch; gap: var(--space-1); flex: none; min-width: 0; }
+.dock-tabs-head > .dock-tabs-bar { flex: 1 1 auto; min-width: 0; }
+.dock-log-door { flex: none; min-height: var(--tap-min); padding-inline: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+.dock-log-door:hover { border-color: var(--line-strong); color: var(--text); }
 .dock-tabs-bar { flex: none; }
 .dock-tabs-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
 /* Inside the sheet these are the body's contents, not cards standing in a column: they drop the
@@ -888,10 +897,9 @@
   .sheet-embedded .sheet-pane { padding: var(--space-3); }
 }
 /* Player map view: Initiative / My sheet toggle (v4 #8). */
-.player-view-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
-.player-view-toggle button { padding: .22rem .7rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
-.player-view-toggle button + button { border-left: 1px solid var(--line); }
-.player-view-toggle button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
+/* D10 — the Initiative / My-sheet toggle retired: there is ONE "My sheet" now, a plain button in the
+   topbar, and the sheet's own close is the way back. What is left is the button's flex behaviour. */
+.player-sheet-door { flex: 0 0 auto; }
 /* Its own browser tab: the workspace fills the window; no modal chrome. */
 .sheet-standalone { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--surface-2); }
 /* The same presentation inside the SPA's `/characters/:id` layer fills the PANE, not the window —

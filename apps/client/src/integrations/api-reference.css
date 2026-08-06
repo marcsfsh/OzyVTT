@@ -59,3 +59,15 @@
 /* The ladder's 760 rung (§3), one block for the whole file: below it nothing in this panel keeps a
    right-hand column — the auth chips, the export button and the type column all give up their gutter. */
 @media (max-width: 760px) { .api-auth { margin-left: 0; width: 100%; } .api-field-table td:nth-child(2) { white-space: normal; } .api-export-spec { margin-left: 0; } }
+
+/* ── RULING 61: the reference at its own address (`/settings/api`), full window width ──
+   The page IS the surface, so it takes the pane's whole width rather than the 72rem reading
+   measure Settings gives its groups: this is a reference to scan, not prose to read, and the
+   endpoint rows and the command table are the widest things in the app.
+   `.api-reference-body`'s own left/right padding is dropped here — the frame's gutter
+   (`.pane-frame`) already supplies it, and paying twice inset the content by 40px a side. */
+.api-reference-page-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); }
+.api-reference-page-head h2 { margin: 0; }
+.api-reference-page-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
+.api-reference-page-body > .api-reference-body { padding-inline: 0; }
+.api-reference-page-body .api-reference-toolbar { margin-top: var(--space-2); }

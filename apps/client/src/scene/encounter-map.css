@@ -420,3 +420,10 @@
   .encounter-map-interaction:not(.enlarged) .encounter-map-feedback { min-height: 0; margin: var(--space-1) 0 0; }
   .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty { display: none; }
 }
+
+/* RULING 12 — the map's Scenes button became the menu that holds BOTH errands, because the top-left
+   scenes row is gone and this is now the one door. The trigger keeps the button paint it had (the
+   cluster's shadow rule above already reaches `.nh-btn`; a `<summary>` needs it stated), and the
+   menu opens upward-left out of the corner it lives in — `Menu` clamps its own horizontal overflow. */
+.encounter-map-scene-menu > .encounter-map-scene-trigger { box-shadow: var(--shadow-1); }
+.encounter-map-scene-live-name { margin: 0; padding: var(--space-2) var(--space-3) var(--space-1); color: var(--text-muted); font-size: var(--fs-xs); }

@@ -448,6 +448,8 @@ const SURFACES = [
   { name: "play-roster", path: "/roster", root: "main", ready: ".party-heading-actions" },
   { name: "play-replays", path: "/replays", root: "main", ready: ".replay-panel" },
   { name: "play-settings", path: "/settings", root: "main", ready: ".settings-group" },
+  // Ruling 61 — the API reference as a real GM-only address, full window width.
+  { name: "play-api-reference", path: "/settings/api", root: "main", ready: ".api-reference-page" },
   { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" },
   // The sheet LAYER (`/characters/:id`) — a parameterised address, so it resolves its id from the
   // table's own tokens the way the no-scroll audit does, then navigates. Its page actions live
@@ -503,6 +505,10 @@ const PLAYER_SURFACES = [
     } },
   // ---- The player's own play shell (see the GM `play-*` block above). ----
   { name: "player-play-table", path: "/table", root: "main", ready: ".table-layout" },
+  // D9 — MY CHARACTER, the player's first tab and the only player-ONLY address in the app. It
+  // carries the release verb and the builder doors the deleted character bar used to hold, so it is
+  // exactly the kind of dense control cluster this audit exists to measure.
+  { name: "player-my-character", path: "/me", root: "main", ready: ".my-character" },
   { name: "player-play-replays", path: "/replays", root: "main", ready: ".replay-panel" },
   { name: "player-play-settings", path: "/settings", root: "main", ready: ".settings-group" }
 ];

@@ -6,14 +6,15 @@ import "./styles.css";
 import { ClaimCharacter } from "./actors/ClaimCharacter";
 import { PartyRosterTab } from "./actors/PartyRosterTab";
 import { PartyStrip } from "./actors/PartyStrip";
-import { YouArePlaying } from "./actors/YouArePlaying";
+import { MyCharacter } from "./actors/MyCharacter";
 import { CharacterBuilder } from "./builder/CharacterBuilder";
 import { LevelFlow } from "./builder/LevelFlow";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
 import { DicePanel } from "./dice/DicePanel";
 import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "./encounter/EncounterPanel";
-import { CombatLogPanel } from "./encounter/CombatLog";
+import { CombatLogDrawer } from "./encounter/CombatLog";
+import { ApiReferencePage } from "./integrations/ApiReference";
 import { DockAccordion } from "./encounter/DockAccordion";
 import { CharacterSheet } from "./encounter/CharacterSheet";
 import { TokenLibrary } from "./tokens/TokenLibrary";
@@ -31,12 +32,12 @@ import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
 import { SceneBuilder } from "./scenes/SceneBuilder";
 import { EncounterMap } from "./scene/EncounterMap";
 import { socket } from "./socket";
-import { currentHref, isGmOnlyPath, isKnownPath, lastLocationForTab, layerOf, litGmTab, navigate, pathForGmTab, redirectForRetiredPath, rememberLocation, resumeTarget, useRoute, type GmTab } from "./router";
+import { currentHref, isGmOnlyPath, isKnownPath, isPlayerOnlyPath, lastLocationForTab, layerOf, litGmTab, navigate, pathForGmTab, redirectForRetiredPath, rememberLocation, resumeTarget, useRoute, type GmTab } from "./router";
 import { NotFoundPage } from "./components/NotFoundView";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, IconArrow, IconChevron, IconScene, Modal, Badge, Button, Input } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, IconArrow, IconScene, Modal, Badge, Button, Input } from "@vtt/ui";
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
@@ -131,9 +132,16 @@ function App() {
    */
   const setGmTab = (next: GmTab) =>
     navigate(next === gmTab ? pathForGmTab(next) : lastLocationForTab("gm", pathForGmTab(next).slice(1)) ?? pathForGmTab(next));
-  /** D4/D24: the player's three views. Every address that is not the Codex or Settings is the table. */
-  const playerView: "table" | "codex" | "settings" =
-    route.segments[0] === "codex" ? "codex" : route.segments[0] === "settings" ? "settings" : "table";
+  /**
+   * D4/D24/D9: the player's FOUR views. Every address that is not My character, the Codex or Settings
+   * is the table. `/me` is the player's own tab (D9) and leads the bar — the character bar that used
+   * to ride over the map is gone, and this is where its three facts live now.
+   */
+  const playerView: "mine" | "table" | "codex" | "settings" =
+    route.segments[0] === "me" ? "mine"
+      : route.segments[0] === "codex" ? "codex"
+      : route.segments[0] === "settings" ? "settings"
+      : "table";
   /** D29: the layer open on top of the tab — the sheet, the builder, a replay, a scene workspace. */
   const layer = layerOf(route.path);
   /**
@@ -156,8 +164,11 @@ function App() {
    *     address it does not recognise, so `/nonsense` painted the whole encounter table — map, panel,
    *     dice, combat log — underneath the not-found card with the Encounter tab lit. That is the
    *     lit-tab lie D1 was raised to kill, one level up from where it was killed.
+   * (3) **A PLAYER-ONLY address is unknown to the GM.** `/me` (D9) is about the character you
+   *     claimed, and the GM claims nobody. It is a known address, so rule (2) would have painted the
+   *     table under it; it gets the same not-found card `/nonsense` does.
    */
-  const gmAddressUnknown = !isKnownPath(route.path) && route.segments[0] !== "codex";
+  const gmAddressUnknown = (!isKnownPath(route.path) || isPlayerOnlyPath(route.path)) && route.segments[0] !== "codex";
   const [state, setState] = useState<PlayerView | GmView | null>(null);
   const [notice, setNotice] = useState<NoticeMessage>(null);
   const [password, setPassword] = useState("");
@@ -166,6 +177,12 @@ function App() {
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [showViewerPreview, setShowViewerPreview] = useState(false);
+  /**
+   * RULING 6 — the combat log is a drawer from the right. The state lives here rather than in the
+   * dock, because the door is in two places (the dock's own row, and the docked-into-the-map arm
+   * where there is no dock) and one drawer must answer both.
+   */
+  const [logOpen, setLogOpen] = useState(false);
   const previewSceneId = usePreviewScene();
   const [scenePrepOpen, setScenePrepOpen] = useState(false);
   /** Which character's token image is being picked (A11/D18) — GM anywhere, player on their own. */
@@ -453,7 +470,6 @@ function App() {
   const activeScene = mode === "gm" && state
     ? (state as GmView).combat.scenes?.find((scene) => scene.id === (state as GmView).combat.activeSceneId) ?? null
     : null;
-  const activeSceneName = activeScene?.name ?? "Scenes";
   useEffect(() => {
     // Staging renders on the table map - make sure the GM is looking at it, and close the pickers.
     if (previewScene) { navigate(pathForGmTab("table")); setScenePrepOpen(false); setScenesModalOpen(false); }
@@ -507,6 +523,10 @@ function App() {
       className="player-view-tabs"
       ariaLabel="Player sections"
       tabs={[
+        /* D9/ruling 20 — the player's FIRST tab. It replaces the character bar that used to ride
+           over the map: who you are playing, how they are doing, the door to the sheet, the party,
+           and the builder doors (ruling 18). The map got its 69px back. */
+        { id: "mine", label: "My character" },
         { id: "table", label: "Table" },
         { id: "codex", label: <>Codex{recapBadge.unread > 0 && <> <Badge tone="info" solid>{recapBadge.unread} new</Badge></>}</> },
         /* D24: a real tab, not hidden chrome — it lights when active and it is addressed. A player
@@ -517,7 +537,7 @@ function App() {
       /* Same rule for the player's views: the Codex reopens on the page they were reading. */
       onChange={(id) => {
         if (id === "codex") recapBadge.markSeen();
-        const home = id === "codex" ? "/codex" : id === "settings" ? "/settings" : "/table";
+        const home = id === "codex" ? "/codex" : id === "settings" ? "/settings" : id === "mine" ? "/me" : "/table";
         if (id === playerView) { navigate(home); return; }
         navigate(id === "codex" ? lastLocationForTab("player", "codex") ?? "/codex" : home);
       }}
@@ -636,10 +656,21 @@ function App() {
           controls are absent from the tree rather than hidden in it.
           Settings owns its frame now (heading row + one scrolling region + its own sky), so it
           takes the pane directly — no staging wrapper. */}
-      {mode === "player" && playerView === "settings" && <SettingsPage role="player" state={state} />}
+      {mode === "player" && playerView === "settings" && !isGmOnlyPath(route.path) && isKnownPath(route.path) && <SettingsPage role="player" state={state} />}
+      {/* D9 — MY CHARACTER, the player's first tab. It replaces the character bar over the map
+          (ruling 20) and carries the release verb the bar used to own. */}
+      {mode === "player" && playerView === "mine" && <MyCharacter
+        state={state as PlayerView}
+        onOpenSheet={(actorId) => navigate(`/characters/${actorId}`)}
+        onCreateCharacter={() => navigate("/builder")}
+        onLevel={(actorId) => navigate(`/characters/${actorId}/level`)}
+        onGoToTable={() => navigate("/table")}
+      />}
       {/* A player on a GM-only or unknown address: the not-found view, indistinguishable from each other
-          and from a genuinely unknown address (invariant §3.2). */}
-      {mode === "player" && playerView === "table" && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundPage role="player" />}
+          and from a genuinely unknown address (invariant §3.2). It covers the SETTINGS view too since
+          ruling 61 put a GM-only address under `/settings` — without that, `/settings/api` painted the
+          player's own settings page, which volunteers that the address means something. */}
+      {mode === "player" && (playerView === "table" || playerView === "settings") && (isGmOnlyPath(route.path) || !isKnownPath(route.path)) && <NotFoundPage role="player" />}
 
       {/* THE TABLE OWNS ITS FRAME (B1), at every width since C1: above the rung two columns share one
           height and the map takes what the rows above it leave; below it the same rows stack into a
@@ -661,17 +692,14 @@ function App() {
               party beside it — and `display: contents` above it, so the laptop keeps the separate rows
               it already had. The wrapper exists for that one job, and hides itself when it is empty
               (an unclaimed player in combat has nothing to put in it). */}
+          {/* RULING 12 — ONE DOOR TO THE SCENES, not two. The top-left scenes row is gone (56px back
+              to the map); its function is a "View all scenes" entry in the map's own Scenes menu,
+              bottom-right, where the GM's hand already is. RULING 20 took the character bar with it
+              (69px) — the My character tab holds its three facts now. What is left in this wrapper is
+              the party strip, which is why it still exists and why it still hides when empty. */}
           <div className="table-topline">
-            {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
-                Guarded on the field, not just the mode - the first state after login can still be
-                player-projected (no scenes) until the session join lands. */}
-            {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <div className="scenes-open-row">
-              <Button variant="secondary" className="scenes-open" aria-label={activeScene ? `Scenes — ${activeScene.name} is live` : "Scenes"} onClick={() => setScenesModalOpen(true)}><IconScene className="scenes-open-icon" />{activeSceneName}<IconChevron className="scenes-open-caret" /></Button>
-            </div>}
-            {/* D15/D32 — the party is part of the TABLE. A player who has claimed leads with their own
-                character; and out of combat both roles get the slim strip, because in combat the turn
-                order already carries the same people. */}
-            {mode === "player" && playerHasClaimed && <YouArePlaying state={state as PlayerView} />}
+            {/* D15/D32 — the party is part of the TABLE, out of combat only: in combat the turn order
+                already carries the same people. */}
             {!previewScene && !state.combat.active && (mode === "gm"
               ? <PartyStrip role="gm" state={state as GmView} onOpenRoster={() => navigate(pathForGmTab("roster"))} />
               : playerHasClaimed ? <PartyStrip role="player" state={state as PlayerView} /> : null)}
@@ -705,11 +733,16 @@ function App() {
             fog={state.combat.fog}
             dock={mapDock}
             onScenePrep={mode === "gm" ? () => setScenePrepOpen(true) : undefined}
+            {...(mode === "gm" && Array.isArray((state as GmView).combat.scenes) ? { onViewAllScenes: () => setScenesModalOpen(true), ...(activeScene ? { activeSceneName: activeScene.name } : {}) } : {})}
+            {...(mode === "gm" && gmToken ? { viewerPreview: { on: showViewerPreview, onToggle: () => setShowViewerPreview((current) => !current) } } : {})}
             healthDisplay={mode === "gm" ? (state as GmView).combat.healthDisplay : undefined}
             state={state}
           /> : <div className="empty map-empty-hero scanlines"><div className="empty-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div><strong>No map loaded yet</strong><span>{mode === "gm" ? "Prepare a scene from the Scenes tab - pick a map and who's in it, then go live." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <Button variant="secondary" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}><IconScene /> Prepare a scene</Button>}</div>}
           </>}
-          {mode === "gm" && gmToken && !previewScene && <Button variant="secondary" className="viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</Button>}
+          {/* RULING 13 — the "Preview what players see" anchor row is gone (53.6px back to the map).
+              Its trigger joined Draw / Fog / View in the map toolbar; nothing else had to change,
+              because the payload was already a `position: fixed` draggable panel that never depended
+              on the row that launched it. */}
         </section>
         {/* THE SHEET ROW (C1). Above the rung this is the sidebar column it has always been; below it,
             it is the one row that takes the leftover height and holds everything the band does not —
@@ -740,12 +773,14 @@ function App() {
                When the tracker is docked INTO the map the dock is not this column at all, so the
                accordion stands down and the map owns the arrangement. */
             : showDocked
-              ? <><DicePanel role={mode} state={state} /><CombatLogPanel /></>
+              /* RULING 6 again: the log left this column too. What is left when the tracker is docked
+                 into the map is the dice, and the drawer is one tap away from the map's own chrome. */
+              ? <><DicePanel role={mode} state={state} /><Button variant="secondary" className="dock-log-door-standalone" onClick={() => setLogOpen(true)}>Combat log</Button></>
               : <DockAccordion role={mode === "gm" ? "gm" : "player"} inCombat={state.combat.active}
                   turnLabel={state.combat.active ? "Turn order" : "The fight"}
                   turn={encounterPanel}
                   dice={<DicePanel role={mode} state={state} />}
-                  log={<CombatLogPanel />} />}
+                  onOpenLog={() => setLogOpen(true)} />}
           {/* §B4.4 — the shelf: the fights the GM shared, under the player's own sheet, out of combat.
               Renders nothing when nothing has been shared, so an empty shelf is never a thing to read. */}
           {mode === "player" && !state.combat.active && mapToken && <ReplayShelf token={mapToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />}
@@ -801,7 +836,13 @@ function App() {
           credentials and session security to The table → Access & integrations (§B9.4).
           The GM's page is the two-column one at ≥1280 (settings.css); the surface owns the
           frame either way, so it takes the pane directly. */}
-      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "settings" && <SettingsPage
+      {/* RULING 61 — A6 as a real address. `/settings/api` is the reference given the whole pane,
+          bookmarkable and deep-linkable, with an "open in a new tab" action. The new tab lands on the
+          app's own GM sign-in card and takes the password once: the GM token is deliberately
+          memory-only, and every alternative copies a credential somewhere it should not go. */}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "settings" && route.path === "/settings/api" &&
+        <ApiReferencePage gmToken={gmToken} onBack={() => navigate(pathForGmTab("settings"))} />}
+      {mode === "gm" && gmToken && !gmAddressUnknown && gmTab === "settings" && route.path !== "/settings/api" && <SettingsPage
         role="gm"
         state={state}
         gmToken={gmToken}
@@ -812,6 +853,10 @@ function App() {
       />}
     </>}
     </div>
+    {/* RULING 6 — the combat log's drawer. It lives OUTSIDE the pane for the same reason the token
+        picker does: it is `position: fixed`, and the pane is where transforms happen. Non-modal by
+        design, so the table stays live behind it — which is the whole requirement. */}
+    {shellVisible && <CombatLogDrawer open={logOpen} onClose={() => setLogOpen(false)} />}
     {/* A11/D18 — the token picker, opened from the sheet or from Settings → Players. The server
         decides who may set which token; this is the door, not the gate. Dialogs live outside the
         pane: open they are top-layer, closed they render no box — neither takes a frame row. */}
