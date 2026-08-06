@@ -83,7 +83,40 @@
 /* The count of questions waiting on the GM, on the header that is still on screen when the body that
    would have shown them is unmounted (known-bugs.md). Caution, not danger: nothing has gone wrong —
    a move is simply not allowed yet, and someone is waiting on a call (§2). */
-.dock-waiting-count { display: inline-grid; place-items: center; min-width: 1.3rem; margin-left: .4rem; padding: 0 .3rem; border-radius: var(--radius-pill); background: var(--caution); color: var(--text-on-neon); font: 800 var(--fs-2xs)/1.7 var(--font-mono); vertical-align: baseline; }
+/* DE-PILLED (ruling 24). This is the count the ruling names by name — "one silhouette from the
+   largest button to the smallest count badge" — and measured on the live tree it was the ONLY one
+   of this panel's six `--radius-pill` rules that still computed to 999px (see the note below the
+   `.economy-slot` block for the other five). It is a count, not a dot: it holds a number and grows
+   with its digits, so nothing about it is protected.
+   The cut rides a backing layer for the reason Badge.css gives at this size — the count sits
+   inside a tab header, which IS a tap target, and a `clip-path` that arrives on a child of one
+   clips hit-testing silently. `inset: 0` and no border on either box: this badge has no rim to
+   preserve, so the layer covers the padding box exactly and the count keeps its measured size. */
+.dock-waiting-count {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.3rem;
+  margin-left: .4rem;
+  padding: 0 .3rem;
+  border-radius: 0;
+  background: none;
+  color: var(--text-on-neon);
+  font: 800 var(--fs-2xs)/1.7 var(--font-mono);
+  vertical-align: baseline;
+  --chamfer: .3rem;
+  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+}
+.dock-waiting-count::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  background: var(--caution);
+}
 
 .encounter-panel { margin-top: var(--space-10); padding: var(--space-4) 1.1rem; border: 1px solid transparent; }
 .encounter-panel.compact { padding-block: 1.1rem; }
@@ -114,7 +147,7 @@
 /* "Round 3" is a COUNT, not a state and not an action, so it reads like the tray's secondary line
    (`.staging-tray-title span`, muted) rather than in the accent. It was `--magenta-hi`, which put
    the brightest ink in the panel on the one thing nobody acts on. */
-.encounter-round { flex: none; padding: .4rem .7rem; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.encounter-round { flex: none; padding: .4rem .7rem; background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Dock picker sits on its own compact row so it never competes with the title for width. */
 .encounter-dock-picker { display: flex; align-items: center; gap: .3rem; margin-top: .7rem; }
 .encounter-dock-label { margin-right: .1rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
@@ -271,7 +304,13 @@
 .initiative-name { display: flex; align-items: center; gap: .45rem; min-width: 0; }
 .initiative-name > span:not(.initiative-caret):not(.initiative-tag) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .initiative-caret { flex: none; color: var(--text-dim); font-size: var(--fs-xs); }
-.initiative-tag { flex: none; padding: .05rem .4rem; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+/* `.initiative-tag` WAS HERE and it was a `--radius-pill` rule for markup that does not exist:
+   searched 2026-08-06 across `apps/client/src`, `packages/ui/src` and the server, the class is
+   written nowhere but in the `:not()` above and in this file's own rule, and the live DOM renders
+   zero of them. Dead CSS, deleted rather than de-pilled — de-pilling a rule nothing matches ships
+   no pixels and leaves the trap for whoever adds the markup back. The `:not()` on the line above
+   is left alone deliberately: it costs nothing and it is the one place the intended class name
+   still reads as intended. */
 .initiative-score-value { flex: none; min-width: 1.9rem; padding: .2rem .15rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-dim); font-weight: 800; font-size: var(--fs-sm); text-align: right; cursor: pointer; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .initiative-score-value:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .initiative-score-value:disabled { opacity: .7; cursor: default; }
@@ -379,9 +418,13 @@
 .hp-editor input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
 .hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .hp-editor button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.health-chip { display: inline-block; margin-left: var(--space-2); padding: .1rem .45rem; border-radius: var(--radius-pill); font: 800 var(--fs-2xs)/1.5 var(--font-body); letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
-.health-bloodied { background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta)); color: var(--magenta-hi); }
-.health-down { background: color-mix(in srgb, var(--surface-3) 60%, var(--danger)); color: var(--danger-hi); }
+/* `.health-chip` AND ITS TWO TONES WERE HERE — another `--radius-pill` rule for markup that does
+   not exist. Same search as `.initiative-tag` above, same result: `health-chip`, `health-bloodied`
+   and `health-down` appear in no `.tsx` anywhere in the repo, and the live DOM renders zero. The
+   fact a player reads off them — bloodied / down — is carried by `.token-health-bloodied` over the
+   map (encounter-map.css) and by `.init-row-health.hp-bloodied` in the row (InitiativeList.css);
+   nothing regressed when these went, because nothing was drawing them. Deleted rather than
+   de-pilled, for the reason given above. */
 /* Conditions: tracked reference state — chips everywhere (violet-coded), a compact picker where editable. */
 /* --space-3 is the minimum gap a row of pressable chips can use: each carries a 44px hit area
    around 2rem of paint (Chip.css), so anything tighter and neighbouring chips steal taps. */
@@ -402,11 +445,20 @@
 .turn-economy-name { margin-right: .15rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
 /* Route 1: the slots wrap in a .3rem-gap row, which is 4.8px against the 4.85px a side a `.tap-target`
    would overhang at their measured 34.3px — the pills would steal each other's taps. */
-.economy-slot { min-height: var(--tap-min); padding: .24rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+/* THE THREE DEAD `--radius-pill` DECLARATIONS ARE GONE FROM THIS FILE, and they were dead rather
+   than merely unfashionable — measured on the live tree with `getComputedStyle`, not read off the
+   source: `.encounter-round`, `.economy-slot` and `.turn-end` all computed `border-radius: 0px`
+   already, because the material blocks near the bottom of this file re-declare all three at the
+   same single-class specificity and win on source order. Keeping a `--radius-pill` line that the
+   same stylesheet overrides 1100 lines later is how a reader concludes the panel still has
+   bubbles, which is exactly the question that started this pass. `.dock-waiting-count` (top of
+   file) was the one that genuinely still rendered round; `.initiative-tag` and `.health-chip`
+   rendered nothing at all. */
+.economy-slot { min-height: var(--tap-min); padding: .24rem .55rem; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .economy-slot:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .economy-slot[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); text-decoration: line-through; }
-/* Same pill shape + size as the Action/Bonus/Reaction slots, keeping the primary magenta fill. */
-.turn-end { margin-left: auto; padding: .24rem .8rem; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: 700; }
+/* Same shape + size as the Action/Bonus/Reaction slots, keeping the primary magenta fill. */
+.turn-end { margin-left: auto; padding: .24rem .8rem; font-size: var(--fs-sm); font-weight: 700; }
 .economy-feedback { width: 100%; color: var(--text-dim); font-size: var(--fs-sm); }
 /* Action runner: stat-block actions -> targets -> server-rolled result -> explicit apply. */
 .action-runner { margin-top: .6rem; display: flex; flex-direction: column; }

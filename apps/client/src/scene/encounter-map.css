@@ -9,20 +9,168 @@
    shrink/jitter the map every time a token is grabbed (the tray mounts on pointer-down). Float it over
    the stage top here too, inset to match the enlarged container's 1rem padding. */
 .encounter-map-interaction.enlarged .encounter-token-tray { position: absolute; z-index: 4; top: var(--space-4); left: var(--space-4); right: var(--space-4); margin-bottom: 0; }
-.encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-2); padding: var(--space-2) .7rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); transition: border-color .15s, background .15s; }
-.encounter-token-tray.receiving { border-color: var(--cyan); background: color-mix(in srgb, var(--surface-2) 84%, var(--cyan)); }
+/* ══ THE STAGING TRAY, MAP SIDE — THE TEAM COLOUR BECOMES AN EDGE (rulings 24, 39, 47) ═══════
+   Measured 2026-08-06 at 1280x900 / 390x844 / 844x390 in all three themes, by the SAME per-pixel
+   method the initiative-panel and scene-prep passes used (chroma >= 30; hue 262-344 magenta,
+   160-210 cyan; the element's box ∩ its clipping ancestors ∩ the viewport). Before and after are
+   a PAIRED reading — both halves taken in one session on the same DOM, because the tray's accent
+   share moves with how many tokens are staged and an across-runs diff would confound the two:
+
+     live initiative panel   4.4% accent      the surface the client asked this one to match
+     scene-prep tray         5.9% accent      the surface that already landed
+     THIS TRAY              31.3% accent  ->  5.6%
+
+   Both halves of the complaint were in one declaration. `.tray-token` was a `--radius-pill`
+   silhouette over `color-mix(--surface-3 60%, --cyan)` (magenta for monsters, indigo for NPCs):
+   a fully-rounded bubble whose team colour was the GROUND rather than a mark on it. Nine or ten
+   of them float over the map at once, which is why this surface measured seven times the panel it
+   sits beside, and why it now measures between the two surfaces it was asked to match rather than
+   below them — it sits on the map's dark plate, a different ground from either panel.
+
+   THE FIX IS THE ONE THE TWO TARGET SURFACES ALREADY MADE, not a new idea:
+   · the ground goes neutral — `--material-plate`, the same flat plate every non-textured surface
+     in the tracker takes (ruling 45), so no tint sits behind a name a GM is reading mid-setup;
+   · team identity moves to the EDGE at a 45% tint over `--line-strong` — literally
+     `.staging-row.is-placed`'s recipe (`color-mix(--cyan 45%, --line)` on its rule) applied to a
+     boundary instead of a bottom rule;
+   · and it stays on the DISC, which is where the live tracker already puts it
+     (`.initiative-avatar.monster` / `.npc` / `.player-known`, encounter-panel.css). The disc is
+     PROTECTED BY RULING 24 — dots, swatches and avatars stay round, shape is meaning there — so
+     `border-radius: 50%` below is deliberate and must not be chamfered.
+
+   ONE PIXEL OF EDGE, NOT `--rim-w`'s TWO, and that is Badge.css's stated rule at this scale
+   ("the badge's edge is a boundary rather than the material's rim") and this file's own habit:
+   `.map-toolbar-choice` and `.map-toolbar-group`, the other controls that float over the map,
+   are 1px too. Nine 2px neon outlines side by side trade one kind of loud for another.
+
+   ⚠ THE CUT IS ON A BACKING LAYER AND MUST STAY THERE. `.tray-token` is the app's drag surface —
+   dragging a chip out places a token, tapping one drops it at the map's centre, and that is why
+   it carries `touch-action: none`. `clip-path` clips HIT-TESTING, not just paint (ruling 14/49),
+   so putting the cut on the chip would silently shrink the one hit area the whole feature runs
+   on. `inset: -1px` spans the border box, so every chip keeps the size it had.
+
+   AND THE LAYER SURVIVES THE HORIZONTAL SCROLLER, WHICH WAS CHECKED RATHER THAN ASSUMED. Below
+   561px `.encounter-token-tray-list` becomes an `overflow-x` scroller; two earlier passes were
+   bitten there (the map toolbar's plate scrolled off its own element, and a 7.2px pseudo-element
+   sitting on a scroller's clip edge was dropped entirely). Neither applies: the SCROLLER is the
+   list, the layer belongs to a CHIP inside it — so it is scrolled content and travels with its
+   chip — and it is a 46px box inset 1px, not a hairline flush against the clip. Measured at 390
+   and 375 with the list scrolled to both ends: every chip's plate and edge paint, and
+   `elementFromPoint` still returns the chip at all four cut corners. */
+.encounter-token-tray {
+  position: relative;
+  isolation: isolate;
+  min-height: 3.6rem;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+  padding: var(--space-2) .7rem;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  --tray-edge: var(--line-strong);
+  --material-fill: var(--material-plate);
+}
+/* ══ THE DASH MOVES TO THE STATE THAT MEANS IT ═══════════════════════════════════════════════
+   The container was dashed at ALL times, and measured that is a 968x114 dashed rectangle sitting
+   across the top of the map — the largest dashed shape in the app, on its busiest screen. The
+   convention it was borrowing does not actually cover it: `.nh-empty` and `.nh-card--new::before`
+   are dashed because they are EMPTY — a place with nothing in it yet. This tray is a populated
+   shelf you drag chips OUT of; it is only a place-a-thing-goes while a drag is live.
+   So the dash goes where that is true. At rest the tray wears the app's ordinary boundary
+   (`--line-strong`, solid); on drag-over it becomes cyan AND dashed, which is the universal
+   drop-zone mark and now separates the two states by shape as well as by hue — a second channel
+   the previous version did not have, and one that survives a colour-blind reading. */
+.encounter-token-tray::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: 1px solid var(--tray-edge);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+/* Drag-over. The edge does the work — cyan, and dashed, which is the state the dash belongs to —
+   and the wash drops from 16% to 8%: enough to read as a changed surface, not another cyan field. */
+.encounter-token-tray.receiving { --tray-edge: var(--cyan); --material-fill: color-mix(in srgb, var(--surface-2) 92%, var(--cyan)); }
+.encounter-token-tray.receiving::before { border-style: dashed; }
 .encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
 .encounter-token-tray > div:first-child span { margin-top: .15rem; color: var(--text-muted); font-size: .72rem; }
 .encounter-token-tray-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
-.tray-token { display: flex; align-items: center; gap: .45rem; padding: .42rem .6rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-3) 60%, var(--cyan)); text-align: left; cursor: grab; touch-action: none; }
+/* `--chamfer-cut` is RESTATED, not merely re-sized, and Badge.css explains why: a custom
+   property's computed value has its `var()`s already substituted at the element that declares it,
+   so `--chamfer-cut` inherits from `:root` as a literal 9.6px polygon and overriding `--chamfer`
+   alone does nothing. `--team` is the one knob the three kinds repaint. */
+.tray-token {
+  position: relative;
+  isolation: isolate;
+  display: flex; align-items: center; gap: .45rem;
+  padding: .42rem .6rem;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+  --team: var(--cyan);
+  --team-edge: color-mix(in srgb, var(--team) 45%, var(--line-strong));
+  --chamfer: .32rem;
+  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+}
+.tray-token::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: 1px solid var(--team-edge);
+  background: var(--material-plate);
+  background-origin: border-box;
+  background-clip: border-box;
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+/* Ruling 40: the edge brightens, and PRESS carries what hover carries — this is the surface a
+   phone drags from, and half this table has no hover at all. `border-color` is pinned transparent
+   on the element because the base `button:hover` rule (styles.css) would otherwise paint a second
+   cyan edge on top of the layer's, in every kind's colour but its own. */
+.tray-token:hover:not(:disabled), .tray-token:focus-visible, .tray-token:active:not(:disabled) { border-color: transparent; }
+.tray-token:hover:not(:disabled)::before, .tray-token:focus-visible::before, .tray-token:active:not(:disabled)::before { border-color: color-mix(in srgb, var(--team) 75%, var(--line-strong)); }
 .tray-token:active { cursor: grabbing; }
-.tray-token > span { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; margin: 0; border-radius: 50%; background: color-mix(in srgb, var(--cyan) 45%, var(--void)); color: #fff; font-weight: 900; }
+/* PROTECTED BY RULING 24 — this is the avatar, and it stays round. It is also where the team
+   colour is loudest on purpose: a disc is a mark, and the tracker identifies its own rows the
+   same way one column over. */
+.tray-token > span { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; margin: 0; border-radius: 50%; background: color-mix(in srgb, var(--team) 45%, var(--void)); color: #fff; font-weight: 900; }
+/* ══ DAYBREAK NEEDS THE OTHER INK, AND THAT IS RULING 29 RATHER THAN TASTE ═══════════════════
+   `--void` is the darkest token in night and dusk and a LIGHT one in daybreak (#E7E6F2), so the
+   same `color-mix(--team 45%, --void)` disc is dark ink's ground in one theme and white ink's in
+   the other two. Measured on the live tree: white on the daybreak monster disc rgb(217,140,191)
+   is **2.48:1** — under the 4.5 floor for 12px initials, and identity carried by luminance is
+   exactly what ruling 29 forbids. Night (6.14) and dusk (5.51) pass on white and get WORSE on
+   `--text`, which in those themes is #ECEAFB / #F0EEFB — light ink either way, only dimmer. So
+   the override is scoped to the one theme that fails, which is also its true scope.
+   This is Badge.css's daybreak-ink precedent (`:root[data-theme="light"] .nh-badge--info`), and
+   it keeps `#fff` in the file, where the ratchet pins this stylesheet's literal count — the same
+   reason `--token-ink` above is hoisted rather than typed twice. */
+:root[data-theme="light"] .tray-token > span { color: var(--text); }
 .tray-token > strong { font-size: .75rem; }
-.tray-token.monster { background: color-mix(in srgb, var(--surface-3) 55%, var(--magenta)); }
-.tray-token.monster > span { background: color-mix(in srgb, var(--magenta) 45%, var(--void)); }
-.tray-token.npc { background: color-mix(in srgb, var(--surface-3) 58%, var(--indigo)); }
-.tray-token.npc > span { background: color-mix(in srgb, var(--indigo) 48%, var(--void)); }
-.tray-token.hidden { border-style: dashed; opacity: .76; }
+.tray-token.monster { --team: var(--magenta); }
+.tray-token.npc { --team: var(--indigo); }
+.tray-token.npc > span { background: color-mix(in srgb, var(--team) 48%, var(--void)); }
+/* HIDDEN FROM PLAYERS. The dash moves to the layer with the rest of the edge — and it is now
+   MORE legible than it was, not less: it used to inherit the base `button` rule's 1px
+   `--line-strong`, which is a near-invisible hairline over a saturated chip (measured, it did
+   paint — 2.2% of the chip's pixels change when the class is toggled with opacity pinned — but
+   `--line-strong` on `--magenta` is not a signal a GM can catch at a glance). It is the chip's
+   own team tone now, on a quiet ground, beside `opacity: .76`. */
+.tray-token.hidden::before { border-style: dashed; }
+.tray-token.hidden { opacity: .76; }
 /* RULING 30 — THE STAGE IS FRAMED AS AN INSTRUMENT: a 2px rim and four corner ticks.
    The rim is the material's own edge (--rim-w / --rim-color), replacing the 1px --line hairline,
    so the map plate reads as a piece of chrome rather than a div with a border. RULING 22 IS
