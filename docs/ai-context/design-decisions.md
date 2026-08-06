@@ -93,8 +93,15 @@ off screens that hold dense text.
   bloodied magenta, critical danger, temp-HP a violet segment; always show the number
   in mono with `tabular-nums`. (On the shared screen a player sees a *band*, never a
   number — `viewer-mode.md`.)
-- **Combat state (hue shift):** encounter + map panels take `.combat-active` (a
-  quiet magenta tint) while an encounter is live; eases in/out, never pulses.
+- **Combat state (hue shift):** the encounter panel takes `.combat-active` while an
+  encounter is live, and the tint rides its **rim**, never its ground — the plate stays
+  the app's ordinary material. It used to warm `--material-plate` and `--rim-color`,
+  which are inherited custom properties, so one tint reached every surface and every
+  edge inside the panel: measured 2026-08-06, 77% of the panel's pixels (94% in dusk)
+  sat in the magenta hue band, against 9% for the scene-prep staging tray the client
+  named as the reference. Accent, never field (rulings 2, 47). It eases in, never pulses.
+  Nothing in the map's own stylesheet reads `.combat-active`; the turn token's `--magenta`
+  ring above is what says the fight is live there.
 
 ---
 
