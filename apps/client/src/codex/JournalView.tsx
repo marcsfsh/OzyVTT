@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Combobox, Field, GmOnlyTag, Input, Panel, RevealSwitch, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
+import { Alert, Badge, Button, Combobox, Field, GmOnlyTag, IconButton, IconX, Input, Panel, RevealSwitch, SegmentedControl, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, journalApi, type CodexAutosaveSettings, type CodexChronicleKind, type CodexChronicleRecord, type CodexPageSummary, type CodexSession, type GmCodexCalendar } from "./api";
 import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META, CHRONICLE_LENSES, questEventLabel, questEventOf, chronicleWhenLabel, deadlineFired, deadlinesPassedBy, deadlineStateLabel, deadlineStateTone, downtimeOf, downtimeProposedDate, downtimeSummaryLabel, groupChronicle, milestoneOf, milestoneSummaryLabel, revealAheadOfPlayers, sameInWorldDate, standingChangeLabel, standingOf, type ChronicleLens } from "./chronicle";
@@ -55,6 +55,27 @@ type Draft = { kind: ComposerKind; playerText: string; gmText: string; sessionId
 const EMPTY: Draft = { kind: "entry", playerText: "", gmText: "", sessionId: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [], who: "", activity: "", days: "", level: "", reason: "" };
 const DRAFT_KEY = "codex-journal-draft";
 const LENS_KEY = "codex-chronicle-lens";
+/**
+ * Ruling 57 — **the journal is a document, and its composer wears the page editor's shape.**
+ *
+ * What did NOT move: the feed. Ruling 57's own principle is that a surface keeps its composition when a
+ * document shape would fight what it is, and a chronicle entry is an ARTICLE — kind badge, in-world date,
+ * session link, two layers of prose, tags, a downtime's confirm row and four footer actions. Squeezed
+ * into a 300px rail beside a detail pane it would be unreadable, which is the "map is spatial" argument
+ * applied to a timeline. So the Journal stays a centred column with a composer over an entry feed.
+ *
+ * What DID move is the composer, and it is the half that was actually wrong: MEASURED at 1280x900 it
+ * stood roughly 1,100px tall — two stacked 224px/179px writing fields plus five filing controls — so the
+ * first entry of the campaign began below the fold on every laptop. It now uses the same two controls as
+ * a page and a quest: one body at a time, and the filing behind Details.
+ *
+ * The kind PAYLOAD (a downtime's who/activity/days, a milestone's level) deliberately stays in the
+ * centre. It is not metadata — it IS the record, and it is what arms the submit button; behind a panel a
+ * GM would meet a button that will not press and no visible reason why.
+ */
+const JOURNAL_DETAILS_KEY = "codex-journal-details";
+const JOURNAL_DETAILS_ID = "codex-journal-details";
+type ComposerBodyTab = "player" | "gm";
 /**
  * OWNER DECISION (2026-07-30): the prep-clock reveal warning is switchable off, and the switch is per
  * DEVICE — `localStorage`, like every other GM reading preference in this app (`vtt.show-occupied`,
@@ -140,6 +161,16 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
   const [notice, setNotice] = useState<NoticeMessage>(null);
   /** The reveal warning's own switch (see `REVEAL_WARN_KEY`). State, not a raw read, so turning it back on re-arms without a reload. */
   const [revealWarn, setRevealWarn] = useState(readRevealWarn);
+  const [bodyTab, setBodyTab] = useState<ComposerBodyTab>("player");
+  const detailsRef = useRef<HTMLElement>(null);
+  const [detailsOpen, setDetailsOpen] = useState(() => {
+    try { return localStorage.getItem(JOURNAL_DETAILS_KEY) === "open"; } catch { return false; }
+  });
+  const showDetails = useCallback((open: boolean) => {
+    setDetailsOpen(open);
+    try { localStorage.setItem(JOURNAL_DETAILS_KEY, open ? "open" : "closed"); } catch { /* private mode - fine */ }
+  }, []);
+  useEffect(() => { if (detailsOpen) detailsRef.current?.focus(); }, [detailsOpen]);
 
   // CT-12: the lens is a reading preference, so it survives leaving and returning to the mode — the same
   // sessionStorage discipline the composer draft uses, and for the same reason.
@@ -413,6 +444,7 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
             {nowLabel && <span className="codex-now-chip" title="The date a new record is given">Your date: {nowLabel}</span>}
             {nowLabel && <GmOnlyTag />}
             <Button variant="ghost" size="sm" onClick={() => (onOpenCalendar ? onOpenCalendar() : setCalendarOpen(true))}>Calendar</Button>
+            <Button variant="ghost" size="sm" aria-expanded={detailsOpen} aria-controls={JOURNAL_DETAILS_ID} onClick={() => showDetails(!detailsOpen)}>Details</Button>
             {editingId && <Button variant="ghost" size="sm" onClick={cancelEdit}>Cancel</Button>}
           </div>
         </div>
@@ -442,41 +474,29 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
             )}
           </div>
         )}
+        {/* Ruling 57: one body at a time, the page editor's own control and the page editor's own words
+            for the two layers. The player-facing label changes with the kind (an entry's "summary" is a
+            deadline's "what will happen"), so the switch carries the kind's word rather than a generic one. */}
+        <div className="codex-body-bar">
+          <SegmentedControl ariaLabel="Which layer to write" value={bodyTab} onChange={(value) => setBodyTab(value as ComposerBodyTab)}
+            options={[{ value: "player", label: COMPOSER_COPY[draft.kind].textLabel }, { value: "gm", label: "GM-only notes" }]} />
+          {bodyTab === "gm" && <GmOnlyTag />}
+        </div>
         {/* D13: the SAME writing surface a page body gets, so `[[links]]` typed into a journal entry
             autocomplete and join the connection graph instead of silently doing nothing. */}
-        <Field label={COMPOSER_COPY[draft.kind].textLabel} htmlFor="j-player">
-          <CodexEditor id="j-player" token={gmToken} value={draft.playerText} onChange={(playerText) => set({ playerText })}
-            ariaLabel={COMPOSER_COPY[draft.kind].textLabel} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder}
-            pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} rows={5} />
-        </Field>
-        <Field label={<span className="codex-composer-gm-label">GM-only notes <GmOnlyTag /></span>} htmlFor="j-gm">
-          <CodexEditor id="j-gm" token={gmToken} value={draft.gmText} onChange={(gmText) => set({ gmText })}
-            ariaLabel="GM-only notes" placeholder="Notes hidden from players"
-            pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} gmLayer rows={4} />
-        </Field>
-        <div className="codex-composer-meta">
-          {/* D9: a session is chosen by RECORD, not by typing a number. Renumbering then relabels every
-              entry with no journal write at all, and a hidden session's number can no longer leak. */}
-          <Field label="Session" htmlFor="j-session">
-            <Select id="j-session" value={draft.sessionId} onChange={(event) => set({ sessionId: event.target.value })}>
-              <option value="">None</option>
-              {sessions.map((session) => (
-                <option key={session.id} value={session.id}>{sessionTitle(session)}{session.id === activeSessionId ? " (active)" : ""}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Year" htmlFor="j-year"><Input id="j-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => set({ dateYear: event.target.value })} /></Field>
-          <Field label="Month" htmlFor="j-month"><Select id="j-month" value={draft.dateMonth} disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateMonth: event.target.value })}>{(calendar?.months ?? []).map((month, index) => <option key={index} value={String(index)}>{month.name}</option>)}</Select></Field>
-          <Field label="Day" htmlFor="j-day"><Input id="j-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateDay: event.target.value })} /></Field>
-          <Field label="Attach to page" htmlFor="j-page">
-            <Combobox id="j-page" options={pages.map((page) => ({ id: page.id, label: page.title }))} value={draft.attachPageId || null}
-              onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Attach to page" placeholder="None" />
-          </Field>
-        </div>
+        {bodyTab === "player"
+          ? <CodexEditor id="j-player" token={gmToken} value={draft.playerText} onChange={(playerText) => set({ playerText })}
+              ariaLabel={COMPOSER_COPY[draft.kind].textLabel} placeholder={COMPOSER_COPY[draft.kind].textPlaceholder}
+              pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} rows={7} />
+          : <CodexEditor id="j-gm" token={gmToken} value={draft.gmText} onChange={(gmText) => set({ gmText })}
+              ariaLabel="GM-only notes" placeholder="Notes hidden from players"
+              pages={shellPages} onNavigate={(target) => { const match = shellPages.find((page) => page.title.toLowerCase() === target.trim().toLowerCase()); if (match) onOpenPage(match.id); }} gmLayer rows={7} />}
         {/* A deadline's date is not optional metadata, it is half the record — so say so where the button
-            will not arm, rather than letting the GM discover it as a save failure. */}
+            will not arm, rather than letting the GM discover it as a save failure. The date now lives in
+            Details, so the sentence says where to go: a hint that names a control the GM cannot see is
+            worse than no hint. */}
         {needsDate && !draft.dateYear.trim() && (
-          <p className="codex-composer-hint">A deadline needs a date. It fires when your date passes it.</p>
+          <p className="codex-composer-hint">A deadline needs a date. Set the year, month and day under Details. It fires when your date passes it.</p>
         )}
         {/* CT-10's payload. Its own row, sharing the meta row's column rules so the composer keeps one
             grid rather than growing a second layout for three more fields. */}
@@ -515,24 +535,55 @@ export function JournalView({ gmToken, autosave, pages: shellPages, onOpenPage, 
             <p className="codex-composer-hint">A milestone records the level the party reached and when. It changes no character sheet and counts no XP. Leave the date blank to record it at your current date.</p>
           </>
         )}
-        {/* Its own full-width row rather than a cell in .codex-composer-meta: that row's `flex: 1 1 130px`
-            columns would squeeze a wrapping chip cloud into a 130px gutter on a phone. The composer is
-            also the edit surface, so this one control covers both the new-entry and the edit path. */}
-        <Field label="Tags" htmlFor="j-tags">
-          <TagInput id="j-tags" ariaLabel="Tags" placeholder="session-recap, downtime" values={draft.tags}
-            onChange={(next) => set({ tags: next })}
-            max={24} maxReachedReason="An entry may carry at most 24 tags."
-            suggestions={tagSuggestions}
-            /* DEFAULT slugify on purpose — it IS the server contract (`codex-store.ts` tags():
-               /^[a-z0-9][a-z0-9-]*$/, which throws rather than sanitising). Overriding it here would
-               let "Session Recap" through as a value the PATCH rejects with a generic save failure. */ />
-        </Field>
         <div className="codex-composer-foot">
           {/* O-2 / P2: a deadline and a downtime hide by default exactly as an entry does, and are
               revealed by this same switch. There is no kind-specific visibility anywhere. */}
           <RevealSwitch revealed={draft.revealed} onChange={(revealed) => set({ revealed })} ariaLabel="Show this entry to players" />
           <Button variant="primary" size="sm" disabled={!canSubmit} onClick={submit}>{editingId ? "Save entry" : COMPOSER_COPY[draft.kind].submit}</Button>
         </div>
+
+        {/* WHERE THIS RECORD IS FILED — the same panel, the same control and the same words as a page's
+            and a quest's. Held to the composer's own box rather than the viewport, so it reads as this
+            record's own detail and cannot collide with the shell's Session prep drawer. */}
+        {detailsOpen && (
+        <aside id={JOURNAL_DETAILS_ID} className="codex-editor-context scroll-y" aria-label="Entry details" tabIndex={-1} ref={detailsRef}
+          onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); showDetails(false); } }}>
+          <div className="codex-context-head">
+            <h3 className="codex-backlinks-title">Entry details</h3>
+            <IconButton label="Close entry details" size="sm" onClick={() => showDetails(false)}><IconX /></IconButton>
+          </div>
+          {/* D9: a session is chosen by RECORD, not by typing a number. Renumbering then relabels every
+              entry with no journal write at all, and a hidden session's number can no longer leak. */}
+          <Field label="Session" htmlFor="j-session">
+            <Select id="j-session" value={draft.sessionId} onChange={(event) => set({ sessionId: event.target.value })}>
+              <option value="">None</option>
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>{sessionTitle(session)}{session.id === activeSessionId ? " (active)" : ""}</option>
+              ))}
+            </Select>
+          </Field>
+          <div className="codex-composer-meta">
+            <Field label="Year" htmlFor="j-year"><Input id="j-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => set({ dateYear: event.target.value })} /></Field>
+            <Field label="Month" htmlFor="j-month"><Select id="j-month" value={draft.dateMonth} disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateMonth: event.target.value })}>{(calendar?.months ?? []).map((month, index) => <option key={index} value={String(index)}>{month.name}</option>)}</Select></Field>
+            <Field label="Day" htmlFor="j-day"><Input id="j-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateDay: event.target.value })} /></Field>
+          </div>
+          <Field label="Attach to page" htmlFor="j-page">
+            <Combobox id="j-page" options={pages.map((page) => ({ id: page.id, label: page.title }))} value={draft.attachPageId || null}
+              onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Attach to page" placeholder="None" />
+          </Field>
+          {/* The composer is also the edit surface, so this one control covers both the new-entry and the
+              edit path. */}
+          <Field label="Tags" htmlFor="j-tags">
+            <TagInput id="j-tags" ariaLabel="Tags" placeholder="session-recap, downtime" values={draft.tags}
+              onChange={(next) => set({ tags: next })}
+              max={24} maxReachedReason="An entry may carry at most 24 tags."
+              suggestions={tagSuggestions}
+              /* DEFAULT slugify on purpose — it IS the server contract (`codex-store.ts` tags():
+                 /^[a-z0-9][a-z0-9-]*$/, which throws rather than sanitising). Overriding it here would
+                 let "Session Recap" through as a value the PATCH rejects with a generic save failure. */ />
+          </Field>
+        </aside>
+        )}
       </Panel>
 
       {error && <Alert tone="danger">{error}</Alert>}

@@ -550,7 +550,7 @@ and rules, **no texture behind numbers a player reads mid-fight**.
 > density pass the sheet is being tightened, and a hero moment that quietly adds 40px has taken back
 > what that pass just won.
 
-### 46 — Codex entity kinds: colour as an accent only
+### 46 — Codex entity kinds: colour as an accent only — **OPEN, and the palette has no room**
 
 The kind badge and a leading rule take the hue; nothing sits behind text. Makes a long page list
 scannable without a second colour vocabulary.
@@ -559,6 +559,21 @@ scannable without a second colour vocabulary.
 > finished*, cyan is focus in daybreak, `--state-on` is *on*. **Entity-kind hues must come from
 > outside that set, or a badge will read as a state.** If the kind list outgrows the free hues, kinds
 > share a hue and the icon disambiguates — do not borrow a meaning-bearing colour to stretch the set.
+
+**Wave 4 measured the palette against the eight existing kinds and the escape clause is the only
+route left.** The kinds currently take magenta, magenta-hi, cyan, cyan-hi, violet, violet-hi, indigo
+and muted — and **the repo reserves violet exclusively for GM-only content**, a stronger reservation
+than this ruling listed and the one that bites hardest, because a violet kind badge would sit in the
+same row as a violet GM-only pill. That disqualifies six of the eight. `--indigo` is the only free
+accent in the palette.
+
+So: **all kinds share one hue and the icon disambiguates.** Not yet shipped — executing it re-hues
+every entity glyph app-wide (search results, campaign type cards, journal event rows) and the hue
+lives in `packages/ui/src/styles/design-tokens.css`, which no wave-4 lane owned. **Owed to wave 5**,
+where the palette is already open.
+
+The ruling's other half is already satisfied: nothing sits behind text today. Still missing is the
+kind badge and leading rule on the page-list row.
 
 ### 47 — List rows: hairline rules, no fill
 

@@ -198,6 +198,10 @@ describe("An event page is dated in the editor (CT-11)", () => {
   );
 
   beforeEach(() => {
+    // Ruling 11: a page's properties and its connections live in the summonable Details panel.
+    // These tests are about what the panel holds, not about summoning it, so the remembered
+    // preference is seeded open.
+    localStorage.setItem("codex-page-details", "open");
     updatePage.mockResolvedValue({ ...PAGE, rev: 4 });
     markersForPage.mockResolvedValue([]);
     forPage.mockResolvedValue([]);

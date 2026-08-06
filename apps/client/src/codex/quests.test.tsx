@@ -191,6 +191,9 @@ describe("The dashboard's open-quests card (M10)", () => {
     const log = within(await screen.findByRole("navigation", { name: "Quests" }));
     await waitFor(() => expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true"));
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
+    // Ruling 57: a quest wears the page editor's shape, so one body is on screen at a time. The GM half
+    // is one switch away and still the record's own text, not a second copy of it.
+    await user.click(screen.getByRole("button", { name: "GM notes" }));
     expect(screen.getByRole("textbox", { name: /GM notes/ })).toHaveValue("The vestiges are still bargaining.");
 
     // The card is a view: one read for the whole workspace, and no write anywhere on the way here.
@@ -245,6 +248,8 @@ describe("The GM's objective checklist (M10)", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Quests" })[0]);
     await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
+    // Ruling 11/57: everything that is not the writing lives behind Details.
+    await user.click(await screen.findByRole("button", { name: "Details" }));
     const list = within(await screen.findByRole("list", { name: "Objectives" }));
     expect(list.getAllByRole("checkbox")).toHaveLength(2);
 
@@ -272,6 +277,7 @@ describe("The GM's objective checklist (M10)", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Quests" })[0]);
     await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
+    await user.click(await screen.findByRole("button", { name: "Details" }));
     await screen.findByRole("list", { name: "Objectives" });
     // G6: THE regression this milestone's autosave exists for — a tick used to be lost unless the GM
     // also pressed Save, on the one surface where the tick IS the work.
