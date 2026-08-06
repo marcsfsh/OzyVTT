@@ -11,7 +11,7 @@ import { socket } from "../socket";
 import "./replay.css";
 
 /**
- * **Replays (A8 / D25–D27).** Every finished fight, kept — and now reachable by both roles.
+ * **Replays (A8 / D25–D27).** Every finished fight is kept, and reachable by both roles.
  *
  * The GM gets the list (with the per-replay reveal control, hidden by default), the viewer, and
  * *Launch from here*. A player gets exactly the replays the GM shared, rendered from the **player
@@ -448,14 +448,16 @@ export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm
     <header className="replay-list-head neon-beam">
       {onBack && <Button variant="ghost" className="replay-list-back" onClick={onBack}><IconChevronLeft /> Back to the table</Button>}
       <h2>Replays</h2>
-      <p>{role === "gm" ? "Every finished fight, kept." : "The fights your GM has shared with the party."}</p>
+      {/* The player's line only. A GM knows what their own replay list is; a player needs to know
+          why theirs may be short, and that is the one fact this row is worth its height for. */}
+      {role === "player" && <p>The fights your GM has shared with the party.</p>}
       {error && <p className="replay-error">{error}</p>}
     </header>
     <div className="replay-list-body scroll-y frame-fill">
     {archives === null && <p>Loading replays…</p>}
     {/* A scene moment (§9), and one with no door: this list fills itself when a fight ends. */}
     {archives !== null && archives.length === 0 && !error && <div className="scene-empty">
-      <p>{role === "gm" ? "No replays yet — every fight that ends is kept here." : "Your GM hasn’t shared a fight yet."}</p>
+      <p>{role === "gm" ? "No replays yet. Every fight that ends is kept here." : "Your GM hasn’t shared a fight yet."}</p>
     </div>}
     {archives !== null && archives.length > 0 && <ul className="replay-rows">
       {archives.map((archive) => {

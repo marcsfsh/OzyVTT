@@ -17,7 +17,19 @@
 .scene-prep-pick:hover { border-color: var(--line-hover); background: var(--surface-2); }
 .scene-prep-pick strong { font-size: .8rem; }
 .scene-prep-pick small { color: var(--text-muted); font-size: .68rem; }
-.scene-prep-recent > summary { min-height: var(--tap-min); display: flex; align-items: center; color: var(--text-dim); font-size: .76rem; font-weight: 800; cursor: pointer; }
+/* A DISCLOSURE HAS TO LOOK LIKE ONE. `Recent (6)` already carries its count, but the row was a bare
+   bold label: no border, no background, and `display: flex` on a <summary> suppresses the native
+   ::marker outright — so it read as a heading over a list you scroll to, not a control you click.
+   It takes the shape this codebase already uses for a native <details> inside a panel (the Size-styled
+   conditions disclosure, encounter-map.css:328-331): a bordered, padded row with the caret pushed to
+   the far edge, so the whole 44px row is one obvious target under a finger as well as a pointer.
+   Click-to-expand is kept — pre-collapsed is D3's decision, this is only its affordance. */
+.scene-prep-recent > summary { min-height: var(--tap-min); display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .3rem .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text-dim); font-size: .76rem; font-weight: 800; cursor: pointer; list-style: none; }
+.scene-prep-recent > summary::-webkit-details-marker { display: none; }
+.scene-prep-recent > summary::after { content: "▾"; color: var(--text-muted); font-weight: 400; }
+.scene-prep-recent[open] > summary::after { content: "▴"; }
+.scene-prep-recent > summary:hover { border-color: var(--line-hover); background: var(--surface-2); color: var(--text); }
+.scene-prep-recent > summary:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
 .scene-prep-recent[open] > summary { margin-bottom: .3rem; }
 .scene-prep-note { margin: 0; padding: .3rem .1rem; color: var(--text-muted); font-size: .72rem; }
 .scene-prep-footer { display: flex; flex-direction: column; gap: .45rem; padding-top: .2rem; border-top: 1px solid var(--line); }

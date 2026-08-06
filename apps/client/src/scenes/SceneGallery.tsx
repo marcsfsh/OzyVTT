@@ -44,7 +44,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
   onManageMaps?: () => void;
   /** Called after Prepare / Go live — used to close the picker popup on the Encounter tab. */
   onClose?: () => void;
-  /** Hide the "GM PREP / Scenes" header (the picker popup carries its own title). */
+  /** Hide the "Scenes" header row (the picker popup carries its own title). */
   hideHeading?: boolean;
   /**
    * This instance IS the Scenes surface: it owns the pane's frame (§7) — heading and command bar
@@ -151,10 +151,12 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
         this same component is the Scenes modal's body, and a sky there would stack a second scene
         over the table's chrome. */}
     {surface && <div className="pane-sky" aria-hidden="true" />}
+    {/* The head is a ROW (scene-gallery.css:4): the helper rides the heading's baseline instead of
+        claiming a row of its own, and the eyebrow is gone — "GM PREP" over "Scenes" on the GM's own
+        tab said nothing the tab bar had not already said. */}
     {!hideHeading && <div className={`scene-gallery-head${surface ? " neon-beam" : ""}`}>
-      <span className="eyebrow">GM PREP</span>
       <h2 id="scene-gallery-heading">Scenes</h2>
-      <p>Build your fights ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>
+      <p>Prepare fights before the table.</p>
     </div>}
     {scenes.length > 0 && <div className="scene-gallery-bar">
       <Button variant="primary" arrow onClick={onNewScene}>New scene</Button>
@@ -164,7 +166,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
       /* A scene moment (§9): one line and one door. The old dashed box carried a title, two
          sentences and a decorative glyph — three of the four said the same thing. */
       ? <div className="scene-empty">
-          <p>No scenes prepared yet — pick a map, stage who’s in it, then go live.</p>
+          <p>No scenes prepared yet. Pick a map, stage who’s in it, then go live.</p>
           <Button variant="primary" arrow onClick={onNewScene}>New scene</Button>
         </div>
       /* The REGION is this wrapper, never the grid itself: a grid with a definite block size

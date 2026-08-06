@@ -1,9 +1,13 @@
 /* GM scene-prep hub — the gallery of prepared scenes. The cards, grid, and live/staging states all
    come from the shared @vtt/ui `.nh-gallery` / `.nh-card` pattern; this file is just the hub frame. */
 .scene-gallery-hub { display: flex; flex-direction: column; gap: var(--space-4); }
-.scene-gallery-head { display: flex; flex-direction: column; gap: var(--space-1); }
+/* A ROW, not a stack. The head used to be three stacked rows (eyebrow, heading, a two-line helper);
+   the eyebrow is gone and the helper is one short clause, so it rides the heading's baseline and
+   costs the card grid nothing. `flex-wrap` is deliberate: below ~560px the helper returns to its
+   own row, which is correct where the vertical budget is not the question. */
+.scene-gallery-head { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); }
 .scene-gallery-head h2 { margin: 0; color: var(--text); font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h1); }
-.scene-gallery-head p { margin: var(--space-1) 0 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.scene-gallery-head p { margin: 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 
 /* Command bar above the gallery — the primary "New scene" action (and Manage maps) always in reach. */
 .scene-gallery-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); }

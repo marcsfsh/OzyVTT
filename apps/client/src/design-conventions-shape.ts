@@ -107,17 +107,17 @@ export const CONVENTION_SHAPE = {
    */
   eyebrowSourceFloor: 100,
   /**
-   * Local `eyebrow` class token in a `className`: **15** uses in **14** files. Measured
-   * 2026-08-03 at 20/16; the shell rebuild (D15/D30) took five with it — the landing's eyebrow
-   * (D30 removes the subtext outright), the deleted lobby roster's two, the Roster tab's, and
-   * the player bar's, which renders `<Eyebrow>` now.
-   * This is the TOKEN count, not `\beyebrow\b`, which measures 35 on the same tree because
+   * Local `eyebrow` class token in a `className`: **8** uses in **7** files. Measured
+   * 2026-08-06; round 2's copy trim took three — the Scenes tab's "GM PREP", the same eyebrow
+   * repeated in the New-scene modal directly above a heading that already said the word, and
+   * the dice panel's "DICE" over "Roll dice". Was 11/10 after the shell rebuild, 20/16 before it.
+   * This is the TOKEN count, not `\beyebrow\b`, which measures higher on the same tree because
    * `\b` matches at a hyphen and sweeps in the different class `viewer-eyebrow` (x4, the public
    * shared screen). Its sibling `viewer-tools-eyebrow` retired 2026-08-05 when the shared-screen
    * controls took `<Eyebrow>`. That one is the viewer rebuild's problem, not this scan's.
    */
-  eyebrowUses: 11,
-  eyebrowFiles: 10,
+  eyebrowUses: 8,
+  eyebrowFiles: 7,
   /**
    * `.eyebrow` selectors still in `apps/client/src/styles.css`: **1** — the declaration alone.
    * The second, `.you-are-playing .eyebrow`, went when the player bar moved to `<Eyebrow>`. The

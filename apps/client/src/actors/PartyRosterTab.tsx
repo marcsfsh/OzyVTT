@@ -133,8 +133,10 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
   return <section className="party-roster pane-frame pane-scene scanlines frame-col anim-view">
     <div className="pane-sky" aria-hidden="true" />
     <div className="party-heading neon-beam">
-      <h2>The party</h2>
-      <p>Every character on the table — create, import, approve, archive.</p>
+      {/* "Roster" is the settled word (main.tsx's tab table, the address, the party strip); the old
+          "The party" heading was the drift. The helper under it listed the four buttons directly
+          below it, so it narrated the UI instead of describing the tab, and is gone. */}
+      <h2>Roster</h2>
       <div className="party-heading-actions">
         {onCreateCharacter && <Button variant="primary" onClick={onCreateCharacter}>Create a character</Button>}
         <Button onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>

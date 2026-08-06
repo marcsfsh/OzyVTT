@@ -56,12 +56,15 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, stagingDefaults, o
   };
 
   return <section className="scene-panel" aria-labelledby="scene-panel-heading">
-    <div className="scene-panel-heading"><div><span className="eyebrow">GM PREP</span><h2 id="scene-panel-heading">Prepare a scene</h2></div><p>A scene is a map plus who is on it. Arrange it privately, then make it live when the table is ready.</p></div>
+    {/* No eyebrow: "GM PREP" sat directly above "Prepare a scene" and said the same word twice.
+        The helper stays — it carries the two-layer fact and a dialog is not short of height. */}
+    <div className="scene-panel-heading"><div><h2 id="scene-panel-heading">Prepare a scene</h2></div><p>A scene is a map plus who is on it. Arrange it privately, then make it live when the table is ready.</p></div>
 
     <form className="scene-create" onSubmit={(event) => { event.preventDefault(); create(); }}>
       <label>Scene name <span className="scene-create-optional">(optional)</span><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder={sceneMap ? sceneMap.name : "Goblin ambush"} /></label>
+      {/* No `heading`: "On this map" restated the map row directly under it. The prop stays optional
+          on ScenePrepPanel — SceneBuilder still passes "In this scene", EncounterPanel passes none. */}
       <ScenePrepPanel
-        heading="On this map"
         actors={actors}
         staged={staged}
         onAdd={(actorId) => setStaged((current) => current.includes(actorId) ? current : [...current, actorId])}

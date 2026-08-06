@@ -101,7 +101,10 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
 
   return <section className="dice-proof" aria-labelledby="dice-proof-heading">
     <div className="dice-heading">
-      <div><span className="eyebrow">DICE</span><h2 id="dice-proof-heading">Roll dice</h2></div>
+      {/* No eyebrow: "DICE" over "Roll dice" was a second line saying the first line's word, in a
+          docked panel where every row is paid for. The `id` stays — the section's `aria-labelledby`
+          above is this heading, and losing it would be an accessibility regression, not a trim. */}
+      <div><h2 id="dice-proof-heading">Roll dice</h2></div>
       <label className="dice-visibility">Who sees it?<Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>{visibilityOptions.map((value) => <option key={value} value={value}>{ROLL_VISIBILITY_WORD[value]}</option>)}</Select></label>
     </div>
     {/* The per-browser roll-input preference, mirrored from (and in lockstep with) the character sheet's
