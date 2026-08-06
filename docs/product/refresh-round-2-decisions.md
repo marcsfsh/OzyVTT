@@ -591,6 +591,39 @@ top of a session-start-linked document is the only place that reliably does.
 
 ---
 
+## Addendum — decisions raised during implementation
+
+Discovery closed at 60. These came out of the bug-fix plan, which flagged them as questions it had no
+authority to answer. They are client rulings and carry the same weight as the sixty above.
+
+### 61 — A6: a real new tab, and the password prompt is accepted
+
+The obstacle was real and is not a bug: **the GM token is deliberately memory-only and never
+persisted**, so any new tab starts with no credential. The client accepted the honest consequence.
+
+`/settings/api` becomes a real address — bookmarkable, deep-linkable, full window width — and "open in
+a new tab" lands on the app's own GM sign-in card, which takes the password once.
+
+> **The three alternatives were rejected on the same grounds and should not be revisited:** the token
+> in the URL (lands in history and referrers), the token in `localStorage` (a direct reversal of the
+> memory-only decision, for a documentation page), and a `window.opener` `postMessage` handshake (new
+> mechanism, new attack surface, still copies the credential into a second document). Authenticating
+> on the *player* token the way `sheet.html` does was measured and works — and was rejected because it
+> silently fails on a GM-only browser, which is the exact machine the GM reads this page on.
+
+The *shape* of the reference is a separate problem and is not closed by this: at roughly 31,700px it
+is a 36-screen document with no navigation, and full width does not make that readable. It needs a
+table of contents, per-group collapse or a filter — design work, not a bug fix.
+
+### 62 — The roster heading becomes "Roster"
+
+A naming drift, not a copy trim: the tab is labelled `Roster` — recorded as the deliberately settled
+word, matching its address and the party strip — while the page heading said `The party`. **The
+heading is the drift, so the heading moves.** This touches the play-vocabulary lock, so it lands as a
+naming change with the lock's corpus re-measured, not as helper text.
+
+---
+
 ## Director's rulings made without spending a client question
 
 These were decided by the director on the record, because they are contracts rather than taste:
