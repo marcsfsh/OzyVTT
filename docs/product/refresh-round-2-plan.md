@@ -1,6 +1,6 @@
 # Refresh round 2 — the client's feedback, categorized, and the plan to work it
 
-**Status:** intake complete, awaiting go-ahead. Nothing in here is implemented.
+**Status:** waves 1-5 landed 2026-08-06; phase 3 QA in progress. Category A and B are shipped; C, D and E are shipped except where a ruling below is marked open.
 **Read this when:** picking up the round-2 work, or after a context compaction lost the thread.
 
 This document exists because the work below spans many sessions and the plan must outlive any one

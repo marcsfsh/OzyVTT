@@ -1,6 +1,6 @@
 # Refresh round 2 — the client's rulings, in order
 
-**Status:** discovery complete — **60 rulings, all settled.** Nothing here is implemented.
+**Status:** discovery closed at **66 rulings**. Waves 1-5 landed 2026-08-06 and phase 3 QA is in progress; individual rulings carry their own delivery notes.
 **Read this when:** implementing any part of round 2, or when a choice looks arbitrary and you are
 about to "improve" it. Most of these rulings overrode a director recommendation, and several
 deliberately reverse an earlier written decision.

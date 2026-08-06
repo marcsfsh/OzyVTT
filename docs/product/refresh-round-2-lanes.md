@@ -1,6 +1,6 @@
 # Refresh round 2 — the implementation plan
 
-**Status:** planning complete, nothing implemented. This is phase 1's deliverable.
+**Status:** all five waves landed 2026-08-06 (see the per-wave sections below). Phase 3 QA in progress; phases 4-6 pending.
 **Read this with** `docs/product/refresh-round-2-plan.md` (what the work is) and
 `docs/product/refresh-round-2-decisions.md` (what was decided and why, and the acceptance bar).
 
