@@ -1167,6 +1167,31 @@
 .codex-sidebar.is-rail { padding-inline: var(--space-1); }
 .codex-sidebar.is-rail .codex-navitem,
 .codex-sidebar.is-rail .codex-sidebar-search { justify-content: center; padding-inline: 0; }
+/* ONE RAIL, ONE CENTRE LINE. The 56px track minus its border and `--space-1` padding is a 46px
+   content box, and three things used to land on three different columns in it — measured
+   2026-08-06, GM /codex at 1440x900, rail collapsed:
+     rail content centre  44.0   the truth
+     ⌘K search glyph      44.0   outside the scroller, so already correct
+     the 13 nav icons     39.0   inside `.scroll-y`, whose `scrollbar-gutter: stable` spends 11px
+                                 of 46 on a gutter — 5.0px left of the rail it lives in
+     collapse chevron     52.2   `.codex-sidebar-foot` is `flex-end` and nothing re-centred it here
+   The chevron is the one that gets reported, because it is the only thing below the icons; the
+   glyph-vs-icons disagreement is the same defect and nobody had ever looked at it.
+   `scrollbar-gutter: stable` earns its keep on a wide region whose content grows and shrinks. Here
+   the content is a fixed list of destinations, so there is no jitter to prevent and the reservation
+   only buys a bent column. Taking it out of the flow and centring the foot puts all three on 44.0
+   with no engine-dependent constant: `stable both-edges` would also re-centre, but it halves the
+   nav item's paint from 36px to 24px, and matching the foot DOWN to 39.0 means hard-coding
+   `::-webkit-scrollbar`'s 11px, which is a different number under Firefox's `scrollbar-width: thin`.
+   THE COST, stated rather than buried: the rail has no visible scrollbar. It overflows only on short
+   windows — measured 0px at >=850px viewport height (1920x1080, 1440x900, 1280x900, 800x900), 75px
+   at 1366x768, 143px at 1280x700 — and wheel, trackpad, touch, keyboard and focus-scroll-into-view
+   are all unaffected. Precedent for hiding a bar on a narrow strip: Tabs.css:6, Steps.css:41.
+   Keyed on `.is-rail`, which both shells put on the <nav> for BOTH rail paths (the GM's collapse
+   preference and the forced 761–849 band), so no new `@media` rung is needed. */
+.codex-sidebar.is-rail .codex-sidebar-groups { scrollbar-width: none; scrollbar-gutter: auto; }
+.codex-sidebar.is-rail .codex-sidebar-groups::-webkit-scrollbar { display: none; }
+.codex-sidebar.is-rail .codex-sidebar-foot { justify-content: center; }
 
 .codex-navdrawer .nh-drawer-body { padding: var(--space-2); }
 /* D24: the prep drawer is NEVER a full-screen takeover, at any width — 15% of the surface behind it

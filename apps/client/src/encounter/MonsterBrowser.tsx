@@ -35,7 +35,23 @@ export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEn
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * A SET, not one id. A single in-flight marker meant `disabled={busyId !== null}` greyed all 330
+   * Add buttons for one row's round trip, and a second click overwrote the first row's marker.
+   * Concurrency is what a GM staging four monsters wants, and it is safe: every
+   * `actor:add-from-definition` creates a new actor and carries its own `commandId`.
+   */
+  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(() => new Set());
+  /**
+   * What has landed during THIS dialog session. The confirmation line says which monster went in;
+   * this says which ROWS have, which is the half that stops a distracted GM adding the same monster
+   * three times before noticing the first one worked. It resets with the dialog, because the
+   * component unmounts when it closes.
+   *
+   * Deliberately not named `setMessage`/`setFeedback`: this is a per-row mark, not a second feedback
+   * channel, and the one-channel check collides with those two names on purpose.
+   */
+  const [addedIds, setAddedIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     socket.emit("content:monsters", {}, (result) => {
@@ -53,10 +69,10 @@ export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEn
   }, [monsters, search]);
 
   const add = (monster: ContentMonsterSummary) => {
-    setBusyId(monster.id);
+    setBusyIds((current) => new Set(current).add(monster.id));
     socket.emit("actor:add-from-definition", { commandId: newId(), definitionId: monster.id, visibility, ...(joinEncounter ? { joinEncounter: true } : {}) }, (result) => {
-      setBusyId(null);
-      if (result.ok && result.actorId) onAdded?.(result.actorId);
+      setBusyIds((current) => { const next = new Set(current); next.delete(monster.id); return next; });
+      if (result.ok && result.actorId) { setAddedIds((current) => new Set(current).add(monster.id)); onAdded?.(result.actorId); }
       setFeedback(result.ok
         ? `${monster.name} is in the staging tray${visibility === "gm-only" ? ", GM only" : ""}.`
         : result.message ?? "The monster could not be added.");
@@ -72,8 +88,8 @@ export function MonsterBrowser({ onClose, onAdded, visibility = "public", joinEn
     {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}
     {monsters && <ol className="monster-browser-list scroll-y">
       {shown.map((monster) => <li key={monster.id}>
-        <div className="monster-browser-name"><strong>{monster.name}</strong><small>CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}</small></div>
-        <button type="button" className="monster-browser-add" disabled={busyId !== null} onClick={() => add(monster)}>{busyId === monster.id ? "Adding…" : "Add"}</button>
+        <div className="monster-browser-name"><strong>{monster.name}{addedIds.has(monster.id) && <span className="monster-browser-added">Added</span>}</strong><small>CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}</small></div>
+        <button type="button" className="monster-browser-add" disabled={busyIds.has(monster.id)} onClick={() => add(monster)}>{busyIds.has(monster.id) ? "Adding…" : "Add"}</button>
       </li>)}
       {shown.length === 0 && <li className="monster-browser-none">No monsters match "{search}".</li>}
     </ol>}

@@ -931,7 +931,20 @@
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }
 .encounter-add-monsters { width: 100%; min-height: var(--tap-min); margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); color: var(--text); }
-/* Monster browser renders in the shared Modal, sized for a scrollable list. */
+/* Monster browser renders in the shared Modal, sized for a scrollable list.
+   THE DIALOG IS THE FRAME (§7), and until now it was not. `.nh-modal-body` is `display: block`
+   (Modal.css:92), so the list's `flex: 1 1 auto` below had no flex parent and had never done
+   anything: the list rendered its full height — measured 20,538px for 330 SRD monsters at
+   1920x1080 — the BODY did the scrolling, and the `role="status"` confirmation line under the list
+   went with it, to y = 20,891 in a 1080px window. A GM added a monster and nothing visible happened.
+   The body becomes the column and the list becomes the region, so the search, the target line, the
+   confirmation and the attribution are all pinned and the list scrolls inside the height the modal
+   surface already caps (`max-height: min(88vh, 48rem)`, Modal.css:26). NO new cap and no new
+   `overflow`: a `max-height` here would be a number re-tuned per viewport and would fight the
+   surface's own contract, and `.scroll-y` is already on the <ol> in the markup, which is what
+   check (h) requires and why it stays there. Precedent: `.codex-preview-modal .nh-modal-body`,
+   codex.css:1114. */
+.monster-browser .nh-modal-body { display: flex; flex-direction: column; }
 .monster-browser-controls { display: flex; flex-direction: column; gap: .5rem; margin-top: .2rem; }
 .monster-browser-controls input[type="search"] { margin-top: 0; padding: .6rem .8rem; }
 /* Where an add lands and what it will be — read-only here; the staging tray owns the decision. */
@@ -939,12 +952,24 @@
 .monster-browser-target strong { color: var(--text); }
 /* `.scroll-y` rides this in MonsterBrowser's markup (check (h)); the modal's own height contract is
    what gives the region something to fill. */
-.monster-browser-list { flex: 1 1 auto; list-style: none; margin: .8rem 0 0; padding: 0 .25rem 0 0; border-top: 1px solid var(--line); }
+.monster-browser-list { flex: 1 1 auto; min-height: 0; list-style: none; margin: .8rem 0 0; padding: 0 .25rem 0 0; border-top: 1px solid var(--line); }
 .monster-browser-list li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .1rem; border-bottom: 1px solid var(--line); }
 .monster-browser-name { min-width: 0; }
 .monster-browser-name strong { display: block; }
 .monster-browser-name small { display: block; margin-top: .15rem; color: var(--text-muted); }
-.monster-browser-add { flex: none; padding: .5rem .95rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: center; cursor: pointer; }
+/* The row's own answer to "did my first click work?" — the confirmation line says WHICH monster
+   landed, this says WHICH ROWS have. Quiet by construction: it must not read as a second Add. */
+.monster-browser-added { margin-inline-start: .5rem; color: var(--cyan); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+/* Reserve the wider of the two labels so the button does not slide. Measured 2026-08-06 in Chromium
+   at 1920x1080: "Add" 59.7px, "Adding…" 90.4px — the left edge moved 30.8px out and back on every
+   add, which is most of what read as "a glitch". 5.65rem = 90.4px at the 16px root, and rem rather
+   than px so it tracks the label when the root size does.
+   `StableSwap` (packages/ui/src/primitives/StableSwap.tsx) is the right primitive for this and
+   argues against exactly this hand-tuned min-width — but it is not exported from `@vtt/ui`, and
+   exporting it trips the styleguide-completeness ratchet ("exported but not demoed: 0") and needs a
+   StyleGuide demo. A shared-package change for one button width is out of proportion; when
+   StableSwap is exported, this site should collect. */
+.monster-browser-add { flex: none; min-width: 5.65rem; padding: .5rem .95rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: center; cursor: pointer; }
 .monster-browser-add:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .monster-browser-none { color: var(--text-muted); }
 .monster-browser-status { color: var(--text-dim); margin: 1rem 0 0; }
