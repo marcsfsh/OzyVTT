@@ -11,7 +11,22 @@
 /* Wrap, don't crush: on a narrow surface (the viewer sidebar) the dots/health tag drop to a second
    line instead of squeezing the name down to one letter; the name still ellipsizes past ~8ch. */
 .init-row-name-line { display: flex; align-items: center; gap: .4em; min-width: 0; flex-wrap: wrap; row-gap: .1em; }
-.init-row-caret { flex: none; color: var(--magenta-hi); font-size: .85em; }
+/* RULING 36 — THE ROW LIGHTS WHEN THE TURN ARRIVES, ONCE.
+   The caret is rendered only for the active entry (`{entry.active && ...}` in InitiativeList.tsx),
+   so it MOUNTS on the turn change and a one-shot animation on a freshly-mounted element runs exactly
+   once, with no state to track and no way to become a repeating alarm. Both surfaces that render
+   this row get it — the player's panel on a phone and the shared screen — and the map token pulses
+   in the same beat (`encounter-turn-pulse`, encounter-map.css). That pairing is the ruling's point:
+   a player looking at the map misses a list-only highlight, and that is the exact moment they most
+   need to notice. Verified on a phone as a PLAYER, not from the GM's seat. */
+.init-row-caret { flex: none; color: var(--magenta-hi); font-size: .85em; animation: init-turn-flare .6s var(--ease-settle, ease-out) 1; }
+@keyframes init-turn-flare {
+  0%   { opacity: 0; transform: translateX(-.5em) scale(.7); text-shadow: none; }
+  45%  { opacity: 1; transform: translateX(0) scale(1.35); text-shadow: 0 0 .5em var(--magenta); }
+  100% { opacity: 1; transform: translateX(0) scale(1); text-shadow: none; }
+}
+/* Frozen, not removed: the caret still marks the active row, it just arrives without the flare. */
+@media (prefers-reduced-motion: reduce) { .init-row-caret { animation: none; } }
 .init-row-name { color: var(--text); font-size: 1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 8ch; }
 .init-row-you { flex: none; padding: .05em .4em; border-radius: .35em; background: var(--cyan); color: var(--text-on-neon); font-size: .62em; font-weight: 800; letter-spacing: .05em; }
 .init-row-health { flex: none; font-size: .78em; font-weight: 800; }

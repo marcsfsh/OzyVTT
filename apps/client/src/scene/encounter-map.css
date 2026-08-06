@@ -23,7 +23,47 @@
 .tray-token.npc { background: color-mix(in srgb, var(--surface-3) 58%, var(--indigo)); }
 .tray-token.npc > span { background: color-mix(in srgb, var(--indigo) 48%, var(--void)); }
 .tray-token.hidden { border-style: dashed; opacity: .76; }
-.encounter-map-stage { --dock-side-width: 22rem; position: relative; flex: 1; min-height: 12rem; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); touch-action: none; }
+/* RULING 30 — THE STAGE IS FRAMED AS AN INSTRUMENT: a 2px rim and four corner ticks.
+   The rim is the material's own edge (--rim-w / --rim-color), replacing the 1px --line hairline,
+   so the map plate reads as a piece of chrome rather than a div with a border. RULING 22 IS
+   UNTOUCHED: nothing is painted BEHIND the map — the stage keeps its flat --void plate, and the
+   ticks paint in FRONT, at the four corners of the frame, where no token, fog rectangle or ruler
+   ever needs to be read. The table's sky belongs on the chrome AROUND this box, never inside it. */
+.encounter-map-stage { --dock-side-width: 22rem; position: relative; flex: 1; min-height: 12rem; display: grid; place-items: center; overflow: hidden; border: var(--rim-w) solid var(--rim-color); border-radius: var(--radius-md); background: var(--void); touch-action: none; }
+/* The corner ticks. One pseudo carrying EIGHT background layers — two bars per corner, an L each —
+   because `::after` is the only pseudo this element has spare and eight gradients cost one box.
+   (`::before` is deliberately left free: `.tap-target::after` and `.scanlines::after` are spoken
+   for app-wide and the material utilities use `::before`; nothing here may collide with either.)
+
+   POINTER-EVENTS: NONE IS THE RULING, NOT A PRECAUTION. This box spans the whole stage, so without
+   it the ticks would swallow every press on the map — a token drag, a fog stroke, a ruler pull. The
+   map's own hit-testing is not negotiable; verified with elementFromPoint on all four corners and
+   the centre, and with a real token drag, after this landed.
+
+   z-index 1 puts them over the map svg (z-index auto) and under everything that is a control: the
+   dock (2), the toolbar overlay (3), the tray and shape editor (4), the open phone rail (5). */
+.encounter-map-stage::after {
+  content: "";
+  position: absolute;
+  inset: var(--space-1);
+  z-index: 1;
+  pointer-events: none;
+  --map-tick-len: 1.1rem;
+  --map-tick-w: 2px;
+  --map-tick: linear-gradient(var(--rim-color-hi), var(--rim-color-hi));
+  background-image: var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick);
+  background-repeat: no-repeat;
+  background-size:
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len);
+  background-position:
+    left top, left top,
+    right top, right top,
+    left bottom, left bottom,
+    right bottom, right bottom;
+}
 /* No viewport cap. `max-height: min(72vh, 680px)` was the single biggest reason the table outgrew its
    pane: 72vh of MAP plus the rows above and below it is more than 100vh of surface, so the taller the
    screen the worse it got. The stage takes the frame's leftover height and the svg fills it; the
@@ -45,7 +85,44 @@
    variants below — keep all three scoped or the next glyph added to the stage inherits the bug. */
 .encounter-map-stage > svg { display: block; width: 100%; height: 100%; background: var(--void); user-select: none; }
 .encounter-map-stage > p { padding: var(--space-8); text-align: center; }
-.encounter-token { outline: none; }
+/* RULING 37 — A SELECTED TOKEN WEARS CORNER BRACKETS, NEVER A SECOND RING.
+   Rhymes with the stage's corner ticks above, and it is a collision fix, not a flourish: a token
+   can already wear an HP ring (`.token-health-ring-*` at the bottom of this file — the element wave
+   1 stopped from painting a solid disc), and two concentric rings on one token at phone size is
+   unreadable. Brackets and rings never compete for the same edge.
+
+   HOW, WITHOUT TOUCHING THE MARKUP. The token `<g>` holds no spare element to draw a bracket on
+   (mapImage.tsx: turn ring, body, portrait-or-initials, name), and SVG shapes generate no
+   ::before/::after — so the bracket has to be made out of the body's OWN rim. `clip-path` takes
+   four bites out of the rim at north/east/south/west and what survives is four corner arcs.
+
+   PERCENTAGES, DELIBERATELY. On an SVG element a basic-shape `clip-path` resolves against the
+   fill box (the object bounding box), so one polygon is correct for a Medium token and a
+   Gargantuan one, at every zoom — which a `stroke-dasharray` cannot be: the dash pattern would have
+   to be a fraction of 2πr, and CSS cannot read r. The outline runs -20%..120% so the stroke, which
+   lies half OUTSIDE the fill box, is not shaved everywhere it is not being bitten.
+
+   THE BITES COST HIT AREA, AND THE NUMBER IS MEASURED, NOT ESTIMATED. clip-path clips hit-testing
+   as well as paint. Sampled with elementFromPoint on a 120x120 grid over a 57px token at 375px,
+   a selected token answers on 87.0% of its disc against 100% with the clip off — 13.0 points, all
+   of it in the outer ninth of the diameter, none of it within 78% of the radius. That is the honest
+   trade and it is bounded three ways: it applies ONLY while a token is selected, neither selected
+   state is a drag state (`:focus-visible` is a keyboard user who moves with arrow keys; `.targeted`
+   is already selected), and both states had already replaced the team-coloured rim with a state
+   colour, so nothing that carried meaning is lost. The centre and a real drag were checked too.
+
+   THE HUE IS NEUTRAL OR A STATE HUE, NEVER THE HEALTH BAND. `--hp-band` is set on the health
+   INDICATOR element, not on the token group, so a bracket cannot read it from a sibling; making it
+   possible means lifting the band class onto the `<g>` in mapImage.tsx, which is a markup change
+   this rule deliberately does not make. */
+.encounter-token {
+  outline: none;
+  --token-bracket-cut: polygon(
+    -20% -20%, 30% -20%, 30% 11%, 70% 11%, 70% -20%, 120% -20%,
+    120% 30%, 89% 30%, 89% 70%, 120% 70%, 120% 120%,
+    70% 120%, 70% 89%, 30% 89%, 30% 120%, -20% 120%,
+    -20% 70%, 11% 70%, 11% 30%, -20% 30%);
+}
 .encounter-token.movable { cursor: grab; }
 .encounter-token.dragging { cursor: grabbing; opacity: .82; }
 /* Token bodies: team coding (§6.6) — allies cyan, enemies magenta, neutrals indigo. Glyph fills stay
@@ -54,11 +131,46 @@
 .encounter-token.monster .encounter-token-body { fill: color-mix(in srgb, var(--magenta) 40%, var(--void)); stroke: var(--magenta-hi); }
 .encounter-token.npc .encounter-token-body { fill: color-mix(in srgb, var(--indigo) 45%, var(--void)); stroke: var(--violet-hi); }
 .encounter-token.hidden .encounter-token-body { stroke-dasharray: 6 4; opacity: .72; }
-/* Active turn on the map = magenta ring + glow, no motion (§6.6). */
-.encounter-token-turn { fill: rgb(255 46 154 / 18%); stroke: var(--magenta); stroke-width: 5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%)); }
-.encounter-token-initials, .encounter-token-name { pointer-events: none; fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: var(--font-body); font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
+/* Active turn on the map = magenta ring + glow, and — RULING 36 — ONE pulse when it arrives.
+   An event, not an alarm: `1` iteration, no repeat, and the ring is left at rest afterwards. It
+   ties the initiative list to the map, which is the whole point — a player watching the map misses
+   a list-only highlight, and that is the exact moment they most need to notice.
+
+   IT FIRES ON ITS OWN, WITH NO STATE TO TRACK. The ring `<circle>` is rendered only while the token
+   is active (mapImage.tsx `{active && ...}`), so it MOUNTS on the turn change and a CSS animation on
+   a freshly-mounted element runs exactly once. Nothing has to remember whose turn it was.
+
+   `transform-box: fill-box` is required, not decoration: an SVG element's default transform-box is
+   the view-box, so `transform-origin: center` without it would scale the ring about the centre of
+   the whole battle map. `.annotation-ping-ring` sets the same pair for the same reason. */
+.encounter-token-turn { fill: rgb(255 46 154 / 18%); stroke: var(--magenta); stroke-width: 5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%)); transform-box: fill-box; transform-origin: center; animation: encounter-turn-pulse .72s var(--ease-settle, ease-out) 1; }
+@keyframes encounter-turn-pulse {
+  0%   { transform: scale(.72); opacity: 0; }
+  38%  { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+/* Frozen, not removed: the ring still appears, it just does not move. The information a player needs
+   ("this token is up") is carried by the ring itself; the pulse only draws the eye to it. */
+@media (prefers-reduced-motion: reduce) { .encounter-token-turn { animation: none; } }
+/* THE TOKEN LAYER'S OWN INK, hoisted to a property so two rules can share one literal.
+   It is a literal on purpose and the file's COLOR_ALLOW row already says why: this layer sits on
+   arbitrary map ART, not on a themed surface, so it is deliberately light-on-dark-outline in every
+   theme and `--text` (which inverts to dark ink in daybreak) would be wrong. Hoisting it also keeps
+   the file's literal count where the ratchet pins it — the selection bracket below reads this
+   instead of typing a second `#fff`.
+   The list carries `.replay-token` because the replay canvas renders the same glyph classes inside
+   its OWN group (ReplayPanel.tsx:107), so a property declared only on `.encounter-token` would not
+   reach it and the replay's initials would lose their fill. */
+.encounter-token, .replay-token, .encounter-token-initials, .encounter-token-name { --token-ink: #fff; }
+.encounter-token-initials, .encounter-token-name { pointer-events: none; fill: var(--token-ink); text-anchor: middle; dominant-baseline: central; font-family: var(--font-body); font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
 .encounter-token-name { dominant-baseline: hanging; }
-.encounter-token.movable:focus-visible .encounter-token-body { stroke: var(--cyan); stroke-width: 6; }
+/* Keyboard selection — the first of the two selected states, and the one a GM reaches by Tab.
+   THE HUE MOVED FROM --cyan TO --token-ink, AND THE MEASUREMENT IS THE REASON. `--cyan` is also
+   the healthy `--hp-band`, so cyan brackets sitting 3px inside a cyan HP ring merged into one thick
+   notched ring — screenshotted side by side at a 57px token on a 375px phone before the change.
+   The token layer's own white separates them at a glance and can never collide with a band (cyan /
+   magenta / danger). It reuses the ink hoisted above rather than typing a second literal. */
+.encounter-token.movable:focus-visible .encounter-token-body { stroke: var(--token-ink); stroke-width: 6; clip-path: var(--token-bracket-cut); }
 .encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
 .encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
 /* Keep the scene cluster clear of a left/right docked panel by moving it to the opposite corner. */
@@ -151,7 +263,61 @@
 /* Open, the rail outranks the token tray (z-index 4) so it can use the whole stage height instead of
    being painted behind it. Closed, it stays under — the tray is the thing you are reading then. */
 .encounter-map-overlay.compact.open { z-index: 5; }
-.map-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: .35rem; max-width: 100%; padding: var(--space-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 88%, transparent); }
+/* ── RULING 38 — THE MAP'S INSTRUMENTS TAKE THE FULL MATERIAL ──
+   Ruler, ping and fog live in this bar, and the client's words were "full identity, fog included".
+   So the bar, its group panel and the phone rail stop being bordered boxes over the map and become
+   chrome: 2px rim, inner bezel, cut corner, scanline over a plate.
+
+   HAND-ROLLED, NOT `.rim .bezel .chamfer`. Those utilities are applied as CLASSES in markup, and
+   `MapToolbar.tsx` is not this lane's file.
+
+   AND THE CUT IS A MASK HERE, NOT THE UTILITY'S BACKING LAYER — MEASURED, NOT PREFERRED.
+   `.chamfer::before` is `position: absolute; inset: 0; z-index: -1`, which makes it part of the
+   SCROLLED CONTENT of any consumer that is a scroll container. Two of these four are: the group
+   panel and the phone rail both carry `.scroll-y`. Opening the rail's Fog section scrolls it
+   (measured `scrollTop: 198` of `scrollHeight: 585` at 375px) and the whole plate — fill, rim and
+   bezel — scrolled off the top with it, leaving the switch and its note sitting on bare map. That
+   is a latent bug in the shared utility, not in this file; it is reported rather than patched
+   there, because `packages/ui/src/styles/design-tokens.css` is another lane's.
+
+   `mask-image` is the right tool and it is STRICTLY SAFER than the backing layer on the point that
+   matters. Ruling 14/49 forbids `clip-path` on anything that is or contains a tap target because
+   clipping clips HIT-TESTING; masking does not — verified with elementFromPoint on both cut corners
+   of a masked 44px control, which still answer. Backgrounds do not scroll with content, so the
+   plate stays put. The two gradients are the two cut corners; `mask-composite: intersect` takes
+   both. The stop is `--chamfer / √2` because a gradient's stops are measured along its own axis and
+   the cut line sits that far from the corner, not `--chamfer` far. The gradients use `currentColor`
+   rather than a black literal: only the ALPHA is read by a mask, and a literal here would spend a
+   row of the colour ratchet on a colour nothing can see.
+
+   WHAT IT COSTS: a masked element paints no box-shadow and no drop-shadow — both are outside the
+   border box, so the mask removes them (verified side by side). The panel and rail therefore trade
+   `--shadow-2` for the 2px rim and an opaque plate, which is what separates them from the map now.
+
+   THE PLATE GOES UP FROM 88% TO 94% OPAQUE, and that is what buys the scanline. A 3px texture over
+   a 12%-transparent plate is a texture over MAP ART, which is both a moiré risk (ruling 28's whole
+   subject) and a legibility cost on the one bar a GM uses mid-fight. Ruling 31's principle applies
+   to the panels below for the same reason: nothing textured sits behind a field being edited. */
+.map-toolbar, .map-toolbar-panel, .map-toolbar-rail, .map-toolbar-toggle {
+  --chamfer-mask-stop: calc(var(--chamfer) / 1.4142);
+  -webkit-mask-image:
+    linear-gradient(135deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop)),
+    linear-gradient(315deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop));
+  mask-image:
+    linear-gradient(135deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop)),
+    linear-gradient(315deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop));
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  border: var(--rim-w) solid var(--rim-color);
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.map-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: .35rem; max-width: 100%; padding: var(--space-1); border-radius: var(--radius-md); background: var(--material-scanline), linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 94%, transparent), color-mix(in srgb, var(--surface-1) 94%, transparent)); }
+/* Ruling 40: the rim brightens on interaction, and PRESS carries the same information as hover —
+   half the devices at this table have no hover at all. The bar itself is not a control, so only the
+   phone's `Tools` button takes the state. */
+.map-toolbar-toggle:hover, .map-toolbar-toggle:focus-visible, .map-toolbar-toggle:active, .map-toolbar-toggle[aria-expanded="true"] { border-color: var(--rim-color-hi); }
 /* 2.75rem of paint — the 44px floor carried as REAL paint (route 1), not the primitive's 2.25rem
    plus overhang. Measured before this: every bar button painted 40px tall at ≥561px while the
    phone rail's rows painted 44, and a `.tap-target` overhang a QA pass cannot see is a floor a
@@ -175,7 +341,11 @@
 /* One open group at a time, in one bounded surface: never a second row of floating icons. It
    shrinks to whatever height the stage leaves and scrolls inside itself — `.scroll-y` in
    MapToolbar's markup declares that (check (h)); the `inset` on the overlay gives it the height. */
-.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: var(--space-2); padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
+/* The group panel takes the material too, minus the texture: ruling 31 — nothing textured ever sits
+   behind text a person is reading or editing, and this panel is where the fog radius, the ruler
+   units and the colour well are set. Rim, bezel and cut; a flat opaque plate, no shadow (see the
+   mask note above for why a masked surface cannot carry one). */
+.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: var(--space-2); padding: .6rem .7rem; border-radius: var(--radius-md); background: var(--surface-2); overscroll-behavior: contain; }
 .map-toolbar-panel-title { margin: 0; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
 .map-toolbar-panel .nh-field, .map-toolbar-panel-body .nh-field { gap: .2rem; }
 .map-toolbar-field { font-size: .78rem; }
@@ -200,9 +370,12 @@
 .map-toolbar-custom-colour { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 2.75rem; color: var(--text-dim); font-size: .72rem; }
 .map-toolbar-custom-colour input { width: 3rem; height: 2.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); }
 /* The phone rail: the same three tools and the same three groups, every row icon + words. */
-.map-toolbar-toggle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 92%, transparent); color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; cursor: pointer; }
-.map-toolbar-toggle[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
-.map-toolbar-rail { min-height: 0; width: min(17rem, 100%); display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
+/* The phone's one door onto the toolbar. It is a tap target, so the cut is a MASK and its 2.75rem of
+   real paint is untouched — route 1, the same as every other control in here. `tap-audit.mjs 375`
+   is the check that this stayed true, and it is unchanged by this block. */
+.map-toolbar-toggle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .7rem; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 94%, transparent); color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.map-toolbar-toggle[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); }
+.map-toolbar-rail { min-height: 0; width: min(17rem, 100%); display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border-radius: var(--radius-md); background: var(--surface-2); overscroll-behavior: contain; }
 .map-toolbar-rail-tools { display: flex; flex-direction: column; gap: .15rem; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
 .map-toolbar-rail-section + .map-toolbar-rail-section { border-top: 1px solid var(--line); }
 .map-toolbar-row { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 2.75rem; padding: .3rem var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; text-align: left; cursor: pointer; }
@@ -320,10 +493,39 @@
 .hp-fill-healthy { --hp-band: var(--cyan); }
 .hp-fill-bloodied { --hp-band: var(--magenta); }
 .hp-fill-down { --hp-band: var(--danger); }
-/* Manual fog of war: --void veil (§6.5). The GM sees a dim veil (everything stays workable); players get solid cover. */
-.fog-overlay-gm { fill: var(--void); fill-opacity: .45; }
-.fog-overlay-player { fill: var(--void); }
-.fog-stroke-preview { fill-opacity: .18; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+/* ── RULING 38 — FOG TAKES THE IDENTITY, AND THE CONSTRAINT IS THE RULING ──
+   Manual fog of war (§6.5). The GM sees a veil (everything stays workable); players get solid cover.
+
+   1. THE EDGE STAYS HARD, AND IT IS HARD BY CONSTRUCTION. The boundary is an SVG `<mask>`
+      (mapImage.tsx `FogOverlay`) — a binary alpha cut with no feather anywhere in it. Identity is
+      allowed in the FILL and nowhere else: no blur, no drop-shadow, no soft edge, ever. "Is this
+      square hidden?" is a rules-visible fact, not a judgement call, and the moment the boundary
+      softens it becomes one. Nothing below touches `mask`, `filter` or `stroke` on the overlay.
+
+   2. FOG IS A MASS; THE RULER AND THE PING ARE THIN NEON STROKES. `.encounter-move-line`,
+      `.annotation-measurement line` and `.annotation-ping-ring` are 3–4px strokes that glow and
+      (for the ping) pulse. Fog is a filled rectangle that neither strokes nor moves. Different
+      weight, different behaviour, no shared silhouette — so the identity pass must not give fog a
+      neon outline, which is the obvious way to break this.
+
+   3. THE TWO FOG STATES MUST STAY OBVIOUSLY DIFFERENT, because a GM who cannot tell at a glance
+      what their players can see reveals something by accident. This is projection-adjacent, not
+      decoration. So they differ on TWO axes at once, not one: the GM's is translucent AND violet,
+      the player's is opaque AND neutral. Violet is the repo's reserved "GM-only / hidden from the
+      table" hue — the same one `.fog-stroke-hide` already paints the hide-stroke preview with — so
+      the veil now says WHY it is there instead of only dimming. The player's cover stays a flat
+      --void plate with no hue at all: it is not a state a player reads, it is an absence.
+
+   TEXTURE IN THE FILL IS NOT REACHABLE FROM CSS and is reported rather than faked. An SVG `fill`
+   takes a paint server, not a CSS gradient, so a fog hatch/gradient needs a `<pattern>` in
+   mapImage.tsx's `FogOverlay` — markup this lane does not own. Hue and value are the identity that
+   CSS alone can carry here, and neither of them can soften the edge. */
+.fog-overlay-gm { fill: color-mix(in srgb, var(--void) 72%, var(--violet)); fill-opacity: .48; }
+.fog-overlay-player { fill: var(--void); fill-opacity: 1; }
+/* The live fog stroke while it is being dragged. It reads as a MASS being placed, not a line being
+   drawn (ruling 38's second bullet): the fill carries it and the dashed edge only says "not
+   committed yet". At .18 it was a tinted outline and sat in the same visual family as the ruler. */
+.fog-stroke-preview { fill-opacity: .3; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .fog-stroke-reveal { fill: var(--cyan); stroke: var(--cyan); }
 .fog-stroke-hide { fill: var(--violet); stroke: var(--violet-hi); }
 
@@ -337,7 +539,9 @@
 /* Click-to-target: rings while a targeting session is live. Targetable = subtle cyan invite; targeted = danger ring (§6.6). */
 .encounter-token.targetable { cursor: crosshair; }
 .encounter-token.targetable .encounter-token-body { stroke: var(--cyan-hi); stroke-dasharray: 5 4; }
-.encounter-token.targeted .encounter-token-body { stroke: var(--danger); stroke-width: 6; stroke-dasharray: none; }
+/* The second selected state: a token picked as a target. Brackets, per ruling 37 — the danger hue
+   already stood in for the team rim here, so the corners carry it and no ring is added. */
+.encounter-token.targeted .encounter-token-body { stroke: var(--danger); stroke-width: 6; stroke-dasharray: none; clip-path: var(--token-bracket-cut); }
 .encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: var(--space-2) .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); font-size: .85rem; }
 /* Center the transient overlays over the MAP area, not the whole stage — when the tracker is docked
    into the stage, half the width is the dock, so a plain 50% would sit over the initiative list. */
