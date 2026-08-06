@@ -155,6 +155,40 @@ instruction, which is the outcome the rules ask for:
 
 ---
 
+## Wave 2 — the material exists now
+
+**Lane 2A landed the vocabulary.** `--state-on` (three themes), `--rim-w`, a reworked `.chamfer`,
+`.rim`, `.bezel`, `.cue`, scrollbar tokens, `--font-numeric`, and a de-pilled `.nh-card`. The contract
+names shipped exactly as specified, so nothing downstream has to be renamed.
+
+**Three things every later lane needs, and cannot see from its own files:**
+
+1. **`.chamfer` paints BEHIND the content.** An element with its own background gets a square fill
+   under a cut outline. For any filled surface use **`.chamfer.chamfer`** — the doubled class wins at
+   (0,2,0), zeroes `background` and `border-color`, and moves the fill to **`--material-fill`**.
+   Setting `background` on a chamfered element is the mistake this note exists to prevent.
+2. **`::after` is spoken for twice** — `.tap-target`'s 44px hit area and `.scanlines`' 11 consumers.
+   The material uses `::before` only. **Reaching for `::after` on anything carrying `.tap-target`
+   destroys a hit area.**
+3. **`.chamfer` / `.rim` / `.bezel` / `.cue` all set `isolation: isolate`,** which makes the element a
+   stacking context. Any surface relying on an absolutely-positioned popover escaping above a sibling
+   needs a `z-index` lift once it takes the material. `.nh-card` already had this for its open menu;
+   wave 5's surfaces will not.
+
+**A regression 2A introduced and caught before shipping**, recorded because the next person to touch
+scrollbars will meet it: `scrollbar-color` inherits and `scrollbar-width` does not. Declaring both on
+`:root` made every `.scroll-y` compute `auto` while the inherited colour disabled `::-webkit` sizing,
+and **every scroll gutter in the app went 10px → 15px**. The fix is `*, *::before, *::after`. Related:
+when `scrollbar-width` is not `auto`, Chromium **ignores** `::-webkit-scrollbar` entirely, so the
+standard properties are what paint and the webkit block is a fallback that must be kept in step.
+
+**Owed, and owned by nobody yet:** `apps/client/src/styleguide/StyleGuide.tsx` needs a section
+demoing `.chamfer` / `.rim` / `.bezel` / `.cue` / `.numeric`. Without one the material is the only
+part of the design vocabulary with no reference entry, which is how a utility ends up re-invented
+per surface. **Assign it to wave 5A.**
+
+---
+
 ## Debts a wave hands to a later one
 
 Recorded here because a debt agreed in a commit message and nowhere else is a debt nobody pays.

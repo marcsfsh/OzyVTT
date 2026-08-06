@@ -82,6 +82,20 @@ Mechanically this is a **state-only token whose value varies per theme** — `--
 times in `packages/ui/src/styles/design-tokens.css`. The token means "on"; each theme picks the hue
 that reads best against its own surfaces.
 
+**Shipped values (wave 2, measured):** dark `#FF2E9A`, dusk `#FF9E4A`, light **`#0B6497`**.
+All three clear 3:1 filled against every surface tier, as this ruling assumed.
+
+> **Light moved, and the reason is the one thing that outranks the palette.** The obvious choice was
+> the theme's usual cyan `#0F7FC0`. It clears 3:1 filled — but **no ink clears 4.5 on it**: white
+> reads 4.36, body text 4.12. So the light value is the deeper cyan twin, which reads 6.39 against
+> white. Still cyan, as the client asked. Do not "restore" it toward the lighter one; daybreak is
+> where legibility is absolute. A side benefit: it loosens the focus-ring collision below.
+>
+> **All three are literals, not aliases.** Dusk deliberately matches today's `--caution` hue, because
+> ruling 7 keeps the hue and lets shape carry the distinction — but it does not *reference* the
+> caution token, so a future severity retune cannot silently move a state colour. That is what keeps
+> this ruling and ruling 39 from fighting.
+
 Three collisions came out of this, all resolved by ruling 7. Contrast was never the problem — all
 three clear 3:1 filled:
 
@@ -528,14 +542,23 @@ fill and colour. Consistent with ruling 24, which put the same corner on badges,
 > **Re-run `scripts/tap-audit.mjs` after this lands** — it is the single change most able to silently
 > shrink hit areas app-wide.
 
-### 50 — Game numbers: a distinct face with tabular figures
+### 50 — Game numbers: a distinct face with tabular figures — **the face is Space Mono, and the stated example was wrong**
 
-HP, AC, initiative and dice totals. **The tabular half is functional, not decorative** — a value going
-from `44` to `9` currently reflows the row it sits in, and these are the values that change most
-during a fight. The face half is free character on the numbers people watch most.
+HP, AC, initiative and dice totals. Applies to *game* numbers, not every digit; counts and page
+numbers stay in the body face so the distinction keeps meaning something.
 
-Applies to *game* numbers, not every digit. Counts and page numbers stay in the body face, so the
-distinction keeps meaning something.
+**Two corrections from wave 2, both measured:**
+
+- **The arcade face cannot do this.** Russo One ships **no `tnum` feature** — `font-variant-numeric:
+  tabular-nums` changes nothing on it, and its `1` is 60% the width of its `0`. Bungee likewise. The
+  only tabular non-body face already on disk is **Space Mono**, so `--font-numeric` is Space Mono 700.
+  A purpose-built arcade numeric face would be a new font dependency, which is a bigger change than
+  this ruling authorises.
+- **The `44` → `9` example is not a tabular problem.** That loses a digit, so the row moves whatever
+  the figures do. Tabular buys `44` ↔ `11` and an exact `1ch`. What actually stops the reflow is a
+  **`min-width` in `ch` units** reserving the widest expected value — the mechanism is documented
+  beside the token. The ruling's intent (numbers that change must not shift the row) stands; the
+  mechanism named in it does not deliver it alone.
 
 ### 51 — The whole chrome carries the role hue
 

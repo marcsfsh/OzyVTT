@@ -84,6 +84,31 @@
   --danger-hi: #FF6B8E;
   --info: var(--indigo);
 
+  /* ---- STATE: ON (ruling 4) ----
+     The segmented control's ON fill. A STATE token whose VALUE varies per theme: the token
+     means "on"; each theme picks the hue that reads best against its own surfaces. Defined
+     three times — here (night), in the dusk block and in the light block.
+
+     WRITTEN AS LITERALS, NOT ALIASES, and that is ruling 39: `--caution` keeps its own meaning
+     (warning / not finished) and "must not be borrowed by the segmented on-state in dusk". An
+     alias would make a severity retune silently move a state colour. The palette hue each value
+     matches is named beside it so nobody thinks it drifted.
+
+     THE HUES ARE SHARED ON PURPOSE and the collisions are real — ruling 7 resolves all three by
+     SHAPE, not by hue: the segmented group takes the corner cut and the on option a leading tick,
+     a silhouette neither the Switch nor the focus ring has. Do not "fix" a collision here by
+     changing a value; the distinction lives in SegmentedControl.css.
+
+     Measured 2026-08-06 (WCAG 2.1, sRGB) as a FILL against this theme's three surfaces —
+     the bar is 3:1 (SC 1.4.11, non-text), and the label on the fill is held to 4.5:1. */
+  /* Night: --magenta #FF2E9A. Fill 5.32 / 4.92 / 4.37 on --surface-1/2/3 (5.66 on --bg).
+     --text-on-neon #0C0A18 on the fill: 5.70. */
+  --state-on: #FF2E9A;
+  /* The label ON the fill. `--text-on-neon` clears 4.5 in all three themes on these values
+     (5.70 night / 8.80 dusk / 6.39 daybreak), so this is an alias and stays one — it is the
+     same "dark ink on a bright fill" decision, not a second one. */
+  --state-on-ink: var(--text-on-neon);
+
   /* Text */
   --text: #ECEAFB;
   --text-dim: #A8A2CC;
@@ -115,6 +140,12 @@
   /* Ambient shadows (dark, for resting elevation) */
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.50);
+  /* Elevation as a FILTER — the drop-shadow twin of --shadow-2, for chamfered surfaces, the
+     same reason the --glow-drop-* set exists: box-shadow cannot follow a clip-path cut, and on
+     a cut card a square shadow shows through the notch. The blur is HALVED because the two
+     properties measure it differently — drop-shadow's radius is the Gaussian sigma, box-shadow's
+     is twice it — so 24px of box-shadow reads as 12px of drop-shadow, not 24. */
+  --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.50));
 
   /* Texture (retro screen surface) */
   --grid-line: rgba(255, 46, 154, 0.16);
@@ -381,6 +412,24 @@
   --font-display: "Russo One", system-ui, sans-serif;
   --font-body: "Manrope", system-ui, sans-serif;
   --font-mono: "Space Mono", ui-monospace, "Courier New", monospace;
+  /* GAME NUMBERS (ruling 50) — HP, AC, initiative, dice totals. Counts and page numbers stay in
+     the body face, so the distinction keeps meaning something. Spend it through `.numeric`.
+
+     THE TABULAR HALF IS FUNCTIONAL, and it decided the face. Measured 2026-08-06 in Chromium at
+     32px, digit advances 0-9 across all four bundled families:
+       Russo One (the arcade face this ruling reads as asking for) — 12.97 to 21.45px, and
+         `font-variant-numeric: tabular-nums` changes NOTHING: the face ships no `tnum`. A `1` is
+         60% the width of a `0`. It cannot carry this ruling.
+       Bungee — 19.23 to 23.27px, no `tnum` either.
+       Manrope (the body face) — proportional (12.48-19.86) but `tnum` works, giving 19.84 flat.
+       Space Mono — 19.59px flat by construction, with or without the feature.
+     So the only face on disk that is BOTH tabular and not the body face is Space Mono. It is
+     `--font-mono` too, which is why `.numeric` sets weight 700: the mono face at 400 is already
+     spoken for by table/meta data, and 700 is what makes a game number read as its own thing.
+     A genuinely separate arcade-numeric face is a `packages/ui/package.json` + `fonts.css`
+     change and belongs to whoever owns those files, not to a token. */
+  --font-numeric: "Space Mono", ui-monospace, "Courier New", monospace;
+  --fw-numeric: 700;
 
   --fs-display: 34px;
   --fs-h1: 26px;
@@ -422,6 +471,81 @@
      box-shadow — box-shadow cannot follow a clip-path cut. */
   --chamfer: .6rem;
   --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+
+  /* ---- THE MATERIAL (rulings 2, 40, 64) ----
+     The landing door, expressed as tokens a surface anywhere can take. Phase 0 measured that
+     five of the door's six pieces have ZERO call sites outside `.choices`, so this is a BUILD,
+     not a reuse: the rim, the bezel, the cue and the chamfer had nothing for another surface to
+     inherit. The utilities that spend these live in the §9 block further down.
+
+     RULING 2 SPLITS THE USE and that is why the glow is a token of its own rather than part of
+     the rim: hero surfaces (Roster, Scenes, empty states, not-found, the builder gate) take the
+     full door INCLUDING the rest glow; every other surface takes the material WITHOUT it. A rim
+     that glowed by default would spend the restraint rule's budget on every panel in the app. */
+  --rim-w: 2px;
+  /* The rim: a neon-tinted structural edge, well above `--line-strong` (1.63 on --surface-2 —
+     an edge nobody sees). Derived from --cyan/--line-strong so the sunset hour comes free;
+     DAYBREAK OVERRIDES IT, because ruling 29 asks for a daylight TRANSLATION and an inverted
+     neon is a pale line on a pale ground. Measured 2026-08-06 (WCAG 2.1) against
+     --surface-1/2/3: night #3780AC reads 4.22 / 3.90 / 3.47, dusk #5B9DDA 4.84 / 4.23 / 3.58.
+     Both clear the 3:1 non-text bar on every surface in their theme. */
+  --rim-color: color-mix(in srgb, var(--cyan) 42%, var(--line-strong));
+  /* Interaction (ruling 40): the rim BRIGHTENS. Night #32AFD4 7.15 / 6.61 / 5.88, dusk #45BEEC
+     6.54 / 5.72 / 4.83. Hover is not the only route to it — the utility fires this on
+     :hover, :focus-visible AND :active, because half the table's devices have no hover. */
+  --rim-color-hi: color-mix(in srgb, var(--cyan) 70%, var(--line-strong));
+  /* The rest glow, separable (ruling 2) and DERIVED FROM THE RIM, so a hero that repaints
+     --rim-color gets a glow in its own hue for free. A filter, never a box-shadow: box-shadow
+     cannot follow a clip-path cut and the material is cut. Daybreak GROUNDS instead of blooming
+     — the rule the --glow-drop-* set already follows in the light theme. */
+  --rim-glow:
+    drop-shadow(0 0 6px color-mix(in srgb, var(--rim-color) 62%, transparent))
+    drop-shadow(0 0 18px color-mix(in srgb, var(--rim-color) 34%, transparent));
+  /* The bezel: the second, quieter outline just inside the rim, like a cabinet bezel. The
+     landing draws it as `1px solid currentColor` at `opacity: .22`, so it is currentColor here
+     too — a bezel belongs to whatever ink the surface is already using, in every theme at once.
+     --bezel-inset must stay >= --chamfer / 2 (4.8px at the default cut) or the ring's corner
+     lands outside the cut and gets clipped to a notch. */
+  --bezel-color: color-mix(in srgb, currentColor 22%, transparent);
+  --bezel-inset: calc(var(--rim-w) + 3px);
+  /* The cue: the small solid triangle that appears on hover/focus/press. Drawn as a conic wedge
+     rather than a clip-path so it can ride a BACKGROUND LAYER — `::before` is the material's
+     backing layer and `::after` belongs to `.tap-target`, whose 44px hit area is not negotiable.
+     The 225deg/90deg pair is exact only while --cue-w is half --cue-h; keep the ratio if you
+     retune the size. currentColor, like the landing's. */
+  --cue-w: .45rem;
+  --cue-h: .9rem;
+  --cue-inset: .95rem;
+  --cue-mark: conic-gradient(from 225deg at 100% 50%, currentColor 0 90deg, transparent 0);
+  /* The fill. --material-fill is the KNOB a consumer sets (it inherits, like any custom
+     property, so a nested surface picks up its ancestor's unless it sets its own); --material-*
+     below are the ready-made values. Default `transparent`: a utility that repainted every
+     surface it touched would be un-composable, and ruling 2 hands the fill to the surface.
+     "Scanline-over-gradient" (ruling 2) is `var(--material-scanline), var(--material-plate)` —
+     exactly how the landing door stacks it. In daybreak the scanline resolves through
+     --scanline-color to a faint paper texture, which is ruling 29's translation, not an
+     exemption. Note this is NOT the `.scanlines` utility: that one is a full-surface CRT
+     overlay with 11 app consumers and ruling 28 scopes it to the outermost panel. */
+  --material-fill: transparent;
+  --material-plate: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  --material-scanline: repeating-linear-gradient(to bottom,
+    transparent 0 calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) var(--scanline-gap));
+
+  /* ---- SCROLLBARS (ruling 44) ----
+     A thin neon track, ALWAYS VISIBLE, never hover-revealed. Discoverability is the functional
+     half of the ruling: "is this region scrollable?" has been a recurring real problem, and a
+     permanently visible track answers it without inventing an affordance. The track is a
+     centred hairline so an empty gutter still reads as a rail; the thumb rides it.
+     Style the track and the thumb — never replace the scroller with a custom widget, because
+     keyboard and assistive behaviour come from the real one.
+     Two blessed exceptions, both on the record: `Tabs.css` hides its bar because its edge-fade
+     mask is a BETTER discoverability signal on a phone, and the Codex rail owes wave 4B one. */
+  --scrollbar-w: 11px;
+  --scrollbar-track: color-mix(in srgb, var(--rim-color) 40%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--cyan) 55%, var(--line-strong));
+  --scrollbar-thumb-hi: var(--rim-color-hi);
 
   /* Layout (§7) — the frame's shared dimensions, seeded 2026-08-04 from the live values
      they will replace; the shell lock and the recomposes consume them phase by phase.
@@ -477,6 +601,14 @@
   /* D21 #2: dusk inherits the dark theme's warm-orange caution pair — #FFB877 measures
      8.24 / 7.20 / 6.08 on the sunset surfaces, so it needs no override of its own. */
 
+  /* STATE: ON, definition 2 of 3 (ruling 4) — the sunset orange. Measured 2026-08-06 as a fill:
+     6.82 / 5.96 / 5.03 on --surface-1/2/3 (7.66 on --bg); --text-on-neon #16132C on it, 8.80.
+     THIS IS DELIBERATELY NOT `var(--caution)` even though the value matches today's caution.
+     Ruling 39 keeps caution's meaning (warning / not finished) unborrowed; ruling 7 keeps the
+     hue and gives the on-state a silhouette instead. Both hold only while this is its own
+     value: alias it and a caution retune becomes a state-colour change nobody asked for. */
+  --state-on: #FF9E4A;
+
   --text: #F0EEFB;
   --text-dim: #C4BEE2;
   /* D21 #1. Was #938CB6 — 3.80 / 3.27 / 2.72 on the old lifted surfaces. #C2BBE0 measures
@@ -488,6 +620,7 @@
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.34);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.42);
+  --shadow-drop-2: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.42));
 
   --grid-line: rgba(255, 46, 154, 0.16);
   --scanline-color: rgba(0, 0, 0, 0.14);
@@ -545,6 +678,33 @@
   --danger-hi: #E24C6C;
   --info: var(--indigo);
 
+  /* STATE: ON, definition 3 of 3 (ruling 4) — daybreak's cyan, at the DEEP twin's value.
+     Ruling 4 asserts all three clear 3:1 filled and all three do; what it did not check is the
+     LABEL on the fill, and that is what moved this value. Measured 2026-08-06: on --cyan
+     #0F7FC0 the best available ink reads 4.36 (--text-on-neon #FFFFFF) and 4.12 (--text
+     #17132E) — no ink clears the 4.5 floor on that fill, so the fill had to deepen, and the
+     light theme already keeps a deepened cyan for exactly this reason (see --cyan-hi's note
+     above: on a pale ground the READABLE twin is the darker one). At #0B6497 the fill reads
+     6.21 / 5.80 / 5.41 on --surface-1/2/3 (5.65 on --bg) and white ink on it reads 6.39.
+     Still cyan, and it drops half of ruling 4's third collision as a bonus: the focus ring and
+     --line-hover stay on --cyan, one value away. */
+  --state-on: #0B6497;
+
+  /* THE MATERIAL, translated (ruling 29): same geometry, daylight values. The rim stops being a
+     lit line and becomes a HARD DARK one — an inverted neon is a pale edge on a pale ground,
+     which is the failure this ruling names. Measured 2026-08-06 against --surface-1/2/3:
+     rest #3B547E reads 7.40 / 6.92 / 6.45; the interaction state moves by CHROMA rather than
+     luminance (--cyan #0F7FC0, 4.23 / 3.96 / 3.69 — still over the 3:1 non-text bar), because
+     "the rim brightens" cannot mean "the rim gets lighter" on a white surface.
+     The glow grounds instead of blooming, and the bezel firms up a little: currentColor here is
+     deep ink, so 22% of it is a paler line than 22% of night's near-white. */
+  --rim-color: #3B547E;
+  --rim-color-hi: var(--cyan);
+  --rim-glow: drop-shadow(0 1px 4px color-mix(in srgb, var(--rim-color) 34%, transparent));
+  --bezel-color: color-mix(in srgb, currentColor 30%, transparent);
+  --scrollbar-thumb: #3B547E;
+  --scrollbar-thumb-hi: var(--cyan);
+
   --text: #17132E;      /* deep indigo ink */
   --text-dim: #4A4568;
   /* D21 #1. Was #726C90 — 5.02 / 4.70 / 4.38: it passed on --surface-1 and failed on the
@@ -570,6 +730,7 @@
 
   --shadow-1: 0 1px 2px rgba(23, 19, 46, 0.08);
   --shadow-2: 0 10px 30px rgba(23, 19, 46, 0.12);
+  --shadow-drop-2: drop-shadow(0 10px 15px rgba(23, 19, 46, 0.12));
 
   --grid-line: rgba(200, 29, 128, 0.14);
   --scanline-color: rgba(23, 19, 46, 0.05);
@@ -591,6 +752,24 @@ body {
 /* Numbers that update live (HP, initiative, totals) */
 .tabular {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* GAME numbers (ruling 50) — HP, AC, initiative, dice totals. Not counts, not page numbers:
+   those stay in the body face so the distinction keeps meaning something. See --font-numeric
+   for why this face and not the arcade one.
+
+   TABULAR FIGURES ARE NOT THE WHOLE FIX, and the ruling's own example is the case that proves
+   it: `44` -> `9` loses a DIGIT, so the string is genuinely narrower and the row still moves,
+   tabular or not. What tabular buys is two things, both measured on this rule at 20px:
+   (a) `44` and `11` are both 24.484px, so a same-length change no longer jitters — in the body
+   face they are 24.4px apart; (b) `1ch` is exactly one digit advance (12.25px), because every
+   advance here is equal, so a slot can reserve its width honestly. Reserve it at the widest
+   value the field can hold — `min-width: 3ch` for HP, `2ch` for AC — and the row stops moving
+   for good: measured, that slot holds 36.719px at "9" and 36.734px at "144". */
+.numeric {
+  font-family: var(--font-numeric);
+  font-weight: var(--fw-numeric);
   font-variant-numeric: tabular-nums;
 }
 
@@ -705,15 +884,129 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
   -webkit-backdrop-filter: blur(8px) saturate(1.15);
 }
 
-/* Chamfered panel (§9): the landing doors' cut, generalized — panels, cards, feature
-   tiles, status tags and the primary/danger buttons wear it; secondary controls stay
-   plain squares. Rules: glow rides the --glow-drop-* FILTERS (box-shadow is clipped by
-   the cut); a focus ring must be an INSET outline (outline-offset ≤ -5px) because an
-   outer ring is clipped too; and never put the cut on a control that relies on
-   .tap-target — clip-path clips hit-testing, so the extended ::after area would die. */
-.chamfer {
-  clip-path: var(--chamfer-cut);
-  border-radius: 0;
+/* ============================================================
+   THE MATERIAL — the landing door as four composable utilities
+   (rulings 2, 14, 29, 40, 49, 64)
+   ------------------------------------------------------------
+   Phase 0's finding is the reason this exists: FIVE OF THE DOOR'S SIX PIECES HAVE ZERO CALL
+   SITES outside `.choices`. The rim, the bezel, the cue and the chamfer had no consumers at
+   all, so "carry the landing door inward" is a build, not a reuse. These are the vocabulary;
+   spending it on surfaces is wave 5's job, not this file's.
+
+   .chamfer   the corner cut, painted on a BACKING LAYER
+   .rim       the 2px rim
+   .bezel     the quieter second outline just inside it
+   .cue       the small solid triangle on hover / focus / press
+   .rim-lit   the rest glow — SEPARATE on purpose (ruling 2: hero surfaces get the full door
+              including the glow; everything else gets the material without it)
+
+   `.rim` IS NOT `.rim-player` / `.rim-gm`. Those are the ROLE rims further down — a 3px
+   inline-start bar saying whose chrome this is — and they neither match nor conflict with this
+   selector. One element may wear both; they touch different properties on different boxes.
+
+   THE PSEUDO-ELEMENT BUDGET IS THE DESIGN CONSTRAINT, and it is worth stating because it
+   looks arbitrary otherwise. `::after` is spoken for twice over — `.tap-target::after` is a
+   44px hit-area guarantee and `.scanlines::after` has 11 app consumers — so the material gets
+   `::before` and nothing else. That is why the cue is a background layer rather than a
+   triangle pseudo, and why the bezel is an outline rather than a second clipped ring.
+
+   CLIP-PATH CLIPS HIT-TESTING, NOT JUST PAINT. That is why `.chamfer` used to be exempt on
+   small buttons and why it never reached a call site; ruling 49 now puts the cut on EVERY
+   button, so the backing layer is the default implementation and not an escape hatch. Nothing
+   here ever puts a clip-path on the element itself. Verified with elementFromPoint on a 44px
+   control: all four corners still hit the control, and `.tap-target`'s extended area survives.
+
+   COMPOSING WITH .chamfer, once, so it is not a surprise later: the cut is painted BEHIND the
+   content, so the element's own background and border would show through it as an uncut
+   square. `.chamfer` therefore takes both off and the fill moves to `--material-fill`. The
+   doubled selector below is not a typo — this file loads before every consumer stylesheet, so
+   a single class loses at equal specificity to `.nh-btn--primary { background: ... }`, which
+   is exactly the case this has to survive. A bordered consumer should drop its border and let
+   `.rim` carry the edge; the border box is left at its own width so nothing reflows.
+   ============================================================ */
+
+/* The backing layer, shared. Behind the content, above the element's own background box, and
+   pointer-transparent, so it can carry paint the element must never be clipped by. */
+.chamfer, .rim, .bezel, .rim-lit, .cue { position: relative; isolation: isolate; }
+.chamfer::before,
+.rim::before,
+.bezel::before,
+.rim-lit::before,
+.cue::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;   /* packages/ui has no `*` reset — the client's lives in styles.css */
+  pointer-events: none;
+  background: var(--material-fill);
+  border: 0 solid transparent;
+  transition: border-color var(--dur-hover), background var(--dur-hover), filter var(--dur-hover);
+}
+
+.chamfer { border-radius: 0; }
+.chamfer::before { clip-path: var(--chamfer-cut); }
+.chamfer.chamfer { background-color: transparent; background-image: none; border-color: transparent; }
+
+/* The rim. On the backing layer so it follows the cut — the diagonal itself stays unrimmed,
+   which is the landing door's own silhouette, not an omission. */
+.rim::before { border-width: var(--rim-w); border-color: var(--rim-color); }
+/* Ruling 40: the rim brightens on interaction, and the PRESS state carries the same
+   information as hover, because hover does not exist on half the table's devices. */
+.rim:hover:not(:disabled)::before,
+.rim:focus-visible::before,
+.rim:active:not(:disabled)::before,
+.rim.is-active::before { border-color: var(--rim-color-hi); }
+
+/* The bezel: a second, quieter outline just inside the rim, like a cabinet bezel. An outline
+   costs no layout and contests no property the rim uses. --bezel-inset must stay at or above
+   half the chamfer or this ring's corner falls outside the cut and is clipped to a notch. */
+.bezel::before { outline: 1px solid var(--bezel-color); outline-offset: calc(-1 * var(--bezel-inset)); }
+
+/* The rest glow (ruling 2), opt-in and never baked into `.rim`. A filter on the backing layer:
+   it follows the cut, which box-shadow cannot, and it stays off the ELEMENT, where a filter
+   would make a containing block for every fixed overlay inside it. */
+.rim-lit::before { filter: var(--rim-glow); }
+
+/* The cue: the small solid triangle that appears on hover, focus and press. A background layer
+   ON THE BACKING LAYER, for two measured reasons. It is not a pseudo of its own because the
+   budget note above says there is none left. And it is not a background on the ELEMENT, which
+   was the first cut: the element's own background paints at the very bottom of its stacking
+   context and the backing layer at z-index -1 paints ABOVE it, so an opaque --material-fill
+   hid the triangle outright — verified by screenshot before this moved.
+
+   Prepending one layer to `var(--material-fill)` composes whatever the fill is: a bare colour
+   (`transparent`, the default) becomes the shorthand's final background-color, and a two-layer
+   scanline-over-gradient becomes layers 2 and 3. Nothing has to know which.
+
+   It appears; it does not blink. The landing's blink is a title-screen flourish, and ruling 25's
+   "don't overdo it" is a spec rather than a mood. Ruling 40 is the other half: PRESS carries the
+   same information as hover, because hover does not exist on half the table's devices. */
+.cue:hover:not(:disabled)::before,
+.cue:focus-visible::before,
+.cue:active:not(:disabled)::before,
+.cue.is-active::before {
+  background:
+    var(--cue-mark) no-repeat var(--cue-inset) center / var(--cue-w) var(--cue-h),
+    var(--material-fill);
+}
+
+/* Inert reads as a material state, not only as reduced opacity (ruling 40): the rim and the
+   texture go, a flat box stays. Written as token overrides so every utility above follows from
+   one rule. The class is spelled out rather than wrapped in `:where()` — measured: at zero
+   class-specificity this rule ties with a consumer's own `--material-fill: …` and loses on
+   source order, because this file loads first, so the disabled door kept its texture. */
+.chamfer:disabled, .rim:disabled, .bezel:disabled, .rim-lit:disabled, .cue:disabled,
+.chamfer[aria-disabled="true"], .rim[aria-disabled="true"], .bezel[aria-disabled="true"],
+.rim-lit[aria-disabled="true"], .cue[aria-disabled="true"] {
+  --material-fill: var(--surface-2);
+  --rim-color: transparent;
+  --rim-color-hi: transparent;
+  --bezel-color: transparent;
+  /* `:not(:disabled)` guards the cue's own selectors but cannot see `aria-disabled`, and an
+     inert control that still answers a hover with a cue is lying about being inert. */
+  --cue-mark: none;
+  --rim-glow: none;
 }
 
 /* The beam divider (§9): the sky's horizon, used as a rule. Put it on the element whose
@@ -762,22 +1055,57 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
 .frame-col { display: flex; flex-direction: column; min-height: 0; }
 .frame-fill { flex: 1; min-height: 0; }
 
-/* Thin, quiet scrollbars; reserve gutter to avoid width jitter */
+/* Thin NEON scrollbars, always visible (ruling 44). Not hover-revealed — and that is the
+   functional half of the ruling rather than a look: "is this region scrollable?" has been a
+   recurring real problem here, and a permanently visible track answers it without inventing an
+   affordance. The track used to be `transparent`, which is precisely the state the ruling
+   names; it now carries a low-alpha neon so the rail reads even where the thumb is short.
+
+   THE REAL SCROLLER, ALWAYS. Style the track and the thumb; never replace either with a custom
+   widget — keyboard, wheel, touch and assistive behaviour all come from the real one.
+
+   WHY BOTH SYNTAXES, AND WHY THEY MUST AGREE. Measured 2026-08-06 in Chromium 1194: when
+   `scrollbar-width` is anything but `auto`, the ::-webkit-scrollbar rules are IGNORED for that
+   scroller — a `.scroll-y` region measured a 10px gutter (the standard thin bar) while an
+   otherwise identical region without it measured 11px (this file's ::-webkit width). So the
+   standard pair is what actually paints in Chromium and Firefox, and the webkit block is the
+   fallback for engines that only speak it. They are written to look the same on purpose: two
+   scrollbar looks in one app would be worse than the quiet one this replaces.
+
+   THE UNIVERSAL SELECTOR IS NOT LAZINESS — it is the only form that reaches every scroller.
+   `scrollbar-color` inherits but `scrollbar-width` DOES NOT, so the first cut of this put both on
+   :root and measured the cost: `.scroll-y` lost its `thin` (computed `auto`), and because the
+   inherited `scrollbar-color` had already disabled the ::-webkit sizing, every scroll region's
+   gutter went 10px -> 15px. Five pixels off the content width of every scrolling region in the
+   app, silently, in the round that is also tightening spacing.
+   At (0,0,0) the two blessed exemptions still win outright, because they set
+   `scrollbar-width: none` on themselves: `Tabs.css` (its edge-fade mask is the better phone
+   signal — director's ruling) and the Codex rail (wave 4B's debt). `Steps.css` does the same.
+
+   Not verifiable by screenshot in this environment: headless Chromium here paints OVERLAY
+   scrollbars (measured gutter 0 without `scrollbar-gutter`), so nothing renders at rest. The
+   precedence and sizing above were measured through layout, not by looking. On a real desktop
+   Chrome the bars are classic and these rules paint; on macOS and phones the OS may still
+   choose overlay, which no stylesheet can override. */
+*, *::before, *::after {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
 .scroll-y {
   overflow-y: auto;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-width: thin;   /* restated: a region may not silently fall back to the 15px bar */
 }
-*::-webkit-scrollbar { width: 11px; height: 11px; }
-*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar { width: var(--scrollbar-w); height: var(--scrollbar-w); }
+*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+*::-webkit-scrollbar-corner { background: transparent; }
 *::-webkit-scrollbar-thumb {
-  background: var(--line);
+  background: var(--scrollbar-thumb);
   border-radius: var(--radius-pill);
   border: 3px solid transparent;
   background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hi); background-clip: content-box; }
 
 /* ---- Signature color bloom ---- */
 .bloom {
