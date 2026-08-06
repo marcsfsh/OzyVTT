@@ -102,7 +102,7 @@ The layout changes. These are real behaviour, not paint.
 | Lane | Owns | Does |
 |---|---|---|
 | **4A · shell, table, routes** | `apps/client/src/main.tsx`, `apps/client/src/router.ts` + its test, `apps/client/src/styles.css`, `apps/client/src/scene/{MapToolbar,EncounterMap}.tsx`, `apps/client/src/integrations/{ApiReference.tsx, api-reference.css}`, and the new My-Character surface | **~180px of map returned on a player's phone**: delete the top-left scenes row (D1, 56px), move the preview trigger into the map toolbar (ruling 13, 53.6px), delete the character bar (ruling 20, 69px). Add "view all scenes" to the map's Scenes menu. The My-Character tab as the player's first tab, with the builder door on it (ruling 18). Remove the duplicate "My sheet" — **but not before there is another route into the sheet view**, since the toggle is currently the only one. Mount the combat log as a Drawer (ruling 6). **A6 as a real address** at `/settings/api` (ruling 61). |
-| **4B · the Codex** | `apps/client/src/codex/**` except `icons.tsx` | The context column becomes summonable (ruling 11) — a removal in `PageEditor` and an addition in Journal and Quests. Journal is a genuine re-composition; **atlas and calendar keep their own shapes** (ruling 57). Control-height alignment, and "Shown to players" becomes an icon-only eye **with an accessible name** (rulings 17, C6). Entity-kind colour as an accent drawn from outside the palette's meaning-bearing hues (ruling 46). |
+| **4B · the Codex** | `apps/client/src/codex/**` except `icons.tsx` | The context column becomes summonable (ruling 11) — a removal in `PageEditor` and an addition in Journal and Quests. Journal is a genuine re-composition; **atlas and calendar keep their own shapes** (ruling 57). Control-height alignment, and "Shown to players" becomes an icon-only eye **with an accessible name** (rulings 17, C6). Entity-kind colour as an accent drawn from outside the palette's meaning-bearing hues (ruling 46). **Inherited from wave 1:** the collapsed rail's hidden scrollbar needs a replacement affordance — see below. |
 | **4C · the server** | `packages/domain/src/index.ts`, `apps/server/src/{game-operations,server,game-http,projections}.ts`, `packages/api-contract/src/index.ts`, `apps/client/src/settings/{SettingsPage.tsx, settings.css}`, and the two generated docs | `partyVisibility` as a four-tier setting (rulings 5, 8, 19). **The only server-side work in the round.** |
 
 **4C carries three obligations no other lane has.** It is the **only** lane that regenerates docs, so
@@ -124,6 +124,29 @@ Depends on wave 2 for the material and wave 3 for the spacing. Applies rulings 2
 | **5A · shell and chrome** | `apps/client/src/styles.css` | Tab bar gets its own material and no glow (26). Connection strip folds into it (48). Role hue across the whole chrome — **never on the viewer** (51). Table sky behind the chrome, never behind the map (22). The dock attached to the shell (53). Scanlines on the outermost panel only (28). Entry animation to 1.75–2.0s, both elements staged — **and the jump diagnosed, not padded** (27). The scanline wipe on tab and page transitions **only** (25). The roll result flares (35). |
 | **5B · feature surfaces** | `apps/client/src/{encounter,codex,scenes,settings,homebrew,replay,actors,builder,maps}/**.css` | The material at ~119 hand-rolled panel sites (2, 64). List rows to hairline rules (47). The character sheet: quiet body, hero header, **zero added height** (45). Empty and error surfaces (55, 56). One reveal language everywhere (58). Retire `.surface-glass` as the material replaces it (23). |
 | **5C · map, viewer, motion** | `apps/client/src/scene/{encounter-map.css, annotation.css}`, `apps/client/src/viewer/**`, `apps/client/src/encounter/InitiativeList.css` | Map stage rim and corner ticks, `pointer-events: none` (30). Selected tokens get corner brackets, not a ring — they must not collide with the health ring 1A just fixed (37). Full identity on the map instruments **with fog's edge left hard** (38). The turn-change pulse, verified **on a phone, out of the GM's seat** (36). The shared screen: more identity, less density, and **exempt from the tightened scale** (34). |
+
+---
+
+## Debts a wave hands to a later one
+
+Recorded here because a debt agreed in a commit message and nowhere else is a debt nobody pays.
+
+- **Wave 1B → wave 4B: the Codex rail's scroll affordance.** Aligning the rail's three columns cost
+  it its visible scrollbar. Measured overflow with the bar hidden: **0px above 850px of viewport
+  height, 75px at 1366×768, 143px at 1280×700.** Scrolling by wheel, trackpad, touch and keyboard
+  still works and focus still scrolls into view — the affordance is gone, not the capability. The
+  director accepted the trade because the misalignment was present at *every* height while the hidden
+  overflow only bites below ~843px.
+  **It is also now an exception to ruling 44** (thin neon track, always visible), and the second one —
+  the tab bar is the first. The difference is that the tab bar has a fade mask standing in for the
+  scrollbar and the rail has nothing. 4B owns `SidebarNav.tsx` and can add one; it must be
+  **conditional on real overflow**, because an unconditional fade claims "there is more" at the
+  heights where there is not.
+- **Wave 1C → wave 5A: the 176px sky reserve.** The Scenes copy trim delivers 2.99 card rows, not the
+  three the client expected. The lever that would deliver three is the gallery's reserved horizon
+  band — 27% of the card region, and 2.6× the whole copy trim. It is a design-language rule, so
+  reversing it is a client decision, and it belongs with the wave 5 work where the sky is already
+  being touched. **Do not quietly shrink it in the density pass.**
 
 ---
 
