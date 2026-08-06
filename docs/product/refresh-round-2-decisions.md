@@ -249,15 +249,23 @@ the horizon; the map stage stays a clean dark plate.
 > The no-sky entry was explicitly flagged at the time as something an agent must not "fix" later. An
 > agent reading only the old entries will revert this work unless the reversal is on the record.
 
-### 23 — `.surface-glass` is deleted, not revived
+### 23 — ~~`.surface-glass` is deleted~~ **SUPERSEDED. It renders. It stays until the material replaces it.**
 
-All 285 declarations go. **It has never rendered** — a stylesheet import-order bug has silently
-overridden it since it was written — so deleting it is a zero-visual-change refactor and can ride in
-the mechanical lane rather than the identity lane. Ruling 2's material is the app's one panel
-vocabulary.
+**The original ruling rested on two claims the director made and both were false.** It is not 285
+declarations — it is **6, across 2 rule blocks**, with 4 markup call sites. And it has not "never
+rendered": there *was* a real import-order override, it was diagnosed, and it was **already fixed in
+commit `029dc87`** before this round began. `.surface-glass` paints at HEAD on the settings groups and
+on both shared-screen control columns.
 
-> Verify the zero-change claim by screenshot diff, not by reasoning. If any pixel moves, the no-op
-> diagnosis was wrong somewhere and the deletion stops until that is explained.
+The client chose "delete it" on the basis that nobody had ever seen it. That basis did not exist.
+
+**Revised ruling: `.surface-glass` stays until ruling 2's panel material actually replaces it**, and
+its retirement belongs to the identity lane, not the mechanical one. Deleting it early would strip a
+real `color-mix` + `blur(8px) saturate(1.15)` from three live surfaces — one of them
+`apps/client/src/viewer/viewer-controls.css`, the shared screen ruling 34 just gave *more* identity.
+
+> **The lesson generalises and is why this is written out rather than quietly edited:** a decision
+> justified by "this costs nothing" must have the nothing verified before it is offered, not after.
 
 ### 25 — Page motion: a scanline wipe
 
@@ -427,18 +435,39 @@ The placeholder reads as a screen drawing itself.
 > loading; the wipe fires once. Reusing one animation for both is the "overdone" that ruling 25
 > forbids. Under `prefers-reduced-motion` the sweep stops and the placeholder holds a static tone.
 
-### 43 — Icons: heavier stroke, hard corners — calibrated, not maximised
+### 43 — Icons: the **heavier silhouette**, not a stroke — calibrated, not maximised
 
 > "heavier stroke, hard corners, but dont overdo it or make it overly distracting. but dont err so far
 > on the side of caution that you underdo it either"
 
-Every glyph keeps its shape; the drawing changes — thicker stroke, mitred joins instead of rounded.
-The client asked for a calibration, so it needs a testable rule rather than a taste call:
+**The instruction could not be executed as written, because the premise was false.** All ~69 glyphs
+in `packages/ui/src/primitives/icons.tsx` and `apps/client/src/codex/icons.tsx` are **filled
+silhouettes** — `fill="currentColor"`, zero `stroke` attributes in either file. There is no
+`stroke-width` to raise and no rounded join to mitre.
+
+The two real options were drawn from eight of the app's own glyphs and shown to the client at display
+size and at the real 17px, on both grounds. **They chose the heavier silhouette.**
+
+**The ruling:** every glyph keeps its shape and stays filled; the drawing changes — **thicker limbs,
+silhouette corners mitred to points, negative space tightened.** The stroked-outline conversion is
+rejected.
+
+The reasoning is worth keeping, because it is about risk rather than taste: **the heavier silhouette
+is a change of degree — the outline was a change of kind.** An outline set replaces the drawing
+convention, so it either works everywhere or it reads as foreign beside the marks that stay filled no
+matter what: the health ring, the status dots, the gauges (all protected by ruling 24). It is also
+the thinnest of the three, which puts it at most risk in daybreak; the heavier silhouette puts *more*
+ink on a light ground and so reads stronger there, not weaker.
+
+The client's calibration still binds, restated for a fill-only set:
 
 - **The floor:** the change must be obvious in a side-by-side at 100%. If a reviewer has to be told
   which is which, it was underdone.
-- **The ceiling:** an icon's stroke must not read heavier than the stems of the label beside it. An
-  icon that out-weighs its own text has become the distraction the client named.
+- **The ceiling:** a glyph's visual weight must not exceed the stems of the label beside it. An icon
+  that out-weighs its own text has become the distraction the client named.
+
+Some glyphs barely move (Fog, Scene are already hard-cornered bands) and that is correct — this is a
+weight change, not a redraw quota. **Scope: ~69 glyphs, two files, no call sites touched.**
 
 This is the best candidate for **phase 6, the director's polish pass**. It is a dial, and dials are
 set by looking.
@@ -624,6 +653,71 @@ naming change with the lock's corpus re-measured, not as helper text.
 
 ---
 
+## Phase 0 — premises that turned out to be false
+
+A read-only intake mapped every ruling to the files it touches. It found four rulings resting on
+premises that are not true of this codebase. **Finding one is a success, not a failure** — a ruling
+written from a wrong premise is the most expensive thing to discover late. All four are corrected in
+place above or here; none was quietly dropped.
+
+### 63 — Density: tokenise first, then tighten. Ruling 33's premise was largely false.
+
+The spacing scale exists — ten steps, `--space-1` through `--space-16`, in
+`packages/ui/src/styles/design-tokens.css`. But **65% of the client's CSS bypasses it**: 904
+hard-coded spacing declarations, concentrated in exactly the surfaces the client complained about
+(`apps/client/src/encounter/encounter-panel.css` 413, `apps/client/src/styles.css` 150). The ui
+primitives are genuinely tokenised (14% bypass); almost nothing else is.
+
+So "one commit that changes the scale" would have moved ~42% of the app's spacing and **0% of the
+table and the encounter panel** — shipping a *non-uniform* tightening while reporting a uniform one.
+
+**The client took the honest version: a mechanical lane converts the 904 declarations to the scale
+first, then one commit changes it.** Large, but every step is reviewable and the result is uniform
+for real. Ruling 32's four guardrails are unchanged and apply to both halves.
+
+### 64 — Ruling 2's material is a build, not a reuse
+
+Two measurements, both of which change the size of the identity work:
+
+- **`Panel` reaches 5% of the app.** The primitive has **6 real call sites, all in the Codex**.
+  There are **≥119 hand-rolled panel-shaped rules across 20 stylesheets** that would not inherit
+  anything from editing `Panel.css`. The material has to be a shareable utility applied at ~119
+  sites, not a primitive edit.
+- **Five of the six landing-door pieces have zero reach outside the landing.** The 2px rim, the inner
+  bezel, the cue triangle and the chamfer utility have **no call sites at all** beyond `.choices`;
+  `.sign` has one, and it is the styleguide. Only the scanline (11 app surfaces) and the neon beam
+  (7) already travel.
+
+**Consequence: "carry the landing door inward" means expressing the rim, bezel, cue and chamfer as
+shareable utilities before any surface can take them.** That is a foundation lane that must land
+before the identity lanes, not alongside them.
+
+### 65 — Ruling 15's corrections: right conclusion, wrong three things
+
+The 44px floor holds — the headers are real click targets in a stacked flex column and
+`min-height: var(--tap-min)` cannot come off. Three factual corrections the implementer needs:
+
+- **They are the dock's headers, not the dice tray's.** Turn order / Dice / Combat log, in
+  `apps/client/src/encounter/DockAccordion.tsx`. The dice tray has two `<details>` of its own.
+- **They only exist at ≥980px.** Below the rung the dock renders a `Tabs` bar instead — so on a phone
+  there are no stacked headers and no header height to recover. Ruling 15's vertical arithmetic is
+  laptop-only, which matters because acceptance test #1 is a phone.
+- **The 24px gap is not the accordion's** — `.dock-accordion` is already `gap: .5rem`. The live 24px
+  gaps are `.table-layout` and `.table-sidebar` in `apps/client/src/styles.css`, and cutting those
+  changes the map/dock relationship, not the dice tray's internals.
+
+### 66 — Ruling 16 is half shipped, and B6 names the wrong surface
+
+`Recent (6)` **already renders the count**. What is missing is the chevron and the click affordance:
+the `<summary>` in `apps/client/src/scenes/scene-prep.css` has no border, no background and no
+list-marker handling, which is precisely the "does not look collapsed" symptom. Scope is one CSS rule
+plus a chevron, not a re-plumb.
+
+Separately: **"On this map" is in the New-scene modal, not the Scenes popup.** A lane told to edit the
+popup will not find it.
+
+---
+
 ## Director's rulings made without spending a client question
 
 These were decided by the director on the record, because they are contracts rather than taste:
@@ -631,6 +725,17 @@ These were decided by the director on the record, because they are contracts rat
 - **The focus ring does not change in this pass.** It already passes contrast in all three themes, and
   ruling 4 recorded that it is double-duty as `--line-hover` in daybreak. Restyling it would move two
   things at once for flavour.
+- **The tab bar is exempt from ruling 44's always-visible scrollbar.** `packages/ui/src/primitives/Tabs.css`
+  deliberately hides its scrollbar and replaces it with an edge-fade mask, and its own comment records
+  why: the fade is *the only thing telling a phone user there are more tabs*. Ruling 44's stated
+  justification is discoverability — so hiding the scrollbar where a better discoverability signal
+  already exists **serves** the ruling rather than breaking it. Everywhere else, ruling 44 applies.
+- **The scene card's top-left corner stays with the LIVE / Staging badge; D6's counts go bottom-left.**
+  D6 asked for counts "in the thumbnail's top-left, opposite the drag controls", but
+  `packages/ui/src/styles/patterns.css` already puts the live-state badge there. State outranks a
+  count, and the intent — counts inside the thumbnail, away from the tools — survives the move.
+  Note also that `.nh-card-tools`' gap is the *measured minimum* that keeps two 44px hit areas apart;
+  the density pass must not tighten it.
 - **The remaining C and D items need no further discovery** — they are mechanical: the scenes popup's
   nested borders · the gallery cards (the client fully specified them: drop the filename, counts into
   thumbnail badges opposite the drag handle) · the revoked-displays list · the map toolbar's
