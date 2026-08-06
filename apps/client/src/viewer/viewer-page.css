@@ -1,7 +1,9 @@
-/* Page-level reset for the standalone shared-screen viewer page (viewer.html) only. Imported by
-   viewer-main.tsx, NOT by the shared `.viewer-*` component styles in viewer.css — the main SPA
-   reuses those components (in the GM's in-tab Viewer preview) and must not inherit this
-   `overflow: hidden`, which would kill its page scroll. */
+/* Page-level reset for the standalone shared-screen page (viewer.html) only. Imported by
+   viewer-main.tsx; kept out of viewer.css so a reset stays with the page it resets.
+
+   Both files reach only viewer.html — see the header in viewer.css. The GM's in-tab preview is an
+   iframe of this same document, not a second consumer, so the `overflow: hidden` below cannot reach
+   the main SPA. (Measured 2026-08-06; the header this replaces said otherwise.) */
 /* Colors/type come from @vtt/ui tokens; keep only the shared-screen page frame. */
 :root { color-scheme: dark; background: var(--void); color: var(--text); }
 * { box-sizing: border-box; }

@@ -31,7 +31,19 @@
    20rem to 12rem — it is a floor for a short frame now, not a target height. Below the ladder's 980
    rung there is no frame to take a leftover from, so the map states its own height there instead of
    riding this floor — the band rule at the bottom of this file. */
-.encounter-map-stage svg { display: block; width: 100%; height: 100%; background: var(--void); user-select: none; }
+/* THE DIRECT CHILD, NOT EVERY DESCENDANT. The stage holds far more than its canvas: the map
+   toolbar, the shape editor, the docked tracker, the target bar and the zoom cluster all live
+   inside it, and every `@vtt/ui` glyph in them is `<svg width="1em" height="1em">` — presentation
+   attributes, which lose to any CSS rule. As a descendant selector this line was sizing and
+   painting all of them: measured at 1920x1080 the toolbar's tool glyphs came out 42px against the
+   group icons' 12.8 (a 3.28x mismatch in one bar) and all ten non-canvas svgs in the stage carried
+   an opaque `--void` tile behind the glyph but not behind the text labels — three background tones
+   in one 444px bar, which is the "mis-coloured border" that got reported. The map's own svg sits
+   inside a React fragment (EncounterMap.tsx:603), which creates no DOM node, so it IS a direct
+   child and nothing else in the stage is. `>` is a combinator, not a compound, so specificity is
+   unchanged and no other rule's outcome moves. Same reason on the :fullscreen and .enlarged
+   variants below — keep all three scoped or the next glyph added to the stage inherits the bug. */
+.encounter-map-stage > svg { display: block; width: 100%; height: 100%; background: var(--void); user-select: none; }
 .encounter-map-stage > p { padding: 2rem; text-align: center; }
 .encounter-token { outline: none; }
 .encounter-token.movable { cursor: grab; }
@@ -86,7 +98,11 @@
    what stopped this corner from wrapping into a second and third row of controls over the map. */
 .encounter-map-zoom .nh-btn { box-shadow: var(--shadow-1); }
 .encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: var(--void); }
-.encounter-map-stage:fullscreen svg { max-height: 100vh; height: 100vh; }
+/* Direct child, per the stage rule above. Unscoped this was the worst of the three: `height: 100vh`
+   on EVERY svg in the stage blew each toolbar glyph up to 1080px, which pushed the toolbar itself to
+   1895.63 x 1096 inside a 1080-tall viewport — the bar's own bottom edge landed at 1108, below the
+   fold, so entering fullscreen from the View group lost the toolbar entirely. */
+.encounter-map-stage:fullscreen > svg { max-height: 100vh; height: 100vh; }
 /* "Enlarge map" is an in-tab overlay (not the OS Fullscreen API): the whole interaction area floats
    over the page so the map physically grows, with the stage flex-filling the space so the SVG scales
    up. Dismissed by "Shrink map". */
@@ -97,7 +113,12 @@
    scroller that never scrolls is a claim a reader has to check by hand. */
 .encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); }
 .encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
-.encounter-map-interaction.enlarged .encounter-map-stage svg { max-height: none; height: 100%; }
+/* Direct child, per the stage rule above. "Enlarge map" is a separate state from fullscreen and
+   this is its path. Measured, its own contribution to the glyph damage was nil (the `height: 100%`
+   here resolves the same as the stage rule's, and `max-height: none` uncaps nothing on a glyph), so
+   enlarged mode was broken by the stage rule alone — but leaving this one a descendant selector
+   would keep re-arming the trap the other two just disarmed. */
+.encounter-map-interaction.enlarged .encounter-map-stage > svg { max-height: none; height: 100%; }
 .encounter-map-saving { margin: .5rem 0 0; color: var(--text-dim); font-size: .85rem; }
 /* In enlarged mode the interaction is a flex column; a "Saving move…" line mounting in-flow on token
    release would steal height from the flex:1 stage and bounce the map. Float it over the stage (like
@@ -263,18 +284,39 @@
 .token-health-bloodied { fill: var(--magenta); }
 .token-health-down { fill: var(--danger); }
 /* Richer token-health indicators (GM opt-in): a thin HP bar under the token, or a cyan->danger ring
-   around it. The fill color is inlined from the fraction (see mapImage.tsx); these style the track/geometry only. */
+   around it.
+
+   THE BAND CLASS CARRIES A COLOUR, NOT A SET OF PROPERTIES. `healthFillClass()` (mapImage.tsx:185)
+   returns ONE class for THREE element kinds that each need a different property: the ring `<circle>`
+   wants `stroke` and must not have `fill`, the bar `<rect>` wants `fill` and must not have `stroke`,
+   and the aura's three `<stop>`s want `stop-color`. While `.hp-fill-*` declared all three, the two
+   "and not that one" suppressors below were the same (0,1,0) specificity and declared EARLIER, so
+   they lost: the ring painted a solid disc (measured 112 wide against a 100 token body — the whole
+   token went one flat colour), and the bar painted a 1px stroke it had been told not to have.
+   The `fill="none"` presentation attribute on the ring circle lost for the same reason.
+
+   Handing the band class a custom property and letting each consumer map it to the ONE property it
+   needs DELETES the collision rather than re-deciding it. Reordering the declarations was the cheap
+   alternative and it is wrong: it leaves both properties in play and the next person to sort this
+   block, extract a partial, or merge it with viewer.css's near-identical twin resurrects the bug
+   silently — duplication across two files is how it got here. Under this shape no rule sets `fill`
+   on a ring or `stroke` on a bar at all, so order, specificity and file-merge order stop mattering.
+   `--hp-band` is set and read on the SAME element (mapImage.tsx always emits the band class beside
+   the element class — `:207-209`, `:237`, `:246`), so no inheritance subtlety is involved. */
 .token-health-bar-track { fill: var(--void); fill-opacity: .8; }
-.token-health-bar-fill { stroke: none; }
+.token-health-bar-fill { fill: var(--hp-band); stroke: none; }
 .token-health-ring-track { fill: none; stroke: var(--void); stroke-opacity: .5; }
-.token-health-ring-fill { fill: none; }
+.token-health-ring-fill { fill: none; stroke: var(--hp-band); }
 /* Soft health glow: purely decorative and larger than the token, so it must never capture pointer events. */
 .token-health-aura { pointer-events: none; }
-/* Theme-aware health fill: one band class drives the bar fill, ring stroke, and aura stop-color from
-   the same brand token, so map health follows dark/dusk/light instead of a baked dark-theme hex. */
-.hp-fill-healthy { fill: var(--cyan); stroke: var(--cyan); stop-color: var(--cyan); }
-.hp-fill-bloodied { fill: var(--magenta); stroke: var(--magenta); stop-color: var(--magenta); }
-.hp-fill-down { fill: var(--danger); stroke: var(--danger); stop-color: var(--danger); }
+/* The third consumer. It never had a suppressor to lose to, so its paint is unchanged by the above. */
+.token-health-aura stop { stop-color: var(--hp-band); }
+/* Theme-aware health band: the themed brand token, so map health follows dark/dusk/light instead of
+   a baked dark-theme hex. The band->colour mapping is unchanged (healthy > 50%, bloodied > 25%,
+   else down — mapImage.tsx:187-189); only which property each consumer paints with it has moved. */
+.hp-fill-healthy { --hp-band: var(--cyan); }
+.hp-fill-bloodied { --hp-band: var(--magenta); }
+.hp-fill-down { --hp-band: var(--danger); }
 /* Manual fog of war: --void veil (§6.5). The GM sees a dim veil (everything stays workable); players get solid cover. */
 .fog-overlay-gm { fill: var(--void); fill-opacity: .45; }
 .fog-overlay-player { fill: var(--void); }
