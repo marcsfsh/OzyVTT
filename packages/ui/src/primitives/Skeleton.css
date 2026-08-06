@@ -1,18 +1,46 @@
+/* RULING 42 — a scanline SWEEP, not a shimmer: the placeholder reads as a screen drawing itself.
+
+   THIS IS NOT RULING 25'S PAGE WIPE AND MUST NOT BECOME IT. Same vocabulary, different element,
+   different meaning: the wipe says NAVIGATION and fires ONCE on a tab or page transition; the
+   sweep says WAITING and LOOPS while the data is in flight. Reusing one animation for both is
+   exactly the "overdone" ruling 25 forbids. Three things keep them apart on purpose — this one
+   loops, it is slower (1.6s against the wipe's ≤180ms), and it never leaves this component.
+
+   The placeholder rests on a flat tone and the sweep is the only moving part: a band of scanlines
+   travelling down the box, under a soft leading edge. Vertical, because a screen draws in rows. */
 .nh-skeleton {
   display: block;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(100deg, var(--surface-2) 30%, var(--surface-3) 50%, var(--surface-2) 70%);
-  background-size: 200% 100%;
-  animation: nh-skeleton-shimmer 1.4s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0;
+  background-color: var(--surface-2);
 }
-.nh-skeleton--text { height: .8em; width: 100%; border-radius: var(--radius-pill); }
-.nh-skeleton--block { height: 8rem; width: 100%; border-radius: var(--radius-md); }
+.nh-skeleton::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Two and a bit boxes tall so the band can travel a full height before it repeats. */
+  top: -100%;
+  height: 100%;
+  background-image:
+    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(to bottom, transparent, color-mix(in srgb, var(--text) 9%, transparent) 70%, transparent);
+  background-repeat: repeat, no-repeat;
+  background-size: 100% var(--scanline-gap), 100% 100%;
+  animation: nh-skeleton-sweep 1.6s linear infinite;
+}
+.nh-skeleton--text { height: .8em; width: 100%; }
+.nh-skeleton--block { height: 8rem; width: 100%; }
+/* Round stays round — ruling 24 protects dots, swatches and avatars, and this stands in for one. */
 .nh-skeleton--circle { width: 2.4rem; height: 2.4rem; border-radius: 50%; }
 
-@keyframes nh-skeleton-shimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
+@keyframes nh-skeleton-sweep {
+  from { transform: translateY(0); }
+  to { transform: translateY(200%); }
 }
+/* "Under `prefers-reduced-motion` the sweep stops and the placeholder holds a static tone"
+   — ruling 42, stated in its own words. The box keeps its fill; only the travelling band goes. */
 @media (prefers-reduced-motion: reduce) {
-  .nh-skeleton { animation: none; }
+  .nh-skeleton::after { display: none; }
 }

@@ -1,6 +1,7 @@
 import { Badge } from "./Badge";
 import { StableSwap } from "./StableSwap";
-import { Switch } from "./Switch";
+import { Tooltip } from "./Tooltip";
+import { cx } from "./util";
 import { IconEye, IconEyeOff } from "./icons";
 import "./Reveal.css";
 
@@ -34,29 +35,49 @@ import "./Reveal.css";
 const SHOWN = "Shown to players";
 const HIDDEN = "Hidden from players";
 
-/** The one reveal toggle. Same wording on pages, journal entries, maps, pins, records and rows. */
+/**
+ * The one reveal toggle — **an icon-only eye** (ruling 17), with the state carried by the magenta the
+ * client kept and by which of the two glyphs is drawn. Removing the label removes the optical-centring
+ * complaint at the root rather than tuning it, and ruling 58 makes this exact glyph, colour and
+ * position the app-wide signal for "players can see this".
+ *
+ * **It keeps a name and a tooltip, and that is not optional.** An icon-only toggle with no accessible
+ * name is a regression, not a simplification (ruling 17's own constraint). Three things carry the
+ * meaning now: `aria-label` for assistive technology, the tooltip for a pointer, and `title` for the
+ * platforms that surface one on a long press — because hover does not exist on half this table's
+ * devices, and this is the control where a GM misreading the state leaks something to the table
+ * (ruling 58: a safety property, not tidiness).
+ *
+ * The tooltip says the STATE in the glossary's exact words, so the phrase the label used to show is
+ * still in the document and still the only place it is written.
+ *
+ * `role="switch"` and `aria-checked` are unchanged: the semantics were never the problem.
+ */
 export function RevealSwitch({ revealed, onChange, ariaLabel, banded = false, disabled = false, className }: Readonly<{
   revealed: boolean;
   onChange: (next: boolean) => void;
   ariaLabel?: string;
-  /** Pass in a form grid so the track aligns with the input wells beside it (D23b). */
+  /** Pass in a form grid so the control aligns with the input wells beside it (D23b). */
   banded?: boolean;
   disabled?: boolean;
   className?: string;
 }>) {
+  const state = revealed ? SHOWN : HIDDEN;
   return (
-    <Switch
-      checked={revealed}
-      onChange={onChange}
-      aria-label={ariaLabel ?? "Show to players"}
-      label={revealed ? SHOWN : HIDDEN}
-      // The two states differ by four characters, and the cluster this usually sits in is right-anchored:
-      // without the reservation the track walks out from under the pointer on the first click (D23c).
-      labelAlternate={revealed ? HIDDEN : SHOWN}
-      banded={banded}
-      disabled={disabled}
-      className={className}
-    />
+    <Tooltip content={state} className={cx("nh-reveal", banded && "nh-reveal--banded", className)}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={revealed}
+        aria-label={ariaLabel ?? "Show to players"}
+        title={state}
+        disabled={disabled}
+        onClick={() => onChange(!revealed)}
+        className={cx("nh-reveal-toggle", revealed && "is-revealed", "tap-target", "interactive")}
+      >
+        {revealed ? <IconEye /> : <IconEyeOff />}
+      </button>
+    </Tooltip>
   );
 }
 

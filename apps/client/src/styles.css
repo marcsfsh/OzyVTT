@@ -519,9 +519,16 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
 /* Its actions are doors too. "Enter table" rests as a cyan door and fills on hover exactly like
    ENTER AS GM; disabled keeps the full cyan treatment and lets the global disabled opacity dim it
    — dormant neon, never grey plastic. Back is a low-key pink ghost so both belong to the scene. */
-.landing .card .nh-btn--primary { border: 1px solid var(--landing-door-gm-rim); background: var(--landing-glass); color: var(--landing-door-label); filter: var(--landing-door-gm-glow); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; }
-.landing .card .nh-btn--primary:hover:not(:disabled), .landing .card .nh-btn--primary:focus-visible { background: var(--landing-door-gm-rim); border-color: var(--landing-door-gm-rim); color: var(--landing-ink-deep); filter: var(--landing-door-gm-glow-strong); }
-.landing .card .nh-btn--primary:disabled { background: var(--landing-glass); border-color: var(--landing-door-gm-rim); color: var(--landing-door-label); filter: var(--landing-door-gm-glow); }
+/* THESE SET `--nh-fill`/`--nh-rim`, NOT `background`/`border-color`, and that is load-bearing.
+   Since round 2 wave 2 every `.nh-btn` paints its fill and rim on a `::before` backing layer — the
+   only way to give a tap target a chamfer, because `clip-path` clips hit-testing and would eat the
+   button's own 44px. That layer sits ABOVE the element's own background, so a rule here setting
+   `background` would be painted over and this card's third door would come out as the app's magenta
+   primary. It regressed exactly that way before this comment existed. The `.choices` doors above
+   are unaffected — their `::before` at (0,2,0) already overrides the primitive's. */
+.landing .card .nh-btn--primary { --nh-fill: var(--landing-glass); --nh-rim: var(--landing-door-gm-rim); --nh-tex: transparent; color: var(--landing-door-label); filter: var(--landing-door-gm-glow); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; }
+.landing .card .nh-btn--primary:hover:not(:disabled), .landing .card .nh-btn--primary:focus-visible { --nh-fill: var(--landing-door-gm-rim); --nh-rim: var(--landing-door-gm-rim); color: var(--landing-ink-deep); filter: var(--landing-door-gm-glow-strong); }
+.landing .card .nh-btn--primary:disabled { --nh-fill: var(--landing-glass); --nh-rim: var(--landing-door-gm-rim); color: var(--landing-door-label); filter: var(--landing-door-gm-glow); }
 .landing .card .link { color: color-mix(in srgb, var(--landing-door-play-rim) 80%, transparent); }
 .landing .card .link:hover:not(:disabled) { color: var(--landing-door-label); background: color-mix(in srgb, var(--landing-door-play-rim) 14%, transparent); }
 
@@ -569,9 +576,18 @@ input, select, textarea { width: 100%; padding: .8rem; margin-top: .4rem; border
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: var(--glow-cyan); }
 .card input { margin-bottom: 1rem; }
-/* Primary action button (magenta fill, dark ink) */
-.card button { text-align: center; background: var(--primary); color: var(--text-on-neon); border: 0; margin-right: .5rem; }
-.card button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
+/* Primary action button (magenta fill, dark ink) — a bare-element rule from before <Button> existed,
+   kept for the hand-rolled `<button>`s still inside cards. It sets `--nh-fill`/`--nh-rim` rather than
+   `background`, because since round 2 wave 2 every `.nh-btn` paints on a `::before` backing layer
+   (the only way a tap target can carry a chamfer — `clip-path` clips hit-testing). At (0,1,1) this
+   used to out-specify `.nh-btn { background: transparent }` and paint magenta UNDER that layer,
+   which showed through anywhere the layer is translucent. It did: the landing's GM sign-in door is
+   72% glass, and it came out muddied with the app's magenta. Bare `<button>`s in a card still get
+   the fill via the `background` on the second line, which the primitive's own layer covers. */
+.card button { text-align: center; --nh-fill: var(--primary); --nh-rim: var(--magenta-hi); color: var(--text-on-neon); border: 0; margin-right: .5rem; }
+.card button:not(.nh-btn) { background: var(--primary); }
+.card button:hover:not(:disabled) { --nh-fill: var(--magenta-hi); box-shadow: var(--glow-magenta); }
+.card button:not(.nh-btn):hover:not(:disabled) { background: var(--magenta-hi); }
 .card .link { background: transparent; color: var(--text-dim); }
 .card .link:hover:not(:disabled) { color: var(--text); box-shadow: none; }
 

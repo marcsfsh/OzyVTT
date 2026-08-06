@@ -25,6 +25,16 @@
    rules (e.g. margin-top or font-size meant for composite buttons), which would otherwise shove
    the absolutely-centered thumb off-center and resize the label. */
 .nh-switch span { margin: 0; font: inherit; }
+/* SIBLINGS, NOT THE SAME CONTROL (ruling C4, resolving ruling 4's third collision).
+   In dark, `--state-on` and this track are the same magenta — the client kept both colours
+   deliberately, so the two must be told apart by SHAPE, which is ruling 7's whole mechanism:
+
+     SegmentedControl  a chamfered rectangle, several options, a leading tick on the chosen one
+     Switch            a pill track and a round thumb, one thing, on or off
+
+   The track therefore KEEPS `--radius-pill` — ruling 24 protects gauges, and this is one. Squaring
+   it would erase the only thing distinguishing the two at a glance in dark, which is the collision
+   ruling 7 exists to prevent. Do not "unify" these shapes. */
 .nh-switch-track {
   position: relative;
   flex: none;
@@ -35,6 +45,13 @@
   border: 1px solid var(--line-strong);
   transition: background var(--dur-base) var(--ease-settle), border-color var(--dur-base);
 }
+/* Ruling 40's touch clause. The switch had no resting affordance at all — nothing said "this
+   responds" until it had already changed — and on a phone there is no hover to discover it with.
+   `:active` carries the same information as `:hover`, which is the whole point of the clause. */
+.nh-switch:hover:not(:disabled) .nh-switch-track,
+.nh-switch:active:not(:disabled) .nh-switch-track { border-color: var(--line-hover); }
+.nh-switch:active:not(:disabled) .nh-switch-thumb { background: var(--text); }
+.nh-switch--on:active:not(:disabled) .nh-switch-thumb { background: var(--text-on-neon); }
 .nh-switch-thumb {
   position: absolute;
   top: 50%;

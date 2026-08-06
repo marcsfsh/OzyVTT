@@ -1,3 +1,31 @@
+/* RULING 17 + 58 — the reveal toggle is an ICON-ONLY EYE, and the magenta is the state.
+   One glyph, one colour, one position, everywhere the product asks "do the players see this?".
+   The 44px floor is met by hit AREA (`.tap-target`), not by paint: this control sits in dense
+   record rows and a 44px square of chrome in every one of them would be the noise ruling 17 is
+   removing. `--chamfer-cut` is not used: the paint is a glyph, not a box. */
+.nh-reveal { display: inline-flex; vertical-align: middle; }
+.nh-reveal--banded { margin-top: var(--nh-label-band); }
+.nh-reveal-toggle {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  line-height: 1;
+  cursor: pointer;
+}
+.nh-reveal-toggle svg { width: 1.15rem; height: 1.15rem; }
+/* THE STATE IS THE MAGENTA (ruling 17), and never colour alone — the glyph changes too, which is
+   what keeps it readable for anyone who cannot separate the two hues. */
+.nh-reveal-toggle.is-revealed { color: var(--magenta); filter: var(--glow-drop-magenta); }
+/* Ruling 40's touch clause: `:active` carries what `:hover` carries. */
+.nh-reveal-toggle:hover:not(:disabled), .nh-reveal-toggle:active:not(:disabled) { color: var(--text); }
+.nh-reveal-toggle.is-revealed:hover:not(:disabled), .nh-reveal-toggle.is-revealed:active:not(:disabled) { color: var(--magenta-hi); }
+.nh-reveal-toggle:disabled { color: var(--text-muted); opacity: .55; cursor: not-allowed; filter: none; }
+
 /* Both status pills read as STATUS rather than prose: the mono face plus tracked uppercase is the
    system's "this is a machine fact about the record" treatment, and it keeps a two-word pill from
    being mistaken for the record's own copy. */

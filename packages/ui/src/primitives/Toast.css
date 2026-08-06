@@ -10,22 +10,41 @@
   width: min(100vw - 2rem, 24rem);
   pointer-events: none;
 }
+/* RULING 39, the toast half: severity on a 2px leading rule (was 3px), never in the fill, so the
+   message reads on a neutral ground in all three themes. The material is on a backing layer
+   because a toast carries its own ✕ — see Alert.css for the same reasoning at length. */
 .nh-toast {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--line);
-  border-left-width: 3px;
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
-  box-shadow: var(--shadow-2);
   pointer-events: auto;
+  --nh-rule: var(--line-strong);
 }
-.nh-toast--success { border-left-color: var(--success); }
-.nh-toast--error { border-left-color: var(--danger); }
-.nh-toast--info { border-left-color: var(--info); }
+.nh-toast::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--nh-rule);
+  background: var(--surface-2);
+  /* A toast floats over arbitrary app surface, so it keeps a lift — as a drop-shadow FILTER,
+     because box-shadow cannot follow a clip-path cut and would have drawn a rectangle. */
+  filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--void) 55%, transparent));
+}
+.nh-toast--success { --nh-rule: var(--success); }
+.nh-toast--error { --nh-rule: var(--danger); }
+.nh-toast--info { --nh-rule: var(--info); }
 .nh-toast-icon { flex: none; display: grid; place-items: center; font-size: 1.05rem; line-height: 1; }
 .nh-toast--success .nh-toast-icon { color: var(--success); }
 .nh-toast--error .nh-toast-icon { color: var(--danger-hi); }
@@ -34,4 +53,4 @@
 /* Paint stays a quiet ✕; `.tap-target` (route 2, §4) lifts the hit area to the 44px
    floor without turning the toast into a two-line surface. */
 .nh-toast-close { flex: none; display: grid; place-items: center; width: 1.25rem; height: 1.25rem; padding: 0; border: 0; background: transparent; color: var(--text-muted); line-height: 1; cursor: pointer; transition: color var(--dur-hover); }
-.nh-toast-close:hover { color: var(--text); }
+.nh-toast-close:hover, .nh-toast-close:active { color: var(--text); }

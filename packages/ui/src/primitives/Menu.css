@@ -2,24 +2,45 @@
 
 /* Trigger and items both meet the 44px touch floor as paint — a popover list can't
    use overlapping `.tap-target` extensions without stealing its neighbours' taps. */
+/* Ruling 49 reaches the trigger: it is a button in everything but tag name. The cut goes on a
+   backing layer for the usual reason — a `<summary>` is the disclosure's whole tap target, and
+   the icon variant below grows its hit area with `::after`, which a clip-path would eat. */
 .nh-menu-trigger {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: var(--tap-min);
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   font: 600 var(--fs-sm) / 1 var(--font-body);
   cursor: pointer;
   list-style: none;
+  --nh-fill: var(--surface-2);
+  --nh-rim: var(--rim-color);
+  --chamfer-trigger: .38rem;
+}
+.nh-menu-trigger::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: polygon(0 var(--chamfer-trigger), var(--chamfer-trigger) 0, 100% 0, 100% calc(100% - var(--chamfer-trigger)), calc(100% - var(--chamfer-trigger)) 100%, 0 100%);
+  border: 1px solid var(--nh-rim);
+  background: var(--nh-fill);
+  transition: border-color var(--dur-hover), background-color var(--dur-hover);
 }
 .nh-menu-trigger::-webkit-details-marker { display: none; }
 .nh-menu-trigger::marker { content: ""; }
-.nh-menu-trigger:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* Ruling 40's touch clause — `:active` says what `:hover` says. */
+.nh-menu-trigger:hover, .nh-menu-trigger:active { --nh-rim: var(--rim-color-hi); }
 
 /* ---- Icon-square trigger ----
    A compact 1.75rem square for dense tool clusters, so a ⋯ can sit beside a same-size
@@ -45,11 +66,12 @@
   min-height: 0;
   padding: 0;
   gap: 0;
-  border-radius: var(--radius-sm);
-  border-color: var(--line);
-  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  border-radius: 0;
   font-size: 1rem;
   line-height: 1;
+  --nh-rim: var(--rim-color);
+  --nh-fill: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  --chamfer-trigger: .26rem;
 }
 .nh-menu-trigger--icon::after,
 .nh-card-tools .nh-menu-trigger::after {
@@ -81,9 +103,14 @@
      2. `--nh-menu-shift` is written by Menu.tsx on open (and on resize while open) to
         slide the box back inside. It rides the `translate` PROPERTY, not `transform`,
         because `.anim-popover`'s entrance keyframes own `transform`. */
+/* RULING 52 — panel material with a BRIGHTER rim. A menu, a popover and a tooltip read as panels
+   that ARRIVED, and the brighter rim is what carries "on top" without a drop shadow. They are
+   usually the outermost panel while open, so by ruling 28 they do take the scanline.
+   Material on a backing layer: the popover is a list of tap targets. */
 .nh-menu-popover {
   --nh-menu-gutter: var(--space-2);
   position: absolute;
+  isolation: isolate;
   z-index: 40;
   top: calc(100% + var(--space-1));
   left: 0;
@@ -91,13 +118,32 @@
   max-width: calc(100vw - 2 * var(--nh-menu-gutter));
   translate: var(--nh-menu-shift, 0) 0;
   padding: var(--space-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  box-shadow: var(--shadow-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+.nh-menu-popover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  /* The brighter rim of ruling 52 — `--rim-color-hi`, the same value ruling 40 brightens a
+     control's rim to, one step up from the `--rim-color` an ordinary panel wears. */
+  border: var(--rim-w) solid var(--rim-color-hi);
+  background-color: var(--surface-2);
+  background-image:
+    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 45%);
+  background-repeat: repeat, no-repeat;
+  background-size: 100% var(--scanline-gap), 100% 100%;
+  background-origin: border-box;
+  background-clip: border-box;
 }
 .nh-menu--end .nh-menu-popover { left: auto; right: 0; }
 
@@ -109,7 +155,7 @@
   min-height: var(--tap-min);
   padding: var(--space-2) var(--space-3);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: transparent;
   color: var(--text);
   font: 500 var(--fs-sm) / 1.3 var(--font-body);
@@ -117,7 +163,9 @@
   cursor: pointer;
   transition: background var(--dur-hover), color var(--dur-hover);
 }
-.nh-menu-item:hover { background: var(--surface-3); }
+/* Ruling 40's touch clause. A menu item's only feedback was `:hover`, which on a phone means
+   no feedback at all between the tap and the action. */
+.nh-menu-item:hover, .nh-menu-item:active { background: var(--surface-3); }
 /* A disabled item (RowEditor's "Move up" on the first row) must dim per PROPERTY, never
    with a group `opacity` (design-language §5). Two reasons this rule has to exist here:
    the client's styles.css has a bare `button:disabled { opacity: .55 }` at (0,1,1), and
@@ -127,5 +175,5 @@
 .nh-menu-item:disabled { opacity: 1; color: var(--text-muted); cursor: not-allowed; }
 .nh-menu-item:disabled:hover { background: transparent; }
 .nh-menu-item--danger { color: var(--danger-hi); }
-.nh-menu-item--danger:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.nh-menu-item--danger:hover, .nh-menu-item--danger:active { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 .nh-menu-item-icon { width: 1.1rem; text-align: center; color: var(--text-dim); }

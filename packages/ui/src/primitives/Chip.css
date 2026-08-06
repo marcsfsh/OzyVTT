@@ -1,20 +1,49 @@
+/* DE-PILLED (rulings 10 + 24), and this is the half of that pair that is INTERACTIVE at 27 call
+   sites — `.nh-chip--pressable` is a real `<button>` carrying `.tap-target`'s 44px extension. So
+   the cut goes on a backing layer and never on the element: a `clip-path` here would clip the
+   ::after that IS the tap area, which is ruling 14's whole warning.
+
+   See Badge.css for why `--chamfer-cut` is redeclared rather than `--chamfer` re-sized. */
 .nh-chip {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   padding: 2px var(--space-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
-  background: var(--surface-3);
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   font: 600 var(--fs-xs) / 1.4 var(--font-body);
   white-space: nowrap;
+  --chamfer: .3rem;
+  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --nh-fill: var(--surface-3);
+  --nh-rim: var(--line-strong);
+  --nh-glow: none;
 }
-.nh-chip--harmful { border-color: var(--danger); }
-.nh-chip--beneficial { border-color: var(--cyan); }
-.nh-chip--magical { border-color: var(--violet); }
-.nh-chip--info { border-color: var(--indigo); }
-.nh-chip--at-risk { box-shadow: var(--glow-violet); }
+.nh-chip::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  /* 1px for the same reason as the badge: a 2px rim on a 24px box is an edge, not a material. */
+  border: 1px solid var(--nh-rim);
+  background: var(--nh-fill);
+  filter: var(--nh-glow);
+  transition: background-color var(--dur-hover), border-color var(--dur-hover), filter var(--dur-hover);
+}
+.nh-chip--harmful { --nh-rim: var(--danger); }
+.nh-chip--beneficial { --nh-rim: var(--cyan); }
+.nh-chip--magical { --nh-rim: var(--violet); }
+.nh-chip--info { --nh-rim: var(--indigo); }
+/* Glow rides the drop-shadow filter now, not box-shadow: box-shadow cannot follow a clip-path cut,
+   so on the backing layer it would have drawn a rectangular halo around a chamfered chip. */
+.nh-chip--at-risk { --nh-glow: var(--glow-drop-violet); }
 
 .nh-chip-icon { font-size: 1em; line-height: 1; color: var(--text-dim); }
 .nh-chip--harmful .nh-chip-icon { color: var(--danger-hi); }
@@ -22,6 +51,10 @@
 .nh-chip--magical .nh-chip-icon { color: var(--violet-hi); }
 .nh-chip--info .nh-chip-icon { color: var(--indigo); }
 
+/* The remove ✕ STAYS ROUND. Ruling 24 de-pills status labels, rows, tags and counts — shapes that
+   were carrying meaning by being pills. This is a 17.6px close control, the same family as the dot
+   and the swatch the same ruling protects, and squaring it would make a chip look like it holds a
+   second chip. */
 .nh-chip-remove {
   display: inline-grid;
   place-items: center;
@@ -38,16 +71,31 @@
   opacity: 0.7;
   transition: opacity var(--dur-hover), background var(--dur-hover);
 }
-.nh-chip-remove:hover { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
+.nh-chip-remove:hover, .nh-chip-remove:active { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
 /* A chip's ✕ stays visually tiny; `.tap-target` gives the finger the 44px floor. */
 .nh-chip-remove.tap-target::after { border-radius: 50%; }
 
 /* Pressable / selectable chip (filter + condition toggles). A condition toggle mid-combat
-   is a finger target, so it takes the 44px floor: 2rem of paint (a 44px pill would stop
-   reading as a chip and would double the height of an initiative row) plus `.tap-target`
-   for the last 12px of hit AREA. That leaves 6px of overhang per side, so a wrapping chip
-   row must gap its children by at least --space-3 or neighbours steal each other's taps. */
+   is a finger target, so it takes the 44px floor: 2rem of paint (a 44px chip would double the
+   height of an initiative row) plus `.tap-target` for the last 12px of hit AREA. That leaves 6px
+   of overhang per side, so a wrapping chip row must gap its children by at least --space-3 or
+   neighbours steal each other's taps. */
 .nh-chip--pressable { min-height: 2rem; cursor: pointer; }
-.nh-chip--pressable:hover:not(:disabled) { border-color: var(--line-strong); }
-.nh-chip--pressable[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 55%, var(--surface-2)); box-shadow: inset 0 0 0 1px currentColor; }
+/* Ruling 40, and its touch clause: `:active` says what `:hover` says, because half this table's
+   devices have no hover at all. */
+.nh-chip--pressable:hover:not(:disabled), .nh-chip--pressable:active:not(:disabled) { --nh-rim: var(--rim-color-hi); }
+/* Selected = a lifted fill plus the leading tick that ruling 7 gives every "on" in the system, so a
+   pressed chip and a pressed segment read as the same state. Drawn as a background layer on the
+   backing element: `::after` is the tap extension and overwriting it would delete the hit area.
+   The tick lives INSIDE the existing left padding and adds none of its own — a chip row that
+   reflowed every time one chip was pressed would be a layout shift under the finger. */
+.nh-chip--pressable[aria-pressed="true"] { --nh-fill: color-mix(in srgb, var(--surface-3) 55%, var(--surface-2)); --nh-rim: currentColor; }
+.nh-chip--pressable[aria-pressed="true"]::before {
+  background-image:
+    linear-gradient(to top right, var(--state-on, var(--magenta)) 0 50%, transparent 50%),
+    linear-gradient(to bottom right, var(--state-on, var(--magenta)) 0 50%, transparent 50%);
+  background-repeat: no-repeat, no-repeat;
+  background-size: .26rem .2rem, .26rem .2rem;
+  background-position: left .17rem top calc(50% - .2rem), left .17rem top 50%;
+}
 .nh-chip--pressable:disabled { opacity: 0.6; cursor: not-allowed; }
