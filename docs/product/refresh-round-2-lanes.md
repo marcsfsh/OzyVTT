@@ -127,6 +127,34 @@ Depends on wave 2 for the material and wave 3 for the spacing. Applies rulings 2
 
 ---
 
+## Wave 1 — landed 2026-08-06
+
+Three lanes, thirteen files, no collisions. Committed separately so a bad lane could be reverted alone.
+
+**The route audit went 18 → 10 failing cells.** Not 14 → 10: the "14" on record was an undercount,
+and the baseline was re-measured on a worktree at the pre-wave commit rather than taken on trust.
+`/scenes` went **fully green** (three landscape cells, cleared by the copy trim alone), `/roster` went
+4 fails → 1 with the survivor improving Y+88 → Y+31, and `/replays/:id` went 4 → 3 with Y+139 → Y+63.
+**No green cell went red.** `/replays` player at 844×390 reads FAIL Y+1 and did so in the baseline
+too — worth stating because it looks like a new regression and is not. Two `/scenes/maps` cells got
+1px worse while staying red; noise, not a finding.
+
+Ratchet (c) reconciled from a measured scan: eyebrow uses **11 → 8**, files **10 → 7**. No other
+counter moved. Typecheck clean, 575 client tests green.
+
+**What the lanes found that the plan had wrong** — recorded because each was a measurement beating an
+instruction, which is the outcome the rules ask for:
+- The Codex rail does **not** overflow 5px at 1280×900 as planned; it does not overflow there at all,
+  but it hides 75px at 1366×768 and 143px at 1280×700. See the debt below.
+- Ruling 15's third selector (`:100`, enlarged mode) had **zero measured damage** — enlarged mode was
+  broken entirely by `:34`. Scoping it is hygiene, not a fix, and "three lines, not two" should not be
+  read as three separate bugs.
+- The monster list's problem was never a missing height cap: it was a declared scroller that could not
+  scroll, because its `flex: 1 1 auto` had no flex parent.
+- The Scenes trim delivers 2.99 card rows, not 3. See the debt below.
+
+---
+
 ## Debts a wave hands to a later one
 
 Recorded here because a debt agreed in a commit message and nowhere else is a debt nobody pays.
