@@ -122,6 +122,36 @@ out of the box; the GM opts in to more.
 > visibility tier is a projection decision. Filtering in the client would make the setting decorative
 > and the data still on the wire.
 
+### `off` stops at the party surface — a director instruction corrected by measurement
+
+The director specified `off` as "absent from the player's projection entirely — not a stub, not a
+name with nulls." **Built exactly that way, it breaks the table**, and the lane measured it rather
+than shipping it: `combat.initiative` still names the other player's character and `combat.tokens`
+still carries their token, because both are projected by a different function the tier does not
+touch — but `EncounterMap` bails on an actor it cannot find. **A player at `off` would see an ally's
+name in the turn order and an empty square where they are standing.**
+
+A GM choosing "Off" is saying *my players don't read each other's sheets*. They are not saying
+*delete my players from the battle map*. That also matches D9's own wording — the setting disables
+the read-only-sheet visibility on the My Character tab.
+
+| tier | entry in `state.actors` | `classLine` | `definition` | resources | My Character tab |
+|---|---|---|---|---|---|
+| **off** | **present** | – | – | – | **no party list at all** |
+| name-and-class | present | `"Wizard 7"` | – | – | identity cards |
+| full-sheet | present | Y | Y | – | + read-only sheet |
+| sheet-and-resources | present | Y | Y | Y | + live resources |
+
+**The client must branch on `state.partyVisibility`, never on which fields happen to be present.** At
+`off` the entries exist only so the map, the turn order and the tokens stay coherent; their presence
+is not permission to list them.
+
+**One new field, `PlayerActor.classLine`** ("Wizard 7"). The `name-and-class` tier is unrenderable
+without it — `definition` is owner-only below `full-sheet` and `PlayerView` carries no definitions
+list, so class was simply unreachable. Absent on the player's own character, where the owner already
+holds the whole definition. **Unclaimed characters sit outside the gate entirely**, because the claim
+screen reads `state.actors` and gating them would brick claiming.
+
 ### 6 — Combat log: a drawer from the right
 
 Chosen with both named costs accepted. Both are the implementer's to solve:
