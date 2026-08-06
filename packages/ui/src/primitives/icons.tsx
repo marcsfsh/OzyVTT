@@ -5,7 +5,19 @@
 
    This set is deliberately tiny (only what the primitives themselves need). The
    app's richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx;
-   @vtt/ui must not depend on the app, so the few UI-chrome glyphs live here. */
+   @vtt/ui must not depend on the app, so the few UI-chrome glyphs live here.
+
+   WEIGHT (ruling 43). "Heavier stroke, hard corners" could not be executed as asked, because
+   nothing here is stroked — there is no stroke-width to raise. The ruling is a heavier
+   DRAWING instead: same shapes, still filled, but limbs thickened, silhouette corners mitred
+   to points and negative space tightened. The set's line weight is 2.8 units on the 24-box,
+   up from ~2.0. It is one number on purpose: a glyph set with two stroke weights reads as two
+   sets. Where a counter would close up before 2.8 (Drag's dots, Fog's bands, Measure's ticks)
+   the gap wins and the note on that glyph says so — a mark that fuses at 17px has failed.
+
+   The Glyph wrapper owns width/height/fill. Never put them on an individual icon: a stray
+   class rule that beats the 1em presentation attribute has already blown this set up to
+   1080px once, and per-icon overrides make the next such bug asymmetric across the set. */
 
 import type { ReactNode } from "react";
 
@@ -19,12 +31,12 @@ function Glyph({ children, className }: Readonly<{ children: ReactNode; classNam
 
 /** Selection tick — the single "chosen" mark across the system. */
 export function IconCheck({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M9.6 16.2 5.4 12l-1.4 1.4 5.6 5.6L20.4 7.8 19 6.4z" /></Glyph>;
+  return <Glyph className={className}><path d="M3.4 13.2 9.5 19.3 20.7 7.3 18.7 5.3 9.5 15.3 5.4 11.2z" /></Glyph>;
 }
 
 /** Disclosure caret. Points down at rest; callers rotate it when open. */
 export function IconChevron({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M12 15.4 5.6 9l1.4-1.4 5 5 5-5L18.4 9z" /></Glyph>;
+  return <Glyph className={className}><path d="M4.9 9.8 12 16.9 19.1 9.8 17.1 7.8 12 12.9 6.9 7.8z" /></Glyph>;
 }
 
 /* The two horizontal chevrons are drawn rather than left to a CSS rotation of the one above. A rotated
@@ -34,18 +46,22 @@ export function IconChevron({ className }: Readonly<{ className?: string }>) {
 
 /** Back / previous. */
 export function IconChevronLeft({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M15.4 5.6 16.8 7l-5 5 5 5-1.4 1.4L9 12z" /></Glyph>;
+  return <Glyph className={className}><path d="M14.2 4.9 7.1 12l7.1 7.1 2-2L11.1 12l5.1-5.1z" /></Glyph>;
 }
 
 /** Forward / next / "there is more this way". */
 export function IconChevronRight({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M8.6 18.4 7.2 17l5-5-5-5L8.6 5.6 15 12z" /></Glyph>;
+  return <Glyph className={className}><path d="M7.8 6.9 12.9 12l-5.1 5.1 2 2L16.9 12 9.8 4.9z" /></Glyph>;
 }
 
+/* The lens and its handle are two <path> elements rather than one `d`. A filled ring needs
+   evenodd to keep its hole; a bar laid across that ring under the SAME fill rule would flip
+   the overlap back to a hole. Two elements, two fill rules, no interaction. */
 export function IconSearch({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M10.5 3a7.5 7.5 0 1 0 4.55 13.46l4.24 4.25 1.42-1.42-4.25-4.24A7.5 7.5 0 0 0 10.5 3zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z" />
+      <path fillRule="evenodd" d="M10.3 2.6a7.7 7.7 0 1 0 0 15.4 7.7 7.7 0 0 0 0-15.4zm0 2.8a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8z" />
+      <path d="M13.8 16 19.6 21.8 21.8 19.6 16 13.8z" />
     </Glyph>
   );
 }
@@ -54,7 +70,10 @@ export function IconSearch({ className }: Readonly<{ className?: string }>) {
 export function IconShuffle({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path d="M17 4.2 21.8 8 17 11.8V9h-2.1c-1 0-1.6.4-2.4 1.5l-.9 1.3-1.3-1.7.7-1c1.2-1.7 2.4-2.4 3.9-2.4H17zM2.2 7h3.3c1.4 0 2.6.6 3.6 1.9l5 6.6c.7.9 1.2 1.2 2 1.2H17v-2.7L21.8 18 17 21.8V19h-.9c-1.5 0-2.7-.7-3.7-2l-5-6.6c-.7-.9-1.2-1.2-1.9-1.2H2.2zm0 10h3.3c.8 0 1.4-.3 2.1-1.2l.6-.8 1.3 1.7-.5.7C8 18.9 6.9 19.5 5.5 19.5H2.2z" />
+      <path d="M2 8.8H6l8.3 9.8h2.3v-2.8h-1.1L7.2 6H2z" />
+      <path d="M16.4 13.4 21.8 17.2 16.4 21z" />
+      <path d="M2 18h5.2l8.3-9.8h1.1V5.4h-2.3L6 15.2H2z" />
+      <path d="M16.4 3 21.8 6.8 16.4 10.6z" />
     </Glyph>
   );
 }
@@ -63,7 +82,7 @@ export function IconShuffle({ className }: Readonly<{ className?: string }>) {
 export function IconDie({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm3.2 3.4a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6zm7.6 0a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6zm-3.8 3.8a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6zm-3.8 3.8a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6zm7.6 0a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6z" />
+      <path fillRule="evenodd" d="M2.6 2.6h18.8v18.8H2.6zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm8 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-4 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-4 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm8 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
     </Glyph>
   );
 }
@@ -72,7 +91,11 @@ export function IconDie({ className }: Readonly<{ className?: string }>) {
 export function IconPencil({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path d="M3 17.3 14.1 6.2l3.7 3.7L6.7 21H3zM15.5 4.8l1.7-1.7a1.2 1.2 0 0 1 1.7 0l2 2a1.2 1.2 0 0 1 0 1.7l-1.7 1.7z" />
+      {/* Shaft and head keep the ~2-unit ferrule gap they always had. Widening the barrel to 6.5
+          without re-opening that gap fuses the two into one wedge and the pencil stops being a
+          pencil — the first thing this pass got wrong. */}
+      <path d="M2.6 21.4 2.8 16.5 14.1 5.3 18.7 9.9 7.5 21.2z" />
+      <path d="M15.5 3.9 17.3 2 22 6.7 20.1 8.5z" />
     </Glyph>
   );
 }
@@ -85,7 +108,7 @@ export function IconPencil({ className }: Readonly<{ className?: string }>) {
 export function IconWarning({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M12 2.6c.6 0 1.2.32 1.53.87l9 15.4A1.75 1.75 0 0 1 21 21.5H3a1.75 1.75 0 0 1-1.53-2.63l9-15.4A1.76 1.76 0 0 1 12 2.6zm-1.1 5.6v6h2.2v-6zm0 7.6v2.2h2.2v-2.2z" />
+      <path fillRule="evenodd" d="M12 2.1 22.9 21.4H1.1zm-1.5 6.3h3v6.6h-3zm0 8h3v3h-3z" />
     </Glyph>
   );
 }
@@ -94,7 +117,7 @@ export function IconWarning({ className }: Readonly<{ className?: string }>) {
 export function IconInfo({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.1 4.4v2.2h2.2V6.4zm0 3.9v7.3h2.2v-7.3z" />
+      <path fillRule="evenodd" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.5 4.2h3v3h-3zm0 4.4h3v7.4h-3z" />
     </Glyph>
   );
 }
@@ -105,14 +128,14 @@ export function IconInfo({ className }: Readonly<{ className?: string }>) {
 
 /** Add — the one "make another of these" mark (RowEditor's Add, TagInput's commit). */
 export function IconPlus({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" /></Glyph>;
+  return <Glyph className={className}><path d="M10.6 4.6h2.8v6h6v2.8h-6v6h-2.8v-6h-6v-2.8h6z" /></Glyph>;
 }
 
 /** Remove — destructive, so it is always paired with a word ("Remove action 2"). */
 export function IconTrash({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M9.5 2.5h5a1 1 0 0 1 1 1V5H20v2h-1.1l-.86 12.07A2 2 0 0 1 16.05 21H7.95a2 2 0 0 1-2-1.93L5.1 7H4V5h4.5V3.5a1 1 0 0 1 1-1zm1 2.5h3V5h-3zM9.2 9l.5 9.5h1.6L10.8 9zm4 0-.5 9.5h1.6L14.8 9z" />
+      <path fillRule="evenodd" d="M9.2 2.2h5.6v2.6h5.8v3h-1.7l-1 13.8H6.1L5.1 7.8H3.4v-3h5.8zM9.1 9.6l.5 9.4h1.9L11 9.6zm3.9 0-.5 9.4h1.9l.5-9.4z" />
     </Glyph>
   );
 }
@@ -122,7 +145,10 @@ export function IconTrash({ className }: Readonly<{ className?: string }>) {
 export function IconDrag({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path d="M9 4.5h2.2v2.2H9zm3.8 0H15v2.2h-2.2zM9 8.9h2.2v2.2H9zm3.8 0H15v2.2h-2.2zM9 13.3h2.2v2.2H9zm3.8 0H15v2.2h-2.2zM9 17.7h2.2v2.2H9zm3.8 0H15v2.2h-2.2z" />
+      {/* The dots gain weight but NOT at the expense of the gaps between them: at 17px a gap
+          under ~1.4px closes up and eight dots read as two dashed bars. Squares 2.2→2.9,
+          gaps held at ~2.0, and the grip grows into the box instead. */}
+      <path d="M8.3 3.2h2.9v2.9H8.3zm4.6 0h2.9v2.9h-2.9zM8.3 8.1h2.9V11H8.3zm4.6 0h2.9V11h-2.9zM8.3 13h2.9v2.9H8.3zm4.6 0h2.9v2.9h-2.9zM8.3 17.9h2.9v2.9H8.3zm4.6 0h2.9v2.9h-2.9z" />
     </Glyph>
   );
 }
@@ -131,7 +157,7 @@ export function IconDrag({ className }: Readonly<{ className?: string }>) {
 export function IconCopy({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M8 2h9a2 2 0 0 1 2 2v11h-2V4H8zM5 6h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v12h8V8z" />
+      <path fillRule="evenodd" d="M7.6 2.2h13.2v13.2h-2.9V5.1H7.6zM3.2 6.4h13.2v15.4H3.2zm2.9 2.9v9.6h7.4V9.3z" />
     </Glyph>
   );
 }
@@ -141,16 +167,22 @@ export function IconCopy({ className }: Readonly<{ className?: string }>) {
 export function IconEye({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M12 4.8c4.5 0 8.3 2.9 9.9 7.2-1.6 4.3-5.4 7.2-9.9 7.2S3.7 16.3 2.1 12C3.7 7.7 7.5 4.8 12 4.8zm0 2c-3.4 0-6.4 2-7.8 5.2 1.4 3.2 4.4 5.2 7.8 5.2s6.4-2 7.8-5.2C18.4 8.8 15.4 6.8 12 6.8zm0 1.7a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z" />
+      <path fillRule="evenodd" d="M12 4.4c4.7 0 8.7 3 10.4 7.6-1.7 4.6-5.7 7.6-10.4 7.6S3.3 16.6 1.6 12C3.3 7.4 7.3 4.4 12 4.4zm0 2.8c-3.5 0-6.6 2-8 4.8 1.4 2.8 4.5 4.8 8 4.8s6.6-2 8-4.8c-1.4-2.8-4.5-4.8-8-4.8zm0 .8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" />
     </Glyph>
   );
 }
 
-/** GM-only / hidden from players. The slash is the state, not the colour. */
+/** GM-only / hidden from players. The slash is the state, not the colour.
+    The slash is its OWN element laid over a whole lens, not a fourth contour inside the lens's
+    evenodd path. Tried that: evenodd alternates, so the bar knocks out across the lid and the
+    pupil but prints across the counter, and the slash renders as three woven fragments. SVG has
+    no way to subtract one path from another without a mask, and a mask needs an id — which
+    collides the moment two of this icon share a page. A whole lens plus a solid bar it is. */
 export function IconEyeOff({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M3.5 2.1 21.9 20.5l-1.4 1.4-3.2-3.2a11 11 0 0 1-5.3 1.3c-4.5 0-8.3-2.9-9.9-7.2A11.6 11.6 0 0 1 5.4 7.5L2.1 4.2zm3.3 6.8A9.6 9.6 0 0 0 4.2 12c1.4 3.2 4.4 5.2 7.8 5.2 1.2 0 2.4-.26 3.44-.74l-1.7-1.7a3.5 3.5 0 0 1-4.74-4.74zM12 4.8c4.5 0 8.3 2.9 9.9 7.2a11.7 11.7 0 0 1-2.53 3.86l-1.43-1.43A9.7 9.7 0 0 0 19.8 12C18.4 8.8 15.4 6.8 12 6.8c-.5 0-1 .04-1.48.13L8.85 5.25A11.3 11.3 0 0 1 12 4.8z" />
+      <path fillRule="evenodd" d="M12 4.4c4.7 0 8.7 3 10.4 7.6-1.7 4.6-5.7 7.6-10.4 7.6S3.3 16.6 1.6 12C3.3 7.4 7.3 4.4 12 4.4zm0 2.8c-3.5 0-6.6 2-8 4.8 1.4 2.8 4.5 4.8 8 4.8s6.6-2 8-4.8c-1.4-2.8-4.5-4.8-8-4.8zm0 .8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" />
+      <path d="M1.5 3.7 20.1 22.3 22.3 20.1 3.7 1.5z" />
     </Glyph>
   );
 }
@@ -162,12 +194,13 @@ export function IconEyeOff({ className }: Readonly<{ className?: string }>) {
 
 /** Dismiss. Always paired with an accessible name on the control that holds it. */
 export function IconX({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M18.3 7.1 16.9 5.7 12 10.6 7.1 5.7 5.7 7.1l4.9 4.9-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z" /></Glyph>;
+  return <Glyph className={className}><path d="M5.1 7.1 16.9 18.9 18.9 16.9 7.1 5.1zM7.1 18.9 18.9 7.1 16.9 5.1 5.1 16.9z" /></Glyph>;
 }
 
-/** Go live / play. The one "start this" mark. */
+/** Go live / play. The one "start this" mark. A solid triangle has no limb to thicken, so its
+    share of the weight pass is size and nothing else — it was already among the densest marks. */
 export function IconPlay({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M8 5.2 19 12 8 18.8z" /></Glyph>;
+  return <Glyph className={className}><path d="M7.8 4.7 19.6 12 7.8 19.3z" /></Glyph>;
 }
 
 /** Forward — "this takes you there". The set carried no arrow for a long time on the grounds that the
@@ -177,12 +210,23 @@ export function IconPlay({ className }: Readonly<{ className?: string }>) {
     once. Rotate it for ← ↑ ↓ (the map library's four nudges) — it is centred on the 24-box for exactly
     that. */
 export function IconArrow({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M4 11h11.2l-4.9-4.9L11.7 4.7 19 12l-7.3 7.3-1.4-1.4 4.9-4.9H4z" /></Glyph>;
+  return (
+    <Glyph className={className}>
+      <path d="M3.6 10.6h13.6v2.8H3.6z" />
+      <path d="M11.6 6.6 17 12l-5.4 5.4 2 2L21 12 13.6 4.6z" />
+    </Glyph>
+  );
 }
 
 /** Download / export — the replay's "keep a copy", and any save-to-disk action. */
 export function IconDownload({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M11 3h2v8.2l3.1-3.1 1.4 1.4L12 15l-5.5-5.5 1.4-1.4L11 11.2zM4 18h16v2H4z" /></Glyph>;
+  return (
+    <Glyph className={className}>
+      <path d="M10.6 3.2h2.8v10h-2.8z" />
+      <path d="M6.2 11.2 12 17l5.8-5.8-2-2L12 13 8.2 9.2z" />
+      <path d="M3.8 18.6h16.4v2.8H3.8z" />
+    </Glyph>
+  );
 }
 
 /* ---- Map-tool glyphs. The map toolbar rendered its tools as emoji (✏ 👁 🌫 🎨 📍 📏 ⛌ …), which is the
@@ -193,7 +237,7 @@ export function IconDownload({ className }: Readonly<{ className?: string }>) {
 
 /** Select / move — the toolbar's resting tool, and the one every other tool returns to. */
 export function IconSelect({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M6 3v15.4l3.6-3.5 2.3 5 2.6-1.2-2.3-4.9h5z" /></Glyph>;
+  return <Glyph className={className}><path d="M5.6 2.6v17l4-4 2.5 5.4 3-1.2-2.5-5.4h6z" /></Glyph>;
 }
 
 /** Ping — "look here", the transient beacon a GM drops on the map. Rings around a point, because that
@@ -201,16 +245,18 @@ export function IconSelect({ className }: Readonly<{ className?: string }>) {
 export function IconPing({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M12 3.6a8.4 8.4 0 1 0 0 16.8 8.4 8.4 0 0 0 0-16.8zm0 2a6.4 6.4 0 1 1 0 12.8 6.4 6.4 0 0 1 0-12.8zm0 3.4a3 3 0 1 1 0 6 3 3 0 0 1 0-6z" />
+      <path fillRule="evenodd" d="M12 3.4a8.6 8.6 0 1 0 0 17.2 8.6 8.6 0 0 0 0-17.2zm0 2.8a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6zm0 2.2a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2z" />
     </Glyph>
   );
 }
 
-/** Measure — distance in squares or feet. A ruler, ticks and all, so it cannot be read as a plain bar. */
+/** Measure — distance in squares or feet. A ruler, ticks and all, so it cannot be read as a plain bar.
+    Still four ticks, as before — they widen (1.6→1.9) but stay 1.9 apart, because a 2.8-unit frame
+    eats the tick budget and a gap under ~1.3px at 17px turns four ticks into one grey smear. */
 export function IconMeasure({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M3 8h18a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zm1 2v4h16v-4h-1.6v2.2h-1.6V10h-2.2v2.2h-1.6V10h-2.2v2.2H9.2V10H7v2.2H5.4V10z" />
+      <path fillRule="evenodd" d="M1.6 7h20.8v10H1.6zm2.4 2.8v4.4h16V9.8h-1.3v2.6h-1.9V9.8h-1.9v2.6h-1.9V9.8h-1.9v2.6H9.2V9.8H7.3v2.6H5.4V9.8z" />
     </Glyph>
   );
 }
@@ -219,14 +265,16 @@ export function IconMeasure({ className }: Readonly<{ className?: string }>) {
 export function IconDraw({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path d="M12 2.6 18.4 13H5.6zM3.4 14.8h7.2V22H3.4zM17.6 14.4a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6z" />
+      <path d="M12 2.2 19 13.2H5zM3 14.6h7.8v7.8H3zM17.7 14.2a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 0 1 0-8.6z" />
     </Glyph>
   );
 }
 
-/** Fog of war — the covered map. Banded rather than a cloud: what it hides is a rectangle of ground. */
+/** Fog of war — the covered map. Banded rather than a cloud: what it hides is a rectangle of ground.
+    Already hard-cornered, so this one takes weight only: bands 2.3→3.0, gaps held at 2.3 so the
+    three bands never fuse into a block (ruling 38 — fog must stay unmistakable, not a mass). */
 export function IconFog({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M4 6.4h16v2.3H4zM7 11.3h13v2.3H7zM4 16.2h12v2.3H4z" /></Glyph>;
+  return <Glyph className={className}><path d="M4 5.2h16v3H4zM7 10.5h13v3H7zM4 15.8h12v3H4z" /></Glyph>;
 }
 
 /** Colour — the drawing palette. Never the only way to say what a mark means (the palette is
@@ -234,7 +282,10 @@ export function IconFog({ className }: Readonly<{ className?: string }>) {
 export function IconColor({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d="M12 3c-5.5 0-10 3.1-10 7 0 4.7 5 8 10 8 .9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1 0-.9.7-1.6 1.6-1.6h1.9c3.4 0 5.7-2.3 5.7-5.7C22 6.1 17.5 3 12 3zM7.4 12.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4zm3.2-4.4a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4zm4.8 0a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z" />
+      {/* Barely moves, and that is right: the palette is already one of the densest marks in the
+          set. It gets a slightly larger body — its wells stay put, so the ink around them grows —
+          and nothing else. Mitring the thumb notch would fight the one organic shape here. */}
+      <path fillRule="evenodd" d="M12 2.6c-5.7 0-10.4 3.3-10.4 7.6 0 5 5.2 8.6 10.4 8.6 1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.4-.4-.7-.4-1.1 0-1 .8-1.7 1.7-1.7h2c3.6 0 6-2.5 6-6.1 0-4.1-4.8-7.4-10.5-4.4zM7.4 12.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4zm3.2-4.4a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4zm4.8 0a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z" />
     </Glyph>
   );
 }
@@ -244,7 +295,7 @@ export function IconColor({ className }: Readonly<{ className?: string }>) {
 export function IconCleanup({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path d="M18.4 2.9 21.1 5.6l-6.3 6.3-2.7-2.7zM11.2 10.6l2.7 2.7-5.5 5.5A4 4 0 0 1 5.6 20H2.9l2.2-2.2a2.3 2.3 0 0 0 .4-2.7z" />
+      <path d="M17.9 2.2 21.3 5.6 14.4 12.5 11 9.1zM10.1 10 14.9 14.8l-5.6 5.6a4.4 4.4 0 0 1-3.1 1.3H2.2l2.5-2.5a2.6 2.6 0 0 0 .4-3.1z" />
     </Glyph>
   );
 }
@@ -255,7 +306,10 @@ export function IconCleanup({ className }: Readonly<{ className?: string }>) {
 export function IconScene({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path d="M2.3 6.8 20.9 4.2l.5 3.4-18.6 2.6zM3 11.6h18V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      {/* The other glyph that barely moves: it was already a hard-cornered band over a box. The
+          slate deepens 3.4→4.2, the body's two rounded bottom corners go square, the gap closes
+          1.4→1.1. No redraw — there is nothing here that a redraw would improve. */}
+      <path d="M2.1 6.6 21.2 3.9l.6 4.2-19.1 2.7zM2.8 11.9h18.4v9.5H2.8z" />
     </Glyph>
   );
 }
@@ -263,5 +317,5 @@ export function IconScene({ className }: Readonly<{ className?: string }>) {
 /** Legendary — the monster that breaks the turn order's rules. Always paired with a word; a lone star
     means "favourite" to most people and that is not what this says. */
 export function IconStar({ className }: Readonly<{ className?: string }>) {
-  return <Glyph className={className}><path d="M12 2.8 14.7 8.7l6.4.7-4.8 4.3 1.3 6.3L12 16.8l-5.6 3.2 1.3-6.3L2.9 9.4l6.4-.7z" /></Glyph>;
+  return <Glyph className={className}><path d="M12 2.2 14.9 8l6.4 1-4.6 4.5 1.1 6.4L12 16.9l-5.8 3 1.1-6.4L2.7 9l6.4-1z" /></Glyph>;
 }

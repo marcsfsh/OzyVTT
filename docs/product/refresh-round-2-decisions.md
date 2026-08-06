@@ -476,12 +476,28 @@ ink on a light ground and so reads stronger there, not weaker.
 The client's calibration still binds, restated for a fill-only set:
 
 - **The floor:** the change must be obvious in a side-by-side at 100%. If a reviewer has to be told
-  which is which, it was underdone.
-- **The ceiling:** a glyph's visual weight must not exceed the stems of the label beside it. An icon
-  that out-weighs its own text has become the distraction the client named.
+  which is which, it was underdone. **Cleared:** ink coverage up a median **+38.2%** across the UI set
+  and **+25.7%** across the Codex set; painted limb at 17px 1.420px → 1.980px.
+- **The ceiling, as the director first wrote it, was never satisfiable and has been restated.** The
+  rule said a glyph's limb must not exceed the stem of the label beside it. Measured, **the old set
+  already breached that** — 1.420px of limb against a 1.337px button-label stem, 106%, before this
+  lane touched anything. A floor requiring more weight and a ceiling already exceeded cannot both
+  hold. **The operative ceiling is parity at real paired sizes**, which is where the set now sits:
+  94% at button size, 95–117% on the map toolbar. It is only above 100% where the glyph carries no
+  adjacent label at all.
 
-Some glyphs barely move (Fog, Scene are already hard-cornered bands) and that is correct — this is a
-weight change, not a redraw quota. **Scope: ~69 glyphs, two files, no call sites touched.**
+Some glyphs barely move and that is correct — this is a weight change, not a redraw quota. Fog gains
+weight while **holding its band gaps** so they never fuse; Play is a solid triangle with no limb to
+thicken. **Three glyphs correctly lost ink** (Warning, Info, the Codex quest mark): on a counterform
+glyph the bang or the stroke *is* the counter, so widening it removes fill. Coverage is the wrong
+metric there and all three read bolder.
+
+**Scope was 97 glyphs, not the ~69 this ruling estimated** — the Codex registry holds 68, not ~40.
+Two files, no call sites, no export or signature changed.
+
+**Two glyphs had never rendered at all** and were fixed in passing: the Codex `graveyard` cross and
+the `sessions` ruled lines were wound the same direction as their parent under nonzero fill, so they
+were invisible. They are counters now.
 
 This is the best candidate for **phase 6, the director's polish pass**. It is a dial, and dials are
 set by looking.
