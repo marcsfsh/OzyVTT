@@ -200,7 +200,7 @@
 .codex-editor-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 /* Obsidian/OneNote-style three-pane: explorer (rail) | editor center | context (outline + backlinks). */
 .codex-editor-titlewrap { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.codex-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
+.codex-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
 .codex-crumb-sep { opacity: 0.6; }
 .codex-editor-head { padding-inline: var(--space-4); }
 .codex-editor-cols { display: flex; flex-direction: column; gap: var(--space-4); align-items: stretch; min-height: 0; }

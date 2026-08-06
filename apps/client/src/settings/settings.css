@@ -15,10 +15,10 @@
 
 /* No background of its own: `.surface-glass` (the markup carries it) is the scene tier, and a
    flat `--surface-1` fill here would paint over it. */
-.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: 1rem 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: var(--space-4) 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .settings-group > .nh-eyebrow { margin-bottom: .6rem; }
 
-.settings-row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: .8rem 0; border-top: 1px solid var(--line); }
+.settings-row { display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; padding: .8rem 0; border-top: 1px solid var(--line); }
 .settings-group > .settings-row:first-of-type { border-top: 0; padding-top: .2rem; }
 .settings-row.stacked { flex-direction: column; align-items: stretch; }
 .settings-row-text { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
@@ -35,13 +35,13 @@
 
 .settings-exceptions { display: flex; flex-direction: column; gap: .45rem; width: 100%; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .settings-exception { display: flex; gap: .6rem; align-items: center; justify-content: space-between; }
-.settings-methods { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; }
+.settings-methods { display: flex; flex-wrap: wrap; gap: var(--space-2) 1.2rem; }
 
-.settings-subsection { display: flex; flex-direction: column; gap: .8rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.settings-subsection { display: flex; flex-direction: column; gap: .8rem; margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line); }
 .settings-session { display: flex; flex-wrap: wrap; gap: .6rem; }
 
 .settings-empty { margin: 0; padding: 1.2rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .9rem; }
-.settings-players { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.settings-players { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .settings-player { display: flex; gap: .7rem; align-items: center; padding: .6rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .settings-player-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
 .settings-player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

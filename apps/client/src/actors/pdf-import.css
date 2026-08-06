@@ -1,8 +1,8 @@
-.pdf-import-head { margin-bottom: 1rem; }
+.pdf-import-head { margin-bottom: var(--space-4); }
 .pdf-import-head h2 { margin: 0.15rem 0 0.35rem; }
 .pdf-import-head p { margin: 0; opacity: 0.75; font-size: 0.9rem; }
 
-.pdf-import-drop { display: grid; gap: 0.6rem; justify-items: center; padding: 2rem 1rem; }
+.pdf-import-drop { display: grid; gap: 0.6rem; justify-items: center; padding: var(--space-8) var(--space-4); }
 .pdf-import-note { margin: 0; opacity: 0.75; }
 
 .pdf-import-review { display: grid; gap: 0.9rem; }
@@ -11,7 +11,7 @@
 .pdf-import-error {
   border: 1px solid var(--border, #6b5a86);
   border-radius: 0.5rem;
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem var(--space-3);
   font-size: 0.88rem;
 }
 .pdf-import-warnings { border-color: var(--caution, #e0a458); background: color-mix(in srgb, var(--caution, #e0a458) 12%, transparent); }
@@ -24,18 +24,18 @@
 .pdf-import-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
-.pdf-import-fields label { display: grid; gap: 0.25rem; font-size: 0.85rem; opacity: 0.95; }
+.pdf-import-fields label { display: grid; gap: var(--space-1); font-size: 0.85rem; opacity: 0.95; }
 
 .pdf-import-summary { display: grid; gap: 0.4rem; margin: 0; }
-.pdf-import-summary > div { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.pdf-import-summary > div { display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .pdf-import-summary dt { opacity: 0.7; }
 .pdf-import-summary dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .pdf-import-abilities { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
-.pdf-import-buttons { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
-.pdf-import-buttons-right { display: flex; gap: 0.5rem; }
+.pdf-import-buttons { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.pdf-import-buttons-right { display: flex; gap: var(--space-2); }
 
 /* The ladder's narrow rung (§3), one block for the whole file. (The GM approval queue's
    `.roster-pending*` rules stood above this block until Phase C: their one consumer was

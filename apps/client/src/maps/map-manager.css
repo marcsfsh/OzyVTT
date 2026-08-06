@@ -64,7 +64,7 @@
 .map-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-3); min-width: 0; min-height: 0; }
 
 .map-rail { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; }
-.map-rail-filters { display: flex; flex-direction: column; gap: .5rem; }
+.map-rail-filters { display: flex; flex-direction: column; gap: var(--space-2); }
 /* Folders up front (D5): one scrolling chip row above the picture grid. */
 .map-folder-chips { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
 .map-folder-chips > * { flex: none; }
@@ -73,8 +73,8 @@
    markup; the shared picker's own 21rem cap is neutralised below so only one thing scrolls. */
 .map-rail-list { min-height: 0; padding-right: var(--space-1); }
 .map-rail .map-picker-grid { max-height: none; }
-.map-list-empty { margin: var(--space-2) 0 0; padding: 1rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: var(--fs-sm); }
-.map-empty { margin: 0; padding: 2rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); }
+.map-list-empty { margin: var(--space-2) 0 0; padding: var(--space-4); border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: var(--fs-sm); }
+.map-empty { margin: 0; padding: var(--space-8); border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); }
 .map-pane-empty { display: grid; place-items: center; }
 
 /* ───────────────────────── the calibration pane ───────────────────────── */
@@ -86,12 +86,12 @@
 .map-pane-title { display: flex; flex-direction: column; min-width: 0; margin-inline-end: auto; }
 .map-pane-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .map-pane-title span { color: var(--text-muted); font-size: var(--fs-xs); }
-.map-folder-move { display: flex; align-items: center; gap: .5rem; }
+.map-folder-move { display: flex; align-items: center; gap: var(--space-2); }
 .map-folder-move select { width: auto; }
 
 .map-steps { flex: none; }
 /* ONE per-step instruction line, and the surface's only live region. */
-.map-step-note { margin: 0; padding: .55rem .75rem; border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
+.map-step-note { margin: 0; padding: .55rem var(--space-3); border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
 
 /* THE CANVAS COLUMN — the pane's one flex-filling child. `flex-basis: 0` so it takes the leftover
    height rather than its content's, and a min-height floor so it survives even when the flex
@@ -177,9 +177,9 @@
    2 at a laptop's, 3 at 1080p — and it needs no rung at all. */
 .grid-detected { margin: 0; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--cyan-hi); font-weight: 700; }
 .point-editor { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
-.point-editor fieldset { display: flex; flex: 1 1 11rem; gap: .45rem; min-width: 0; margin: 0; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.point-editor fieldset { display: flex; flex: 1 1 11rem; gap: .45rem; min-width: 0; margin: 0; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .point-editor legend { color: var(--text-muted); font-size: .7rem; font-weight: 800; }
-.point-editor label { display: flex; flex: 1 1 4rem; flex-direction: column; gap: .25rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
+.point-editor label { display: flex; flex: 1 1 4rem; flex-direction: column; gap: var(--space-1); min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
 .point-editor input { width: 100%; min-width: 0; }
 /* `.nh-btn` is `white-space: nowrap` by design, which is right for a verb and wrong for this
    sentence: at 320 it overflowed the step body by 21.5px before the column existed at all. */
@@ -212,9 +212,9 @@
    EVERY control here is at the 44px floor by PAINT (route 1), not by a `.tap-target` overhang:
    the swatches sit 4px apart in a row, so a centred 44px ::after on a 24px swatch would reach
    ~10px into each neighbour and steal its taps, and the row sits under a drag surface besides. */
-.crosshair-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .4rem .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-xs); }
+.crosshair-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: .4rem .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-xs); }
 .crosshair-label { color: var(--magenta-hi); font-weight: 700; }
-.crosshair-swatches { display: flex; gap: .25rem; }
+.crosshair-swatches { display: flex; gap: var(--space-1); }
 .crosshair-swatches button { display: grid; place-items: center; width: var(--tap-min); height: var(--tap-min); padding: 0; border: 0; background: none; cursor: pointer; }
 .crosshair-swatches button::before { content: ""; width: 1.5rem; height: 1.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--swatch); }
 .crosshair-swatches button:hover:not(:disabled)::before { border-color: var(--cyan-hi); }
@@ -234,7 +234,7 @@
    heading stacks. */
 @media (max-width: 560px) {
   .map-manager-title { display: block; }
-  .map-manager-title p { margin-top: .5rem; text-align: left; }
+  .map-manager-title p { margin-top: var(--space-2); text-align: left; }
   .map-upload:not(.has-file) .map-upload-details { display: none; }
   .map-upload label { flex-basis: 100%; }
   .map-upload-file { flex: 1 1 100%; }

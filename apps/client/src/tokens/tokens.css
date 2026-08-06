@@ -1,7 +1,7 @@
 /* Token library renders in the shared Modal (box, head, close, scroll handled there); the Done/Remove
    buttons live in the Modal footer. Below are the token-library body + grid rules only. */
 
-.token-library-filters { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1rem; }
+.token-library-filters { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: var(--space-4); }
 .token-library-filters > * { flex: 1 1 10rem; margin-top: 0; }
 .token-library-filters select { width: auto; margin-top: 0; }
 

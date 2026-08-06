@@ -17,9 +17,9 @@
    the last control in each would read as clipped. Two classes to win on specificity, not on
    bundle order. */
 .viewer-controls.pane-frame { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
-.viewer-controls-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.viewer-controls-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-4); }
 .viewer-controls-title p { margin: .4rem 0 0; max-width: 44rem; color: var(--text-dim); font-size: .9rem; }
-.viewer-controls-heading h2 { margin: .25rem 0 0; font-family: var(--font-display); }
+.viewer-controls-heading h2 { margin: var(--space-1) 0 0; font-family: var(--font-display); }
 .viewer-controls-heading > strong { color: var(--text-muted); font-size: .85rem; white-space: nowrap; }
 .viewer-controls-heading > strong.online { color: var(--cyan-hi); }
 
@@ -34,13 +34,13 @@
 .viewer-tools-head h3 { margin: .2rem 0 0; font: 400 1.15rem var(--font-display); }
 .viewer-tools-head p { margin: .4rem 0 0; color: var(--text-dim); font-size: .85rem; }
 
-.viewer-no-map-notice { margin: 0; padding: .8rem 1rem; border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); }
+.viewer-no-map-notice { margin: 0; padding: .8rem var(--space-4); border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); }
 .viewer-no-map-notice strong { color: var(--text); }
-.viewer-address { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.viewer-address { display: grid; grid-template-columns: 1fr auto; gap: .3rem var(--space-4); align-items: center; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .viewer-address span { grid-column: 1 / -1; color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-address code { min-width: 0; overflow-wrap: anywhere; color: var(--cyan-hi); font-family: var(--font-mono); }
 .viewer-control-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
-.viewer-pairing-code { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; padding: 1rem; border-left: 4px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); }
+.viewer-pairing-code { display: grid; grid-template-columns: 1fr auto; gap: .3rem var(--space-4); align-items: center; padding: var(--space-4); border-left: 4px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); }
 .viewer-pairing-code .nh-eyebrow, .viewer-pairing-code strong, .viewer-pairing-code small { grid-column: 1; }
 .viewer-pairing-code strong { font: 700 clamp(1.5rem, 4vw, 2.25rem) var(--font-mono); letter-spacing: .08em; color: var(--text); }
 .viewer-pairing-code small { color: var(--text-muted); }
@@ -48,18 +48,18 @@
 .viewer-control-feedback { margin: 0; color: var(--danger-hi); }
 
 .viewer-tool-tabs { margin: 0; }
-.viewer-tool-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.viewer-tool-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 /* The preview. No `overflow` of its own any more (its one declared-scroll site retires with it):
    the svg is bounded by its own max-width/max-height and letterboxes by `preserveAspectRatio`, so
    there is nothing left to scroll to. Below the rung the map takes its natural size within a
    44rem lane; at the rung the column's leftover height is the bound. */
-.viewer-tool-preview { display: grid; place-items: center; min-height: 8rem; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); cursor: crosshair; line-height: 0; }
+.viewer-tool-preview { display: grid; place-items: center; min-height: 8rem; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); cursor: crosshair; line-height: 0; }
 .viewer-tool-preview svg { display: block; max-width: min(100%, 44rem); width: auto; height: auto; user-select: none; }
 .viewer-tool-preview line { stroke: var(--cyan); stroke-width: 3; vector-effect: non-scaling-stroke; }
 .viewer-tool-preview circle { fill: color-mix(in srgb, var(--magenta) 50%, transparent); stroke: var(--magenta-hi); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .viewer-tool-preview text { fill: #fff; font: 800 14px var(--font-body); text-anchor: middle; dominant-baseline: central; }
 .viewer-tool-fields { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
-.viewer-tool-fields fieldset { display: flex; gap: .45rem; margin: 0; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.viewer-tool-fields fieldset { display: flex; gap: .45rem; margin: 0; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .viewer-tool-fields legend { color: var(--text-muted); font-size: .7rem; font-weight: 800; }
 .viewer-tool-fields label { color: var(--text-dim); font-size: .76rem; }
 .viewer-tool-fields input { display: block; width: 7rem; margin-top: .3rem; padding: .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
@@ -67,7 +67,7 @@
 
 .viewer-access-list h3 { margin: 0; font: 400 1rem var(--font-display); }
 .viewer-access-list ul { list-style: none; margin: 0; padding: 0; }
-.viewer-access-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 0; border-top: 1px solid var(--line); }
+.viewer-access-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: .8rem 0; border-top: 1px solid var(--line); }
 .viewer-access-list li strong, .viewer-access-list li span { display: block; }
 .viewer-access-list li span { margin-top: .15rem; color: var(--text-muted); font-size: .78rem; }
 
@@ -98,7 +98,7 @@
 
 @media (max-width: 560px) {
   .viewer-controls-heading { display: block; }
-  .viewer-controls-heading > strong { display: block; margin-top: .5rem; }
+  .viewer-controls-heading > strong { display: block; margin-top: var(--space-2); }
   .viewer-control-actions { grid-template-columns: 1fr; }
   .viewer-address { grid-template-columns: 1fr; }
   .viewer-address .nh-btn { justify-self: start; }
