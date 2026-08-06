@@ -13,31 +13,62 @@
    rule, which reads the same on a phone and does not stack five fills inside one panel. */
 .staging-row { position: relative; display: flex; align-items: center; gap: .4rem; min-height: var(--tap-min); padding: var(--space-1) .35rem .35rem; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .staging-row.is-placed { border-bottom-color: color-mix(in srgb, var(--cyan) 45%, var(--line)); padding-inline-start: .85rem; }
-.staging-row.is-placed::before { content: ""; position: absolute; inset-inline-start: 0; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--cyan); background: var(--cue-mark); pointer-events: none; }
+/* ══ THE TICK WAS NOT PAINTING, AND `inset-inline-start` IS WHY ══════════════════════════════
+   Measured 2026-08-06 at 1280x900, all three themes: `.staging-row.is-placed` rendered its .85rem
+   indent, its cyan rule and NO MARK — the one thing ruling 7 asks a chosen row to carry. The
+   badge beside it hid the loss until the badge went.
+
+   It is not the gradient and not the colour. With `background: red !important` forced onto the
+   same pseudo-element it still painted 0 pixels; the box only appeared when it was widened past
+   ~11px, or when `.staging-tray-list` was given `overflow: visible`, or when it was moved off the
+   container's edge. The tray's list is a scroll container (`.scroll-y`, and it has to be — the
+   cap is the whole point of this file), the row is flush inside it, and a 7.2px box sitting
+   exactly ON that scroller's clip edge is dropped.
+
+   `.2rem` off the edge is the fix, and it is also why the tracker's identical mark never had this
+   bug: `.initiative-row-main::before` sits inside the panel's own padding, several boxes in from
+   `.encounter-region`'s clip. The mark keeps `--cue-w`/`--cue-h` — the shared size, unchanged —
+   and still clears the row's .85rem text gutter (3.2 + 7.2 = 10.4 < 13.6), so nothing reflows. */
+.staging-row.is-placed::before { content: ""; position: absolute; inset-inline-start: .2rem; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--cyan); background: var(--cue-mark); pointer-events: none; }
 .staging-tray-list > .staging-row:last-child { border-bottom: 0; }
 .staging-row-name { flex: 1; min-width: 0; }
 .staging-row-name strong { display: block; font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.staging-row-name small { color: var(--text-muted); font-size: .68rem; }
-/* ══ RULING 58 — ONE REVEAL LANGUAGE EVERYWHERE, and this row was the exception ═══════════════
-   `StagingTray.tsx` draws its per-entry reveal with a raw `IconButton` + `IconEye`/`IconEyeOff`
-   rather than `RevealSwitch`, so it never picked up the primitive's colours — and what it painted
-   instead said two wrong things at once:
+/* The kind and the placement, one muted line, the way the tracker's rows carry their second line
+   (`.initiative-list small`, encounter-panel.css). It replaces a `Badge` per row; `display: block`
+   because a `<small>` after a `display: block` `<strong>` is otherwise an inline box that a long
+   name can wrap around, and the ellipsis needs a block to clip against. */
+.staging-row-name small { display: block; overflow: hidden; color: var(--text-muted); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
 
-     · REVEALED read as nothing at all. The primitive's `.nh-reveal-toggle.is-revealed` is
-       `--magenta` with a glow (Reveal.css); this row left the on-state at the icon button's
-       default ink, so a GM scanning the tray saw no magenta for "shown to players" — the one
-       state that has to be unmissable.
-     · HIDDEN read VIOLET, which is this repo's reservation for GM-only CONTENT. Two axes, one
-       colour, on a row that also carries a GM-only staging banner above it.
+/* ══ THE TWO ROW CONTROLS ARE GLYPHS, NOT BOXES ══════════════════════════════════════════════
+   Measured 2026-08-06 at 1280x900, night: each row carried TWO 29.6px boxes — a 2px `--rim-color`
+   rim over a `--surface-2` plate, chamfered — and the reveal one put `filter: var(--glow-drop-
+   magenta)` on that whole box, so the halo was cast by the 29.6px silhouette rather than by the
+   eye inside it. Five of them on screen at once is what read as "bubbles" beside a list whose rows
+   are hairlines: **9.0% of the tray's pixels sat in the magenta band against the live initiative
+   panel's 2.4%**, and the panel is the quieter surface now.
 
-   Ruling 58 calls this a safety property rather than tidiness: reveal is where a GM misreading
-   the state leaks something to the table. Both states now match the primitive exactly — same
-   glyph (already), same colour, same position. The words are already right (the button's
-   `aria-label` uses the glossary's own "Shown to players" / "Hidden from players"). */
-.staging-row-reveal { color: var(--magenta); filter: var(--glow-drop-magenta); }
-.staging-row-reveal:hover:not(:disabled), .staging-row-reveal:active:not(:disabled) { color: var(--magenta-hi); }
-.staging-row-reveal.is-hidden { color: var(--text-muted); filter: none; border-color: transparent; }
-.staging-row-reveal.is-hidden:hover:not(:disabled), .staging-row-reveal.is-hidden:active:not(:disabled) { color: var(--text); }
+   So the paint goes and the hit area stays. Both controls are transparent boxes at the 44px floor
+   with the glyph centred — route 1, and it costs nothing, exactly as `.save-prompt-dismiss` does
+   it in the tracker: growing transparent paint to the floor grows an invisible box. It is route 1
+   and not route 2 on purpose: these two sit .4rem (6.4px) apart, and a `.tap-target::after` on
+   28px paint overhangs 8px a side, so the later control would take the earlier one's taps. At 44px
+   of real box `max(100%, var(--tap-min))` resolves to 100% and the pseudo-element is inert.
+
+   Nothing is bought with row height: `.staging-row` already carries `min-height: var(--tap-min)`.
+   And the row is WIDER than before, not narrower — the `Badge` these sat beside is gone.
+
+   Every selector below is scoped to `.staging-row` deliberately: `--nh-rim` / `--nh-fill` and the
+   `--sm` size are single-class rules in `packages/ui` Button.css, so an unscoped override here
+   would be a source-order coin toss rather than a rule. */
+.staging-row .staging-row-reveal .nh-reveal-toggle,
+.staging-row .staging-row-remove { width: var(--tap-min); height: var(--tap-min); }
+/* Ruling 58: the reveal is the primitive now, so its colours come from Reveal.css and are not
+   restated here. The rule above only sizes it.
+   The remove keeps the shared `IconButton` — its name, its title and its focus ring — and hands
+   back the chrome: Button.css's own note says the fill and the edge live on `--nh-fill` /
+   `--nh-rim`, so this is the supported way to take them off rather than painting under them. */
+.staging-row .staging-row-remove { color: var(--text-muted); --nh-fill: transparent; --nh-rim: transparent; }
+.staging-row .staging-row-remove:hover:not(:disabled), .staging-row .staging-row-remove:active:not(:disabled) { color: var(--text); --nh-rim: transparent; }
 .staging-tray-empty, .staging-tray-hint { margin: 0; color: var(--text-dim); font-size: .74rem; }
 
 /* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
@@ -46,8 +77,24 @@
    because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
    where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
    daybreak translation arrives for free.
-   The tray is the outermost panel of the staging column, so it takes the scanline; its rows are
-   ruling 47 hairlines and carry no material of their own (ruling 28). */
+
+   ══ THE EDGE STAYS, THE TEXTURE GOES (ruling 28) ══════════════════════════════════════════
+   The rim is NOT a tray idiosyncrasy and it is not "the cyan panel": `--rim-color` is the app's
+   panel edge, and the live initiative panel wears the same one on the same backing layer
+   (`.encounter-panel::before`, encounter-panel.css). The tray is a distinct region inside the
+   scene-prep column — a capped, self-scrolling list with its own head and its own reveal
+   decision, sitting between the map line above it and the Add buttons below — so it earns an
+   edge, and the edge it earns is the one the surface it is being matched to already has.
+
+   The TEXTURE was a different question and this comment used to get it wrong: it claimed "the
+   tray is the outermost panel of the staging column". Measured 2026-08-06, it is not, at either
+   call site. On the scene-prep door its parent chain is `.scene-prep` → `.scene-builder-body` →
+   `.scene-builder.frame-col`, and that last one already paints `--material-scanline` over a
+   violet rim; on the table's setup door the wrapper is `.encounter-panel`, which paints the
+   scanline too. So the tray was a second scanline inside a first — "two horizontal rhythms at
+   different periods", which is the exact interference ruling 47 rejected zebra striping to
+   avoid. Ruling 28's prescription for a nested surface is rim + bezel over a PLATE, and that is
+   what it takes now. Its rows stay ruling 47 hairlines and carry no material of their own. */
 .staging-tray {
   position: relative;
   isolation: isolate;
@@ -70,4 +117,4 @@
   outline-offset: calc(-1 * var(--bezel-inset));
   transition: border-color var(--dur-hover), background var(--dur-hover);
 }
-.staging-tray { --material-fill: var(--material-scanline), var(--material-plate); }
+.staging-tray { --material-fill: var(--material-plate); }
