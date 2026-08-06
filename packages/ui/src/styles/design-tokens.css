@@ -447,10 +447,21 @@
   --tracking-eyebrow: 0.08em;
   --tracking-display: 0.01em;
 
-  /* Spacing (4px base) */
-  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
-  --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
-  --space-12: 48px; --space-16: 64px;
+  /* Spacing. TIGHTENED once, round 2 (the client's density pass), after wave 3 put ~460
+     declarations across 19 stylesheets onto these tokens. Changing the scale before that would
+     have moved 42% of the app while reporting all of it — the two densest surfaces, the table
+     and the encounter panel, held almost no token references at all.
+
+     THE STEP NAMES ARE NOT PIXEL VALUES AND NEVER WERE. `--space-4` means "the fourth step",
+     not 16px. It is 14px now.
+
+     The bottom two steps do NOT move. They are hairline and tight gaps — the space between a
+     glyph and its label, between two chips — where the eye reads a cut as a mistake rather than
+     as tightening. The waste the client saw lives in the large steps, so those give up 17-22%
+     and the small ones give up nothing. */
+  --space-1: 4px;   --space-2: 8px;   --space-3: 10px;  --space-4: 14px;
+  --space-5: 16px;  --space-6: 20px;  --space-8: 26px;  --space-10: 32px;
+  --space-12: 38px; --space-16: 50px;
 
   /* Radius — THE SQUARE STANDARD (2026-08-04, decision log). The surface radii are ZERO:
      the screen is the page and its edges are cut, not rounded — panels, cards, inputs and
@@ -552,7 +563,11 @@
      (--header-h and its one consumer, the root scroll recipe, retired with the shell lock:
      the SPA page no longer scrolls, and the styleguide entry carries its own copy.) */
   --app-bar-h: calc(var(--tap-min) + 1px);  /* the tab-bar row: one 44px tab (Tabs.css min-height) + the bar's 1px baseline */
-  --pane-gap: var(--space-6);               /* frame gutter — the table's live 1.5rem column gap (.table-layout) */
+  /* The table's own gutter, and the ONLY two consumers are .table-layout and .table-sidebar.
+     The client asked for this specific 24px cut to 8 — a separate ask from the scale change, and
+     the reason wave 3 routed those two gaps through this token instead of the raw step: it cuts
+     the map/dock/sheet gutter without dragging every other consumer of the same step with it. */
+  --pane-gap: var(--space-2);               /* was --space-6 (24px); the client's named cut */
   --rail-w: clamp(220px, 22vw, 280px);      /* nav/list rails: homebrew's live 220px floor, the viewer rail's live 22vw growth, §7's 280px cap */
   --dock-w: 22rem;                          /* the table's side dock — the in-map dock's live --dock-side-width (encounter-map.css); the sidebar column's minmax(21rem, 27rem) converges here */
   --row-h: var(--tap-min);                  /* comfortable rows (§7.4) — the default everywhere */

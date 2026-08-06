@@ -8,7 +8,7 @@
 /* Enlarged mode is a flex column, so an in-flow tray would steal height from the flex:1 stage and
    shrink/jitter the map every time a token is grabbed (the tray mounts on pointer-down). Float it over
    the stage top here too, inset to match the enlarged container's 1rem padding. */
-.encounter-map-interaction.enlarged .encounter-token-tray { position: absolute; z-index: 4; top: 1rem; left: 1rem; right: 1rem; margin-bottom: 0; }
+.encounter-map-interaction.enlarged .encounter-token-tray { position: absolute; z-index: 4; top: var(--space-4); left: var(--space-4); right: var(--space-4); margin-bottom: 0; }
 .encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-2); padding: var(--space-2) .7rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); transition: border-color .15s, background .15s; }
 .encounter-token-tray.receiving { border-color: var(--cyan); background: color-mix(in srgb, var(--surface-2) 84%, var(--cyan)); }
 .encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
@@ -123,7 +123,10 @@
 /* In enlarged mode the interaction is a flex column; a "Saving move…" line mounting in-flow on token
    release would steal height from the flex:1 stage and bounce the map. Float it over the stage (like
    the token tray) so it never resizes the stage. */
-.encounter-map-interaction.enlarged .encounter-map-saving { position: absolute; z-index: 4; left: 1rem; bottom: 1rem; margin: 0; padding: .2rem .55rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 78%, transparent); }
+/* left/bottom track the enlarged container's PADDING (--space-4), not the viewport inset above it.
+   They were literal 1rem and the padding was too; wave 3 tokenised the padding and left insets out
+   of scope, so the scale change would have desynced them. Same reason as the token tray at :11. */
+.encounter-map-interaction.enlarged .encounter-map-saving { position: absolute; z-index: 4; left: var(--space-4); bottom: var(--space-4); margin: 0; padding: .2rem .55rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 78%, transparent); }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: var(--text-dim); font-size: .78rem; }
 
 /* ─────────────────────── THE ONE MAP TOOLBAR (D4) ───────────────────────

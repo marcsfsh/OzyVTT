@@ -53,7 +53,14 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  /* 44px touch floor (decision 16): the default button carries it as real paint. */
+  /* 44px touch floor (decision 16): the default button carries it as real paint.
+     BOTH AXES. `min-height` alone was the floor for a long time, and it held only because the
+     horizontal padding happened to be wide enough — which made the width floor an accident of the
+     spacing scale rather than a rule. Round 2's density pass took --space-5 from 20px to 16px and
+     a "+" button on the map manager fell to 43px wide: still passing every height check, one pixel
+     under on an axis nothing was asserting. State the invariant instead of re-deriving it.
+     `--sm` and `.nh-iconbtn` are exempt because they reach the floor by route 2 (a centred 44px
+     `.tap-target::after`) rather than by paint, and widening their paint would change layout. */
   min-height: var(--tap-min);
   padding: var(--space-3) var(--space-5);
   /* Geometry only — the visible edge is `--nh-rim` on the backing layer. Kept as a
@@ -125,6 +132,9 @@
    count badge", and `--chamfer-cut` computes on `:root` with its `var()` already substituted,
    so re-sizing `--chamfer` here would have done nothing anyway — measured, and the reason
    Badge.css redeclares the polygon rather than the size. */
+/* The width half of the floor. Scoped rather than folded into `.nh-btn` so the two route-2
+   controls keep their paint: `--sm` and the icon button reach 44px through `.tap-target::after`. */
+.nh-btn:not(.nh-btn--sm) { min-width: var(--tap-min); }
 .nh-btn--sm { min-height: 2rem; padding: var(--space-2) var(--space-3); font-size: var(--fs-sm); }
 .nh-btn--block { display: flex; width: 100%; }
 
