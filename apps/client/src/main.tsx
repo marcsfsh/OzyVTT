@@ -251,8 +251,13 @@ function App() {
     const once = () => { if (!committed) { committed = true; commit(); } };
     requestAnimationFrame(() => requestAnimationFrame(once));
     entryTimers.current.push(window.setTimeout(once, 120));
-    entryTimers.current.push(window.setTimeout(() => setEntry("settle"), 900));
-    entryTimers.current.push(window.setTimeout(() => setEntry(null), 1400));
+    // RULING 27 — the entry is 1.9s: a 1500ms drive and a 400ms settle. These two numbers are the
+    // same fact as `--entry-drive` in styles.css (the curtain's own `entry-clear` runs for exactly
+    // the first of them) and they move together — cut the timer short and the drive is chopped
+    // mid-run, which is what the earlier 900/1400 pair did to a 1500ms scene. The 3s ceiling the
+    // older note treated as headroom is dead.
+    entryTimers.current.push(window.setTimeout(() => setEntry("settle"), 1500));
+    entryTimers.current.push(window.setTimeout(() => setEntry(null), 1900));
   };
   useEffect(() => () => { entryTimers.current.forEach(clearTimeout); }, []);
   /** Keyboard safety is shell plumbing: installed once, for every region on every surface. */

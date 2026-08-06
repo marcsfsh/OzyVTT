@@ -1490,7 +1490,53 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="scene" title="The scene — sky, rims, beam, sign" blurb="Reversal, 2026-08-04 (decision log; design-language.md §9): the scene tier used to be one quiet wash and now it is a literal sky — a starfield, a sun cresting a lit horizon, a receding grid floor — off one --sky-* token set, so the theme toggle changes the HOUR. Three rules make it a work screen rather than a title screen. The horizon is a FIXED INSET from the pane's bottom (--sky-horizon-inset), never a percentage, so it cannot drift up into content as the pane grows. The sun is a CREST, not a disc, and the crown is exactly HALF the diameter so what stands above the line is a hemisphere: --sky-sun-d is derived from --sky-sun-crown rather than typed, because the first cut set them independently and the mask's cap flattened into a 394x54px slab. And the bright band is RESERVED — row-scanned over every pixel of the bare sky, the band that fails AA for --text-muted is at most 157px at 1920x1080 and 130px at 390x844 in all three hours, against a 176px / 144px reserve, so a scene surface's scroll region pads --sky-horizon-inset + --sky-sun-crown at the bottom and no row can rest in it. Legibility is a structure, not an opacity dial — with one named caveat: the scan sets point features aside, because a 1px star can land anywhere and no bottom reserve can bound it. The table deliberately gets no sky: a horizon behind a battle map competes with the map, and the map is the canvas — its chrome takes the linework instead.">
+          {/* Owed since wave 2 and assigned to wave 5A. The material shipped as five utilities with
+              no reference entry anywhere, which is precisely how a utility gets re-invented per
+              surface — the failure ruling 64 measured (five of the six landing-door pieces had zero
+              call sites outside the landing). Everything below is real: the styleguide loads
+              design-tokens.css, where these live, so unlike the sky demo further down this one paints. */}
+          <Section id="material" title="The material — the landing door, carried inward (ruling 2)" blurb="Four composable utilities and a numeric face, expressing the one shape the app is made of: a 2px neon rim, a quieter bezel just inside it, a corner cut, a cue triangle that appears on interaction, and a scanline-over-gradient fill. Compose them; there is no single .door class, because a tab bar wants a rim without a corner and a badge wants a corner without a bezel. RULING 2 SPLITS THE GLOW: hero surfaces — Roster, Scenes, empty states, not-found, the builder gate — add .rim-lit for the rest glow; every other surface takes the material WITHOUT it, which is what keeps the restraint rule ('at most one glowing element per region at rest') meaningful on the surfaces where several controls share one region.">
+            <h3 className="sg-h3">The pieces</h3>
+            <div className="sg-material-grid">
+              <div className="sg-material rim"><code>.rim</code><span className="sg-muted">2px structural edge, --rim-color. Brightens on hover, focus AND press (ruling 40) — half the table&rsquo;s devices have no hover.</span></div>
+              <div className="sg-material bezel"><code>.bezel</code><span className="sg-muted">The cabinet&rsquo;s inner line: a 1px outline at --bezel-inset, in currentColor.</span></div>
+              <div className="sg-material chamfer chamfer"><code>.chamfer</code><span className="sg-muted">The corner cut, on a backing layer. Never a clip-path on the element itself.</span></div>
+              <div className="sg-material rim cue" tabIndex={0}><code>.cue</code><span className="sg-muted">Hover, focus or press me — the triangle appears. It does not blink; the landing&rsquo;s blink is a title-screen flourish.</span></div>
+            </div>
+
+            <h3 className="sg-h3">Composed — the door itself</h3>
+            <div className="sg-row">
+              <div className="sg-door chamfer chamfer rim bezel cue" tabIndex={0}>Ordinary surface</div>
+              <div className="sg-door sg-door-hero chamfer chamfer rim bezel cue rim-lit" tabIndex={0}>Hero surface · <code>.rim-lit</code></div>
+              <div className="sg-door chamfer chamfer rim bezel cue" aria-disabled="true">Inert</div>
+            </div>
+            <p className="sg-muted" style={{ marginTop: "var(--space-3)" }}>Inert is a material state, not only reduced opacity: the rim, the texture and the cue all go and a flat box stays.</p>
+
+            <h3 className="sg-h3">Three things that bite</h3>
+            <ul className="sg-material-notes">
+              <li><strong><code>.chamfer</code> paints BEHIND the content.</strong> An element with its own <code>background</code> gets a square fill under a cut outline. For any FILLED surface write the class twice — <code>.chamfer.chamfer</code> — which wins at (0,2,0), zeroes <code>background</code> and <code>border-color</code>, and moves the fill to <code>--material-fill</code>. Setting <code>background</code> on a chamfered element is the mistake this note exists to prevent, and it has already caused one visible regression.</li>
+              <li><strong>The material owns <code>::before</code>; never reach for <code>::after</code>.</strong> <code>::after</code> is spoken for twice — <code>.tap-target</code>&rsquo;s 44px hit area and <code>.scanlines</code>&rsquo; consumers — so a second pseudo on anything carrying <code>.tap-target</code> destroys a hit area. That is why the cue is a background layer and the bezel is an outline rather than a second ring.</li>
+              <li><strong>All four set <code>isolation: isolate</code>,</strong> which makes the element a stacking context. A surface relying on an absolutely-positioned popover escaping above a sibling needs a <code>z-index</code> lift once it takes the material.</li>
+            </ul>
+
+            <h3 className="sg-h3">The fill — <code>--material-fill</code></h3>
+            <p className="sg-muted">The knob a consumer sets, and it inherits like any custom property, so a nested surface picks up its ancestor&rsquo;s unless it sets its own. Ruling 2&rsquo;s &ldquo;scanline-over-gradient&rdquo; is <code>var(--material-scanline), var(--material-plate)</code> — exactly how the landing door stacks it. Default is <code>transparent</code>: a utility that repainted every surface it touched would not compose. This is NOT the <code>.scanlines</code> utility, which is a full-surface CRT overlay — and ruling 28 scopes THAT one to the outermost panel, so a nested panel keeps its rim and bezel and drops the texture.</p>
+            <div className="sg-row">
+              <div className="sg-door chamfer chamfer rim bezel" style={{ ["--material-fill" as string]: "var(--material-scanline), var(--material-plate)" }}>plate + scanline</div>
+              <div className="sg-door chamfer chamfer rim bezel" style={{ ["--material-fill" as string]: "var(--material-plate)" }}>plate only</div>
+              <div className="sg-door chamfer chamfer rim bezel">transparent (default)</div>
+            </div>
+
+            <h3 className="sg-h3">Game numbers — <code>.numeric</code></h3>
+            <p className="sg-muted">HP, AC, initiative and dice totals (ruling 50). Not counts, not page numbers: those stay in the body face so the distinction keeps meaning something. The face is Space Mono at 700 — the arcade faces ship no <code>tnum</code> at all, so <code>tabular-nums</code> does nothing on them. And tabular figures are not the whole fix: a value that loses a digit is genuinely narrower, so a slot that must not move also reserves its width in <code>ch</code>, where one <code>ch</code> is exactly one digit advance.</p>
+            <div className="sg-numeric-demo">
+              <div><span className="sg-muted">body face</span><strong>144</strong><strong>9</strong><strong>44</strong><strong>11</strong></div>
+              <div><span className="sg-muted"><code>.numeric</code></span><strong className="numeric">144</strong><strong className="numeric">9</strong><strong className="numeric">44</strong><strong className="numeric">11</strong></div>
+              <div><span className="sg-muted">+ <code>min-width: 3ch</code></span><strong className="numeric sg-numeric-slot">144</strong><strong className="numeric sg-numeric-slot">9</strong><strong className="numeric sg-numeric-slot">44</strong><strong className="numeric sg-numeric-slot">11</strong></div>
+            </div>
+          </Section>
+
+          <Section id="scene" title="The scene — sky, rims, beam, sign" blurb="Reversal, 2026-08-04 (decision log; design-language.md §9): the scene tier used to be one quiet wash and now it is a literal sky — a starfield, a sun cresting a lit horizon, a receding grid floor — off one --sky-* token set, so the theme toggle changes the HOUR. Three rules make it a work screen rather than a title screen. The horizon is a FIXED INSET from the pane's bottom (--sky-horizon-inset), never a percentage, so it cannot drift up into content as the pane grows. The sun is a CREST, not a disc, and the crown is exactly HALF the diameter so what stands above the line is a hemisphere: --sky-sun-d is derived from --sky-sun-crown rather than typed, because the first cut set them independently and the mask's cap flattened into a 394x54px slab. And the bright band is RESERVED — row-scanned over every pixel of the bare sky, the band that fails AA for --text-muted is at most 157px at 1920x1080 and 130px at 390x844 in all three hours, against a 176px / 144px reserve, so a scene surface's scroll region pads --sky-horizon-inset + --sky-sun-crown at the bottom and no row can rest in it. Legibility is a structure, not an opacity dial — with one named caveat: the scan sets point features aside, because a 1px star can land anywhere and no bottom reserve can bound it. REVERSED IN PART, 2026-08-06 (ruling 22): the table used to get no sky at all, and it now gets the horizon behind its chrome — the dock, the sheet and the margins — while the map STAGE stays a clean dark plate. The original reason survives as the scoping rule rather than as the ban: a horizon behind a battle map competes with the map, so nothing paints behind the map. The table's sky is painted as background layers rather than as a .pane-sky child, because .table-layout has position:fixed descendants and therefore may never take the perspective the grid floor needs — so it is the horizon without the floor mesh.">
             <h3 className="sg-h3">The sky — switch the theme above to change the hour</h3>
             {/* The box below is INERT on this page and the note says so rather than letting a reader
                 conclude the sky is broken. `.pane-scene` / `.pane-sky` live in the client's own

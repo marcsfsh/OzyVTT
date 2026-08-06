@@ -25,7 +25,53 @@ main {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
+  /* ===== RULING 51 — THE WHOLE CHROME CARRIES THE ROLE HUE =====
+     The reason is operational, not decorative: the client runs a GM window and a player window
+     side by side, and ACTING AS THE WRONG ROLE is the mistake this prevents. So the hue is a
+     property of the FRAME, declared once here and inherited by every piece of chrome under it —
+     the connection strip, the tab bar, the table's panel rims — instead of each site re-deriving
+     it from a class it cannot see.
+
+     THE SOURCE OF TRUTH IS THE TAB BAR'S OWN `.rim-*` CLASS, read with `:has()`. The frame has
+     no role of its own in the markup (`main.tsx` puts the class on frame row 2), and inventing a
+     second place to say "this window is the GM's" is exactly the kind of duplicate signal that
+     drifts. Anything that inherits --role-hue is therefore role-tinted for free and anything that
+     does not is untouched, which is what keeps this to the chrome.
+
+     TWO CONSTRAINTS FROM THE RULING, BOTH LOAD-BEARING:
+     - A ROLE HUE IS NOT A SECURITY BOUNDARY. Projection is (apps/server/src/projections.ts).
+       Nothing may become GM-only *because* it is tinted; the tint sits on top of a boundary
+       enforced on the server, and every rimmed site still names its role in words.
+     - THE PUBLIC VIEWER TAKES NO ROLE HUE AT ALL. It is the shared screen, it has no role, and a
+       GM tint on the screen the players look at would be actively wrong. That is structural here
+       rather than a rule to remember: `viewer.html` never loads this stylesheet, so there is no
+       `main` and no --role-hue in that document.
+     The fallback is --rim-color, the neutral structural edge, so the chrome is complete before
+     auth (the landing) and in any state where no bar has rendered yet. */
+  --role-hue: var(--rim-color);
+  /* THE CHROME PLATE (rulings 26, 48). A lit-top/shaded-bottom gradient is what makes a strip
+     read as a PIECE rather than as background — flat fill is the thing the client called "square
+     and basic". Tinted with the role hue rather than merely standing on a 7% wash of it: the wash
+     alone had to survive whatever the plate put over it, and diluting the role signal to buy a
+     material would trade ruling 51 for ruling 26. Adding the hue INTO the fill spends neither. */
+  --chrome-plate: linear-gradient(180deg,
+    color-mix(in srgb, var(--role-hue) 13%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--role-hue) 6%, var(--surface-1)) 100%);
+  /* The chrome-tier scanline, hoisted so row 1 and row 2 spend ONE texture (they are one piece of
+     chrome after ruling 48). `--scanline-color` is the CHROME strength (.22 / .14 / .05); the
+     shared `.scanlines` utility halves it with `opacity: .5` for the SCENE tier, which is why the
+     sky is at .11 and this bar is at .22 — two strengths of one texture, not a contradiction. */
+  --chrome-scanline: linear-gradient(to bottom,
+    transparent 0,
+    transparent calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) var(--scanline-gap));
 }
+main:has(> .frame-tabbar.rim-gm)     { --role-hue: var(--rim-gm); }
+main:has(> .frame-tabbar.rim-player) { --role-hue: var(--rim-player); }
+/* Daybreak drops the texture and keeps the geometry (ruling 29): the identity is carried by the
+   plate, the rim and the bezel, never by luminance. Matches `.scanlines`' own light-theme rule. */
+[data-theme="light"] main { --chrome-scanline: none; }
 /* Height of the connection strip row — the row's box AND its entrance animation's target
    read this one number (see .connection-banner). */
 :root { --connection-banner-h: 2.5rem; }
@@ -88,6 +134,16 @@ main {
   background: var(--sky-wash);
 }
 .pane-scene.scanlines::after { z-index: -1; }
+/* ===== RULING 28 — SCANLINES ON THE OUTERMOST PANEL ONLY =====
+   Nested surfaces keep the rim and the bezel and drop the TEXTURE. The reason is moiré where
+   surfaces stack — two 3px combs at slightly different sub-pixel offsets beat against each other
+   — and it costs nothing, because every screen has an outermost panel and that is the one wearing
+   it. This is a scoping rule, not a new utility: `.scanlines` is unchanged and every existing call
+   site keeps its class, so a surface that stops being nested gets its texture back automatically.
+   One line rather than a list of surfaces, because the condition is structural — "there is already
+   a textured surface between me and the viewport" — and a list would go stale the first time a
+   panel moved. */
+.scanlines .scanlines::after { display: none; }
 /* THE HORIZON BAND IS RESERVED, and this one rule is what makes the sky's legibility a
    STRUCTURE rather than a hope. Everything bright in the scene — the sun's crest, the beam,
    its glow, the ember, the grid — lives within --sky-horizon-inset + --sky-sun-crown of the
@@ -215,10 +271,84 @@ main {
    `.table-layout.anim-view { animation-fill-mode: backwards }` patch covered that one arm;
    the pane generalizes the entrance instead: same timing, opacity only, nothing to trap. */
 @keyframes pane-in { from { opacity: 0; } to { opacity: 1; } }
-.app-pane > .anim-view { animation-name: pane-in; }
-/* The landing→app entry's cascade (one-shot; main.tsx drops the class when it settles):
-   the chrome rows ride view-in, the pane rides opacity — same trap, same answer. */
-main.anim-cascade > .app-pane { animation-name: pane-in; }
+/* ===== RULING 25 — THE SCANLINE WIPE, ON TAB AND PAGE TRANSITIONS ONLY =====
+   "Scanline wipe, but dont overdo it" — and the qualifier is the spec: <=180ms, ONE band, ONE
+   pass, no repeat, no trailing bloom, no second band, and it moves no layout.
+
+   THIS SELECTOR IS THE WHOLE SCOPING ARGUMENT, so it is written out rather than left to be
+   re-derived. `.app-pane > .anim-view` is the pane's one child, and the pane's one child changes
+   exactly when the address does — a tab, a route, a full-page layer. It is a NEW element every
+   time, which is what makes a CSS animation fire once with no state to reset. Panel expands,
+   drawer opens, list updates and accordion sections are all inside that child and match nothing
+   here. An implementer who adds this to a fifth surface has broken the ruling, not extended it.
+
+   IT IS A MASK, NOT AN OVERLAY, and the reason is the pseudo budget: `::after` is `.tap-target`'s
+   and `.scanlines`', `::before` is the material's, and these surfaces belong to three other
+   stylesheets besides this one. A mask needs no pseudo and no box, so it moves no layout — which
+   is the property that made the wipe beat the slide in the first place.
+   Verified before it was written, because this file's whole history is the fixed-overlay trap:
+   `mask-image` does NOT make a containing block for `position: fixed` descendants in Chromium
+   (probed with a fixed child of a masked box — getBoundingClientRect top/left stayed 0/0 with and
+   without the mask). `fill-mode: none` on this leg also means the mask is gone the instant the
+   180ms is up, so nothing carries it.
+
+   The band DIMS rather than reveals: mask alpha never reaches 0, so the surface stays legible for
+   the whole pass and what travels is one dark scanline, not a curtain.
+
+   THE ARITHMETIC, ONCE, BECAUSE IT IS THE PART THAT SILENTLY BREAKS. The tile is 200% of the box
+   and the band sits at 47-50% OF THE TILE, i.e. 94-100% of the box. `mask-position` in percent
+   resolves against (box - image) = -100% of the box, so position 100% puts the band at the box's
+   TOP edge and position 0% puts it at the BOTTOM: sweeping 100% -> 0% is one downward pass.
+   `no-repeat` is what keeps it ONE band — the default `repeat` would tile the mask and give the
+   surface a moving comb — and it is only safe because a 200% tile still covers the whole box at
+   both ends of that range, so nothing outside the band is ever masked away.
+   `prefers-reduced-motion` falls back to the plain opacity fade — not to nothing — below. */
+.app-pane > .anim-view {
+  animation-name: pane-in, pane-wipe;
+  animation-duration: var(--dur-enter), 180ms;
+  animation-timing-function: var(--ease-settle), linear;
+  animation-fill-mode: both, none;
+  -webkit-mask-size: 100% 200%;   mask-size: 100% 200%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+@keyframes pane-wipe {
+  from {
+    -webkit-mask-image: var(--pane-wipe-band); mask-image: var(--pane-wipe-band);
+    -webkit-mask-position: 0 100%; mask-position: 0 100%;
+  }
+  to {
+    -webkit-mask-image: var(--pane-wipe-band); mask-image: var(--pane-wipe-band);
+    -webkit-mask-position: 0 0%; mask-position: 0 0%;
+  }
+}
+/* Only the ALPHA of this gradient is read (a mask image's alpha channel is the mask), so the hue
+   is irrelevant — but it still goes through a token, because check (d) is a rule about what a
+   stylesheet may contain and "this one is not really a colour" is exactly the argument that puts
+   the first literal in. `--void` is opaque in all three themes; the mix is the band. */
+:root {
+  --pane-wipe-band: linear-gradient(to bottom,
+    var(--void) 0 45%,
+    color-mix(in srgb, var(--void) 34%, transparent) 47.4%,
+    color-mix(in srgb, var(--void) 34%, transparent) 49%,
+    var(--void) 51.4% 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-pane > .anim-view { animation-name: pane-in; -webkit-mask-image: none; mask-image: none; }
+}
+/* THE SETTLE NO LONGER RE-REVEALS THE APP, and this is the second half of ruling 27's defect —
+   found on a filmstrip of the drive, not by reading. `.anim-cascade` (design-tokens.css) fades and
+   drifts every child of `main` when `entry` becomes "settle", and it was written for an entry where
+   the curtain was still opaque at that moment. It is not: `entry-clear` holds to 74% and then fades
+   over the last 390ms, so the chrome rows and the pane are ALREADY fully visible through it — and
+   then the cascade started them again from opacity 0. The filmstrip caught the result as a black
+   frame between the sun cresting and the app arriving, which is exactly the "glitch" the client
+   described and exactly the thing a longer duration would have made worse rather than better.
+
+   The reveal belongs to the curtain and happens once. `main.tsx` still sets the class — it is the
+   marker for "the entry is finishing" — and this rule is what makes the phase silent.
+   `.anim-view` inside the pane is untouched: that is the SURFACE's own entrance, it ran at mount
+   behind the curtain, and it is not a second reveal of the frame. */
+main.anim-cascade > * { animation: none; }
 /* (No bare `header` rule. One lived here — `max-width: 40rem`, written for the old left-aligned landing
    hero — and it clamped EVERY <header> in the app to 640px, including the character builder's sticky
    header and the Codex entry heads: known-bugs.md's `[ui] bare header` entry. D30's landing owns its
@@ -345,89 +475,127 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
    The brief, in the client's words: the doors travel past the screen as if you were driving down
    the grid road, the sun rises above you, and that clears the space for the app to appear.
 
-   Four things move on one 900ms beat, and they are deliberately NOT synchronised — the road and the
-   doors go first, the sun answers a quarter-beat later, the flare last, so it reads as one continuous
-   move rather than four things starting at once.
+   ===== RULING 27 — 1.75-2.0s, BOTH ELEMENTS, STAGED. THE 3s CEILING IS DEAD. =====
+   The drive runs --entry-drive (1500ms) and `main.tsx` hands over to the settle 400ms later, so
+   the whole landing->app entry is 1.9s. That supersedes the earlier 2-2.5s figure, which was the
+   client's estimate of how much SLOWER the entry needed to feel while they still assumed the
+   jumpiness was inherent to the timing. It was not — it was a defect (below) — and with the defect
+   fixed, less time is needed to feel deliberate. `--entry-drive` here and the two timers in
+   `main.tsx` are one number in two places; move them together or the curtain gets cut mid-run.
+
+   TWO BEATS, so neither element has to move unnaturally slowly to fill the run. Beat one is the
+   road and the doors (0-1000ms): the grid rushes first. Beat two is the sun and the flare
+   (560-1500ms), and it is timed against the curtain deliberately — `entry-clear` holds opaque to
+   74% and fades over the last 390ms, so the sun is still cresting while the app resolves
+   underneath it. That overlap IS the staging the ruling asks for.
+
+   ===== THE JUMP WAS A DEFECT, AND HERE IS THE MEASUREMENT =====
+   Instrumented over rAF at 1280x900 before this rewrite: THREE properties changed value
+   discontinuously in the single frame the drive class landed, because the drive REPLACED the
+   resting animations that already owned them.
+     - `.landing-grid` background-position   0% calc(0% + 46.0px)  ->  0px 0px   (a 46px snap; up
+       to one whole 56px cell, since `landing-grid-roll` loops through exactly one)
+     - `.landing-stars` opacity              0.550 -> 1
+     - `.landing-stars-far` opacity          0.594 -> 0.5
+   And the run itself was not composited: 16 frames in 950ms (median 50.1ms, max 183ms), with a
+   single-frame road step of 107px — two cells teleported at once — because `background-position`
+   is a MAIN-THREAD property and the app's entire mount was running on that thread behind the
+   curtain. "Everything animated is transform/opacity" was the claim in this comment's previous
+   version and the road had never been either.
+
+   THE FIX IS THAT NOTHING IS REPLACED ANY MORE. The resting animations keep running through the
+   drive and the drive rides properties they do not touch:
+     - the road's texture goes on streaming on `background-position` (`landing-grid-roll`, never
+       interrupted, so there is nothing to snap) while the drive scales the PLANE on `transform`,
+       anchored at `transform-origin: center top` — the horizon — so the road rushes without the
+       far edge ever leaving the sky. That also answers why the plane is not translated: the old
+       comment's ~254px void at the horizon is exactly what scaling from the horizon cannot open.
+     - the stars go on twinkling on `opacity` while the drive fades them on `filter: opacity()`,
+       which composes multiplicatively instead of contesting the same property.
+     - the sun's resting rise moved to the `translate` property (see `landing-sunrise`), leaving
+       `transform` free for the drive, so an early click no longer snaps it either.
+   And the layers are promoted AT REST rather than on the frame the animation starts, because
+   creating a compositor layer is itself main-thread work and doing it inside the run is the one
+   thing guaranteed to cost the first frames.
 
    It becomes a fixed CURTAIN for its beat. The frame's chrome rows mount the instant auth lands, and
    without the cover you would watch the tab bar pop in beneath a scene that is still driving. z-70
    clears the tallest thing in the app (the token menu at 60); nothing here survives, because the
    whole subtree unmounts when the beat ends.
 
-   Everything animated is transform/opacity — compositor work, no layout, no repaint of the gradients
-   themselves. The subtree unmounting is also what keeps `perspective` safe: a perspective (like a
-   transform) makes a containing block for position:fixed descendants, which is the trap that made the
-   pane's own entrance opacity-led (refresh risk #2). Nothing fixed lives inside the landing, and none
-   of this outlives the beat.
+   The subtree unmounting is also what keeps `perspective` safe: a perspective (like a transform)
+   makes a containing block for position:fixed descendants, which is the trap that made the pane's
+   own entrance opacity-led (refresh risk #2). Nothing fixed lives inside the landing, and none of
+   this outlives the beat.
 
    Reduced motion never reaches here — main.tsx declines to enter the state at all, so the swap is
    instant rather than frozen mid-drive. */
+:root { --entry-drive: 1500ms; }
 .landing--drive {
   position: fixed; inset: 0; z-index: 70; pointer-events: none;
   perspective: 900px; perspective-origin: 50% 42%;
-  animation: entry-clear 900ms linear forwards;
+  animation: entry-clear var(--entry-drive) linear forwards;
 }
-/* These are large elements painting gradients, and the app mounts behind the curtain while they run,
-   so they are promoted deliberately: on the compositor a transform/opacity keyframe keeps its own
-   time instead of queueing behind the mount's layout on the main thread. Scoped to the drive, and
-   the subtree unmounts when the beat ends, so nothing is left holding a layer — or a containing
-   block — afterwards.
-   Honest caveat: the stall this answers was measured on a machine that was also running several
-   headless browsers, at ~10fps. The promotion is right on its own terms, but how much of that stall
-   was main-thread contention and how much was the box being busy has NOT been separated. Re-measure
-   the beat on an idle machine before trusting any timing number attached to it. */
-.landing--drive > *,
-.landing--drive .landing-sun,
-.landing--drive .landing-stars,
-.landing--drive .landing-stars-far,
-.landing--drive .landing-horizon { will-change: transform, opacity; }
 /* The content — wordmark, doors, or the GM's sign-in card, whichever the door answered from —
    accelerates INTO the camera. `translateZ` against the container's perspective is what makes it
    grow and slide off-frame the way a thing you drive past does; an ease-in curve is the acceleration.
-   The rule outranks `.anim-view`'s entrance on the same elements, which has already finished. */
+   The rule outranks `.anim-view`'s entrance on the same elements, which has already finished.
+   It clears the frame well before the curtain lifts: the doors are beat one. */
 .landing--drive > *:not(.landing-scene):not(.landing-flare) {
-  animation: entry-pass 620ms cubic-bezier(.55, .06, 1, .5) forwards;
+  will-change: transform, opacity;
+  animation: entry-pass 820ms cubic-bezier(.55, .06, 1, .5) forwards;
 }
-/* The road. The texture streams; the PLANE stays anchored at the horizon. Translating the plane was
-   the first attempt and it is wrong for exactly one reason: the plane's far edge is the horizon, so
-   sliding it toward the camera opens a widening void where the road used to meet the sky — measured
-   at ~254px of empty gradient by two-thirds of the beat, which is precisely when "driving down the
-   road" should be at its most convincing. Streaming the background instead keeps road arriving out of
-   the horizon for the whole beat. 560px is ten of the 56px cells, so it starts and ends in step. */
-.landing--drive .landing-grid { animation: entry-road 900ms cubic-bezier(.42, 0, .78, .96) forwards; }
-/* The sun rises out from behind the horizon — the skyband still clips it, so it climbs INTO the sky
-   rather than floating free of the scene — and brightens as it comes. */
-.landing--drive .landing-sun { animation: entry-sunrise 760ms cubic-bezier(.22, .58, .3, 1) 220ms forwards; }
-.landing--drive .landing-horizon { animation: entry-horizon 900ms ease-in forwards; }
+/* The road. `landing-grid-roll` is re-declared FIRST in each of these lists on purpose: an
+   `animation` shorthand replaces the whole list, so the resting animation has to be restated or it
+   stops — and stopping it is the 46px snap the comment above measured. Two animations, two
+   different properties, no contest. */
+.landing--drive .landing-grid {
+  animation: landing-grid-roll 1.5s linear infinite,
+             entry-road var(--entry-drive) cubic-bezier(.36, 0, .62, 1) forwards;
+}
+/* The sun crests as the app resolves — beat two. Its resting rise lives on `translate` now, so it
+   is untouched by this and there is nothing to restate. */
+.landing--drive .landing-sun { animation: entry-sunrise 940ms cubic-bezier(.22, .58, .3, 1) 560ms forwards; }
+.landing--drive .landing-horizon { animation: entry-horizon 1000ms ease-in forwards; }
 /* Parallax: the near field opens faster than the far one, which is the whole of the depth cue. */
-.landing--drive .landing-stars { animation: entry-stars 900ms cubic-bezier(.5, 0, .9, .8) forwards; }
-.landing--drive .landing-stars-far { animation: entry-stars-far 900ms cubic-bezier(.5, 0, .9, .8) forwards; }
-.landing--drive .landing-flare { animation: entry-flare 700ms cubic-bezier(.3, 0, .25, 1) 260ms forwards; }
+.landing--drive .landing-stars {
+  animation: landing-twinkle 5.5s ease-in-out infinite,
+             entry-stars 1150ms cubic-bezier(.5, 0, .9, .8) forwards;
+}
+.landing--drive .landing-stars-far {
+  animation: landing-twinkle 7s ease-in-out infinite reverse,
+             entry-stars-far 1150ms cubic-bezier(.5, 0, .9, .8) forwards;
+}
+.landing--drive .landing-flare { animation: entry-flare 620ms cubic-bezier(.3, 0, .25, 1) 880ms forwards; }
 
 @keyframes entry-pass {
   from { transform: translateZ(0); opacity: 1; }
   55% { opacity: 1; }
   to { transform: translateZ(640px); opacity: 0; }
 }
+/* Scale, not translate, and not background-position: see the fix note above. 1.62 from the horizon
+   is what reads as ten cells of road arriving; the fade is the road clearing the frame for the app. */
 @keyframes entry-road {
-  from { background-position: 0 0; }
-  to { background-position: 0 560px; }
+  from { transform: perspective(340px) rotateX(63deg) scale(1); opacity: 1; }
+  72% { opacity: 1; }
+  to { transform: perspective(340px) rotateX(63deg) scale(1.62); opacity: 0; }
 }
 @keyframes entry-sunrise {
-  from { transform: translateX(-50%) translateY(0) scale(1); }
+  from { transform: translateX(-50%) scale(1); }
   to { transform: translateX(-50%) translateY(-46%) scale(1.28); }
 }
 @keyframes entry-horizon {
   from { transform: scaleX(1); opacity: 1; }
   to { transform: scaleX(1.4); opacity: 0; }
 }
+/* `filter: opacity()` rather than `opacity`, so `landing-twinkle` keeps the property it owns. */
 @keyframes entry-stars {
-  from { transform: scale(1); opacity: 1; }
-  to { transform: scale(1.5); opacity: 0; }
+  from { transform: scale(1); filter: opacity(1); }
+  to { transform: scale(1.5); filter: opacity(0); }
 }
 @keyframes entry-stars-far {
-  from { transform: scale(1); opacity: .5; }
-  to { transform: scale(1.18); opacity: 0; }
+  from { transform: scale(1); filter: opacity(1); }
+  to { transform: scale(1.18); filter: opacity(0); }
 }
 @keyframes entry-flare {
   from { transform: translate(-50%, -50%) scale(0); opacity: 0; }
@@ -435,9 +603,11 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
   to { transform: translate(-50%, -50%) scale(11); opacity: 0; }
 }
 /* The curtain holds opaque while the drive happens and only lets go at the very end, once the flare
-   has washed the frame — so what appears underneath is the settled app, never the swap itself. */
+   has washed the frame — so what appears underneath is the settled app, never the swap itself.
+   74% of 1500ms puts the reveal at 1110-1500ms, inside the sun's own 560-1500ms crest: the app
+   resolves WHILE the sun is still rising, which is the staging ruling 27 names. */
 @keyframes entry-clear {
-  0%, 72% { opacity: 1; }
+  0%, 74% { opacity: 1; }
   100% { opacity: 0; }
 }
 
@@ -532,18 +702,31 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
 .landing .card .link { color: color-mix(in srgb, var(--landing-door-play-rim) 80%, transparent); }
 .landing .card .link:hover:not(:disabled) { color: var(--landing-door-label); background: color-mix(in srgb, var(--landing-door-play-rim) 14%, transparent); }
 
-/* ---- Motion: ignition, twinkle, and the drive. Freeze under reduced motion. ---- */
+/* ---- Motion: ignition, twinkle, and the drive. Freeze under reduced motion. ----
+   `will-change` is declared HERE, at rest, and not in the drive rule where it used to live. The
+   previous version promoted these four layers on the same frame the drive's keyframes started,
+   which is the frame least able to afford the layer creation — measured at 16 frames in 950ms with
+   a 183ms stall. These elements already run infinite compositor animations at rest, so the layers
+   exist anyway; declaring the promotion is what stops it being re-decided mid-run.
+   Nothing `position: fixed` lives inside the landing, so the containing block `will-change` creates
+   costs nothing here (it is the trap that made the pane's own entrance opacity-led). */
 @media (prefers-reduced-motion: no-preference) {
   .landing .home-hero-title .nh-wordmark { animation: landing-ignite 1.1s steps(1, end) both; }
-  .landing-stars { animation: landing-twinkle 5.5s ease-in-out infinite; }
-  .landing-stars-far { animation: landing-twinkle 7s ease-in-out infinite reverse; }
-  .landing-grid { animation: landing-grid-roll 1.5s linear infinite; }
-  .landing-sun { animation: landing-sunrise 1.6s var(--ease-settle) both; }
+  .landing-stars { animation: landing-twinkle 5.5s ease-in-out infinite; will-change: transform, filter; }
+  .landing-stars-far { animation: landing-twinkle 7s ease-in-out infinite reverse; will-change: transform, filter; }
+  .landing-grid { animation: landing-grid-roll 1.5s linear infinite; will-change: transform, opacity; }
+  .landing-sun { animation: landing-sunrise 1.6s var(--ease-settle) both; will-change: transform; }
+  .landing-horizon { will-change: transform, opacity; }
 }
 @keyframes landing-ignite { 0% { opacity: 0; } 12% { opacity: 1; } 18% { opacity: .25; } 26% { opacity: 1; } 34% { opacity: .45; } 41% { opacity: 1; } 100% { opacity: 1; } }
 @keyframes landing-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 @keyframes landing-grid-roll { to { background-position: 0 0, 0 var(--landing-grid-cell); } }
-@keyframes landing-sunrise { from { transform: translateX(-50%) translateY(6%); } to { transform: translateX(-50%) translateY(0); } }
+/* THE RESTING RISE OWNS `translate`, NOT `transform`, and that is the whole reason it is written
+   this way. The individual transform properties (translate/rotate/scale) compose WITH `transform`
+   rather than replacing it, so the base rule's `translateX(-50%)` centring survives and — the point
+   — the entry drive can animate `transform` without ever contesting this. Before the split, a door
+   clicked inside the first 1.6s snapped the sun by 6% of its own height in one frame. */
+@keyframes landing-sunrise { from { translate: 0 6%; } to { translate: 0 0; } }
 
 /* Base controls. Reusable buttons should use @vtt/ui <Button>; this styles the
    raw <button>/<input>/<select> that remain, in the token vocabulary. */
@@ -698,6 +881,30 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .roll-formula { color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); }
 .roll-eq { color: var(--text-muted); font-family: var(--font-mono); }
 .roll-total { margin-left: auto; font-family: var(--font-display); font-size: var(--fs-h2); color: var(--text); }
+/* ===== RULING 35 — THE ROLL RESULT FLARES; THE DICE DO NOT TUMBLE =====
+   One-shot bloom on the TOTAL, ~250ms. The reasoning generalises and is the part worth keeping:
+   rolling is the app's most repeated action, so any beat between the click and the answer is
+   charged forty times a session. A flare costs nothing because it plays ON the answer rather than
+   before it — the number is already correct on the first frame and the bloom decays off it.
+
+   SCOPED TO THE NEWEST CARD, not to every total, and that is what makes it one-shot rather than a
+   flurry. `.roll-card` is keyed by roll id (DicePanel.tsx), so an arriving roll mounts one new
+   element and the thirty below it keep their DOM nodes and never re-animate; `:first-child` is
+   belt and braces for the case where the whole panel remounts — toggling a dock section — where
+   without it every visible total would bloom at once.
+
+   REDUCED MOTION KEEPS THE COLOUR AND DROPS THE BLOOM, which is what the ruling asks for rather
+   than freezing to nothing: the global reduced-motion rule collapses every animation to 0.001ms,
+   so the flare is stated a second time as a static accent on the newest total. */
+@keyframes roll-flare {
+  from { color: var(--magenta-hi); text-shadow: 0 0 10px var(--magenta), 0 0 26px color-mix(in srgb, var(--magenta) 55%, transparent); }
+  70%  { color: var(--magenta-hi); }
+  to   { color: var(--text); text-shadow: none; }
+}
+.roll-list > .roll-card:first-child .roll-total { animation: roll-flare 250ms var(--ease-settle) 1; }
+@media (prefers-reduced-motion: reduce) {
+  .roll-list > .roll-card:first-child .roll-total { color: var(--magenta-hi); }
+}
 
 .gm-session-controls { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: var(--space-4); }
 .gm-session-controls button { flex: 0 0 auto; padding: .7rem 1.1rem; text-align: center; }
@@ -772,7 +979,27 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    readout that overlaps nothing catches no taps either). It HEIGHT-animates in (200ms
    settle) so the tab bar and pane step down instead of jumping; unmount on reconnect is
    instant — good news needs no ceremony. Fixed height, not min-height: the height is the
-   animated property, and the message fits one line down to the 320px floor. */
+   animated property, and the message fits one line down to the 320px floor.
+
+   ===== RULING 48 — THE STRIP FOLDS INTO THE TAB BAR'S MATERIAL =====
+   One piece of chrome instead of two stacked bands. What went is the `border-bottom: 1px solid
+   var(--line-strong)` that used to sit between this row and the bar: that line WAS the horizontal
+   seam at the top of every screen, and with both rows on one plate there is nothing left for it
+   to separate. The block's single structural edge is the tab bar's bottom rim, below.
+
+   IT IS STATUS, NOT NAVIGATION, AND SHARING A MATERIAL MUST NOT MAKE IT LOOK TAPPABLE. Three
+   things keep that true and each is deliberate: the plate is INVERTED (dark at the top, so the
+   row reads as a well set into the chrome rather than as a raised key), there is no hover, focus
+   or press treatment anywhere on it, and no cue triangle — `.cue` is the app's "this responds"
+   mark and putting one here would be a lie. It stays a `<p role="status">`, so it is not
+   focusable and takes no tap.
+
+   THE CAUTION EDGE SURVIVES THE ROLE HUE and outranks it here: this row exists to say something
+   is wrong, and ruling 51's own constraint is that a role hue must not collide with --caution.
+   So the hue tints the plate (the row still belongs to this window) while the leading 3px bar
+   stays the caution colour (the row still says what it is). It moves from `border-left` to an
+   inset shadow so it costs no layout — the message is centred against the row, not against the
+   row minus 3px, which matters at the 320px floor where it fits on exactly one line. */
 .connection-banner {
   grid-row: 1;
   display: flex;
@@ -782,14 +1009,22 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
   overflow: hidden;
   margin: 0;
   padding: 0 var(--space-4);
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line-strong);
-  border-left: 3px solid var(--caution);
+  border: 0;
+  background-color: var(--surface-2);
+  background-image: var(--chrome-scanline), linear-gradient(180deg,
+    color-mix(in srgb, var(--caution) 9%, var(--surface-3)) 0%,
+    color-mix(in srgb, var(--role-hue) 7%, var(--surface-2)) 100%);
+  background-size: 100% var(--scanline-gap), auto;
+  box-shadow: inset 3px 0 0 0 var(--caution);
   color: var(--text-dim);
   font-size: .9rem;
   text-align: center;
   animation: connection-in var(--dur-base) var(--ease-settle);
 }
+/* When no tab bar follows — a full-page layer before the shell mounts — this row IS the chrome,
+   so it carries the block's structural edge itself. `:has(~ .frame-tabbar)` is the only way to
+   ask "is something after me"; the negation is what makes the rim appear exactly once. */
+.connection-banner:not(:has(~ .frame-tabbar)) { border-bottom: var(--rim-w) solid var(--role-hue); }
 @keyframes connection-in { from { height: 0; opacity: 0; } to { height: var(--connection-banner-h); opacity: 1; } }
 
 /* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
@@ -816,6 +1051,43 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    the map column to prevent a jump that cannot happen. The arm that really scrolls — `.table-sidebar`
    when docked — keeps the stable gutter, because there the scrollbar is real. */
 .table-layout { display: grid; gap: var(--pane-gap); height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; scrollbar-gutter: auto; }
+/* ===== RULING 22 — THE TABLE SKY: BEHIND THE CHROME, NEVER BEHIND THE MAP =====
+   A DATED REVERSAL, and it must be read as one: the earlier ruling said the table gets no sky at
+   all, and the entry naming it was explicitly flagged as something an agent must not "fix" later.
+   Its stated REASON — the map is the content, and a horizon competes with tokens and fog —
+   survives intact and is now a SCOPING rule: the dock, the sheet and the margins get the horizon;
+   the map stage stays a clean dark plate. The dated reversal in `docs/ai-ledger/decision-log.md`
+   is the director's, written after wave 5; until it is there, an agent reading only the old no-sky
+   entry will try to revert this believing it is fixing a mistake, which is why the reversal is
+   named here as well as there.
+
+   PAINTED AS BACKGROUND LAYERS ON THIS ELEMENT, not as a `.pane-sky` child, and the constraint
+   that decides it is the one every comment in this file circles: `.table-layout` has `position:
+   fixed` descendants (the enlarged map, the viewer preview, the drawer), so it may never take
+   `transform`, `filter`, `perspective`, `contain: paint` or `will-change` of any of them. That
+   rules out the scene tier's perspective grid floor, which is the one sky layer that needs one.
+   What is left — wash, horizon beam, its glow, the bloom — is exactly the HORIZON the ruling
+   names, and losing the floor mesh under a battle map is a gain rather than a compromise.
+
+   `background-attachment` stays at its default `scroll`, which is the behaviour this needs and
+   the name for it is a lie: the background is fixed to the ELEMENT's own box and does NOT travel
+   with its contents. Below the rung `.table-layout` really does scroll, and the horizon has to
+   stay at the bottom of the frame rather than sliding up out of it.
+
+   NOTHING PAINTS BEHIND THE MAP because the stage is opaque `--void` (encounter-map.css) and the
+   map column around it is a margin, not a panel — see the ≥980 rule below, which drops the slab
+   the column used to be. Reduced transparency needs no branch here: the wash and the horizon are
+   what distinguish the three hours, and there is no mesh or film layer to remove. */
+.table-layout {
+  background-image:
+    linear-gradient(90deg, transparent 0%, var(--sky-horizon-a) 22%, var(--sky-horizon-b) 50%, var(--sky-horizon-a) 78%, transparent 100%),
+    var(--sky-horizon-glow),
+    var(--sky-bloom),
+    var(--sky-wash);
+  background-size: 100% 2px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 calc(100% - var(--sky-horizon-inset)), 0 0, 0 0, 0 0;
+  background-repeat: no-repeat;
+}
 /* `.scroll-y` RIDES THIS ELEMENT IN THE MARKUP, and what it is for is narrow: on most cells the
    frame fits and this class declares a scroll nothing uses. C1 took it off on exactly that
    reasoning — both halves are frames now — and two arrangements proved it wrong, each by a
@@ -948,12 +1220,59 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 @media (min-width: 980px) { .table-topline { display: contents; } }
 .table-topline:empty { display: none; }
 @media (min-width: 980px) {
-  .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(var(--dock-w), 27rem); }
+  /* RULING 53 — THE DOCK IS PART OF THE SHELL, so the column gap goes. It was `--pane-gap` (8px)
+     of page background between the map and the dock, which is what made them read as two panels
+     that happen to be adjacent instead of one instrument. The seam is now the dock's own left
+     rim — one 2px line in the role hue rather than a gutter — and the dock reaches the frame's
+     right, top and bottom edges with no margin at all. An attached panel needs no surrounding
+     margin, which is also what the ruling means by "cheaper under the density pass". */
+  .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(var(--dock-w), 27rem); gap: 0; }
+  /* RULING 22 — THE MAP COLUMN IS A MARGIN, NOT A PANEL. It used to be an opaque `--surface-1`
+     slab with a 1px rule around it, covering two thirds of the pane: with a sky behind it, that
+     slab is the thing standing between the surface and its own ground, and the ruling's split
+     ("the dock, the sheet and the margins get the horizon; the map stage stays a clean dark
+     plate") puts the frame on the STAGE — ruling 30's rim and corner ticks — not on the column
+     around it. The phone has composed it this way since C1; this makes the laptop agree.
+     The padding stays: it is the map's gutter, and it is the only thing keeping the stage off
+     the pane's edges now that there is no border to do it. */
+  .table-layout > .table { border: 0; background: none; }
   /* `.dice-proof { margin-top: auto }` and the `.docked` stretch pair retired here: both existed to
      fake a shared height between two columns that were each sized by their own content. The frame
      gives them one height for real, so bottom-aligning by margin would now fight it. */
   /* RULING 13 — the "Preview what players see" anchor row is gone (53.6px back to the map); its
      trigger is a map-toolbar tool now, so it has no row of its own to space. */
+}
+/* ===== RULING 53 — THE DOCK TAKES THE PANEL MATERIAL =====
+   Rim, bezel and a scanline-over-gradient fill, and NO SHADOW: the ruling asks for the dock to
+   read as part of the shell, and a drop shadow is the one thing that says "this is floating above
+   it". The rim is the LEFT edge only — the seam against the map — because the other three edges
+   are the frame's own and a rim there would draw a box around a thing that is not a box.
+
+   THE FILL IS TRANSLUCENT ON PURPOSE. Ruling 22 hands the dock the horizon, and an opaque plate
+   would take it straight back; at 88% the material reads as material and the sky reads as ground
+   under it. `prefers-reduced-transparency` takes the plate to solid, which is that preference's
+   whole job — the sky's own wash and horizon stay, so the hour is still legible.
+
+   Below the rung the dock is not a column at all — it is `.table-sheet`, the frame's second ROW,
+   and a left rim on a full-width row would be a stray vertical line. So the material is scoped to
+   the arrangement that has a seam to draw. */
+@media (min-width: 980px) {
+  /* No padding, deliberately. The dock's own panels carry theirs, and 16px of vertical breathing
+     room here would come straight out of the column that `scripts/no-scroll-audit.mjs` already
+     reports overflowing by 130px for a player at 1280x720. Attached means attached. */
+  .table-sidebar {
+    border-left: var(--rim-w) solid var(--role-hue);
+    background-image: var(--chrome-scanline), linear-gradient(180deg,
+      color-mix(in srgb, var(--surface-1) 88%, transparent) 0%,
+      color-mix(in srgb, var(--surface-2) 92%, transparent) 100%);
+    background-size: 100% var(--scanline-gap), auto;
+    outline: 1px solid var(--bezel-color);
+    outline-offset: calc(-1 * var(--bezel-inset));
+    box-shadow: none;
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .table-sidebar { background-image: linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%); }
+  }
 }
 
 .table-status { margin: 0 0 .8rem; color: var(--text-muted); font-size: .85rem; }
@@ -1082,25 +1401,42 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    "Player sections"), the tab sets differ, and the GM's bar is unreachable without a GM token.
    The rim costs no layout (an inset shadow, not a border), so the gutter still puts the labels
    on the same column as the surface headings below them. */
-.frame-tabbar { grid-row: 2; min-width: 0; }
-.gm-tabs, .player-view-tabs { padding-inline: var(--pane-gutter); }
-/* THE CHROME-TIER SCANLINE. `--scanline-color` is the CHROME strength (.22 / .14 / .05); the
-   shared `.scanlines` utility halves it with `opacity: .5` for the SCENE tier, which is why the
-   sky is at .11 and this bar is at .22 — two strengths of one texture, not a contradiction. The
-   style guide's own bar wears it and this one wore nothing, so the bar read as a hole between
-   the sky above and the sky below. Still a background-IMAGE rather than the `.scanlines` utility
-   (an inset ::after would sit above the tabs), but now on the row, which neither scrolls nor
-   masks. Daybreak drops it, matching the utility's own light-theme rule and the caption
-   ("texture drops to near-nothing"). */
+/* ===== RULING 26 — THE TAB BAR'S MATERIAL, AND RULING 51'S HUE ON IT =====
+   THE RIM AND THE BEZEL ARE THE PRIMITIVE'S, NOT THIS ROW'S, and that is the composition rather
+   than a gap. `packages/ui/src/primitives/Tabs.css` paints ruling 26's material — a bottom rim, a
+   bezel a `--bezel-inset` above it, and a translucent fill — as BACKGROUND LAYERS on the bar
+   itself, because the bar is a scroll container and an absolutely-positioned pseudo inside a
+   scroller travels with the tabs. Measured before this rule was written: a second rim on a
+   `.frame-tabbar::before` at `z-index: -1` never appeared at all, because the bar is a full-size
+   in-flow child and its own background paints over any negative-index layer of its parent. Two
+   rims would have been wrong even if both had shown.
+
+   SO THE ROW'S JOB IS THE HUE, NOT A SECOND EDGE. `--rim-color` is redeclared here, which is what
+   makes the primitive's own rim and its interaction brightening come out in the ROLE colour —
+   magenta for the player's seat, violet for the GM's — with no knowledge of roles inside the
+   primitive and exactly one line on screen. `--rim-color` is only read by the bar inside this
+   row; the scrollbar tokens that also derive from it are declared on `:root` and were substituted
+   there, so nothing else moves.
+
+   AND THE ROW'S OWN PAINT IS THE PLATE. `--chrome-plate` is a lit-top/shaded-bottom gradient
+   carrying the role hue, under the chrome-tier scanline; the bar's fill is 62% translucent, so
+   both read through it. The plate replaces the flat 7% role WASH the row used to paint and
+   carries the hue at 13%/6% instead — a stronger role signal, not a weaker one, which is the
+   thing to check if this is ever retuned. The wash token stays as the background-color beneath it
+   so the row still has a role-tinted floor if the plate is ever taken off.
+
+   NO GLOW, and that is the ruling rather than an omission: the bar sits next to regions that do
+   glow, and leaving its budget unspent is what keeps the restraint rule meaningful. `.rim-lit`
+   must stay absent here. */
 .frame-tabbar {
-  background-image: linear-gradient(to bottom,
-    transparent 0,
-    transparent calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap));
-  background-size: 100% var(--scanline-gap);
+  grid-row: 2;
+  min-width: 0;
+  --rim-color: var(--role-hue);
+  --rim-color-hi: var(--role-hue);
+  background-image: var(--chrome-scanline), var(--chrome-plate);
+  background-size: 100% var(--scanline-gap), auto;
 }
-[data-theme="light"] .frame-tabbar { background-image: none; }
+.gm-tabs, .player-view-tabs { padding-inline: var(--pane-gutter); }
 .frame-tabbar.rim-gm { background-color: var(--rim-gm-wash); }
 .frame-tabbar.rim-player { background-color: var(--rim-player-wash); }
 

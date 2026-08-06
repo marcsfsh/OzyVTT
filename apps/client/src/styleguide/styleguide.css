@@ -145,6 +145,37 @@ html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 .sg-grid-demo .grid-floor { position: absolute; inset: 0; }
 .sg-texture span { position: relative; z-index: 1; }
 
+/* The material demo (ruling 2). Every box below is a real utility composition, so these rules carry
+   ONLY size, layout and type — the moment one of them sets `background` on a `.chamfer` box it stops
+   being a demo of the thing and becomes a demo of the bug the section warns about. The fill goes
+   through --material-fill, which is what a consumer actually does. */
+.sg-material-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+.sg-material {
+  --material-fill: var(--material-plate);
+  display: flex; flex-direction: column; gap: var(--space-2);
+  min-height: 7rem; padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+  color: var(--text); font-size: var(--fs-sm);
+}
+.sg-material code { color: var(--violet-hi); font-family: var(--font-mono); }
+.sg-door {
+  --material-fill: var(--material-scanline), var(--material-plate);
+  display: grid; place-items: center;
+  min-width: 12rem; min-height: 3.5rem; padding: var(--space-3) var(--space-6) var(--space-3) var(--space-8);
+  color: var(--text); font: 700 var(--fs-sm)/1.2 var(--font-display);
+  letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; text-align: center;
+}
+/* A hero repaints --rim-color and gets its glow in that hue for free: --rim-glow is derived from
+   the rim rather than being a colour of its own. That is the whole reason the glow is separable. */
+.sg-door-hero { --rim-color: var(--magenta); --rim-color-hi: var(--magenta-hi); }
+.sg-material-notes { margin: var(--space-3) 0 0; padding-left: var(--space-5); color: var(--text-dim); font-size: var(--fs-sm); display: grid; gap: var(--space-2); }
+.sg-material-notes code { font-family: var(--font-mono); color: var(--violet-hi); }
+.sg-material-notes strong { color: var(--text); }
+.sg-numeric-demo { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.sg-numeric-demo > div { display: flex; align-items: baseline; gap: var(--space-4); }
+.sg-numeric-demo > div > span:first-child { min-width: 11rem; font-size: var(--fs-sm); }
+.sg-numeric-demo strong { font-size: var(--fs-h3); color: var(--text); }
+.sg-numeric-slot { display: inline-block; min-width: 3ch; text-align: right; }
+
 /* The scene demo (§9). Tall enough that --sky-horizon-inset (7rem) reads as a horizon with sky
    above it rather than as a stripe. No `overflow` of its own on purpose — `.pane-sky` clips the
    floor's spill itself, and the demo should behave exactly as a real pane does. */
