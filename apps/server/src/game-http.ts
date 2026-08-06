@@ -282,6 +282,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.rulesAsk), ...command("rules.ask"));
   router.post(expressPath(GAME_PATHS.rulesAnswer), ...command("rules.answer"));
   router.post(expressPath(GAME_PATHS.stagingDefaults), ...command("table.set-staging-defaults"));
+  router.post(expressPath(GAME_PATHS.partyVisibility), ...command("table.set-party-visibility"));
   // Literal segments (ping/clear) are registered before the {id} routes, though methods keep them unambiguous anyway.
   router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
   router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));

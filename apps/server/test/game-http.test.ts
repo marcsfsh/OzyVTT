@@ -851,6 +851,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.rulesAsk, "post", "rules.ask"],
       [GAME_PATHS.rulesAnswer, "post", "rules.answer"],
       [GAME_PATHS.stagingDefaults, "post", "table.set-staging-defaults"],
+      [GAME_PATHS.partyVisibility, "post", "table.set-party-visibility"],
       [GAME_PATHS.annotations, "post", "annotation.add"],
       [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
       [GAME_PATHS.annotationsClear, "post", "annotation.clear"],

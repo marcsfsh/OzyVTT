@@ -100,6 +100,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `rules.ask` | `combat:write` |
 | `rules.answer` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
+| `table.set-party-visibility` | `combat:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
@@ -1317,6 +1318,22 @@ Sets the table's staging defaults (GM-grade only): the token visibility a newly 
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `visibility` | `public` \| `gm-only` | yes | What a newly staged combatant's token visibility starts at |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/table/party-visibility`
+
+Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface - the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card - the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection - a withheld field is never sent. A player's own claimed character is unaffected at every tier.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `visibility` | `off` \| `name-and-class` \| `full-sheet` \| `sheet-and-resources` | yes | How much a player sees of another player's character; the default is name-and-class |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

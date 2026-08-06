@@ -539,6 +539,31 @@ export const StagingDefaultsSchema = z.object({
 }).strict();
 export type StagingDefaults = z.infer<typeof StagingDefaultsSchema>;
 
+/**
+ * How much a player sees of ANOTHER player's character (rulings 5/8/19). GM-facing words, settled by
+ * the client: Off · Name and class · Full sheet · Sheet + resources.
+ *
+ *   - `off`                 - no party surface at all: no identity card, no sheet, no resources. The
+ *                             actor entry STAYS, because the map, the tokens and the turn order are
+ *                             not sheet data and a table without them is broken, not private.
+ *   - `name-and-class`      - the identity card. Who they are and what they play; no sheet.
+ *   - `full-sheet`          - plus their imported sheet (`PlayerActor.definition`), read-only.
+ *   - `sheet-and-resources` - plus the live resources that are otherwise owner-only (spell slots,
+ *                             pact slots, prepared spells, inventory, currency, hit dice, uses).
+ *
+ * **The default is `name-and-class`** - the safe middle, not the fullest. Players get a useful party
+ * roster out of the box and the GM opts in to more.
+ *
+ * **Enforced in `projectPlayerView` (`apps/server/src/projections.ts`), never client-side.** A tier
+ * filtered in the client is decorative: the data would still be on the wire and the setting would be a
+ * lie. The tier itself is projected onto `PlayerView` so a client renders the shape it was GIVEN
+ * rather than inferring one from which fields happen to be present.
+ *
+ * A player's OWN character is never governed by this - see `PlayerActor`.
+ */
+export const PartyVisibilitySchema = z.enum(["off", "name-and-class", "full-sheet", "sheet-and-resources"]);
+export type PartyVisibility = z.infer<typeof PartyVisibilitySchema>;
+
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().nonnegative().default(0),
@@ -554,7 +579,11 @@ export const GameStateSchema = z.object({
   /** Standing rules policy every new fight starts from (D7). GM-set, player-read; additive with a full default. */
   rulesPolicy: RulesPolicySchema.default({}),
   /** Table defaults for staging new combatants (D2). GM-set, GM-read; additive with a full default. */
-  stagingDefaults: StagingDefaultsSchema.default({})
+  stagingDefaults: StagingDefaultsSchema.default({}),
+  /** How much a player sees of ANOTHER player's character (rulings 5/8/19). GM-set, player-read - the
+   * tier rides `PlayerView` so a client knows which shape it was handed. Additive; the default is the
+   * safe middle, so a save written before the field existed parses to `name-and-class`. */
+  partyVisibility: PartyVisibilitySchema.default("name-and-class")
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
@@ -569,7 +598,17 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
 export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived" | "sheetPreview"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool (per-die `entries` plus the derived total summary) - only on the requesting player's own claimed character. */ hitDice?: NonNullable<Actor["hitDice"]>; /** Sheet resources (spell slots, prepared spells, inventory, currency) - only on the requesting player's own claimed character. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
+/**
+ * A creature as ONE player sees it. Two gates decide what is populated, and they are independent:
+ *
+ * 1. **"Is this mine?"** - the requesting player's own claimed character always gets everything below
+ *    (sheet + resources), whatever the table's `partyVisibility` says. That branch is untouchable.
+ * 2. **`GameState.partyVisibility`** - how much of ANOTHER PLAYER's claimed character reaches you.
+ *    The authoritative per-tier field table lives beside the code that enforces it, in
+ *    `apps/server/src/projections.ts`. Monsters, NPCs and UNCLAIMED characters are outside both gates
+ *    and are unchanged by either.
+ */
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived" | "sheetPreview"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** "Fighter 7" / "Fighter 5 / Rogue 2" - the identity card's second line, derived server-side from the stored sheet because a player projection carries no `definitions` list to derive it from. ANOTHER player's claimed character only, at every tier from `name-and-class` up; absent on your own (you already hold the whole `definition`), on unclaimed characters, and on monsters. */ classLine?: string; /** The imported sheet. Your own claimed character always; another player's only at `partyVisibility` `full-sheet` or `sheet-and-resources`. */ definition?: ActorDefinition; /** Spent limited-use counts. Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ actionUses?: Record<string, number>; /** Hit Point Dice pool (per-die `entries` plus the derived total summary). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ hitDice?: NonNullable<Actor["hitDice"]>; /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand; /** Active condition ids + parallel display labels ("Prone", "Exhaustion 3"): public info, so players and the shared screen render the same dots from one source. */ conditionIds: readonly string[]; conditions: readonly string[] }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
@@ -590,7 +629,7 @@ export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnAc
  * list exists so a player can find the preview, not so it can render one.
  */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
-export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[]; /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy; /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[] };
+export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[]; /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy; /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[]; /** The tier the server APPLIED to this projection (see PartyVisibility). It travels so a client renders the shape it was handed instead of guessing one from which fields happen to be present - "no definition" and "definition withheld" look identical otherwise. It is a description of what was already done server-side, never an instruction the client is trusted to obey. */ partyVisibility: PartyVisibility };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
 export type TurnHistoryEntry = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string }>;
@@ -927,6 +966,8 @@ export interface ClientToServerEvents {
   "rules:answer": (payload: { commandId: string; askId: string; allow: boolean; reason?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   /** GM sets the table's staging defaults (D2): what visibility a newly staged combatant's token starts at. */
   "table:set-staging-defaults": (payload: { commandId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  /** GM sets how much a player sees of ANOTHER player's character (rulings 5/8/19); enforced in the projection, never client-side. */
+  "table:set-party-visibility": (payload: { commandId: string; visibility: PartyVisibility; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-token-image": (payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-size": (payload: { commandId: string; actorId: string; size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-visibility": (payload: { commandId: string; actorId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

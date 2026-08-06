@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BuilderAbilityMethod, GmView, PlayerView, RuleExceptions, RuleFamily, RuleMode } from "@vtt/domain";
+import type { BuilderAbilityMethod, GmView, PartyVisibility, PlayerView, RuleExceptions, RuleFamily, RuleMode } from "@vtt/domain";
 import {
   Avatar, Badge, Button, Eyebrow, Input, RevealSwitch, SegmentedControl, Select, Stepper, Switch, ThemeToggle, useToast
 } from "@vtt/ui";
@@ -68,6 +68,29 @@ const ABILITY_METHODS: ReadonlyArray<Readonly<{ id: BuilderAbilityMethod; label:
   { id: "roll", label: "Roll" },
   { id: "custom", label: "Custom formula" }
 ];
+
+/**
+ * Rulings 5/8/19 — how much a player sees of ANOTHER player's character. **These four words are the
+ * client's ruling and the GM's whole mental model of the feature**; the wire says
+ * `off | name-and-class | full-sheet | sheet-and-resources` and `apps/server/src/projections.ts` is
+ * the only thing that enforces them. Nothing here filters anything — a withheld field never arrives.
+ *
+ * A `Select`, not a `SegmentedControl`: four labels this long are unreadable in a segment at 320px,
+ * and the health-display row beside it already sets the precedent for a picker with many options.
+ */
+const PARTY_VISIBILITY_OPTIONS = [
+  { value: "off", label: "Off" },
+  { value: "name-and-class", label: "Name and class" },
+  { value: "full-sheet", label: "Full sheet" },
+  { value: "sheet-and-resources", label: "Sheet + resources" }
+] as const;
+
+const PARTY_VISIBILITY_HELP: Readonly<Record<PartyVisibility, string>> = {
+  off: "Players see each other's tokens on the map and nothing else — no party list.",
+  "name-and-class": "Players see who's in the party and what they play.",
+  "full-sheet": "Players can open each other's sheets, read-only.",
+  "sheet-and-resources": "Players also see each other's spell slots, inventory and hit dice."
+};
 
 const HEALTH_STYLES = [
   { value: "band", label: "Band" },
@@ -228,6 +251,17 @@ function TableGroup({ state, gmToken, onSignOut, onRevokeAll, busy }: Readonly<{
           options={[{ value: "gm", label: "GM only" }, { value: "all", label: "Shown to players" }]}
         />
       </div>
+    </Row>
+
+    <Row title="What players see of each other" help={PARTY_VISIBILITY_HELP[state.partyVisibility]} stacked>
+      <Select
+        value={state.partyVisibility}
+        aria-label="What players see of each other"
+        onChange={(event) => send("table:set-party-visibility", { visibility: event.target.value }, "That setting was rejected.")}
+      >
+        {PARTY_VISIBILITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </Select>
+      <p className="settings-note">Their own character is always theirs in full — this is only what they see of the rest of the party.</p>
     </Row>
 
     <Row title="New tokens" help="What a newly staged character or monster starts as." stacked>

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, AskableCommandSchema, BuilderAbilityMethodSchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, RuleExceptionsSchema, RuleModeSchema } from "@vtt/domain";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, AskableCommandSchema, BuilderAbilityMethodSchema, EncounterTokenPositionSchema, PartyVisibilitySchema, RollPurposeSchema, RollVisibilitySchema, RuleExceptionsSchema, RuleModeSchema } from "@vtt/domain";
 import { AbilitySchema, CharacterChoiceSchema, CharacterIdentitySchema, CurrencySchema, InventoryItemSchema, ProficienciesSchema } from "@vtt/schemas";
 
 /**
@@ -205,6 +205,8 @@ export const RulesAnswerSchema = z.object({ commandId: z.string().uuid(), askId:
 export const RulesSetPolicySchema = z.object({ commandId: z.string().uuid(), dial: RuleModeSchema, exceptions: WireRuleExceptionsSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** GM sets the table's staging defaults (D2): the visibility a newly staged combatant's token starts at. */
 export const TableSetStagingDefaultsSchema = z.object({ commandId: z.string().uuid(), visibility: z.enum(["public", "gm-only"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM sets how much a player sees of ANOTHER player's character (rulings 5/8/19). The tiers are spelled once, in `PartyVisibilitySchema`. */
+export const TableSetPartyVisibilitySchema = z.object({ commandId: z.string().uuid(), visibility: PartyVisibilitySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Table-wide policy for how a player's own confirmed hit reaches an enemy's HP (GM): a GM-confirmed proposal, or direct server-side apply. */
 export const SetPlayerDamageModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["proposal", "direct"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** GM resolves a parked player-hit damage proposal: apply it (optionally overriding the total) or dismiss it. */

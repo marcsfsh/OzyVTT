@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 10 GameState fields · 85 commands · 189 HTTP paths
+- 11 GameState fields · 86 commands · 190 HTTP paths
 
 ## GameState shape
 
@@ -18,6 +18,7 @@ single JSON blob the server persists and projects per role.
 - `builderPolicy`
 - `combat`
 - `definitions`
+- `partyVisibility`
 - `pendingImports`
 - `revision`
 - `rolls`
@@ -116,6 +117,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `scene.rename` | `scene:write` |
 | `scene.reorder` | `scene:write` |
 | `scene.set-combatants` | `scene:write` |
+| `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `token.move` | `combat:write` |
 | `turn.end` | `combat:write` |
@@ -278,6 +280,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/scenes/{sceneId}/duplicate`
 - `POST /api/v1/game/scenes/{sceneId}/rename`
 - `POST /api/v1/game/scenes/reorder`
+- `POST /api/v1/game/table/party-visibility`
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/tokens/{actorId}/move`
 - `POST /api/v1/game/turn/end`

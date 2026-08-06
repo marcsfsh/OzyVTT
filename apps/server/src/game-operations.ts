@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
+import type { AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PartyVisibility, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
 import { ABILITY_ROLL_FORMULA, parseDiceFormula, resolveDice, rollDice, validateAbilityFormula } from "@vtt/rules-5e";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { buildCharacterDefinition } from "./character-build.js";
@@ -51,7 +51,7 @@ import {
   InitiativeRollRemainingSchema, InitiativeRollSelfSchema, InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   SetPlayerInitiativeModeSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  ActionUseSchema, RulesAnswerSchema, RulesAskSchema, RulesSetPolicySchema, SaveRollSchema, TableSetStagingDefaultsSchema,
+  ActionUseSchema, RulesAnswerSchema, RulesAskSchema, RulesSetPolicySchema, SaveRollSchema, TableSetPartyVisibilitySchema, TableSetStagingDefaultsSchema,
   BuilderRollAbilitiesSchema, CharacterRebuildSchema, ReplayLaunchSchema, SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorSheetPreviewSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetPlayerDamageModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
@@ -107,6 +107,20 @@ function gmGradeLabelOf(principal: GamePrincipal): string { return principal.kin
 function requireGmGrade(principal: GamePrincipal, message: string) {
   if (!isGmGrade(principal)) throw new GameAccessDeniedError(message);
 }
+
+/**
+ * GM-only audit line for a party-visibility tier. The GM-FACING words on the settings page are the
+ * client's (Off · Name and class · Full sheet · Sheet + resources); this is the log's own sentence, so
+ * the two read naturally in their own places without either owning the other's copy. `off` says what
+ * players KEEP as well as what they lose, because "nothing" would misdescribe it - a combatant is
+ * still on the map and in the turn order at every tier.
+ */
+const PARTY_VISIBILITY_LOG: Readonly<Record<PartyVisibility, string>> = {
+  off: "Players no longer see anything of each other's characters beyond the tokens on the map.",
+  "name-and-class": "Players now see each other's name and class.",
+  "full-sheet": "Players can now read each other's full sheets.",
+  "sheet-and-resources": "Players can now read each other's full sheets and live resources."
+};
 
 /** GM-only audit text for a per-family exception set ("movement: freeform, slots: strict"), or "no exceptions". */
 function describeRuleExceptions(exceptions: RuleExceptions): string {
@@ -1645,6 +1659,27 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    /**
+     * How much a player sees of ANOTHER player's character (rulings 5/8/19). Stored only - the whole
+     * of the enforcement is `projectPlayerView` in `projections.ts`, which is what makes this a real
+     * setting rather than a client-side filter over data already on the wire.
+     *
+     * `publishGameState` re-projects for every connected socket, so a player already at the table sees
+     * the new tier on the next tick without reconnecting - the same mechanism every other table
+     * setting rides. The audit line is GM-only: what the GM lets players see is table management, and
+     * announcing it to the table would be its own small leak.
+     */
+    async tableSetPartyVisibility(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can set what players see of each other.");
+      const request = parse(TableSetPartyVisibilitySchema, raw, "The party-visibility command is malformed.");
+      const { commandId, visibility, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "table.set-party-visibility", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        state.partyVisibility = visibility;
+      });
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: PARTY_VISIBILITY_LOG[visibility], gmOnly: true }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     async encounterSetPlayerDamageMode(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can change how players' hits apply damage.");
       const request = parse(SetPlayerDamageModeSchema, raw, "The player-damage-mode command is malformed.");
@@ -2348,6 +2383,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["rules.ask", "Ask the GM to allow a blocked command; it re-runs first and is parked only if it still blocks (GM anyone; a player their own claimed character).", (p, raw) => operations.rulesAsk(p, raw)],
     ["rules.answer", "Allow (re-running the parked command with an override) or decline a parked rules question (GM).", (p, raw) => operations.rulesAnswer(p, raw)],
     ["table.set-staging-defaults", "Set the table's staging defaults: the token visibility a newly staged combatant starts at (GM).", (p, raw) => operations.tableSetStagingDefaults(p, raw)],
+    ["table.set-party-visibility", "Set how much a player sees of another player's character: nothing, name and class, the full sheet, or the sheet plus live resources (GM).", (p, raw) => operations.tableSetPartyVisibility(p, raw)],
     ["encounter.set-player-damage-mode", "Set how a player's own hit reaches an enemy's HP: a GM-confirmed proposal or direct server-side apply (GM).", (p, raw) => operations.encounterSetPlayerDamageMode(p, raw)],
     ["encounter.set-player-initiative-mode", "Set whether player-rolled initiative begins turns immediately or waits for all players to roll (GM).", (p, raw) => operations.encounterSetPlayerInitiativeMode(p, raw)],
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],
