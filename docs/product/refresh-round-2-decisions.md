@@ -1,9 +1,33 @@
 # Refresh round 2 — the client's rulings, in order
 
-**Status:** discovery in progress. Nothing here is implemented.
+**Status:** discovery complete — **60 rulings, all settled.** Nothing here is implemented.
 **Read this when:** implementing any part of round 2, or when a choice looks arbitrary and you are
 about to "improve" it. Most of these rulings overrode a director recommendation, and several
 deliberately reverse an earlier written decision.
+
+---
+
+## THE ACCEPTANCE BAR — read this first, every time
+
+Round 2 is done when **all three** of these are true. Not the best of them, not two of them.
+The client set this bar explicitly so that a long build could not drift away from it:
+
+> "all 3. a session runs on a phone with nothing in the way. all 21 feedback items closed and
+> verified. landing and app read as one product. This will need to survive any context collapsing or
+> context compression, so it needs to be documented so that as we go on this long journey, we dont
+> get derailed or sidetracked"
+
+1. **A session runs on a phone with nothing in the way.** A real fight, a real player, a real phone.
+   This is the test the other two cannot substitute for.
+2. **All 21 feedback items are closed and verified.** Countable, provable item by item, against
+   `docs/product/refresh-round-2-plan.md`. Verified means measured, not "should work now".
+3. **The landing and the app read as one product.** Put the landing beside any app surface: nothing
+   should say they were designed at different times. Checked on every surface, in all three themes.
+
+**Nothing is deferred to buy time** (ruling 59). There is no round 3 to push work into. If a phase is
+not finished, it gets another phase — "we ran out of phases" is not an outcome that exists.
+
+---
 
 The scope and sequencing live in `docs/product/refresh-round-2-plan.md`. **This file is the other
 half: what the client actually decided, and why.** A ruling here beats a recommendation anywhere else,
@@ -388,6 +412,183 @@ opacity.
 > as hover, not less.** A control whose only affordance is `:hover` is the `packages/ui/src/primitives/Steps.tsx`
 > bug already on the known-open list, repeated.
 
+### 41 — The modal scrim: darken plus a vignette
+
+The dialog sits in a pool of light. **A scanline scrim was rejected on ruling 28's own grounds** — it
+would lie directly over the scanlined surface beneath it, which is where moiré lives. The dialog is
+the outermost panel while open and carries the scanline; the scrim must not.
+
+### 42 — Loading: a scanline sweep, not a shimmer
+
+The placeholder reads as a screen drawing itself.
+
+> **This is not ruling 25's wipe and must not become it.** Same vocabulary, different element,
+> different meaning: the wipe says *navigation*, the sweep says *waiting*. The sweep loops while
+> loading; the wipe fires once. Reusing one animation for both is the "overdone" that ruling 25
+> forbids. Under `prefers-reduced-motion` the sweep stops and the placeholder holds a static tone.
+
+### 43 — Icons: heavier stroke, hard corners — calibrated, not maximised
+
+> "heavier stroke, hard corners, but dont overdo it or make it overly distracting. but dont err so far
+> on the side of caution that you underdo it either"
+
+Every glyph keeps its shape; the drawing changes — thicker stroke, mitred joins instead of rounded.
+The client asked for a calibration, so it needs a testable rule rather than a taste call:
+
+- **The floor:** the change must be obvious in a side-by-side at 100%. If a reviewer has to be told
+  which is which, it was underdone.
+- **The ceiling:** an icon's stroke must not read heavier than the stems of the label beside it. An
+  icon that out-weighs its own text has become the distraction the client named.
+
+This is the best candidate for **phase 6, the director's polish pass**. It is a dial, and dials are
+set by looking.
+
+### 44 — Scrollbars: a thin neon track, always visible
+
+Not hover-revealed. **Discoverability is the functional half of this ruling** — "is this region
+scrollable?" has been a recurring real problem in this app, and a permanently visible track answers it
+without inventing an affordance.
+
+> Style the track and thumb. Never replace the scroller with a custom widget — keyboard and assistive
+> behaviour comes from the real one.
+
+### 45 — The character sheet: quiet body, hero header
+
+The name/class/portrait block is treated as a hero surface; everything below stays structural — rims
+and rules, **no texture behind numbers a player reads mid-fight**.
+
+> **The hero header must cost zero height.** It re-treats a block that already exists. Under the
+> density pass the sheet is being tightened, and a hero moment that quietly adds 40px has taken back
+> what that pass just won.
+
+### 46 — Codex entity kinds: colour as an accent only
+
+The kind badge and a leading rule take the hue; nothing sits behind text. Makes a long page list
+scannable without a second colour vocabulary.
+
+> **The palette already assigns meanings.** Magenta is *act*, `--caution` is *warning / not
+> finished*, cyan is focus in daybreak, `--state-on` is *on*. **Entity-kind hues must come from
+> outside that set, or a badge will read as a state.** If the kind list outgrows the free hues, kinds
+> share a hue and the icon disambiguates — do not borrow a meaning-bearing colour to stretch the set.
+
+### 47 — List rows: hairline rules, no fill
+
+A 1px rule between rows; the selected row takes ruling 7's leading tick. This is the most repeated
+layout in the app — roster, Codex page list, replays, monster browser — so it has the widest reach.
+
+**Zebra was rejected for a specific reason, not a taste one:** an alternating horizontal tint sits
+underneath ruling 2's scanline texture, and two horizontal rhythms at different periods is where
+interference appears.
+
+### 48 — The connection strip folds into the tab bar's material
+
+One piece of chrome instead of two stacked bands. Removes a horizontal seam at the top of every screen
+and contributes real height to the density pass rather than just paint. The strip is still status, not
+navigation — sharing a material must not make it look tappable.
+
+### 49 — Every button takes the cut corner
+
+The chamfer is the app's silhouette, not a signal about importance; importance is already carried by
+fill and colour. Consistent with ruling 24, which put the same corner on badges, chips and counts.
+
+> **This promotes ruling 14 from an escape hatch to the default implementation.** `clip-path` clips
+> hit-testing, and *every button is a tap target* — so **the corner is painted on a backing layer on
+> every button**, not just small ones. The existing `sm` exemption in
+> `packages/ui/src/primitives/Button.css` is not a special case to preserve; it was the symptom that
+> the technique was wrong, and it disappears once the paint moves off the interactive element.
+> **Re-run `scripts/tap-audit.mjs` after this lands** — it is the single change most able to silently
+> shrink hit areas app-wide.
+
+### 50 — Game numbers: a distinct face with tabular figures
+
+HP, AC, initiative and dice totals. **The tabular half is functional, not decorative** — a value going
+from `44` to `9` currently reflows the row it sits in, and these are the values that change most
+during a fight. The face half is free character on the numbers people watch most.
+
+Applies to *game* numbers, not every digit. Counts and page numbers stay in the body face, so the
+distinction keeps meaning something.
+
+### 51 — The whole chrome carries the role hue
+
+Tab bar, connection strip and panel rims, not just a single rim. The reason is operational: **the
+client runs a GM window and a player window side by side, and acting as the wrong role is the mistake
+this prevents.**
+
+> - **A role hue is not a security boundary.** Projection is. Nothing may become GM-only *because* it
+>   is tinted; the tint sits on top of a boundary enforced in `apps/server/src/projections.ts`.
+> - **The public viewer takes no role hue at all.** It is the shared screen, it has no role, and a GM
+>   tint on the screen the players look at would be actively wrong.
+> - **Role hues must not collide with `--state-on` or `--caution`.** If the free hues are spoken for,
+>   the role signal changes *value* rather than hue.
+
+### 52 — Menus, popovers and tooltips: panel material, brighter rim
+
+They read as panels that arrived, and the brighter rim carries "on top" without a drop shadow. One
+rule for all three. They are usually the outermost panel while open, so by ruling 28 they do take the
+scanline.
+
+### 53 — The dock is part of the shell
+
+Panel material, attached to the frame with no gap and no shadow, so the map and the dock read as one
+instrument. Also cheaper under the density pass — an attached panel needs no surrounding margin.
+
+### 54 — The theme switch goes in both places
+
+Settings and the connection strip. The client took the option the director flagged as "two doors to
+one preference", and the distinction that makes it defensible is recorded: **Scenes was two doors to a
+destination; this is one preference with a real quick-access case** — the room gets dark mid-session,
+which is what dusk exists for.
+
+> - **Settings stays the canonical home.** The strip control is a shortcut, not a second setting.
+> - **The strip control is an icon with no label**, and must not become the most prominent thing in
+>   the app's most persistent row.
+> - It is still a tap target: the 44px floor applies, in a row ruling 48 is also tightening.
+
+### 55 — Empty surfaces get one door each, hero-treated
+
+No dashed boxes, no "nothing here yet" — each empty screen says the single next thing to do. Extends
+the existing scene-surface empty state (one line, one door) to every surface that can be empty.
+**A guided first-run wizard was rejected as build cost for a screen seen once.**
+
+Cheap by construction: an empty surface has no content for a hero treatment to compete with, which is
+why it was already on ruling 2's hero list.
+
+### 56 — Error surfaces: designed frame, technical detail behind a disclosure
+
+Reads as handled rather than broken, gives a clear next action, and keeps the detail one tap away for
+whoever is debugging. This matters more than it sounds: a cold deep link to `/settings` was crashing
+8 out of 8 times until recently, so these screens get met mid-session, not in a test.
+
+### 57 — Two Codex shapes, each earned
+
+Journal and quests are documents and take ruling 11's list-plus-editor with summonable context. **The
+atlas and the calendar get their own compositions** — a map is spatial, a calendar is a grid, and
+forcing either into a document shape fights what it is.
+
+Two shapes is the ceiling, not a licence for five. Per-surface composition is what produced the
+"stitched-together panels" complaint in the first place.
+
+### 58 — One reveal language everywhere
+
+Ruling 17's eye icon and magenta become the app-wide signal for "players can see this" — identical
+glyph, colour and position on Codex pages, tokens, scenes and journal entries.
+
+> **This is a safety property, not tidiness.** Reveal is the control where a GM misreading the state
+> leaks something to the table. Consistency is what makes it unmisreadable. It is still not the
+> boundary — the boundary is the projection — but it is what stands between a GM's intent and their
+> players' screens, and it should look the same every time they meet it.
+
+### 59 — Nothing defers; the work takes as long as it takes
+
+The client declined the cut order entirely, including the director's recommendation to defer the
+density pass. **There is no round 3 to push work into and no scope to trade against time.** If a phase
+is not finished, it gets another phase.
+
+### 60 — The acceptance bar is all three tests
+
+Recorded at the top of this document, because the client asked for it to survive context loss and the
+top of a session-start-linked document is the only place that reliably does.
+
 ---
 
 ## Director's rulings made without spending a client question
@@ -407,7 +608,10 @@ These were decided by the director on the record, because they are contracts rat
 
 ## Process notes
 
-- **Two questions per round** from round 4 onward, at the client's request; option text kept short.
-- **The round count floats.** What is fixed is the open-decision list, not a counter.
+- **60 questions over 20 rounds**, two per round from round 4 onward at the client's request.
 - **Where a ruling overrode a director recommendation, the ruling says so.** That is deliberate: the
   overrides are the ones most at risk of being "corrected" by someone reading only the reasoning.
+- **A quoted line is the client's own words and outranks the paragraph beneath it.**
+- **The client's qualifiers are specs, not moods.** "Don't overdo it" (ruling 25) and "don't underdo
+  it either" (ruling 43) were both turned into checkable rules on purpose. Anything vague enough to
+  be argued about later has been given a number or a test.
