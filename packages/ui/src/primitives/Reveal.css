@@ -5,7 +5,12 @@
    removing. `--chamfer-cut` is not used: the paint is a glyph, not a box. */
 .nh-reveal { display: inline-flex; vertical-align: middle; }
 .nh-reveal--banded { margin-top: var(--nh-label-band); }
-.nh-reveal-toggle {
+/* ONE MARK, TWO ROLES. `.nh-reveal-toggle` is the pressable switch and `.nh-reveal-mark` is the
+   read-only twin on a card or a list row; they share every line of paint on purpose, because
+   ruling 58 asks for an IDENTICAL glyph, colour and position wherever the product answers "do the
+   players see this?". The read-only one was a `Badge` with the words in it until the client
+   pointed at a Codex page reading "👁 Shown to players" — a second design for one fact. */
+.nh-reveal-toggle, .nh-reveal-mark {
   display: grid;
   place-items: center;
   width: 1.75rem;
@@ -15,27 +20,23 @@
   background: transparent;
   color: var(--text-muted);
   line-height: 1;
-  cursor: pointer;
 }
-.nh-reveal-toggle svg { width: 1.15rem; height: 1.15rem; }
+.nh-reveal-toggle { cursor: pointer; }
+.nh-reveal-toggle svg, .nh-reveal-mark svg { width: 1.15rem; height: 1.15rem; }
 /* THE STATE IS THE MAGENTA (ruling 17), and never colour alone — the glyph changes too, which is
    what keeps it readable for anyone who cannot separate the two hues. */
-.nh-reveal-toggle.is-revealed { color: var(--magenta); filter: var(--glow-drop-magenta); }
+.nh-reveal-toggle.is-revealed, .nh-reveal-mark.is-revealed { color: var(--magenta); filter: var(--glow-drop-magenta); }
 /* Ruling 40's touch clause: `:active` carries what `:hover` carries. */
 .nh-reveal-toggle:hover:not(:disabled), .nh-reveal-toggle:active:not(:disabled) { color: var(--text); }
 .nh-reveal-toggle.is-revealed:hover:not(:disabled), .nh-reveal-toggle.is-revealed:active:not(:disabled) { color: var(--magenta-hi); }
 .nh-reveal-toggle:disabled { color: var(--text-muted); opacity: .55; cursor: not-allowed; filter: none; }
 
-/* Both status pills read as STATUS rather than prose: the mono face plus tracked uppercase is the
-   system's "this is a machine fact about the record" treatment, and it keeps a two-word pill from
-   being mistaken for the record's own copy. */
+/* The GM-only CONTENT pill reads as STATUS rather than prose: the mono face plus tracked uppercase is
+   the system's "this is a machine fact about the record" treatment, and it keeps a two-word pill from
+   being mistaken for the record's own copy. (It is the only pill left here — the record axis is the
+   icon-only mark above.) */
 .nh-reveal-pill { font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
 /* Corner-anchored variant for a GM-only content block. The positioning CONTEXT belongs to the block —
    the pill only claims the corner and never eats the clicks in it. */
 .nh-reveal-pill--floating { position: absolute; top: var(--space-2); right: var(--space-2); pointer-events: none; }
 
-/* The visibility badge keeps sentence case: it is a fact stated in the product's own words, which the
-   glossary locks verbatim, and uppercasing them would make the badge and the switch beside it look like
-   two different vocabularies. The icon rides slightly under the cap height so it reads as a mark rather
-   than a second glyph in the sentence. */
-.nh-visibility-badge svg { width: .9em; height: .9em; }

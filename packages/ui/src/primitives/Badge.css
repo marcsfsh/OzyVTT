@@ -51,7 +51,14 @@
 .nh-badge--caution { --nh-rim: var(--caution); color: var(--caution-hi); }
 .nh-badge--danger  { --nh-rim: var(--danger); color: var(--danger-hi); }
 .nh-badge--info    { --nh-rim: var(--info); color: var(--indigo); }
-:root[data-theme="light"] .nh-badge--info { color: var(--info); }
+/* Daybreak's outline info badge needs the deeper ink; `--indigo` is a light accent on a pale
+   surface. `:not(.nh-badge--solid)` is LOAD-BEARING and not tidiness: without it this rule is
+   (0,2,0) and beats `.nh-badge--solid`'s (0,1,0) `--text-on-neon`, so the SOLID info badge
+   painted `--info` ink on an `--info` fill — measured rgb(61,80,214) on rgb(61,80,214),
+   contrast **1.00**, an invisible block where the Codex tab's "N new" count should be. The
+   override was always about the outline variant; now it says so. (Night and the sunset hour
+   never took this rule and measured 4.66 / 7.73.) */
+:root[data-theme="light"] .nh-badge--info:not(.nh-badge--solid) { color: var(--info); }
 
 /* Solid — filled tone for counts / high emphasis. Dark ink on neon per §5.1. */
 .nh-badge--solid { --nh-rim: transparent; color: var(--text-on-neon); }

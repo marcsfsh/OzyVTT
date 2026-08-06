@@ -109,10 +109,13 @@
    Material on a backing layer: the popover is a list of tap targets. */
 .nh-menu-popover {
   --nh-menu-gutter: var(--space-2);
+  /* The offset off the trigger, as a token rather than an inline `var(--space-1)`, because
+     Menu.tsx reads it to decide which side of the trigger has room (`nh-menu--up`). */
+  --nh-menu-gap: var(--space-1);
   position: absolute;
   isolation: isolate;
   z-index: 40;
-  top: calc(100% + var(--space-1));
+  top: calc(100% + var(--nh-menu-gap));
   left: 0;
   min-width: min(12rem, calc(100vw - 2 * var(--nh-menu-gutter)));
   max-width: calc(100vw - 2 * var(--nh-menu-gutter));
@@ -146,6 +149,11 @@
   background-clip: border-box;
 }
 .nh-menu--end .nh-menu-popover { left: auto; right: 0; }
+/* OPENS UPWARD when there is no room below. Set by Menu.tsx on open and on resize/rotate — CSS
+   cannot know where in the viewport the trigger landed, the same reason `--nh-menu-shift` exists
+   for the horizontal axis. A trigger in the bottom-right corner of the map (the Scenes menu) had
+   its whole list off the bottom of the window until this existed. */
+.nh-menu--up .nh-menu-popover { top: auto; bottom: calc(100% + var(--nh-menu-gap)); }
 
 .nh-menu-item {
   display: flex;

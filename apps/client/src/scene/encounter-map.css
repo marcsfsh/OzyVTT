@@ -172,7 +172,13 @@
    magenta / danger). It reuses the ink hoisted above rather than typing a second literal. */
 .encounter-token.movable:focus-visible .encounter-token-body { stroke: var(--token-ink); stroke-width: 6; clip-path: var(--token-bracket-cut); }
 .encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
-.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
+/* z-index 5, ABOVE the staging tray's 4 (line 7). The cluster holds the Scenes menu (ruling 12's
+   one door), and `z-index: 3` made a stacking context that trapped the popover's own z-index 40
+   beneath the tray: on an 844x390 landscape phone the map is 224px tall, the tray overlays its top
+   edge, and the flipped-up menu's first item hit-tested to a tray token instead of itself. The two
+   only ever meet on a map that short — a bottom-right cluster and a full-width top row — and when
+   they do, the control the GM is pressing has to win. */
+.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 5; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
 /* Keep the scene cluster clear of a left/right docked panel by moving it to the opposite corner. */
 .encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
 /* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize.

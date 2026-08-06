@@ -1,5 +1,4 @@
 import { Badge } from "./Badge";
-import { StableSwap } from "./StableSwap";
 import { Tooltip } from "./Tooltip";
 import { cx } from "./util";
 import { IconEye, IconEyeOff } from "./icons";
@@ -8,10 +7,14 @@ import "./Reveal.css";
 /**
  * The one shared "shown to players vs GM-only" vocabulary, factored so it can never drift again.
  * Two axes, four components:
- *  - RevealSwitch: is this whole record shown to players at all? ("Shown to players" / "Hidden from players")
- *  - VisibilityBadge: the same RECORD-level fact, read-only, said with an icon AND the same words
- *  - HiddenFromPlayers: the off half of that badge alone, for a list that only marks what is withheld
+ *  - RevealSwitch: is this whole record shown to players at all? (an icon-only eye you can press)
+ *  - VisibilityBadge: the same RECORD-level fact, read-only — the SAME icon-only eye, unpressable
+ *  - HiddenFromPlayers: the off half of that mark alone, for a list that only marks what is withheld
  *  - GmOnlyTag: this piece of CONTENT is GM-only (always a violet "GM only" pill, same everywhere)
+ *
+ * **The record axis carries no visible words at all any more** (rulings 17 + 58). One glyph, one
+ * colour, one position, in the switch and in the read-only mark alike; the two phrases below are still
+ * written exactly once and still reach every user — through `aria-label`, `title` and the tooltip.
  *
  * The two axes used to share one phrase, and on a journal row both appeared at once: the switch read
  * "GM only" for the whole entry while the violet pill read "GM only" for one paragraph of it — the same
@@ -82,29 +85,57 @@ export function RevealSwitch({ revealed, onChange, ariaLabel, banded = false, di
 }
 
 /**
- * **One fact, one badge.** Whether a record is shown to players, said the same way on every list in the
- * suite: icon + the RevealSwitch's exact words, never colour alone and never a drifted "Shown"/"Hidden"
- * shorthand that means something subtly different card to card. Width-stable for the same reason the
- * switch is: these badges sit in card headers whose other contents must not shuffle when one flips.
+ * The READ-ONLY half of the same control — **the identical icon-only eye**, with no label, no badge
+ * box and no second vocabulary (rulings 17 + 58).
+ *
+ * It used to be `Badge` + icon + the words, and that is the defect the client reported: a Codex page
+ * list showing an eye followed by "Shown to players", inches from the switch that says the same fact
+ * with the glyph alone. Ruling 58 asks for an identical glyph, colour and position everywhere reveal
+ * is shown — a badge box and a two-word label on the read-only twin is not "identical", and reveal is
+ * the one control where a GM misreading the state leaks something to the table.
+ *
+ * **The accessible name is not optional here either.** Same three carriers as the switch: `aria-label`,
+ * the tooltip, and `title` for a long press. `role="img"` is what makes the label count — a bare `span`
+ * with an `aria-label` has no name at all. This is a STATUS and not a control, so it is deliberately
+ * not a `switch` and not focusable: the surfaces that render it have no reveal action on that row.
  *
  * GM-only by construction wherever the caller is: a shared card type that carries no reveal flag simply
  * cannot pass `revealed`.
  */
 export function VisibilityBadge({ revealed }: Readonly<{ revealed: boolean }>) {
-  return revealed
-    ? <Badge tone="success" className="nh-visibility-badge"><IconEye /><StableSwap current={SHOWN} alternate={HIDDEN} /></Badge>
-    : <Badge tone="neutral" className="nh-visibility-badge"><IconEyeOff /><StableSwap current={HIDDEN} alternate={SHOWN} /></Badge>;
+  return <RevealMark revealed={revealed} />;
+}
+
+/**
+ * The shared mark. One element, one glyph, one colour — the switch's own paint minus the button, so
+ * the read-only fact and the toggleable one cannot drift apart again.
+ *
+ * Width is constant by construction (a 1.75rem square either way), which is why the `StableSwap` these
+ * used to need is gone rather than merely satisfied: nothing can shuffle a card header when a record
+ * flips.
+ */
+function RevealMark({ revealed, className }: Readonly<{ revealed: boolean; className?: string }>) {
+  const state = revealed ? SHOWN : HIDDEN;
+  return (
+    <Tooltip content={state} className={cx("nh-reveal", className)}>
+      <span role="img" aria-label={state} title={state} className={cx("nh-reveal-mark", revealed && "is-revealed")}>
+        {revealed ? <IconEye /> : <IconEyeOff />}
+      </span>
+    </Tooltip>
+  );
 }
 
 /**
  * "This whole record is hidden" where the row has no switch to read it from — a page timeline, a page's
- * pin list, the pin inspector's entry list. These used `GmOnlyTag`, which is the CONTENT pill: on a list
- * of records it answered the record question in the paragraph vocabulary. Same words as the switch's off
- * state, on purpose, because it is the same fact. No width reservation here: nothing toggles in place —
- * the row either carries this pill or it does not.
+ * pin list, the pin inspector's entry list.
+ *
+ * **It is the same mark, not a pill.** It was a `Badge` with the words in it, which made the record axis
+ * speak two ways depending on which list you were looking at — the exact drift ruling 58 closes. The
+ * fact, the glyph, the colour and the accessible name are `VisibilityBadge`'s off state, so this is now
+ * a name for a call site's intent ("this list only marks what is withheld") rather than a second design.
  */
 export function HiddenFromPlayers() {
-  return <Badge tone="neutral" className="nh-reveal-pill"><IconEyeOff /> {HIDDEN}</Badge>;
+  return <RevealMark revealed={false} />;
 }
 
 /**

@@ -79,15 +79,22 @@ describe("RevealSwitch — the one reveal toggle", () => {
 });
 
 describe("VisibilityBadge — the same fact, read-only", () => {
-  it("says the words AND draws the mark, in both states — never colour alone", () => {
+  it("draws the mark and NAMES it, in both states — no visible label, never colour alone", () => {
+    // Rulings 17 + 58: the record axis is an icon-only eye everywhere, read-only sites included. This
+    // was a Badge with the words printed in it, and the client found one on a Codex page reading
+    // "eye + Shown to players" beside a switch that says the same fact with the glyph alone.
     // The palette is heavy in the red-pink-magenta band and reserves violet for GM-only content, so no
-    // state in this system may be carried by hue. Icon first, word always.
+    // state in this system may be carried by hue either: the GLYPH changes as well as the colour.
     const view = render(<VisibilityBadge revealed />);
-    expect(screen.getByText("Shown to players")).toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveAccessibleName("Shown to players");
+    expect(screen.getByRole("img")).toHaveAttribute("title", "Shown to players");
     expect(view.container.querySelector("svg")).not.toBeNull();
+    // No badge box and no printed label — the words reach a pointer through the tooltip only.
+    expect(view.container.querySelector(".nh-badge")).toBeNull();
+    expect(screen.getByText("Shown to players")).toHaveAttribute("role", "tooltip");
 
     view.rerender(<VisibilityBadge revealed={false} />);
-    expect(screen.getByText("Hidden from players")).toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveAccessibleName("Hidden from players");
     expect(view.container.querySelector("svg")).not.toBeNull();
   });
 
@@ -99,20 +106,27 @@ describe("VisibilityBadge — the same fact, read-only", () => {
     expect(control.container.textContent).toBe(badgeWords);
   });
 
-  it("is width-stable too — these sit in card headers whose contents must not shuffle", () => {
-    const { container } = render(<VisibilityBadge revealed={false} />);
-    expect(container.querySelector(".nh-stableswap-ghost")!.getAttribute("data-stable-swap-alt")).toBe("Shown to players");
+  it("is width-stable by construction — these sit in card headers whose contents must not shuffle", () => {
+    // D23c's `StableSwap` reservation is GONE rather than merely satisfied: a 1.75rem square holds one
+    // of two glyphs, so there is no label left whose width could change when a record flips.
+    const view = render(<VisibilityBadge revealed={false} />);
+    expect(view.container.querySelector(".nh-stableswap")).toBeNull();
+    const off = screen.getByRole("img").className;
+    view.rerender(<VisibilityBadge revealed />);
+    expect(screen.getByRole("img").className.replace(" is-revealed", "")).toBe(off);
   });
 });
 
 describe("The two axes stay two axes", () => {
-  it("marks a withheld record with the record words, and GM-only content with the content pill", () => {
+  it("marks a withheld record with the record MARK, and GM-only content with the content pill", () => {
     const record = render(<HiddenFromPlayers />);
-    expect(record.container.textContent!.trim()).toBe("Hidden from players");
-    expect(record.container.querySelector("svg"), "the pill must carry the eye-off mark, not colour alone").not.toBeNull();
-    // Never violet: violet is reserved for GM-only CONTENT, and a hidden record is one switch away from
-    // being shared while a GM body never will be.
-    expect(record.container.querySelector(".nh-badge")!.className).not.toContain("nh-badge--violet");
+    // The record axis prints nothing: same eye-off, same colour, same position as everywhere else
+    // (ruling 58). Its words live where the switch's do — the accessible name, the title, the tooltip.
+    expect(screen.getByRole("img")).toHaveAccessibleName("Hidden from players");
+    expect(record.container.querySelector("svg"), "the mark must be a glyph, not colour alone").not.toBeNull();
+    // Never violet, and now never a badge at all: violet is reserved for GM-only CONTENT, and a hidden
+    // record is one switch away from being shared while a GM body never will be.
+    expect(record.container.querySelector(".nh-badge")).toBeNull();
     record.unmount();
 
     const content = render(<GmOnlyTag />);

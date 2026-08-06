@@ -69,18 +69,28 @@
      cannot follow the cut and is already spoken for by the bezel. */
   filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--void) 60%, transparent));
 }
-.nh-modal--accent-magenta::before,
-.nh-modal--accent-cyan::before,
-.nh-modal--accent-violet::before {
+/* THE ACCENT HAIRLINE RIDES `::after`, AND THAT IS THE WHOLE FIX FOR A TRANSPARENT DIALOG.
+   `nh-modal--accent-*` is set on `.nh-modal-surface` (Modal.tsx:64), the same element whose
+   `::before` is the material's backing layer three rules up — so this block used to reach into
+   that layer and destroy it: `inset: 0 0 auto 0` + `height: 2px` collapsed the plate to a 2px
+   strip, and the `background` SHORTHAND cleared `background-color: var(--surface-2)` AND the
+   scanline/sheen images with it. `accent` defaults to "magenta", so EVERY modal in the app was
+   painting no plate at all — measured on the character sheet, whose body copy sat directly on
+   the blurred roster sky behind it (the client's "too transparent to read against"). The
+   surface uses no `::after` of its own and is not a tap target, so the hairline lives there. */
+.nh-modal--accent-magenta::after,
+.nh-modal--accent-cyan::after,
+.nh-modal--accent-violet::after {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
   z-index: 1;
+  pointer-events: none;
 }
-.nh-modal--accent-magenta::before { background: var(--magenta); }
-.nh-modal--accent-cyan::before { background: var(--cyan); }
-.nh-modal--accent-violet::before { background: var(--violet); }
+.nh-modal--accent-magenta::after { background: var(--magenta); }
+.nh-modal--accent-cyan::after { background: var(--cyan); }
+.nh-modal--accent-violet::after { background: var(--violet); }
 
 .nh-modal-head {
   /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:

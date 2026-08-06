@@ -149,17 +149,61 @@
    so a plain `.initiative-list li` would bleed this flex/border/padding onto the console's own <li>s
    (action summaries etc.). Keep every row selector scoped to the top-level combatant rows. */
 .initiative-list > li { display: flex; justify-content: space-between; gap: var(--space-4); padding: .8rem var(--space-4); border-top: 1px solid var(--line); }
-/* The active row is the bold combat moment: a rounded highlight with a magenta left accent bar and a
-   steady stronger magenta glow (no motion, §6.9). The inset shadow is clipped by the radius so the
-   accent reads as a rounded-off bar, not a sharp corner-to-corner rectangle. */
-/* The active turn is one clean highlight: a left accent bar + a subtle tint. The acting console
-   below carries its own frame, so an outer glow around the whole (tall) block just doubled up. */
-.initiative-list > li.active { border-color: transparent; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .22rem 0 0 var(--magenta); }
-/* Pad past the accent so nested death-save and save prompts clear it instead of hiding it behind
-   their own background (report #1). */
-.initiative-list.gm > li.active, .initiative-list.player > li.active { padding-left: .55rem; }
-.initiative-list > li.you { background: color-mix(in srgb, var(--surface-2) 88%, var(--cyan)); }
-.initiative-list > li.you.active { background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .22rem 0 0 var(--magenta); }
+/* ══ RULING 47 ON THE LIVE TRACKER — HAIRLINE RULES, NO FILL, TICK ON THE SELECTED ROW ═════════
+   The client compared this panel with the scene-prep staging tray and asked for the tray's
+   language here: "rows read as rows". They were not the same shape at all. A prep row is a
+   hairline (`scenes/staging-tray.css`), and its chosen state is ruling 7's leading tick plus a
+   tinted rule; the live active row was a ROUNDED FILLED CONTAINER holding a second filled
+   container (`.acting-console`) holding a third (`.turn-economy`) — the "boxes inside boxes
+   inside boxes" in the report.
+   So the active row keeps every distinction it had and spends none of it on fill: the tick says
+   WHICH row, and two magenta-tinted hairlines BRACKET the acting block so it still reads as one
+   thing when it runs tall. That leaves the action rows as the only boxes in the column, which is
+   where the affordance is actually load-bearing (report #6 — a rollable action must look
+   tappable). Ruling 36's "the row lights" survives as the tick and the rules; §8.1's one glowing
+   element is untouched, because nothing here ever glowed. */
+.initiative-list > li.active {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  border-top-color: color-mix(in srgb, var(--magenta) 55%, var(--line));
+  border-bottom: 1px solid color-mix(in srgb, var(--magenta) 55%, var(--line));
+}
+/* The tick rides `.initiative-row-main` and not the `<li>`: the row is the LINE, while the `<li>`
+   grows to hold the console, prompts and the tools popover — a mark centred on that box would
+   drift down the block as it fills. Same construction as the tray's `.staging-row.is-placed`. */
+.initiative-list.gm > li.active .initiative-row-main,
+.initiative-list.player > li.active .initiative-row-main { position: relative; padding-inline-start: .85rem; }
+.initiative-list.gm > li.active .initiative-row-main::before,
+.initiative-list.player > li.active .initiative-row-main::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  width: var(--cue-w);
+  height: var(--cue-h);
+  transform: translateY(-50%);
+  color: var(--magenta);
+  background: var(--cue-mark);
+  pointer-events: none;
+}
+/* Everything nested under the active row indents to the row's own text column, so the tick is the
+   only thing in the leading gutter and the block reads as one hanging indent.
+   `.85rem` is the tick's gutter and `.3rem` is `.initiative-expand`'s own padding, so the console
+   starts on the same vertical as the row's avatar and name rather than 5px left of them
+   (measured: avatar 890, console 885, before this term). */
+.initiative-list.gm > li.active > :not(.initiative-row-main),
+.initiative-list.player > li.active > :not(.initiative-row-main) { margin-inline-start: calc(.85rem + .3rem); }
+/* The row's `▶` text caret is what the tick REPLACES. Two marks for one fact, three characters
+   apart, is the redundancy ruling 47 removes — and the tick is the app-wide mark, so it is the one
+   that stays. (`InitiativeRow` still draws its own caret for the shared screen, which has no
+   tick.) */
+.initiative-list.gm > li.active .initiative-caret,
+.initiative-list.player > li.active .init-row-caret { display: none; }
+/* The player's own row: a cyan leading rule, for the same reason the active row lost its fill —
+   a second tinted plate in a list of hairlines is the nesting this pass removes. */
+.initiative-list > li.you { background: transparent; border-top-color: color-mix(in srgb, var(--cyan) 55%, var(--line)); }
+.initiative-list > li.you.active { background: transparent; box-shadow: none; }
 .initiative-list > li > span { display: flex; align-items: center; }
 .initiative-list > li > strong { color: var(--text); font-family: var(--font-mono); }
 .your-turn { margin-top: var(--space-4); padding: .85rem var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--cyan); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); color: var(--text); }
@@ -283,8 +327,9 @@
 .actor-card-conditions { margin: -.4rem 0 .8rem; }
 .actor-card-conditions .condition-chips { margin-left: 0; }
 .you-are-playing .condition-editor { margin-top: .4rem; }
-/* Turn economy: pressed = spent. */
-.turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .45rem; padding: .3rem .45rem; border: 1px solid transparent; }
+/* Turn economy: pressed = spent. A bare strip since the tray-language pass — no rim, no plate,
+   no padding of its own; the pills sit on the row they belong to. */
+.turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .45rem; padding: 0; border: 0; }
 .turn-economy-name { margin-right: .15rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
 /* Route 1: the slots wrap in a .3rem-gap row, which is 4.8px against the 4.85px a side a `.tap-target`
    would overhang at their measured 34.3px — the pills would steal each other's taps. */
@@ -1146,10 +1191,15 @@
 /* The acting console is the one region on this surface that may keep a tint: it is WHOSE TURN IT
    IS, §8.1's single glowing thing, and it holds no numbers of its own — the vitals and the action
    rows sit outside it. Ruling 39 still moves the severity onto the 2px leading rule. */
-.acting-console { margin-top: .7rem; padding: var(--space-3) .8rem .85rem; border: 0; border-left: 2px solid var(--magenta); border-radius: 0; background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
+/* FLATTENED (the tray-language pass). It was a tinted card with its own 2px magenta bar, sitting
+   inside the active row's tint — two fills and two magenta accents for one fact. The active row
+   above already says whose turn it is with the tick and the bracketing rules, so the console is
+   now a continuation of that row rather than a container: a hairline separates it from the row
+   line, and it keeps NOTHING of its own but spacing. Every control that was in it is still in it. */
+.acting-console { margin-top: .45rem; padding: .5rem 0 .2rem; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
 /* A down creature (0 HP): dim the console (the server blocks its actions; clicking one still surfaces
    the audited override), with its death saves / down note lifted above it. */
-.acting-console.down { opacity: .5; border-left-color: var(--danger); }
+.acting-console.down { opacity: .5; border-top-color: color-mix(in srgb, var(--danger) 55%, var(--line)); }
 .acting-down-note { margin: var(--space-2) 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
 /* Row 1: name (left) and movement (right) share a line; row 2: the resource buttons, left-aligned. */
 .acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: var(--space-2); }
@@ -1161,7 +1211,7 @@
 /* Movement rides the name row, right-aligned; read it a touch brighter than the muted default. */
 .acting-console-title .economy-movement { flex: none; margin: 0; padding: 0; align-self: baseline; font-size: var(--fs-sm); font-weight: 700; color: var(--text-dim); white-space: nowrap; }
 .acting-console-title .legendary-pill { flex: none; }
-.acting-console .turn-economy { margin-top: 0; padding: 0; border: 0; background: transparent; }
+.acting-console .turn-economy { margin-top: 0; }
 .acting-console .action-runner { margin-top: .45rem; }
 /* Ruling 55: solid. A dashed edge on a real control reads as a placeholder, and this one is the
    door onto the rest of the built-in actions — the quieter ink is what says "secondary", not the
@@ -1178,7 +1228,7 @@
 .legendary-offer { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .28rem .6rem; border: 1px solid var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .legendary-offer:hover:not(:disabled) { border-color: var(--violet-hi); }
 .legendary-offer:disabled { color: var(--text-muted); border-color: var(--line); cursor: default; }
-.acting-console.legendary-acting { border-left-color: var(--violet); background: color-mix(in srgb, var(--surface-2) 86%, var(--violet)); }
+.acting-console.legendary-acting { border-top-color: color-mix(in srgb, var(--violet) 60%, var(--line)); }
 .acting-console.legendary-acting .acting-console-head strong { color: var(--violet-hi); }
 .legendary-pill { cursor: default; color: var(--violet-hi); border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); }
 .legendary-done { margin-left: auto; padding: .24rem .55rem; font-size: var(--fs-sm); }
@@ -1273,7 +1323,6 @@
    one glowing element: whoever's turn it is. A glowing panel edge would compete with that. */
 .encounter-panel,
 .encounter-round,
-.turn-economy,
 .condition-picker,
 .action-row,
 .action-targeting,
@@ -1293,7 +1342,6 @@
 }
 .encounter-panel::before,
 .encounter-round::before,
-.turn-economy::before,
 .condition-picker::before,
 .action-row::before,
 .action-targeting::before,
@@ -1323,9 +1371,12 @@
 }
 /* The one textured surface on the tracker: its own outermost frame (ruling 28). */
 .encounter-panel { --material-fill: var(--material-scanline), var(--material-plate); }
-/* Everything a player reads a number off of: rim, bezel, cut — and a flat plate (ruling 45). */
+/* Everything a player reads a number off of: rim, bezel, cut — and a flat plate (ruling 45).
+   `.turn-economy` LEFT this list in the tray-language pass: the action economy is three pills on
+   a line, and giving the line that holds them a rim, a bezel and a plate made a box whose only
+   contents were other boxes. The pills keep their own edges; the strip that carries them does
+   not. Nothing was removed from it — Action, Bonus, Reaction and End turn are all still there. */
 .encounter-round,
-.turn-economy,
 .condition-picker,
 .action-row,
 .action-targeting,

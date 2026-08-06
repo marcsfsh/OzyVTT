@@ -49,15 +49,47 @@
   gap: var(--space-2);
   /* Paint stays compact; `.tap-target` on the option lifts the hit area to 44px. */
   min-height: 2.25rem;
-  padding: var(--space-2) var(--space-3);
+  /* THE TICK'S OWN LANE. `--space-3` (10px) left the mark inside the label's first glyph — see
+     the `--cue-*` note below — so the leading pad is the trailing pad plus the tick's width and
+     a gap. It is on EVERY option, pressed or not: the tick is a background and adds no width, so
+     buying its room only on the pressed option would reflow the whole row on every press. */
+  padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + var(--cue-w) + var(--space-2));
   border: 0;
   border-radius: 0;
   background-color: transparent;
   color: var(--text-dim);
   font: 600 var(--fs-sm) / 1 var(--font-body);
   cursor: pointer;
+  /* THE CUE AT THIS CONTROL'S SCALE — the same re-declaration `Button.css` makes and this file
+     never did. The root token is the landing door's (`--cue-inset: .95rem` = 15.2px, sized for
+     2.4rem of padding); against an option's 10px it painted the wedge THROUGH the first letter —
+     over the D of "Dark", the A of "Auto-roll", the D of "Digital". The 1:2 w:h ratio is not free
+     choice: the token's conic wedge is exact only there. Slightly wider than the button's .3rem
+     because this mark is a persistent STATE, not a hover cue, and the client read the old one as
+     a rendering artifact rather than a design — it has to read as a triangle at rest. */
+  --cue-w: .4rem;
+  --cue-h: .8rem;
+  --cue-inset: .3rem;
 }
-.nh-segmented--sm .nh-segmented-option { min-height: 1.85rem; padding: var(--space-1) var(--space-2); }
+.nh-segmented--sm .nh-segmented-option {
+  min-height: 1.85rem;
+  padding: var(--space-1) var(--space-2) var(--space-1) calc(var(--space-2) + var(--cue-w) + var(--space-1));
+  --cue-w: .34rem;
+  --cue-h: .68rem;
+  --cue-inset: .26rem;
+}
+/* THE LABEL AND THE ICON STATE THEIR OWN INK, and that is a fix rather than a formality —
+   the same lesson `.nav-arrow` and `.nh-switch span` already carry. The client app's base
+   control styling has `button strong, button span { display: block }` and
+   `button span { color: var(--text-dim); font-size: .9rem; margin-top: var(--space-1) }`
+   (apps/client/src/styles.css:748-750), written for card-shaped buttons with a dim second line.
+   An INHERITED value loses to any matching rule whatever its specificity, so that element
+   selector beat `[aria-pressed="true"] { color: var(--state-on-ink) }` on the label and the icon
+   while leaving the option's own `color` — and the tick, which is `currentColor` — correct.
+   Measured on the pressed option: label 1.42 night / 1.15 dusk / 1.40 daybreak against the fill,
+   where the token pair reads 5.70 / 8.80 / 6.39. That gap IS the client's "almost impossible".
+   `margin: 0` re-centres the label, which the same rule was pushing 4px below the tick. */
+.nh-segmented-label, .nh-segmented-icon { color: inherit; margin: 0; font: inherit; }
 /* Ruling 40's touch clause: `:active` says what `:hover` says. */
 .nh-segmented-option:hover, .nh-segmented-option:active { color: var(--text); }
 /* Pressed = the per-theme ON fill plus the leading tick. NO glow: this control is a filter, and it
