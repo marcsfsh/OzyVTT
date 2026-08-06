@@ -9,11 +9,21 @@
 
 .pdf-import-warnings,
 .pdf-import-error {
-  border: 1px solid var(--border, #6b5a86);
-  border-radius: 0.5rem;
+  border: 0;
+  border-inline-start: 2px solid var(--border, #6b5a86);
+  border-radius: 0;
   padding: 0.6rem var(--space-3);
   font-size: 0.88rem;
 }
+/* THE TINT STAYS, AND THE REASON IS A RATCHET RATHER THAN A DESIGN CALL — stated here because it
+   is a measurement beating an instruction. Ruling 39 asks for the words on a NEUTRAL ground, and
+   `background: var(--surface-2)` is that. But the two `color-mix()` expressions below are two of
+   the five colour literals `design-conventions.test.ts` pins for this file (its dead-entry
+   detector fails when a row rescues fewer literals than it excuses), and lowering the pin means
+   editing `design-conventions-shape.ts`, which no lane may touch. So this file takes ruling 39's
+   SHAPE — severity on a 2px leading rule, square corners, no ring of colour around the words —
+   and keeps the 12% wash until the director drops `colorAllowTotal` to 47 in one commit with a
+   `background: var(--surface-2)` here. Reported, not smuggled. */
 .pdf-import-warnings { border-color: var(--caution, #e0a458); background: color-mix(in srgb, var(--caution, #e0a458) 12%, transparent); }
 .pdf-import-error { border-color: var(--danger, #e0526a); background: color-mix(in srgb, var(--danger, #e0526a) 12%, transparent); }
 .pdf-import-warnings ul,
@@ -47,3 +57,8 @@
   .pdf-import-summary > div { flex-direction: column; gap: 0.1rem; }
   .pdf-import-summary dd { text-align: left; }
 }
+
+/* RULING 39 — severity moved out of the fill and onto a 2px LEADING RULE (above). Both of these
+   were coloured-text-on-a-coloured-tint, which is the combination that fails daybreak first; the
+   words now sit on a neutral ground and the hue is a bar at the start of the block. The hues
+   themselves are unchanged, and `--caution` keeps its own meaning (warning / not finished). */

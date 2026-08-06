@@ -39,16 +39,37 @@
   --violet-hi: #C79BFF;   /* readable violet for text on dark surfaces */
   --indigo: #5B6EF5;
 
-  /* Codex entity-type accents: a restrained magenta->cyan spectrum aliasing existing brand hues; the
-     entity icon + label always carry the finer distinction, so near-neighbours (base vs -hi) are fine. */
-  --codex-type-note: var(--text-muted);
-  --codex-type-character: var(--magenta);
-  --codex-type-event: var(--magenta-hi);
-  --codex-type-location: var(--cyan);
-  --codex-type-species: var(--cyan-hi);
-  --codex-type-faction: var(--violet);
-  --codex-type-religion: var(--violet-hi);
-  --codex-type-item: var(--indigo);
+  /* CODEX ENTITY-KIND ACCENT — RULING 46, and it resolves to ONE HUE FOR ALL EIGHT KINDS.
+     The eight names stay so no consumer changes and a future palette can re-split them, but every
+     one of them is `--indigo` now. This is the ruling's own escape clause ("if the kind list
+     outgrows the free hues, kinds share a hue and the icon disambiguates"), and wave 4 measured
+     that it is the only route left:
+
+       magenta / magenta-hi  = ACT (the primary action)         — disqualified
+       cyan / cyan-hi        = focus, and the selection axis     — disqualified
+       violet / violet-hi    = GM-ONLY CONTENT, reserved         — disqualified, and the one that
+                               bites: a violet kind badge would sit in the same row as a violet
+                               GM-only pill and read as the same statement
+       --caution             = warning / not finished            — disqualified (ruling 39)
+       --state-on            = on                                — disqualified (ruling 4)
+
+     Six of eight were spending a meaning-bearing colour on a taxonomy. `--indigo` is the only
+     free accent in the palette, so it takes all eight, and the ENTITY ICON carries the whole
+     distinction — which it already did (the glyph and the label were always the finer signal;
+     the old comment said so while shipping eight hues anyway).
+
+     The hue is an ACCENT ONLY (ruling 46's first line): the kind badge's rim and glyph and the
+     page-list row's leading rule. Nothing sits behind text, so the floor it must clear is the
+     3:1 graphics one — and it clears 4.5 on every surface in every theme after dusk's lift below. */
+  --codex-type: var(--indigo);
+  --codex-type-note: var(--codex-type);
+  --codex-type-character: var(--codex-type);
+  --codex-type-event: var(--codex-type);
+  --codex-type-location: var(--codex-type);
+  --codex-type-species: var(--codex-type);
+  --codex-type-faction: var(--codex-type);
+  --codex-type-religion: var(--codex-type);
+  --codex-type-item: var(--codex-type);
 
   /* D25: the atlas pin palette. These were eight hardcoded hex values inside `icons.tsx`, which meant
      the light theme drew map pins at dark-theme saturation. The palette OFFERED is tokenized; the value
@@ -482,6 +503,19 @@
      box-shadow — box-shadow cannot follow a clip-path cut. */
   --chamfer: .6rem;
   --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  /* THE MASKED FORM OF THE SAME CUT (minted for wave 5C, and the stricter of the two techniques).
+     Two 45° `linear-gradient` masks composited with `mask-composite: intersect` cut the same two
+     corners as the polygon above, with three properties the backing layer does not have: it is
+     PAINT-ONLY (hit-testing is untouched, so `elementFromPoint` still answers at both cut corners
+     of a 44px control), it needs no pseudo-element at all, and the element's own background does
+     NOT scroll — which is exactly the failure mode documented on `.chamfer` below. Its one cost is
+     that a masked element paints no box-shadow, so a surface that needs a drop shadow keeps the
+     backing layer.
+     THE STOP IS --chamfer / √2 AND THAT IS GEOMETRY, NOT TASTE: the gradient runs along the
+     diagonal, so a cut of --chamfer along each edge is a band of --chamfer·cos45° measured
+     perpendicular to the gradient's own axis. Typing the edge length here would cut a corner
+     41% too deep. */
+  --chamfer-mask-stop: calc(var(--chamfer) / 1.4142136);
 
   /* ---- THE MATERIAL (rulings 2, 40, 64) ----
      The landing door, expressed as tokens a surface anywhere can take. Phase 0 measured that
@@ -632,6 +666,16 @@
   --text-on-neon: #16132C;
 
   --violet-hi: #D3AEFF;
+  /* THE SUNSET HOUR NEVER LIFTED ITS INDIGO, and ruling 46 is what surfaced it: the dark theme's
+     #5B6EF5 measures 3.32 / 2.90 / 2.45 on dusk's --surface-1/2/3 (3.74 on --bg), so it was under
+     the 3:1 GRAPHICS floor on two of four grounds — never mind text. #93A4FF measures
+     5.99 / 5.23 / 4.42 (6.73 on --bg), clearing AA on all four. Measured 2026-08-06, Chromium,
+     WCAG 2.1, same method as --violet-hi and --text-muted above.
+     THIS ALSO MOVES `--info`, which aliases --indigo, and that is the point rather than a
+     side-effect: the info alert's icon, the info badge's rim and the downtime entry's glyph were
+     all sitting at 2.45-3.32 in this theme. A solid info badge fills with it under
+     --text-on-neon #16132C, which gets MORE readable, not less. */
+  --indigo: #93A4FF;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.34);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.42);
@@ -938,6 +982,29 @@ button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: transla
    a single class loses at equal specificity to `.nh-btn--primary { background: ... }`, which
    is exactly the case this has to survive. A bordered consumer should drop its border and let
    `.rim` carry the edge; the border box is left at its own width so nothing reflows.
+
+   ⚠ NEVER PUT `.chamfer` / `.rim` / `.bezel` / `.cue` ON AN ELEMENT THAT SCROLLS. This is the
+   one way to hold this utility that silently destroys it, and it is invisible in a screenshot
+   taken at rest. The backing layer is `position: absolute`, so its containing block is the
+   element's PADDING BOX — and on a scroll container that box is the scrolled box, not the
+   scrollport. The whole plate (fill, rim, bezel, cue) therefore rides the content out of view
+   and the element paints as an unstyled rectangle for the rest of the scroll.
+
+   MEASURED TWICE IN WAVE 5, in two lanes that found it independently:
+     · 5B, Homebrew's detail pane (`.hb-detail`, `.scroll-y` in the markup): at `scrollTop: 500`
+       on a 1,283px item editor the rim's bottom edge sat 380px up a 776px pane, with bare sky
+       under it.
+     · 5C, a phone rail with a section open: at `scrollTop: 198` of 585 the plate was gone above
+       the fold entirely.
+
+   THE FIX IS A COMPOSITION, NOT A PATCH: frame the region, never the scroller. A frame holds a
+   region; the region scrolls INSIDE it. Put the material on the non-scrolling wrapper and leave
+   the `.scroll-y` child bare — which is the arrangement §7 already asks for. Where no wrapper
+   exists, either the element keeps a REAL border at `var(--rim-w) solid var(--rim-color)` (square,
+   no cut — the honest trade) or it takes `--chamfer-mask-stop`'s masked cut above, whose paint is
+   the element's own background and therefore does not scroll.
+
+   VERIFY BY SCROLLING THE REGION AND RE-SHOOTING. A screenshot at scrollTop 0 cannot see this.
    ============================================================ */
 
 /* The backing layer, shared. Behind the content, above the element's own background box, and

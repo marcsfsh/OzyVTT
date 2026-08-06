@@ -13,9 +13,60 @@
 .settings-head p { margin: .3rem 0 0; color: var(--text-dim); font-size: .92rem; }
 .settings-body { display: flex; flex-direction: column; gap: 1.4rem; }
 
-/* No background of its own: `.surface-glass` (the markup carries it) is the scene tier, and a
-   flat `--surface-1` fill here would paint over it. */
-.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: var(--space-4) 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--radius-lg); }
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════
+   `.settings-group` is this surface's OUTERMOST panel, so it takes the full recipe including
+   the scanline fill; `.settings-exceptions` nests inside it and takes rim + bezel over a plain
+   plate (ruling 28 — two horizontal rhythms at different periods is where moiré appears).
+   No rest glow: ruling 2 gives that to hero surfaces only, and settings is not one.
+
+   The construction is `.nh-panel::before`'s (packages/ui Panel.css), written against the
+   selectors this file already owns because the markup is not this lane's to change. The cut,
+   the rim and the fill ride a BACKING LAYER, never the element — `clip-path` clips
+   hit-testing, and a settings group is full of tap targets. `inset: -1px` spans the border
+   box, so the rim lands exactly where the 1px border used to and nothing reflows. Every value
+   is a shared token, so ruling 29's daybreak translation arrives for free.
+
+   `.surface-glass` RETIRES HERE (revised ruling 23). SettingsPage.tsx still puts the class on
+   the group and that file is another lane's; the material replaces what it painted, so the
+   blur and the 72% wash are switched off from this side rather than left to double-paint. */
+.settings-group,
+.settings-exceptions {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.settings-group::before,
+.settings-exceptions::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.settings-group { --material-fill: var(--material-scanline), var(--material-plate); }
+.settings-exceptions { --material-fill: var(--surface-2); }
+/* The role edge has to MOVE to the backing layer, not merely survive. `.rim-gm` is an inset
+   box-shadow on the element, and a negative-z-index pseudo paints above its originator's own
+   background AND shadow — so the material would bury the one mark that says "GM only". Restated
+   here it also follows the cut, which the element-level shadow never did. */
+.settings-group.rim-gm { box-shadow: none; }
+.settings-group.rim-gm::before { box-shadow: inset 3px 0 0 0 var(--rim-gm); }
+.settings-group.rim-player { box-shadow: none; }
+.settings-group.rim-player::before { box-shadow: inset 3px 0 0 0 var(--rim-player); }
+
+.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: var(--space-4) 1.1rem 1.2rem; border: 1px solid transparent; }
 .settings-group > .nh-eyebrow { margin-bottom: .6rem; }
 
 .settings-row { display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; padding: .8rem 0; border-top: 1px solid var(--line); }
@@ -33,16 +84,24 @@
 .settings-inline { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
 .settings-inline-label { color: var(--text-dim); font-size: .85rem; }
 
-.settings-exceptions { display: flex; flex-direction: column; gap: .45rem; width: 100%; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.settings-exceptions { display: flex; flex-direction: column; gap: .45rem; width: 100%; padding: .7rem .8rem; border: 1px solid transparent; }
 .settings-exception { display: flex; gap: .6rem; align-items: center; justify-content: space-between; }
 .settings-methods { display: flex; flex-wrap: wrap; gap: var(--space-2) 1.2rem; }
 
 .settings-subsection { display: flex; flex-direction: column; gap: .8rem; margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line); }
 .settings-session { display: flex; flex-wrap: wrap; gap: .6rem; }
 
-.settings-empty { margin: 0; padding: 1.2rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .9rem; }
-.settings-players { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.settings-player { display: flex; gap: .7rem; align-items: center; padding: .6rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+/* Ruling 55: no dashed boxes. An empty list inside a group says the one next thing and stands
+   on the group's own ground — the dashes were the only thing here that read as a placeholder. */
+.settings-empty { margin: 0; padding: 1.2rem; text-align: center; color: var(--text-dim); font-size: .9rem; }
+/* Ruling 47 — LIST ROWS ARE HAIRLINE RULES, NO FILL. A filled card per player put a second
+   rectangle inside a rectangle for a row that is a name and two buttons. `gap: 0` because the
+   rule IS the separation now; the last row keeps no trailing line. Zebra was rejected upstream:
+   an alternating tint under the group's scanline is two horizontal rhythms at different
+   periods, which is where interference appears. */
+.settings-players { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.settings-player { display: flex; gap: .7rem; align-items: center; padding: .6rem .2rem; border-bottom: 1px solid var(--line); }
+.settings-player:last-child { border-bottom: 0; }
 .settings-player-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
 .settings-player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-player-meta { color: var(--text-dim); font-size: .78rem; }

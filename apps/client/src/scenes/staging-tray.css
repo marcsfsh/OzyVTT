@@ -1,6 +1,6 @@
 /* The staging tray. The cap is the point (Appendix A1): the list scrolls INSIDE itself at every
    width, so the Add buttons and the primary action below it never scroll out of the panel. ~5 rows. */
-.staging-tray { display: flex; flex-direction: column; gap: .4rem; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.staging-tray { display: flex; flex-direction: column; gap: .4rem; padding: var(--space-2); border: 1px solid transparent; }
 .staging-tray-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; }
 .staging-tray-title strong { display: block; font-size: .84rem; }
 .staging-tray-title span { display: block; color: var(--text-muted); font-size: .7rem; }
@@ -8,11 +8,66 @@
 .staging-tray-reveal > span { color: var(--text-dim); font-size: .72rem; font-weight: 700; }
 /* Declared region (§7): the cap is here, the scroll is `.scroll-y` in the markup. */
 .staging-tray-list { display: flex; flex-direction: column; gap: var(--space-1); max-height: 15rem; overscroll-behavior: contain; margin: 0; padding: 0; list-style: none; }
-.staging-row { display: flex; align-items: center; gap: .4rem; min-height: var(--tap-min); padding: var(--space-1) .35rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); }
-.staging-row.is-placed { border-color: color-mix(in srgb, var(--cyan) 45%, var(--line)); }
+/* Ruling 47: the tray is a LIST, so its rows are hairline rules and no fill. `is-placed` used to
+   be a cyan border on a filled card; it is now the leading tick (ruling 7's mark) plus a cyan
+   rule, which reads the same on a phone and does not stack five fills inside one panel. */
+.staging-row { position: relative; display: flex; align-items: center; gap: .4rem; min-height: var(--tap-min); padding: var(--space-1) .35rem .35rem; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+.staging-row.is-placed { border-bottom-color: color-mix(in srgb, var(--cyan) 45%, var(--line)); padding-inline-start: .85rem; }
+.staging-row.is-placed::before { content: ""; position: absolute; inset-inline-start: 0; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--cyan); background: var(--cue-mark); pointer-events: none; }
+.staging-tray-list > .staging-row:last-child { border-bottom: 0; }
 .staging-row-name { flex: 1; min-width: 0; }
 .staging-row-name strong { display: block; font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .staging-row-name small { color: var(--text-muted); font-size: .68rem; }
-/* The reveal dot. Off state reads violet - the colour this product reserves for GM-only. */
-.staging-row-reveal.is-hidden { color: var(--violet-hi); border-color: color-mix(in srgb, var(--violet) 55%, transparent); }
+/* ══ RULING 58 — ONE REVEAL LANGUAGE EVERYWHERE, and this row was the exception ═══════════════
+   `StagingTray.tsx` draws its per-entry reveal with a raw `IconButton` + `IconEye`/`IconEyeOff`
+   rather than `RevealSwitch`, so it never picked up the primitive's colours — and what it painted
+   instead said two wrong things at once:
+
+     · REVEALED read as nothing at all. The primitive's `.nh-reveal-toggle.is-revealed` is
+       `--magenta` with a glow (Reveal.css); this row left the on-state at the icon button's
+       default ink, so a GM scanning the tray saw no magenta for "shown to players" — the one
+       state that has to be unmissable.
+     · HIDDEN read VIOLET, which is this repo's reservation for GM-only CONTENT. Two axes, one
+       colour, on a row that also carries a GM-only staging banner above it.
+
+   Ruling 58 calls this a safety property rather than tidiness: reveal is where a GM misreading
+   the state leaks something to the table. Both states now match the primitive exactly — same
+   glyph (already), same colour, same position. The words are already right (the button's
+   `aria-label` uses the glossary's own "Shown to players" / "Hidden from players"). */
+.staging-row-reveal { color: var(--magenta); filter: var(--glow-drop-magenta); }
+.staging-row-reveal:hover:not(:disabled), .staging-row-reveal:active:not(:disabled) { color: var(--magenta-hi); }
+.staging-row-reveal.is-hidden { color: var(--text-muted); filter: none; border-color: transparent; }
+.staging-row-reveal.is-hidden:hover:not(:disabled), .staging-row-reveal.is-hidden:active:not(:disabled) { color: var(--text); }
 .staging-tray-empty, .staging-tray-hint { margin: 0; color: var(--text-dim); font-size: .74rem; }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
+   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
+   daybreak translation arrives for free.
+   The tray is the outermost panel of the staging column, so it takes the scanline; its rows are
+   ruling 47 hairlines and carry no material of their own (ruling 28). */
+.staging-tray {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.staging-tray::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.staging-tray { --material-fill: var(--material-scanline), var(--material-plate); }

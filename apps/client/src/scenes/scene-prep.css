@@ -12,9 +12,15 @@
 .scene-prep-adds { display: flex; flex-wrap: wrap; gap: .4rem; }
 .scene-prep-adds > * { flex: 1 1 9rem; justify-content: center; }
 /* Declared region (§7): the cap is here, the scroll is `.scroll-y` in the markup. */
-.scene-prep-picklist { display: flex; flex-direction: column; gap: .2rem; max-height: 13rem; overscroll-behavior: contain; padding: .3rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
-.scene-prep-pick { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); min-height: var(--tap-min); padding: .3rem var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; }
-.scene-prep-pick:hover { border-color: var(--line-hover); background: var(--surface-2); }
+/* The picklist IS the scroller (`.scroll-y` in the markup) and an absolutely-positioned child of a
+   scroll container rides the scroll — so this one keeps its edge as a real border rather than a
+   backing layer. Square, at the material's weight, in the material's colour: the identity here is
+   carried by the line, and a cut corner that scrolled away would be worse than no cut at all. */
+.scene-prep-picklist { display: flex; flex-direction: column; gap: 0; max-height: 13rem; overscroll-behavior: contain; padding: .3rem; border: var(--rim-w) solid var(--rim-color); border-radius: 0; background: var(--surface-1); }
+/* Ruling 47: a pick is a list row — a rule between rows, never a fill. */
+.scene-prep-pick { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); min-height: var(--tap-min); padding: .3rem var(--space-2); border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; }
+.scene-prep-picklist > .scene-prep-pick:last-child { border-bottom: 0; }
+.scene-prep-pick:hover { border-bottom-color: var(--line-hover); color: var(--text); }
 .scene-prep-pick strong { font-size: .8rem; }
 .scene-prep-pick small { color: var(--text-muted); font-size: .68rem; }
 /* A DISCLOSURE HAS TO LOOK LIKE ONE. `Recent (6)` already carries its count, but the row was a bare
@@ -24,11 +30,12 @@
    conditions disclosure, encounter-map.css:328-331): a bordered, padded row with the caret pushed to
    the far edge, so the whole 44px row is one obvious target under a finger as well as a pointer.
    Click-to-expand is kept — pre-collapsed is D3's decision, this is only its affordance. */
-.scene-prep-recent > summary { min-height: var(--tap-min); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: .3rem var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text-dim); font-size: .76rem; font-weight: 800; cursor: pointer; list-style: none; }
+.scene-prep-recent > summary { position: relative; isolation: isolate; min-height: var(--tap-min); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: .3rem var(--space-2); border: 1px solid transparent; border-radius: 0; background: none; color: var(--text-dim); font-size: .76rem; font-weight: 800; cursor: pointer; list-style: none; }
 .scene-prep-recent > summary::-webkit-details-marker { display: none; }
 .scene-prep-recent > summary::after { content: "▾"; color: var(--text-muted); font-weight: 400; }
 .scene-prep-recent[open] > summary::after { content: "▴"; }
-.scene-prep-recent > summary:hover { border-color: var(--line-hover); background: var(--surface-2); color: var(--text); }
+.scene-prep-recent > summary:hover { color: var(--text); }
+.scene-prep-recent > summary:hover::before, .scene-prep-recent > summary:focus-visible::before { border-color: var(--rim-color-hi); }
 .scene-prep-recent > summary:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
 .scene-prep-recent[open] > summary { margin-bottom: .3rem; }
 .scene-prep-note { margin: 0; padding: .3rem .1rem; color: var(--text-muted); font-size: .72rem; }
@@ -54,3 +61,35 @@
    the panel stands beside the map in an 856px column, where the line is free and worth having for a
    GM meeting the two-layer model for the first time. The rung is the phone table's own (styles.css). */
 @media (max-width: 979px) { .scene-builder-head p { display: none; } }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
+   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
+   daybreak translation arrives for free.
+   One panel-shaped control here — the Recent disclosure. It is nested inside the prep room, so
+   rim + bezel over a plate and no texture (ruling 28). */
+.scene-prep-recent > summary {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.scene-prep-recent > summary::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.scene-prep-recent > summary { --material-fill: var(--material-plate); }

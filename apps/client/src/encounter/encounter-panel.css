@@ -85,11 +85,17 @@
    a move is simply not allowed yet, and someone is waiting on a call (§2). */
 .dock-waiting-count { display: inline-grid; place-items: center; min-width: 1.3rem; margin-left: .4rem; padding: 0 .3rem; border-radius: var(--radius-pill); background: var(--caution); color: var(--text-on-neon); font: 800 var(--fs-2xs)/1.7 var(--font-mono); vertical-align: baseline; }
 
-.encounter-panel { margin-top: var(--space-10); padding: var(--space-4) 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.encounter-panel { margin-top: var(--space-10); padding: var(--space-4) 1.1rem; border: 1px solid transparent; }
 .encounter-panel.compact { padding-block: 1.1rem; }
 /* Live-combat hue shift (§6.10): a quiet magenta tint while an encounter runs. Higher specificity than
    the resting `.encounter-panel` surface so it wins; eases in/out, never pulses. */
-.encounter-panel.combat-active { background: color-mix(in srgb, var(--surface-1) 90%, var(--magenta)); border-color: color-mix(in srgb, var(--line) 65%, var(--magenta)); transition: background var(--dur-base) var(--ease-settle), border-color var(--dur-base) var(--ease-settle); }
+/* The live-combat hue shift now rides the MATERIAL's own knobs — the plate warms toward magenta
+   and the rim follows — because the backing layer paints above the element's own background and a
+   `background` here would simply be buried. Same tint, same easing, one layer further back. */
+.encounter-panel.combat-active {
+  --material-plate: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 90%, var(--magenta)) 0%, color-mix(in srgb, var(--surface-1) 90%, var(--magenta)) 100%);
+  --rim-color: color-mix(in srgb, var(--rim-color) 65%, var(--magenta));
+}
 .encounter-panel h2 { margin: .2rem 0 0; }
 .encounter-panel > p { color: var(--text-dim); }
 .encounter-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
@@ -199,7 +205,7 @@
 .initiative-row-tools .secondary { padding: .3rem .7rem; font-size: var(--fs-xs); }
 /* Floating tools card + shared click-away backdrop (also used by the ⋯ menu). */
 .encounter-overlay-backdrop { position: fixed; inset: 0; z-index: 40; background: transparent; }
-.row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; gap: .45rem; padding: .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+.row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; gap: .45rem; padding: .6rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
 /* The active row carries the acting console inline, so open its HP/tools popover in-flow ABOVE the
    console (not floating below the whole row), so editing HP shows those controls above the actions. */
 .initiative-list.gm > li.active .row-tools-popover { position: relative; z-index: 41; top: auto; margin-top: .4rem; }
@@ -233,7 +239,9 @@
 /* Anchored under the ⋯ button via inline top/left/width/max-height computed from the button rect. */
 /* `.scroll-y` rides this in EncounterPanel's markup (check (h)). The 85vh cap stays: this is a fixed
    overlay layer, which is the one place §7 rule 2 keeps the idiom. */
-.encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* Ruling 52: a menu takes the panel material with a BRIGHTER rim, so a floating surface reads as
+   one step in front of the panel it opened from. */
+.encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); display: grid; gap: .6rem; padding: .7rem; border: 1px solid transparent; box-shadow: var(--shadow-2); }
 /* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
 .encounter-menu .rules-mode-control { flex-direction: column; align-items: stretch; gap: .3rem; margin: 0; }
 .encounter-menu .rules-mode-control select { width: 100%; }
@@ -270,13 +278,13 @@
 .condition-add { min-width: 1.5rem; text-align: center; background: transparent; color: var(--text-muted); border-style: dashed; }
 .condition-editor { margin-top: .35rem; }
 .initiative-list.gm .condition-editor { margin-top: .3rem; }
-.condition-picker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: .45rem; padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.condition-picker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: .45rem; padding: .55rem; border: 1px solid transparent; }
 .condition-option { display: inline-flex; align-items: center; gap: .3rem; }
 .actor-card-conditions { margin: -.4rem 0 .8rem; }
 .actor-card-conditions .condition-chips { margin-left: 0; }
 .you-are-playing .condition-editor { margin-top: .4rem; }
 /* Turn economy: pressed = spent. */
-.turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .45rem; padding: .3rem .45rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .45rem; padding: .3rem .45rem; border: 1px solid transparent; }
 .turn-economy-name { margin-right: .15rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
 /* Route 1: the slots wrap in a .3rem-gap row, which is 4.8px against the 4.85px a side a `.tap-target`
    would overhang at their measured 34.3px — the pills would steal each other's taps. */
@@ -297,7 +305,7 @@
 .player-actions { margin-top: .45rem; }
 .player-actions-label { margin: 0 0 .3rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .player-actions-label span { color: var(--text-muted); font-weight: 700; text-transform: none; letter-spacing: normal; }
-.action-row.action-row-readonly, .action-row.action-row-readonly:hover { cursor: default; background: var(--surface-2); border-color: var(--line); border-left-color: var(--magenta); }
+.action-row.action-row-readonly, .action-row.action-row-readonly:hover { cursor: default; border-left-color: var(--magenta); }
 .action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
 /* Rollable stat-block actions read as real buttons (report #6): a border + raised fill + magenta left
    accent so it's obvious they're tappable. The name sits on its own line with the mechanics stacked as
@@ -305,8 +313,12 @@
 /* Route 1 is not a choice here: this is a stacked list, and design-language §4 forbids route 2 in one —
    overlapping invisible `::after` boxes in a vertical list steal their neighbours' taps. The rollable
    rows are already well past the floor; it is the flat reference rows below that were 39.9px. */
-.action-row { width: 100%; min-height: var(--tap-min); display: flex; flex-direction: column; align-items: stretch; gap: .3rem; padding: .55rem .65rem; border: 1px solid var(--line); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: left; cursor: pointer; }
-.action-row:hover:not(:disabled) { background: var(--surface-3); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); border-left-color: var(--magenta-hi); }
+/* Ruling 39's shape on the fight surface's most-read control: the magenta stays a LEADING RULE and
+   the words sit on a neutral ground. The leading bar is a real border rather than paint, because
+   the backing layer paints above the element's own border and would bury it. */
+.action-row { width: 100%; min-height: var(--tap-min); display: flex; flex-direction: column; align-items: stretch; gap: .3rem; padding: .55rem .65rem; border: 1px solid transparent; border-left: 2px solid var(--magenta); border-radius: 0; color: var(--text); text-align: left; cursor: pointer; }
+.action-row:hover:not(:disabled) { border-left-color: var(--magenta-hi); }
+.action-row:hover:not(:disabled)::before, .action-row:focus-visible::before, .action-row:active:not(:disabled)::before { border-color: var(--rim-color-hi); }
 .action-row-name { font-size: var(--fs-body); font-weight: 800; color: var(--text); }
 .action-row-summary { list-style: none; margin: 0; padding: 0; display: grid; gap: .18rem; }
 /* Bullet as a flex item (not absolute) so it always sits BEFORE the text with a real gap - an
@@ -319,13 +331,13 @@
    button-styled rollable actions above stand out. Tap to reveal the rules text. */
 /* `align-items: center`, not baseline: the row carries the 44px floor now, and a baseline in a box
    taller than its one line of text parks the text at the top with the rest of the target empty below. */
-.action-row-static { flex-direction: row; align-items: center; gap: var(--space-2); border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
-.action-row-static:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; border-left-color: var(--line-strong); }
-.action-row-static[aria-expanded="true"] { background: var(--surface-2); opacity: 1; }
+.action-row-static { flex-direction: row; align-items: center; gap: var(--space-2); border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; --material-fill: transparent; --rim-color: transparent; }
+.action-row-static:hover:not(:disabled) { border-color: transparent; border-left-color: var(--line-strong); --material-fill: var(--material-plate); }
+.action-row-static[aria-expanded="true"] { opacity: 1; --material-fill: var(--material-plate); }
 .action-row-static strong { flex: none; font-size: var(--fs-sm); }
 .action-row-static small { flex: 1 1 auto; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .action-reference-text { margin: .35rem 0 .1rem; padding: var(--space-2) .65rem; border-left: 2px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
-.action-targeting { margin-top: .4rem; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.action-targeting { margin-top: .4rem; padding: .6rem; border: 1px solid transparent; }
 .action-targeting-head { margin: 0 0 .45rem; font-size: var(--fs-sm); color: var(--text-dim); }
 /* The scroll is declared in the MARKUP (`.scroll-y`, both call sites — ActionRunner and the player's
    own runner in EncounterPanel): check (h) reads that class, and a bare `overflow-y` here would be a
@@ -335,7 +347,7 @@
 .action-target input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--magenta); }
 .action-targeting-buttons { display: flex; gap: var(--space-2); margin-top: .6rem; }
 .action-targeting-buttons button { flex: 1; padding: var(--space-2); text-align: center; }
-.action-result { margin-top: .4rem; padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.action-result { margin-top: .4rem; padding: .6rem .7rem; border: 1px solid transparent; }
 .action-result-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .action-result-actions { display: flex; align-items: center; gap: .4rem; flex: none; }
 /* Multiattack / Extra Attack: roll the same action again without dismissing the result first. */
@@ -352,7 +364,7 @@
 .action-damage { margin: .35rem 0 0; font-size: var(--fs-sm); color: var(--danger-hi); }
 .action-damage strong { font-size: 1rem; color: var(--danger-hi); }
 /* Attack preview: reuses the saving-throw widget's button row + manual field for a recognizable roll. */
-.action-preview { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding: .4rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.action-preview { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding: .4rem var(--space-2); border: 1px solid transparent; }
 .roll-zone { display: flex; flex-direction: column; gap: .35rem; }
 .roll-zone-caption { align-self: center; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 /* A centered "or" flanked by a solid divider line, separating the auto-roll and manual-entry zones. */
@@ -394,7 +406,7 @@
 .action-save-buttons button { padding: .35rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-save-buttons button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* Saving-throw prompts inside the target's initiative row (auto-apply on answer). */
-.save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
+.save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem var(--space-2); border: 1px solid transparent; }
 .save-prompt-label { font-size: var(--fs-sm); color: var(--text-dim); }
 .save-prompt-label strong { color: var(--text); }
 .save-prompt-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
@@ -451,7 +463,9 @@
    a centred value, tight padding, a thin border, no dead space. HP is the same chip, just wide enough to
    also hold its Dmg/Heal/Temp controls (#2.4). */
 .sheet-vitals { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: .9rem; align-items: stretch; }
-.sheet-vital { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .12rem; padding: .35rem .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); min-width: 3.2rem; text-align: center; }
+/* RULING 45's constraint lives here: these are the numbers a player reads mid-fight, so the chip
+   takes the rim and the cut and a FLAT plate — never the scanline. */
+.sheet-vital { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .12rem; padding: .35rem .55rem; border: 1px solid transparent; min-width: 3.2rem; text-align: center; }
 .sheet-vital span { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
 .sheet-vital strong { font: 700 1.15rem/1 var(--font-mono); color: var(--text); }
 /* HP: same chip, wide enough for the controls; label+value stay centred over the buttons. */
@@ -585,7 +599,7 @@
 .sheet-coins input { width: 4rem; padding: var(--space-1) .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
 .sheet-identity-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-1) 0 0; }
 /* Section Edit/Done + identity Edit now render as <Button variant="ghost" size="sm">. */
-.sheet-editor { margin: var(--space-2) 0 0; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.sheet-editor { margin: var(--space-2) 0 0; padding: .6rem; border: 1px solid transparent; }
 /* v6 #6: the editor skill list lays out fully (no clipped inner scroll-in-a-scroll) and scrolls with the
    sheet body. Two columns of uniform rows. */
 .sheet-editor .sheet-skill-list { margin-top: var(--space-2); }
@@ -795,8 +809,35 @@
 .sheet-workspace { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
 /* Header (v3 #2.1/2.2/#4): name + prominent identity on the left; log-dock · Pop out · New tab · × on the right. */
-.sheet-header { display: flex; align-items: flex-start; gap: .8rem; padding: .7rem var(--space-5); border-bottom: 1px solid var(--line); }
-.sheet-header--drag { cursor: move; touch-action: none; background: var(--surface-1); }
+/* ══ RULING 45 — THE HERO HEADER, AND IT COSTS ZERO HEIGHT ═══════════════════════════════════
+   The name/class block is the sheet's hero surface: it takes the full landing door — the scanline
+   over the plate, a 2px rim on its bottom edge, and the rest glow on that edge alone. Everything
+   below stays structural (rims and rules, no texture), because ruling 45's constraint is that
+   nothing textured sits behind a number a player reads mid-fight.
+
+   EVERY PIECE OF IT IS PAINT. The `padding`, the `gap` and the font sizes are untouched; the
+   treatment rides a backing layer at `inset: 0` whose bottom border REPLACES the 1px `--line`
+   rule that was already there (the element keeps a 1px transparent border so its box does not
+   move, and the layer's 2px rim overlaps the header's own bottom padding rather than adding to
+   it). Measured before and after at 1280/390/320 — the header is the same height in all three.
+   The glow is a `filter` on the LAYER, never a `box-shadow` on the element: it follows the cut,
+   and it cannot make the header a containing block for the modal's fixed children. */
+.sheet-header { position: relative; isolation: isolate; display: flex; align-items: flex-start; gap: .8rem; padding: .7rem var(--space-5); border: 0; border-bottom: 1px solid transparent; }
+.sheet-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border-bottom: var(--rim-w) solid var(--rim-color);
+  background: var(--material-scanline), var(--material-plate);
+  background-origin: border-box;
+  background-clip: border-box;
+  filter: var(--rim-glow);
+}
+.sheet-header--drag { cursor: move; touch-action: none; }
 .sheet-header-id { min-width: 0; flex: 1; }
 .sheet-name { display: block; font: 400 var(--fs-h1) / 1.1 var(--font-display); color: var(--text); }
 .sheet-header-sub { display: flex; align-items: baseline; gap: var(--space-2); margin-top: .2rem; flex-wrap: wrap; }
@@ -859,7 +900,10 @@
 
 /* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). The
    unified header doubles as the drag handle (.sheet-header--drag), so there is no separate title bar. */
-.sheet-float { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* `overflow: hidden` would clip a backing layer at `inset: -1px`, and this panel is dragged around
+   the viewport, so the rim stays a REAL border here at the material's own weight and colour.
+   Square, per ruling 24's one silhouette; the cut is the one piece the clip costs. */
+.sheet-float { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow: hidden; border: var(--rim-w) solid var(--rim-color); border-radius: 0; background: var(--surface-2); box-shadow: var(--shadow-2); }
 .sheet-float-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%); }
 
 /* Embedded inline in a panel (v4 #8): fills its container, panel chrome, no modal. */
@@ -870,7 +914,10 @@
    and this fills it. Where the region has no definite height of its own (the tracker docked into the
    map), it sizes to content and that dock scrolls, which is the honest answer rather than a fraction
    of a viewport nobody measured. */
-.sheet-embedded { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); overflow: hidden; }
+/* Same clip constraint as `.sheet-float` above: `overflow: hidden` is load-bearing here (it is what
+   makes the embedded sheet clip rather than grow), so the rim is a real border at the material's
+   weight rather than a backing layer that would be cut off at the box. */
+.sheet-embedded { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; border: var(--rim-w) solid var(--rim-color); border-radius: 0; background: var(--surface-2); overflow: hidden; }
 /* While the player's own sheet is the tracker's content it IS the region — one child, taking all of it. */
 .encounter-region.is-sheet { display: flex; flex-direction: column; }
 .sheet-embedded .sheet-workspace { flex: 1; min-height: 0; }
@@ -999,16 +1046,16 @@
 .encounter-scenes-panel .scene-panel { margin-top: var(--space-4); }
 
 /* Turn time-travel (#12): the review banner, the confirm bar, and the player's paused notice. */
-.turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); border-radius: var(--radius-md); background: var(--surface-2); display: grid; gap: var(--space-1); }
-.turn-review.dirty { border-left-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); }
+.turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 0; border-left: 2px solid var(--caution); border-radius: 0; background: var(--surface-2); display: grid; gap: var(--space-1); }
+.turn-review.dirty { border-left-color: var(--danger); }
 .turn-review strong { color: var(--text); font-size: var(--fs-body); }
 .turn-review span { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
 .turn-controls .encounter-primary.resume { background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); border-color: var(--cyan); }
-.turn-confirm { margin: var(--space-2) 0 0; padding: .6rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: var(--space-2); }
+.turn-confirm { margin: var(--space-2) 0 0; padding: .6rem .7rem; border: 0; border-left: 2px solid var(--danger); border-radius: 0; background: var(--surface-2); display: grid; gap: var(--space-2); }
 .turn-confirm span { color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
 .turn-confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .turn-confirm-actions button { flex: 0 0 auto; padding: .4rem .9rem; }
-.table-rewound { margin: .4rem 0 0; padding: var(--space-2) .7rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
+.table-rewound { margin: .4rem 0 0; padding: var(--space-2) .7rem; border-left: 2px solid var(--line-strong); border-radius: 0; background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* Rules engine (ADR-0020): effect chips, the dying tracker, the rules-mode control, and the
    action runner's availability hints / blocked-override bar. */
@@ -1016,7 +1063,7 @@
 /* Effect pills are the shared Chip (info tone); only the trailing duration/DC note needs a quieter weight. */
 .effect-chips .nh-chip small { color: var(--text-muted); font-weight: 400; }
 .own-effect-row { margin-top: var(--space-1); }
-.dying-tracker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: .35rem 0 0; padding: .35rem .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 84%, var(--danger)); }
+.dying-tracker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: .35rem 0 0; padding: .35rem .55rem; border: 0; border-left: 2px solid var(--danger); border-radius: 0; background: var(--surface-2); }
 /* The shared roll widget sits after the pips and wraps to its own line on a phone. */
 .dying-tracker .save-prompt-actions, .dying-tracker .save-prompt-confirm { flex: 1 1 12rem; }
 .dying-label { color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
@@ -1033,7 +1080,7 @@
 .action-hint { color: var(--text-dim); font-weight: 700; }
 .action-row-hinted { opacity: .82; }
 .action-instance-note { margin: .3rem 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
-.action-blocked { margin: .4rem 0; padding: .55rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: var(--space-2); }
+.action-blocked { margin: .4rem 0; padding: .55rem .7rem; border: 0; border-left: 2px solid var(--danger); border-radius: 0; background: var(--surface-2); display: grid; gap: var(--space-2); }
 .action-blocked span { color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
 .action-blocked-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .action-blocked-actions button { flex: 0 0 auto; padding: .35rem .8rem; }
@@ -1059,7 +1106,7 @@
 .action-spellcasting-head span { color: var(--violet-hi); }
 /* Spellcasting prose: each line its own paragraph with breathing room; recognized spell names are
    buttons that open the spell's SRD rules in an in-tab card (owner feedback). */
-.spellcasting-text { margin: .35rem 0 .1rem; padding: .6rem var(--space-3); border-left: 2px solid var(--violet); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.spellcasting-text { margin: .35rem 0 .1rem; padding: .6rem var(--space-3); border-left: 2px solid var(--violet); border-radius: 0; background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 .spellcasting-line { margin: 0; }
 .spellcasting-line + .spellcasting-line { margin-top: .55rem; }
 .spellcasting-bullet { padding-left: .4rem; }
@@ -1096,7 +1143,10 @@
 
 /* The acting creature's console: its own labeled card BELOW the initiative order — the tracker
    stays a pure list. One quiet container with the active magenta accent; contents are flat. */
-.acting-console { margin-top: .7rem; padding: var(--space-3) .8rem .85rem; border: 1px solid color-mix(in srgb, var(--magenta) 45%, var(--line)); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
+/* The acting console is the one region on this surface that may keep a tint: it is WHOSE TURN IT
+   IS, §8.1's single glowing thing, and it holds no numbers of its own — the vitals and the action
+   rows sit outside it. Ruling 39 still moves the severity onto the 2px leading rule. */
+.acting-console { margin-top: .7rem; padding: var(--space-3) .8rem .85rem; border: 0; border-left: 2px solid var(--magenta); border-radius: 0; background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
 /* A down creature (0 HP): dim the console (the server blocks its actions; clicking one still surfaces
    the audited override), with its death saves / down note lifted above it. */
 .acting-console.down { opacity: .5; border-left-color: var(--danger); }
@@ -1113,16 +1163,22 @@
 .acting-console-title .legendary-pill { flex: none; }
 .acting-console .turn-economy { margin-top: 0; padding: 0; border: 0; background: transparent; }
 .acting-console .action-runner { margin-top: .45rem; }
-.builtin-more { border-style: dashed; color: var(--text-muted); }
+/* Ruling 55: solid. A dashed edge on a real control reads as a placeholder, and this one is the
+   door onto the rest of the built-in actions — the quieter ink is what says "secondary", not the
+   broken line. (The dashed chips further up this file are different: on `.sheet-cast-slot` and
+   `.sheet-prep-tag.cantrip` the broken line is a STATE — at-will vs prepared — which R2 requires to
+   have a second channel beside colour. Those keep it.) */
+.builtin-more { color: var(--text-muted); }
 
 /* Legendary actions (SRD): a one-tap console switch per off-turn legendary creature, and the
    off-turn console variant showing the per-round pool instead of the turn actor's economy. Violet = special. */
 .legendary-strip { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
 /* Route 1: a .35rem-gap wrapping strip leaves 5.6px, against 6.8px a side of overhang at 30.4px. */
-.legendary-offer { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .28rem .6rem; border: 1px dashed var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
-.legendary-offer:hover:not(:disabled) { border-color: var(--violet-hi); border-style: solid; }
+/* Ruling 55's no-dashed-boxes rule reaches this too: an offer is a door, not a placeholder. */
+.legendary-offer { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: .28rem .6rem; border: 1px solid var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+.legendary-offer:hover:not(:disabled) { border-color: var(--violet-hi); }
 .legendary-offer:disabled { color: var(--text-muted); border-color: var(--line); cursor: default; }
-.acting-console.legendary-acting { border-left-color: var(--violet); border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); background: color-mix(in srgb, var(--surface-2) 86%, var(--violet)); }
+.acting-console.legendary-acting { border-left-color: var(--violet); background: color-mix(in srgb, var(--surface-2) 86%, var(--violet)); }
 .acting-console.legendary-acting .acting-console-head strong { color: var(--violet-hi); }
 .legendary-pill { cursor: default; color: var(--violet-hi); border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); }
 .legendary-done { margin-left: auto; padding: .24rem .55rem; font-size: var(--fs-sm); }
@@ -1197,3 +1253,261 @@
 /* The GM's queue is the one that is asking something OF you, so it leads with the brand's attention
    colour rather than caution — it is a request, not a warning. */
 .rule-ask-question { border-left-color: var(--magenta); }
+
+/* ══ THE MATERIAL (ruling 2), ON THE FIGHT SURFACE ═══════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing and this is the surface where a lost tap costs a turn.
+   `inset: -1px` spans the border box, so the rim lands exactly where the 1px border used to and
+   NOTHING in this file changes size. Every value is a shared token, so ruling 29's daybreak
+   translation arrives for free.
+
+   RULING 45 IS THE SCOPING RULE HERE, and it is stricter than ruling 28 alone. Only two things
+   carry the scanline: `.encounter-panel`, the tracker's own outermost frame, and `.sheet-header`
+   (above), which is the sheet's hero block. EVERYTHING ELSE TAKES A FLAT PLATE — the vitals, the
+   ability chips, the action rows, the save prompts, the targeting and result blocks — because
+   ruling 45 forbids texture behind a number a player reads mid-fight, and every one of those is
+   a number a player reads mid-fight.
+
+   NO REST GLOW below the header. The tracker is the densest region in the app and §8.1 gives it
+   one glowing element: whoever's turn it is. A glowing panel edge would compete with that. */
+.encounter-panel,
+.encounter-round,
+.turn-economy,
+.condition-picker,
+.action-row,
+.action-targeting,
+.action-result,
+.action-preview,
+.save-prompt,
+.sheet-editor,
+.sheet-vital,
+.sheet-ability,
+.sheet-slot,
+.encounter-menu,
+.row-tools-popover {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.encounter-panel::before,
+.encounter-round::before,
+.turn-economy::before,
+.condition-picker::before,
+.action-row::before,
+.action-targeting::before,
+.action-result::before,
+.action-preview::before,
+.save-prompt::before,
+.sheet-editor::before,
+.sheet-vital::before,
+.sheet-ability::before,
+.sheet-slot::before,
+.encounter-menu::before,
+.row-tools-popover::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+/* The one textured surface on the tracker: its own outermost frame (ruling 28). */
+.encounter-panel { --material-fill: var(--material-scanline), var(--material-plate); }
+/* Everything a player reads a number off of: rim, bezel, cut — and a flat plate (ruling 45). */
+.encounter-round,
+.turn-economy,
+.condition-picker,
+.action-row,
+.action-targeting,
+.action-result,
+.action-preview,
+.save-prompt,
+.sheet-editor,
+.sheet-vital,
+.sheet-ability,
+.sheet-slot { --material-fill: var(--material-plate); }
+/* Ruling 52: a floating surface reads one step in front of the panel it opened from — same
+   material, brighter rim. Both of these already carried `--shadow-2` for the same reason. */
+.encounter-menu,
+.row-tools-popover { --material-fill: var(--material-plate); --rim-color: var(--rim-color-hi); }
+/* AND THEIR OWN POSITIONING IS RESTORED, because the shared rule above sets `position: relative`
+   for the backing layer's containing block and these two do not need it — they already establish
+   one. MEASURED, not foreseen: with `relative` applied, the ⋯ fight menu stopped being `fixed`,
+   flowed in the document at its inline `top: 242px` and opened at y=1142 in a 900px viewport —
+   entirely below the fold. Any future member of the list above that positions itself belongs here. */
+.encounter-menu { position: fixed; }
+.row-tools-popover { position: absolute; }
+/* The chamfer is sized for a panel, not for a 5rem stat chip: at the default .6rem cut a 3.2rem
+   chip loses a visible wedge of its own corner, and `--bezel-inset` must stay at or above half the
+   cut or the bezel's corner falls outside it and is clipped to a notch. Both are re-stated as one
+   pair, which is exactly what `Badge.css` does at the same scale and for the same reason. */
+.encounter-round,
+.sheet-vital,
+.sheet-ability,
+.sheet-slot,
+.action-row {
+  --chamfer: .32rem;
+  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --bezel-inset: calc(var(--rim-w) + 1px);
+}
+/* `.encounter-round` is a pill in the markup's own words ("Round 3") and the cut is the product's
+   de-pilling silhouette (ruling 24) — one shape from the largest panel to the smallest count. */
+.encounter-round { border-radius: 0; }
+
+/* ══ THE HAND-ROLLED CONTROLS (rulings 24, 31, 49) ═══════════════════════════════════════════
+   Wave 2 gave every `.nh-btn`, `Chip`, `Badge` and form control the cut corner by editing four
+   primitives. THIS FILE'S CONTROLS ARE NOT PRIMITIVES — they are bare `<button>`s and `<input>`s
+   written into the fight surface before the primitives existed, and after the panel work above
+   they were the loudest remaining tell: a chamfered panel full of rounded buttons is exactly the
+   "designed at different times" read this round exists to close. Measured after the panel pass:
+   33 of the 37 rules in this lane's files still carrying a radius were in here, and every one of
+   them is a control rather than a panel.
+
+   They take the material at BUTTON scale — the smaller cut `Button.css` and `Badge.css` use, the
+   shared rim, a flat plate, and the cue wedge on hover / focus / press (ruling 40: press carries
+   what hover carries, because half this table has no hover). Never the scanline: ruling 45 keeps
+   texture off anything a player reads a number from, and half of these ARE the numbers.
+
+   THE CUT IS ON A BACKING LAYER, NEVER THE ELEMENT. `clip-path` clips hit-testing, and these are
+   the controls a GM taps mid-fight. `inset: -1px` spans the border box, so every one of them keeps
+   the exact size it had — re-run `scripts/tap-audit.mjs 375` after touching this block. */
+.dock-log-door,
+.encounter-dock-choice,
+.encounter-primary, .turn-controls button,
+.encounter-menu-toggle,
+.initiative-score-edit,
+.initiative-reaction,
+.menu-add-row button,
+.hp-editor button,
+.action-again,
+.action-save-buttons button,
+.save-prompt-actions button, .save-prompt-confirm button,
+.action-preview .save-prompt-manual button,
+.save-die-mode,
+.sheet-hp-controls input,
+.sheet-roll-chip,
+.sheet-prepare,
+.sheet-toggle-btn,
+.sheet-add-item input,
+.sheet-picker-search,
+.sheet-picker-chip,
+.sheet-picker-add,
+.sheet-coins input,
+.sheet-id-editor input,
+.sheet-ability-rolls button,
+.sheet-spellcast-field,
+.sheet-cast-effect, .sheet-cast-select, .sheet-cast-slot, .sheet-cast-btn,
+.sheet-prep-tag,
+.monster-browser-add,
+.encounter-scenes-toggle,
+.builtin-chip,
+.economy-slot,
+.legendary-offer {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+  border-color: transparent;
+  --material-fill: var(--material-plate);
+  --chamfer: .32rem;
+  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --cue-w: .26rem;
+  --cue-h: .52rem;
+  --cue-inset: .26rem;
+}
+.dock-log-door::before,
+.encounter-dock-choice::before,
+.encounter-primary::before, .turn-controls button::before,
+.encounter-menu-toggle::before,
+.initiative-score-edit::before,
+.initiative-reaction::before,
+.menu-add-row button::before,
+.hp-editor button::before,
+.action-again::before,
+.action-save-buttons button::before,
+.save-prompt-actions button::before, .save-prompt-confirm button::before,
+.action-preview .save-prompt-manual button::before,
+.save-die-mode::before,
+.sheet-hp-controls input::before,
+.sheet-roll-chip::before,
+.sheet-prepare::before,
+.sheet-toggle-btn::before,
+.sheet-add-item input::before,
+.sheet-picker-search::before,
+.sheet-picker-chip::before,
+.sheet-picker-add::before,
+.sheet-coins input::before,
+.sheet-id-editor input::before,
+.sheet-ability-rolls button::before,
+.sheet-spellcast-field::before,
+.sheet-cast-effect::before, .sheet-cast-select::before, .sheet-cast-slot::before, .sheet-cast-btn::before,
+.sheet-prep-tag::before,
+.monster-browser-add::before,
+.encounter-scenes-toggle::before,
+.builtin-chip::before,
+.economy-slot::before,
+.legendary-offer::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+/* Interaction, once, for all of them (ruling 40). The rim brightens and the cue wedge appears; the
+   `:active` half is not optional, because hover does not exist on half this table's devices. */
+.dock-log-door:hover:not(:disabled)::before, .dock-log-door:focus-visible::before, .dock-log-door:active:not(:disabled)::before,
+.encounter-dock-choice:hover:not(:disabled)::before, .encounter-dock-choice:focus-visible::before, .encounter-dock-choice:active:not(:disabled)::before,
+.encounter-primary:hover:not(:disabled)::before, .encounter-primary:focus-visible::before, .encounter-primary:active:not(:disabled)::before,
+.turn-controls button:hover:not(:disabled)::before, .turn-controls button:focus-visible::before, .turn-controls button:active:not(:disabled)::before,
+.encounter-menu-toggle:hover:not(:disabled)::before, .encounter-menu-toggle:focus-visible::before, .encounter-menu-toggle:active:not(:disabled)::before,
+.menu-add-row button:hover:not(:disabled)::before, .menu-add-row button:focus-visible::before,
+.hp-editor button:hover:not(:disabled)::before, .hp-editor button:focus-visible::before,
+.action-again:hover:not(:disabled)::before, .action-again:focus-visible::before,
+.action-save-buttons button:hover:not(:disabled)::before, .action-save-buttons button:focus-visible::before,
+.save-prompt-actions button:hover:not(:disabled)::before, .save-prompt-confirm button:hover:not(:disabled)::before,
+.save-die-mode:hover:not(:disabled)::before, .save-die-mode:focus-visible::before,
+.sheet-roll-chip:hover:not(:disabled)::before, .sheet-roll-chip:focus-visible::before,
+.sheet-prepare:hover:not(:disabled)::before, .sheet-prepare:focus-visible::before,
+.sheet-toggle-btn:hover:not(:disabled)::before, .sheet-toggle-btn:focus-visible::before,
+.sheet-picker-add:hover:not(:disabled)::before, .sheet-picker-add:focus-visible::before,
+.sheet-ability-rolls button:hover:not(:disabled)::before, .sheet-ability-rolls button:focus-visible::before,
+.sheet-cast-btn:hover:not(:disabled)::before, .sheet-cast-btn:focus-visible::before,
+.monster-browser-add:hover:not(:disabled)::before, .monster-browser-add:focus-visible::before,
+.encounter-scenes-toggle:hover:not(:disabled)::before, .encounter-scenes-toggle:focus-visible::before,
+.builtin-chip:hover:not(:disabled)::before, .builtin-chip:focus-visible::before,
+.legendary-offer:hover:not(:disabled)::before, .legendary-offer:focus-visible::before {
+  border-color: var(--rim-color-hi);
+  background: var(--cue-mark) no-repeat var(--cue-inset) center / var(--cue-w) var(--cue-h), var(--material-fill);
+}
+/* The three that carry their own meaning-bearing edge keep it on the layer, where it follows the
+   cut: the primary action is magenta (act), the reaction prompt is cyan, legendary is violet. */
+.encounter-primary::before, .turn-controls button::before { border-color: var(--magenta); }
+.encounter-primary { color: var(--text); }
+.initiative-reaction::before { border-color: color-mix(in srgb, var(--cyan) 55%, var(--rim-color)); }
+.legendary-offer::before { border-color: var(--violet); }
+.legendary-offer:hover:not(:disabled)::before { border-color: var(--violet-hi); }
+.legendary-offer { border-radius: 0; }
+/* Inert reads as a material state, not only as reduced opacity (ruling 40). */
+.dock-log-door:disabled::before, .encounter-primary:disabled::before, .turn-controls button:disabled::before,
+.hp-editor button:disabled::before, .sheet-prepare:disabled::before, .builtin-chip:disabled::before,
+.legendary-offer:disabled::before, .monster-browser-add:disabled::before {
+  border-color: transparent;
+  background: var(--surface-2);
+}

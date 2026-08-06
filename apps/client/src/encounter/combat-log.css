@@ -1,4 +1,4 @@
-.combat-log { margin-top: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: .85rem var(--space-4) var(--space-4); }
+.combat-log { margin-top: var(--space-4); border: 1px solid transparent; padding: .85rem var(--space-4) var(--space-4); }
 .combat-log-heading { display: flex; align-items: baseline; gap: .6rem; }
 .combat-log-heading h2 { margin: 0; font-size: 1.05rem; color: var(--text); }
 .combat-log-empty { margin: .7rem 0 0; color: var(--text-muted); font-size: .85rem; }
@@ -7,7 +7,11 @@
    component has to be able to see that it is the scroller. The 16rem cap is for the standalone panel;
    inside the dock (accordion or tabbed sheet) `max-height: none` hands it the section instead. */
 .combat-log-list { list-style: none; margin: .7rem 0 0; padding: 0 .3rem 0 0; display: grid; gap: .3rem; max-height: 16rem; }
-.combat-log-entry { display: flex; gap: var(--space-2); padding: .35rem var(--space-2); border-left: 2px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); font-size: .82rem; line-height: 1.35; color: var(--text-dim); }
+/* Ruling 47 + ruling 39: a log entry is a list row, so it is a hairline and a LEADING RULE and
+   nothing else. The kind hues below already sat on that leading bar; what goes is the tinted
+   fill behind the words, which is the combination that fails first in daybreak, and the rounded
+   corner that made every line its own card. `gap` on the list is what separates rows now. */
+.combat-log-entry { display: flex; gap: var(--space-2); padding: .35rem var(--space-2); border-left: 2px solid var(--line); border-radius: 0; font-size: .82rem; line-height: 1.35; color: var(--text-dim); }
 .combat-log-text { min-width: 0; }
 /* Kind accents keep the feed skimmable: harm warm, relief green, structure/turn muted, GM history amber. */
 .combat-log-entry.log-damage { border-left-color: var(--danger); }
@@ -19,5 +23,37 @@
 .combat-log-entry.log-turn { border-left-color: var(--line-strong); color: var(--text-dim); }
 .combat-log-entry.log-encounter { border-left-color: var(--line-strong); color: var(--text-dim); }
 .combat-log-entry.log-scene { border-left-color: var(--line-strong); color: var(--text-dim); }
-.combat-log-entry.log-history { border-left-color: var(--violet); background: var(--surface-3); color: var(--violet-hi); }
+.combat-log-entry.log-history { border-left-color: var(--violet); color: var(--violet-hi); }
 .combat-log-entry.log-movement { border-left-color: var(--success); }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
+   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
+   daybreak translation arrives for free.
+   The log is the outermost panel wherever it stands — a standalone card on the table or the one
+   child of the dock Drawer — so it takes the scanline. Its rows do not (ruling 28). */
+.combat-log {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.combat-log::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.combat-log { --material-fill: var(--material-scanline), var(--material-plate); }

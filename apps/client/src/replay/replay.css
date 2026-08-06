@@ -48,8 +48,10 @@
    the subtree, because each is `<svg width="1em" height="1em">` and a class rule beats a
    presentation attribute. Harmless here today (this stage holds only the canvas) and scoped anyway,
    so it cannot arm itself the next time a control lands inside. */
-.replay-stage > svg { width: 100%; height: 100%; display: block; border-radius: var(--radius-md); background: var(--void); }
-.replay-stage-missing { display: grid; gap: 0.35rem; place-content: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); padding: var(--space-4); text-align: center; opacity: 0.85; }
+.replay-stage > svg { width: 100%; height: 100%; display: block; border-radius: 0; background: var(--void); }
+/* Ruling 55/56: a missing stage is an EMPTY SURFACE, not a placeholder — one designed frame (the
+   material, below), not a dashed rectangle apologising for itself. */
+.replay-stage-missing { position: relative; isolation: isolate; display: grid; gap: 0.35rem; place-content: center; border: 1px solid transparent; border-radius: 0; padding: var(--space-4); text-align: center; opacity: 0.85; }
 .replay-token-hidden { opacity: 0.65; }
 .replay-token-hidden .encounter-token-body { stroke-dasharray: 4 3; }
 
@@ -59,14 +61,21 @@
 .replay-side-tabs { display: none; }
 .replay-side-scroll { display: flex; flex-direction: column; gap: var(--space-3); }
 .replay-side h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
-.replay-initiative, .replay-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
-.replay-initiative li { display: grid; grid-template-columns: 1fr auto; gap: 0 var(--space-2); padding: 0.35rem 0.55rem; border-radius: var(--radius-sm); background: var(--surface-2); }
-.replay-initiative li.active { background: color-mix(in srgb, var(--magenta) 18%, transparent); box-shadow: inset 2px 0 0 var(--magenta), var(--glow-magenta-strong); }
+.replay-initiative { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.replay-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+/* RULING 47 — the two side lists are the most repeated layout on this surface, so they are
+   hairline rules and no fill. `gap` goes to 0 because the rule is the separation now. */
+.replay-initiative li { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 0 var(--space-2); padding: 0.35rem 0.55rem; border-bottom: 1px solid var(--line); border-radius: 0; }
+/* The active combatant keeps its magenta — this is the one row on the surface whose whole job is
+   saying whose turn it is, and it is the region's single glowing element (§8.1). Ruling 7's
+   leading tick replaces the tint behind the words; the bar and the glow stay. */
+.replay-initiative li.active { padding-inline-start: 1.15rem; border-bottom-color: var(--magenta); box-shadow: inset 2px 0 0 var(--magenta), var(--glow-magenta-strong); }
+.replay-initiative li.active::before { content: ""; position: absolute; inset-inline-start: .4rem; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--magenta); background: var(--cue-mark); pointer-events: none; }
 .replay-initiative li > strong { grid-column: 2; grid-row: 1; font-family: var(--font-mono); }
 .replay-init-hp { font-family: var(--font-mono); font-size: 0.82rem; opacity: 0.8; grid-column: 1; }
 .replay-init-conditions { font-size: 0.78rem; opacity: 0.7; grid-column: 1 / -1; }
-.replay-hidden-tag { font-style: normal; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 0 0.3rem; margin-left: 0.4rem; }
-.replay-log li { padding: 0.3rem 0.55rem; border-left: 3px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); font-size: 0.88rem; }
+.replay-hidden-tag { font-style: normal; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; border: 1px solid currentColor; border-radius: 0; padding: 0 0.3rem; margin-left: 0.4rem; }
+.replay-log li { padding: 0.3rem 0.55rem; border-left: 2px solid var(--line-strong); border-radius: 0; font-size: 0.88rem; }
 .replay-log li.replay-log-gm { border-left-style: dashed; }
 .replay-log-empty { opacity: 0.7; }
 
@@ -101,4 +110,33 @@
   .replay-side-pane > h3 { display: none; }
   .replay-side.is-order .replay-side-log,
   .replay-side.is-log .replay-side-order { display: none; }
+}
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css): the cut, the rim and the fill
+   ride a BACKING LAYER, never the element, because `clip-path` clips hit-testing. `inset: -1px`
+   spans the border box, so the rim lands where the border used to and nothing reflows.
+
+   ONE panel here, and it is an EMPTY SURFACE — ruling 55 puts those on the hero list, so this is a
+   full landing door with the rest glow, not the reduced material. It is also the only thing on the
+   stage when it shows, so the region's glow budget is unspent (§8.1). The replays LIST beside it
+   renders `.nh-card` rows, which already carry the primitive's material. */
+.replay-stage-missing {
+  --material-fill: var(--material-scanline), var(--material-plate);
+}
+.replay-stage-missing::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  filter: var(--rim-glow);
 }

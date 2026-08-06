@@ -1,4 +1,4 @@
-.api-reference { margin-top: var(--space-8); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); }
+.api-reference { margin-top: var(--space-8); border: 1px solid transparent; }
 .api-reference > summary { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; padding: var(--space-4) var(--space-5); cursor: pointer; list-style-position: inside; }
 .api-reference > summary strong { font-family: var(--font-display); font-size: 1.15rem; }
 .api-reference > summary span { color: var(--text-muted); font-size: 0.85rem; }
@@ -10,11 +10,14 @@
 .api-reference-group { margin-top: var(--space-5); }
 .api-reference-group h3 { margin: 0 0 var(--space-2); font-size: 1rem; color: var(--text); }
 .api-endpoint-list { display: grid; gap: 0.55rem; }
-.api-endpoint { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+/* Ruling 47: forty endpoints are the longest list on this surface. A hairline rule between rows,
+   no per-row fill and no per-row card — the disclosure's own open border is what separates a row
+   from its body. The list's `gap` is what separates one row from the next. */
+.api-endpoint { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .api-endpoint > summary { list-style: none; cursor: pointer; padding: 0.55rem 0.7rem; display: grid; gap: var(--space-1); }
 .api-endpoint > summary::-webkit-details-marker { display: none; }
 .api-endpoint[open] > summary { border-bottom: 1px solid var(--line); }
-.api-endpoint > summary:hover { background: var(--surface-3); }
+.api-endpoint > summary:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .api-endpoint-summary { font-size: 0.8rem; color: var(--text-dim); }
 .api-reference-route { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .api-method { font-weight: 800; font-size: 0.72rem; letter-spacing: 0.05em; padding: 0.15rem 0.45rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--info) 30%, transparent); color: var(--text); }
@@ -37,12 +40,12 @@
 .api-field-table th { color: var(--text-muted); font-weight: 600; }
 .api-field-table td:first-child code { color: var(--cyan); }
 .api-field-table td:nth-child(2) { color: var(--text-dim); white-space: nowrap; }
-.api-code { margin: 0; padding: 0.7rem 0.8rem; border-radius: var(--radius-sm); background: var(--void); border: 1px solid var(--line); overflow-x: auto; }
+.api-code { margin: 0; padding: 0.7rem 0.8rem; border-radius: 0; background: var(--void); border: 1px solid var(--line); overflow-x: auto; }
 .api-code code { font-size: 0.78rem; color: var(--text-dim); white-space: pre; }
 .api-code-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
 .api-code-header h4 { margin: 0; }
 .api-code-lang { font-size: 0.72rem; color: var(--text-muted); }
-.api-copy { margin-left: auto; padding: var(--space-1) 0.6rem; font-size: 0.72rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text-dim); text-align: center; }
+.api-copy { margin-left: auto; padding: var(--space-1) 0.6rem; font-size: 0.72rem; border: 1px solid var(--line); border-radius: 0; background: var(--surface-3); color: var(--text-dim); text-align: center; }
 .api-copy:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 
 .api-reference-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4); }
@@ -71,3 +74,34 @@
 .api-reference-page-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
 .api-reference-page-body > .api-reference-body { padding-inline: 0; }
 .api-reference-page-body .api-reference-toolbar { margin-top: var(--space-2); }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   One panel on this surface — the reference itself, a `<details>` standing on the settings page.
+   Same construction as `.nh-panel::before` (packages/ui Panel.css): the cut, the rim and the fill
+   ride a BACKING LAYER, never the element, because `clip-path` clips hit-testing and the summary
+   row is the control that opens it. `inset: -1px` spans the border box, so the rim lands where the
+   1px border used to and nothing reflows. Ruling 28: it is the outermost panel here, so it takes
+   the scanline and nothing inside it does. No rest glow — not a hero surface. */
+.api-reference {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+  --material-fill: var(--material-scanline), var(--material-plate);
+}
+.api-reference::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}

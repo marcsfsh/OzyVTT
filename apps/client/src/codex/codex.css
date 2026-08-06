@@ -24,9 +24,7 @@
   gap: var(--space-3);
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-1);
+  border: 1px solid transparent;
   padding: var(--space-3);
 }
 /* D7's "top-left label area beside the search bar", measured rather than eyeballed. At 1280x900 this
@@ -96,12 +94,14 @@
 .codex-list-item {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   width: 100%; min-height: var(--tap-min); text-align: left; padding: var(--space-2) var(--space-3);
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
   background: transparent; color: var(--text); cursor: pointer;
-  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+  position: relative;
+  transition: color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
 }
-.codex-list-item:hover { background: var(--surface-2); border-color: var(--line); }
-.codex-list-item.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-list-item:hover { border-bottom-color: var(--line-hover); }
+.codex-list-item.is-active { border-bottom-color: var(--magenta); font-weight: 700; }
+.codex-list-item.is-active::before { content: ""; position: absolute; inset-inline-start: 2px; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--magenta); background: var(--cue-mark); pointer-events: none; }
 .codex-list-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* CI-1 / R2: THE search-result row. One shape for all four record kinds, rendered identically by the
@@ -115,13 +115,15 @@
   min-height: var(--tap-min);
   display: flex; align-items: center; gap: var(--space-2);
   width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
   background: transparent; color: var(--text); cursor: pointer;
-  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+  position: relative;
+  transition: color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
 }
-.codex-hit:hover { background: var(--surface-2); border-color: var(--line); }
-/* R6: selection owns the edge, hover owns the surface lift. */
-.codex-hit.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-hit:hover { border-bottom-color: var(--line-hover); }
+/* R6: selection owns the edge — now a hairline plus ruling 7's leading tick, never a second fill. */
+.codex-hit.is-active { border-bottom-color: var(--magenta); }
+.codex-hit.is-active::before { content: ""; position: absolute; inset-inline-start: 2px; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--magenta); background: var(--cue-mark); pointer-events: none; }
 .codex-hit-glyph { display: flex; flex: none; align-items: center; }
 .codex-hit-ic { width: 1.2em; height: 1.2em; }
 .codex-hit-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
@@ -168,11 +170,13 @@
 .codex-tree-page {
   min-height: var(--tap-min);
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; text-align: left;
-  padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-2); border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
   background: transparent; color: var(--text); cursor: pointer;
+  position: relative;
 }
-.codex-tree-page:hover { background: var(--surface-2); border-color: var(--line); }
-.codex-tree-page.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-tree-page:hover { border-bottom-color: var(--line-hover); }
+.codex-tree-page.is-active { border-bottom-color: var(--magenta); font-weight: 700; }
+.codex-tree-page.is-active::before { content: ""; position: absolute; inset-inline-start: 0; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--magenta); background: var(--cue-mark); pointer-events: none; }
 .codex-tree-page-row { display: flex; align-items: center; }
 .codex-tree-page-row .codex-tree-page { flex: 1; min-width: 0; }
 /* THE ROW WRAPS, and it is measured. A revealed page's row carries `VisibilityBadge` INSIDE the title
@@ -204,7 +208,7 @@
   display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: var(--space-3);
   position: relative;
 }
-.codex-main-empty { margin: auto; max-width: 46ch; text-align: center; color: var(--text-dim); display: flex; flex-direction: column; gap: var(--space-3); align-items: center; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-6); }
+.codex-main-empty { margin: auto; max-width: 46ch; text-align: center; color: var(--text-dim); display: flex; flex-direction: column; gap: var(--space-3); align-items: center; border: 1px solid transparent; padding: var(--space-6); }
 .codex-main-empty h3 { font-family: var(--font-display); color: var(--text); margin: 0; }
 
 /* D25 / G17: the back link is the ghost `Button` primitive now, which carries the 44px floor itself
@@ -228,7 +232,7 @@
 .codex-editor { flex: 1 1 auto; }
 .codex-editor-cols { display: flex; flex-direction: column; gap: var(--space-4); align-items: stretch; flex: 1 1 auto; min-height: 0; position: relative; }
 /* Editor body — its own card, and now the ONLY thing in the centre column. */
-.codex-editor-center { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-width: 0; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-4); }
+.codex-editor-center { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-width: 0; min-height: 0; border: 1px solid transparent; padding: var(--space-4); }
 /* THE SUMMONED PANEL (ruling 11): the page's properties and its connections, over the right of the
    detail column rather than beside it. An overlay and not a column, because a third column with its own
    height is precisely the "stitched-together panels" read D7 names — and it is `absolute` inside
@@ -238,8 +242,7 @@
   position: absolute; inset-block: 0; inset-inline-end: 0; z-index: 2;
   width: min(22rem, 100%);
   display: flex; flex-direction: column; gap: var(--space-4);
-  border: 1px solid var(--line-strong); border-radius: var(--radius-lg);
-  background: var(--surface-1); padding: var(--space-4);
+  border: 1px solid transparent; padding: var(--space-4);
   box-shadow: var(--shadow-2);
 }
 .codex-editor-context:focus { outline: none; }
@@ -263,8 +266,8 @@
 .codex-outline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
 /* §4 ROUTE 1 (grow the paint): a stacked list must not use a ::after box, which would overhang into
    the row below and steal its taps. */
-.codex-outline-item { display: flex; align-items: center; min-height: var(--tap-min); width: 100%; text-align: left; border: none; background: transparent; color: var(--text-dim); padding: 3px var(--space-2); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.codex-outline-item:hover { background: var(--surface-2); color: var(--text); }
+.codex-outline-item { display: flex; align-items: center; min-height: var(--tap-min); width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text-dim); padding: 3px var(--space-2); border-radius: 0; cursor: pointer; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codex-outline-item:hover { color: var(--text); border-bottom-color: var(--line-hover); }
 .codex-tree-folder-row { display: flex; align-items: center; border: 1px solid transparent; border-radius: var(--radius-sm); }
 .codex-tree-folder-row .codex-tree-folder { flex: 1; min-width: 0; }
 .codex-tree-folder-row.is-drop { background: color-mix(in srgb, var(--cyan) 16%, transparent); border-color: var(--cyan); border-style: dashed; }
@@ -311,7 +314,7 @@
 .codex-md-li { margin: 0 0 2px; }
 .codex-md-li::marker { color: var(--text-muted); }
 .codex-md-quote { margin: 0 0 var(--space-2); padding: var(--space-1) 0 var(--space-1) var(--space-3); border-left: 3px solid var(--line); color: var(--text-dim); font-style: italic; line-height: var(--lh-body); }
-.codex-md-code { font-family: var(--font-mono); font-size: 0.92em; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1px 5px; }
+.codex-md-code { font-family: var(--font-mono); font-size: 0.92em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 0; padding: 1px 5px; }
 .codex-md-hr { border: none; border-top: 1px solid var(--line); margin: var(--space-3) 0; }
 .codex-md-link {
   display: inline; background: none; border: none; padding: 0; cursor: pointer;
@@ -351,10 +354,10 @@
 /* §4 route 1 (grow the paint): a stacked list, where §4 requires it — an invisible `::after` overhang
    in a vertical list steals the neighbouring row's taps. Matches `.codex-campaign-recentitem`, the same
    row shape on the dashboard. */
-.codex-connections-item { min-height: var(--tap-min); width: 100%; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
-.codex-connections-item:hover { background: var(--surface-2); border-color: var(--line); }
+.codex-connections-item { min-height: var(--tap-min); width: 100%; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.codex-connections-item:hover { border-bottom-color: var(--line-hover); }
 .codex-connections-item.is-static, .codex-connections-item:disabled { cursor: default; }
-.codex-connections-item.is-static:hover, .codex-connections-item:disabled:hover { background: transparent; border-color: transparent; }
+.codex-connections-item.is-static:hover, .codex-connections-item:disabled:hover { border-bottom-color: var(--line); }
 .codex-connections-aside { align-self: flex-start; padding-inline-start: var(--space-2); font-size: var(--fs-sm); }
 
 .codex-page-timeline { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -375,7 +378,7 @@
 .codex-field-wide { grid-column: 1 / -1; } /* textareas (goals, properties, traits) span the full row */
 /* One shared "GM-only content" language: a violet block accent + the one "GM only" pill, used identically
    for secret fields, the GM body (edit + preview), the journal composer's GM field, and posted GM text. */
-.codex-gm-block { border-left: 3px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); border-radius: var(--radius-md); }
+.codex-gm-block { border-left: 2px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); border-radius: 0; }
 /* D25: `GmOnlyTag` and `HiddenFromPlayers` are the `Badge` primitive now (violet tone / neutral). These
    two rules only carry what a Badge does not: the mono-uppercase treatment and the floating position. */
 .codex-gm-pill { font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
@@ -432,7 +435,7 @@
 .codex-timeline-year.is-openable:hover { color: var(--text); border-bottom-color: var(--cyan); }
 .codex-timeline-year-open { font-size: var(--fs-body); color: var(--text-muted); }
 .codex-now-chip { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); padding: 2px var(--space-2); border-radius: var(--radius-pill); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.codex-timeline-now { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.06em; color: var(--cyan); background: color-mix(in srgb, var(--cyan) 10%, transparent); border-left: 3px solid var(--cyan); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); margin: var(--space-2) 0; }
+.codex-timeline-now { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.06em; color: var(--cyan); border-left: 2px solid var(--cyan); padding: var(--space-1) var(--space-2); border-radius: 0; margin: var(--space-2) 0; }
 .codex-calendar-editor { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-cal-months { display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-cal-months-head { display: flex; align-items: center; justify-content: space-between; }
@@ -455,8 +458,9 @@
 .codex-campaign-section { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-campaign-h { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
 .codex-campaign-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
-.codex-campaign-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--radius-lg); background: var(--surface-1); cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
-.codex-campaign-typecard:hover { background: var(--surface-2); transform: translateY(-1px); }
+.codex-campaign-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid transparent; border-left-width: 3px; cursor: pointer; transition: transform var(--dur-press) var(--ease-settle); }
+.codex-campaign-typecard:hover { transform: translateY(-1px); }
+.codex-campaign-typecard:hover::before, .codex-campaign-typecard:focus-visible::before { border-color: var(--rim-color-hi); }
 .codex-campaign-typeicon { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
 .codex-campaign-typelabel { flex: 1; color: var(--text); }
 .codex-campaign-typecount { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); }
@@ -464,14 +468,16 @@
 /* CF-3 §4 route 2, using the documented pressable-chip precedent verbatim: 32px paint leaves a 6px
    overhang per side, which --space-3 (12px) of row gap covers. Going straight to 44px paint would
    make a wrapping cloud of tag pills far too heavy. */
-.codex-tag-chip { min-height: 32px; display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
+/* Ruling 24: de-pilled. `Badge` and `Chip` lost the pill in wave 2 by editing two primitives;
+   these three chips are hand-rolled in this file and never saw it. One silhouette everywhere. */
+.codex-tag-chip { min-height: 32px; display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: 0; background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
 .codex-tag-chip:hover { border-color: var(--cyan); color: var(--text); }
 .codex-tag-count { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
 .codex-campaign-recent { display: flex; flex-direction: column; gap: var(--space-1); }
 /* CF-3 §4 route 1. This measured 43.6px BEFORE the rule below — a rounding miss rather than a
    deliberate size, which is why the floor is stated explicitly here. */
-.codex-campaign-recentitem { min-height: var(--tap-min); display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); cursor: pointer; text-align: left; }
-.codex-campaign-recentitem:hover { background: var(--surface-2); border-color: var(--line); }
+.codex-campaign-recentitem { min-height: var(--tap-min); display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text); cursor: pointer; text-align: left; }
+.codex-campaign-recentitem:hover { border-bottom-color: var(--line-hover); }
 /* CI-7: the journal and atlas rows share the row chassis above, so they inherit its 44px floor and
    need only their own glyph tint and trailing meta. No second row shape on this surface (R2). */
 .codex-campaign-recentglyph { color: var(--text-muted); }
@@ -567,11 +573,11 @@
   min-height: var(--tap-min);
   display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2);
   width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
   background: transparent; color: var(--text); cursor: pointer;
-  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+  transition: color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
 }
-.codex-session-row:hover { background: var(--surface-2); border-color: var(--line); }
+.codex-session-row:hover { border-bottom-color: var(--line-hover); }
 /* R6: selection owns the edge, hover owns the surface lift — the notebook's rule, unchanged. */
 .codex-session-row.is-active { background: var(--surface-2); border-color: var(--magenta); }
 .codex-session-editor { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -603,9 +609,9 @@
   min-height: var(--tap-min);
   display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2);
   width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
   background: transparent; color: var(--text); cursor: pointer;
-  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+  transition: color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
 }
 /* The rail row wraps, for the reason `.codex-campaign-recentitem` states two hundred lines above and
    with its own measurement: a quest row carries a status Badge AND a `VisibilityBadge` ("Shown to
@@ -643,10 +649,10 @@
 .codex-quest-link-open {
   flex: 1; min-width: 0; min-height: var(--tap-min);
   display: flex; align-items: center; gap: var(--space-2); text-align: left;
-  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2);
+  border: 1px solid transparent;
   color: var(--text); padding: var(--space-1) var(--space-3); cursor: pointer; font-size: var(--fs-sm);
 }
-.codex-quest-link-open:hover { border-color: var(--cyan); }
+.codex-quest-link-open:hover::before, .codex-quest-link-open:focus-visible::before { border-color: var(--cyan); }
 
 /* ----- The PLAYER's quest reader -----
    A destination over the Campaign mode, reusing the GM log's two-pane chassis, its rail rows
@@ -723,12 +729,15 @@
 .codex-settings-usage { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 /* The one destructive area in the Codex outside a record's own editor, so it is fenced rather than inlined:
    a GM must not arrive at "delete all version history" while scanning for the frequency field. */
-.codex-settings-danger { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line)); border-radius: var(--radius-md); }
+.codex-settings-danger { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-3); border: 1px solid transparent; }
 /* WRAPS, and that is load-bearing: the two buttons carry long self-describing labels ("Delete versions older
    than 30 days"), so a nowrap row would push the second off a 320px screen. */
 .codex-settings-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .codex-revisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.codex-revision { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); }
+/* Ruling 47: the revision list is a list. A rule between rows, no card per row. */
+.codex-revisions { gap: 0; }
+.codex-revision { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2); border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: var(--space-2) var(--space-3); }
+.codex-revisions > .codex-revision:last-child { border-bottom: 0; }
 .codex-revision-title { grid-column: 1; color: var(--text-dim); font-size: var(--fs-sm); }
 .codex-revision-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
 
@@ -750,7 +759,7 @@
 .codex-root { display: flex; flex-direction: column; gap: var(--space-3); }
 /* Distinct register from the GM tab bar directly above it: a bordered sub-toolbar strip, so the two
    nav levels don't read as one long tab list. */
-.codex-modebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-1) var(--space-2); margin-bottom: var(--space-3); }
+.codex-modebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; border: 1px solid transparent; padding: var(--space-1) var(--space-2); margin-bottom: var(--space-3); }
 /* §4 GAP BUDGET, corrected when M10's "Quests" made this row seven controls wide. Every button here is
    `Button size="sm"`, which takes §4 route 2: a --tap-min `::after` over 32px of paint, overhanging by
    (44 − 32) / 2 = 6px per side. Neighbours must therefore be gapped by 6 + 6 = 12px, and this row was
@@ -792,7 +801,7 @@
 .codex-palette-input:focus { outline: none; border-bottom-color: var(--cyan); }
 .codex-palette-list { list-style: none; margin: 0; padding: var(--space-1); flex: 1 1 auto; min-height: 0; }
 /* §4 route 1, same reasoning as .codex-hit: the palette list is a vertical stack of commands. */
-.codex-palette-item { min-height: var(--tap-min); display: flex; align-items: center; width: 100%; text-align: left; padding: var(--space-2) var(--space-3); border: none; background: transparent; color: var(--text); border-radius: var(--radius-md); cursor: pointer; }
+.codex-palette-item { min-height: var(--tap-min); display: flex; align-items: center; width: 100%; text-align: left; padding: var(--space-2) var(--space-3); border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 0; cursor: pointer; }
 .codex-palette-item.is-active { background: var(--surface-3); }
 .codex-palette-item.is-action { color: var(--cyan); }
 .codex-palette-empty { padding: var(--space-3); color: var(--text-muted); }
@@ -819,7 +828,7 @@
    it. Route 2 is not available: the overhang would be (44 − 29.5) / 2 = 7.25px per side against this row's
    `--space-2` (8px) gap, under the 14.5px budget, and the row wraps at 375px so the ::after would reach the
    chips stacked below it as well. */
-.codex-descend-chip { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill); }
+.codex-descend-chip { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-3); border-radius: 0; }
 .codex-descend-chip:hover { background: var(--surface-3); border-color: var(--cyan); }
 /* Selection owns the edge, hover owns the fill (design-language §5) — the atlas you are currently in. */
 .codex-descend-chip.is-current { border-color: var(--magenta); color: var(--text); }
@@ -844,7 +853,7 @@
 .codex-atlas-body { display: flex; gap: var(--space-3); align-items: stretch; flex: 1 1 auto; min-height: 0; }
 /* The three 62vh floors here (surface, svg, status) were one number saying "about two thirds of a
    screen" in a box that had no idea how much screen it had. The surface takes the leftover instead. */
-.codex-mapsurface { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--void); touch-action: none; }
+.codex-mapsurface { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; border: var(--rim-w) solid var(--rim-color); border-radius: 0; overflow: hidden; background: var(--void); touch-action: none; }
 .codex-mapsurface.is-placing { cursor: crosshair; }
 .codex-map-svg { display: block; width: 100%; height: 100%; }
 .codex-map-status { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); }
@@ -874,7 +883,7 @@
 /* Inspector — the atlas's second region (`.scroll-y` in the markup). `min-height: 0` rather than a
    72vh cap: it stands beside a map that already fills, so its height is the body's and the pin's
    details scroll inside it. */
-.codex-inspector { flex: 0 0 300px; display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; position: relative; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); }
+.codex-inspector { flex: 0 0 300px; display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; position: relative; border: 1px solid transparent; padding: var(--space-3); }
 /* WRAPS, and it is measured rather than tidy. The head is a name beside a cluster of a `RevealSwitch`
    ("Shown to players", `white-space: nowrap`) and a ⋯ button — 204px of unshrinkable content inside a
    288px column that also has to hold the name. Measured at 1920 with a pin selected: the cluster ran
@@ -897,7 +906,7 @@
 /* §4 ROUTE 1. `PinDetails` has always CLAIMED "its rows are route 1 (min-height)" and this rule was the
    one that did not carry it — ~36px on the player's pin sheet and in the GM's pin inspector, in a column
    whose rows are 4px apart. */
-.codex-marker-link-open { flex: 1; min-width: 0; min-height: var(--tap-min); display: flex; align-items: center; gap: var(--space-2); text-align: left; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); padding: var(--space-1) var(--space-2); cursor: pointer; font-size: var(--fs-sm); }
+.codex-marker-link-open { flex: 1; min-width: 0; min-height: var(--tap-min); display: flex; align-items: center; gap: var(--space-2); text-align: left; border: 1px solid transparent; color: var(--text); padding: var(--space-1) var(--space-2); cursor: pointer; font-size: var(--fs-sm); }
 .codex-marker-link-open:hover { border-color: var(--cyan); }
 .codex-marker-link-name { flex: 1; min-width: 0; }
 .codex-marker-submap { display: flex; gap: var(--space-2); align-items: center; }
@@ -909,24 +918,24 @@
    side — `--space-3` (12px) is exactly the gap budget for that pair, and is the design language's own
    worked example for a pressable-chip row. */
 .codex-swatches { display: flex; gap: var(--space-3); flex-wrap: wrap; }
-.codex-swatch { width: 32px; height: 32px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.codex-swatch { width: 32px; height: 32px; border-radius: 0; border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; cursor: pointer; padding: 0; }
 .codex-swatch.is-active { border-color: currentColor; }
 .codex-swatch-dot { width: 14px; height: 14px; border-radius: var(--radius-pill); background: currentColor; }
 .codex-icon-group-label { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: var(--space-1); }
 .codex-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: var(--space-1); }
 /* §4 ROUTE 1 (grow the paint): a uniform grid, where a bigger cell is harmless and a ::after box
    would overlap its neighbours in BOTH axes. */
-.codex-icon-btn { aspect-ratio: 1; min-width: var(--tap-min); min-height: var(--tap-min); display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); cursor: pointer; padding: var(--space-1); }
-.codex-icon-btn:hover { border-color: var(--line-hover); }
-.codex-icon-btn.is-active { border-color: currentColor; background: var(--surface-3); }
+.codex-icon-btn { aspect-ratio: 1; min-width: var(--tap-min); min-height: var(--tap-min); display: grid; place-items: center; border: 1px solid transparent; cursor: pointer; padding: var(--space-1); }
+.codex-icon-btn:hover::before, .codex-icon-btn:focus-visible::before { border-color: var(--rim-color-hi); }
+.codex-icon-btn.is-active::before { border-color: currentColor; }
 .codex-icon-svg { width: 100%; height: 100%; }
 
 /* Asset picker */
-.codex-asset-picker { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-asset-picker { border: 1px solid transparent; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-asset-picker-head { display: flex; align-items: center; justify-content: space-between; }
 .codex-asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-2); }
-.codex-asset-card { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); cursor: pointer; text-align: left; }
-.codex-asset-card:hover { border-color: var(--magenta); }
+.codex-asset-card { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); border: 1px solid transparent; color: var(--text); cursor: pointer; text-align: left; }
+.codex-asset-card:hover::before, .codex-asset-card:focus-visible::before { border-color: var(--magenta); }
 .codex-asset-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Stacked on a phone, and both halves stay real: the map keeps a floor it cannot be squeezed under
@@ -975,11 +984,16 @@
    no "in sync" state to style — the quiet state is no element at all. The Publish control is `Button` at
    its default size: §4 route 1 (`min-height: var(--tap-min)`, no `::after`), which is what a control
    sitting directly above the composer's field stack needs. */
-.codex-prepclock { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-3); border: 1px solid color-mix(in srgb, var(--caution) 35%, transparent); border-left: 3px solid var(--caution); border-radius: var(--radius-md); background: color-mix(in srgb, var(--caution) 8%, transparent); }
+/* Ruling 39: severity onto a 2px leading rule, words on a neutral ground. The caution tint behind
+   the sentence was colour-over-tint, which is what fails daybreak first. */
+.codex-prepclock { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-3); border: 0; border-left: 2px solid var(--caution); border-radius: 0; background: var(--surface-2); }
 .codex-prepclock-label { font-size: var(--fs-sm); color: var(--text-dim); }
 
 .codex-timeline { display: flex; flex-direction: column; gap: var(--space-3); }
-.codex-entry { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+/* Ruling 39's shape: the kind hue is a 2px LEADING RULE and the words sit on a neutral ground.
+   The entry keeps its own border box so the leading bar is a real border rather than paint that
+   the material's backing layer would bury. */
+.codex-entry { border: 1px solid transparent; border-left: 2px solid var(--cyan); border-radius: 0; background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-entry.is-combat { border-left-color: var(--caution); }
 /* CT-11: a dated `event` page on the chronicle. The accent is the SAME token the event entity type uses
    everywhere else (tree, graph, badges), so one record has one colour across the suite. R2: the accent is
@@ -1054,18 +1068,20 @@
 .codex-reader-body { color: var(--text); line-height: var(--lh-body); }
 
 /* Media */
-.codex-banner { position: relative; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--line); }
+.codex-banner { position: relative; border-radius: 0; overflow: hidden; border: 1px solid var(--line); }
 .codex-banner-img { display: block; width: 100%; max-height: 240px; object-fit: cover; }
 .codex-banner-actions { position: absolute; top: var(--space-2); right: var(--space-2); display: flex; gap: var(--space-1); background: var(--overlay); border-radius: var(--radius-pill); padding: 2px; }
-.codex-banner-add { align-self: flex-start; background: var(--surface-2); border: 1px dashed var(--line); border-radius: var(--radius-md); color: var(--text-dim); padding: var(--space-2) var(--space-3); cursor: pointer; }
-.codex-banner-add:hover { border-color: var(--magenta); color: var(--text); }
+/* Ruling 55: no dashed boxes — the add-a-banner control is a door, so it looks like one. */
+.codex-banner-add { align-self: flex-start; border: 1px solid transparent; color: var(--text-dim); padding: var(--space-2) var(--space-3); cursor: pointer; }
+.codex-banner-add:hover { color: var(--text); }
+.codex-banner-add:hover::before, .codex-banner-add:focus-visible::before { border-color: var(--magenta); }
 /* (`.codex-editor-body` and its two GM-secret rules retired with `.codex-body-input`/`.codex-preview`:
    the violet cue for a GM body lives on `CodexEditor`'s own frame now, in edit AND in preview, which is
    what keeps proofreading and screen-sharing from ever looking player-facing. Zero .tsx consumers.) */
 
 /* New-page template menu */
 .codex-newpage { position: relative; }
-.codex-md-img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-md); margin: var(--space-2) 0; border: 1px solid var(--line); }
+.codex-md-img { display: block; max-width: 100%; height: auto; border-radius: 0; margin: var(--space-2) 0; border: 1px solid var(--line); }
 .codex-img-failed { color: var(--text-muted); font-style: italic; }
 
 /* CF-3: the graph node's touch floor. `fill: transparent` (never `none`) is what makes an invisible
@@ -1106,7 +1122,7 @@
   min-height: var(--tap-min);
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1);
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
 }
 .codex-audit-row { flex-wrap: wrap; row-gap: var(--space-1); }
 .codex-audit-row .codex-list-title { flex: 1 1 auto; min-width: 8rem; }
@@ -1166,9 +1182,7 @@
   display: flex; flex-direction: column; gap: var(--space-3);
   height: 100%; min-height: 0;
   padding: var(--space-3) var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-1);
+  border: 1px solid transparent;
 }
 /* The rail's own region (`.scroll-y` in the markup): thirteen destinations, three group eyebrows, the
    ⌘K chip and the collapse toggle do not fit a 720p laptop, and the ones that do not fit are the ones
@@ -1183,18 +1197,20 @@
 /* §4 ROUTE 1 (grow the paint). A stacked vertical list MUST use route 1: a `::after` box centred on a
    shorter control overhangs into its neighbour, and SVG/DOM hit-testing awards the later sibling. */
 .codex-navitem {
+  position: relative;
   display: flex; align-items: center; gap: var(--space-2);
   width: 100%; min-height: var(--tap-min);
   padding: var(--space-2);
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  border: 0; border-bottom: 1px solid transparent; border-radius: 0;
   background: transparent; color: var(--text-dim);
   font: 600 var(--fs-sm) / 1.2 var(--font-body);
   text-align: start; cursor: pointer;
 }
-.codex-navitem:hover { background: var(--surface-2); color: var(--text); }
+.codex-navitem:hover { color: var(--text); }
 /* Selection owns the EDGE, hover owns the fill (design-language §5) — so "the pointer is here" and
    "this is the section I am in" never render as the same pixels. */
-.codex-navitem.is-active { color: var(--text); border-color: var(--magenta); background: var(--surface-2); }
+.codex-navitem.is-active { color: var(--text); border-bottom-color: var(--magenta); padding-inline-start: calc(var(--space-2) + .55rem); }
+.codex-navitem.is-active::before { content: ""; position: absolute; inset-inline-start: 2px; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--magenta); background: var(--cue-mark); pointer-events: none; }
 .codex-navitem-icon { width: 1.15em; height: 1.15em; flex: none; }
 .codex-navitem-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1202,11 +1218,12 @@
   display: flex; align-items: center; gap: var(--space-2);
   width: 100%; min-height: var(--tap-min);
   padding: var(--space-2);
-  border: 1px solid var(--line); border-radius: var(--radius-md);
-  background: var(--surface-3); color: var(--text-muted);
+  border: 1px solid transparent;
+  color: var(--text-muted);
   font: 500 var(--fs-sm) / 1.2 var(--font-body); text-align: start; cursor: pointer;
 }
-.codex-sidebar-search:hover { border-color: var(--line-hover); color: var(--text); }
+.codex-sidebar-search:hover { color: var(--text); }
+.codex-sidebar-search:hover::before, .codex-sidebar-search:focus-visible::before { border-color: var(--rim-color-hi); }
 .codex-sidebar-search .nh-kbd { margin-inline-start: auto; }
 .codex-sidebar-searchglyph { opacity: .8; }
 .codex-sidebar-foot { display: flex; justify-content: flex-end; padding-block-start: var(--space-2); }
@@ -1309,7 +1326,7 @@
 
 /* The not-found view's actions. */
 .codex-notfound-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; justify-content: center; }
-.codex-missing-record { padding: var(--space-2) var(--space-3); border: 1px solid var(--caution); border-radius: var(--radius-md); background: color-mix(in srgb, var(--caution) 12%, transparent); color: var(--text); font-size: var(--fs-sm); }
+.codex-missing-record { padding: var(--space-2) var(--space-3); border: 0; border-left: 2px solid var(--caution); border-radius: 0; background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
 
 /* ============================================================================
    D18 — the dashboard's one card chassis.
@@ -1318,7 +1335,7 @@
 @media (min-width: 850px) { .codex-dashgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 980px) { .codex-dashgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
-.codex-dashcard { display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); min-width: 0; }
+.codex-dashcard { display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid transparent; padding: var(--space-3); min-width: 0; }
 .codex-dashcard-head { display: flex; align-items: center; gap: var(--space-2); }
 .codex-dashcard-glyph { width: 1.1em; height: 1.1em; flex: none; color: var(--text-dim); }
 .codex-dashcard-title { margin: 0; font: 700 var(--fs-h3) / 1.2 var(--font-display); letter-spacing: var(--tracking-display); flex: 1 1 auto; min-width: 0; }
@@ -1342,7 +1359,8 @@
 .codex-conn-arrow.is-in { transform: rotate(180deg); }
 .codex-conn-kind, .codex-conn-origin { font-size: var(--fs-2xs); color: var(--text-muted); }
 .codex-conn-actions { display: flex; align-items: center; gap: var(--space-2); margin-inline-start: auto; }
-.codex-conn-form { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border: 1px dashed var(--line-strong); border-radius: var(--radius-md); }
+/* Ruling 55: no dashed boxes — an inline form is a panel, not a placeholder. */
+.codex-conn-form { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border: 1px solid transparent; }
 .codex-conn-formactions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .codex-conn-gmswitch { display: flex; align-items: center; gap: var(--space-2); }
 .codex-editor-tagjumps { display: flex; flex-wrap: wrap; gap: var(--space-3); }
@@ -1356,7 +1374,7 @@
    D17 — the Calendar view. A LENS over the chronicle, never a second chronology.
    ============================================================================ */
 .codex-calendar { display: flex; flex-direction: column; gap: var(--space-3); }
-.codex-calendar-clocks { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); }
+.codex-calendar-clocks { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; border: 1px solid transparent; padding: var(--space-3); }
 .codex-calendar-clock { display: flex; align-items: baseline; gap: var(--space-2); }
 .codex-calendar-clocklabel { color: var(--text-muted); font-size: var(--fs-sm); }
 .codex-calendar-monthbar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
@@ -1369,7 +1387,7 @@
 .codex-calendar-cell {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   min-height: var(--tap-min); padding: var(--space-1);
-  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  border: 1px solid var(--line); border-radius: 0;
   background: var(--surface-1); color: var(--text-dim); cursor: pointer; font: inherit;
 }
 .codex-calendar-cell:hover { background: var(--surface-2); }
@@ -1382,12 +1400,12 @@
 .codex-calendar-marks { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .codex-calendar-mark { width: .8em; height: .8em; color: var(--text-muted); }
 .codex-calendar-more { font-size: var(--fs-2xs); color: var(--text-muted); }
-.codex-calendar-day { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); }
+.codex-calendar-day { border: 1px solid transparent; padding: var(--space-3); }
 
 /* ============================================================================
    D12 — the Downtime tracker. A LENS over the Journal, never a second store.
    ============================================================================ */
-.codex-downtime-section { display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); margin-block-end: var(--space-4); }
+.codex-downtime-section { display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid transparent; padding: var(--space-3); margin-block-end: var(--space-4); }
 .codex-downtime-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); }
 .codex-downtime-pending, .codex-downtime-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-downtime-pendingrow, .codex-downtime-historyrow { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-height: var(--tap-min); }
@@ -1401,7 +1419,7 @@
 /* The restore confirm's inventory. Bordered in --danger and set in the tabular figures the rest of the
    Codex uses for counts, because the number a GM is checking here is the one that decides whether they
    press the button — including when it is zero. */
-.codex-backup-inventory { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--danger) 10%, transparent); font-variant-numeric: tabular-nums; }
+.codex-backup-inventory { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border: 0; border-left: 2px solid var(--danger); border-radius: 0; background: var(--surface-2); font-variant-numeric: tabular-nums; }
 .codex-backup-issues { margin: var(--space-2) 0 0; padding-inline-start: var(--space-4); }
 
 /* D10 — the cross-type tag view. */
@@ -1416,13 +1434,13 @@
 .codex-marker.is-dimmed { opacity: .3; }
 
 /* D25 / G16 — the pin inspector's Appearance disclosure. */
-.codex-marker-appearance { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.codex-marker-appearance { border: 1px solid transparent; }
 .codex-marker-appearance-summary { display: flex; align-items: center; gap: var(--space-2); min-height: var(--tap-min); padding: var(--space-2) var(--space-3); cursor: pointer; font: 600 var(--fs-sm) / 1.2 var(--font-body); }
 .codex-marker-appearance[open] .codex-marker-appearance-summary { border-block-end: 1px solid var(--line); }
 .codex-marker-appearance > .codex-iconpicker { padding: var(--space-3); }
 
 /* D14 — the player's pin details: a side panel, a bottom sheet on a phone. */
-.codex-pindetails { display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); }
+.codex-pindetails { display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid transparent; padding: var(--space-3); }
 
 /* A live/active dot, drawn rather than typed — `●` is a symbol character the body face may not carry. */
 .codex-campaign-partyreveal { margin: 0; }
@@ -1469,3 +1487,155 @@
      too, which is what closed a MEASURED 117px sideways scroll of the document on the Downtime history. */
   .codex-campaign-recentwhen { white-space: normal; }
 }
+
+/* ══ RULING 46's SECOND HALF — the kind hue on the page-list row ═════════════════════════════
+   The hue is now ONE hue for all eight kinds (see `--codex-type` in design-tokens.css), which is
+   what makes a leading rule on every typed row legible rather than a second colour vocabulary:
+   the rule says "this row is a typed entity" and the GLYPH says which kind, exactly as ruling 46
+   asks. `:has()` scopes it to rows that actually carry an entity glyph, so a plain note keeps a
+   bare row and the rule stays information rather than decoration.
+
+   THE KIND BADGE, ruling 46's other half, IS NOT SHIPPED HERE and cannot be from CSS: the page
+   list renders `<button class="codex-list-item"><span class="codex-list-title">…` with no glyph
+   element at all (PagesView.tsx:214), so there is nothing to style into a badge. The notebook
+   tree does render one (`EntityIcon`, NotebookTree.tsx:166) and takes both halves. Adding the
+   badge to the flat page list is a markup change in PagesView.tsx — reported, not smuggled. */
+.codex-tree-page:has(.codex-tree-icon),
+.codex-hit:has(.codex-hit-ic) {
+  border-inline-start: 2px solid var(--codex-type);
+  padding-inline-start: var(--space-2);
+}
+/* The glyph itself is the badge's whole content, so it takes the hue rather than inheriting the
+   row's ink. One token, eight kinds — the icon carries the distinction (ruling 46's escape). */
+.codex-tree-icon { color: var(--codex-type); }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities, written against the selectors this file already owns because the markup is
+   not this lane's to change. The cut, the rim and the fill ride a BACKING LAYER, never the
+   element: `clip-path` clips hit-testing, and the Codex is the densest field of tap targets in
+   the app. `inset: -1px` spans the border box, so the rim lands exactly where the 1px border used
+   to and nothing reflows. Every value is a shared token, so ruling 29's daybreak translation
+   arrives for free and cannot drift.
+
+   RULING 28 — SCANLINES ON THE OUTERMOST PANEL ONLY, and this is the surface the ruling was
+   written for: the Codex is where panels nest three deep. The sidebar, the rail, the writing
+   surface, the summoned context panel, the mode bar, the dashboard cards, the calendar and
+   downtime blocks and the pin inspector all stand ON the surface, so they take the texture. Every
+   panel inside one of those — an asset card, a type card, a quest link, an icon button, the
+   search chip, the danger fence, the connection form, the appearance disclosure — takes rim and
+   bezel over a flat plate and drops the texture.
+
+   NO REST GLOW except on `.codex-main-empty`, which is an EMPTY SURFACE and therefore on ruling
+   2's hero list — and it is alone on its column when it shows, so the region's glow budget is
+   unspent (§8.1). Everything else here shares a region with several controls, which is precisely
+   where the split earns its keep.
+
+   THE ONE THING THAT DOES NOT TAKE A BACKING LAYER: a panel that is ALSO the scroller. An
+   absolutely-positioned child of a scroll container is laid out against the scrolled box, so its
+   rim rides the scroll and leaves the pane's lower half bare — measured in Homebrew at 380px of
+   rim on a 1,283px pane. Where a scrolling panel exists here the material goes on the box around
+   it, never on the scroller (`.codex-mapsurface` keeps a real border for the same reason). */
+.codex-sidebar,
+.codex-rail,
+.codex-modebar,
+.codex-main-empty,
+.codex-editor-center,
+.codex-editor-context,
+.codex-inspector,
+.codex-dashcard,
+.codex-calendar-clocks,
+.codex-calendar-day,
+.codex-downtime-section,
+.codex-pindetails,
+.codex-campaign-typecard,
+.codex-asset-picker,
+.codex-asset-card,
+.codex-quest-link-open,
+.codex-marker-link-open,
+.codex-marker-appearance,
+.codex-icon-btn,
+.codex-sidebar-search,
+.codex-settings-danger,
+.codex-conn-form,
+.codex-banner-add {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.codex-sidebar::before,
+.codex-rail::before,
+.codex-modebar::before,
+.codex-main-empty::before,
+.codex-editor-center::before,
+.codex-editor-context::before,
+.codex-inspector::before,
+.codex-dashcard::before,
+.codex-calendar-clocks::before,
+.codex-calendar-day::before,
+.codex-downtime-section::before,
+.codex-pindetails::before,
+.codex-campaign-typecard::before,
+.codex-asset-picker::before,
+.codex-asset-card::before,
+.codex-quest-link-open::before,
+.codex-marker-link-open::before,
+.codex-marker-appearance::before,
+.codex-icon-btn::before,
+.codex-sidebar-search::before,
+.codex-settings-danger::before,
+.codex-conn-form::before,
+.codex-banner-add::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+/* Outermost — the texture. */
+.codex-sidebar,
+.codex-rail,
+.codex-modebar,
+.codex-main-empty,
+.codex-editor-center,
+.codex-editor-context,
+.codex-inspector,
+.codex-dashcard,
+.codex-calendar-clocks,
+.codex-calendar-day,
+.codex-downtime-section,
+.codex-pindetails { --material-fill: var(--material-scanline), var(--material-plate); }
+/* Nested — rim and bezel over a flat plate, no texture (ruling 28). */
+.codex-campaign-typecard,
+.codex-asset-picker,
+.codex-asset-card,
+.codex-quest-link-open,
+.codex-marker-link-open,
+.codex-marker-appearance,
+.codex-icon-btn,
+.codex-sidebar-search,
+.codex-settings-danger,
+.codex-conn-form,
+.codex-banner-add { --material-fill: var(--material-plate); }
+/* THE SUMMONED CONTEXT PANEL POSITIONS ITSELF, and the shared rule above must not take that away:
+   it is `position: absolute` over the right of the detail column (ruling 11), and `relative` would
+   drop it back into the flow. Restated here rather than lifted out of the list, so the panel keeps
+   the same material as everything else. Same class of bug as the fight menu in encounter-panel.css. */
+.codex-editor-context { position: absolute; }
+/* The empty Codex is a hero surface (rulings 2 + 55): the full landing door, glow included. */
+.codex-main-empty::before { filter: var(--rim-glow); }
+/* The danger fence keeps its own edge — the material must not repaint a severity (ruling 39). */
+.codex-settings-danger::before { border-color: color-mix(in srgb, var(--danger) 55%, var(--rim-color)); }
+/* GM-private, and violet is this repo's reservation for it: the type card's 3px leading bar is set
+   per kind in the markup's style attribute, so only the RIM moves to the backing layer here. */
+.codex-campaign-typecard { border-left-width: 3px; }
