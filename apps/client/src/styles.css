@@ -224,8 +224,8 @@ main.anim-cascade > .app-pane { animation-name: pane-in; }
    header and the Codex entry heads: known-bugs.md's `[ui] bare header` entry. D30's landing owns its
    own width (`.home-hero`, `.landing`), so the global goes rather than gets scoped.) */
 
-h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1; letter-spacing: var(--tracking-display); margin: .35rem 0 1rem; }
-h2 { font-family: var(--font-display); font-size: var(--fs-h1); line-height: var(--lh-snug); margin: 0 0 .5rem; }
+h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1; letter-spacing: var(--tracking-display); margin: .35rem 0 var(--space-4); }
+h2 { font-family: var(--font-display); font-size: var(--fs-h1); line-height: var(--lh-snug); margin: 0 0 var(--space-2); }
 p { color: var(--text-dim); line-height: var(--lh-body); }
 .eyebrow { display: inline-block; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
 
@@ -564,10 +564,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 summary { transition: color var(--dur-hover), background var(--dur-hover), border-color var(--dur-hover); }
 button strong, button span { display: block; }
 button strong { font-size: 1.1rem; }
-button span { color: var(--text-dim); font-size: .9rem; margin-top: .25rem; }
+button span { color: var(--text-dim); font-size: .9rem; margin-top: var(--space-1); }
 .secondary { background: transparent; }
 
-.card, .table, .dice-proof { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.card, .table, .dice-proof { margin-top: var(--space-10); padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .card { max-width: 32rem; }
 
 /* Code/identifiers use the branded mono face (Space Mono), not the browser default monospace. */
@@ -575,7 +575,7 @@ code, pre, kbd, samp { font-family: var(--font-mono); }
 input, select, textarea { width: 100%; padding: .8rem; margin-top: .4rem; border: 1px solid var(--line); background: var(--surface-3); color: var(--text); transition: border-color var(--dur-hover), box-shadow var(--dur-hover); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-.card input { margin-bottom: 1rem; }
+.card input { margin-bottom: var(--space-4); }
 /* Primary action button (magenta fill, dark ink) — a bare-element rule from before <Button> existed,
    kept for the hand-rolled `<button>`s still inside cards. It sets `--nh-fill`/`--nh-rim` rather than
    `background`, because since round 2 wave 2 every `.nh-btn` paints on a `::before` backing layer
@@ -584,22 +584,22 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
    which showed through anywhere the layer is translucent. It did: the landing's GM sign-in door is
    72% glass, and it came out muddied with the app's magenta. Bare `<button>`s in a card still get
    the fill via the `background` on the second line, which the primitive's own layer covers. */
-.card button { text-align: center; --nh-fill: var(--primary); --nh-rim: var(--magenta-hi); color: var(--text-on-neon); border: 0; margin-right: .5rem; }
+.card button { text-align: center; --nh-fill: var(--primary); --nh-rim: var(--magenta-hi); color: var(--text-on-neon); border: 0; margin-right: var(--space-2); }
 .card button:not(.nh-btn) { background: var(--primary); }
 .card button:hover:not(:disabled) { --nh-fill: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .card button:not(.nh-btn):hover:not(:disabled) { background: var(--magenta-hi); }
 .card .link { background: transparent; color: var(--text-dim); }
 .card .link:hover:not(:disabled) { color: var(--text); box-shadow: none; }
 
-.notice { margin-top: 1.5rem; padding: .8rem 1rem; border-left: 3px solid var(--primary); border-radius: var(--radius-sm); background: var(--surface-2); }
-.empty { margin-top: 2rem; min-height: 14rem; display: grid; place-content: center; text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--text-dim); }
+.notice { margin-top: var(--space-6); padding: .8rem var(--space-4); border-left: 3px solid var(--primary); border-radius: var(--radius-sm); background: var(--surface-2); }
+.empty { margin-top: var(--space-8); min-height: 14rem; display: grid; place-content: center; text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--text-dim); }
 .empty strong, .empty span { display: block; }
 .empty strong { color: var(--text); font-family: var(--font-display); font-weight: 400; }
 .empty span { margin-top: .4rem; }
 
 /* Shared by the Integrations panel's heading/feedback rows (the roster that used to own these classes
    is gone — its party is the strip below and its management moved to the Roster tab). */
-.roster-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+.roster-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-8); }
 .roster-heading h2 { font-size: var(--fs-h1); }
 .roster-heading p { max-width: 23rem; margin: 0; font-size: .9rem; text-align: right; }
 .presence { display: inline-flex; align-items: center; font-size: .7rem; color: var(--text-muted); }
@@ -615,9 +615,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
    viewport, i.e. the entire app zoomed out. The row scrolls; the page must not. */
 .party-strip { min-width: 0; max-width: 100%; margin: 0 0 .9rem; }
 .table-layout > .table { min-width: 0; }
-.party-strip-row { display: flex; gap: .5rem; min-width: 0; max-width: 100%; margin: 0; padding: 0 0 .25rem; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.party-strip-row { display: flex; gap: var(--space-2); min-width: 0; max-width: 100%; margin: 0; padding: 0 0 var(--space-1); list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .party-strip-item { flex: 0 0 auto; }
-.party-strip-entry { display: flex; align-items: center; gap: .5rem; min-height: 3.5rem; max-width: 13rem; padding: .5rem .8rem .5rem .5rem; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); text-align: left; }
+.party-strip-entry { display: flex; align-items: center; gap: var(--space-2); min-height: 3.5rem; max-width: 13rem; padding: var(--space-2) .8rem var(--space-2) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); text-align: left; }
 button.party-strip-entry { cursor: pointer; }
 button.party-strip-entry:hover { border-color: var(--line-strong); }
 .party-strip-item.is-mine .party-strip-entry { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
@@ -637,17 +637,17 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    fight still gets a map and hiding one is worse than making them scroll a picker). */
 .claim-view { min-height: 0; margin-bottom: 1.2rem; }
 .claim-heading h2 { font-size: var(--fs-h2); }
-.claim-heading p { margin: 0 0 1rem; font-size: .9rem; }
+.claim-heading p { margin: 0 0 var(--space-4); font-size: .9rem; }
 .claim-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .8rem; margin: 0; padding: 0; list-style: none; }
-.claim-card { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); text-align: center; }
+.claim-card { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); text-align: center; }
 .claim-card-name { margin: 0; font: 400 1.05rem/1.2 var(--font-display); }
 .claim-card-action { margin-top: auto; }
-.claim-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.claim-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: var(--space-4); }
 
 /* Dice */
 .dice-proof h2 { font-size: var(--fs-h2); }
-.dice-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.dice-visibility { display: flex; align-items: center; gap: .5rem; min-width: 0; white-space: nowrap; color: var(--text-dim); font-size: var(--fs-sm); }
+.dice-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.dice-visibility { display: flex; align-items: center; gap: var(--space-2); min-width: 0; white-space: nowrap; color: var(--text-dim); font-size: var(--fs-sm); }
 /* A `<select>`'s min-content width is its WIDEST OPTION, and the longest roll audience is
    "Hidden from players — you and the GM see it" (349px at 390). Left unshrinkable it made the
    QUESTION the only thing that could give: measured at 390x844, `.dice-visibility` overflowed
@@ -656,15 +656,15 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    in the open list), `white-space: nowrap` above keeps the question on one line, and the label
    is what the row is FOR. */
 .dice-visibility select { flex: 1 1 auto; width: auto; min-width: 0; margin-top: 0; }
-.dice-quick { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; align-items: center; }
-.dice-quick button { padding: .65rem 1rem; text-align: center; background: var(--surface-2); }
+.dice-quick { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); align-items: center; }
+.dice-quick button { padding: .65rem var(--space-4); text-align: center; background: var(--surface-2); }
 .dice-quick button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
-.dice-armed { margin: .6rem 0 0; padding: .5rem .75rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--magenta-hi); font-size: var(--fs-sm); font-weight: 700; }
-.dice-roll-pref { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; align-items: center; }
-.dice-adv-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; align-items: stretch; }
-.dice-adv-row .secondary { padding: .65rem 1rem; text-align: center; }
+.dice-armed { margin: .6rem 0 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--magenta-hi); font-size: var(--fs-sm); font-weight: 700; }
+.dice-roll-pref { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: .6rem; align-items: center; }
+.dice-adv-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); align-items: stretch; }
+.dice-adv-row .secondary { padding: .65rem var(--space-4); text-align: center; }
 .dice-adv-row .secondary[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
-.dice-custom { margin-top: 1rem; color: var(--text-muted); font-size: var(--fs-sm); }
+.dice-custom { margin-top: var(--space-4); color: var(--text-muted); font-size: var(--fs-sm); }
 .dice-custom summary { cursor: pointer; }
 .dice-custom .dice-form { margin-top: .8rem; }
 .dice-hint { margin: .6rem 0 0; font-size: var(--fs-sm); }
@@ -674,13 +674,13 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .dice-form button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .dice-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: var(--fs-body); }
 /* Roll-list header (Table/Mine filter now renders as a SegmentedControl from @vtt/ui). */
-.roll-list-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: 1rem; }
+.roll-list-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: var(--space-4); }
 .roll-list-title { margin: 0; font: 800 var(--fs-xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
 /* The feed is a declared region: `.scroll-y` rides it in DicePanel's markup (check (h) — a scroller
    the stylesheet declares on its own is a scroller no reader of the component can see). The cap stays
    for the standalone panel; inside the dock accordion `max-height: none` hands it the section instead. */
-.roll-list { display: grid; gap: .4rem; max-height: 19rem; padding-right: .25rem; margin-top: .5rem; }
-.roll-card { padding: .5rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.roll-list { display: grid; gap: .4rem; max-height: 19rem; padding-right: var(--space-1); margin-top: var(--space-2); }
+.roll-card { padding: var(--space-2) .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 /* v6 #4: the roll's KIND leads (a badge), the roller/audience is a muted footer, and faces · formula = total
    read as one left-to-right unit instead of being flung to four corners. */
 .roll-card-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
@@ -691,7 +691,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .roll-badge--save { background: color-mix(in srgb, var(--cyan) 26%, var(--surface-3)); }
 .roll-badge--check { background: color-mix(in srgb, var(--cyan) 15%, var(--surface-3)); }
 .roll-badge--manual { background: var(--surface-3); color: var(--text-muted); }
-.roll-readout { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .5rem; margin-top: .5rem; }
+.roll-readout { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem var(--space-2); margin-top: var(--space-2); }
 .dice-faces { display: flex; flex-wrap: wrap; gap: .3rem; }
 .die { display: grid; place-items: center; min-width: 2rem; height: 2rem; padding: 0 .35rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); font-weight: 700; font-family: var(--font-mono); }
 .die.discarded { opacity: .35; text-decoration: line-through; }
@@ -699,23 +699,23 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .roll-eq { color: var(--text-muted); font-family: var(--font-mono); }
 .roll-total { margin-left: auto; font-family: var(--font-display); font-size: var(--fs-h2); color: var(--text); }
 
-.gm-session-controls { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.gm-session-controls { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: var(--space-4); }
 .gm-session-controls button { flex: 0 0 auto; padding: .7rem 1.1rem; text-align: center; }
 /* Destructive control (mirrors <Button variant="destructive">) */
 .danger { background: transparent; border: 1px solid var(--danger); color: var(--danger-hi); }
 .danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 
 /* Integrations (VTT Setup) */
-.integrations { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.integrations { margin-top: var(--space-10); padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .integration-secret { border-left-color: var(--cyan); }
 .integration-secret strong { display: block; margin-bottom: .3rem; }
 .integration-token { display: block; margin: .8rem 0; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); color: var(--cyan-hi); word-break: break-all; font-size: .9rem; font-family: var(--font-mono); }
 .integration-secret-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
-.integration-secret-actions button { padding: .7rem 1rem; }
+.integration-secret-actions button { padding: .7rem var(--space-4); }
 .integration-secret-warning { margin-top: .8rem; color: var(--danger-hi); font-size: .85rem; }
-.integration-form { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1rem; margin-top: 1.5rem; align-items: start; }
+.integration-form { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--space-4); margin-top: var(--space-6); align-items: start; }
 .integration-form label { display: block; color: var(--text-dim); font-size: .8rem; }
-.integration-form fieldset { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: var(--radius-md); padding: .8rem 1rem; display: flex; flex-wrap: wrap; gap: .6rem .9rem; }
+.integration-form fieldset { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: var(--radius-md); padding: .8rem var(--space-4); display: flex; flex-wrap: wrap; gap: .6rem .9rem; }
 .integration-form legend { padding: 0 .4rem; color: var(--text-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
 /* Route 1 (design-language §4), and the route that section's exception table already names for this
    control: the box is a replaced `<input type="checkbox">` that cannot take `::after`, so the WRAPPING
@@ -725,15 +725,15 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .integration-scope input { width: auto; margin: 0; }
 .integration-form button[type="submit"] { grid-column: 1 / -1; background: var(--primary); color: var(--text-on-neon); border: 0; padding: .85rem 1.2rem; }
 .integration-form button[type="submit"]:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
-.integration-list { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: .8rem; }
-.integration-row { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.integration-row-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.integration-list { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; gap: .8rem; }
+.integration-row { padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.integration-row-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .integration-scopes { margin: .3rem 0 0; color: var(--text-muted); font-size: .8rem; }
-.integration-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: .9rem 0; }
-.integration-meta div { padding: .5rem .4rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
+.integration-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); margin: .9rem 0; }
+.integration-meta div { padding: var(--space-2) .4rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
 .integration-meta dt { color: var(--text-muted); font-size: .6rem; text-transform: uppercase; letter-spacing: .05em; }
 .integration-meta dd { margin: .15rem 0 0; font-size: .75rem; }
-.integration-row-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.integration-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .integration-row-actions button { padding: .6rem .9rem; }
 .integration-audit { list-style: none; margin: .8rem 0 0; padding: .6rem .8rem; border: 1px dashed var(--line); border-radius: var(--radius-md); font-size: .75rem; color: var(--text-muted); display: grid; gap: .3rem; }
 
@@ -764,7 +764,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .notice-info { border-left-color: var(--info); }
 /* `useConfirm`'s optional "don't ask again" row. Separated from the body prose by a rule so it reads as a
    setting rather than as another sentence of the warning it turns off. */
-.confirm-suppress { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); }
+.confirm-suppress { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border); }
 /* "The table is offline" is frame row 1 — a real row the frame makes room for, not a fixed
    strip painting over whatever happened to be at the top (its previous life; the
    `main:has(> .connection-banner)` padding dance that reserved its room retired with it,
@@ -781,7 +781,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
   height: var(--connection-banner-h);
   overflow: hidden;
   margin: 0;
-  padding: 0 1rem;
+  padding: 0 var(--space-4);
   background: var(--surface-2);
   border-bottom: 1px solid var(--line-strong);
   border-left: 3px solid var(--caution);
@@ -820,10 +820,10 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    44px row with the name at exactly the 51.4px it had before this rule. 2.75rem takes the middle and
    leaves ~7px for a wider HP readout. At the 320 floor the row genuinely cannot hold: "My sheet"
    takes a second line and the name reads 87.1px — the whole of it — instead of nothing. */
-.you-are-playing { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-width: 0; min-height: var(--tap-min); margin-top: 0; padding: .25rem .5rem; border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
+.you-are-playing { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; min-height: var(--tap-min); margin-top: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--cyan); border-radius: var(--radius-pill); background: var(--surface-2); box-shadow: var(--glow-cyan); }
 .you-are-playing-name { flex: 1 1 2.75rem; min-width: 2.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 1.05rem/1.2 var(--font-display); color: var(--text); }
 .you-are-playing .nh-btn { flex: 0 0 auto; }
-.you-badge { margin-left: .5rem; vertical-align: middle; }
+.you-badge { margin-left: var(--space-2); vertical-align: middle; }
 
 .own-hp { flex: 0 0 auto; color: var(--cyan-hi); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .8rem; font-weight: 700; }
 
@@ -839,7 +839,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    1280/1440/1920, sidebar and docked alike), so a reserved gutter would be a permanent 10px tax on
    the map column to prevent a jump that cannot happen. The arm that really scrolls — `.table-sidebar`
    when docked — keeps the stable gutter, because there the scrollbar is real. */
-.table-layout { display: grid; gap: 1.5rem; height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; scrollbar-gutter: auto; }
+.table-layout { display: grid; gap: var(--pane-gap); height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; scrollbar-gutter: auto; }
 /* `.scroll-y` RIDES THIS ELEMENT IN THE MARKUP, and what it is for is narrow: on most cells the
    frame fits and this class declares a scroll nothing uses. C1 took it off on exactly that
    reasoning — both halves are frames now — and two arrangements proved it wrong, each by a
@@ -863,7 +863,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* The left column is a frame: the scene row, the party strip and the status line are fixed rows, and
    the map underneath them is the one thing that grows. */
 .table-layout > .table { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; min-height: 0; }
+.table-sidebar { display: flex; flex-direction: column; gap: var(--pane-gap); min-width: 0; min-height: 0; }
 /* ============ THE PHONE TABLE IS A FRAME TOO (C1) ============
    The interim block this replaces named itself a placeholder, and the measurements are why: with the
    dock's sections opened one at a time, `.table-layout` scrollHeight ran to several THOUSAND pixels
@@ -917,11 +917,11 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      documents ~7px of slack at 375. Measured with the gutter reserved: a claimed player's top line
      at 375x667 went 44px -> 82px, the row wrapped, and 38px came out of the sheet on the phase's
      own shortest supported phone. A phone's scrollbar is an overlay and costs nothing anyway. */
-  .table-layout { display: flex; flex-direction: column; gap: .5rem; min-height: 0; }
+  .table-layout { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; }
   /* The card chrome goes: a phone has no room to spend 24px a side plus a rule on a container that
      is the surface rather than a panel standing on it. */
-  .table-layout > .table { flex: 0 0 auto; padding: .75rem; border: 0; border-radius: 0; background: none; }
-  .table-layout > .table-sheet { flex: 1 1 0; min-height: 8.25rem; gap: .5rem; }
+  .table-layout > .table { flex: 0 0 auto; padding: var(--space-3); border: 0; border-radius: 0; background: none; }
+  .table-layout > .table-sheet { flex: 1 1 0; min-height: 8.25rem; gap: var(--space-2); }
   /* ONE 44px TOP LINE — at 375 and up, and the exception is stated rather than wished away: at the
      320 floor a claimed player's row is 82px in combat (the "You're playing" pill wraps) and 138px
      out of it (the party strip drops below the pill), and the GM's is 100px out of combat. That
@@ -931,7 +931,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      wrapper exists only so the phone can put the scene door, the player's own character and the
      party on one line instead of three. `wrap` stays as the escape hatch: nothing here may be
      crushed, so a line that genuinely cannot hold breaks instead of clipping. */
-  .table-topline { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .table-topline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
   /* THE DOOR IS THE LINE'S GUEST, NOT ITS OWNER. `flex: 0 0 auto` handed the scene door its whole
      natural width, and a long scene name makes that 227px: 227 + .5rem + the strip's 8rem basis is
      363px against 351px of line at 375x667, so the strip wrapped and the ONE 44px row this wrapper
@@ -966,13 +966,13 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
      56px was a comfortable laptop row; 44 is the floor and the phone needs the other 12px. The
      padding comes down with it or the avatar's own 2rem plus .5rem a side overshoots the floor and
      the row costs 55px again — measured. */
-  .party-strip-entry { min-height: var(--tap-min); padding: .25rem .7rem .25rem .25rem; }
-  .table-status { margin: 0 0 .5rem; }
+  .party-strip-entry { min-height: var(--tap-min); padding: var(--space-1) .7rem var(--space-1) var(--space-1); }
+  .table-status { margin: 0 0 var(--space-2); }
   /* The staging banner is a frame ROW while the GM arranges a scene, and at this width its two
      sentences wrapped to 127px — more than half the band. Tightened, not shortened: the copy is the
      only instruction for a mode with no other chrome. (`.table-layout` on the selector for the same
      reason as the empty hero above: the base rule is later in this file and @media adds no weight.) */
-  .table-layout .scene-preview-banner { gap: .4rem; margin-bottom: .5rem; padding: .4rem .6rem; font-size: .8rem; }
+  .table-layout .scene-preview-banner { gap: .4rem; margin-bottom: var(--space-2); padding: .4rem .6rem; font-size: .8rem; }
   /* The empty state stands in for the map, so it takes the map's band rather than the map's leftover.
      `.table-layout` is on the selector because the base rule is LATER in this file and a media query
      adds no specificity — without it the hero kept its 12rem and overflowed its own box by 27px. */
@@ -1008,20 +1008,20 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .table-status { margin: 0 0 .8rem; color: var(--text-muted); font-size: .85rem; }
 
 /* GM-private scene staging = violet (special/preview state) */
-.scene-preview-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .8rem; padding: .7rem 1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); color: var(--violet-hi); font-size: .9rem; }
-.scene-preview-actions { display: flex; gap: .5rem; flex: none; }
-.scene-preview-actions button { padding: .5rem 1rem; text-align: center; }
+.scene-preview-banner { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: .8rem; padding: .7rem var(--space-4); border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); color: var(--violet-hi); font-size: .9rem; }
+.scene-preview-actions { display: flex; gap: var(--space-2); flex: none; }
+.scene-preview-actions button { padding: var(--space-2) var(--space-4); text-align: center; }
 
 /* Scene prep renders in the shared Modal; only the scene panel's top margin needs a reset there. */
 .scene-prep-modal .scene-panel { margin-top: 0; }
-.empty-scene-prep { margin-top: 1rem; padding: .6rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
+.empty-scene-prep { margin-top: var(--space-4); padding: .6rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
 
 /* ============ THE DOCK ACCORDION (B1) ============
    Three headers, one body. The accordion itself is the sidebar's frame column: the open section takes
    the leftover height and scrolls inside itself, and the two closed ones cost exactly one header row
    each. That is what lets the dock hold a turn order, the dice and the log in a column that has only
    one height to give — the arrangement the blueprint calls the `<details>` idiom "made deliberate". */
-.dock-accordion { display: flex; flex-direction: column; gap: .5rem; flex: 1; min-height: 0; }
+.dock-accordion { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-height: 0; }
 .dock-section { display: flex; flex-direction: column; min-height: 0; }
 /* The open one flexes; the closed ones are their header and nothing else. The 200ms is the handover
    settling rather than a slide: `flex-grow` is the only thing that moves, so the sections trade height
@@ -1033,7 +1033,7 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* The whole header row is the control, so the hit area is the row and not the words — `.tap-target`
    carries the 44px floor. */
 .dock-section-toggle {
-  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   /* The floor is met by the ROW's own height, not by an overlay: this is a real, always-visible
      control in the busiest column on the surface, and it measured 42px on padding alone. */
   width: 100%; min-height: var(--tap-min); padding: .55rem .8rem; border: 1px solid var(--line); background: var(--surface-2);
@@ -1065,9 +1065,9 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 .dock-section-body .roll-list, .dock-section-body .combat-log-list { flex: 1; min-height: 0; max-height: none; }
 
 .sidebar-collapsed { margin-top: .8rem; }
-.sidebar-collapsed > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.sidebar-collapsed > summary { padding: var(--space-2) .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .sidebar-collapsed > summary:hover { border-color: var(--line-strong); color: var(--text); }
-.sidebar-collapsed > .dice-proof, .sidebar-collapsed > section { margin-top: .5rem; }
+.sidebar-collapsed > .dice-proof, .sidebar-collapsed > section { margin-top: var(--space-2); }
 
 /* ---- The Roster tab's management sections (B6). The party gallery itself is styled with the other
    card galleries in encounter-panel.css; these are the pieces the tab gained when it became the
@@ -1077,10 +1077,10 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    surface itself is full-bleed now — it paints the scene. */
 .party-heading, .party-roster-body { width: 100%; max-width: 72rem; margin-inline: auto; }
 .party-heading-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0 0 1.4rem; }
-.party-queue { margin: 0 0 1.6rem; padding: 1rem 1.1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); }
+.party-queue { margin: 0 0 1.6rem; padding: var(--space-4) 1.1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); }
 .party-section-head { margin: 0 0 .7rem; font: 400 1.1rem/1.2 var(--font-display); color: var(--violet-hi); }
-.party-queue-list { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
-.party-queue-row { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); }
+.party-queue-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.party-queue-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: .6rem var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); }
 .party-queue-name { font-weight: 700; }
 .party-queue-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-left: auto; }
 .party-card-preview { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; padding: 0 .9rem .6rem; }
@@ -1089,14 +1089,14 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
 /* Route 1 (design-language §4): a disclosure row in a stacked list grows its PAINT to the floor
    — an invisible `::after` extension would reach over its neighbours and steal their taps. The
    paint was 30px; `--tap-min` with the text centred in it is the whole fix. */
-.party-archived > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.party-archived > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: var(--space-2) .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .party-archived > summary:hover { border-color: var(--line-strong); color: var(--text); }
 .party-archived-note { margin: .7rem 0; font-size: .85rem; }
-.import-preview { display: grid; gap: .5rem; margin: 0; }
+.import-preview { display: grid; gap: var(--space-2); margin: 0; }
 .import-preview div { display: grid; grid-template-columns: 9rem 1fr; gap: .6rem; align-items: baseline; }
 .import-preview dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
 .import-preview dd { margin: 0; }
-.import-preview-abilities { display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-family: var(--font-mono); }
+.import-preview-abilities { display: flex; flex-wrap: wrap; gap: var(--space-2) .9rem; font-family: var(--font-mono); }
 
 /* Theme switch placements. */
 .home-theme-switch { margin-top: var(--space-6); }

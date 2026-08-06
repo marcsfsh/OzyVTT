@@ -9,7 +9,7 @@
    shrink/jitter the map every time a token is grabbed (the tray mounts on pointer-down). Float it over
    the stage top here too, inset to match the enlarged container's 1rem padding. */
 .encounter-map-interaction.enlarged .encounter-token-tray { position: absolute; z-index: 4; top: 1rem; left: 1rem; right: 1rem; margin-bottom: 0; }
-.encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; padding: .5rem .7rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); transition: border-color .15s, background .15s; }
+.encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-2); padding: var(--space-2) .7rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); transition: border-color .15s, background .15s; }
 .encounter-token-tray.receiving { border-color: var(--cyan); background: color-mix(in srgb, var(--surface-2) 84%, var(--cyan)); }
 .encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
 .encounter-token-tray > div:first-child span { margin-top: .15rem; color: var(--text-muted); font-size: .72rem; }
@@ -44,7 +44,7 @@
    unchanged and no other rule's outcome moves. Same reason on the :fullscreen and .enlarged
    variants below — keep all three scoped or the next glyph added to the stage inherits the bug. */
 .encounter-map-stage > svg { display: block; width: 100%; height: 100%; background: var(--void); user-select: none; }
-.encounter-map-stage > p { padding: 2rem; text-align: center; }
+.encounter-map-stage > p { padding: var(--space-8); text-align: center; }
 .encounter-token { outline: none; }
 .encounter-token.movable { cursor: grab; }
 .encounter-token.dragging { cursor: grabbing; opacity: .82; }
@@ -111,7 +111,7 @@
    the stage is `flex: 1; min-height: 0`, the tray and the saving line are floated over it, and the
    docked panel is absolutely positioned inside the stage and carries its own `.scroll-y`. A declared
    scroller that never scrolls is a claim a reader has to check by hand. */
-.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); }
+.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); }
 .encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
 /* Direct child, per the stage rule above. "Enlarge map" is a separate state from fullscreen and
    this is its path. Measured, its own contribution to the glyph damage was nil (the `height: 100%`
@@ -119,7 +119,7 @@
    enlarged mode was broken by the stage rule alone — but leaving this one a descendant selector
    would keep re-arming the trap the other two just disarmed. */
 .encounter-map-interaction.enlarged .encounter-map-stage > svg { max-height: none; height: 100%; }
-.encounter-map-saving { margin: .5rem 0 0; color: var(--text-dim); font-size: .85rem; }
+.encounter-map-saving { margin: var(--space-2) 0 0; color: var(--text-dim); font-size: .85rem; }
 /* In enlarged mode the interaction is a flex column; a "Saving move…" line mounting in-flow on token
    release would steal height from the flex:1 stage and bounce the map. Float it over the stage (like
    the token tray) so it never resizes the stage. */
@@ -148,7 +148,7 @@
 /* Open, the rail outranks the token tray (z-index 4) so it can use the whole stage height instead of
    being painted behind it. Closed, it stays under — the tray is the thing you are reading then. */
 .encounter-map-overlay.compact.open { z-index: 5; }
-.map-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: .35rem; max-width: 100%; padding: .25rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 88%, transparent); }
+.map-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: .35rem; max-width: 100%; padding: var(--space-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 88%, transparent); }
 /* 2.75rem of paint — the 44px floor carried as REAL paint (route 1), not the primitive's 2.25rem
    plus overhang. Measured before this: every bar button painted 40px tall at ≥561px while the
    phone rail's rows painted 44, and a `.tap-target` overhang a QA pass cannot see is a floor a
@@ -163,7 +163,7 @@
 .map-toolbar-divider { align-self: stretch; width: 1px; margin: .2rem .1rem; background: var(--line-strong); }
 /* A group button is icon + WORD at every width above the collapse. The word is not a tooltip:
    a phone has no hover, so a label that only exists on hover does not exist (design-language §4). */
-.map-toolbar-group { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .5rem; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.map-toolbar-group { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .map-toolbar-group:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .map-toolbar-group[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
 .map-toolbar-group-icon { display: grid; place-items: center; font-size: 1.05rem; }
@@ -172,7 +172,7 @@
 /* One open group at a time, in one bounded surface: never a second row of floating icons. It
    shrinks to whatever height the stage leaves and scrolls inside itself — `.scroll-y` in
    MapToolbar's markup declares that (check (h)); the `inset` on the overlay gives it the height. */
-.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: .5rem; padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
+.map-toolbar-panel { min-height: 0; width: min(19rem, 100%); display: flex; flex-direction: column; gap: var(--space-2); padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
 .map-toolbar-panel-title { margin: 0; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
 .map-toolbar-panel .nh-field, .map-toolbar-panel-body .nh-field { gap: .2rem; }
 .map-toolbar-field { font-size: .78rem; }
@@ -180,7 +180,7 @@
 .map-toolbar-label span { display: grid; place-items: center; font-size: .95rem; }
 .map-toolbar-note { margin: 0; color: var(--text-muted); font-size: .7rem; line-height: 1.35; }
 .map-toolbar-choices { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; }
-.map-toolbar-choice { display: flex; align-items: center; justify-content: center; gap: .3rem; min-height: 2.5rem; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; cursor: pointer; }
+.map-toolbar-choice { display: flex; align-items: center; justify-content: center; gap: .3rem; min-height: 2.5rem; padding: .3rem var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-family: var(--font-body); font-size: .78rem; font-weight: 700; cursor: pointer; }
 .map-toolbar-choice:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .map-toolbar-choice[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
 .map-toolbar-choice:disabled { color: var(--text-muted); cursor: not-allowed; }
@@ -194,7 +194,7 @@
 .map-toolbar-segmented .nh-segmented-option { min-height: var(--tap-min); }
 /* The custom-colour well is a control, so it carries a control's touch target (44px), not the
    1.7rem swatch the shape editor gets away with inside a form row. */
-.map-toolbar-custom-colour { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 2.75rem; color: var(--text-dim); font-size: .72rem; }
+.map-toolbar-custom-colour { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 2.75rem; color: var(--text-dim); font-size: .72rem; }
 .map-toolbar-custom-colour input { width: 3rem; height: 2.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); }
 /* The phone rail: the same three tools and the same three groups, every row icon + words. */
 .map-toolbar-toggle { display: inline-flex; align-items: center; gap: .3rem; min-height: 2.75rem; padding: 0 .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 92%, transparent); color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; cursor: pointer; }
@@ -202,12 +202,12 @@
 .map-toolbar-rail { min-height: 0; width: min(17rem, 100%); display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
 .map-toolbar-rail-tools { display: flex; flex-direction: column; gap: .15rem; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
 .map-toolbar-rail-section + .map-toolbar-rail-section { border-top: 1px solid var(--line); }
-.map-toolbar-row { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 2.75rem; padding: .3rem .5rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; text-align: left; cursor: pointer; }
+.map-toolbar-row { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 2.75rem; padding: .3rem var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-family: var(--font-body); font-size: .82rem; font-weight: 700; text-align: left; cursor: pointer; }
 .map-toolbar-row:disabled { color: var(--text-muted); cursor: not-allowed; }
 .map-toolbar-row[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); }
 .map-toolbar-row-icon { display: grid; place-items: center; font-size: 1.1rem; }
 .map-toolbar-rail-head .map-toolbar-caret { margin-left: auto; }
-.map-toolbar-panel-body { display: flex; flex-direction: column; gap: .5rem; padding: .1rem .5rem .5rem; }
+.map-toolbar-panel-body { display: flex; flex-direction: column; gap: var(--space-2); padding: .1rem var(--space-2) var(--space-2); }
 /* The rail scrolls when the stage is shorter than it is (a 390px phone leaves ~210px of map) —
    `.scroll-y` in the markup carries it. The section a tap just opened is scrolled to, so its
    contents are never left below the fold. */
@@ -230,15 +230,15 @@
 .annotation-shape.selected .annotation-shape-body { stroke-width: 4.5; }
 .annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
 
-.encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); }
+.encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: var(--space-2); padding: .7rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); }
 /* Slide the overlaid tool cluster (top-left) and shape editor (top-right) clear of a docked panel
    sharing their edge, so a left dock never hides the tools and a right dock never hides the editor. */
 .encounter-map-stage.has-dock-left .encounter-map-overlay { left: calc(var(--dock-side-width) + .7rem); }
 .encounter-map-stage.has-dock-right .encounter-shape-editor { right: calc(var(--dock-side-width) + .7rem); }
-.encounter-shape-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.encounter-shape-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .encounter-shape-editor-head strong { text-transform: capitalize; }
 .encounter-shape-editor-head span { color: var(--text-muted); font-size: .7rem; }
-.encounter-shape-editor label { display: flex; flex-direction: column; gap: .25rem; color: var(--text-dim); font-size: .75rem; }
+.encounter-shape-editor label { display: flex; flex-direction: column; gap: var(--space-1); color: var(--text-dim); font-size: .75rem; }
 .encounter-shape-editor select { padding: .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
 .encounter-shape-editor-check { align-self: start; }
 .encounter-shape-editor .danger { padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); text-align: center; cursor: pointer; }
@@ -335,7 +335,7 @@
 .encounter-token.targetable { cursor: crosshair; }
 .encounter-token.targetable .encounter-token-body { stroke: var(--cyan-hi); stroke-dasharray: 5 4; }
 .encounter-token.targeted .encounter-token-body { stroke: var(--danger); stroke-width: 6; stroke-dasharray: none; }
-.encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); font-size: .85rem; }
+.encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: var(--space-2) .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); font-size: .85rem; }
 /* Center the transient overlays over the MAP area, not the whole stage — when the tracker is docked
    into the stage, half the width is the dock, so a plain 50% would sit over the initiative list. */
 .encounter-map-stage.has-dock-left .encounter-target-bar { left: calc(50% + var(--dock-side-width) / 2); }
@@ -348,26 +348,26 @@
 /* The menu scrolls itself when the viewport cannot hold it (§7); `.scroll-y` in the markup carries the
    overflow, and the inline max-height is measured against the live viewport. overscroll-behavior so a
    flick past its end does not chain to the locked page behind it. */
-.token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
-.token-context-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); overscroll-behavior: contain; }
+.token-context-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .token-context-head strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The close is the shared IconButton now (SVG, not a "✕" character), so this only quiets it into the
    header: no fill, no border, and it keeps the primitive's 44px `.tap-target` area. */
 .token-context-head .nh-iconbtn { flex: none; background: transparent; border-color: transparent; }
 .token-context-head .nh-iconbtn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .token-context-hp { display: flex; gap: .3rem; }
-.token-context-hp input { width: 3.4rem; margin: 0; padding: .5rem; text-align: center; }
+.token-context-hp input { width: 3.4rem; margin: 0; padding: var(--space-2); text-align: center; }
 .token-context-hp button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .token-context-hp button { flex: 1; text-align: center; }
 .token-context-item { text-align: left; }
 .token-context-hp button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* Fixed label column so the Size / Health / Show-to selects all share one width and left edge. */
-.token-context-size { display: grid; grid-template-columns: 4rem 1fr; align-items: center; gap: .5rem; color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
-.token-context-size select { width: 100%; margin: 0; padding: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
+.token-context-size { display: grid; grid-template-columns: 4rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+.token-context-size select { width: 100%; margin: 0; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
 .token-context-item[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); }
 /* Conditions collapse into a Size-styled disclosure (native <details>) under the Health dropdown. */
 .token-context-conditions { display: grid; gap: .3rem; margin-top: .1rem; }
-.token-context-conditions-summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; list-style: none; }
+.token-context-conditions-summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; list-style: none; }
 .token-context-conditions-summary::-webkit-details-marker { display: none; }
 .token-context-conditions-summary::after { content: "▾"; color: var(--text-muted); }
 .token-context-conditions[open] .token-context-conditions-summary::after { content: "▴"; }
@@ -414,6 +414,6 @@
      dropping a token: the stage stayed 224px while the message was up). It keeps its `role="status"`,
      which is why this is a fold and not a `display: none`; floating it over the stage was the other
      candidate and would land on the compact toolbar's own bottom-left corner. */
-  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback { min-height: 0; margin: .25rem 0 0; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback { min-height: 0; margin: var(--space-1) 0 0; }
   .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty { display: none; }
 }
