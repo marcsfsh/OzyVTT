@@ -233,14 +233,24 @@ export const sorcerer: ClassMechanicsModule = {
        * own typed entry - one addition per resolve, which is the printed "one damage roll of that
        * spell".
        *
-       * THE GATE IS `damage-type-is` AND NOT "a spell", and that is a knowing widening. Nothing in
-       * the engine ever announces `attack-kind-is: ["spell"]` - `attackKindsOf` derives melee, ranged,
-       * thrown, unarmed and reaction, and no producer sets "spell" - so a spell filter would fail
-       * closed and this rider would ship inert, which is the exact failure `2e` is the name for. What
-       * lands instead fires on any damage roll of the chosen type, which on a Sorcerer's sheet is a
-       * spell in every ordinary case (the class's own starting kit is a spear and a dagger, both
-       * Piercing). Over-applying to a hypothetical Flame Tongue is the smaller error by a wide
-       * margin, and it is visible on the roll card, which an inert rider never is.
+       * THE GATE IS `damage-type-is` AND NOT "a spell", and that is a knowing choice with a known
+       * edge. Nothing in the engine ever announces `attack-kind-is: ["spell"]` - `attackKindsOf`
+       * derives melee, ranged, thrown, unarmed and reaction, and no producer sets "spell" - so a
+       * spell filter would fail closed and this rider would ship inert, which is the exact failure
+       * `2e` is the name for.
+       *
+       * WHERE IT REACHES, stated exactly, because the code is the truth here and a comment that
+       * claimed more would be the defect: `action-resolution.ts` populates `damageTypes` on the
+       * RiderContext only for an action with an `attack` block against a single target. So this
+       * fires for an attack-roll spell (Fire Bolt, Chromatic Orb) and NOT for a save-only one
+       * (Fireball, Burning Hands), whose resolve carries no damage types to filter on. That is
+       * under-application, which is the safe direction, and the test pins the boundary so the day
+       * that context is widened someone sees this record light up rather than discovering it by
+       * accident. The alternative - no rider at all - reaches nothing.
+       *
+       * Over-applying to a hypothetical Flame Tongue is the remaining error and it is the smaller
+       * one by a wide margin: the class's own starting kit is a spear and a dagger, both Piercing,
+       * and the addition is visible on the roll card, which an inert rider never is.
        */
       "elemental-affinity": {
         choice: {
