@@ -1474,6 +1474,10 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
     wears the chrome-tier scanline, and the dock's inner edge wears the horizon's own rule. *(The
     dock's half was invisible as first shipped — the resize grip painted over it; see the correction
     entry below.)*
+    > **SUPERSEDED IN PART, 2026-08-06 (round 2, ruling 22)** — see the entry below. The table now
+    > takes the horizon behind its CHROME; the ban survives, narrowed to the map stage. The
+    > sentence above forbidding a later "fix" was aimed at an agent reconciling the guide, not at
+    > the client — the client reversed it.
   - **The sky is generalized FROM the landing, never shared WITH it.** New `--sky-*` tokens and a
     `.pane-sky` layer; the `--landing-*` block and the landing's own rules are untouched (the entry
     animation is a concurrent lane). Three departures make it a work screen: the horizon is a fixed
@@ -1534,3 +1538,35 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
     clears **AA-large only** in daybreak (valid at wordmark scale, nowhere smaller), and the light
     `--danger` destructive label is under AA with or without the scene (known-bugs, with the sky's
     −0.14 recorded so the token fix is sized against the composited value).
+- **2026-08-06 — REVERSAL IN PART: the table takes the horizon behind its CHROME, and the map stage
+  stays a clean dark plate.** Round 2, ruling 22, client's words: *"Sky behind the chrome, never the
+  map."* This reverses the no-sky half of the 2026-08-04 entry above — which was flagged at the time
+  as a director ruling an agent "must not 'fix' later", so it is reversed **by the client, on the
+  record, with a date**, and that sub-bullet now carries a superseded marker pointing here. Anyone
+  who reads only the old entry and starts stripping the sky is reverting a live ruling.
+  - **The reason survives; only its scope changes.** "A horizon behind a battle map competes with
+    the map, and the map is the canvas" was right and is still the rule — it is now a SCOPING rule
+    rather than a ban. The dock, the sheet and the margins get the horizon. Nothing paints behind
+    the map, and the mechanism is structural rather than a z-order convention: the stage is opaque
+    `--void` (`apps/client/src/scene/encounter-map.css`) and the column around it was demoted from
+    an opaque `--surface-1` panel to a margin, so there is no slab left to paint on.
+  - **It is the horizon WITHOUT the floor mesh, and that was forced, not chosen.** The sky is
+    painted as background layers on `.table-layout` (`apps/client/src/styles.css`) — wash, horizon
+    beam, its glow, the bloom — because `.table-layout` has `position: fixed` descendants (the
+    enlarged map, the viewer preview, the drawer) and therefore may never take `transform`,
+    `filter`, `perspective`, `contain: paint` or `will-change`. The scene tier's receding grid floor
+    is the one layer that needs a `perspective`, so the table cannot have it. Losing a perspective
+    grid under a battle grid is a gain.
+  - **`background-attachment` stays `scroll`, and the name is a lie.** The background is fixed to
+    the element's own box and does not travel with its contents — which is what this needs, because
+    below the rung where `.table-layout` really does scroll, the horizon has to stay at the bottom
+    of the frame rather than sliding out of it.
+  - Ruling 21 — chrome metal (`.sign`) on hero surfaces — is the other partial reversal round 2
+    settled, and it needs **no** entry here: measured at the end of round 2, `.sign` has exactly one
+    call site in the repo (the style guide) and was never applied to a hero surface. There is
+    nothing to reverse. Its own wording is permissive ("hero surfaces **may** use it"), so leaving
+    it unbuilt is not a violation. The bar barring it from panel headers stands unchanged.
+  - Full round-2 ruling set: `docs/product/refresh-round-2-decisions.md`. That document is the
+    primary source for round 2 and quotes the client directly; this entry exists so the two
+    reversals are discoverable from the log an agent actually reads before changing something
+    architectural.
