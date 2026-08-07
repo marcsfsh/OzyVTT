@@ -459,6 +459,27 @@ Both halves are in scope:
 This is the largest single body of work in the PR. `2a`, `2b`, `2e`, `2d` and `3b` are all
 downstream of it.
 
+> **Correction, 2026-08-07 (intake).** This section originally claimed *"the gap has never been
+> missing text; it is that the text was never translated into mechanical riders."* **That was wrong**,
+> and the error came from the 2026-08-07 recon. Measured at HEAD: **149 of 185 class features carry
+> the literal stub string** `"See the <Class> class description in SRD 5.2.1."` — Monk 23/23,
+> Barbarian 20/20, Rogue 19/19, Ranger 18/18, Paladin 18/18, Druid 14/14, Warlock 13/13, Bard 13/13,
+> Sorcerer 11/11. Cleric, Fighter and Wizard are exempt because they are `HAND_AUTHORED` and skipped
+> by the ETL.
+>
+> The prose is **not** missing — it is dropped by a slug mismatch in the bundle build.
+> `featureProse` (`packages/content-srd-5.2.1/scripts/build-class-bundle.ts:133-146`) slugs the whole
+> markdown heading, so `#### Level 1: Rage` becomes `level-1-rage`; the lookup asks for the level
+> table's feature id, `rage`, misses, and falls through to the stub at `:557`. The subclass parser
+> already gets this right by stripping `Level N:` first (`LEVEL_HEADING`, `:621`).
+>
+> **Consequence for the plan: `2a` splits in two.** Half of it is a **bug fix, size S** — key each
+> heading under both slugs, regenerate `classes.v1.json`, and add a build assertion that no emitted
+> description matches `/^See the .* in SRD 5\.2\.1\.$/` so the stub can never ship again. That alone
+> closes `2a`'s observed symptom for all 149 features. The other half is the mechanical authoring
+> below, which remains XL. Ship the prose fix first: it is the cheapest visible win in the PR and it
+> makes the authoring reviewable, because an author can read the SRD text beside the record.
+
 **Reference material — the client has approved `foundryvtt/dnd5e` as an aid.**
 Verified 2026-08-07: that repository is **MIT licensed** (Copyright 2021 Andrew Clayton). Commercial
 use, modification and redistribution are permitted; the copyright notice and licence text must
@@ -466,8 +487,8 @@ travel with any substantial portion used. Its `LICENSE.txt` carries no separate 
 
 **How to use it, and how not to.** The rules *text* for every missing feature is **already vendored
 here** — `bundles/attribution.json` records `dnd-5e-srd-markdown` as covering *"classes, subclasses,
-class spell lists, species, backgrounds, feats."* The gap has never been missing text; it is that
-the text was never translated into mechanical riders. So:
+class spell lists, species, backgrounds, feats,"* and `sources/dnd-5e-srd-markdown/classes.md` is
+298 KB of real prose. So:
 
 - **Use Foundry as a modelling reference** — how to represent Rage, Sneak Attack, Ki or an
   Invocation *as data*: which fields, what shape, where the edges are. That is where it is genuinely
