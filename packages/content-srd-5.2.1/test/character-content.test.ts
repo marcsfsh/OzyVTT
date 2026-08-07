@@ -709,6 +709,76 @@ describe("character-builder content records", () => {
   });
 });
 
+/**
+ * `2a` - every class presents its actual features. The observed symptom was Warlock's class step
+ * reading "See the warlock class description in SRD 5.2.1."; the cause was a slug mismatch in the
+ * ETL (`scripts/build-class-bundle.ts`, `featureProse`), which keyed `#### Level 1: Rage` under
+ * `level-1-rage` while the level table asked for `rage`. **149 of 185** class features shipped the
+ * stub - Monk 23/23, Barbarian 20/20, Rogue 19/19, Ranger 18/18, Paladin 18/18, Druid 14/14,
+ * Warlock 13/13, Bard 13/13, Sorcerer 11/11 - and the prose was in the bundle source the whole time.
+ *
+ * The build now REFUSES to write a bundle containing one. This is the read-side half of that bar:
+ * the build guards regeneration, this guards the committed artefact, and the two fail independently.
+ */
+describe("2a - no class or subclass feature falls back to a pointer at an external document", () => {
+  const STUB = /^See the .* in SRD 5\.2\.1\.$/;
+  const classes = loadClasses();
+  const subclasses = loadSubclasses();
+
+  it("has zero stub descriptions across every class and subclass feature", () => {
+    const offenders = [
+      ...classes.flatMap((record) => record.features.filter((f) => STUB.test(f.description)).map((f) => `${record.id}.${f.id}`)),
+      ...subclasses.flatMap((record) => record.features.filter((f) => STUB.test(f.description)).map((f) => `${record.id}.${f.id}`))
+    ];
+    expect(offenders, `these features carry the SRD-pointer stub instead of prose:\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+
+  it("gives every feature real prose, not a placeholder", () => {
+    // The floor is 40, not 60: `paladin.aura-expansion` is 51 characters and is the SRD's COMPLETE
+    // printed text ("Your Aura of Protection is now a 30-foot Emanation."). A 60-character bar would
+    // have failed on correct content, which is the wrong kind of test.
+    for (const record of [...classes, ...subclasses]) {
+      for (const feature of record.features) {
+        expect(feature.description.length, `${record.id}.${feature.id} is ${feature.description.length} chars: "${feature.description}"`)
+          .toBeGreaterThanOrEqual(40);
+      }
+    }
+  });
+
+  it("recovers the specific prose the report named, for the nine ETL-generated classes", () => {
+    const proseOf = (classId: string, featureId: string) =>
+      classes.find((record) => record.id === classId)!.features.find((feature) => feature.id === featureId)!.description;
+    expect(proseOf("warlock", "pact-magic")).toContain("you have formed a pact with a mysterious entity");
+    expect(proseOf("warlock", "eldritch-invocations")).toContain("pieces of forbidden knowledge");
+    expect(proseOf("barbarian", "rage")).toContain("a primal power called Rage");
+    expect(proseOf("monk", "martial-arts")).toContain("Unarmed Strike");
+    expect(proseOf("rogue", "sneak-attack")).toContain("Sneak Attack");
+    // Negative control: the three HAND_AUTHORED classes are skipped by the ETL and must be untouched.
+    expect(proseOf("cleric", "channel-divinity")).toContain("Channel Divinity");
+    expect(proseOf("wizard", "arcane-recovery")).toContain("regain some of your magical energy by studying your spellbook");
+  });
+
+  it("keys one printed heading onto the whole family the level table splits it into", () => {
+    // Warlock's table grants four Mystic Arcanum slots (levels 11/13/15/17) under ONE heading.
+    const warlock = classes.find((record) => record.id === "warlock")!;
+    const arcana = warlock.features.filter((feature) => feature.id.startsWith("mystic-arcanum-"));
+    expect(arcana.map((feature) => feature.level)).toEqual([11, 13, 15, 17]);
+    for (const feature of arcana) expect(feature.description).toContain("a magical secret called an arcanum");
+  });
+
+  it('drops the table\'s "Subclass feature" reminder rows, as the hand-authored three already do', () => {
+    // It is not a class feature: the SRD prints no heading for it, so it can carry no prose, and the
+    // real feature is on the subclass record. Cleric's empty levels 6 and 17 are the oracle.
+    for (const record of classes) {
+      expect(record.features.map((feature) => feature.id), record.id).not.toContain("subclass-feature");
+      for (const row of record.levelTable) expect(row.features, `${record.id} L${row.level}`).not.toContain("subclass-feature");
+    }
+    const barbarian = classes.find((record) => record.id === "barbarian")!;
+    expect(barbarian.levelTable[5].features).toEqual([]); // level 6 printed "Subclass feature" alone
+  });
+});
+
+
 describe("content-record schema guards", () => {
   const fighter = loadClasses().find((entry) => entry.id === "fighter")!;
 

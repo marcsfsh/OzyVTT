@@ -44,6 +44,9 @@ const strip = (value: string) =>
 const slug = (value: string) =>
   strip(value).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+/** `#### Level 7: Remarkable Athlete` -> [, level, name]. Read by BOTH the class and subclass parsers. */
+const LEVEL_HEADING = /^Level (\d+):\s*(.+)$/;
+
 /** A dash-only table cell means "nothing at this level" in the printed tables. */
 const blank = (cell: string) => {
   const v = strip(cell);
@@ -129,7 +132,20 @@ function optionSection(body: string, heading: string) {
   return options;
 }
 
-/** Feature prose keyed by slug, from the `###`/`####` headings that follow the tables. */
+/**
+ * Feature prose keyed by slug, from the `###`/`####` headings that follow the tables.
+ *
+ * Keyed under BOTH the raw heading slug and the `Level N:`-stripped one. The source prints
+ * `#### Level 1: Rage`, which slugs to `level-1-rage`, while the level TABLE names the feature
+ * `rage` - so every generated class asked for `rage`, missed, and fell through to the
+ * "See the <Class> class description in SRD 5.2.1." stub. 149 of 185 class features shipped that
+ * way: Monk 23/23, Barbarian 20/20, Rogue 19/19, Ranger 18/18, Paladin 18/18, Druid 14/14,
+ * Warlock 13/13, Bard 13/13, Sorcerer 11/11. The prose was never missing; the key was wrong.
+ * The subclass parser has always stripped the prefix first (`LEVEL_HEADING`).
+ *
+ * Both keys are kept rather than only the stripped one, because a heading with no `Level N:`
+ * prefix must still resolve, and because a class's own prose may reference either form.
+ */
 function featureProse(body: string): Map<string, string> {
   const out = new Map<string, string>();
   const parts = body.split(/^#{3,4} (.+)$/m);
@@ -140,9 +156,35 @@ function featureProse(body: string): Map<string, string> {
       .replace(/<table>[\s\S]*?<\/table>/g, " ")
       .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
       .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
-    if (text) out.set(slug(heading), text);
+    if (!text) continue;
+    const bare = heading.match(LEVEL_HEADING)?.[2];
+    // First write wins: the source prints "Level 4: Ability Score Improvement" at 4, 8, 12, 16 and
+    // 19 with identical bodies, and the bare key must not end up holding the last copy's stray text.
+    for (const key of [slug(heading), ...(bare ? [slug(bare)] : [])]) {
+      if (!out.has(key)) out.set(key, text);
+    }
   }
   return out;
+}
+
+/**
+ * The last resort before the stub: the LONGEST heading slug that is a hyphen-boundary prefix of the
+ * feature id.
+ *
+ * One printed heading can name a family the level table then splits. Warlock's table grants
+ * "Mystic Arcanum (level 6 spell)" at 11 and again at 13/15/17 for levels 7/8/9 - four feature ids -
+ * under the single heading `#### Level 11: Mystic Arcanum`, whose own body says so ("as shown in the
+ * Warlock Features table"). Prefixing at a hyphen boundary keeps this from over-matching: nothing
+ * resolves unless a whole leading segment sequence matches, so `brutal-strike` cannot claim
+ * `improved-brutal-strike`.
+ */
+function proseByPrefix(prose: Map<string, string>, featureId: string): string | undefined {
+  let best: string | undefined;
+  for (const key of prose.keys()) {
+    if (!featureId.startsWith(`${key}-`)) continue;
+    if (best === undefined || key.length > best.length) best = key;
+  }
+  return best === undefined ? undefined : prose.get(best);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -524,8 +566,14 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
     });
     // The features column is positional: always index 2 in every printed class table. A level that
     // grants nothing prints an em dash, which slugs to "" - drop those rather than emit a blank id.
+    //
+    // "Subclass feature" is dropped too. It is the table's REMINDER that the chosen subclass grants
+    // something at this level, not a class feature: the SRD prints no heading for it, so it can have
+    // no prose, and the real feature lives on the subclass record. All three hand-authored classes
+    // already omit it - `character-content.test.ts` pins Cleric's levels 6 and 17 as EMPTY rows - so
+    // the nine generated classes carrying a prose-less `subclass-feature` trait were the outlier.
     const named = strip(cells[2] ?? "").split(",").map((part) => part.trim()).filter(Boolean);
-    row.features = named.map((label) => slug(label)).filter(Boolean);
+    row.features = named.map((label) => slug(label)).filter((id) => id && id !== "subclass-feature");
     for (const id of row.features as string[]) featureIds.set(id, (featureIds.get(id) ?? row.level) as number);
     if (sawSlot && slots.some((count) => count > 0)) row.spellSlots = slots;
     if (pact) row.pactSlots = pact;
@@ -554,6 +602,7 @@ for (const [id, entry] of parsed) {
   const features = [...featureIds].map(([featureId, level]) => {
     const description = entry.prose.get(featureId)
       ?? entry.prose.get(featureId.replace(new RegExp(`^${id}-`), ""))
+      ?? proseByPrefix(entry.prose, featureId)
       ?? `See the ${entry.name} class description in SRD 5.2.1.`;
     const configured = config.choices?.[featureId];
     const choice = configured?.optionsFrom
@@ -616,9 +665,6 @@ if (unresolvedItems.length) {
 // ---------------------------------------------------------------------------------------------
 // Subclasses
 // ---------------------------------------------------------------------------------------------
-
-/** `#### Level 7: Remarkable Athlete` -> { level, name }. */
-const LEVEL_HEADING = /^Level (\d+):\s*(.+)$/;
 
 /**
  * Bundle features that deliberately have no counterpart heading in the source, and why.
@@ -777,6 +823,31 @@ const classesOut = z.array(ClassReferenceSchema).safeParse(allClasses);
 if (!classesOut.success) fail("classes", classesOut.error);
 const subclassesOut = z.array(SubclassReferenceSchema).safeParse(allSubclasses);
 if (!subclassesOut.success) fail("subclasses", subclassesOut.error);
+
+/**
+ * THE STUB CAN NEVER SHIP AGAIN.
+ *
+ * `featureProse`'s fallback is a pointer at a document the player does not have, and for a year it
+ * was the description of 149 of 185 class features because of a single slug mismatch - a silent
+ * degradation that looked like missing content and was actually a missing key. A build that emits
+ * even one of these has lost prose it was holding, so it fails here rather than writing the bundle.
+ * If a feature genuinely has no printed text, give it real text; do not re-add a fallback.
+ */
+const STUB_DESCRIPTION = /^See the .* in SRD 5\.2\.1\.$/;
+const stubs = [
+  ...allClasses.flatMap((record) => (record as ClassReference).features
+    .filter((feature) => STUB_DESCRIPTION.test(feature.description))
+    .map((feature) => `${(record as ClassReference).id}.${feature.id}`)),
+  ...allSubclasses.flatMap((record) => ((record as { id: string; features: { id: string; description: string }[] }).features ?? [])
+    .filter((feature) => STUB_DESCRIPTION.test(feature.description))
+    .map((feature) => `${(record as { id: string }).id}.${feature.id}`))
+];
+if (stubs.length) {
+  console.error(`\n${stubs.length} emitted feature description(s) are the "See the ... in SRD 5.2.1." STUB, not real prose:`);
+  for (const line of stubs.slice(0, 40)) console.error(`  ${line}`);
+  console.error("A stub means featureProse could not key the heading. Fix the keying (see featureProse); do not lower this bar.");
+  process.exit(1);
+}
 
 writeFileSync(join(bundles, "classes.v1.json"), `${JSON.stringify(allClasses, null, 1)}\n`);
 writeFileSync(join(bundles, "subclasses.v1.json"), `${JSON.stringify(allSubclasses, null, 1)}\n`);

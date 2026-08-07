@@ -99,6 +99,65 @@ function emptyState(): GameState {
   return GameStateSchema.parse({ schemaVersion: 1 });
 }
 
+/**
+ * `2a`, at the far end of the pipe the report described. The observed symptom was a Warlock's class
+ * step showing only "See the warlock class description in SRD 5.2.1."; the cause was a slug mismatch
+ * in the class ETL, and 149 of 185 class features shipped that stub. The bundle-side guards live in
+ * `packages/content-srd-5.2.1` (a build-time refusal plus a read-side check). This is the BUILDER
+ * half: the prose has to survive `interpretFeature` into the definition the sheet actually renders.
+ */
+const warlockInput = (): MutableCreateInput => ({
+  name: "Vex",
+  speciesId: "human",
+  backgroundId: "acolyte",
+  classId: "warlock",
+  level: 5,
+  subclassId: "fiend-patron",
+  abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
+    { level: 1, classId: "warlock", kind: "skill", id: "deception" },
+    { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+    { level: 1, classId: "warlock", kind: "eldritch-invocation", id: "agonizing-blast", payload: { featureId: "eldritch-invocations" } },
+    { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
+    { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
+    { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
+    { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "equipment", id: "warlock-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ]
+});
+
+describe("2a - a built Warlock carries the SRD's real feature prose, not a pointer at the SRD", () => {
+  const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
+  const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string; description: string }> }).traits;
+  const traitNamed = (name: string) => traits.find((trait) => trait.name === name);
+
+  it("lands Pact Magic, Eldritch Invocations and Magical Cunning as readable prose", () => {
+    expect(traitNamed("Pact Magic")?.description).toContain("you have formed a pact with a mysterious entity");
+    expect(traitNamed("Eldritch Invocations")?.description).toContain("pieces of forbidden knowledge");
+    expect(traitNamed("Magical Cunning")?.description).toContain("you regain expended Pact Magic spell slots");
+  });
+
+  it("carries no trait whose description is the SRD-pointer stub", () => {
+    const stubbed = traits.filter((trait) => /^See the .* in SRD 5\.2\.1\.$/.test(trait.description)).map((trait) => trait.name);
+    expect(stubbed, `these traits reached the sheet as a pointer instead of prose: ${stubbed.join(", ")}`).toEqual([]);
+  });
+
+  it("does not offer a prose-less \"Subclass Feature\" trait at levels the subclass fills", () => {
+    // The printed table's "Subclass feature" cell is a reminder, not a class feature - it has no
+    // heading and so no text. It used to reach the sheet as a trait reading only the stub.
+    expect(traits.map((trait) => trait.name)).not.toContain("Subclass Feature");
+  });
+});
+
+
 describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () => {
   const definition = buildCharacterDefinition(fighterInput(), library, defaultPolicy);
 
