@@ -26,7 +26,14 @@ const definitionOf = (name: string, className: string, level: number, secret: st
   source: { name: "test", version: "1" },
   name, size: "medium", armorClass: 14, proficiencyBonus: 3, initiativeBonus: 0, speedFeet: 30,
   abilityScores: { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 8 },
-  hitPoints: { maximum: 30 }, actions: [], extensions: {}, token: { disposition: "friendly" },
+  hitPoints: { maximum: 30 }, extensions: {}, token: { disposition: "friendly" },
+  // Two actions sharing ONE pool plus a solo one, so the derived `pools` list has something with a
+  // real shape to assert: the shared ceiling is the MAX over its members, not the first one printed.
+  actions: [
+    { id: "divine-spark", name: "Channel Divinity: Divine Spark", activation: "action", description: "A surge of divine energy.", uses: { limit: 2, per: "short-rest", pool: "channel-divinity" } },
+    { id: "preserve-life", name: "Channel Divinity: Preserve Life", activation: "action", description: "You restore the wounded.", uses: { limit: 1, per: "short-rest", pool: "channel-divinity" } },
+    { id: "second-wind", name: "Second Wind", activation: "bonus-action", description: "You catch your breath.", uses: { limit: 3, per: "short-rest" } }
+  ],
   character: { classes: [{ id: className.toLowerCase(), name: className, level }], feats: [], background: { id: "sage", name: secret } }
 });
 
@@ -60,7 +67,7 @@ function tableAt(partyVisibility: PartyVisibility): GameState {
 const viewAt = (tier: PartyVisibility) => projectPlayerView(tableAt(tier), ME, () => null);
 const actorIn = (tier: PartyVisibility, id: string) => viewAt(tier).actors.find((actor) => actor.id === id);
 
-const RESOURCES = ["actionUses", "hitDice", "spellSlots", "pactSlots", "preparedSpellIds", "inventory", "currency"] as const;
+const RESOURCES = ["actionUses", "pools", "hitDice", "spellSlots", "pactSlots", "preparedSpellIds", "inventory", "currency"] as const;
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
 describe("party visibility — the tier is enforced in projectPlayerView, never client-side", () => {
@@ -179,5 +186,60 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
     state.definitions = state.definitions.filter((entry) => entry.id !== "import-theirs");
     const theirs = projectPlayerView(state, ME, () => null).actors.find((actor) => actor.id === THEIRS)!;
     expect("classLine" in theirs).toBe(false);
+  });
+});
+
+/**
+ * **The pools projection (`3b`'s binding surface) — what the spent counts are OUT OF.**
+ *
+ * `actionUses` has always been a bare `Record<string, number>` of SPENT counts with nothing on the
+ * wire naming the pools or their ceilings, so a client could render "1" and had no way to know
+ * whether that was one of two or one of five. `pools` is that missing half.
+ *
+ * It adds NO state: it is a pure function of the definition's own actions, computed at projection
+ * time, so there is nothing to store, migrate, or keep in sync with the counters.
+ */
+describe("pools — the shape a resource tracker binds to", () => {
+  it("names every pool, keyed by the exact actionUses key, with the ceiling the engine enforces", () => {
+    const mine = actorIn("sheet-and-resources", MINE)!;
+    expect(mine.pools).toEqual([
+      // The SHARED pool: keyed on `uses.pool`, ceiling 2 (the max over its members, not Preserve
+      // Life's printed 1), and named from the slug because no action is itself called that.
+      { id: "channel-divinity", name: "Channel Divinity", limit: 2, per: "short-rest" },
+      // The SOLO pool: keyed on the action id, and named from the action that owns it.
+      { id: "second-wind", name: "Second Wind", limit: 3, per: "short-rest" }
+    ]);
+  });
+
+  it("uses the same keys actionUses is indexed by, so a tracker can join the two", () => {
+    // The whole point of the field. If these two namespaces could drift, the tracker would show a
+    // ceiling for one resource beside a spent count for another and never say so.
+    const mine = actorIn("sheet-and-resources", MINE)!;
+    for (const key of Object.keys(mine.actionUses!)) {
+      expect(mine.pools!.some((pool) => pool.id === key), `actionUses key "${key}" has no pool entry`).toBe(true);
+    }
+    expect(mine.actionUses).toEqual({ "second-wind": 1 });
+  });
+
+  it("reaches a player under the SAME gate as actionUses, and no wider", () => {
+    // Viewer safety, stated as the assertion rather than the comment: `pools` is derived from
+    // `definition.actions[].uses`, and the definition itself already ships one tier LOWER
+    // (`full-sheet`). So the tier at which pools appears can never be the tier at which a limit
+    // first becomes knowable - it is strictly later.
+    for (const tier of TIERS) {
+      const theirs = actorIn(tier, THEIRS)!;
+      expect("pools" in theirs, `pools at ${tier}`).toBe(tier === "sheet-and-resources");
+      expect("pools" in theirs).toBe("actionUses" in theirs);
+      // Where the sheet IS visible, every ceiling pools would report is already readable off it.
+      if ("definition" in theirs) {
+        expect(theirs.definition!.actions.map((action) => action.uses?.limit)).toEqual([2, 1, 3]);
+      }
+    }
+  });
+
+  it("is absent on a monster and on an unclaimed character, which carry no sheet at all", () => {
+    const view = viewAt("sheet-and-resources");
+    expect("pools" in view.actors.find((actor) => actor.id === GOBLIN)!).toBe(false);
+    expect("pools" in view.actors.find((actor) => actor.id === FREE)!).toBe(false);
   });
 });

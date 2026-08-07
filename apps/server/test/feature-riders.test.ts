@@ -106,6 +106,8 @@ type Homebrew = Readonly<{
   /** Adds an epic-boon-shaped ability-score CHOICE to the class: a number is its `maximum`, `false` authors none. */
   boon?: number | false;
   method?: string;
+  /** Which printed column `rift-channel` scales off - the dice column and a missing id are the negative controls. */
+  chargeId?: string;
   /** The background spread, when the default STR/CON one is not the ability under test. */
   spread?: ReadonlyArray<{ ability: string; amount: number }>;
 }>;
@@ -125,7 +127,13 @@ function classFor(brew: Homebrew) {
   const levelTable = Array.from({ length: 20 }, (_, index) => ({
     level: index + 1,
     proficiencyBonus: 2 + Math.floor(index / 4),
-    features: index === 0 ? ["rift-attunement", "rift-focus", "rift-surge", ...(brew.boon === undefined ? [] : ["rift-apotheosis"])] : []
+    features: index === 0 ? ["rift-attunement", "rift-focus", "rift-surge", "rift-channel", ...(brew.boon === undefined ? [] : ["rift-apotheosis"])] : [],
+    // The PRINTED column, stepping 2/2/3/3/4... - exactly the shape `scaling: {type:
+    // "class-resource"}` exists to read without re-typing it into a `by-level` table.
+    classResources: [
+      { id: "rift-charge", name: "Rift Charges", amount: 2 + Math.floor(index / 2), display: true },
+      { id: "rift-dice", name: "Rift Dice", amount: `${1 + Math.floor(index / 4)}d6`, display: true }
+    ]
   }));
   return ClassReferenceSchema.parse({
     id: "hb-riftwarden", name: "Riftwarden", source: "homebrew", summary: "A homebrew class.",
@@ -167,6 +175,15 @@ function classFor(brew: Homebrew) {
           id: "rift-surge", name: "Rift Surge", activation: "bonus-action",
           description: "You surge with rift energy and regain your footing.",
           uses: { limit: 3, per: "short-rest" }
+        }]
+      },
+      {
+        id: "rift-channel", name: "Rift Channel", level: 1,
+        description: "You spend rift charges, as many as your class table prints.",
+        uses: { scaling: { type: "class-resource", id: brew.chargeId ?? "rift-charge" }, per: "long-rest" },
+        actions: [{
+          id: "rift-channel", name: "Rift Channel", activation: "action",
+          description: "You channel the rift."
         }]
       }
     ]
@@ -277,6 +294,7 @@ describe("the builder records every granted feature by id and provenance", () =>
       { id: "rift-attunement", kind: "class", sourceId: "hb-riftwarden" },
       { id: "rift-focus", kind: "class", sourceId: "hb-riftwarden" },
       { id: "rift-surge", kind: "class", sourceId: "hb-riftwarden" },
+      { id: "rift-channel", kind: "class", sourceId: "hb-riftwarden" },
       { id: "rift-breaking", kind: "subclass", sourceId: "hb-riftbreaker" },
       { id: "rift-sense", kind: "species", sourceId: "hb-riftborn" },
       { id: "rift-heritage", kind: "species", sourceId: "hb-riftborn" },
@@ -775,5 +793,54 @@ describe("an ability-score choice raises past 20 when it says so", () => {
     // Standard array STR 15 + background 2 = 17, and the boon's +1 makes 18 whatever the ceiling is.
     expect(build({ boon: 30 }).definition.abilityScores.str).toBe(18);
     expect(build({ boon: false }).definition.abilityScores.str).toBe(18);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// `scaling: {type: "class-resource"}` - the printed column IS the number
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * The fourth way 5e scales a feature's uses, and the one the other three could not say.
+ *
+ * Rage, Bardic Inspiration and Channel Divinity step on a schedule that is neither the proficiency
+ * bonus nor an ability modifier, and the schedule is already printed on the class table. Re-typing
+ * it into a `by-level` table beside the column it duplicates is the second copy that drifts.
+ *
+ * Nothing here builds a new pool system: the resolved number lands on the SAME `uses.limit` the
+ * engine already gates, spends and re-arms - see the Rift Surge tests above.
+ */
+describe("a feature scales its uses off the class table's printed column", () => {
+  it("resolves the level-5 printed amount onto the action's real use limit", () => {
+    // The column prints 2 + floor((level-1)/2): at level 5 that is 4.
+    const built = build();
+    expect(actionOf(built, "rift-channel").uses).toEqual({ limit: 4, per: "long-rest" });
+  });
+
+  it("is SPENDABLE up to that limit and refuses the use past it", () => {
+    // The point of resolving it at all: this is the live `actionUses` counter, not a display number.
+    const built = fight(build());
+    built.hero.actionUses = { "rift-channel": 3 };
+    resolveDefinitionAction(built.state, actionOf(built, "rift-channel"), { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000060" }, deps(built, []));
+    expect(built.hero.actionUses["rift-channel"]).toBe(4);
+    expect(() => resolveDefinitionAction(built.state, actionOf(built, "rift-channel"), { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000061" }, deps(built, []))).toThrow();
+    expect(built.hero.actionUses["rift-channel"]).toBe(4); // the refusal spent nothing
+  });
+
+  it("and a `resource-bonus` rider still raises it, because it is the ordinary pool", () => {
+    const built = build({ on: "species", modifiers: [{ type: "resource-bonus", poolId: "rift-channel", amount: 1 }] });
+    expect(actionOf(built, "rift-channel").uses!.limit).toBe(5);
+  });
+
+  it("resolves a DICE column to no uses, because dice are damage and not a count", () => {
+    // "3d6" is Sneak Attack's shape. A feature that scaled its uses off it would otherwise get a
+    // NaN, a crash, or a silently wrong number; it gets the same "no uses" an unmatched row gives.
+    const built = build({ chargeId: "rift-dice" });
+    expect(actionOf(built, "rift-channel").uses).toBeUndefined();
+  });
+
+  it("resolves an id no column prints to no uses, rather than inventing one", () => {
+    const built = build({ chargeId: "no-such-column" });
+    expect(actionOf(built, "rift-channel").uses).toBeUndefined();
   });
 });

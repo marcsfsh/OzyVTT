@@ -4982,10 +4982,11 @@ ONE row of a class's 20-level table. `features` lists the ids granted at that le
 | `spellsKnown` | integer (0–40) | no |  |
 | `preparedFormula` | string | no | The prepared-spell rule as data ("<ability> modifier + <class> level") so a homebrew class prints its own wording |
 | `preparedCount` | integer (0–60) | no |  |
-| `classResources` | object[] | no | Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3) |
+| `classResources` | object[] | no | Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3). A PRINTED COLUMN, not a namespace: the live pool the engine spends is `actor.actionUses[uses.pool ?? action.id]`, and an id here reaches it only by matching a `uses.pool` on the same class. Mark a column that is genuinely only ink with `display: true` |
 | `classResources[].id` | string (pattern) | yes |  |
 | `classResources[].name` | string | yes |  |
 | `classResources[].amount` | integer (0–999) \| string | yes | A count, or a dice string |
+| `classResources[].display` | boolean | no | This column is ink only - no live pool answers to this id, and none is expected to |
 
 ### `HomebrewClassRecord`
 
@@ -5456,7 +5457,7 @@ Uses a feature gets back on a rest, as DATA rather than a formula language. Eith
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `limit` | integer (1–20) | no | A flat count |
-| `scaling` | HomebrewUsesByProficiency \| HomebrewUsesByAbility \| HomebrewUsesByLevel | no | The three ways 5e actually scales a feature's uses. |
+| `scaling` | HomebrewUsesByProficiency \| HomebrewUsesByAbility \| HomebrewUsesByLevel \| HomebrewUsesByClassResource | no | The four ways 5e actually scales a feature's uses. |
 | `per` | `turn` \| `encounter` \| `short-rest` \| `long-rest` | yes |  |
 | `pool` | string (pattern) | no | Shares ONE counter across every feature carrying the same pool id |
 
@@ -6316,6 +6317,15 @@ Uses equal to an ability modifier, floored at `minimum`.
 | `type` | const `"ability-modifier"` | yes |  |
 | `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
 | `minimum` | integer (0–5) | no | Default: `1`. |
+
+### `HomebrewUsesByClassResource`
+
+Read the count straight off THIS class table's printed column, by `classResources.id`. The one the other three cannot say: Rage, Bardic Inspiration and Channel Divinity step on a schedule that is neither the proficiency bonus nor an ability modifier, and re-typing the printed column into a `by-level` table beside the column it duplicates is the second copy that drifts. A resource whose printed amount is a DICE STRING (Sneak Attack "3d6") is damage, not a count of uses, and resolves to no uses at all.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"class-resource"` | yes |  |
+| `id` | string (pattern) | yes |  |
 
 ### `HomebrewUsesByLevel`
 

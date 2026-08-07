@@ -70,7 +70,18 @@ export const FeatureUsesSchema = z.object({
   scaling: z.discriminatedUnion("type", [
     z.object({ type: z.literal("proficiency-bonus") }).strict(),
     z.object({ type: z.literal("ability-modifier"), ability: AbilitySchema, minimum: z.number().int().min(0).max(5).default(1) }).strict(),
-    z.object({ type: z.literal("by-level"), table: z.array(z.object({ level: ContentLevelSchema, limit: z.number().int().min(0).max(99) }).strict()).min(1).max(20) }).strict()
+    z.object({ type: z.literal("by-level"), table: z.array(z.object({ level: ContentLevelSchema, limit: z.number().int().min(0).max(99) }).strict()).min(1).max(20) }).strict(),
+    /**
+     * Read the count straight off the CLASS TABLE's printed column for this level, by
+     * `classResources.id`. The fourth way 5e scales uses, and the one the other three cannot say:
+     * Rage, Bardic Inspiration and Channel Divinity all step on a schedule that is neither the
+     * proficiency bonus nor an ability modifier, and re-typing the printed column into a `by-level`
+     * table beside the printed column it duplicates is exactly the second copy that drifts.
+     *
+     * A resource whose printed amount is a DICE STRING (Sneak Attack "3d6") is not a count of uses
+     * and resolves to 0, which is the same "no uses" a `by-level` table with no matching row gives.
+     */
+    z.object({ type: z.literal("class-resource"), id: ContentIdSchema }).strict()
   ]).optional(),
   per: z.enum(["turn", "encounter", "short-rest", "long-rest"]),
   pool: ContentIdSchema.optional()
@@ -441,10 +452,22 @@ export const ClassLevelRowSchema = z.object({
    */
   preparedFormula: z.string().max(60).optional(),
   preparedCount: z.number().int().min(0).max(60).optional(),
-  /** Named per-level resources; `amount` is a count or a dice string ("3d6" for Sneak Attack). */
+  /**
+   * Named per-level resources; `amount` is a count or a dice string ("3d6" for Sneak Attack).
+   *
+   * THIS IS A PRINTED COLUMN, NOT A NAMESPACE. The live pool the engine spends and re-arms is
+   * `actor.actionUses[uses.pool ?? action.id]`, and these ids reach it only BY CONVENTION: a
+   * `classResources.id` that matches a `uses.pool` on the same class names the same thing, and the
+   * `class-resource` use-scaling reads its amount. `display: true` is the explicit opt-out for a
+   * column that is genuinely only ink - Sneak Attack's dice, the Monk's unarmored movement, a
+   * mastery count - and `class-resource-pools.test.ts` holds every id to one or the other, so a
+   * resource that LOOKS spendable and is wired to nothing cannot ship unannounced.
+   */
   classResources: z.array(z.object({
     id: ContentIdSchema, name: z.string().min(1).max(60),
-    amount: z.union([z.number().int().min(0).max(999), z.string().min(1).max(20)])
+    amount: z.union([z.number().int().min(0).max(999), z.string().min(1).max(20)]),
+    /** This column is ink only - no live pool answers to this id, and none is expected to. */
+    display: z.boolean().optional()
   }).strict()).max(8).default([])
 }).strict();
 export type ClassLevelRow = z.infer<typeof ClassLevelRowSchema>;

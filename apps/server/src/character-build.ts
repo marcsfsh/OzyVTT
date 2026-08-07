@@ -151,6 +151,8 @@ type BuildContext = Readonly<{
   proficiencyBonus: number;
   finalScores: Record<Ability, number>;
   spellcastingAbility: Ability | null;
+  /** The class table's printed row for THIS level - what `scaling: {type: "class-resource"}` reads. */
+  classResources: ClassLevelRow["classResources"];
 }>;
 
 type InterpretedFeatures = {
@@ -243,6 +245,13 @@ function resolvedUseLimit(uses: NonNullable<FeatureRecord["uses"]>, context: Bui
   const scaling = uses.scaling!;
   if (scaling.type === "proficiency-bonus") return context.proficiencyBonus;
   if (scaling.type === "ability-modifier") return Math.max(scaling.minimum, abilityModifier(context.finalScores[scaling.ability]));
+  if (scaling.type === "class-resource") {
+    // The printed column IS the number, read at this character's level - so Rage 3 and Rage 4 need
+    // no `by-level` table beside the table they would be copying. A dice-string amount (Sneak Attack
+    // "3d6") is damage, not a count of uses, and resolves to the same 0 an unmatched row gives.
+    const amount = context.classResources.find((resource) => resource.id === scaling.id)?.amount;
+    return typeof amount === "number" ? amount : 0;
+  }
   const rows = [...scaling.table].filter((row) => row.level <= context.level).sort((left, right) => left.level - right.level);
   return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
@@ -775,7 +784,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // get there because `heldFeatures` below records theirs. Both halves are read by the same
   // `collectRiders` a magic item's riders go through - see `deriveEquipment`.
   const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
-  const context: BuildContext = { level: input.level, proficiencyBonus, finalScores, spellcastingAbility: casting?.ability ?? null };
+  const context: BuildContext = { level: input.level, proficiencyBonus, finalScores, spellcastingAbility: casting?.ability ?? null, classResources: levelRow.classResources };
   const interpreted: InterpretedFeatures = {
     actions: [], traits: [], grantedSkills: [], grantedExpertise: [], grantedTools: [], grantedLanguages: [],
     grantedArmor: [], grantedWeapons: [], grantedSaves: [], damageResistances: [], damageImmunities: [],

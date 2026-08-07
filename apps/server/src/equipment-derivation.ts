@@ -86,7 +86,9 @@ export type RiderUsesLike = Readonly<{
   scaling?:
     | Readonly<{ type: "proficiency-bonus" }>
     | Readonly<{ type: "ability-modifier"; ability: RiderAbility; minimum?: number }>
-    | Readonly<{ type: "by-level"; table: readonly Readonly<{ level: number; limit: number }>[] }>;
+    | Readonly<{ type: "by-level"; table: readonly Readonly<{ level: number; limit: number }>[] }>
+    /** Reads the class table's printed column by `classResources.id`. An ITEM has no class table, so it resolves to nothing here - see `scaledLimit`. */
+    | Readonly<{ type: "class-resource"; id: string }>;
 }>;
 /**
  * A `FeatureAction` as synthesised here.
@@ -715,6 +717,10 @@ function scaledLimit(scaling: RiderUsesLike["scaling"], definition: ActorDefinit
   if (!scaling) return undefined;
   if (scaling.type === "proficiency-bonus") return definition?.proficiencyBonus ?? 0;
   if (scaling.type === "ability-modifier") return Math.max(scaling.minimum ?? 1, scoreModifierOf(definition, scaling.ability));
+  // `class-resource` reads a CLASS TABLE's printed column, which a built definition no longer
+  // carries - the builder resolved it to a flat number at build time, which is the only place the
+  // row exists. An ITEM authored with it therefore grants no uses rather than guessing a count.
+  if (scaling.type === "class-resource") return undefined;
   const level = bearerLevel(definition);
   const rows = [...scaling.table].filter((row) => row.level <= level).sort((left, right) => left.level - right.level);
   return rows.length > 0 ? rows[rows.length - 1].limit : 0;

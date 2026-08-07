@@ -1,4 +1,5 @@
 import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerEffect, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import { actionPools } from "./effective-actions.js";
 import { healthBandOf } from "./hit-points.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
@@ -272,6 +273,17 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         ...(classLine !== null ? { classLine } : {}),
         ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
         ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),
+        // WHAT THOSE SPENT COUNTS ARE OUT OF. `actionUses` has always been a bare map of spent
+        // numbers with nothing on the wire naming the pools or their ceilings, so "3" could not be
+        // rendered as "3 of 5". `pools` is derived from the sheet that is ALREADY being sent (see
+        // `actionPools`) and adds no state.
+        //
+        // VIEWER SAFETY. It is a pure function of `storedSheet.actions[].uses`, and it rides
+        // `resourcesVisible`, which is strictly NARROWER than `sheetVisible` - the gate under which
+        // the whole definition, every `uses.limit` included, already ships. So this can reveal
+        // nothing to a recipient who could not already read it off the definition in the same
+        // payload, and at `off`/`name-and-class` the sheet is never even looked up.
+        ...(resourcesVisible && storedSheet ? { pools: actionPools(storedSheet.actions) } : {}),
         // The pool's `entries` array is copied too - a player projection must never hand out a live
         // reference into GameState (same deep-copy rule as spellSlots/inventory below).
         ...(resourcesVisible && hitDice ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } } : {}),

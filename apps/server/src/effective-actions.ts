@@ -86,3 +86,49 @@ export function criticalThreshold(derivation: EquipmentDerivation, actor: Actor,
   return riders.reduce((lowest, rider) => rider.modifier.type === "critical-range" && rider.modifier.threshold !== undefined
     ? Math.min(lowest, Math.max(15, rider.modifier.threshold)) : lowest, 20);
 }
+
+/**
+ * THE SHEET'S LIMITED-USE POOLS, as one flat list keyed by the counter the engine actually spends.
+ *
+ * `actor.actionUses` is a bare `Record<string, number>` of SPENT counts, and nothing on the wire ever
+ * said what those keys were called or how high they went - so a client could show "3" and had no way
+ * to know whether that was three of three or three of five, or that "channel-divinity" is the pool
+ * two differently-named actions share. This is the missing half, and it is derived rather than
+ * stored: no new state, nothing to migrate, nothing to keep in sync.
+ *
+ * `id` is EXACTLY `uses.pool ?? action.id` - the same key `useLimitFor` gates on, `usesBonus` raises,
+ * `rests.ts` and `encounter.ts` re-arm, and `actionUses` is indexed by. Not a new namespace, and
+ * deliberately not `ClassLevelRow.classResources`, which is a printed column (see its own note).
+ *
+ * `limit` is the max over the members sharing the pool AND the rest scope, which is `useLimitFor`'s
+ * rule restated over the whole list rather than one action at a time: a Cleric 3's Channel Divinity
+ * is 2, not the "1" printed on Preserve Life.
+ *
+ * `name` is the same-id action's when there is one (Second Wind, Action Surge), and otherwise the
+ * slug title-cased - which is what a shared pool's own name always is, because the members are named
+ * after the pool ("Channel Divinity: Turn Undead" shares "channel-divinity").
+ *
+ * TAKES AN ACTION LIST, so a caller holding the EFFECTIVE list gets item-raised limits and a caller
+ * holding only the stored sheet gets the sheet's own. The player projection is the second: it has no
+ * content catalog and must stay a pure function of GameState.
+ */
+export function actionPools(actions: readonly ActorAction[]): Array<{ id: string; name: string; limit: number; per: string }> {
+  const pools = new Map<string, { id: string; name: string; limit: number; per: string }>();
+  for (const action of actions) {
+    if (!action.uses) continue;
+    const id = action.uses.pool ?? action.id;
+    const existing = pools.get(id);
+    if (!existing) {
+      pools.set(id, { id, name: action.id === id ? action.name : titleCase(id), limit: action.uses.limit, per: action.uses.per });
+      continue;
+    }
+    // Same rule as `useLimitFor`: only a sibling in the same REST SCOPE raises the ceiling.
+    if (existing.per === action.uses.per) existing.limit = Math.max(existing.limit, action.uses.limit);
+    // A later action whose own id IS the pool key names it better than the derived title.
+    if (action.id === id) existing.name = action.name;
+  }
+  return [...pools.values()];
+}
+
+const titleCase = (slug: string): string =>
+  slug.split("-").filter(Boolean).map((word) => `${word[0].toUpperCase()}${word.slice(1)}`).join(" ");

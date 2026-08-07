@@ -191,7 +191,17 @@ function proseByPrefix(prose: Map<string, string>, featureId: string): string | 
 // Per-class configuration the printed text cannot supply deterministically
 // ---------------------------------------------------------------------------------------------
 
-type ResourceSpec = { id: string; name: string; dice?: boolean };
+/**
+ * One printed resource column. `display` marks a column that is INK ONLY - no live `uses.pool`
+ * answers to its id, and none is expected to.
+ *
+ * Every column below carries it today, and that is a statement of fact rather than a policy: the
+ * nine generated classes have no authored mechanics at all yet (Stage 4), so not one of these ids
+ * is spendable. `class-resource-pools.test.ts` holds each id to "matches a pool OR says it is
+ * display", so as Stage 4 wires Rage or Bardic Inspiration to a real pool, the flag comes off HERE
+ * and the test starts requiring the pool it now names.
+ */
+type ResourceSpec = { id: string; name: string; dice?: boolean; display?: boolean };
 type ClassConfig = {
   /** See BLURBS. */
   blurb?: { summary: string; description: string };
@@ -270,9 +280,9 @@ const CONFIG: Record<string, ClassConfig> = {
   barbarian: {
     subclassLevel: 3,
     columns: {
-      Rages: { id: "rage", name: "Rages" },
-      "Rage Damage": { id: "rage-damage", name: "Rage Damage" },
-      "Weapon Mastery": { id: "weapon-mastery", name: "Weapon Mastery" }
+      Rages: { id: "rage", name: "Rages", display: true },
+      "Rage Damage": { id: "rage-damage", name: "Rage Damage", display: true },
+      "Weapon Mastery": { id: "weapon-mastery", name: "Weapon Mastery", display: true }
     },
     choices: {
       "weapon-mastery": weaponMastery(2),
@@ -284,7 +294,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: true, focus: "arcane-focus", multiclassProgression: "full", spellListId: "bard" },
     columns: {
-      "Bardic Die": { id: "bardic-inspiration", name: "Bardic Die", dice: true },
+      "Bardic Die": { id: "bardic-inspiration", name: "Bardic Die", dice: true, display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared"
     },
@@ -299,7 +309,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "wis", prepares: "prepared", ritual: true, focus: "druidic-focus", multiclassProgression: "full", spellListId: "druid" },
     columns: {
-      "Wild Shape": { id: "wild-shape", name: "Wild Shape" },
+      "Wild Shape": { id: "wild-shape", name: "Wild Shape", display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared"
     },
@@ -311,9 +321,9 @@ const CONFIG: Record<string, ClassConfig> = {
   monk: {
     subclassLevel: 3,
     columns: {
-      "Martial Arts": { id: "martial-arts", name: "Martial Arts", dice: true },
-      "Focus Points": { id: "focus-points", name: "Focus Points" },
-      "Unarmored Movement": { id: "unarmored-movement", name: "Unarmored Movement" }
+      "Martial Arts": { id: "martial-arts", name: "Martial Arts", dice: true, display: true },
+      "Focus Points": { id: "focus-points", name: "Focus Points", display: true },
+      "Unarmored Movement": { id: "unarmored-movement", name: "Unarmored Movement", display: true }
     },
     choices: {
       "ability-score-improvement": asiChoice,
@@ -324,7 +334,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: false, focus: "holy-symbol", multiclassProgression: "half", spellListId: "paladin" },
     columns: {
-      "Channel Divinity": { id: "channel-divinity", name: "Channel Divinity" },
+      "Channel Divinity": { id: "channel-divinity", name: "Channel Divinity", display: true },
       "Prepared Spells": "prepared"
     },
     choices: {
@@ -338,7 +348,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "wis", prepares: "prepared", ritual: true, focus: "druidic-focus", multiclassProgression: "half", spellListId: "ranger" },
     columns: {
-      "Favored Enemy": { id: "favored-enemy", name: "Favored Enemy" },
+      "Favored Enemy": { id: "favored-enemy", name: "Favored Enemy", display: true },
       "Prepared Spells": "prepared"
     },
     choices: {
@@ -351,7 +361,7 @@ const CONFIG: Record<string, ClassConfig> = {
   },
   rogue: {
     subclassLevel: 3,
-    columns: { "Sneak Attack": { id: "sneak-attack", name: "Sneak Attack", dice: true } },
+    columns: { "Sneak Attack": { id: "sneak-attack", name: "Sneak Attack", dice: true, display: true } },
     choices: {
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
       "weapon-mastery": weaponMastery(2),
@@ -363,7 +373,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: false, focus: "arcane-focus", multiclassProgression: "full", spellListId: "sorcerer" },
     columns: {
-      "Sorcery Points": { id: "sorcery-points", name: "Sorcery Points" },
+      "Sorcery Points": { id: "sorcery-points", name: "Sorcery Points", display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared"
     },
@@ -377,7 +387,7 @@ const CONFIG: Record<string, ClassConfig> = {
     subclassLevel: 3,
     spellcasting: { ability: "cha", prepares: "prepared", ritual: true, focus: "arcane-focus", multiclassProgression: "pact", spellListId: "warlock" },
     columns: {
-      "Eldritch Invocations": { id: "eldritch-invocations", name: "Eldritch Invocations" },
+      "Eldritch Invocations": { id: "eldritch-invocations", name: "Eldritch Invocations", display: true },
       Cantrips: "cantrips",
       "Prepared Spells": "prepared",
       "Spell Slots": "pact-slots",
@@ -562,7 +572,7 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
       if (spec === "pact-level") { pact = { ...(pact ?? { level: 1, slots: 0 }), level: intOf(cell) ?? 1 }; return; }
       const amount = spec.dice ? strip(cell).toLowerCase().replace(/^d/, "1d") : intOf(cell);
       if (amount === null || amount === "") return;
-      (row.classResources as unknown[]).push({ id: spec.id, name: spec.name, amount });
+      (row.classResources as unknown[]).push({ id: spec.id, name: spec.name, amount, ...(spec.display ? { display: true } : {}) });
     });
     // The features column is positional: always index 2 in every printed class table. A level that
     // grants nothing prints an em dash, which slugs to "" - drop those rather than emit a blank id.
