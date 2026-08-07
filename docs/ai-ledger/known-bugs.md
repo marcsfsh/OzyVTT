@@ -201,15 +201,27 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   the real fix.
 - **[rules-5e] Third-caster multiclass rounding** is unverified against the SRD's rounding rule for
   Eldritch Knight / Arcane Trickster style progressions.
-- **[character-builder] Step 4's *arrival* state is still heavy at high level.** Measured per class
-  2026-07-27 (the earlier "~306 cards" figure was wrong — it is class-dependent): **Fighter L20 = 10
-  offers / 62 cards**; **Wizard L20 = 12 offers / 467 cards**. The worst case is 467, materially
-  worse than filed. The composition is the real story — "Wizard prepared spells" is choose 25 of 203,
-  and because collapse is (correctly) derived from `picks.length === capacity`, that one grid stays
-  fully expanded until the 25th spell is picked, so a Wizard 20 sits above 200 cards for the whole
-  step. `5c32df9` fixed the *answered* state (24,222px → 1,933px at L20) and that fix is real; the
-  arrival state is untouched. Cutting it means progressive disclosure — a design change, not a
-  density fix.
+- **[character-builder] Step 4 is dense at high level — but no longer tall. CLOSED as a height bug
+  2026-08-07; the card COUNT stands.** Measured per class 2026-07-27 (the earlier "~306 cards" figure
+  was wrong — it is class-dependent): **Fighter L20 = 10 offers / 62 cards**; **Wizard L20 = 12
+  offers / 467 cards**, and 467 is still what a Wizard 20 is asked to read. What changed is that the
+  cards no longer set the step's height. `5c32df9`'s answered-state fix (24,222px → 1,933px) worked
+  by UNMOUNTING an answered offer's grid, which the client then reported as its own defect (issue
+  `1`: a player could not see what they had not chosen). The fold is gone and `ChoiceGrid bounded`
+  caps each card list at 21rem instead, so both states are bounded rather than one being traded for
+  the other. Re-measured 2026-08-07 in Chromium 1194 by driving the real wizard to a fully answered
+  Wizard 20 features step and reading `.cb-step` scrollHeight — 14 offers / 468 cards:
+
+  | | 1280px | 375px |
+  |---|---|---|
+  | arrival, before | 13,434px | — |
+  | arrival, now | **3,705px** | 4,085px |
+  | answered, now | **5,238px** | 5,963px |
+  | answered, cap lifted | 17,089px | 44,949px |
+
+  The answered step is now shorter than the same step used to be on ARRIVAL, so nothing in the flow
+  is taller than it already was. What is left is genuinely a density question — 467 cards to read —
+  and cutting that means progressive disclosure, a design change rather than a CSS one.
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device

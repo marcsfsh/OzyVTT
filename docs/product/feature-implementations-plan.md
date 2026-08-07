@@ -696,13 +696,27 @@ Root cause is **not** `unavailableOf`, and `ChoiceGrid` **already implements the
 still tappable). It is dead code. `OfferPicker` computes `collapsed = complete && !expanded`
 (`apps/client/src/builder/CharacterBuilder.tsx:141`, with `collapsed` at `:149`) and the collapsed branch (`:206-212`)
 **unmounts the whole grid**.
-→ Add `COLLAPSE_THRESHOLD = 8` (the constant already gating `searchable` at `:218`) and use
-`collapsed = foldable && complete && !expanded`. Separately, replace the feat *filter* at
+→ ~~Add `COLLAPSE_THRESHOLD = 8` and use `collapsed = foldable && complete && !expanded`.~~
+**SUPERSEDED 2026-08-07 (`8a9c99e`) — the threshold was the wrong answer and the client said so.**
+Shipped as `d1f01cf`, it made the rule true below 8 options and left it false for every list made of
+spells, cantrips, feats or equipment; reviewing the running app the client restated the rule with no
+threshold in it: *"any time the player is choosing multiple options, once they've selected the max,
+all unselected options are greyed out."*
+→ **The fold is DELETED**, and the height it was buying is bought by a bounded scroll region:
+`ChoiceGrid` gains `bounded`, which caps `.nh-choicegrid-items` at 21rem and declares it with
+`.scroll-y` in the markup (§7 ratchet (h); the cap rides the grid itself, the narrow exception
+`map-picker.css:12-17` already measured). Every option stays mounted at every length. The constant
+survives as `SEARCH_THRESHOLD`, doing only the job it can honestly do — earning the search box that
+makes a capped 203-card region navigable. Separately, replace the feat *filter* at
 `build-payload.ts:335-337` with an `unavailable` entry ("already on this character").
-**Do not delete the collapse** — it is load-bearing: Wizard L20's answered step is 1,933px with it
-and **24,222px** without.
-*Tests:* Elf → Keen Senses → pick Perception → Insight and Survival still in the DOM and disabled;
-re-click Perception → all three enabled. Negative control: a 203-option spell offer still folds.
+*Measured, Chromium 1194, Wizard L20 answered step:* **5,238px at 1280 / 5,963px at 375** with all
+468 cards mounted, against **17,089 / 44,949** for deleting the fold and adding nothing — and against
+13,434px for what the same step used to cost on ARRIVAL. Numbers and method in `known-bugs.md`.
+*Tests:* Elf → Keen Senses → pick Perception → all three still in the DOM and enabled (a radiogroup
+must not lock a keyboard player into their first answer); a choose-2 offer greys the third at
+capacity and un-picking restores it; a **long** answered offer keeps all twelve cards mounted with
+nine greyed; and the same rule proved on a **non-skill** (cantrip) offer, which is the kind the
+client watched fail.
 
 **`2b` — conditional placeholder. Size S.**
 The wiring is sound; the *invitation* is unconditional. `DETAIL_PLACEHOLDER.features`
