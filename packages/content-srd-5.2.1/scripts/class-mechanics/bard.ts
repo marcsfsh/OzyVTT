@@ -85,8 +85,12 @@ export const bard: ClassMechanicsModule = {
      * and the overlay REFUSES to overwrite a `choice` the record already carries - correctly, since
      * "which of the two homes is the real one" has no good silent answer.
      *
-     * Also not authored: Jack of All Trades (half the proficiency bonus - `check-bonus` takes a flat
-     * integer), Countercharm and Superior Inspiration (reaction-time and initiative-time rules text).
+     * Also not authored, one line each: Jack of All Trades (HALF the proficiency bonus, and
+     * `check-bonus` takes a flat integer), Font of Inspiration (recovery moves to a Short Rest at
+     * level 5, and `uses.per` names one rest with no level schedule), Superior Inspiration (an
+     * initiative-time refill), and Countercharm - which is a Reaction that costs nothing, so an
+     * action carrying neither damage, a save, an effect nor a use would be a button that refuses
+     * itself. All four are rules text a GM reads, which is what ADR-0008 says to leave alone.
      */
   },
 

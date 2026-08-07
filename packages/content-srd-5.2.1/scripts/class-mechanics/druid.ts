@@ -163,6 +163,19 @@ export const druid: ClassMechanicsModule = {
     "epic-boon": {
       choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
     }
+
+    /**
+     * NOT AUTHORED, and why - the four that are all the same missing idea.
+     *
+     * `wild-resurgence` (5), `archdruid` (20) and Circle of the Land's `natural-recovery` (6) all
+     * CONVERT one resource into another: a spell slot into a Wild Shape use, Wild Shape uses into a
+     * slot ("each use contributing 2 spell levels"), expended slots back on a Short Rest. Nothing in
+     * the vocabulary spends one pool to refill another, and `uses` cannot even say which of Natural
+     * Recovery's TWO independent once-per-Long-Rest benefits a single counter would be tracking -
+     * one counter for two would make using either block the other, which is worse than prose.
+     *
+     * `beast-spells` (18) is a permission ("you can cast spells in Beast form"), not a rider.
+     */
   },
 
   subclasses: {
