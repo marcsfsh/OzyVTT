@@ -318,8 +318,11 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     // The carrier holds it...
     expect(featCarrier(built)!.modifiers).toHaveLength(1);
-    // ...but the standing collection does not, by construction.
-    expect(collectRiders(derivation.carriers, { ...derivation.context, moment: null })).toEqual([]);
+    // ...but the standing collection does not, by construction. Narrowed to the feat under test
+    // rather than asserting an empty list: this hero is a Champion, and Stage 4 authored Improved
+    // Critical and Remarkable Athlete as genuinely STANDING riders on the subclass, so an empty
+    // standing pass would now be asserting that the SRD content does nothing.
+    expect(collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter((rider) => rider.label === "Warcaller")).toEqual([]);
   });
 
   it("grants advantage on a MELEE attack and leaves a ranged one a single die", () => {
@@ -345,13 +348,17 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
   });
 
   it("widens the critical range from a feat, the way a keen weapon does from an item", () => {
-    const built = build({ modifiers: [{ type: "critical-range", threshold: 19 }] });
+    // 18 rather than 19, and the control is 19 rather than 20, because this hero is a level-5
+    // Champion: Improved Critical is a real `critical-range` rider now, so the feat has to beat the
+    // subclass to prove anything. `criticalThreshold` takes the LOWEST any carrier names, which is
+    // what makes the two compose instead of one winning.
+    const built = build({ modifiers: [{ type: "critical-range", threshold: 18 }] });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     const sword = actionOf(built, "item-greatsword");
-    expect(criticalThreshold(derivation, built.hero, sword)).toBe(19);
+    expect(criticalThreshold(derivation, built.hero, sword)).toBe(18);
 
     const bare = build();
-    expect(criticalThreshold(deriveEquipment(bare.hero, bare.definition, bare.catalog), bare.hero, actionOf(bare, "item-greatsword"))).toBe(20);
+    expect(criticalThreshold(deriveEquipment(bare.hero, bare.definition, bare.catalog), bare.hero, actionOf(bare, "item-greatsword"))).toBe(19);
   });
 });
 
