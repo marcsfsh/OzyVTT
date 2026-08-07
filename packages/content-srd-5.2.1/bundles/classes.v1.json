@@ -9062,17 +9062,51 @@
       {
        "id": "agonizing-blast",
        "name": "Agonizing Blast",
-       "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage Choose one of your known Warlock cantrips that deals damage. You can add your Charisma modifier to that spell's damage rolls. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip."
+       "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage Choose one of your known Warlock cantrips that deals damage. You can add your Charisma modifier to that spell's damage rolls. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip.",
+       "modifiers": [
+        {
+         "type": "extra-damage",
+         "abilityModifier": "cha",
+         "damageType": "force",
+         "when": [
+          {
+           "type": "on-hit"
+          },
+          {
+           "type": "spell-id-is",
+           "spellIds": [
+            "eldritch-blast"
+           ]
+          }
+         ]
+        }
+       ]
       },
       {
        "id": "armor-of-shadows",
        "name": "Armor of Shadows",
-       "description": "You can cast Mage Armor on yourself without expending a spell slot."
+       "description": "You can cast Mage Armor on yourself without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "mage-armor",
+          "level": 1
+         }
+        ]
+       }
       },
       {
        "id": "ascendant-step",
        "name": "Ascendant Step",
-       "description": "Prerequisite: Level 5+ Warlock You can cast Levitate on yourself without expending a spell slot."
+       "description": "Prerequisite: Level 5+ Warlock You can cast Levitate on yourself without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "levitate",
+          "level": 2
+         }
+        ]
+       }
       },
       {
        "id": "devils-sight",
@@ -9102,7 +9136,15 @@
       {
        "id": "fiendish-vigor",
        "name": "Fiendish Vigor",
-       "description": "Prerequisite: Level 2+ Warlock You can cast False Life on yourself without expending a spell slot. When you cast the spell with this feature, you don't roll the die for the Temporary Hit Points; you automatically get the highest number on the die."
+       "description": "Prerequisite: Level 2+ Warlock You can cast False Life on yourself without expending a spell slot. When you cast the spell with this feature, you don't roll the die for the Temporary Hit Points; you automatically get the highest number on the die.",
+       "grants": {
+        "spells": [
+         {
+          "id": "false-life",
+          "level": 1
+         }
+        ]
+       }
       },
       {
        "id": "gaze-of-two-minds",
@@ -9112,7 +9154,19 @@
       {
        "id": "gift-of-the-depths",
        "name": "Gift of the Depths",
-       "description": "Prerequisite: Level 5+ Warlock You can breathe underwater, and you gain a Swim Speed equal to your Speed. You can also cast Water Breathing once without expending a spell slot. You regain the ability to cast it in this way again when you finish a Long Rest."
+       "description": "Prerequisite: Level 5+ Warlock You can breathe underwater, and you gain a Swim Speed equal to your Speed. You can also cast Water Breathing once without expending a spell slot. You regain the ability to cast it in this way again when you finish a Long Rest.",
+       "grants": {
+        "spells": [
+         {
+          "id": "water-breathing",
+          "level": 3
+         }
+        ]
+       },
+       "uses": {
+        "limit": 1,
+        "per": "long-rest"
+       }
       },
       {
        "id": "gift-of-the-protectors",
@@ -9137,42 +9191,101 @@
       {
        "id": "mask-of-many-faces",
        "name": "Mask of Many Faces",
-       "description": "Prerequisite: Level 2+ Warlock You can cast Disguise Self without expending a spell slot."
+       "description": "Prerequisite: Level 2+ Warlock You can cast Disguise Self without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "disguise-self",
+          "level": 1
+         }
+        ]
+       }
       },
       {
        "id": "master-of-myriad-forms",
        "name": "Master of Myriad Forms",
-       "description": "Prerequisite: Level 5+ Warlock You can cast Alter Self without expending a spell slot."
+       "description": "Prerequisite: Level 5+ Warlock You can cast Alter Self without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "alter-self",
+          "level": 2
+         }
+        ]
+       }
       },
       {
        "id": "misty-visions",
        "name": "Misty Visions",
-       "description": "Prerequisite: Level 2+ Warlock You can cast Silent Image without expending a spell slot."
+       "description": "Prerequisite: Level 2+ Warlock You can cast Silent Image without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "silent-image",
+          "level": 1
+         }
+        ]
+       }
       },
       {
        "id": "one-with-shadows",
        "name": "One with Shadows",
-       "description": "Prerequisite: Level 5+ Warlock While you're in an area of Dim Light or Darkness, you can cast Invisibility on yourself without expending a spell slot."
+       "description": "Prerequisite: Level 5+ Warlock While you're in an area of Dim Light or Darkness, you can cast Invisibility on yourself without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "invisibility",
+          "level": 2
+         }
+        ]
+       }
       },
       {
        "id": "otherworldly-leap",
        "name": "Otherworldly Leap",
-       "description": "Prerequisite: Level 2+ Warlock You can cast Jump on yourself without expending a spell slot."
+       "description": "Prerequisite: Level 2+ Warlock You can cast Jump on yourself without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "jump",
+          "level": 1
+         }
+        ]
+       }
       },
       {
        "id": "pact-of-the-blade",
        "name": "Pact of the Blade",
-       "description": "As a Bonus Action, you can conjure a pact weapon in your hand—a Simple or Martial Melee weapon of your choice with which you bond—or create a bond with a magic weapon you touch; you can't bond with a magic weapon if someone else is attuned to it or another Warlock is bonded with it. Until the bond ends, you have proficiency with the weapon, and you can use it as a Spellcasting Focus. Whenever you attack with the bonded weapon, you can use your Charisma modifier for the attack and damage rolls instead of using Strength or Dexterity; and you can cause the weapon to deal Necrotic, Psychic, or Radiant damage or its normal damage type. Your bond with the weapon ends if you use this feature's Bonus Action again, if the weapon is more than 5 feet away from you for 1 minute or more, or if you die. A conjured weapon disappears when the bond ends."
+       "description": "As a Bonus Action, you can conjure a pact weapon in your hand—a Simple or Martial Melee weapon of your choice with which you bond—or create a bond with a magic weapon you touch; you can't bond with a magic weapon if someone else is attuned to it or another Warlock is bonded with it. Until the bond ends, you have proficiency with the weapon, and you can use it as a Spellcasting Focus. Whenever you attack with the bonded weapon, you can use your Charisma modifier for the attack and damage rolls instead of using Strength or Dexterity; and you can cause the weapon to deal Necrotic, Psychic, or Radiant damage or its normal damage type. Your bond with the weapon ends if you use this feature's Bonus Action again, if the weapon is more than 5 feet away from you for 1 minute or more, or if you die. A conjured weapon disappears when the bond ends.",
+       "choice": {
+        "kind": "weapon",
+        "choose": 1,
+        "fromCatalog": "weapons"
+       }
       },
       {
        "id": "pact-of-the-chain",
        "name": "Pact of the Chain",
-       "description": "You learn the Find Familiar spell and can cast it as a Magic action without expending a spell slot. When you cast the spell, you choose one of the normal forms for your familiar or one of the following special forms: Imp, Pseudodragon, Quasit, Skeleton, Sphinx of Wonder, Sprite, or Venomous Snake (see \"Monsters\" for the familiar's stat block). Additionally, when you take the Attack action, you can forgo one of your own attacks to allow your familiar to make one attack of its own with its Reaction."
+       "description": "You learn the Find Familiar spell and can cast it as a Magic action without expending a spell slot. When you cast the spell, you choose one of the normal forms for your familiar or one of the following special forms: Imp, Pseudodragon, Quasit, Skeleton, Sphinx of Wonder, Sprite, or Venomous Snake (see \"Monsters\" for the familiar's stat block). Additionally, when you take the Attack action, you can forgo one of your own attacks to allow your familiar to make one attack of its own with its Reaction.",
+       "grants": {
+        "spells": [
+         {
+          "id": "find-familiar",
+          "level": 1
+         }
+        ]
+       }
       },
       {
        "id": "pact-of-the-tome",
        "name": "Pact of the Tome",
-       "description": "Stitching together strands of shadow, you conjure forth a book in your hand at the end of a Short or Long Rest. This Book of Shadows (you determine its appearance) contains eldritch magic that only you can access, granting you the benefits below. The book disappears if you conjure another book with this feature or if you die. Cantrips and Rituals. When the book appears, choose three cantrips, and choose two level 1 spells that have the Ritual tag. The spells can be from any class's spell list, and they must be spells you don't already have prepared. While the book is on your person, you have the chosen spells prepared, and they function as Warlock spells for you. Spellcasting Focus. You can use the book as a Spellcasting Focus."
+       "description": "Stitching together strands of shadow, you conjure forth a book in your hand at the end of a Short or Long Rest. This Book of Shadows (you determine its appearance) contains eldritch magic that only you can access, granting you the benefits below. The book disappears if you conjure another book with this feature or if you die. Cantrips and Rituals. When the book appears, choose three cantrips, and choose two level 1 spells that have the Ritual tag. The spells can be from any class's spell list, and they must be spells you don't already have prepared. While the book is on your person, you have the chosen spells prepared, and they function as Warlock spells for you. Spellcasting Focus. You can use the book as a Spellcasting Focus.",
+       "choice": {
+        "kind": "cantrip",
+        "choose": 3,
+        "fromCatalog": "warlock-spells",
+        "maxSpellLevel": 0
+       }
       },
       {
        "id": "repelling-blast",
@@ -9187,12 +9300,28 @@
       {
        "id": "visions-of-distant-realms",
        "name": "Visions of Distant Realms",
-       "description": "Prerequisite: Level 9+ Warlock You can cast Arcane Eye without expending a spell slot."
+       "description": "Prerequisite: Level 9+ Warlock You can cast Arcane Eye without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "arcane-eye",
+          "level": 4
+         }
+        ]
+       }
       },
       {
        "id": "whispers-of-the-grave",
        "name": "Whispers of the Grave",
-       "description": "Prerequisite: Level 7+ Warlock You can cast Speak with Dead without expending a spell slot."
+       "description": "Prerequisite: Level 7+ Warlock You can cast Speak with Dead without expending a spell slot.",
+       "grants": {
+        "spells": [
+         {
+          "id": "speak-with-dead",
+          "level": 3
+         }
+        ]
+       }
       },
       {
        "id": "witch-sight",
