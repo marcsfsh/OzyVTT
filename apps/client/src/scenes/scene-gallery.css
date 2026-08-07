@@ -12,6 +12,34 @@
 /* Command bar above the gallery — the primary "New scene" action (and Manage maps) always in reach. */
 .scene-gallery-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
+/* RULING 2 — THIS IS THE HERO SURFACE'S DOOR, so it takes the rest glow. Ruling 2 names Scenes as a
+   hero surface and gives hero surfaces "the full landing door, rest glow included"; measured at the
+   end of round 2, Scenes had none. The door here is not a panel — this is a gallery, and the thing
+   that plays the landing door's part is the one action that takes you IN. `--nh-glow` is the
+   Button primitive's own hook (`Button.css`), which paints a drop-shadow on the backing layer so it
+   follows the chamfer cut; primary buttons already light it on hover, and this makes it the resting
+   state HERE ONLY. Nothing new is invented and no `.rim-lit` is involved — that utility replaces the
+   backing layer's background, which on a button is its fill. */
+.scene-gallery-bar .nh-btn--primary { --nh-glow: var(--glow-drop-magenta); }
+
+/* AND THE ROW ACTION STOPS COMPETING WITH IT — ruling 2's restraint rule ("at most one glowing
+   element per region at rest") cannot be satisfied by adding a glow alone. A nine-card gallery shows
+   nine "Go live" buttons, each a solid magenta block identical to the door above them, so the door
+   read as one more row action and a glow on it would have been lost in the field. This is the same
+   defect the client named on the initiative panel — "it seriously overdid the coloring (the
+   all-magenta look is just too much)" — on a surface nobody had re-checked for it.
+
+   MAGENTA BECOMES THE EDGE INSTEAD OF THE FIELD, which is the shape `.nh-btn--destructive` already
+   uses for a coloured button that must not shout (rim + ink, no fill), and the same move that fixed
+   the initiative panel. `variant="primary"` STAYS in the markup: Go live really is the card's primary
+   action and the semantics are true — what changes is how nine of them read at once. Hover keeps the
+   primitive's own fill and glow, so the pressed/hover state is unchanged. */
+.nh-card-actions .nh-btn--primary:not(:hover):not(:active):not(:focus-visible) {
+  --nh-fill: transparent;
+  --nh-rim: var(--magenta);
+  color: var(--magenta-hi);
+}
+
 /* Prepare (secondary) sits opposite Go live (primary); the shared .nh-card-actions row spaces them.
    On a live card the actions row instead carries a quiet "live now" caption at the start. */
 .scene-live-note { color: var(--magenta); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .02em; }

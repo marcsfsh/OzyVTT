@@ -155,11 +155,18 @@
    into the notch. -5px is the offset the chamfered primitives already use for the same reason. */
 .nh-card-open:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -5px; }
 
-/* Add-new tile — a dashed call to action sharing the gallery grid. Fills its cell so it reads as one
-   more listing (same width, same min-height as the real cards) rather than a narrow odd-one-out. */
-/* Add-new tile — a dashed call to action sharing the gallery grid. It is a BUTTON, so its dashed
-   edge and its hover fill both ride the backing layer for the same hit-testing reason as above;
-   the element itself is never clipped. */
+/* Add-new tile — the call to action sharing the gallery grid. Fills its cell so it reads as one more
+   listing (same width, same min-height as the real cards) rather than a narrow odd-one-out. It is a
+   BUTTON, so its edge and its hover fill both ride the backing layer for the same hit-testing reason
+   as above; the element itself is never clipped.
+
+   RULING 55 — NO DASHED BOXES, and this tile was the last one in the app. `patterns.css`'s `.nh-empty`
+   was converted in the QA fix pass and this was missed because it is not an empty state: it is an
+   ADD tile, so nothing scanning for `.nh-empty` found it. The ruling's reasoning applies to it more
+   directly than to anything it did catch — "a dashed outline reads as a placeholder, a drop zone or
+   something half-built" is exactly how a real, working button was reading, sitting in a grid of solid
+   cards. It keeps its quieter edge (`--line-strong` against the cards' own rim) so it still reads as
+   the odd one out by INTENT rather than by looking unfinished. */
 .nh-card--new {
   display: grid;
   place-items: center;
@@ -174,7 +181,7 @@
   text-align: center;
   --card-edge: var(--line-strong);
 }
-.nh-card--new::before { border-style: dashed; background: transparent; }
+.nh-card--new::before { background: transparent; }
 .nh-card--new:hover { color: var(--text); --card-edge: var(--magenta); }
 .nh-card--new:hover::before { background: color-mix(in srgb, var(--surface-3) 40%, transparent); }
 .nh-card--new:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -5px; }

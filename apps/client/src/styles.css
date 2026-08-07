@@ -1359,6 +1359,17 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    surface itself is full-bleed now — it paints the scene. */
 .party-heading, .party-roster-body { width: 100%; max-width: 72rem; margin-inline: auto; }
 .party-heading-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0 0 1.4rem; }
+/* RULING 2 — THIS IS THE HERO SURFACE'S DOOR, so it takes the rest glow. Ruling 2 names Roster as a
+   hero surface and gives hero surfaces "the full landing door, rest glow included"; measured at the
+   end of round 2, Roster had NOTHING glowing at rest. The door on a gallery surface is not a panel —
+   it is the one action that takes you in, which here is "Create a character". `--nh-glow` is the
+   Button primitive's own hook, a drop-shadow on the backing layer so it follows the chamfer cut;
+   primary buttons already light it on hover and this makes it the resting state here only.
+   The restraint rule ("at most one glowing element per region at rest") is satisfied by measurement
+   rather than by hope: this surface's card actions are all `secondary`, so the heading's primary is
+   the only magenta fill on it and this glow is the only glow. Scenes needed a second edit to reach
+   the same state — see `scene-gallery.css` — because its cards each carry a `Go live`. */
+.party-heading-actions .nh-btn--primary { --nh-glow: var(--glow-drop-magenta); }
 .party-queue { margin: 0 0 1.6rem; padding: var(--space-4) 1.1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); }
 .party-section-head { margin: 0 0 .7rem; font: 400 1.1rem/1.2 var(--font-display); color: var(--violet-hi); }
 .party-queue-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
