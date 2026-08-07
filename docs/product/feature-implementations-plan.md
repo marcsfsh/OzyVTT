@@ -1,7 +1,7 @@
 # Feature implementations — the client's issue register and the plan to work it
 
-**Status:** issues logged 2026-08-07; **D1, D2 and D3 decided 2026-08-07**. Intake not started. No
-plan written yet. Nothing implemented.
+**Status:** issues logged 2026-08-07; **D1–D7 decided 2026-08-07**; **4-agent intake complete
+2026-08-07**. Plans not yet written. Nothing implemented.
 **Read this when:** picking up this work, or after a context compaction lost the thread.
 
 This document exists because the work below spans many sessions and must outlive any one of them.
@@ -532,6 +532,46 @@ class spell lists, species, backgrounds, feats,"* and `sources/dnd-5e-srd-markdo
 Intake returns a real estimate. If it is a contained change to the map's existing input handling, it
 ships with Area 3. If it needs a rework of the gesture or viewport model, **stop and bring the
 client the number before spending anything.** Do not start this item on an agent's own judgement.
+
+### D4 — H1 typechecking: **turn it on first, in its own commit, before Area 1**
+
+Two intake agents disagreed; the client took INTAKE-1's position. Sequence: (a) re-measure the error
+count — the ledger's own figures disagree (41 in `known-bugs.md`, 46 across 10 of 91 in
+`current-state.md`) and neither was verifiable before `npm install` ran; (b) fix the fixture and
+signature drift; (c) flip `apps/server/tsconfig.json` to `"include": ["src", "test"]`; (d) update
+`docs-tooling.test.ts` and delete the `known-bugs.md` entry. **Only then** does Area 1 start.
+
+The reason: `2e` adds a field to `ActorDefinition.character` and ~91 server test files construct
+definition literals. Left off, those breakages are invisible to `npm run check` and surface as Zod
+errors at runtime during the largest content change in the repo.
+
+### D5 — D1 schema gaps: **close both**
+
+1. **Invocation vocabulary.** `extra-damage` gains the ability to name *an ability modifier* as its
+   amount, and a `spell-id-is` trigger so a rider can attach to one specific spell. Without this,
+   Agonizing Blast — the invocation nearly every Warlock takes — cannot be expressed, and the class
+   reads as broken no matter how much prose lands.
+2. **Weapon mastery, in full.** A `mastery` slug on all 38 weapon records, plus the nine named
+   behaviours: Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex. **Push, Topple and Slow touch
+   movement and conditions, so this is new engine surface, not content authoring** — size it and
+   stage it as engine work. INTAKE-1 recommended deferring this; the client chose to close it.
+
+### D6 — Calendar K7 (`5f`): **keep auto-publish for seeding only, and make Publish visible**
+
+Auto-publish survives only when a brand-new codex is being seeded. Otherwise it goes, and both
+clocks always render with a Publish button always visible. Today Publish is hidden unless the dates
+have diverged (`CalendarView.tsx:86,132`), so from the unset state there is no visible publish act at
+all — that absence is the real reason the two dates felt welded together. `codex-store.ts:4185-4199`
+is a dated decision and `codex-http.test.ts:1562` pins it: update both in the same change, and date
+the reversal in `decision-log.md`.
+
+### D7 — Manual damage (`4a`): **the GM's damage entry gains an optional type**
+
+Defaulting to untyped, so today's fast path is unchanged. Choose a type and
+resistance / immunity / vulnerability apply and the feed shows the adjustment. Without this, `4a` can
+be fully implemented and the table would still watch untyped damage ignore resistance — because the
+untyped `amount` path (`hit-points.ts:117-120`) is the most-used entry point and deliberately skips
+the maths. Not required: the override remains available by leaving the type unset.
 
 ### D3 — Replay characters (`4i`): **keep the clone, hide the clone**
 
