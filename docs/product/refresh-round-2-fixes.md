@@ -485,3 +485,98 @@ lane's file list.
   the specific viewport/role/state that would catch its regression — those are the minimum, not the
   ceiling.
 - **The P0s come first.** If Lane A runs out of room, A4 and A5 defer before A1–A3 do.
+
+---
+
+## §9 — What landed (2026-08-07)
+
+**Phase 5 and phase 6 are done.** Both lanes ran to completion, the director's pass followed, and
+everything below was measured on the combined tree rather than in each lane's own window.
+
+### Gates, on the combined tree
+
+`npm run check` **exit 0**. `npm run test` **exit 0** — 161 files, **2215 tests, 0 failures**, 1
+skipped (pre-existing), across all nine workspaces. *(Note for whoever runs these next: `npm run test
+| tail` reports the exit code of `tail`, not of vitest. Redirect to a file and read `$?`.)*
+Ratchet `design-conventions.test.ts` **34/34, no count moved by either lane.**
+Route audit **8 failing cells — the baseline, unchanged**, all on the same four long-standing
+surfaces (`/scenes/maps`, `/roster`, `/homebrew`, `/replays/:id`). **No `/table` cell is red in
+either role.**
+
+### The three P0s, verified by the director independently of the lane that fixed them
+
+Emulated viewports with touch enabled. **No physical-device pass exists and none is possible from
+here** — §6 said so and it is still true.
+
+| | 844×390 before → after | 667×375 | 390×844 |
+|---|---|---|---|
+| Fight menu | `max-height: 0px`, **2.1%** visible → **297.6px, 28.8%, flips up** | 282.6px, 27.3% | **421px, 40.8%, still opens down** |
+| "End the fight" hit test | `DIV.encounter-menu-backdrop` → **`BUTTON.encounter-end`** | same | same |
+| "Next turn" hit test | `nh-tabs` / `null` → **`BUTTON.encounter-primary`** at arrival, `scrollTop` 0 **and** max | same | same |
+| Tray first chip | y=39, hits `BUTTON.nh-tab` → **y=63, hits `BUTTON.tray-token`** | y=63 | y=63 |
+| Touch tap-to-place | 9→9 (never worked) → **7→6** | **9→8** | **8→7** |
+
+A touch tap on "Next turn" at 844×390 advances the active combatant three times running and rolls
+the round 1→2. Escape closes the menu; the `⋯` is named "Fight options".
+
+### Three places the plan itself was wrong, and the lane was right
+
+1. **A3's preferred fix would have disarmed the drag.** The plan prescribed an early return for
+   tray-origin presses *and* named "the guard must not disarm the drag" as the regression risk —
+   those are the same code path. Lane A measured the drag working at HEAD and fixed the far end
+   instead (a press that travelled ≤8px is a tap). **The plan contradicted itself and the lane
+   caught it.**
+2. **A4's cause was not a layout offset.** The tray sits under the tab bar because the landscape
+   pane *scrolls*, by a varying amount — so a static offset is right at exactly one scroll position.
+   The overflow is **38px at 844×390 and 53px at 667×375, not the 14px §6 recorded**, and it runs
+   through the map band rather than `.table-sidebar`.
+3. **Finding 14's count was wrong twice.** QA3 said five doorless dashcards, the plan corrected it to
+   four, and the truth is **two** — `seeAll` renders whether or not a card has content.
+
+### Decisions §5 flagged, and what happened to them
+
+- **§5.1 (the `off` audit line)** — still open, deliberately. B1 landed, so "no party list" is true
+  now; the sentence about "nothing beyond the tokens on the map" still overstates what `off`
+  withholds. **Recommended: rewrite the copy, do not change the projection.** `off` means *no sheet*,
+  and the field table's rule 2 is why the rest stays.
+- **§5.2 (`/replays` rows)** — implemented as ruled. Lane B's honest read: **better as a list, slightly
+  worse as a row** — without the card's fill, a row's three controls have no ground under them at
+  390×844. If it reads worse to the client, the middle is `background: var(--surface-1)` on the row,
+  keeping the rule and dropping the rim. **Not** a return to `.nh-card`.
+  A measured bonus: dropping `.nh-card` removed its `isolation: isolate`, and with it §6's known
+  row-menu occlusion. Paired at identical geometry, the open menu's first item hit-tested to the next
+  row's Watch button before and to itself after.
+- **§5.3 (tone for actionless empty states)** — **resolved against the director's own recommendation.**
+  The recommendation was a deliberate no-action line; measured, both cards have a real destination
+  where the action actually lives (pins are placed in the Atlas; tags are typed on a page), and the
+  old copy already named the next step in prose. Making an instruction clickable is not inventing a
+  door. Tags takes its door on the empty state only, because `tags` is unbounded and a populated card
+  IS the full list — which is `DashCard`'s own contract, not an exception to it.
+
+### Phase 6 — three things no QA pass caught, because they are only visible on a whole surface
+
+1. **Ruling 2 was undelivered on Roster and Scenes.** The door on a gallery surface is not a panel —
+   it is the one action that takes you in. `--nh-glow` at rest on that button only.
+2. **Nine magenta "Go live" buttons made the door invisible.** The same defect the client named on the
+   initiative panel, on a surface nobody re-checked. Magenta is the edge now, not the field.
+   After: 9 primaries on `/scenes`, **exactly 1 filled and 1 glowing**, plus the live card's glow in
+   the grid — one glowing element per region, which is ruling 2's restraint rule exactly.
+3. **The add-new tile was the last dashed box in the app.** Missed because it is not an `.nh-empty`.
+   Swept after: **0 dashed borders** on `/scenes`, `/scenes/maps`, `/roster`, `/settings`, `/homebrew`.
+
+### Owed forward — real, measured, and nobody's yet
+
+| Item | The measurement |
+|---|---|
+| **`/replays` row-menu isolation** | Fixed **by accident** via B6. The general bug remains: `isolation: isolate` is on `.chamfer, .rim, .bezel, .rim-lit, .cue` (`design-tokens.css:1012`), which is most of the app. Still needs its own packet. |
+| **Landscape pane, out of combat** | Overflows **81px** at 844×390 and 667×375 — the encounter-setup panel is taller than the sheet floor. Pre-existing; Lane A's band ceiling cut 38px off it. |
+| **Player's landscape table** | Overflows **52px in combat, 302px out of it**: an unclaimed player gets `ClaimCharacter` in the sheet and it does not fit at 375–390px of height. `actors/ClaimCharacter.tsx`. Worth a packet. |
+| **The `12.75rem` constant** | `encounter-map.css`'s band ceiling is read off boxes in `styles.css` (44 tab bar + 132 sheet floor + 20 padding + 8 gap). If any of those move, it moves. Said at the site. |
+| **§6's "14px dock overflow"** | Superseded: it is **38px / 53px**, through the map band, and it is now zero. |
+| **Ruling 21 (`.sign`)** | Still unbuilt, still not a violation (its wording is permissive), still needs the client's eye rather than an agent's. No reversal is owed — you cannot reverse what was never built. |
+
+**Tap audit reads 10 below the floor (was 7).** Not a regression: the three new ones are
+`g.encounter-token` at 20.1×20.1 / 60.4 / 71.7 — an exact 1:3:3.5 grid ratio, i.e. the map's own
+scale at a 375px viewport. Nothing in this phase touched token geometry, and the band ceiling is
+inert at the audit's 375×**900**. The live scene changed during the session when the fight was
+restarted and probe tokens were placed. **This is a data difference, not code.**
