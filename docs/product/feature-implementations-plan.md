@@ -3,16 +3,52 @@
 **Status:** issues logged 2026-08-07; **D1–D7 decided**; **4-agent intake complete**; **plans written**.
 **Area 1 in progress** — see below. Areas 2, 3 and 4 not started.
 
-**Area 1 landed so far** (verified, not asserted): Stage 0 (`6205a01`) — `apps/server/tsconfig.json` is
-`"include": ["src", "test"]` and the drift it hid is fixed. Stage 1 / `2a` (`78cc194`) — **149 class-feature
-stubs → 0**, counted. Issues `1`, `2b`, `2c` (`d1f01cf`) — complete with 8 tests incl. negative controls.
-Stage 2 / `2e` (`e60656d`) — **code written, NOT verified**: `feature-riders.test.ts` does not exist, so
-nothing proves a class feature's rider reaches a roll. Read that commit's message before trusting it.
-**Still open in Area 1:** Stage 2's far-end tests · Stage 3 (all four gaps absent) · Stage 4 content ·
-Stage 5 weapon mastery · Stage 6 generator · **the `HAND_AUTHORED`-vs-overlay question, which blocks Stage 4.**
+**Area 1 foundation is COMPLETE — Stages 0–3 done and verified.** Content authoring (Stage 4),
+weapon mastery (Stage 5) and the generator (Stage 6) remain.
 
-Tiers at `e60656d`: `npm run check` exit 0 · `npm run test` 162 files / **2,231 tests** / 0 failures
-(baseline was 161 / 2,215).
+| Stage | Commit | State |
+|---|---|---|
+| 0 — H1 typecheck | `6205a01` | `apps/server/tsconfig.json` is `"include": ["src", "test"]`; drift fixed; ledger entry deleted |
+| 1 — `2a` prose | `78cc194` | **149 class-feature stubs → 0**, counted directly |
+| `1`, `2b`, `2c` | `d1f01cf` | Complete, 8 tests incl. negative controls |
+| 2 — `2e` plumbing | `e60656d` + `d4c25fa` | **See the correction below** |
+| 3 — schema gaps | `c85ff11`, `c571514`, `7a822fa` | All four landed |
+| Stage 4 mechanism | `6a109a9` | Answered and prototyped on Rage |
+
+> **`2e` was dead code, and only the tests found it.** `e60656d` put `character.features` on the schema,
+> indexed the catalog and wrote `characterFeatureCarriers` — all correct — but **the builder never wrote
+> the array.** `origin` was computed onto every `granted` row and dropped at the `interpretFeature` loop,
+> so `features ?? []` was always `[]` and a class feature's 13 roll-time riders still went nowhere.
+> **It typechecked.** Fixed by `dedupeFeatureRefs` (`apps/server/src/character-build.ts:427`, emitted at
+> `:807`), which skips `origin: null` rows so a feat does not get a second carrier and double every rider.
+>
+> **Non-vacuity is proved, not assumed:** with `features: heldFeatures` commented out, **15 of 24 tests
+> fail**; the 9 that survive are the negative controls and fail-open cases. `feature-riders.test.ts` is
+> 39 tests across all 13 carrier variants × all 6 carrier kinds. Fail-open is a test, not an assertion —
+> a definition with no `features` array (PDF imports, the example party, bundled monsters) derives
+> identically.
+>
+> **The lesson for every remaining area: "it typechecks" is not evidence a rider reaches the table.**
+
+**Agonizing Blast works, with a number** (D5 closed): CHA 17 → damage `[1d10 force 7, "3" force 3]`,
+total 10; the same rider on a CHA-12 sheet adds 1. `spell-id-is` trigger, `ActorAction.spellId`, and
+`extra-damage.abilityModifier`. `spell-school-is` / `spell-level-is` remain inert — no consumer populates
+them; only `spellId` was wired.
+
+**Pools projection — Area 2's `3b` binds to exactly this:**
+```ts
+pools?: Array<{ id: string; name: string; limit: number; per: string }>
+```
+`id` is **exactly** the `actionUses` key (`uses.pool ?? action.id`) — not a new namespace. `limit` is the
+max over members sharing pool **and** rest scope, so Cleric's 3 Channel Divinity reads **2**, not Preserve
+Life's printed 1. Derived by `actionPools` (`effective-actions.ts:115`), emitted at `projections.ts:277`,
+never stored. **Caveat for Area 2:** derived from `definition.actions`, so item-raised limits are not
+reflected — `projectPlayerView` has no content catalog and must stay a pure function of `GameState`.
+*Viewer safety:* `pools` ships under `resourcesVisible`, strictly narrower than the `sheetVisible` gate
+under which the whole definition (every `uses.limit` included) already ships. Viewer projection untouched.
+
+Tiers at `6a109a9`, verified independently by the lead: `npm run check` exit 0, 0 TS errors ·
+`npm run test` **164 files / 2,281 passed / 1 skipped / 0 failures** (baseline was 161 / 2,215).
 **Read this when:** picking up this work, or after a context compaction lost the thread.
 
 This document exists because the work below spans many sessions and must outlive any one of them.
@@ -749,6 +785,22 @@ is a printed column, not a namespace** — bind them by convention and enforce w
 
 **Stage 4 — content authoring.** 242 records, 226 remaining (16 currently mechanical).
 **SRD 5.2.1 ships exactly one subclass per class — 12 records, not 40.**
+
+> **D8 — the mechanism is a MECHANICS OVERLAY the ETL merges. Settled and prototyped (`6a109a9`).**
+> Do not promote classes to `HAND_AUTHORED`. The ETL's cross-check compares structure but **deliberately
+> not prose** ("descriptions are legitimately reworded in places"), so frozen prose would drift from the
+> source silently — nine times over, purely to have somewhere to hang three lines of riders. It would also
+> undo Stage 1's 149-stub fix. **This package already made this exact call once and wrote down why**, for
+> spell lists: *"a membership OVERLAY, never an edit to `spells.v1.json` … hand-editing is destroyed by
+> the next rebuild."*
+>
+> Authoring surface: `packages/content-srd-5.2.1/scripts/class-mechanics.ts`. The ETL merges it,
+> **fails the build on an unmatched key**, and `ClassReferenceSchema.parse`s every record.
+> Prototyped on Rage: the merged record carries the SRD's own 500+ char paragraph **and** the authored
+> riders, with `uses` scaling off the printed Rages column — which then drops `display: true` and makes
+> the content test **require** that pool. **Every column Stage 4 wires up tightens the ratchet by one.**
+> `SUBCLASS_MECHANICS` is declared and empty; the ETL does not merge it yet — wire that before S3.
+> Rage Damage was deliberately left prose: no column-scaled `damage-bonus` exists in the vocabulary yet.
 
 | Sub-stage | Body | Count |
 |---|---|---|
