@@ -369,3 +369,154 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000032" }, deps(built, []))).toThrow();
   });
 });
+
+// -------------------------------------------------------------------------------------------------
+// WARLOCK - the 28 Eldritch Invocations
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * A level-5 Warlock holding FOUR filler invocations plus whichever one is under test, so every
+ * build below is exactly on the printed budget of five.
+ */
+const withInvocation = (id: string, extra: readonly Row[] = []) => buildCharacterDefinition(warlockInput(5, [
+  invocation(1, "armor-of-shadows"), invocation(2, "mask-of-many-faces"), invocation(2, "misty-visions"),
+  invocation(5, "master-of-myriad-forms"), invocation(5, id),
+  // The level-4 ASI goes into Dexterity so Charisma stays at the Acolyte's 17 (+3) - the number
+  // Agonizing Blast's damage is checked against below.
+  ...asisFor(5, "dex"), ...extra
+]), library, POLICY);
+/** The same Warlock with a fifth FILLER instead - the negative control for every assertion below. */
+const withoutInvocation = () => withInvocation("one-with-shadows");
+
+describe("Warlock invocations: the eleven free castings are handed over (audit rows 37-47)", () => {
+  it("puts each granted spell on the sheet as always-prepared, and free of the prepared budget", () => {
+    // Four of the eleven, taken together, and none of them is even on the Warlock spell list -
+    // which is the point: `grants.spells` hands over a spell the class could never have prepared.
+    const built = withInvocation("otherworldly-leap");
+    for (const [id, level] of [["mage-armor", 1], ["disguise-self", 1], ["silent-image", 1], ["alter-self", 2], ["jump", 1]] as const) {
+      expect(spellOf(built, id)).toMatchObject({ id, level, alwaysPrepared: true, prepared: true });
+    }
+    // A level-5 Warlock prepares 6 spells. Five granted castings on top, all uncharged - the only
+    // charged entry on this sheet is the Magic Initiate spell the background handed over.
+    expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "warlock", prepared: 6 });
+    expect((built.spellcasting!.spells ?? []).filter((spell) => spell.alwaysPrepared === false).map((spell) => spell.id))
+      .toEqual(["bless"]);
+  });
+
+  it("hands over NOTHING when the invocation was not taken", () => {
+    // The negative control: the same class, the same level, one different invocation id.
+    expect(spellOf(withoutInvocation(), "jump")).toBeUndefined();
+    expect(spellOf(withoutInvocation(), "invisibility")).toMatchObject({ id: "invisibility", alwaysPrepared: true });
+  });
+
+  it("gives Gift of the Depths the once-per-Long-Rest counter the SRD prints, and spends it", () => {
+    // The one of the eleven the text limits. The other ten are at will and carry no pool at all.
+    const built = table(withInvocation("gift-of-the-depths"));
+    expect(spellOf(built.definition, "water-breathing")).toMatchObject({ level: 3, alwaysPrepared: true });
+    expect(actionOf(built, "gift-of-the-depths").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    resolveDefinitionAction(built.state, actionOf(built, "gift-of-the-depths"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000040" }, deps(built, []));
+    expect(built.hero.actionUses["gift-of-the-depths"]).toBe(1);
+    expect(() => resolveDefinitionAction(built.state, actionOf(built, "gift-of-the-depths"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000041" }, deps(built, []))).toThrow();
+
+    // ...and an at-will one mints no pool, so the sheet is not littered with counters nobody spends.
+    const atWill = table(withInvocation("otherworldly-leap"));
+    expect(effectiveActions(atWill.definition, atWill.hero, atWill.catalog).some((entry) => entry.id === "otherworldly-leap")).toBe(false);
+  });
+});
+
+describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the blast (audit row 51)", () => {
+  /**
+   * Eldritch Blast as the sheet would cast it. The builder does not mint spell ACTIONS, so the
+   * cantrip is supplied here - but the RIDER under test comes from the real bundle, off the real
+   * chosen option, through the real derivation and the real resolver.
+   */
+  const ELDRITCH_BLAST = {
+    id: "eldritch-blast", name: "Eldritch Blast", activation: "action" as const,
+    description: "A beam of crackling energy streaks toward a creature.",
+    attack: { bonus: 6 }, damage: [{ formula: "1d10", type: "force" }], spellId: "eldritch-blast"
+  };
+
+  const blast = (id: string, faces: number[]) => {
+    const built = table(withInvocation(id));
+    return resolveDefinitionAction(built.state, ELDRITCH_BLAST,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000050" }, deps(built, faces));
+  };
+
+  it("rolls 1d10 force PLUS the Warlock's +3, and 1d10 alone without the invocation", () => {
+    // CHA 17 (+3) at level 5. Same two dice both times; the difference is the authored rider.
+    const bare = blast("one-with-shadows", [15, 7]);
+    expect(bare.damage).toEqual([{ formula: "1d10", type: "force", total: 7 }]);
+    expect(bare.damageTotal).toBe(7);
+
+    const agonized = blast("agonizing-blast", [15, 7]);
+    expect(agonized.damage).toEqual([
+      { formula: "1d10", type: "force", total: 7 },
+      { formula: "3", type: "force", total: 3 }
+    ]);
+    expect(agonized.damageTotal).toBe(10);
+    expect((agonized.warnings ?? []).some((warning) => warning.includes("+3 force (CHA)"))).toBe(true);
+  });
+
+  it("leaves a swing that is not that spell alone", () => {
+    // `spell-id-is` is what makes the gate sayable at all, and this is the proof it filters: the
+    // Warlock's own starting sickle is not Eldritch Blast and gains nothing.
+    const built = table(withInvocation("agonizing-blast"));
+    const swung = resolveDefinitionAction(built.state, actionOf(built, "item-sickle"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000051" }, deps(built, [15, 4]));
+    expect(swung.damage.some((part) => part.type === "force")).toBe(false);
+    expect(swung.damage).toEqual([{ formula: "1d4 - 1", type: "slashing", total: 3 }]); // Str 8, and no Charisma anywhere
+  });
+});
+
+describe("Warlock invocations: the ones that ask a question of their own (audit rows 24, 25, 50)", () => {
+  /**
+   * LESSONS OF THE FIRST ONES (audit row 24) IS DELIBERATELY NOT AUTHORED, and this pins why.
+   *
+   * `{kind: "feat"}` on an option's nested choice cannot be answered by the current builder: FEAT-
+   * kinded rows are settled in pass A and chosen OPTIONS in pass A2, so the offer would not exist
+   * when the row is matched - and leaving the row out fails the completeness check instead. Both
+   * directions reject, so authoring it would make the invocation untakeable rather than working.
+   * This test is the guard: if the pass ordering is ever fixed, it fails and says to author the row.
+   */
+  it("still takes Lessons of the First Ones as a bare option, because a nested FEAT pick cannot be answered yet", () => {
+    // Takeable today, granting only its prose - which is the honest state.
+    expect(() => withInvocation("lessons-of-the-first-ones")).not.toThrow();
+    // ...and the reason it is not authored: a feat row aimed at it finds no offer, because pass A
+    // ran before pass A2 created one.
+    expect(thrown(() => withInvocation("lessons-of-the-first-ones", [
+      { level: 5, classId: "warlock", kind: "feat", id: "tough", payload: { featureId: "lessons-of-the-first-ones" } } as Row
+    ]))).toMatch(/No feature "lessons-of-the-first-ones" offers a "feat" choice/);
+  });
+
+  it("Pact of the Blade asks which weapon, and records the answer", () => {
+    const built = withInvocation("pact-of-the-blade", [
+      { level: 5, classId: "warlock", kind: "weapon", id: "greatsword", payload: { featureId: "pact-of-the-blade" } } as Row
+    ]);
+    expect((built.character?.choices ?? []).some((row) => row.kind === "weapon" && row.id === "greatsword")).toBe(true);
+    expect(thrown(() => withInvocation("pact-of-the-blade")))
+      .toMatch(/"Pact of the Blade" needs 1 pick\(s\) of kind "weapon"/);
+  });
+
+  it("Pact of the Tome asks for THREE cantrips and puts all three on the sheet", () => {
+    const tome = (ids: readonly string[]) => withInvocation("pact-of-the-tome",
+      ids.map((id) => ({ level: 5, kind: "cantrip", id, payload: { featureId: "pact-of-the-tome" } } as Row)));
+    const built = tome(["chill-touch", "minor-illusion", "true-strike"]);
+    for (const id of ["chill-touch", "minor-illusion", "true-strike"]) {
+      expect(spellOf(built, id)).toMatchObject({ id, level: 0, prepared: true });
+    }
+    // A level-5 Warlock's own cantrip budget is 3 and it is untouched: the book's three are extra.
+    expect((built.spellcasting!.spells ?? []).filter((spell) => spell.level === 0)).toHaveLength(5); // 3 book + 2 Magic Initiate
+    expect(thrown(() => tome(["chill-touch", "minor-illusion"])))
+      .toMatch(/"Pact of the Tome" needs 3 pick\(s\) of kind "cantrip"/);
+    expect(thrown(() => tome(["chill-touch", "minor-illusion", "true-strike", "mage-hand"])))
+      .toMatch(/exceeds what this build may choose/);
+  });
+
+  it("Pact of the Chain hands over Find Familiar, free (audit row 36)", () => {
+    expect(spellOf(withInvocation("pact-of-the-chain"), "find-familiar"))
+      .toMatchObject({ id: "find-familiar", level: 1, alwaysPrepared: true, prepared: true });
+    expect(spellOf(withoutInvocation(), "find-familiar")).toBeUndefined();
+  });
+});

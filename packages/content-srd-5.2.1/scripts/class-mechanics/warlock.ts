@@ -49,7 +49,122 @@ export const warlock: ClassMechanicsModule = {
      * growth is the printed number at every one of the twenty rows.
      */
     "eldritch-invocations": {
-      extraPicks: [{ offer: "feature:eldritch-invocations", scaling: { type: "class-resource-growth", id: "eldritch-invocations" } }]
+      extraPicks: [{ offer: "feature:eldritch-invocations", scaling: { type: "class-resource-growth", id: "eldritch-invocations" } }],
+      /**
+       * THE TWENTY-EIGHT INVOCATIONS, and the reason Warlock read as broken however much prose
+       * landed: the ETL parses every `#### Agonizing Blast` heading into a real `FeatureOption`, and
+       * not one of them carried a rider. Eighteen were audit gaps on their own (rows 24, 25, 36,
+       * 37-47, 50, 51-53) - the largest single body in the census.
+       *
+       * ELEVEN ARE "you can cast X without expending a spell slot" (rows 37-47) and are one
+       * `grants.spells` line each. `alwaysPrepared` defaults true and is what makes them free: a
+       * granted spell does not eat one of the Warlock's prepared slots, and the spell need not be on
+       * the Warlock list at all (Mage Armor and Jump are not).
+       *
+       * The rest are named one by one below, each with what it authors or why it does not.
+       */
+      options: {
+        /**
+         * AGONIZING BLAST - audit row 51, closed as far as ruling E allows.
+         *
+         * "You can add your Charisma modifier to that spell's damage rolls" is exactly the pair of
+         * schema additions Stage 3 made for it: `extra-damage.abilityModifier` (the amount is a
+         * property of the CHARACTER, so no authored constant is right) and the `spell-id-is` trigger
+         * (no combination of school and level picks out one cantrip).
+         *
+         * WHICH cantrip stays prose. The printed text is "choose one of your known Warlock cantrips
+         * that deals damage", which is ruling E's `fromPicks` - a pick over the character's own
+         * earlier answers - and it is specified, not built. The gate therefore names Eldritch Blast,
+         * the one the SRD itself recommends under Pact Magic and the one this invocation exists for.
+         * A Warlock who spends it on Poison Spray instead adds their Charisma by hand, exactly as
+         * they do today; naming all four damaging Warlock cantrips would be worse, because it would
+         * apply to every one of them at once instead of to the one chosen.
+         */
+        "agonizing-blast": {
+          modifiers: [{
+            type: "extra-damage", abilityModifier: "cha", damageType: "force",
+            when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
+          }]
+        },
+        // ---- the eleven at-will / once-a-day castings (audit rows 37-47) -------------------------
+        "armor-of-shadows": { grants: { spells: [{ id: "mage-armor", level: 1 }] } },
+        "ascendant-step": { grants: { spells: [{ id: "levitate", level: 2 }] } },
+        "fiendish-vigor": { grants: { spells: [{ id: "false-life", level: 1 }] } },
+        /**
+         * The one of the eleven the SRD limits ("once ... you regain the ability when you finish a
+         * Long Rest"), so it takes a counter as well as the spell. The Swim Speed half stays prose:
+         * `speed` is one number and there is no per-movement-mode vocabulary.
+         */
+        "gift-of-the-depths": {
+          grants: { spells: [{ id: "water-breathing", level: 3 }] },
+          uses: { limit: 1, per: "long-rest" }
+        },
+        "mask-of-many-faces": { grants: { spells: [{ id: "disguise-self", level: 1 }] } },
+        "master-of-myriad-forms": { grants: { spells: [{ id: "alter-self", level: 2 }] } },
+        "misty-visions": { grants: { spells: [{ id: "silent-image", level: 1 }] } },
+        /** The "while you're in Dim Light or Darkness" gate stays prose - there is no light-level trigger. */
+        "one-with-shadows": { grants: { spells: [{ id: "invisibility", level: 2 }] } },
+        "otherworldly-leap": { grants: { spells: [{ id: "jump", level: 1 }] } },
+        "visions-of-distant-realms": { grants: { spells: [{ id: "arcane-eye", level: 4 }] } },
+        "whispers-of-the-grave": { grants: { spells: [{ id: "speak-with-dead", level: 3 }] } },
+        // ---- the picks an invocation makes on top of itself --------------------------------------
+        /**
+         * PACT OF THE BLADE - audit row 25, its pick half.
+         *
+         * `fromCatalog: "weapons"` is the whole equipment catalog, which is wider than the printed
+         * "a Simple or Martial Melee weapon": there is no filter vocabulary on a catalog slug, and
+         * the audit's own note for this row authors it the same way. The PROFICIENCY half ("you have
+         * proficiency with the weapon") is left prose - `grants.weapons` names proficiency GROUPS,
+         * so the only sayable version hands over every Simple and Martial weapon, and the correct
+         * version is a rider conditioned on the answer just given, which is ruling F.
+         */
+        "pact-of-the-blade": { choice: { kind: "weapon", choose: 1, fromCatalog: "weapons" } },
+        /** PACT OF THE CHAIN - audit row 36. "You learn Find Familiar and can cast it ... without a slot." */
+        "pact-of-the-chain": { grants: { spells: [{ id: "find-familiar", level: 1 }] } },
+        /**
+         * PACT OF THE TOME - audit row 50, as far as ruling D allows.
+         *
+         * The three cantrips are authored; the two level-1 Ritual spells are not. Ruling D: there is
+         * no catalog slug meaning "every class's spell list" (that would be a `SpellListReference`
+         * overlay with `basedOn: [...]`, which is a homebrew-merge path an SRD bundle record cannot
+         * point at), and there is no way to filter on the Ritual tag at all. `warlock-spells` is the
+         * narrower list the ruling names; the book's own text carries the rest.
+         */
+        "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
+        /*
+         * THE FIFTEEN LEFT AS PROSE, named so the absence is a decision and not an oversight:
+         *
+         *   lessons-of-the-first-ones (row 24)
+         *                                   - NOT closable, and authoring it would make the
+         *                                     invocation UNTAKEABLE. `{kind:"feat"}` on an option's
+         *                                     nested choice cannot be answered: `character-build.ts`
+         *                                     settles FEAT-kinded rows in pass A and chosen OPTIONS
+         *                                     in pass A2, so the offer this would create does not
+         *                                     exist yet when the feat row is matched ("No feature
+         *                                     'lessons-of-the-first-ones' offers a 'feat' choice"),
+         *                                     and omitting the row fails the completeness check
+         *                                     instead. Spelling the kind something else to dodge
+         *                                     pass A would record the feat and never interpret it,
+         *                                     which is the silent drop this area exists to end.
+         *                                     It needs the pass-ordering work ruling E specifies.
+         *   devils-sight, witch-sight       - `sense`/`darkvision` are display-only by design
+         *                                     (`CARRIER_RIDER_DISPOSITION`); the prose already says it.
+         *   eldritch-mind                   - `roll-mode` has a `concentration` roll and NO consumer
+         *                                     reads it; `roll: "save"` + `ability-is: con` would be
+         *                                     advantage on every Constitution save, which is wrong.
+         *   eldritch-spear (row 52),
+         *   repelling-blast (row 53)        - ruling E (a pick over the character's own answers), and
+         *                                     neither a spell's range nor forced movement is sayable.
+         *   thirsting-blade, devouring-blade,
+         *   eldritch-smite, lifedrinker     - all four scope to "your pact weapon" and the trigger
+         *                                     vocabulary cannot name one conjured weapon. Unscoped,
+         *                                     Thirsting Blade would hand out an Extra Attack with a
+         *                                     longbow.
+         *   gaze-of-two-minds, gift-of-the-protectors,
+         *   investment-of-the-chain-master  - perception, a named page, and a familiar's own stat
+         *                                     block: no numbers this vocabulary reaches.
+         */
+      }
     },
     /** The sheet's spellcasting grouping slug, exactly as the hand-authored Wizard tags its own. */
     "pact-magic": { tags: ["spellcasting"] },
