@@ -208,10 +208,38 @@ vulnerability to a damage type has that effect ignored when damage of that type 
 vulnerability for that type is applied to the amount, and the applied adjustment is visible in the
 feed so the table can see why the number changed.
 
-**Recon note.** This is the deepest item on the register. The `damage-reduction` rider is explicitly
-unread, with the reason recorded in `apps/server/src/character-build.ts:217-218`: *"no incoming-damage
-path collects riders at all yet."* This is not a half-built feature — the incoming-damage path does
-not exist. Expect new server surface, and expect `apps/server/test/` (see **H1**) to bite.
+> **Correction, 2026-08-07 (intake).** The original recon note here claimed *"the incoming-damage
+> path does not exist."* **That was wrong.** The quoted comment at `character-build.ts:217-218` is
+> about **riders**, not about damage. Verified at HEAD: `apps/server/src/hit-points.ts:65`
+> `applyDamageDetailed` exists, collects defenses from four sources — definition RVI (`:50`), active
+> effects (`effects.ts:235`), item grants (`deriveEquipment`), and Petrified/Underwater (`:88-90`) —
+> and runs them through `packages/rules-5e/src/combat.ts:29 adjustDamageParts` (`hit-points.ts:91`).
+> Three of six call sites already narrate the adjustment.
+>
+> **So the Observed above is false for definition RVI, active-effect resistance and item-granted
+> resistance — those work.** It is true for exactly four things, and those are the real scope:
+>
+> 1. **Flat `damage-reduction` is unread.** The rider reaches `collectRiders` and nothing consumes it.
+> 2. **Vulnerability has exactly one channel.** `damageVulnerabilities` is read only at
+>    `hit-points.ts:54` and written only onto an `ActorDefinition`. `InterpretedFeatures`
+>    (`character-build.ts:161-163`) carries resistances and immunities but **no** vulnerabilities;
+>    `effectDamageDefenses` returns resistances only. **A player character can never be vulnerable,
+>    and no effect or item can grant vulnerability to anything.**
+> 3. **The adjustment is invisible on 3 of 6 paths.** `save.answer` and both reaction paths narrate
+>    only the total — and `saving-throws.ts:306` discards `outcome.application.parts` into a bare
+>    `appliedDamage`, so the client could not render it even if it wanted to.
+> 4. **The untyped `amount` path** (`hit-points.ts:117-120`) deliberately skips all defense maths.
+>    That is correct behaviour, but it is the GM's most-used entry point — which is very likely why
+>    the table experiences "fire damage isn't fire damage."
+>
+> **Size drops from XL to L**, and the shape changes: this extends an existing pipeline rather than
+> building one. Do not plan a new incoming-damage path — `applyDamageDetailed` is the single entry
+> point and every call site already routes through it.
+
+**Stacking rules** (SRD 5.2.1, as `combat.ts:29-42` already implements them and as they must stay):
+immunity wins outright → 0; resistance halves rounding down; vulnerability doubles; **resistance and
+vulnerability on the same type cancel to normal** rather than compounding; multiple sources of the
+same resistance halve once. Flat reduction applies **after** all of that, per total, floored at 0.
 
 ---
 
