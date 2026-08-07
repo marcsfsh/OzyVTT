@@ -1140,6 +1140,7 @@ const homebrewChoiceBase = {
   from: { type: "array", minItems: 1, maxItems: 80, items: contentSlug, description: "Explicit option ids. Must name at least one - an empty list is an authoring mistake, not \"no options offered\". Omit the field entirely when `fromCatalog` or `options` supplies the list" },
   fromCatalog: { ...contentSlug, description: "An open catalog slug resolved at pick time (skills, feats, wizard-spells)" },
   maxSpellLevel: { type: "integer", minimum: 0, maximum: 9, description: "Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only)" },
+  maximum: { type: "integer", minimum: 1, maximum: 30, description: "Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons (\"increase one ability score by 1, to a maximum of 30\") do the second" },
   repeatable: { type: "boolean", default: false, description: "The same option may be picked more than once (Expertise across levels)" }
 } as const;
 /** Everything an action carries EXCEPT `attack`/`save`, which is the only place a statblock action (flat numbers) and a feature action (derived from the character) differ. Mirrors `ActionSchema` minus those two - the same omit Zod's `FeatureActionSchema` performs. */

@@ -5345,6 +5345,7 @@ A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an ope
 | `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 | `options` | HomebrewFeatureOption[] | no | Options carrying their own mechanics. Mutually exclusive with `from` |
 
@@ -5426,6 +5427,7 @@ THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureCho
 | `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 
 ### `HomebrewFeatureSave`

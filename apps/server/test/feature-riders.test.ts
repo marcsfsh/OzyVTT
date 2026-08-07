@@ -103,6 +103,9 @@ type Homebrew = Readonly<{
   modifiers?: readonly unknown[];
   actions?: readonly unknown[];
   scores?: Record<string, number>;
+  /** Adds an epic-boon-shaped ability-score CHOICE to the class: a number is its `maximum`, `false` authors none. */
+  boon?: number | false;
+  method?: string;
   /** The background spread, when the default STR/CON one is not the ability under test. */
   spread?: ReadonlyArray<{ ability: string; amount: number }>;
 }>;
@@ -122,7 +125,7 @@ function classFor(brew: Homebrew) {
   const levelTable = Array.from({ length: 20 }, (_, index) => ({
     level: index + 1,
     proficiencyBonus: 2 + Math.floor(index / 4),
-    features: index === 0 ? ["rift-attunement", "rift-focus", "rift-surge"] : []
+    features: index === 0 ? ["rift-attunement", "rift-focus", "rift-surge", ...(brew.boon === undefined ? [] : ["rift-apotheosis"])] : []
   }));
   return ClassReferenceSchema.parse({
     id: "hb-riftwarden", name: "Riftwarden", source: "homebrew", summary: "A homebrew class.",
@@ -150,6 +153,14 @@ function classFor(brew: Homebrew) {
           ]
         }
       },
+      ...(brew.boon === undefined ? [] : [{
+        id: "rift-apotheosis", name: "Rift Apotheosis", level: 1,
+        description: "Increase one ability score by 1, to a maximum of 30.",
+        choice: {
+          kind: "ability-score", choose: 1, from: ["str", "dex", "con", "int", "wis", "cha"],
+          ...(typeof brew.boon === "number" ? { maximum: brew.boon } : {})
+        }
+      }]),
       {
         id: "rift-surge", name: "Rift Surge", level: 1, description: "You surge with rift energy.",
         actions: [{
@@ -201,7 +212,7 @@ function libraryWith(brew: Homebrew = {}): ContentLibrary {
  */
 const heroInput = (brew: Homebrew = {}): CharacterCreateRequestInput => ({
   name: "Vess", speciesId: "hb-riftborn", backgroundId: "hb-riftwalker", classId: "hb-riftwarden", level: 5,
-  subclassId: "hb-riftbreaker", abilityMethod: "standard-array",
+  subclassId: "hb-riftbreaker", abilityMethod: (brew.method ?? "standard-array") as CharacterCreateRequestInput["abilityMethod"],
   baseScores: (brew.scores ?? { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 }) as CharacterCreateRequestInput["baseScores"],
   backgroundBonusAllocation: (brew.spread ?? [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }]) as CharacterCreateRequestInput["backgroundBonusAllocation"],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
@@ -209,7 +220,8 @@ const heroInput = (brew: Homebrew = {}): CharacterCreateRequestInput => ({
     { level: 1, kind: "lineage", id: "hb-riftborn-deep" },
     { level: 1, kind: "rift-form", id: "rift-blade", payload: { featureId: "rift-focus" } },
     { level: 3, classId: "hb-riftwarden", kind: "subclass", id: "hb-riftbreaker" },
-    { level: 1, kind: "equipment", id: "riftwarden-a" }
+    { level: 1, kind: "equipment", id: "riftwarden-a" },
+    ...(brew.boon === undefined ? [] : [{ level: 1, kind: "ability-score", id: "str", payload: { featureId: "rift-apotheosis" } }])
   ] as CharacterCreateRequestInput["choices"]
 });
 
@@ -716,5 +728,52 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
     // The d4 rolled a 2, and CHA added 3: ONE entry of 5, because it is one rider.
     expect(blasted.damage.at(-1)).toEqual({ formula: "1d4", type: "force", total: 5 });
     expect(blasted.damageTotal).toBe(12);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// An ability-score CHOICE may name its own ceiling - the seven epic boons
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * `FeatureChoiceSchema.maximum`, and the reason the modifier's `maximum` was not enough.
+ *
+ * The two are different mechanisms: an `ability-score` RIDER raises a NAMED ability by a fixed
+ * amount and has honoured `maximum` all along; a CHOICE lets the player pick which ability, and the
+ * epic boons do the second - "increase one ability score by 1, to a maximum of 30". The offer
+ * consumer clamped every chosen point at a hard-coded 20, so all seven boons did nothing at all for
+ * the only character who ever takes one: a level-19 character already sitting at 20.
+ */
+describe("an ability-score choice raises past 20 when it says so", () => {
+  /** STR 18 rolled + the background's +2 = exactly 20 BEFORE the boon, which is the interesting case. */
+  const AT_TWENTY = {
+    method: "roll",
+    scores: { str: 18, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+    spread: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }]
+  } as const;
+
+  it("takes STR from 20 to 21 when the choice names a maximum of 30", () => {
+    const built = build({ ...AT_TWENTY, boon: 30 });
+    expect(built.definition.abilityScores.str).toBe(21);
+    // And the number reaches the TABLE, not just the definition: +5 from STR 21, +3 proficiency.
+    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8);
+  });
+
+  it("stops at 20 when the choice names no maximum - the SRD default is unchanged", () => {
+    // The negative control that matters: the fix must not quietly lift the cap for every choice.
+    const built = build({ ...AT_TWENTY, boon: false });
+    expect(built.definition.abilityScores.str).toBe(20);
+    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8); // +5 either way; the SCORE is the assertion
+  });
+
+  it("honours a maximum BELOW 20 too, because the field is a ceiling and not a boon flag", () => {
+    const built = build({ ...AT_TWENTY, boon: 20 });
+    expect(built.definition.abilityScores.str).toBe(20);
+  });
+
+  it("still climbs when the score is nowhere near either ceiling", () => {
+    // Standard array STR 15 + background 2 = 17, and the boon's +1 makes 18 whatever the ceiling is.
+    expect(build({ boon: 30 }).definition.abilityScores.str).toBe(18);
+    expect(build({ boon: false }).definition.abilityScores.str).toBe(18);
   });
 });

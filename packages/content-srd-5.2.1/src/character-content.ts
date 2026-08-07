@@ -290,6 +290,17 @@ const featureChoiceBase = {
   fromCatalog: ContentIdSchema.optional(),
   /** Only options at or below this level are legal (spell picks). */
   maxSpellLevel: z.number().int().min(0).max(9).optional(),
+  /**
+   * The ceiling an ability-score pick from THIS choice may raise a score to; absent = the SRD's 20.
+   *
+   * The sibling of `ability-score`'s own `maximum` (the modifier variant above), and it has to exist
+   * separately because the two are different mechanisms: a modifier RAISES a named ability by a fixed
+   * amount, while a choice lets the player pick WHICH ability - and the epic boons do the second.
+   * "Increase one ability score by 1, to a maximum of 30" was previously unsayable: the offer
+   * consumer hard-clamped every chosen point at 20, so all seven epic-boon feats silently did nothing
+   * for a character already at 20 - which is precisely the character who has one.
+   */
+  maximum: z.number().int().min(1).max(30).optional(),
   /** The same option may be picked more than once (Expertise across levels). */
   repeatable: z.boolean().default(false)
 } as const;

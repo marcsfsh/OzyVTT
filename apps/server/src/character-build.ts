@@ -115,12 +115,14 @@ type ChoiceOffer = {
   unresolvable: string | null;
   repeatable: boolean;
   maxSpellLevel: number | null;
+  /** The ceiling an ability-score pick from this offer may reach; null = the SRD's 20 (epic boons say 30). */
+  maximum: number | null;
   label: string;
   taken: string[];
 };
 
 function offerOf(partial: Pick<ChoiceOffer, "key" | "kind" | "capacity" | "options" | "label"> & Partial<ChoiceOffer>): ChoiceOffer {
-  return { featureId: null, featureAliases: [], optionLevels: null, optionRecords: null, unresolvable: null, maxSpellLevel: null, repeatable: false, taken: [], ...partial };
+  return { featureId: null, featureAliases: [], optionLevels: null, optionRecords: null, unresolvable: null, maxSpellLevel: null, maximum: null, repeatable: false, taken: [], ...partial };
 }
 
 /**
@@ -609,7 +611,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     offers.push(offerOf({
       key: `feature:${record.id}`, featureId: record.id, featureAliases, kind: choice.kind, capacity: choice.choose * count,
       options, optionLevels, optionRecords: choice.options ?? null, unresolvable, repeatable: choice.repeatable,
-      maxSpellLevel: choice.maxSpellLevel ?? null, label: record.name
+      maxSpellLevel: choice.maxSpellLevel ?? null, maximum: choice.maximum ?? null, label: record.name
     }));
   };
   for (const { record, count } of granted) featureOffer(record, count);
@@ -744,12 +746,18 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     if (total !== 2) reject("An Ability Score Improvement grants exactly +2 (one ability +2, or two abilities +1).");
   }
   // A consumed "ability-score" pick (the ASI feat's choose-2, a boon's choose-1) is +1 to that
-  // ability, capped at 20 - the choice vocabulary carries no amount, so one point per pick is the
-  // only reading that fits every printed use; raising past 20 (epic boons) stays unmodeled for now.
+  // ability - the choice vocabulary carries no amount, so one point per pick is the only reading that
+  // fits every printed use.
+  //
+  // THE CEILING IS THE OFFER'S, not a constant. This clamp was `Math.min(20, ...)`, which made all
+  // seven epic-boon feats do nothing at all: "increase one ability score by 1, to a maximum of 30"
+  // is taken at level 19 by a character whose score is already 20, so every point was clamped away
+  // silently. The modifier path beside this one has honoured `maximum` all along; the CHOICE path
+  // had no field to honour until `FeatureChoiceSchema` grew one.
   for (const offer of offers.filter((candidate) => candidate.kind === "ability-score")) {
     for (const taken of offer.taken) {
       const ability = ABILITIES.find((candidate) => candidate === taken) ?? reject(`"${taken}" is not an ability.`);
-      finalScores[ability] = Math.min(20, finalScores[ability] + 1);
+      finalScores[ability] = Math.min(offer.maximum ?? 20, finalScores[ability] + 1);
     }
   }
   for (const feat of chosenFeats) {
