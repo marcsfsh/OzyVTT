@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { BuilderAbilityMethod, ContentFeatureSummary, GmView, PlayerView } from "@vtt/domain";
+import type { BuilderAbilityMethod, ContentFeatureSummary, ContentSpellSummary, GmView, PlayerView } from "@vtt/domain";
 import {
   ABILITIES, ABILITY_ROLL_FORMULA, ABILITY_SCORE_MAXIMUM, ABILITY_SCORE_MINIMUM, abilityModifier,
   hitDieAverage, hitDieFaces, POINT_BUY_BUDGET, POINT_BUY_MAXIMUM, POINT_BUY_MINIMUM, STANDARD_ARRAY,
@@ -11,6 +11,10 @@ import {
   type FeatureItem, type ReviewSection, type StepItem
 } from "@vtt/ui";
 import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
+/* The SAME spell card the fight uses (`encounter/spells.tsx`) — header, the four reference lines,
+   the full description and the upcast note, in a `Modal`. Reused rather than re-specified: a spell's
+   rules must not read one way while choosing it and another way while casting it. */
+import { SpellCard } from "../encounter/spells";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import {
@@ -62,6 +66,25 @@ export type CharacterBuilderProps = Readonly<{
 
 /** How long Create waits for the table's answer before offering the (idempotent) retry. */
 const CREATE_ACK_TIMEOUT_MS = 10_000;
+
+/**
+ * How many options an offer has to carry before its ANSWERED form is worth folding down to chips —
+ * and, at the same number, before the grid earns a search box.
+ *
+ * One constant for both because they are the same judgement: a list long enough to need searching is
+ * a list long enough that leaving it open after it has been answered costs more than it says. Below
+ * it, the whole question fits on screen and the answered grid IS the answer — every option the
+ * player did not take is still there, greyed once the offer is full, and one tap on their own pick
+ * puts the rest back. That is the reported defect: an Elf's Keen Senses (three options) folded to a
+ * single chip the moment it was answered, so the two skills that were declined vanished.
+ *
+ * The fold itself is LOAD-BEARING above the threshold and must not be deleted to close that: a
+ * Wizard's answered level-20 features step measures 1,933px with it and 24,222px without.
+ */
+const COLLAPSE_THRESHOLD = 8;
+
+/** The offer kinds whose options are spells, and therefore have rules worth reading while choosing. */
+const SPELL_KINDS: ReadonlySet<string> = new Set(["spell", "cantrip"]);
 
 const METHOD_LABELS: Readonly<Record<BuilderAbilityMethod, string>> = {
   "standard-array": "Standard array", "point-buy": "Point buy", roll: "Roll 4d6", custom: "GM formula"
@@ -140,13 +163,22 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   const picks = draft.picks[offer.key] ?? [];
   const complete = picks.length === offer.capacity;
   const [expanded, setExpanded] = useState(false);
+  /** Only a list long enough to be worth hiding hides. See `COLLAPSE_THRESHOLD`. */
+  const foldable = offer.options.length > COLLAPSE_THRESHOLD;
   /**
    * DERIVED, never stored. An offer whose picks are pruned away by a change upstream (a new class,
    * a granted origin feat) becomes incomplete, and therefore open again, with no stale "collapsed"
    * flag anywhere to invalidate. It is also why an offer whose capacity exceeds its option count —
    * a choose-5-of-4 content gap — can never fold: it can never be complete.
    */
-  const collapsed = complete && !expanded;
+  const collapsed = foldable && complete && !expanded;
+  /**
+   * The spell whose rules are open, or null. Client-side and free: `catalogs.choice.spells` is the
+   * same catalog the offer's options were resolved from, already loaded, so reading one costs no
+   * round trip and the server learns nothing about what is being read.
+   */
+  const [reading, setReading] = useState<ContentSpellSummary | null>(null);
+  const spells = SPELL_KINDS.has(offer.kind) ? catalogs.choice.spells : null;
   const changeRef = useRef<HTMLButtonElement | null>(null);
   const wasCollapsed = useRef(collapsed);
   useEffect(() => {
@@ -215,7 +247,7 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
           <ChoiceGrid
             ariaLabel={offer.label}
             options={options}
-            searchable={offer.options.length > 8}
+            searchable={foldable}
             searchPlaceholder="Search options…"
             selection={many ? "multiple" : "single"}
             value={many ? null : picks[0] ?? null}
@@ -223,11 +255,18 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
             values={many ? picks : undefined}
             max={many ? offer.capacity : undefined}
             onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
+            /* Choosing six spells out of 203 names is not a choice; it is a lottery. The rules open
+               beside the list, in a modal, and answer nothing — `onInspect` never touches `picks`. */
+            onInspect={spells ? (id) => setReading(spells.find((spell) => spell.id === id) ?? null) : undefined}
+            inspectLabel={(option) => `Read the ${option.title} rules`}
           />
           {/* Only ever offered once the question is answered, so exactly one of Change / Done is on
-              screen at a time. Reopening a finished offer needs a way back out that is not a pick. */}
-          {complete && <div className="cb-offer-picks"><Button variant="ghost" size="sm" onClick={() => setExpanded(false)}>Done</Button></div>}
+              screen at a time. Reopening a finished offer needs a way back out that is not a pick.
+              Only where there is something to go back OUT of: below the fold threshold the grid never
+              left, so Done would be a button that did nothing visible. */}
+          {foldable && complete && <div className="cb-offer-picks"><Button variant="ghost" size="sm" onClick={() => setExpanded(false)}>Done</Button></div>}
         </>}
+    {reading && <SpellCard spell={reading} onClose={() => setReading(null)} />}
   </section>;
 }
 
@@ -589,6 +628,19 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      /**
+       * ...unless something is layered OVER the page, and now something is: the spell-rules card a
+       * player reads while choosing spells is a `Modal`, i.e. a `<dialog>` in the top layer.
+       *
+       * The two mechanisms do not see each other. `showModal()` makes the rest of the document
+       * inert, but Escape reaches this window listener as a plain `keydown` and the dialog answers
+       * it separately, as a `cancel` event — so `defaultPrevented` above is false and one press
+       * dismissed the card AND left the wizard underneath it. Measured, not reasoned: the builder
+       * was gone from the DOM after the first Escape in the 2c browser check.
+       *
+       * The keydown fires before the dialog closes, so the open dialog is still here to be found.
+       */
+      if (document.querySelector("dialog[open]")) return;
       saveAndCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
@@ -700,6 +752,24 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       {grid}
     </section>;
 
+  /**
+   * The class features step's missing question, named.
+   *
+   * Every SRD class carries `subclassLevel: 3` and the draft starts at level 1, so below that level
+   * there is no subclass offer on the step AT ALL — and the detail pane still said "Pick a cleric
+   * subclass to read about it here", inviting a pick that nothing on screen could answer. (It is
+   * only ever an invitation that fails, never the pick itself: verified in a browser at level 3,
+   * where tapping Life Domain fills the pane with the subclass's description and its features.)
+   *
+   * So the fact goes in the step BODY rather than the pane. The pane is hidden below 761px
+   * (`WizardShell.css`'s master-detail rung) and its only door there is gated on real content, so a
+   * sentence left in it is a sentence a phone cannot read — and a one-line fact is not worth leaving
+   * the step to go and find.
+   */
+  const subclassPending = context.classRecord && draft.level < context.classRecord.subclassLevel
+    ? { label: context.classRecord.subclassLabel?.toLowerCase() ?? "subclass", level: context.classRecord.subclassLevel }
+    : null;
+
   const stepOffers = (owner: BuilderOffer["step"]) => offers.filter((offer) => offer.step === owner);
   const renderOffer = (offer: BuilderOffer) => offer.kind === "asi-or-feat"
     ? <AsiOffer key={offer.key} offer={offer} draft={draft} catalogs={catalogs} capBefore={abilityCap.before.get(offer.key) ?? null} onSet={setPicks} onIncreases={setIncreases} />
@@ -785,9 +855,12 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
           {stepOffers("class").map(renderOffer)}
         </>;
       case "features":
-        return stepOffers("features").length === 0
-          ? <div className="nh-empty"><span className="nh-empty-title">Nothing to choose yet</span><span className="nh-empty-text">This class asks for no decisions at level {draft.level}. Carry on.</span></div>
-          : <>{stepOffers("features").map(renderOffer)}</>;
+        return <>
+          {subclassPending && <p className="cb-note">You choose a {subclassPending.label} at level {subclassPending.level}.</p>}
+          {stepOffers("features").length === 0
+            ? <div className="nh-empty"><span className="nh-empty-title">Nothing to choose yet</span><span className="nh-empty-text">This class asks for no decisions at level {draft.level}. Carry on.</span></div>
+            : stepOffers("features").map(renderOffer)}
+        </>;
       case "abilities": {
         const spent = pointBuySpent(draft);
         const options = context.background?.abilityOptions ?? null;
@@ -1033,9 +1106,15 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     species: "Pick a species to read its traits here.",
     background: "Pick a background to read about it here.",
     class: "Pick a class to read about it here.",
-    features: context.classRecord?.subclassLabel
-      ? `Pick a ${context.classRecord.subclassLabel.toLowerCase()} to read about it here.`
-      : "Pick a subclass to read about it here."
+    /* The features pane holds a place for a subclass, so it only holds it when there IS one to pick.
+       Below the class's subclass level the step body says so instead (`subclassPending`), and the
+       step keeps the whole width — there is nothing on it that can ever fill the column, so
+       reserving one would cost every spell grid two of its five tracks to hold a sentence. */
+    ...(subclassPending ? {} : {
+      features: context.classRecord?.subclassLabel
+        ? `Pick a ${context.classRecord.subclassLabel.toLowerCase()} to read about it here.`
+        : "Pick a subclass to read about it here."
+    })
   };
 
   /**

@@ -31,6 +31,30 @@
    class clear of any bare-element hover rule a host might define. */
 .nh-choice.is-selected:hover { border-color: var(--cyan); }
 
+/* ---- The reference control that rides BESIDE a card (ChoiceCard's `action`) ----
+
+   Laid out as a flex sibling rather than floated over the card, because the two must not share a
+   pixel: the card's whole box is its tap area, and a control on top of it would steal taps from
+   the answer it is only supposed to explain. 44px square is the floor (§4), stated outright rather
+   than grown with `.tap-target`, because at 320px the card beside it is already the narrowest it
+   ever gets and an ::after box would overhang it. */
+.nh-choice-wrap { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.nh-choice-wrap > .nh-choice { flex: 1 1 auto; min-width: 0; }
+.nh-choice-info {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--text-dim);
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+.nh-choice-info:hover { background: var(--surface-2); border-color: var(--line-strong); color: var(--text); }
+
 .nh-choice-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .nh-choice-icon { flex: none; display: grid; place-items: center; font-size: 1.25rem; color: var(--text-dim); }
 /* WRAPS. A single-line ellipsis is right for a name ("Dragonborn") and wrong for the only other

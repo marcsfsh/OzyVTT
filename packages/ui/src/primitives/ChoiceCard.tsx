@@ -31,6 +31,17 @@ export interface ChoiceCardProps {
       chosen N" to a screen reader without stamping the sentence onto every locked card. A locked
       option must still say why; this is the other way of saying it. */
   "aria-describedby"?: string;
+  /**
+   * A second control BESIDE the card — reading a spell's rules while choosing spells, and nothing
+   * that changes the answer.
+   *
+   * It is a SIBLING of the card, never a child, and that is structural rather than stylistic: the
+   * card IS a `<button role="radio|checkbox">`, and a button inside a button is invalid HTML that
+   * browsers reparent — the inner control lands outside the card at parse time and the card's own
+   * hit area is left with a hole in it. So an `action` mounts the card inside `.nh-choice-wrap`
+   * with the control laid out next to it, where its 44px target overlaps nothing.
+   */
+  action?: ReactNode;
   className?: string;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -49,10 +60,10 @@ export interface ChoiceCardProps {
     and one card selected means one glowing element per region. */
 export function ChoiceCard({
   selected, onSelect, title, description, icon, badge, meta,
-  disabled = false, disabledReason, tabIndex, onKeyDown, selectionRole = "radio", id, className, ref,
+  disabled = false, disabledReason, tabIndex, onKeyDown, selectionRole = "radio", id, action, className, ref,
   "aria-describedby": describedBy
 }: ChoiceCardProps) {
-  return (
+  const card = (
     <button
       ref={ref}
       id={id}
@@ -80,4 +91,7 @@ export function ChoiceCard({
       <span className="nh-choice-check" aria-hidden="true"><IconCheck /></span>
     </button>
   );
+  /* No wrapper when there is no action: a grid of 203 cards must not grow 203 extra elements to
+     carry nothing, and the card stays the grid's direct child everywhere it always was. */
+  return action == null ? card : <div className="nh-choice-wrap">{card}{action}</div>;
 }
