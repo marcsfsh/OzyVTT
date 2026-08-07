@@ -735,7 +735,23 @@ export type ContentSourceKind = "srd" | "homebrew";
  * wire the wizard offers Divine Order, reports the step complete, and the server refuses the build.
  * Riders (actions, grants, modifiers, uses) deliberately stay server-side - the server applies them.
  */
-export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string; choice: ContentFeatureChoiceSummary | null }>;
+export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string; choice: ContentFeatureChoiceSummary | null; extraPicks: readonly ContentExtraPickSummary[] }>;
+/**
+ * ONE budget a feature (or a chosen option) RAISES: "you know one extra cantrip from the Cleric
+ * spell list" is `{offer: "class-cantrips", amount: 1}`.
+ *
+ * `offer` is the OFFER KEY the wizard and the server already share verbatim - `class-cantrips`,
+ * `class-spells`, `class-skills`, `class-tools`, `background-skills`, `background-tools`,
+ * `background-languages`, `species-languages`, or `feature:<featureId>`. It is not a new namespace
+ * and not a closed enum: the server checks each one against the offers it really built, so an
+ * authored key naming nothing rejects loudly instead of adding zero in silence.
+ *
+ * This crosses the wire although riders (actions, grants, modifiers, uses) deliberately do not,
+ * because it is an input to PICKING rather than an outcome the server applies - the same category as
+ * `choice` and `maxSpellLevel`. A wizard that cannot see it caps the player at the printed level row
+ * and the extra pick the text promised is simply unselectable.
+ */
+export type ContentExtraPickSummary = Readonly<{ offer: string; amount: number }>;
 export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
   /** Ceiling on a spell pick's level (Evocation Savant is level 2 and under; Magic Initiate is cantrips only). Null = no ceiling. WITHOUT this the wizard would offer spells the server then rejects, so it crosses the wire with the rest of the choice. */
   maxSpellLevel: number | null;
@@ -753,7 +769,9 @@ export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: 
  * are not ASIs, and a homebrew class may repeat any choice at all. Empty for a feature that is not
  * granted by a class level table (species traits, feats, subclass features).
  */
-grantedAtLevels: readonly number[] }>;
+grantedAtLevels: readonly number[];
+/** Budgets this feature raises (see `ContentExtraPickSummary`); empty for the vast majority. */
+extraPicks: readonly ContentExtraPickSummary[] }>;
 /**
  * ONE row of a class's printed 20-level table - the display data the wizard renders when a player
  * previews "what do I get at level 7?": slot columns, cantrips/spells known, the prepared-spell

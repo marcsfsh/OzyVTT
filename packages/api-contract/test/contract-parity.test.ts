@@ -120,6 +120,7 @@ const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodTypeAny; wireOnly
   { component: "HomebrewFeatureSaveDc", schema: unionOptions(bundle.FeatureSaveDcSchema)[2] },
   { component: "HomebrewFeatureUses", schema: bundle.FeatureUsesSchema },
   { component: "HomebrewFeatureGrants", schema: bundle.FeatureGrantsSchema },
+  { component: "HomebrewExtraPick", schema: bundle.ExtraPickSchema },
   // Record support shapes.
   { component: "HomebrewChoiceList", schema: bundle.ChoiceListSchema },
   { component: "HomebrewStartingEquipmentOption", schema: bundle.StartingEquipmentOptionSchema },

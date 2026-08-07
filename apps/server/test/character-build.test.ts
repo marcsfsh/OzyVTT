@@ -511,23 +511,33 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
     expect(traits).toContain("Protector");
   });
 
-  it("gives Thaumaturge's own cantrip pick an offer OUTSIDE the class cantrip budget", () => {
+  it("RAISES the class cantrip budget when Thaumaturge is the chosen Divine Order role", () => {
+    // Thaumaturge reads "you know one extra cantrip from the Cleric spell list". It used to be
+    // authored as a second-order CHOICE of its own, which is a different promise: two cards, a
+    // separately-tagged ledger row, and a class budget still stuck on the printed 3. It is now an
+    // `extraPicks` grant, so the ONE budget the text is talking about goes from 3 to 4.
     const thaumaturge = clericInput();
     thaumaturge.choices = thaumaturge.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
-    // The option's second-order pick, tagged with the option's own id...
-    thaumaturge.choices.push({ level: 1, kind: "cantrip", id: "mending", payload: { featureId: "thaumaturge" } });
+    thaumaturge.choices.push({ level: 1, kind: "cantrip", id: "mending" }); // a FOURTH untagged class cantrip
     const built = buildCharacterDefinition(thaumaturge, library, defaultPolicy);
     expect((built.spellcasting?.spells ?? []).some((spell) => spell.id === "mending")).toBe(true);
     expect(built.proficiencies?.armor).not.toContain("heavy"); // the other role's grant does NOT apply
-    // ...or with the parent feature's id, which is just as unambiguous.
-    const viaParent = clericInput();
-    viaParent.choices = viaParent.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
-    viaParent.choices.push({ level: 1, kind: "cantrip", id: "mending", payload: { featureId: "divine-order" } });
-    expect((buildCharacterDefinition(viaParent, library, defaultPolicy).spellcasting?.spells ?? []).some((spell) => spell.id === "mending")).toBe(true);
-    // Omitting the option's pick entirely is still a loud, actionable rejection.
-    const missing = clericInput();
-    missing.choices = missing.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
-    expect(() => buildCharacterDefinition(missing, library, defaultPolicy)).toThrowError(/"Thaumaturge" needs 1 pick\(s\) of kind "cantrip"/);
+    // The fifth is still refused, and the message names the COMPOSED cap rather than the printed one.
+    const overCap = clericInput();
+    overCap.choices = overCap.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
+    overCap.choices.push({ level: 1, kind: "cantrip", id: "mending" }, { level: 1, kind: "cantrip", id: "thaumaturgy" });
+    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy))
+      .toThrowError(/Cleric knows 4 cantrips at level 3; got 5/);
+  });
+
+  it("keeps the printed budget for the role that grants no extra pick (Protector)", () => {
+    // The negative control that makes the test above mean something: the SAME fourth cantrip, on the
+    // SAME class at the SAME level, with Protector chosen instead. If this passed, the composition
+    // would be adding a cantrip to every Cleric rather than to the one whose text promises it.
+    const protector = clericInput(); // clericInput() already picks "protector"
+    protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
+    expect(() => buildCharacterDefinition(protector, library, defaultPolicy))
+      .toThrowError(/Cleric knows 3 cantrips at level 3; got 4/);
   });
 });
 
@@ -660,7 +670,7 @@ describe("D3 - a malformed content record rejects instead of throwing a raw Type
       if (!real || id !== "human") return real;
       return { ...real, traits: [...real.traits, {
         id: "broken-boon", name: "Broken Boon", description: "A boon whose option list was never authored.",
-        tags: [], actions: [], effects: [], modifiers: [],
+        tags: [], actions: [], effects: [], modifiers: [], extraPicks: [],
         // `{kind, choose, from: []}` used to PARSE (an empty array is truthy, so the schema's
         // "needs from OR fromCatalog" refinement never fired) and then hand `undefined` to
         // resolveCatalogChoice - a TypeError, which is neither a CatalogChoiceError nor a

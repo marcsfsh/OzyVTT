@@ -229,7 +229,11 @@ const choiceSummaryOf = (choice: FeatureRecord["choice"]): ContentFeatureSummary
       options: (choice.options ?? []).map((option) => ({
         id: option.id, name: option.name, description: option.description,
         // One level of nesting only, matching the schema's own bound: a nested choice cannot itself carry options.
-        choice: option.choice ? { kind: option.choice.kind, choose: option.choice.choose, from: option.choice.from ?? [], fromCatalog: option.choice.fromCatalog ?? null, maxSpellLevel: option.choice.maxSpellLevel ?? null, options: [] } : null
+        choice: option.choice ? { kind: option.choice.kind, choose: option.choice.choose, from: option.choice.from ?? [], fromCatalog: option.choice.fromCatalog ?? null, maxSpellLevel: option.choice.maxSpellLevel ?? null, options: [] } : null,
+        // The budget a CHOSEN option raises. Travels for the same reason its `choice` does: without
+        // it the wizard caps the player at the printed level row and the extra pick Thaumaturge
+        // promises ("one extra cantrip from the Cleric spell list") cannot be selected at all.
+        extraPicks: option.extraPicks
       }))
     }
   : null;
@@ -241,7 +245,8 @@ const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly numb
   description: feature.description,
   tags: feature.tags,
   choice: choiceSummaryOf(feature.choice),
-  grantedAtLevels
+  grantedAtLevels,
+  extraPicks: feature.extraPicks
 });
 
 /** feature id -> every level row that grants it, in order. The client's repeat count. */

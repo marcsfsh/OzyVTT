@@ -1,8 +1,8 @@
 import {
   CatalogChoiceError, resolveCatalogChoice,
   type BuilderAbilityMethod, type BuilderPolicy, type CatalogChoiceOption, type ContentBackgroundSummary,
-  type ContentClassSummary, type ContentFeatSummary, type ContentFeatureSummary, type ContentSpeciesSummary,
-  type ContentSubclassSummary
+  type ContentClassSummary, type ContentExtraPickSummary, type ContentFeatSummary, type ContentFeatureSummary,
+  type ContentSpeciesSummary, type ContentSubclassSummary
 } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import {
@@ -290,6 +290,23 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     // repeating the SAME id is not legal however the `repeatable` flag reads.
     return !(feat.feature.choice?.fromCatalog?.endsWith("-spells") ?? false);
   };
+  /**
+   * EXTRA PICKS - offer key -> how many picks the granted features have ADDED to it.
+   *
+   * The mirror of `character-build.ts`'s `extraPickBudgets`, keyed identically (the offer key both
+   * sides already share), summed identically, and applied to the same capacities. A divergence
+   * between the two is always the bug: this side decides what the player may pick and the server
+   * re-validates it, so offering one more than the server allows refuses the build at Create, and
+   * offering one fewer makes the promise in the feature's own text unselectable.
+   *
+   * Applied as a POST-PASS (`withGrantedPicks`, below) rather than at each `offers.push`, because a
+   * grant is discovered in step order while the budget it raises may already have been built: the
+   * class skills offer is step 3 and the feature that raises it is step 4.
+   */
+  const extraPicks = new Map<string, number>();
+  const addExtraPicks = (grants: readonly ContentExtraPickSummary[] | undefined, times: number) => {
+    for (const grant of grants ?? []) extraPicks.set(grant.offer, (extraPicks.get(grant.offer) ?? 0) + grant.amount * times);
+  };
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
   // An OPTION is named, not abbreviated: this string is the card's title and the review's value, and
@@ -314,7 +331,11 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     recordHeld(offerKey, kind, label);
   };
 
-  const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, capacity?: number) => {
+  const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, capacity?: number, times = 1) => {
+    // BEFORE the early return: a feature may raise a budget without asking for a pick of its own
+    // ("you gain one additional skill from your class's list" has no choice card, only a bigger one
+    // on the class step). Collecting inside the offer branch would drop exactly those.
+    addExtraPicks(feature.extraPicks, times);
     const choice = feature.choice;
     if (!choice || choice.choose <= 0) return;
     const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind));
@@ -336,6 +357,13 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       ? filtered.filter((option) => option.id === ASI_SHORTHAND || !heldFeatIds.has(option.id) || featRepeats(option.id))
       : filtered;
     const offerKey = uniqueKey(key);
+    // A CHOSEN inline option's own budget grants. Divine Order is one pick between two roles, and
+    // Thaumaturge - not Divine Order - is what grants the extra Cleric cantrip, so the grant is read
+    // off the option the player actually took. This is the client's mirror of the server's pass A2.
+    if ((choice.options ?? []).length > 0) {
+      const picked = new Set(draft.picks[offerKey] ?? []);
+      for (const option of choice.options) if (picked.has(option.id)) addExtraPicks(option.extraPicks, times);
+    }
     offers.push({
       key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
       help: feature.description || null,
@@ -416,7 +444,9 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       else byFeature.set(feat.feature.id, { feat, step: taken.step, level: taken.level, classId: taken.classId, count: 1 });
     }
     for (const entry of byFeature.values()) {
-      featureOffer(`feature:${entry.feat.feature.id}`, entry.step, entry.feat.feature, entry.level, entry.classId, entry.feat.feature.choice!.choose * entry.count);
+      // `entry.count` multiplies the budget grants for the same reason it multiplies `choose`: a feat
+      // taken twice grants twice (the server folds the same count through `grantExtraPicks`).
+      featureOffer(`feature:${entry.feat.feature.id}`, entry.step, entry.feat.feature, entry.level, entry.classId, entry.feat.feature.choice!.choose * entry.count, entry.count);
     }
 
     // The class's own spell budgets, from its printed level row. These are the UNTAGGED rows the
@@ -469,7 +499,32 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     });
   }
 
-  return withExpertiseReach(offers, context, catalogs, draft);
+  return withGrantedPicks(withExpertiseReach(offers, context, catalogs, draft), extraPicks);
+}
+
+/** An offer's key with any uniquifying "#n" suffix removed - what an `extraPicks` grant names. */
+const budgetKeyOf = (key: string) => key.replace(/#\d+$/, "");
+
+/**
+ * CAPACITY IS THE PRINTED BUDGET PLUS WHAT WAS GRANTED - the composition step, applied once every
+ * offer exists.
+ *
+ * Cleric level 1 prints three cantrips; Divine Order's Thaumaturge reads "you know one extra cantrip
+ * from the Cleric spell list". Reading `capacity` solely off the level row made that fourth cantrip
+ * unselectable - the content was right, the wizard simply had no way for a feature to reach the
+ * number. Every budget-raising promise in the SRD (an extra skill, an extra prepared spell, an extra
+ * language, expertise) has the same shape and now lands through the same sum.
+ *
+ * A grant naming no offer is ignored HERE and rejected loudly by the server, which owns the
+ * authority (CLAUDE.md rule 2): it is an authoring mistake, not a player error, and there is nothing
+ * useful the wizard can render for it.
+ */
+function withGrantedPicks(offers: readonly BuilderOffer[], extraPicks: ReadonlyMap<string, number>): BuilderOffer[] {
+  if (extraPicks.size === 0) return [...offers];
+  return offers.map((offer) => {
+    const granted = extraPicks.get(budgetKeyOf(offer.key)) ?? 0;
+    return granted === 0 ? offer : { ...offer, capacity: offer.capacity + granted };
+  });
 }
 
 /**

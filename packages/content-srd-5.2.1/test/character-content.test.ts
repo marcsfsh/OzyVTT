@@ -583,9 +583,17 @@ describe("character-builder content records", () => {
     // A Protector Cleric's PROFICIENCIES are the class's plus the option's - the SRD's printed result.
     expect([...cleric.weaponProficiencies, ...protector.grants!.weapons]).toEqual(["simple", "martial"]);
     expect([...cleric.armorProficiencies, ...protector.grants!.armor]).toEqual(["light", "medium", "shields", "heavy"]);
+    // Thaumaturge RAISES the Cleric cantrip budget rather than opening a pick of its own. The text
+    // says "you know one EXTRA cantrip from the Cleric spell list" - one budget, one card, one number
+    // - and a separate second-order choice was the only way to say it before `extraPicks` existed.
+    // It also cannot be scoped as a choice in the general case ("your class's skill list" is not a
+    // catalog slug), which is why the budget-raising form is the one Stage 4 authors against.
     const thaumaturge = order.find((option) => option.id === "thaumaturge")!;
-    expect(thaumaturge.choice).toMatchObject({ kind: "cantrip", choose: 1, fromCatalog: "cleric-spells", maxSpellLevel: 0 });
+    expect(thaumaturge.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
+    expect(thaumaturge.choice).toBeUndefined();
     expect(thaumaturge.grants).toBeUndefined();
+    // Protector raises nothing: the field is empty, not absent, so a reader never has to guard it.
+    expect(protector.extraPicks).toEqual([]);
 
     // Blessed Strikes: Divine Strike is a once-per-turn rollable that grows 1d8 -> 2d8 at level 14.
     const strikes = optionsOf(cleric, "blessed-strikes");

@@ -287,6 +287,60 @@ export const featureRiders = {
   modifiers: z.array(FeatureModifierSchema).max(8).default([])
 } as const;
 
+/**
+ * WHICH PICK BUDGET an `extraPicks` grant raises.
+ *
+ * Deliberately NOT a closed enum, and deliberately NOT a new namespace: this is the OFFER KEY the
+ * wizard and the server already agree on, spelled the same on both sides -
+ * `class-cantrips`, `class-spells`, `class-skills`, `class-tools`, `background-skills`,
+ * `background-tools`, `background-languages`, `species-languages`, or `feature:<featureId>` for a
+ * specific feature's own pick. The colon is why this cannot be `ContentIdSchema`.
+ *
+ * A key naming no budget THIS build actually has is a loud build rejection, never a silent no-op -
+ * an authored grant that quietly adds zero is the exact failure this vocabulary exists to end. The
+ * check lives on the server (`character-build.ts`), against the offers it really built, rather than
+ * against a second hand-maintained list of legal keys that would drift away from them.
+ */
+export const PickBudgetKeySchema = z.string()
+  .regex(/^[a-z0-9-]+(:[a-z0-9-]+)?$/, "A pick budget names an offer key (\"class-cantrips\") or a feature's own pick (\"feature:expertise\").")
+  .max(80);
+
+/**
+ * ONE extra pick a feature (or a chosen option) adds to a budget that already exists.
+ *
+ * `amount` composes by ADDITION across every source: two features each granting +1 to the same
+ * budget yield +2, because the printed level row and every grant are summed rather than one winning.
+ */
+export const ExtraPickSchema = z.object({
+  offer: PickBudgetKeySchema,
+  amount: z.number().int().min(1).max(5).default(1)
+}).strict();
+export type ExtraPick = z.infer<typeof ExtraPickSchema>;
+
+/**
+ * EXTRA PICKS - the rider by which a feature raises a pick BUDGET rather than granting an outcome.
+ *
+ * "You know one extra cantrip from the Cleric spell list" (Divine Order: Thaumaturge), "you gain
+ * proficiency in one additional skill from your class's list", "you may prepare one more spell".
+ * Every one of those promises a pick the player still gets to MAKE, from a list that already exists
+ * and is already scoped correctly - so none of them can be said with `grants` (which names an
+ * outcome, not an opportunity) and none can be said with a second `choice` either, because there is
+ * no catalog slug meaning "your class's skill list" or "your class's spell list at your slot level".
+ *
+ * WHY IT IS NOT IN `featureRiders`. That block is spread into `EquipmentReferenceSchema` too, and a
+ * pick budget is the one thing an ITEM must never carry: picks are made once at build time and
+ * written to the provenance ledger, so a +1 that comes off with the cloak would strand a chosen
+ * skill with nothing granting it. Declaring `extraPicks` beside `choice` on the two carriers that
+ * are BUILT rather than equipped makes that structural instead of a refusal list.
+ *
+ * WHY IT CROSSES THE WIRE, when riders deliberately do not. `grants`, `modifiers`, `actions` and
+ * `uses` are outcomes the SERVER applies, so the wizard never sees them. `extraPicks` is an input to
+ * PICKING - the same category as `choice`, `maxSpellLevel` and `grantedAtLevels`, all of which cross
+ * for the same reason: a wizard that cannot see it offers too few picks, reports the step complete,
+ * and the server refuses the build (or, worse, the player simply cannot take what the text promised).
+ */
+const extraPicksField = z.array(ExtraPickSchema).max(4).default([]);
+
 /** The fields that describe WHAT is being picked, shared by a feature's choice and an option's own. */
 const featureChoiceBase = {
   kind: ContentIdSchema,
@@ -341,8 +395,10 @@ export const FeatureOptionSchema = z.object({
   name: z.string().min(1).max(120),
   /** Printed text for this option. Always the display source of truth; riders only add mechanics. */
   description: z.string().min(1).max(20000),
-  /** A pick this OPTION asks for once chosen (Thaumaturge's extra Cleric cantrip). */
+  /** A pick this OPTION asks for once chosen, from a list of its own. */
   choice: FeatureOptionChoiceSchema.optional(),
+  /** Budgets this option RAISES once chosen (Thaumaturge's extra Cleric cantrip). */
+  extraPicks: extraPicksField,
   ...featureRiders
 }).strict();
 export type FeatureOption = z.infer<typeof FeatureOptionSchema>;
@@ -404,6 +460,8 @@ export const FeatureRecordSchema = z.object({
   description: z.string().min(1).max(20000),
   /** A pick this feature asks the player to make; writes a `choices[]` row. */
   choice: FeatureChoiceSchema.optional(),
+  /** Budgets this feature RAISES - one extra cantrip, one extra skill, one more prepared spell. */
+  extraPicks: extraPicksField,
   ...featureRiders,
   /** This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17). */
   replacesFeatureId: ContentIdSchema.optional()

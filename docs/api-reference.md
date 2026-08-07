@@ -4635,6 +4635,15 @@ One of the following:
 | `equipment[].armor` | object \| null | yes | Populated for armor and shields only |
 | `attribution` | string | yes |  |
 
+### `ContentExtraPick`
+
+ONE pick budget a feature or a chosen option raises. `offer` is the offer key the wizard and the server share verbatim (class-cantrips, class-spells, class-skills, class-tools, background-skills, background-tools, background-languages, species-languages, or feature:<featureId>); the printed level row and every grant naming it are SUMMED, so two features each granting +1 yield +2.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `offer` | string | yes | The offer key whose capacity this raises |
+| `amount` | integer (1–5) | yes | How many extra picks |
+
 ### `ContentFeatsData`
 
 | Field | Type | Required | Notes |
@@ -4667,6 +4676,7 @@ The browse-and-pick projection of a bundle FeatureRecord. Prose is the display s
 | `tags` | string (pattern)[] | yes | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `choice` | ContentFeatureChoice \| null | yes | The pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking. |
 | `grantedAtLevels` | integer (1–20)[] | yes | Every level at which the owning class's table grants this feature - the authoritative repeat count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times and the server's capacity is choose x grants, so a client that ignores this offers too few picks and the build is rejected at creation. Empty when no class level table grants the feature (species traits, feats, subclass features). |
+| `extraPicks` | ContentExtraPick[] | yes | Budgets this feature RAISES rather than picks it asks for. Travels although riders do not, because it is an input to picking: a wizard that ignores it caps the player at the printed level row and the extra pick the text promised is unselectable. |
 
 ### `ContentFeatureChoice`
 
@@ -4691,6 +4701,7 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `name` | string | yes |  |
 | `description` | string | yes |  |
 | `choice` | ContentFeatureChoice \| null | yes | A nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
+| `extraPicks` | ContentExtraPick[] | yes | Budgets this option RAISES once chosen - Divine Order's Thaumaturge adds one to the Cleric cantrip budget. |
 
 ### `ContentMonsterActionsData`
 
@@ -5244,6 +5255,15 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `rangeFeet` | integer \| null | yes |  |
 | `longRangeFeet` | integer \| null | yes | Attacks past `rangeFeet` up to this roll at disadvantage |
 
+### `HomebrewExtraPick`
+
+ONE budget a feature or a chosen option RAISES. `offer` is the offer key the wizard and the server already share verbatim - `class-cantrips`, `class-spells`, `class-skills`, `class-tools`, `background-skills`, `background-tools`, `background-languages`, `species-languages`, or `feature:<featureId>` - not a new namespace and not a closed enum. A key naming no budget the build actually has is a LOUD rejection at creation, never a silent zero: an authored grant that quietly adds nothing is the failure this vocabulary exists to end.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `offer` | string (pattern) | yes | The offer key whose capacity this raises |
+| `amount` | integer (1–5) | no | How many extra picks. Additive across every source that names the same budget Default: `1`. |
+
 ### `HomebrewFeatRecord`
 
 A feat: catalog metadata plus ONE HomebrewFeature carrying all the mechanics. Nothing about a feat is special-cased - it is literally the same feature record a class or species uses, which is why the smallest of the nine still exercises the whole rider vocabulary.
@@ -5277,6 +5297,7 @@ THE shared feature record: a class feature, a subclass feature, a species trait,
 | `level` | integer (1–20) | no | Class/subclass level this feature is gained at. Omitted for always-on records (species traits, feats) |
 | `description` | string | yes |  |
 | `choice` | HomebrewFeatureChoice | no | A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible |
+| `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
 | `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
@@ -5409,7 +5430,8 @@ ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeat
 | `id` | string (pattern) | yes |  |
 | `name` | string | yes |  |
 | `description` | string | yes |  |
-| `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen (Thaumaturge's extra Cleric cantrip) |
+| `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen, from a list of its own |
+| `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
 | `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |

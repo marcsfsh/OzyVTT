@@ -134,6 +134,10 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
   return {
     id: option.id, name: option.name, description: option.description, tags: option.tags,
     actions: option.actions, effects: option.effects, modifiers: option.modifiers,
+    // A chosen option raises a budget exactly as a feature does (Thaumaturge's extra Cleric cantrip).
+    // Listed explicitly rather than spread, so a field added to one carrier and forgotten on the
+    // other is a TYPE error here instead of a rider that silently stops arriving.
+    extraPicks: option.extraPicks,
     ...(option.uses ? { uses: option.uses } : {}),
     ...(option.grants ? { grants: option.grants } : {}),
     // An option's own choice cannot nest further options (the vocabulary is depth-limited), but the
@@ -625,6 +629,36 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   };
   for (const { record, count } of granted) featureOffer(record, count);
 
+  /**
+   * EXTRA PICKS - a feature (or a chosen option) that raises a budget instead of granting an outcome.
+   *
+   * "You know one extra cantrip from the Cleric spell list" promises a pick the player still gets to
+   * MAKE. Nothing in the vocabulary could say that: `grants` names an outcome, and a second `choice`
+   * cannot be scoped ("your class's skill list" is not a catalog slug), so the printed level row was
+   * the only capacity there was and every such promise was unreachable.
+   *
+   * COMPOSITION IS ADDITION, over the printed row AND over every grant naming the same budget - two
+   * features each granting +1 yield +2, because nothing here overwrites. `count` multiplies for the
+   * same reason a repeated feature's `choose` does: a feature granted at four levels grants four times.
+   *
+   * FOLDED IN AS EACH SOURCE IS SETTLED, not once at the end, because a raised offer has to be raised
+   * BEFORE rows are matched against it - `matchRow` refuses the pick that exceeds `capacity`. Granted
+   * features are folded here, chosen feats after pass A, chosen options after pass A2; each of those
+   * is the earliest point at which that source is known.
+   */
+  const extraPickBudgets = new Map<string, number>();
+  const grantExtraPicks = (record: FeatureRecord, count: number): void => {
+    for (const grant of record.extraPicks) {
+      const amount = grant.amount * count;
+      extraPickBudgets.set(grant.offer, (extraPickBudgets.get(grant.offer) ?? 0) + amount);
+      // The two class budgets (`class-cantrips`, `class-spells`) are not offers - they are the level
+      // row's own columns, read at step 9 - so a key that matches no offer here is not yet an error.
+      const offer = offers.find((candidate) => candidate.key === grant.offer);
+      if (offer) offer.capacity += amount;
+    }
+  };
+  for (const { record, count } of granted) grantExtraPicks(record, count);
+
   const featureTagOf = (row: CharacterChoice): string | null =>
     row.payload && typeof row.payload.featureId === "string" ? row.payload.featureId : null;
   const matchRow = (row: CharacterChoice, candidates: readonly ChoiceOffer[]): ChoiceOffer => {
@@ -684,6 +718,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     granted.push({ record: feat.feature, count: 1, origin: null }); // recorded on `character.feats`
     featureOffer(feat.feature, 1);
   }
+  for (const feat of chosenFeats) grantExtraPicks(feat.feature, 1);
 
   // Pass A2: picks whose OPTIONS carry their own mechanics - Divine Order's two sacred roles, Giant
   // Ancestry's six boons, Blessed Strikes' two forms. Settled here, before pass B, for exactly the
@@ -692,6 +727,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // a chosen option was validated and written to the ledger and then thrown away - the Protector
   // Cleric got no martial weapons or heavy armour, the Goliath's chosen boon no action.
   const optionKinds = new Set(offers.filter((offer) => offer.optionRecords !== null).map((offer) => offer.kind));
+  const chosenOptionFeatures: FeatureRecord[] = [];
   for (const row of input.choices) {
     if (!optionKinds.has(row.kind) || FEAT_KINDS.has(row.kind)) continue;
     const offer = matchRow(row, offers.filter((candidate) => candidate.kind === row.kind));
@@ -703,6 +739,30 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     granted.push({ record: asFeature, count: 1, origin: offer.featureId ? { kind: "option", sourceId: offer.featureId } : null });
     // The option's own pick is keyed on the option id, with the parent feature id as an accepted alias.
     featureOffer(asFeature, 1, offer.featureId ? [offer.featureId] : []);
+    chosenOptionFeatures.push(asFeature);
+  }
+  // Folded AFTER the loop, not inside it, so one option raising another option's pick does not depend
+  // on the order the ledger happens to list them in.
+  for (const record of chosenOptionFeatures) grantExtraPicks(record, 1);
+
+  /**
+   * A BUDGET KEY THAT NAMES NOTHING IS AN AUTHORING ERROR, and it fails loudly here.
+   *
+   * This is the whole reason the vocabulary exists: a rider that parses, validates, is written to the
+   * ledger and then adds zero is indistinguishable from working, and 226 records authored on top of
+   * one would each look correct in review. Every key is checked against the offers this build really
+   * has plus the two printed class columns - reality, not a second hand-maintained list of legal keys
+   * that would drift away from the offers it claims to describe.
+   */
+  const CLASS_CANTRIP_BUDGET = "class-cantrips";
+  const CLASS_SPELL_BUDGET = "class-spells";
+  const printedCantrips = levelRow.cantripsKnown ?? 0;
+  const printedPrepared = levelRow.preparedCount ?? levelRow.spellsKnown ?? 0;
+  for (const key of extraPickBudgets.keys()) {
+    if (offers.some((candidate) => candidate.key === key)) continue;
+    if (key === CLASS_CANTRIP_BUDGET && printedCantrips > 0) continue;
+    if (key === CLASS_SPELL_BUDGET && printedPrepared > 0) continue;
+    reject(`A feature grants an extra pick to "${key}", which is not a pick this build has. Name an offer key ("class-cantrips", "class-spells", "class-skills", "class-tools", "background-skills", "background-tools", "background-languages", "species-languages") or a feature's own pick ("feature:<featureId>").`);
   }
 
   // Pass B: everything else. Rows the offer machinery does not own: the class's own prepared
@@ -882,9 +942,14 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     const alwaysPreparedGrants = new Set(interpreted.grantedSpells.filter((granted) => granted.alwaysPrepared).map((granted) => granted.id));
     const chargedCantripRows = classCantripRows.filter((row) => !alwaysPreparedGrants.has(row.id));
     const chargedPreparedRows = preparedSpellRows.filter((row) => !alwaysPreparedGrants.has(row.id));
-    const cantripCap = levelRow.cantripsKnown ?? 0;
+    // THE PRINTED ROW PLUS WHAT WAS GRANTED, never the row alone. Divine Order's Thaumaturge reads
+    // "you know one extra cantrip from the Cleric spell list", and a cap read solely off
+    // `cantripsKnown` refuses the fourth cantrip the text just promised - the client's
+    // `computeOffers` composes the identical sum for the offer it renders, and a divergence between
+    // the two is always the bug (the wizard offers 4, this refuses the build at Create).
+    const cantripCap = printedCantrips + (extraPickBudgets.get(CLASS_CANTRIP_BUDGET) ?? 0);
     if (chargedCantripRows.length > cantripCap) reject(`${classRecord.name} knows ${cantripCap} cantrips at level ${input.level}; got ${chargedCantripRows.length}.`);
-    const preparedCap = levelRow.preparedCount ?? levelRow.spellsKnown ?? 0;
+    const preparedCap = printedPrepared + (extraPickBudgets.get(CLASS_SPELL_BUDGET) ?? 0);
     if (chargedPreparedRows.length > preparedCap) reject(`${classRecord.name} ${casting.prepares === "prepared" ? "prepares" : "knows"} ${preparedCap} spells at level ${input.level}; got ${chargedPreparedRows.length}.`);
     const spells: Array<Record<string, unknown>> = [];
     // Every id the ledger claimed, whether or not it produced an entry - so "chosen twice" still
@@ -927,7 +992,9 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     // superRefine demands the combined pool when per-class slots exist); the per-class entry rides along.
     spellcasting = {
       ability: casting.ability, saveDc, attackBonus, slots,
-      classes: [{ classId: classRecord.id, ability: casting.ability, saveDc, attackBonus, slots, ...(levelRow.preparedCount !== undefined ? { prepared: levelRow.preparedCount } : {}) }],
+      // `prepared` is the budget the SHEET shows, so it is the composed cap for the same reason the
+      // check above is - a sheet reading 6 beside seven legally prepared spells is the same lie.
+      classes: [{ classId: classRecord.id, ability: casting.ability, saveDc, attackBonus, slots, ...(levelRow.preparedCount !== undefined ? { prepared: preparedCap } : {}) }],
       spells
     };
   } else {
