@@ -5312,6 +5312,7 @@ A rollable action a feature adds to the sheet (Second Wind, Channel Divinity, Br
 | `legendary.cost` | integer (1–5) | yes |  |
 | `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
 | `spellSlot.level` | integer (1–9) | yes |  |
+| `spellId` | string (pattern) | no | WHICH spell this action is a casting of. Identity only - every number the action rolls is already on the action itself - so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed |
 | `attack` | HomebrewFeatureAttack | no |  |
 | `save` | HomebrewFeatureSave | no |  |
 | `damageByLevel` | object[] | no | Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite) |
@@ -5853,12 +5854,13 @@ A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's t
 
 ### `HomebrewRiderExtraDamage`
 
-Extra TYPED damage as dice. Neither older channel can serve it: the effect-side `damage-bonus` is a flat integer, and an attack's `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a damage type. `doubleOnCritical` defaults false because 5e does not double dice added after the attack.
+Extra TYPED damage. Neither older channel can serve it: the effect-side `damage-bonus` is a flat integer with no type, and an attack's `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry one either. TWO independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the BEARER's modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage") - a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with NEITHER is refused at publish rather than stored to silently add nothing. `doubleOnCritical` defaults false because 5e does not double dice added after the attack, and an ability modifier is never doubled at all.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `type` | const `"extra-damage"` | yes |  |
-| `formula` | string (pattern) | yes | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `formula` | string (pattern) | no | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `abilityModifier` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
 | `damageType` | string | yes |  |
 | `doubleOnCritical` | boolean | no | Default: `false`. |
 | `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
@@ -5878,7 +5880,7 @@ Advantage or disadvantage on a NAMED roll: one branch with a `mode` field rather
 
 ### `HomebrewRiderTrigger`
 
-WHEN a rider applies. Thirty named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eleven parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eleven-value `type` enum, so the twenty branches below cover all thirty names.
+WHEN a rider applies. Thirty-one named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eleven parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eleven-value `type` enum, so the twenty-one branches below cover all thirty-one names.
 
 One of the following, discriminated by `type`:
 
@@ -5899,6 +5901,7 @@ One of the following, discriminated by `type`:
 - `HomebrewTriggerSkillIs`
 - `HomebrewTriggerSpellSchoolIs`
 - `HomebrewTriggerSpellLevelIs`
+- `HomebrewTriggerSpellIdIs`
 - `HomebrewTriggerVersusCreatureType`
 - `HomebrewTriggerVersusSize`
 - `HomebrewTriggerVersusCondition`
@@ -6064,6 +6067,7 @@ A stat block's action, in the exact `ActionSchema` vocabulary the live rules eng
 | `legendary.cost` | integer (1–5) | yes |  |
 | `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
 | `spellSlot.level` | integer (1–9) | yes |  |
+| `spellId` | string (pattern) | no | WHICH spell this action is a casting of. Identity only - every number the action rolls is already on the action itself - so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed |
 | `attack` | object | no | A printed to-hit bonus - the stat block knows its own numbers |
 | `attack.bonus` | integer | yes |  |
 | `attack.reachFeet` | integer (≥ 1) | no |  |
@@ -6145,6 +6149,15 @@ FILTER. Narrows a check moment to these skills (Gloves of Thievery: sleight-of-h
 | --- | --- | --- | --- |
 | `type` | const `"skill-is"` | yes |  |
 | `skills` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerSpellIdIs`
+
+FILTER. Narrows a spell moment to these SPECIFIC spells. `spell-school-is` and `spell-level-is` name categories; a printed "when you cast Eldritch Blast" names one record, and no combination of school and level picks out one cantrip. Matches an action's `spellId` - the spell the action IS - so it fires on the cast actions an item's `casts` entries synthesise and on any feature action naming its spell. An action with no `spellId` never matches.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell-id-is"` | yes |  |
+| `spellIds` | string (pattern)[] | yes |  |
 
 ### `HomebrewTriggerSpellLevelIs`
 

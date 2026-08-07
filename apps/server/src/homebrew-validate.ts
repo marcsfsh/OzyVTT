@@ -5,7 +5,7 @@ import {
   HOMEBREW_BODY_SCHEMAS,
   resolveSpellLists, spellListMemberIds,
   type BackgroundReference, type ClassReference, type ContentSpellcasting, type FeatReference,
-  type FeatureChoice, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
+  type FeatureChoice, type FeatureModifier, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
   type SpellListReference, type SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import { STATBLOCK_EXTENSION, statblockFacts, type ContentView } from "./content-library.js";
@@ -369,8 +369,27 @@ function spellcastingIssues(spellcasting: ContentSpellcasting | undefined, owner
 /** Every `fromCatalog` slug a feature - or one of its inline options - names must resolve to a NON-EMPTY list. */
 function featureIssues(feature: FeatureRecord, path: Path, checks: Checks, grants: number, self: SelfCatalog = undefined) {
   choiceIssues(feature.choice, [...path, "choice"], feature.name, checks, grants, self);
+  riderIssues(feature.modifiers, [...path, "modifiers"], feature.name, checks);
   (feature.choice?.options ?? []).forEach((option, index) => {
     choiceIssues(option.choice, [...path, "choice", "options", index, "choice"], `${feature.name} / ${option.name}`, checks, grants, self);
+    riderIssues(option.modifiers, [...path, "choice", "options", index, "modifiers"], `${feature.name} / ${option.name}`, checks);
+  });
+}
+
+/**
+ * A rider that PARSES but can contribute nothing. `extra-damage` carries two independent ways to say
+ * how much - dice (`formula`) and the bearer's own `abilityModifier` - and both are optional, because
+ * either alone is a real printed effect. Neither is not: it stores, publishes, collects at the right
+ * moment, and adds zero, which is the silent-drop failure this whole area exists to end. The schema
+ * cannot say it (a `.superRefine` inside a `z.discriminatedUnion` is not legal in Zod 3), so it is
+ * refused HERE, at publish, which is where the codebase already puts authoring errors.
+ */
+function riderIssues(modifiers: readonly FeatureModifier[] | undefined, path: Path, label: string, checks: Checks) {
+  (modifiers ?? []).forEach((modifier, index) => {
+    if (modifier.type !== "extra-damage") return;
+    if (modifier.formula === undefined && modifier.abilityModifier === undefined) {
+      checks.add([...path, index], `"${label}" has an extra-damage rider with neither a dice \`formula\` nor an \`abilityModifier\`, so it would add nothing.`);
+    }
   });
 }
 

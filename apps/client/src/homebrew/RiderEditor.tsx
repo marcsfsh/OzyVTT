@@ -105,6 +105,7 @@ const TRIGGER_TYPES: readonly SelectOption[] = [
   FOR("skill-is", "One skill"),
   FOR("spell-school-is", "A school of magic"),
   FOR("spell-level-is", "A spell level"),
+  FOR("spell-id-is", "One specific spell"),
   FOR("versus-size", "A target's size"),
   FOR("versus-condition", "A target's condition"),
   FOR("versus-creature-type", "A target's kind")
@@ -137,6 +138,7 @@ function blankTrigger(type: string): Draft {
     case "skill-is": return { type, skills: [] };
     case "spell-school-is": return { type, schools: [] };
     case "spell-level-is": return { type, levels: [] };
+    case "spell-id-is": return { type, spellIds: [] };
     case "versus-size": return { type, sizes: [] };
     case "versus-condition": return { type, conditionIds: [] };
     case "versus-creature-type": return { type, creatureTypes: [] };
@@ -158,7 +160,7 @@ const slugValidate = (value: unknown): string | null => {
 /** A collapsed row's own sentence — "Only for: A damage type — fire, cold". */
 function triggerRowLabel(row: Draft): string {
   const name = triggerLabelOf(row.type);
-  const values = [row.weights, row.classIds, row.speciesIds, row.ids, row.tags, row.conditionIds, row.kinds, row.properties, row.damageTypes, row.abilities, row.skills, row.schools, row.levels, row.sizes, row.creatureTypes]
+  const values = [row.weights, row.classIds, row.speciesIds, row.ids, row.tags, row.conditionIds, row.kinds, row.properties, row.damageTypes, row.abilities, row.skills, row.schools, row.levels, row.spellIds, row.sizes, row.creatureTypes]
     .filter(Array.isArray)
     .flat()
     .map(String);
@@ -229,6 +231,7 @@ const whenField = (): FieldDef => ({
     { key: "skills", label: "Skills", kind: "multiselect", options: (ctx) => ctx.skills, visibleWhen: hasType("skill-is") },
     { key: "schools", label: "Schools", kind: "tags", visibleWhen: hasType("spell-school-is"), suggestions: (ctx) => ctx.schools },
     { key: "levels", label: "Spell levels", kind: "multiselect", options: Array.from({ length: 10 }, (_, level) => opt(String(level), level === 0 ? "Cantrip" : `Level ${level}`)), visibleWhen: hasType("spell-level-is"), read: (row) => (Array.isArray(row.levels) ? row.levels.map(String) : []), write: (next, row) => ({ ...row, levels: (next as string[]).map(Number) }) },
+    { key: "spellIds", label: "Spells", kind: "tags", visibleWhen: hasType("spell-id-is"), suggestions: (ctx) => ctx.spells.map((entry) => entry.id), help: "Only when this exact spell is cast — “when you cast Eldritch Blast”. A school or a level names a category; this names one." },
     { key: "sizes", label: "Sizes", kind: "multiselect", options: SIZES, visibleWhen: hasType("versus-size") },
     { key: "creatureTypes", label: "Kinds of creature", kind: "tags", visibleWhen: hasType("versus-creature-type"), suggestions: (ctx) => ctx.creatureTypes, note: "Not checked yet — a creature doesn't record its kind." }
   ]
@@ -379,7 +382,8 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
     { key: "feet", label: "Distance", kind: "number", min: 0, max: 240, unit: "ft", visibleWhen: hasType("darkvision"), note: "Display only." },
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
     { key: "allowShield", label: "A shield still counts", kind: "switch", visibleWhen: hasType("unarmored-defense"), note: "Not read yet." },
-    { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage") },
+    { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage"), help: "Dice. Leave it empty to add only an ability modifier." },
+    { key: "abilityModifier", label: "Plus an ability modifier", kind: "select", options: ABILITIES, emptyValue: "omit", visibleWhen: hasType("extra-damage"), help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”." },
     { key: "damageType", label: "Damage type", placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
     { key: "doubleOnCritical", label: "Doubled on a critical hit", kind: "switch", visibleWhen: hasType("extra-damage"), help: "Off is the 5e rule — dice added after the attack aren't doubled." },
     { key: "roll", label: "On which roll", kind: "select", options: [opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"), opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")], visibleWhen: hasType("roll-mode") },

@@ -32,7 +32,7 @@ const MOMENTS: ReadonlySet<string> = new Set<RiderMoment>([
 ]);
 const FILTERS: ReadonlySet<string> = new Set([
   "attack-kind-is", "weapon-property-is", "damage-type-is", "ability-is", "skill-is",
-  "spell-school-is", "spell-level-is", "versus-creature-type", "versus-size", "versus-condition"
+  "spell-school-is", "spell-level-is", "spell-id-is", "versus-creature-type", "versus-size", "versus-condition"
 ]);
 const DYNAMIC_GATES: ReadonlySet<string> = new Set(["while-effect-tag", "while-hp-at-or-below", "while-condition"]);
 
@@ -65,6 +65,7 @@ export type RiderTrigger = Readonly<{
   skills?: readonly string[];
   schools?: readonly string[];
   levels?: readonly number[];
+  spellIds?: readonly string[];
   creatureTypes?: readonly string[];
   sizes?: readonly string[];
 }>;
@@ -83,6 +84,8 @@ export type RiderModifier = Readonly<{
   count?: number;
   feet?: number;
   formula?: string;
+  /** `extra-damage` may name an ABILITY instead of (or beside) dice - the bearer's modifier, resolved at the roll. */
+  abilityModifier?: RiderAbility;
   damageType?: string;
   doubleOnCritical?: boolean;
   roll?: "attack" | "incoming-attack" | "save" | "check" | "initiative" | "death-save" | "concentration";
@@ -138,6 +141,8 @@ export type RiderContext = Readonly<{
   skill?: string;
   spellSchool?: string;
   spellLevel?: number;
+  /** WHICH spell is being cast, for `spell-id-is`. Absent = not a spell, so the filter fails closed. */
+  spellId?: string;
   targetSize?: string;
   targetConditionIds?: readonly string[];
   targetCreatureType?: string;
@@ -198,6 +203,8 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       return trigger.schools !== undefined && context.spellSchool !== undefined && trigger.schools.includes(context.spellSchool);
     case "spell-level-is":
       return trigger.levels !== undefined && context.spellLevel !== undefined && trigger.levels.includes(context.spellLevel);
+    case "spell-id-is":
+      return trigger.spellIds !== undefined && context.spellId !== undefined && trigger.spellIds.includes(context.spellId);
     case "versus-creature-type":
       return trigger.creatureTypes !== undefined && context.targetCreatureType !== undefined && trigger.creatureTypes.includes(context.targetCreatureType);
     case "versus-size":

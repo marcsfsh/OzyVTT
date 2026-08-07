@@ -38,7 +38,7 @@ export const ItemSlotSchema = z.enum([
 export type ItemSlot = z.infer<typeof ItemSlotSchema>;
 
 /**
- * WHEN a rider applies. Thirty named triggers in four KINDS, and the kind is what decides the
+ * WHEN a rider applies. Thirty-one named triggers in four KINDS, and the kind is what decides the
  * evaluation layer so a GM never picks one (see `RIDER_TRIGGER_KINDS`):
  *
  *   - `static-gate`  resolvable from the sheet alone   -> a standing number ("AC 17")
@@ -90,6 +90,16 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("skill-is"), skills: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
   z.object({ type: z.literal("spell-school-is"), schools: z.array(RiderSlugSchema).min(1).max(8) }).strict(),
   z.object({ type: z.literal("spell-level-is"), levels: z.array(z.number().int().min(0).max(9)).min(1).max(10) }).strict(),
+  /**
+   * The SPECIFIC spell being cast. `spell-school-is` and `spell-level-is` narrow a category; this
+   * names one record, which is what a printed "when you cast Eldritch Blast" actually says. Without
+   * it Agonizing Blast is inexpressible: no combination of school and level picks out one cantrip.
+   *
+   * It matches `ActorAction.spellId` - the spell an action IS - so it fires on the item-cast actions
+   * the derivation synthesises and on any feature action that names its spell. An action with no
+   * `spellId` never matches, which is the fail-closed every other filter uses.
+   */
+  z.object({ type: z.literal("spell-id-is"), spellIds: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
   /** Authorable but INERT until `ActorDefinition` carries a creature type - see the vocabulary notes. */
   z.object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
   z.object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) }).strict(),
@@ -112,7 +122,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "on-damage-roll": "moment", "on-saving-throw": "moment", "on-ability-check": "moment",
   "on-initiative-roll": "moment", "on-death-save": "moment", "on-taking-damage": "moment", "on-spell-cast": "moment",
   "attack-kind-is": "filter", "weapon-property-is": "filter", "damage-type-is": "filter", "ability-is": "filter",
-  "skill-is": "filter", "spell-school-is": "filter", "spell-level-is": "filter",
+  "skill-is": "filter", "spell-school-is": "filter", "spell-level-is": "filter", "spell-id-is": "filter",
   "versus-creature-type": "filter", "versus-size": "filter", "versus-condition": "filter"
 });
 
@@ -170,14 +180,28 @@ export const AttackBonusVariantSchema = z.object({
 }).strict();
 
 /**
- * Extra typed damage as DICE. Neither existing channel can serve this: the effect-side
- * `damage-bonus` is a flat integer, and `attack.criticalBonusDice` is a bare COUNT applied to the
- * first damage part, so it cannot carry a damage type. `doubleOnCritical` defaults FALSE because 5e
+ * Extra typed damage. Neither existing channel can serve this: the effect-side `damage-bonus` is a
+ * flat integer with no type, and `attack.criticalBonusDice` is a bare COUNT applied to the first
+ * damage part, so it cannot carry a damage type either. `doubleOnCritical` defaults FALSE because 5e
  * does not double dice added after the attack.
+ *
+ * TWO WAYS TO SAY HOW MUCH, and a rider may use either or both:
+ *
+ *   - `formula` - dice ("an extra 1d6 fire"), the original and still the common case;
+ *   - `abilityModifier` - the BEARER's modifier in that ability, as a flat number resolved at the
+ *     roll ("add your Charisma modifier to the damage"). A printed feature says this constantly and
+ *     it was previously inexpressible: the amount depends on the character, so no authored constant
+ *     is correct, and re-authoring the record per character is not authoring.
+ *
+ * Agonizing Blast is exactly `abilityModifier: "cha"` plus a `spell-id-is` gate, and it is the
+ * reason both landed together (decision D5). A rider with NEITHER field adds nothing; the homebrew
+ * publish validator refuses it rather than letting it store and silently do nothing.
  */
 export const ExtraDamageVariantSchema = z.object({
   type: z.literal("extra-damage"),
-  formula: DiceFormulaSchema,
+  formula: DiceFormulaSchema.optional(),
+  /** Add the BEARER's modifier in this ability as a flat number (Agonizing Blast: + your Charisma modifier). */
+  abilityModifier: AbilitySchema.optional(),
   damageType: DamageTypeIdSchema,
   doubleOnCritical: z.boolean().default(false),
   ...riderGate
@@ -584,6 +608,16 @@ export const ActionSchema = z.object({
    * "no uses remaining".
    */
   spellSlot: z.object({ level: z.number().int().min(1).max(9) }).strict().optional(),
+  /**
+   * WHICH SPELL this action is a casting of. Identity only - every number the action rolls is
+   * already on the action itself - so it changes no arithmetic and no existing reader.
+   *
+   * It exists because `spell-id-is` needs something to match against: "when you cast Eldritch Blast"
+   * cannot be said with `spell-school-is` or `spell-level-is`, which name categories. The derivation
+   * sets it on the actions it synthesises from an item's `casts` entries, and a feature action may
+   * name it directly. Absent = this action is not a spell, and every `spell-id-is` gate fails closed.
+   */
+  spellId: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
   reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional(),
   /** SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool (definition `legendary.actionsPerRound`) that refills when the creature's own turn starts. Pairs with activation "other". */

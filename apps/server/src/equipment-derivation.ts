@@ -803,6 +803,9 @@ function castAction(itemId: string, cast: ItemSpellCastLike, itemName: string, d
     activation: "action",
     description: spell?.description ?? `Cast ${spellName} from ${itemName}.`,
     damage: [],
+    // WHICH spell this is, so a `spell-id-is` rider can gate on it. Set even when the catalog cannot
+    // resolve the record: the id is what the item authored, and it is what the gate names.
+    spellId: cast.spellId,
     ...(usesOf(cast.uses, definition) ? { uses: usesOf(cast.uses, definition)! } : {}),
     // The bearer's OWN slot, on top of the item's charges, when the item says so.
     ...(cast.consumesSpellSlot === true && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {})

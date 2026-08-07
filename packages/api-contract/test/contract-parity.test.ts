@@ -295,7 +295,7 @@ describe("Zod / OpenAPI parity", () => {
       expect(type.enum ?? [type.const], `${component} accepts exactly the trigger names mapped to it`).toEqual(values);
     }
     // The fold itself, stated once so shrinking it back to one-branch-per-name is a deliberate act.
-    expect([literals.length, branchNames(TRIGGER_NODE).length], "thirty trigger names over twenty branches").toEqual([30, 20]);
+    expect([literals.length, branchNames(TRIGGER_NODE).length], "thirty-one trigger names over twenty-one branches").toEqual([31, 21]);
   });
 
   it("Direction B: every component's `required` equals its Zod schema's non-optional keys", () => {
@@ -381,7 +381,8 @@ describe("Zod / OpenAPI parity", () => {
       "on-ability-check": {}, "on-initiative-roll": {}, "on-death-save": {}, "on-taking-damage": {}, "on-spell-cast": {},
       "attack-kind-is": { kinds: ["melee", "thrown"] }, "weapon-property-is": { properties: ["finesse"] }, "damage-type-is": { damageTypes: ["fire"] },
       "ability-is": { abilities: ["dex"] }, "skill-is": { skills: ["sleight-of-hand"] }, "spell-school-is": { schools: ["evocation"] },
-      "spell-level-is": { levels: [0, 3] }, "versus-creature-type": { creatureTypes: ["undead"] }, "versus-size": { sizes: ["large", "huge"] },
+      "spell-level-is": { levels: [0, 3] }, "spell-id-is": { spellIds: ["eldritch-blast"] },
+      "versus-creature-type": { creatureTypes: ["undead"] }, "versus-size": { sizes: ["large", "huge"] },
       "versus-condition": { conditionIds: ["prone"] }
     };
 

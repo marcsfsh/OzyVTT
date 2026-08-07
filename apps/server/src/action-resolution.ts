@@ -787,7 +787,11 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   let attack: ActionResolution["attack"] = null;
   let rollMode: ActionResolution["rollMode"];
   let crit = false;
-  let riderFilters: Omit<Partial<RiderContext>, "moment"> = { sourceItemId: riderItemId };
+  // WHICH SPELL this action is, when it is one. `spell-id-is` matches against it, so it belongs on
+  // BOTH branches: a spell that forces a save and rolls no attack ("when you cast Fireball") must
+  // gate its riders exactly as an attack-roll cantrip does.
+  const spellFilter = action.spellId === undefined ? {} : { spellId: action.spellId };
+  let riderFilters: Omit<Partial<RiderContext>, "moment"> = { sourceItemId: riderItemId, ...spellFilter };
   if (action.attack && targets.length === 1) {
     const target = targets[0];
     const targetDerivation = deriveEquipment(target, target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, deps.catalog);
@@ -797,7 +801,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       damageTypes: action.damage.map((part) => part.type),
       targetSize: target.size ?? "medium",
       targetConditionIds: target.conditions.map((condition) => condition.id),
-      sourceItemId: riderItemId
+      sourceItemId: riderItemId,
+      ...spellFilter
     };
     const sources = attackRollSources(state, attacker, target, action, deps, { attacker: derivation, target: targetDerivation, filters: riderFilters });
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
@@ -929,13 +934,28 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const already = new Set<unknown>();
     for (const moment of passes) {
       for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
-        if (rider.modifier.type !== "extra-damage" || rider.modifier.formula === undefined || already.has(rider.modifier)) continue;
+        if (rider.modifier.type !== "extra-damage" || already.has(rider.modifier)) continue;
+        // AN ABILITY MODIFIER IS AN AMOUNT, NOT A DIE. "Add your Charisma modifier to the damage"
+        // (Agonizing Blast) resolves against the BEARER's own sheet at the roll, so no authored
+        // constant could have said it. It rolls nothing - there is no die to record - and it is
+        // never crit-doubled, because 5e doubles dice and this is a flat number.
+        const abilityAmount = rider.modifier.abilityModifier === undefined
+          ? 0 : abilityModifier(deps.definition, rider.modifier.abilityModifier);
+        if (rider.modifier.formula === undefined && rider.modifier.abilityModifier === undefined) continue;
         already.add(rider.modifier);
+        const type = rider.modifier.damageType ?? damage[0]?.type ?? "untyped";
+        if (rider.modifier.formula === undefined) {
+          if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
+          damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
+          warnings.push(`${rider.label}: +${abilityAmount} ${type} (${rider.modifier.abilityModifier!.toUpperCase()}).`);
+          continue;
+        }
         const expression = parseDiceFormula(rider.modifier.formula);
         const rolled = resolveDice(crit && rider.modifier.doubleOnCritical === true ? criticalExpression(expression) : expression, deps.random);
         recordRoll(state, rolled, { ...rollBase, id: deps.newRollId(), purpose: "damage" });
-        damage.push({ formula: rolled.expression.source, type: rider.modifier.damageType ?? damage[0]?.type ?? "untyped", total: rolled.total });
-        warnings.push(`${rider.label}: +${rolled.total} ${rider.modifier.damageType ?? "damage"}.`);
+        const total = rolled.total + abilityAmount;
+        damage.push({ formula: rolled.expression.source, type, total });
+        warnings.push(`${rider.label}: +${total} ${type}.`);
       }
     }
   }

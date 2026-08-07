@@ -96,11 +96,22 @@ const LABEL: Readonly<Record<Carrier, string>> = {
   lineage: "Deep Rift", background: "Rift Lore", option: "Rift Blade"
 };
 
-type Homebrew = Readonly<{ on?: Carrier; modifiers?: readonly unknown[]; actions?: readonly unknown[] }>;
+type Homebrew = Readonly<{
+  on?: Carrier;
+  /** Where the ACTIONS go, when that is not where the riders go - Agonizing Blast gates an invocation on a cantrip the class grants. Defaults to `on`. */
+  actionsOn?: Carrier;
+  modifiers?: readonly unknown[];
+  actions?: readonly unknown[];
+  scores?: Record<string, number>;
+  /** The background spread, when the default STR/CON one is not the ability under test. */
+  spread?: ReadonlyArray<{ ability: string; amount: number }>;
+}>;
 
 /** Riders land on the named carrier and nowhere else; the other five stay prose-only. */
-const ridersFor = (brew: Homebrew, carrier: Carrier) =>
-  (brew.on ?? "class") === carrier ? { modifiers: brew.modifiers ?? [], actions: brew.actions ?? [] } : {};
+const ridersFor = (brew: Homebrew, carrier: Carrier) => ({
+  ...((brew.on ?? "class") === carrier ? { modifiers: brew.modifiers ?? [] } : {}),
+  ...((brew.actionsOn ?? brew.on ?? "class") === carrier ? { actions: brew.actions ?? [] } : {})
+});
 
 /**
  * The homebrew class. Level 5 grants `rift-attunement` (the class carrier), `rift-focus` (whose
@@ -174,7 +185,7 @@ function libraryWith(brew: Homebrew = {}): ContentLibrary {
       })],
       backgrounds: [BackgroundReferenceSchema.parse({
         id: "hb-riftwalker", name: "Riftwalker", source: "homebrew",
-        abilityOptions: { from: ["str", "con", "wis"] },
+        abilityOptions: { from: ["str", "con", "wis", "cha"] },
         features: [{ id: "rift-lore", name: "Rift Lore", description: "You know the rift's lore.", ...ridersFor(brew, "background") }]
       })]
     }),
@@ -188,11 +199,11 @@ function libraryWith(brew: Homebrew = {}): ContentLibrary {
  * martial-proficient greatsword swings at +7 - the same baseline arithmetic `feat-riders.test.ts`
  * uses, deliberately, so a number that drifts is obvious against its sibling.
  */
-const heroInput = (): CharacterCreateRequestInput => ({
+const heroInput = (brew: Homebrew = {}): CharacterCreateRequestInput => ({
   name: "Vess", speciesId: "hb-riftborn", backgroundId: "hb-riftwalker", classId: "hb-riftwarden", level: 5,
   subclassId: "hb-riftbreaker", abilityMethod: "standard-array",
-  baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  baseScores: (brew.scores ?? { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 }) as CharacterCreateRequestInput["baseScores"],
+  backgroundBonusAllocation: (brew.spread ?? [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }]) as CharacterCreateRequestInput["backgroundBonusAllocation"],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
     { level: 1, kind: "lineage", id: "hb-riftborn-deep" },
@@ -212,7 +223,7 @@ type Built = Readonly<{
 /** Build the sheet through the REAL builder, then put it on the table with the play-time catalog. */
 function build(brew: Homebrew = {}): Built {
   const view = libraryWith(brew).forAudience("gm");
-  const definition = buildCharacterDefinition(heroInput(), view, POLICY);
+  const definition = buildCharacterDefinition(heroInput(brew), view, POLICY);
   const catalog = equipmentCatalogOf(view);
   const state = GameStateSchema.parse({
     schemaVersion: 1,
@@ -594,5 +605,116 @@ describe("the recorded feature array stays inside the schema's bound", () => {
     // Comfortably inside 80, with room for chosen options on top; if this ever tightens, raise the
     // schema's `.max(80)` and this number together rather than letting the truncation start biting.
     expect(worst, `the fattest SRD sheet records ${worst} features`).toBeLessThan(60);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// D5: AGONIZING BLAST. `spell-id-is` + `extra-damage` naming an ability modifier.
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * The two schema gaps that made Warlock read as broken no matter how much prose landed, and the one
+ * printed effect that needs BOTH.
+ *
+ * "When you cast Eldritch Blast, add your Charisma modifier to the damage it deals on a hit" has two
+ * halves the vocabulary could not say. WHICH SPELL: `spell-school-is` and `spell-level-is` name
+ * categories, and no combination of school and level picks out one cantrip - so the gate had to
+ * become `spell-id-is`, matched against the new `ActorAction.spellId`. HOW MUCH: every amount in the
+ * vocabulary was an authored constant, and "your Charisma modifier" is a property of the character,
+ * not of the record - so `extra-damage` gained `abilityModifier` beside its `formula`.
+ *
+ * These assert the NUMBER on the damage roll, not that the rider survived derivation.
+ */
+describe("Agonizing Blast: a spell-gated rider adds the caster's own ability modifier", () => {
+  /** A level-5 sheet with CHA 17 (+3), so the modifier that arrives is unmistakably the right one. */
+  const CHA_HERO = {
+    scores: { str: 13, dex: 12, con: 14, int: 8, wis: 10, cha: 15 },
+    spread: [{ ability: "cha", amount: 2 }, { ability: "str", amount: 1 }]
+  } as const;
+
+  /** The cantrip, as a feature action that NAMES the spell it is. */
+  const ELDRITCH_BLAST = {
+    id: "eldritch-blast", name: "Eldritch Blast", activation: "action",
+    description: "A beam of crackling energy streaks toward a creature.",
+    attack: { ability: "cha", proficient: true },
+    damage: [{ formula: "1d10", type: "force" }],
+    spellId: "eldritch-blast"
+  };
+
+  /** The invocation, as an option's rider: + CHA to the damage, but only on that one spell. */
+  const AGONIZING_BLAST = {
+    type: "extra-damage", abilityModifier: "cha", damageType: "force",
+    when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
+  };
+
+  const warlock = (modifiers: readonly unknown[]) =>
+    fight(build({ ...CHA_HERO, on: "option", actionsOn: "class", actions: [ELDRITCH_BLAST], modifiers }));
+
+  it("puts CHA on the Eldritch Blast damage roll as a number", () => {
+    const bare = warlock([]);
+    // CHA 17 (+3) + proficiency 3 = 6 to hit; the cantrip's own damage is 1d10 force and nothing else.
+    expect(actionOf(bare, "eldritch-blast").attack!.bonus).toBe(6);
+    const unaided = resolveDefinitionAction(bare.state, actionOf(bare, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000050" }, deps(bare, [10, 7]));
+    expect(unaided.attack).toMatchObject({ total: 16, naturalRoll: 10, targetAc: 12, outcome: "hit" });
+    expect(unaided.damage).toEqual([{ formula: "1d10", type: "force", total: 7 }]);
+    expect(unaided.damageTotal).toBe(7);
+
+    const built = warlock([AGONIZING_BLAST]);
+    const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000051" }, deps(built, [10, 7]));
+    // The SAME two dice; the difference is +3, and 3 is this character's Charisma modifier.
+    expect(blasted.damage).toEqual([
+      { formula: "1d10", type: "force", total: 7 },
+      { formula: "3", type: "force", total: 3 }
+    ]);
+    expect(blasted.damageTotal).toBe(10);
+    expect((blasted.warnings ?? []).some((warning) => warning.includes("+3 force (CHA)"))).toBe(true);
+  });
+
+  it("tracks the CHARACTER's Charisma, not an authored constant", () => {
+    // The whole point of `abilityModifier`: the same authored record, a different sheet, a different
+    // number. CHA 12 (+1) here against CHA 17 (+3) above, with no change to the rider.
+    const lesser = fight(build({
+      scores: { str: 13, dex: 14, con: 15, int: 8, wis: 10, cha: 12 },
+      spread: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+      on: "option", actionsOn: "class", actions: [ELDRITCH_BLAST], modifiers: [AGONIZING_BLAST]
+    }));
+    const blasted = resolveDefinitionAction(lesser.state, actionOf(lesser, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000052" }, deps(lesser, [10, 7]));
+    expect(blasted.damage.at(-1)).toEqual({ formula: "1", type: "force", total: 1 });
+    expect(blasted.damageTotal).toBe(8);
+  });
+
+  it("does NOT touch a swing that is not that spell", () => {
+    // `spell-id-is` is the whole reason this is expressible: without it the only way to say "on a
+    // spell" is a school or a level, and the greatsword below is neither - but nor is any OTHER
+    // cantrip the Warlock knows, which is what a category gate would have caught by mistake.
+    const built = warlock([AGONIZING_BLAST]);
+    const swung = resolveDefinitionAction(built.state, actionOf(built, "item-greatsword"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000053" }, deps(built, [15, 5, 6]));
+    // 2d6 (5 + 6) + Str 2 = 13, with no Charisma anywhere near it.
+    expect(swung.damage).toEqual([{ formula: "2d6 + 2", type: "slashing", total: 13 }]);
+    expect(swung.damageTotal).toBe(13);
+  });
+
+  it("does NOT fire when the gate names a DIFFERENT spell", () => {
+    const built = warlock([{ ...AGONIZING_BLAST, when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["fire-bolt"] }] }]);
+    const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000054" }, deps(built, [10, 7]));
+    expect(blasted.damage).toEqual([{ formula: "1d10", type: "force", total: 7 }]);
+    expect(blasted.damageTotal).toBe(7);
+  });
+
+  it("does NOT fire on a MISS, because `on-hit` is still `on-hit`", () => {
+    const built = warlock([AGONIZING_BLAST]);
+    // d20 = 2 -> 8 against AC 12: a miss rolls no damage at all, rider included.
+    const missed = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000055" }, deps(built, [2]));
+    expect(missed.attack).toMatchObject({ total: 8, outcome: "miss" });
+    expect(missed.damage).toEqual([]);
+    expect(missed.damageTotal).toBe(0);
+  });
+
+  it("carries dice AND an ability modifier together when a record authors both", () => {
+    const built = warlock([{ ...AGONIZING_BLAST, formula: "1d4" }]);
+    const blasted = resolveDefinitionAction(built.state, actionOf(built, "eldritch-blast"), { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000056" }, deps(built, [10, 7, 2]));
+    // The d4 rolled a 2, and CHA added 3: ONE entry of 5, because it is one rider.
+    expect(blasted.damage.at(-1)).toEqual({ formula: "1d4", type: "force", total: 5 });
+    expect(blasted.damageTotal).toBe(12);
   });
 });

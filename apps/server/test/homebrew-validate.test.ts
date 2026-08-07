@@ -366,6 +366,28 @@ describe("tier 4 - shapes that parse and are then read by nothing", () => {
     // The same subclass on a class that DOES have slots is fine - nothing is being overlaid.
     expect(validateForPublish("subclass", { ...eldritchKnight, classId: "wizard" }, contextWith()).valid).toBe(true);
   });
+
+  it("refuses an extra-damage rider that names neither dice nor an ability modifier", () => {
+    // `extra-damage` carries TWO independent ways to say how much - `formula` (dice) and
+    // `abilityModifier` (the bearer's own, resolved at the roll, which is how Agonizing Blast is
+    // said). Either alone is a real printed effect, so neither can be `required`, and a
+    // `.superRefine` inside a `z.discriminatedUnion` is not legal in Zod 3. So the pairing is
+    // enforced HERE: with neither field the rider parses, stores, publishes, collects at exactly
+    // the right moment - and adds zero. That silence is the failure this whole area exists to end.
+    const withRider = (modifier: Record<string, unknown>) => ({
+      id: "hb-blaster-a1b2c3", name: "Blaster", source: "homebrew", category: "general",
+      feature: { id: "hb-blaster-a1b2c3", name: "Blaster", description: "A homebrew feat.", modifiers: [modifier] }
+    });
+    const empty = validateForPublish("feat", withRider({ type: "extra-damage", damageType: "force" }), contextWith());
+    expect(empty.valid).toBe(false);
+    expect(messages(empty)).toContain("neither a dice `formula` nor an `abilityModifier`");
+    // The offending field is addressable, like every other issue in this file.
+    expect(empty.issues[0].path).toEqual(["feature", "modifiers", 0]);
+
+    // Either half ALONE publishes: dice only (the original shape), and ability only (Agonizing Blast).
+    expect(validateForPublish("feat", withRider({ type: "extra-damage", formula: "1d6", damageType: "fire" }), contextWith()).valid).toBe(true);
+    expect(validateForPublish("feat", withRider({ type: "extra-damage", abilityModifier: "cha", damageType: "force" }), contextWith()).valid).toBe(true);
+  });
 });
 
 describe("a duplicated SRD record still passes its own gate", () => {
