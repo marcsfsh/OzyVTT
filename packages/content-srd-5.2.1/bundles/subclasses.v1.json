@@ -12,13 +12,26 @@
     "id": "improved-critical",
     "name": "Improved Critical",
     "level": 3,
-    "description": "Your attack rolls with weapons and Unarmed Strikes can score a Critical Hit on a roll of 19 or 20 on the d20."
+    "description": "Your attack rolls with weapons and Unarmed Strikes can score a Critical Hit on a roll of 19 or 20 on the d20.",
+    "modifiers": [
+     {
+      "type": "critical-range",
+      "threshold": 19
+     }
+    ]
    },
    {
     "id": "remarkable-athlete",
     "name": "Remarkable Athlete",
     "level": 3,
-    "description": "You have Advantage on Initiative rolls and Strength (Athletics) checks. In addition, immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks."
+    "description": "You have Advantage on Initiative rolls and Strength (Athletics) checks. In addition, immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks.",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "initiative",
+      "mode": "advantage"
+     }
+    ]
    },
    {
     "id": "additional-fighting-style",
@@ -42,7 +55,13 @@
     "name": "Superior Critical",
     "level": 15,
     "description": "Your attack rolls with weapons and Unarmed Strikes can now score a Critical Hit on a roll of 18-20 on the d20.",
-    "replacesFeatureId": "improved-critical"
+    "replacesFeatureId": "improved-critical",
+    "modifiers": [
+     {
+      "type": "critical-range",
+      "threshold": 18
+     }
+    ]
    },
    {
     "id": "survivor",
@@ -71,7 +90,50 @@
     "id": "lands-aid",
     "name": "Land's Aid",
     "level": 3,
-    "description": "As a Magic action, you can expend a use of your Wild Shape and choose a point within 60 feet of yourself. Vitality-giving flowers and life-draining thorns appear for a moment in a 10-foot-radius Sphere centered on that point. Each creature of your choice in the Sphere must make a Constitution saving throw against your spell save DC, taking 2d6 Necrotic damage on a failed save or half as much damage on a successful one. One creature of your choice in that area regains 2d6 Hit Points. The damage and healing increase by 1d6 when you reach Druid levels 10 (3d6) and 14 (4d6)."
+    "description": "As a Magic action, you can expend a use of your Wild Shape and choose a point within 60 feet of yourself. Vitality-giving flowers and life-draining thorns appear for a moment in a 10-foot-radius Sphere centered on that point. Each creature of your choice in the Sphere must make a Constitution saving throw against your spell save DC, taking 2d6 Necrotic damage on a failed save or half as much damage on a successful one. One creature of your choice in that area regains 2d6 Hit Points. The damage and healing increase by 1d6 when you reach Druid levels 10 (3d6) and 14 (4d6).",
+    "actions": [
+     {
+      "id": "lands-aid",
+      "name": "Land's Aid",
+      "activation": "action",
+      "description": "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
+      "save": {
+       "ability": "con",
+       "dc": "spellcasting"
+      },
+      "damage": [
+       {
+        "formula": "2d6",
+        "type": "necrotic"
+       }
+      ],
+      "damageByLevel": [
+       {
+        "level": 3,
+        "formula": "2d6",
+        "type": "necrotic"
+       },
+       {
+        "level": 10,
+        "formula": "3d6",
+        "type": "necrotic"
+       },
+       {
+        "level": 14,
+        "formula": "4d6",
+        "type": "necrotic"
+       }
+      ]
+     }
+    ],
+    "uses": {
+     "scaling": {
+      "type": "class-resource",
+      "id": "wild-shape"
+     },
+     "per": "long-rest",
+     "pool": "wild-shape"
+    }
    },
    {
     "id": "natural-recovery",
@@ -83,13 +145,35 @@
     "id": "natures-ward",
     "name": "Nature's Ward",
     "level": 10,
-    "description": "You are immune to the Poisoned condition, and you have Resistance to a damage type associated with your current land choice in the Circle Spells feature, as shown in the Nature's Ward table. Nature's Ward Land Type Arid: Resistance Fire, Land Type Temperate, Resistance Lightning; Land Type Polar: Resistance Cold, Land Type Tropical, Resistance Poison."
+    "description": "You are immune to the Poisoned condition, and you have Resistance to a damage type associated with your current land choice in the Circle Spells feature, as shown in the Nature's Ward table. Nature's Ward Land Type Arid: Resistance Fire, Land Type Temperate, Resistance Lightning; Land Type Polar: Resistance Cold, Land Type Tropical, Resistance Poison.",
+    "grants": {
+     "conditionImmunities": [
+      "poisoned"
+     ]
+    }
    },
    {
     "id": "natures-sanctuary",
     "name": "Nature's Sanctuary",
     "level": 14,
-    "description": "As a Magic action, you can expend a use of your Wild Shape and cause spectral trees and vines to appear in a 15-foot Cube on the ground within 120 feet of yourself. They last there for 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward while there. As a Bonus Action, you can move the Cube up to 60 feet to ground within 120 feet of yourself."
+    "description": "As a Magic action, you can expend a use of your Wild Shape and cause spectral trees and vines to appear in a 15-foot Cube on the ground within 120 feet of yourself. They last there for 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward while there. As a Bonus Action, you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
+    "actions": [
+     {
+      "id": "natures-sanctuary",
+      "name": "Nature's Sanctuary",
+      "activation": "action",
+      "description": "As a Magic action, expend a use of your Wild Shape to make spectral trees and vines appear in a 15-foot Cube on the ground within 120 feet of yourself. They last 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward there. As a Bonus Action you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
+      "damage": []
+     }
+    ],
+    "uses": {
+     "scaling": {
+      "type": "class-resource",
+      "id": "wild-shape"
+     },
+     "per": "long-rest",
+     "pool": "wild-shape"
+    }
    }
   ]
  },
@@ -106,13 +190,36 @@
     "id": "bonus-proficiencies",
     "name": "Bonus Proficiencies",
     "level": 3,
-    "description": "You gain proficiency with three skills of your choice."
+    "description": "You gain proficiency with three skills of your choice.",
+    "choice": {
+     "kind": "skill",
+     "choose": 3,
+     "fromCatalog": "skills"
+    }
    },
    {
     "id": "cutting-words",
     "name": "Cutting Words",
     "level": 3,
-    "description": "You learn to use your wit to supernaturally distract, confuse, and otherwise sap the confidence and competence of others. When a creature that you can see within 60 feet of yourself makes a damage roll or succeeds on an ability check or attack roll, you can take a Reaction to expend one use of your Bardic Inspiration; roll your Bardic Inspiration die, and subtract the number rolled from the creature's roll, reducing the damage or potentially turning the success into a failure."
+    "description": "You learn to use your wit to supernaturally distract, confuse, and otherwise sap the confidence and competence of others. When a creature that you can see within 60 feet of yourself makes a damage roll or succeeds on an ability check or attack roll, you can take a Reaction to expend one use of your Bardic Inspiration; roll your Bardic Inspiration die, and subtract the number rolled from the creature's roll, reducing the damage or potentially turning the success into a failure.",
+    "actions": [
+     {
+      "id": "cutting-words",
+      "name": "Cutting Words",
+      "activation": "reaction",
+      "description": "When a creature you can see within 60 feet makes a damage roll or succeeds on an ability check or attack roll, take a Reaction to expend one use of your Bardic Inspiration; roll your Bardic Inspiration die and subtract the number rolled from the creature's roll, reducing the damage or potentially turning the success into a failure.",
+      "damage": []
+     }
+    ],
+    "uses": {
+     "scaling": {
+      "type": "ability-modifier",
+      "ability": "cha",
+      "minimum": 1
+     },
+     "per": "long-rest",
+     "pool": "bardic-inspiration"
+    }
    },
    {
     "id": "magical-discoveries",
@@ -124,7 +231,25 @@
     "id": "peerless-skill",
     "name": "Peerless Skill",
     "level": 14,
-    "description": "When you make an ability check or attack roll and fail, you can expend one use of Bardic Inspiration; roll the Bardic Inspiration die, and add the number rolled to the d20, potentially turning a failure into a success. On a failure, the Bardic Inspiration isn't expended."
+    "description": "When you make an ability check or attack roll and fail, you can expend one use of Bardic Inspiration; roll the Bardic Inspiration die, and add the number rolled to the d20, potentially turning a failure into a success. On a failure, the Bardic Inspiration isn't expended.",
+    "actions": [
+     {
+      "id": "peerless-skill",
+      "name": "Peerless Skill",
+      "activation": "other",
+      "description": "When you make an ability check or attack roll and fail, expend one use of Bardic Inspiration; roll the Bardic Inspiration die and add the number rolled to the d20, potentially turning a failure into a success. On a failure, the Bardic Inspiration isn't expended.",
+      "damage": []
+     }
+    ],
+    "uses": {
+     "scaling": {
+      "type": "ability-modifier",
+      "ability": "cha",
+      "minimum": 1
+     },
+     "per": "long-rest",
+     "pool": "bardic-inspiration"
+    }
    }
   ]
  },
@@ -245,25 +370,201 @@
     "id": "fiend-spells",
     "name": "Fiend Spells",
     "level": 3,
-    "description": "The magic of your patron ensures you always have certain spells ready; when you reach a Warlock level specified in the Fiend Spells table, you thereafter always have the listed spells prepared. Fiend Spells Warlock Level 3: Burning Hands, Command, Scorching Ray, Suggestion; Warlock Level 5: Fireball, Stinking Cloud; Warlock Level 7: Fire Shield, Wall of Fire; Warlock Level 9: Geas, Insect Plague."
+    "description": "The magic of your patron ensures you always have certain spells ready; when you reach a Warlock level specified in the Fiend Spells table, you thereafter always have the listed spells prepared. Fiend Spells Warlock Level 3: Burning Hands, Command, Scorching Ray, Suggestion; Warlock Level 5: Fireball, Stinking Cloud; Warlock Level 7: Fire Shield, Wall of Fire; Warlock Level 9: Geas, Insect Plague.",
+    "grants": {
+     "spells": [
+      {
+       "id": "burning-hands",
+       "level": 1
+      },
+      {
+       "id": "command",
+       "level": 1
+      },
+      {
+       "id": "scorching-ray",
+       "level": 2
+      },
+      {
+       "id": "suggestion",
+       "level": 2
+      }
+     ]
+    }
    },
    {
     "id": "dark-ones-own-luck",
     "name": "Dark One's Own Luck",
     "level": 6,
-    "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add 1d10 to your roll. You can do so after seeing the roll but before any of the roll's effects occur. You can use this feature a number of times equal to your Charisma modifier (minimum of once), but you can use it no more than once per roll. You regain all expended uses when you finish a Long Rest."
+    "description": "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, you can use this feature to add 1d10 to your roll. You can do so after seeing the roll but before any of the roll's effects occur. You can use this feature a number of times equal to your Charisma modifier (minimum of once), but you can use it no more than once per roll. You regain all expended uses when you finish a Long Rest.",
+    "uses": {
+     "scaling": {
+      "type": "ability-modifier",
+      "ability": "cha",
+      "minimum": 1
+     },
+     "per": "long-rest"
+    }
    },
    {
     "id": "fiendish-resilience",
     "name": "Fiendish Resilience",
     "level": 10,
-    "description": "Choose one damage type, other than Force, whenever you finish a Short or Long Rest. You have Resistance to that damage type until you choose a different one with this feature."
+    "description": "Choose one damage type, other than Force, whenever you finish a Short or Long Rest. You have Resistance to that damage type until you choose a different one with this feature.",
+    "choice": {
+     "kind": "damage-type",
+     "choose": 1,
+     "options": [
+      {
+       "id": "acid",
+       "name": "Acid",
+       "description": "You have Resistance to Acid damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "acid"
+        ]
+       }
+      },
+      {
+       "id": "bludgeoning",
+       "name": "Bludgeoning",
+       "description": "You have Resistance to Bludgeoning damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "bludgeoning"
+        ]
+       }
+      },
+      {
+       "id": "cold",
+       "name": "Cold",
+       "description": "You have Resistance to Cold damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "cold"
+        ]
+       }
+      },
+      {
+       "id": "fire",
+       "name": "Fire",
+       "description": "You have Resistance to Fire damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "fire"
+        ]
+       }
+      },
+      {
+       "id": "lightning",
+       "name": "Lightning",
+       "description": "You have Resistance to Lightning damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "lightning"
+        ]
+       }
+      },
+      {
+       "id": "necrotic",
+       "name": "Necrotic",
+       "description": "You have Resistance to Necrotic damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "necrotic"
+        ]
+       }
+      },
+      {
+       "id": "piercing",
+       "name": "Piercing",
+       "description": "You have Resistance to Piercing damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "piercing"
+        ]
+       }
+      },
+      {
+       "id": "poison",
+       "name": "Poison",
+       "description": "You have Resistance to Poison damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "poison"
+        ]
+       }
+      },
+      {
+       "id": "psychic",
+       "name": "Psychic",
+       "description": "You have Resistance to Psychic damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "psychic"
+        ]
+       }
+      },
+      {
+       "id": "radiant",
+       "name": "Radiant",
+       "description": "You have Resistance to Radiant damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "radiant"
+        ]
+       }
+      },
+      {
+       "id": "slashing",
+       "name": "Slashing",
+       "description": "You have Resistance to Slashing damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "slashing"
+        ]
+       }
+      },
+      {
+       "id": "thunder",
+       "name": "Thunder",
+       "description": "You have Resistance to Thunder damage until you choose a different type with this feature.",
+       "grants": {
+        "damageResistances": [
+         "thunder"
+        ]
+       }
+      }
+     ]
+    }
    },
    {
     "id": "hurl-through-hell",
     "name": "Hurl Through Hell",
     "level": 14,
-    "description": "Once per turn when you hit a creature with an attack roll, you can try to instantly transport the target through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC, or the target disappears and hurtles through a nightmare landscape. The target takes 8d10 Psychic damage if it isn't a Fiend, and it has the Incapacitated condition until the end of your next turn, when it returns to the space it previously occupied or the nearest unoccupied space. Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore your use of it."
+    "description": "Once per turn when you hit a creature with an attack roll, you can try to instantly transport the target through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC, or the target disappears and hurtles through a nightmare landscape. The target takes 8d10 Psychic damage if it isn't a Fiend, and it has the Incapacitated condition until the end of your next turn, when it returns to the space it previously occupied or the nearest unoccupied space. Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore your use of it.",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "actions": [
+     {
+      "id": "hurl-through-hell",
+      "name": "Hurl Through Hell",
+      "activation": "other",
+      "description": "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
+      "save": {
+       "ability": "cha",
+       "dc": "spellcasting"
+      },
+      "damage": [
+       {
+        "formula": "8d10",
+        "type": "psychic"
+       }
+      ]
+     }
+    ]
    }
   ]
  },
@@ -286,13 +587,45 @@
     "id": "hunters-prey",
     "name": "Hunter's Prey",
     "level": 3,
-    "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Colossus Slayer. Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn. Horde Breaker. Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn."
+    "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Colossus Slayer. Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn. Horde Breaker. Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn.",
+    "choice": {
+     "kind": "hunters-prey",
+     "choose": 1,
+     "options": [
+      {
+       "id": "colossus-slayer",
+       "name": "Colossus Slayer",
+       "description": "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn."
+      },
+      {
+       "id": "horde-breaker",
+       "name": "Horde Breaker",
+       "description": "Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn."
+      }
+     ]
+    }
    },
    {
     "id": "defensive-tactics",
     "name": "Defensive Tactics",
     "level": 7,
-    "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Escape the Horde. Opportunity Attacks have Disadvantage against you. Multiattack Defense. When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn."
+    "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Escape the Horde. Opportunity Attacks have Disadvantage against you. Multiattack Defense. When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.",
+    "choice": {
+     "kind": "defensive-tactics",
+     "choose": 1,
+     "options": [
+      {
+       "id": "escape-the-horde",
+       "name": "Escape the Horde",
+       "description": "Opportunity Attacks have Disadvantage against you."
+      },
+      {
+       "id": "multiattack-defense",
+       "name": "Multiattack Defense",
+       "description": "When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn."
+      }
+     ]
+    }
    },
    {
     "id": "superior-hunters-prey",
@@ -475,19 +808,55 @@
     "id": "oath-of-devotion-spells",
     "name": "Oath of Devotion Spells",
     "level": 3,
-    "description": "The magic of your oath ensures you always have certain spells ready; when you reach a Paladin level specified in the Oath of Devotion Spells table, you thereafter always have the listed spells prepared. Oath of Devotion Spells Paladin Level 3: Protection from Evil and Good, Shield of Faith; Paladin Level 5: Aid, Zone of Truth; Paladin Level 9: Beacon of Hope, Dispel Magic; Paladin Level 13: Freedom of Movement, Guardian of Faith; Paladin Level 17: Commune, Flame Strike."
+    "description": "The magic of your oath ensures you always have certain spells ready; when you reach a Paladin level specified in the Oath of Devotion Spells table, you thereafter always have the listed spells prepared. Oath of Devotion Spells Paladin Level 3: Protection from Evil and Good, Shield of Faith; Paladin Level 5: Aid, Zone of Truth; Paladin Level 9: Beacon of Hope, Dispel Magic; Paladin Level 13: Freedom of Movement, Guardian of Faith; Paladin Level 17: Commune, Flame Strike.",
+    "grants": {
+     "spells": [
+      {
+       "id": "protection-from-evil-and-good",
+       "level": 1,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "shield-of-faith",
+       "level": 1,
+       "alwaysPrepared": true
+      }
+     ]
+    }
    },
    {
     "id": "sacred-weapon",
     "name": "Sacred Weapon",
     "level": 3,
-    "description": "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon that you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls you make with that weapon (minimum bonus of +1), and each time you hit with it, you cause it to deal its normal damage type or Radiant damage. The weapon also emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that. You can end this effect early (no action required). This effect also ends if you aren't carrying the weapon."
+    "description": "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon that you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls you make with that weapon (minimum bonus of +1), and each time you hit with it, you cause it to deal its normal damage type or Radiant damage. The weapon also emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that. You can end this effect early (no action required). This effect also ends if you aren't carrying the weapon.",
+    "uses": {
+     "scaling": {
+      "type": "class-resource",
+      "id": "channel-divinity"
+     },
+     "per": "long-rest",
+     "pool": "channel-divinity"
+    },
+    "actions": [
+     {
+      "id": "sacred-weapon",
+      "name": "Channel Divinity: Sacred Weapon",
+      "activation": "other",
+      "description": "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
+      "damage": []
+     }
+    ]
    },
    {
     "id": "aura-of-devotion",
     "name": "Aura of Devotion",
     "level": 7,
-    "description": "You and your allies have Immunity to the Charmed condition while in your Aura of Protection. If a Charmed ally enters the aura, that condition has no effect on that ally while there."
+    "description": "You and your allies have Immunity to the Charmed condition while in your Aura of Protection. If a Charmed ally enters the aura, that condition has no effect on that ally while there.",
+    "grants": {
+     "conditionImmunities": [
+      "charmed"
+     ]
+    }
    },
    {
     "id": "smite-of-protection",
@@ -499,7 +868,20 @@
     "id": "holy-nimbus",
     "name": "Holy Nimbus",
     "level": 20,
-    "description": "As a Bonus Action, you can imbue your Aura of Protection with holy power, granting the benefits below for 10 minutes or until you end them (no action required). Once you use this feature, you can't use it again until you finish a Long Rest. You can also restore your use of it by expending a level 5 spell slot (no action required). Holy Ward. You have Advantage on any saving throw you are forced to make by a Fiend or an Undead. Radiant Damage. Whenever an enemy starts its turn in the aura, that creature takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus. Sunlight. The aura is filled with Bright Light that is sunlight."
+    "description": "As a Bonus Action, you can imbue your Aura of Protection with holy power, granting the benefits below for 10 minutes or until you end them (no action required). Once you use this feature, you can't use it again until you finish a Long Rest. You can also restore your use of it by expending a level 5 spell slot (no action required). Holy Ward. You have Advantage on any saving throw you are forced to make by a Fiend or an Undead. Radiant Damage. Whenever an enemy starts its turn in the aura, that creature takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus. Sunlight. The aura is filled with Bright Light that is sunlight.",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "actions": [
+     {
+      "id": "holy-nimbus",
+      "name": "Holy Nimbus",
+      "activation": "bonus-action",
+      "description": "You imbue your Aura of Protection with holy power for 10 minutes or until you end it (no action required). You have Advantage on saving throws forced by Fiends and Undead; an enemy that starts its turn in the aura takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus; and the aura is filled with Bright Light that is sunlight. You can restore your use of this feature by expending a level 5 spell slot.",
+      "damage": []
+     }
+    ]
    }
   ]
  },
@@ -534,7 +916,28 @@
     "id": "intimidating-presence",
     "name": "Intimidating Presence",
     "level": 14,
-    "description": "As a Bonus Action, you can strike terror into others with your menacing presence and primal power. When you do so, each creature of your choice in a 30-foot Emanation originating from you must make a Wisdom saving throw (DC 8 plus your Strength modifier and Proficiency Bonus). On a failed save, a creature has the Frightened condition for 1 minute. At the end of each of the Frightened creature's turns, the creature repeats the save, ending the effect on itself on a success. Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a use of your Rage (no action required) to restore your use of it."
+    "description": "As a Bonus Action, you can strike terror into others with your menacing presence and primal power. When you do so, each creature of your choice in a 30-foot Emanation originating from you must make a Wisdom saving throw (DC 8 plus your Strength modifier and Proficiency Bonus). On a failed save, a creature has the Frightened condition for 1 minute. At the end of each of the Frightened creature's turns, the creature repeats the save, ending the effect on itself on a success. Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a use of your Rage (no action required) to restore your use of it.",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "actions": [
+     {
+      "id": "intimidating-presence",
+      "name": "Intimidating Presence",
+      "activation": "bonus-action",
+      "description": "Each creature of your choice in a 30-foot Emanation makes a Wisdom saving throw. On a failed save, the creature has the Frightened condition for 1 minute; at the end of each of its turns it repeats the save, ending the effect on itself on a success.",
+      "damage": [],
+      "save": {
+       "ability": "wis",
+       "dc": {
+        "base": 8,
+        "ability": "str",
+        "proficiencyBonus": true
+       }
+      }
+     }
+    ]
    }
   ]
  },
@@ -551,7 +954,16 @@
     "id": "fast-hands",
     "name": "Fast Hands",
     "level": 3,
-    "description": "As a Bonus Action, you can do one of the following. Sleight of Hand. Make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket. Use an Object. Take the Utilize action, or take the Magic action to use a magic item that requires that action."
+    "description": "As a Bonus Action, you can do one of the following. Sleight of Hand. Make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket. Use an Object. Take the Utilize action, or take the Magic action to use a magic item that requires that action.",
+    "actions": [
+     {
+      "id": "fast-hands",
+      "name": "Fast Hands",
+      "activation": "bonus-action",
+      "description": "As a Bonus Action you can either make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket, or take the Utilize action (or the Magic action to use a magic item that requires it).",
+      "damage": []
+     }
+    ]
    },
    {
     "id": "second-story-work",
@@ -598,7 +1010,24 @@
     "id": "wholeness-of-body",
     "name": "Wholeness of Body",
     "level": 6,
-    "description": "You gain the ability to heal yourself. As a Bonus Action, you can roll your Martial Arts die. You regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained). You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest."
+    "description": "You gain the ability to heal yourself. As a Bonus Action, you can roll your Martial Arts die. You regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained). You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+    "uses": {
+     "scaling": {
+      "type": "ability-modifier",
+      "ability": "wis",
+      "minimum": 1
+     },
+     "per": "long-rest"
+    },
+    "actions": [
+     {
+      "id": "wholeness-of-body",
+      "name": "Wholeness of Body",
+      "activation": "bonus-action",
+      "description": "Roll your Martial Arts die and regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained).",
+      "damage": []
+     }
+    ]
    },
    {
     "id": "fleet-step",
@@ -610,7 +1039,29 @@
     "id": "quivering-palm",
     "name": "Quivering Palm",
     "level": 17,
-    "description": "You gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start these imperceptible vibrations, which last for a number of days equal to your Monk level. The vibrations are harmless unless you take an action to end them. Alternatively, when you take the Attack action on your turn, you can forgo one of the attacks to end the vibrations. To end them, you and the target must be on the same plane of existence. When you end them, the target must make a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one. You can have only one creature under the effect of this feature at a time. You can end the vibrations harmlessly (no action required)."
+    "description": "You gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start these imperceptible vibrations, which last for a number of days equal to your Monk level. The vibrations are harmless unless you take an action to end them. Alternatively, when you take the Attack action on your turn, you can forgo one of the attacks to end the vibrations. To end them, you and the target must be on the same plane of existence. When you end them, the target must make a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one. You can have only one creature under the effect of this feature at a time. You can end the vibrations harmlessly (no action required).",
+    "actions": [
+     {
+      "id": "quivering-palm",
+      "name": "Quivering Palm",
+      "activation": "action",
+      "description": "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
+      "damage": [
+       {
+        "formula": "10d12",
+        "type": "force"
+       }
+      ],
+      "save": {
+       "ability": "con",
+       "dc": {
+        "base": 8,
+        "ability": "wis",
+        "proficiencyBonus": true
+       }
+      }
+     }
+    ]
    }
   ]
  }
