@@ -15,7 +15,7 @@
  * Run with `npm run build-class-bundle -w @vtt/content-srd-5.2.1`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics.js";
+import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -710,8 +710,8 @@ for (const [id, entry] of parsed) {
   // THE MECHANICS OVERLAY. The SRD markdown carries no riders - there is no sentence in it that says
   // `{type: "damage-resistance", ...}` - so the prose is generated and the mechanics are authored,
   // and they meet HERE rather than by freezing the class into HAND_AUTHORED and hand-maintaining its
-  // 20-odd descriptions to gain somewhere to hang three lines. See `class-mechanics.ts`.
-  overlayMisses.push(...applyMechanics(id, features));
+  // 20-odd descriptions to gain somewhere to hang three lines. See `class-mechanics/overlay.ts`.
+  overlayMisses.push(...applyMechanics(id, features, CLASS_MECHANICS));
   // PARSE THE FINISHED RECORD. The overlay is hand-authored TypeScript merged into generated data,
   // so this is the one point where the two are checked together - an authoring mistake stops the
   // build here rather than surfacing as a load failure in whatever runs next.
@@ -803,14 +803,6 @@ for (const [id, entry] of parsed) {
   if (overlaid) console.log(`${title}: ${features.length} features, ${overlaid} with mechanics`);
 }
 
-// A rider authored against a feature id the ETL no longer emits is the silent drop this whole area
-// exists to end, so it fails the build rather than quietly producing a record without its mechanics.
-// Both halves of the overlay report here: a class key and a subclass key fail identically.
-if (overlayMisses.length) {
-  console.error(`\nMechanics overlay keys matching no generated feature (${overlayMisses.length}):`);
-  for (const key of overlayMisses) console.error(`  ${key}`);
-  process.exit(1);
-}
 
 // ---------------------------------------------------------------------------------------------
 // Cross-check: the hand-authored three, re-parsed from this source
@@ -825,6 +817,45 @@ const existingClasses = (JSON.parse(readFileSync(join(bundles, "classes.v1.json"
 const existingSubclassRecords = (JSON.parse(readFileSync(join(bundles, "subclasses.v1.json"), "utf8")) as {
   id: string; name: string; classId: string; features: { id: string; level?: number }[];
 }[]).filter((record) => HAND_AUTHORED.has(record.classId));
+
+/**
+ * THE OVERLAY REACHES ALL TWELVE CLASSES, not the nine the ETL generates.
+ *
+ * `applyMechanics` used to run only inside the generation loop, so Cleric, Fighter and Wizard - the
+ * three whose records are carried through verbatim - could not use the overlay at all. That is why
+ * Thaumaturge's extra cantrip had to be hand-edited straight into `classes.v1.json`, and it is why
+ * three of the four Stage-4 authoring lanes would otherwise have had to edit that same 20,000-line
+ * file. The merge point differs and nothing else does:
+ *
+ *   - a GENERATED record is rebuilt from the markdown every run, so the overlay is the only home
+ *     its riders have and it is re-applied from scratch each time;
+ *   - a HAND_AUTHORED record's prose IS `classes.v1.json`, which this script reads and writes, so
+ *     the overlay's contribution is written back into its own input. `applyMechanics` therefore
+ *     refuses to overwrite a value already on the record: the merge only ADDS, and a rider that
+ *     disagrees with the file stops the build naming both homes rather than picking a winner.
+ *
+ * Both records are re-parsed below, exactly as the generated ones are.
+ */
+for (const record of existingClasses) {
+  overlayMisses.push(...applyMechanics(record.id, record.features, CLASS_MECHANICS));
+  ClassReferenceSchema.parse(record);
+  const overlaid = Object.keys(CLASS_MECHANICS[record.id] ?? {}).length;
+  if (overlaid) console.log(`${record.name} (hand-authored): ${overlaid} feature(s) with overlay mechanics`);
+}
+for (const record of existingSubclassRecords) {
+  overlayMisses.push(...applyMechanics(record.id, record.features, SUBCLASS_MECHANICS));
+  SubclassReferenceSchema.parse(record);
+}
+// A rider authored against a feature id no record emits is the silent drop this whole area exists
+// to end, so it fails the build rather than quietly producing a record without its mechanics. All
+// four merges report here - generated class, generated subclass, hand-authored class, hand-authored
+// subclass - so a key that matches nothing fails identically wherever it was authored.
+if (overlayMisses.length) {
+  console.error(`\nMechanics overlay keys matching no feature (${overlayMisses.length}):`);
+  for (const key of overlayMisses) console.error(`  ${key}`);
+  process.exit(1);
+}
+
 const disagreements: string[] = [];
 for (const record of existingClasses) {
   const entry = parsed.get(record.id);

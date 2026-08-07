@@ -20,7 +20,7 @@ import { loadClasses, loadSubclasses, type ClassReference, type FeatureRecord, t
  *
  * The ETL-generated classes started out entirely the second kind, because Stage 4 has not authored
  * their mechanics yet - and Barbarian's Rage is the first to cross over. Naming a column in
- * `LIVE_CLASS_RESOURCES` (`scripts/class-mechanics.ts`) drops its `display: true`, at which point
+ * `LIVE_CLASS_RESOURCES` (`scripts/class-mechanics/index.ts`) drops its `display: true`, at which point
  * this test stops accepting the annotation and starts requiring the pool it was standing in for.
  * That is the whole ratchet: every column Stage 4 wires up tightens the check by one.
  */
@@ -105,7 +105,7 @@ describe("every printed class resource is either a real pool or marked display-o
  * **The mechanics overlay reached the bundle** - the Stage 4 mechanism, proved on one feature.
  *
  * `classes.v1.json` is GENERATED, and the SRD markdown it is generated from contains no riders. The
- * overlay in `scripts/class-mechanics.ts` is where a human authors them and the ETL merges the two,
+ * overlay in `scripts/class-mechanics/` is where a human authors them and the ETL merges the two,
  * so that prose stays derived and mechanics stay authored. Barbarian's Rage is the worked example;
  * these assertions are what make it a mechanism rather than a plan.
  */

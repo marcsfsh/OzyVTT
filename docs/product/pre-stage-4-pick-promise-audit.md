@@ -256,8 +256,8 @@ built right now and it unblocks the three records where a level-20 character is 
 **Two structural blockers Stage 4 will hit immediately, before any of the above:**
 
 - **`SUBCLASS_MECHANICS` is declared and never merged.** It is exported from
-  `packages/content-srd-5.2.1/scripts/class-mechanics.ts` but `build-class-bundle.ts` imports only
-  `CLASS_MECHANICS`, `LIVE_CLASS_RESOURCES` and `applyMechanics`. Nine of the twelve subclasses are
+  `packages/content-srd-5.2.1/scripts/class-mechanics/index.ts` but `build-class-bundle.ts` imported
+  only `CLASS_MECHANICS`, `LIVE_CLASS_RESOURCES` and `applyMechanics`. **Fixed in `9f31dd9`.** Nine of the twelve subclasses are
   ETL-generated, so **there is no authoring surface for a subclass rider at all today** — 10 of the
   11 subclass gaps are unauthorable until that is wired. (Champion, Evoker and Life Domain are
   preserved from the bundle because their class is `HAND_AUTHORED`, which is why Life Domain alone

@@ -74,7 +74,7 @@ that resolves to nothing — the guard for Stage 4's authoring.
 expressible; see the audit's three column-scaled cases.
 
 > **Correction to D8 — the overlay does NOT apply to every class.** The plan said to author mechanics
-> through `class-mechanics.ts`. That is right for the **nine generated classes** and **wrong for cleric,
+> through the mechanics overlay. That is right for the **nine generated classes** and **wrong for cleric,
 > fighter and wizard**: `applyMechanics` runs only over the generated set
 > (`build-class-bundle.ts:608`), and the three `HAND_AUTHORED` classes are carried over verbatim
 > (`:33`, `:770`). `FeatureMechanics` also cannot express an inline **option**'s fields at all, and
@@ -871,7 +871,7 @@ is a printed column, not a namespace** — bind them by convention and enforce w
 > spell lists: *"a membership OVERLAY, never an edit to `spells.v1.json` … hand-editing is destroyed by
 > the next rebuild."*
 >
-> Authoring surface: `packages/content-srd-5.2.1/scripts/class-mechanics.ts`. The ETL merges it,
+> Authoring surface: `packages/content-srd-5.2.1/scripts/class-mechanics/` (one file per class). The ETL merges it,
 > **fails the build on an unmatched key**, and `ClassReferenceSchema.parse`s every record.
 > Prototyped on Rage: the merged record carries the SRD's own 500+ char paragraph **and** the authored
 > riders, with `uses` scaling off the printed Rages column — which then drops `display: true` and makes
