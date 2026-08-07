@@ -633,6 +633,33 @@ export const CharacterIdentitySchema = z.object({
   background: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional(),
   feats: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(80), description: z.string().max(4000).optional() }).strict()).max(40).default([]),
   /**
+   * WHICH FEATURE RECORDS THIS SHEET HOLDS, by id - the class, subclass, species, lineage and
+   * background features plus every chosen inline option.
+   *
+   * `feats` has always recorded feat ids, and that is the ONLY reason a feat's roll-time riders
+   * reach the table: `deriveEquipment` turns `character.feats` into `RiderCarrier`s, and the same
+   * `collectRiders` that serves a magic item serves them. A class feature was recorded nowhere, so
+   * 13 of the 21 rider variants - `roll-mode`, `extra-damage`, `critical-range`, `spell-slot`,
+   * `resource-bonus`, the trigger-gated bonuses - were authored, validated, and then simply dropped
+   * for class, subclass, species and background features. That is the whole of issue `2e`.
+   *
+   * ID AND PROVENANCE ONLY. The riders themselves are NEVER stored: they live on the catalog record
+   * and are recomputed on every read, exactly as a feat's are, so an edited homebrew feature is
+   * correct on the next read, there is no third copy to drift, and a respec that rewrites this array
+   * needs no migration. `kind` + `sourceId` say WHERE to look the id up (a class feature id is
+   * unique only within its class), and they carry no secret: every value is a public content slug
+   * the player's own sheet already names.
+   *
+   * Additive-optional and it must stay that way: PDF imports, bundled monsters and every definition
+   * written before this field existed have no array at all, and every reader treats that as `[]`.
+   */
+  features: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9-]+$/).max(80),
+    kind: z.enum(["class", "subclass", "species", "lineage", "background", "option"]),
+    /** The record the feature was looked up in: a class/subclass/species/background id, or the parent feature id for an inline option. */
+    sourceId: z.string().regex(/^[a-z0-9-]+$/).max(80)
+  }).strict()).max(80).optional(),
+  /**
    * The choice-provenance ledger (see CharacterChoiceSchema). ABSENT means "this sheet carries no
    * provenance" - a PDF import or a pre-wizard character - which respec must be able to tell apart
    * from "the wizard ran and recorded zero decisions" (an empty array). Read it through

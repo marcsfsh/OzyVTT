@@ -14,7 +14,7 @@ import type {
   FeatureRecord, SpeciesReference, SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
-import { BUILDER_BAKED_MODIFIER_TYPES } from "./equipment-derivation.js";
+import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -64,6 +64,9 @@ export type CharacterCreateRequestInput = Readonly<{
   hp: Readonly<{ mode: "average" | "entries"; entries?: readonly number[] }>;
   choices: readonly CharacterChoice[];
 }>;
+
+/** Where a granted feature came from, for `definition.character.features`. `null` = already recorded on `character.feats`. */
+type CharacterFeatureOrigin = Readonly<{ kind: CharacterFeatureRef["kind"]; sourceId: string }>;
 
 function reject(message: string): never { throw new CommandRejectedError(message); }
 function dedupe(values: readonly string[]): string[] { return [...new Set(values)]; }
@@ -508,13 +511,26 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     : null;
   // Every feat this character already holds, granted or chosen - the cross-offer duplicate guard in pass A.
   const heldFeatIds = new Set<string>(originFeat ? [originFeat.id] : []);
-  const granted: Array<{ record: FeatureRecord; count: number }> = [
-    ...classFeatures.values(),
-    ...subclassFeatures.map((record) => ({ record, count: 1 })),
-    ...species.traits.map((record) => ({ record, count: 1 })),
-    ...(lineage?.traits ?? []).map((record) => ({ record, count: 1 })),
-    ...background.features.map((record) => ({ record, count: 1 })),
-    ...(originFeat ? [{ record: originFeat.feature, count: 1 }] : [])
+  /**
+   * Every granted feature, WITH ITS PROVENANCE (issue `2e`).
+   *
+   * `origin` is not decoration: it becomes `definition.character.features`, which is the only way a
+   * class/subclass/species/lineage/background feature's 13 ROLL-TIME riders can reach the table.
+   * `interpretFeature` below folds the other 8 at build time; the rest are read back through
+   * `deriveEquipment`'s `characterFeatureCarriers`, exactly as a feat's are read through
+   * `character.feats`. A bare id would not do - `unarmored-defense` is a Barbarian feature AND a
+   * Monk feature with different mechanics - so the pair `{kind, sourceId}` travels with each id.
+   *
+   * `origin: null` means "recorded elsewhere": the origin feat and every chosen feat are already on
+   * `character.feats`, and recording them a second time here would double every rider they carry.
+   */
+  const granted: Array<{ record: FeatureRecord; count: number; origin: CharacterFeatureOrigin | null }> = [
+    ...[...classFeatures.values()].map((entry) => ({ ...entry, origin: { kind: "class", sourceId: classRecord.id } as const })),
+    ...subclassFeatures.map((record) => ({ record, count: 1, origin: { kind: "subclass", sourceId: subclass!.id } as const })),
+    ...species.traits.map((record) => ({ record, count: 1, origin: { kind: "species", sourceId: species.id } as const })),
+    ...(lineage?.traits ?? []).map((record) => ({ record, count: 1, origin: { kind: "lineage", sourceId: lineage!.id } as const })),
+    ...background.features.map((record) => ({ record, count: 1, origin: { kind: "background", sourceId: background.id } as const })),
+    ...(originFeat ? [{ record: originFeat.feature, count: 1, origin: null }] : [])
   ];
 
   // ---- 4. Build the choice offers and match every ledger row against them (two passes). ----
@@ -625,7 +641,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // The chosen feats' features join the granted set: their own choices become offers for pass B,
   // and their riders/prose interpret exactly like any class or species feature.
   for (const feat of chosenFeats) {
-    granted.push({ record: feat.feature, count: 1 });
+    granted.push({ record: feat.feature, count: 1, origin: null }); // recorded on `character.feats`
     featureOffer(feat.feature, 1);
   }
 
@@ -642,7 +658,9 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     const option = offer.optionRecords?.find((candidate) => candidate.id === row.id);
     if (!option) continue; // a bare id in a mixed-kind offer: provenance only, nothing to interpret
     const asFeature = optionAsFeature(option);
-    granted.push({ record: asFeature, count: 1 });
+    // An option's riders ride the bearer exactly as its parent feature's do, so it is recorded too -
+    // keyed under the PARENT feature's id, which is where the catalog indexes it.
+    granted.push({ record: asFeature, count: 1, origin: offer.featureId ? { kind: "option", sourceId: offer.featureId } : null });
     // The option's own pick is keyed on the option id, with the parent feature id as an accepted alias.
     featureOffer(asFeature, 1, offer.featureId ? [offer.featureId] : []);
   }

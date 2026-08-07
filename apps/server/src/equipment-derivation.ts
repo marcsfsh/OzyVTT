@@ -156,6 +156,20 @@ export type SpellRecordLike = Readonly<{
   castingOptions?: readonly Readonly<{ type: string; damageRoll: string | null; targetCount: number | null }>[];
 }>;
 export type FeatRecordLike = Readonly<{ id: string; name: string; feature: RiderBlockLike }>;
+/**
+ * A class / subclass / species / lineage / background FEATURE, or a chosen inline option, as this
+ * module reads it. Structurally a `FeatureRecord` (or a `FeatureOption`, which carries the identical
+ * `featureRiders` vocabulary): the record IS the rider block, where a feat's is one level down.
+ */
+export type FeatureRecordLike = RiderBlockLike & Readonly<{ id: string; name: string }>;
+/**
+ * How `definition.character.features` names one record.
+ *
+ * A bare id would be AMBIGUOUS and silently wrong: `unarmored-defense` is a Barbarian feature and a
+ * Monk feature with different mechanics, `weapon-mastery` belongs to five classes, `spellcasting` to
+ * seven, and every class has an `epic-boon`. `kind` + `sourceId` make the lookup exact.
+ */
+export type CharacterFeatureRef = Readonly<{ id: string; kind: "class" | "subclass" | "species" | "lineage" | "background" | "option"; sourceId: string }>;
 
 /**
  * The rider families `buildCharacterDefinition`'s `interpretFeature` FOLDS INTO the ActorDefinition
@@ -192,11 +206,18 @@ const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES)
 export type EquipmentCatalog = Readonly<{
   equipmentRecord: (id: string) => EquipmentRecordLike | undefined;
   featRecord?: (id: string) => FeatRecordLike | undefined;
+  /** The class/subclass/species/lineage/background feature (or inline option) a sheet's `character.features` entry names. */
+  featureRecord?: (ref: CharacterFeatureRef) => FeatureRecordLike | undefined;
   /** The spell an item's `casts` entry names, so the synthesised cast can resolve real damage/attack/save. */
   spellRecord?: (id: string) => SpellRecordLike | undefined;
 }>;
 
-type CatalogSource = Readonly<{ equipmentRecord: (id: string) => unknown; featRecord: (id: string) => unknown; spellRecord?: (id: string) => unknown }>;
+type CatalogSource = Readonly<{
+  equipmentRecord: (id: string) => unknown;
+  featRecord: (id: string) => unknown;
+  featureRecord?: (ref: CharacterFeatureRef) => unknown;
+  spellRecord?: (id: string) => unknown;
+}>;
 const ADAPTED = new WeakMap<CatalogSource, EquipmentCatalog>();
 
 /**
@@ -215,6 +236,7 @@ export function equipmentCatalogOf(view: CatalogSource): EquipmentCatalog {
   const adapted: EquipmentCatalog = {
     equipmentRecord: (id) => view.equipmentRecord(id) as EquipmentRecordLike | undefined,
     featRecord: (id) => view.featRecord(id) as FeatRecordLike | undefined,
+    ...(view.featureRecord ? { featureRecord: (ref: CharacterFeatureRef) => view.featureRecord!(ref) as FeatureRecordLike | undefined } : {}),
     ...(view.spellRecord ? { spellRecord: (id: string) => view.spellRecord!(id) as SpellRecordLike | undefined } : {})
   };
   ADAPTED.set(view, adapted);
@@ -358,6 +380,42 @@ function characterFeatCarriers(definition: ActorDefinition | undefined, catalog:
   return carriers;
 }
 
+/**
+ * THE CHARACTER'S OWN CLASS, SUBCLASS, SPECIES, LINEAGE AND BACKGROUND FEATURES - and every chosen
+ * inline option - as rider carriers. Issue `2e`.
+ *
+ * The near-twin of `characterFeatCarriers` above, and deliberately so: the two solve the identical
+ * problem for two halves of the same sheet. `interpretFeature` in `character-build.ts` folds 8 of
+ * the 21 rider variants into the definition at BUILD time; the other 13 are inherently roll-time (a
+ * `roll-mode` is advantage at a moment, `extra-damage` is dice rolled on a hit, `spell-slot` and
+ * `resource-bonus` are live maxima) and can only reach the table as carriers. A feat got there
+ * because `character.feats` records its id. A class feature was recorded NOWHERE, so its 13
+ * roll-time riders were authored, validated, and dropped - the Cleric with one usable action.
+ *
+ * Every argument in `characterFeatCarriers`'s header applies verbatim and is not repeated: recompute
+ * rather than persist (the riders live on the catalog record, so an edited homebrew feature is
+ * correct on the next read and a respec needs no migration), and no `sourceItemId`, because a class
+ * feature is worn by the BEARER - `collectRiders` must scope its riders to every action.
+ *
+ * FAILS OPEN on an absent array. Definitions written before this field existed - PDF imports, the
+ * example party, every bundled monster - have no `features` at all, and must keep working exactly as
+ * they do today: no array means no carriers, never an error.
+ */
+function characterFeatureCarriers(definition: ActorDefinition | undefined, catalog: EquipmentCatalog): readonly RiderCarrier[] {
+  const features = definition?.character?.features ?? [];
+  if (features.length === 0 || !catalog.featureRecord) return [];
+  const carriers: RiderCarrier[] = [];
+  for (const held of features) {
+    // Same fail-open as a feat with no catalog record: a homebrew class the GM has since deleted, or
+    // a feature renamed out from under a stored sheet, contributes prose only rather than throwing.
+    const record = catalog.featureRecord(held);
+    if (!record) continue;
+    const modifiers = (record.modifiers ?? []).filter(ridesOnTheBearer);
+    if (modifiers.length > 0) carriers.push({ label: record.name, modifiers });
+  }
+  return carriers;
+}
+
 /** Which of a feat's authored riders this carrier may hand to the collector. */
 function ridesOnTheBearer(modifier: RiderModifier): boolean {
   // Already inside the definition's own numbers - see BUILDER_BAKED_MODIFIER_TYPES.
@@ -404,14 +462,15 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     equipped.push(entry);
     if (itemIsActive(item, record)) active.push(entry);
   }
-  // A character's own feats carry riders whether or not they are holding anything, so the
-  // nothing-equipped shortcut has to clear BOTH sources before it can return the empty block.
+  // A character's own feats AND features carry riders whether or not they are holding anything, so
+  // the nothing-equipped shortcut has to clear all three sources before it returns the empty block.
   const featCarriers = characterFeatCarriers(definition, catalog);
-  if (equipped.length === 0 && featCarriers.length === 0) return EMPTY_DERIVATION;
+  const featureCarriers = characterFeatureCarriers(definition, catalog);
+  if (equipped.length === 0 && featCarriers.length === 0 && featureCarriers.length === 0) return EMPTY_DERIVATION;
   /** Feats the character already HOLDS - so an item that grants one they have adds nothing twice. */
   const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
 
-  const carriers: RiderCarrier[] = [...featCarriers];
+  const carriers: RiderCarrier[] = [...featCarriers, ...featureCarriers];
   const featIds: Array<{ id: string; name: string; sourceItemId: string }> = [];
   const actions: ActorAction[] = [];
   const sources: Array<{ itemId: string; itemName: string; summary: string }> = [];

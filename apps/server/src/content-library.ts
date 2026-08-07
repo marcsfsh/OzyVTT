@@ -2,6 +2,7 @@ import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSumm
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
 import { applySpellListOverlay, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import type { CharacterFeatureRef, FeatureRecordLike } from "./equipment-derivation.js";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -89,6 +90,8 @@ export interface ContentView {
   speciesRecord(id: string): SpeciesReference | undefined;
   backgroundRecord(id: string): BackgroundReference | undefined;
   featRecord(id: string): FeatReference | undefined;
+  /** The class/subclass/species/lineage/background feature (or inline option) a sheet's `character.features` entry names - the read that lets a feature's ROLL-TIME riders reach the table. */
+  featureRecord(ref: CharacterFeatureRef): FeatureRecordLike | undefined;
   equipmentRecord(id: string): EquipmentReference | undefined;
   spellRecord(id: string): SpellReference | undefined;
 }
@@ -496,10 +499,52 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     speciesRecords: new Map(species.map((entry) => [entry.id, entry])),
     backgroundRecords: new Map(backgrounds.map((entry) => [entry.id, entry])),
     featRecords: new Map(feats.map((entry) => [entry.id, entry])),
+    featureRecords: featureIndexOf(classes, subclasses, species, backgrounds),
     equipmentRecords: new Map(equipment.map((entry) => [entry.id, entry])),
     spellRecords: new Map(spells.map((entry) => [entry.id, entry]))
   };
 }
+
+/**
+ * Every class / subclass / species / lineage / background FEATURE, plus every inline choice OPTION,
+ * addressable by the `{kind, sourceId, id}` triple a sheet's `character.features` records (issue
+ * `2e` - a feature's 13 roll-time riders reach the table only if the sheet can name the record).
+ *
+ * KEYED ON ALL THREE, not on the id. A bare id is genuinely ambiguous in the bundled SRD alone:
+ * `unarmored-defense` is both a Barbarian and a Monk feature and the two differ mechanically,
+ * `weapon-mastery` belongs to five classes, `spellcasting` to seven, `epic-boon` to all twelve.
+ * An id-keyed map would hand a Monk the Barbarian's riders - silently, and only sometimes.
+ *
+ * First write wins on a duplicate key, so the index is deterministic whatever order homebrew merges
+ * in; an exact triple collision would mean two records claiming the same identity, which the
+ * homebrew id rules already prevent.
+ */
+function featureIndexOf(
+  classes: readonly ClassReference[], subclasses: readonly SubclassReference[],
+  species: readonly SpeciesReference[], backgrounds: readonly BackgroundReference[]
+): Map<string, FeatureRecordLike> {
+  const index = new Map<string, FeatureRecordLike>();
+  const put = (kind: CharacterFeatureRef["kind"], sourceId: string, feature: FeatureRecord) => {
+    const key = featureKey({ kind, sourceId, id: feature.id });
+    if (!index.has(key)) index.set(key, feature as FeatureRecordLike);
+    // A feature's inline options carry the identical `featureRiders` vocabulary and are chosen the
+    // same way; the builder records them as kind "option" under their PARENT FEATURE's id.
+    for (const option of feature.choice?.options ?? []) {
+      const optionKey = featureKey({ kind: "option", sourceId: feature.id, id: option.id });
+      if (!index.has(optionKey)) index.set(optionKey, option as unknown as FeatureRecordLike);
+    }
+  };
+  for (const entry of classes) for (const feature of entry.features) put("class", entry.id, feature);
+  for (const entry of subclasses) for (const feature of entry.features) put("subclass", entry.id, feature);
+  for (const entry of species) {
+    for (const trait of entry.traits) put("species", entry.id, trait);
+    for (const lineage of entry.lineages) for (const trait of lineage.traits) put("lineage", lineage.id, trait);
+  }
+  for (const entry of backgrounds) for (const feature of entry.features) put("background", entry.id, feature);
+  return index;
+}
+
+const featureKey = (ref: CharacterFeatureRef) => `${ref.kind} ${ref.sourceId} ${ref.id}`;
 
 type CatalogData = ReturnType<typeof buildCatalogData>;
 
@@ -532,6 +577,7 @@ function viewOf(audience: ContentAudience, data: CatalogData, attribution: strin
     speciesRecord: (id) => data.speciesRecords.get(id),
     backgroundRecord: (id) => data.backgroundRecords.get(id),
     featRecord: (id) => data.featRecords.get(id),
+    featureRecord: (ref) => data.featureRecords.get(featureKey(ref)),
     equipmentRecord: (id) => data.equipmentRecords.get(id),
     spellRecord: (id) => data.spellRecords.get(id)
   };
