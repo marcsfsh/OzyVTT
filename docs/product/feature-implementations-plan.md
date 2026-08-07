@@ -89,7 +89,12 @@ a pick or grant no rider delivers.** Warlock owns 25. Nine of twelve classes los
 **Species and lineages are a confirmed zero** — 75 records nobody needs to touch. Backgrounds have no
 `features[]` at all. **65% is plain authoring; the awkward 35% is five design questions, not 23 tasks.**
 
-**Two structural blockers Stage 4 hits immediately:**
+**The Stage-4 enabling wave closed both blockers and split the work** — `docs/product/stage-4-authoring-assignments.md`
+is the contract the four authoring lanes work to: which class file each lane owns, which mechanism each
+of the twelve classes uses, every audit row assigned to exactly one lane, and a ruling on each of the
+five design questions (two built, three specified).
+
+**Two structural blockers Stage 4 hit immediately, both now fixed (`9f31dd9`):**
 1. **`SUBCLASS_MECHANICS` is exported but the ETL never imports it** — 10 of the 11 subclass gaps have
    **no authoring surface at all.** Wire this before any subclass work.
 2. **The subclass parser strips `<table>` blocks** — which is why Draconic/Fiend/Oath/Circle spell
