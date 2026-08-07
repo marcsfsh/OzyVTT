@@ -15,7 +15,7 @@
  * Run with `npm run build-class-bundle -w @vtt/content-srd-5.2.1`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, applyMechanics } from "./class-mechanics.js";
+import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -41,6 +41,47 @@ const strip = (value: string) =>
     .replace(/&mdash;|&#8212;/g, "—").replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&rsquo;/g, "'")
     .replace(/\s+/g, " ").trim();
+
+/**
+ * ONE HTML table, as a sentence.
+ *
+ * Every cell is prefixed with its own column heading, so the rendering is self-describing rather
+ * than positional: a player reading "Druid Level 2: Known Forms 4, Max CR 1/4, Fly Speed No" needs
+ * no column order in their head. Rows join with "; " because descriptions are collapsed to a single
+ * line downstream and a table cannot be laid out there.
+ *
+ * A TWO-COLUMN table labels only its first cell. "Sorcerer Level 3: Alter Self, Chromatic Orb" is
+ * unambiguous, and the alternative ("Sorcerer Level 3: Spells Alter Self, ...") reads like a typo -
+ * every spell-by-level table in the SRD's subclasses is this shape, so it is worth the special case.
+ */
+function tableAsText(html: string): string {
+  const cells = (row: string, tag: "th" | "td") =>
+    [...row.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "g"))].map((cell) => strip(cell[1]));
+  const head = html.match(/<thead>([\s\S]*?)<\/thead>/)?.[1] ?? "";
+  const columns = cells(head, "th");
+  const bodyRows = [...(html.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? html).matchAll(/<tr>([\s\S]*?)<\/tr>/g)];
+  const lines: string[] = [];
+  for (const [, row] of bodyRows) {
+    const values = cells(row, "td");
+    if (values.length === 0) continue;
+    const labelled = values.map((value, index) =>
+      (columns[index] && (index === 0 || values.length > 2) ? `${columns[index]} ${value}` : value));
+    lines.push(labelled.length === 1 ? labelled[0] : `${labelled[0]}: ${labelled.slice(1).join(", ")}`);
+  }
+  const text = lines.join("; ");
+  return text === "" ? "" : `${text}.`;
+}
+
+/**
+ * THE TABLES ARE CONTENT, NOT DECORATION - and dropping them truncated five features mid-sentence.
+ *
+ * Every parser below used to `.replace(/<table>[\s\S]*?<\/table>/g, " ")`, which is why Draconic
+ * Spells, Fiend Spells, Oath of Devotion Spells and Circle of the Land Spells each ended at the word
+ * "table" with the spells they promise nowhere in the record, and why Nature's Ward, Wild Shape and
+ * Font of Magic lost theirs too. The table IS the promise in all seven; a description that stops
+ * before it is not shorter prose, it is a feature that does not say what it does.
+ */
+const withTables = (value: string) => value.replace(/<table>[\s\S]*?<\/table>/g, (html) => ` ${tableAsText(html)} `);
 
 const slug = (value: string) =>
   strip(value).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -124,8 +165,7 @@ function optionSection(body: string, heading: string) {
   const options: { id: string; name: string; description: string }[] = [];
   for (let i = 1; i < parts.length; i += 2) {
     const name = strip(parts[i]);
-    const description = parts[i + 1]
-      .replace(/<table>[\s\S]*?<\/table>/g, " ")
+    const description = withTables(parts[i + 1])
       .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
       .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
     if (name && description) options.push({ id: slug(name), name, description: description.slice(0, 4000) });
@@ -152,9 +192,7 @@ function featureProse(body: string): Map<string, string> {
   const parts = body.split(/^#{3,4} (.+)$/m);
   for (let i = 1; i < parts.length; i += 2) {
     const heading = strip(parts[i]);
-    const text = parts[i + 1]
-      .split(/\n#{3,6} /)[0]
-      .replace(/<table>[\s\S]*?<\/table>/g, " ")
+    const text = withTables(parts[i + 1].split(/\n#{3,6} /)[0])
       .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
       .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
     if (!text) continue;
@@ -684,13 +722,8 @@ for (const [id, entry] of parsed) {
 }
 
 console.log(report.join("\n"));
-// A rider authored against a feature id the ETL no longer emits is the silent drop this whole area
-// exists to end, so it fails the build rather than quietly producing a class without its mechanics.
-if (overlayMisses.length) {
-  console.error(`\nMechanics overlay keys matching no generated feature (${overlayMisses.length}):`);
-  for (const key of overlayMisses) console.error(`  ${key}`);
-  process.exit(1);
-}
+// The overlay-miss check waits for the SUBCLASS loop below, so a subclass key that matches nothing
+// fails the same way a class key does. `unresolvedItems` is class-only and can be checked now.
 if (unresolvedItems.length) {
   console.error(`\nUnresolved equipment ids (${unresolvedItems.length}):`);
   for (const item of unresolvedItems) console.error(`  ${item}`);
@@ -737,8 +770,7 @@ function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
   for (let i = 1; i < parts.length; i += 2) {
     const match = strip(parts[i]).match(LEVEL_HEADING);
     if (!match) continue;
-    const description = parts[i + 1]
-      .replace(/<table>[\s\S]*?<\/table>/g, " ")
+    const description = withTables(parts[i + 1])
       .split("\n").map((line) => line.trim()).filter(Boolean).join(" ")
       .replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
     if (!description) continue;
@@ -750,13 +782,34 @@ function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
 for (const [id, entry] of parsed) {
   if (HAND_AUTHORED.has(id)) continue;
   const { title, intro, features } = parseSubclass(entry);
-  builtSubclasses.push({
-    id: slug(title), name: title, source: "srd", classId: id,
+  const subclassId = slug(title);
+  const record = {
+    id: subclassId, name: title, source: "srd", classId: id,
     subclassLevel: CONFIG[id].subclassLevel,
     summary: intro.split(". ")[0].slice(0, 200) || `${title}, the SRD 5.2.1 ${entry.name} subclass.`,
     description: intro.slice(0, 4000) || `${title}.`,
     features
-  });
+  };
+  // THE SUBCLASS HALF OF THE OVERLAY, keyed on (subclassId, featureId) exactly as the class half is
+  // keyed on (classId, featureId). It was declared and never merged, which meant nine of the twelve
+  // subclasses had NO authoring surface for a rider at all - the three that did were only reachable
+  // because their class is HAND_AUTHORED and the whole record is carried over verbatim.
+  overlayMisses.push(...applyMechanics(subclassId, features, SUBCLASS_MECHANICS));
+  // Parsed for the same reason a class is: an authoring mistake in hand-written TypeScript merged
+  // into generated data stops the build here rather than surfacing as a load failure later.
+  SubclassReferenceSchema.parse(record);
+  builtSubclasses.push(record);
+  const overlaid = Object.keys(SUBCLASS_MECHANICS[subclassId] ?? {}).length;
+  if (overlaid) console.log(`${title}: ${features.length} features, ${overlaid} with mechanics`);
+}
+
+// A rider authored against a feature id the ETL no longer emits is the silent drop this whole area
+// exists to end, so it fails the build rather than quietly producing a record without its mechanics.
+// Both halves of the overlay report here: a class key and a subclass key fail identically.
+if (overlayMisses.length) {
+  console.error(`\nMechanics overlay keys matching no generated feature (${overlayMisses.length}):`);
+  for (const key of overlayMisses) console.error(`  ${key}`);
+  process.exit(1);
 }
 
 // ---------------------------------------------------------------------------------------------

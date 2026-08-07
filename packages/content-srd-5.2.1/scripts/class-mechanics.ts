@@ -97,8 +97,31 @@ export const CLASS_MECHANICS: Readonly<Record<string, Readonly<Record<string, Fe
   }
 };
 
-/** The same overlay for subclass features, keyed on (subclassId, featureId). Empty until Stage 4 needs it. */
-export const SUBCLASS_MECHANICS: Readonly<Record<string, Readonly<Record<string, FeatureMechanics>>>> = {};
+/**
+ * The same overlay for subclass features, keyed on (subclassId, featureId) - and merged by
+ * `build-class-bundle.ts`'s subclass loop exactly as the class half is merged by its class loop.
+ *
+ * Nine of the twelve subclasses are ETL-generated, so until this was wired there was no authoring
+ * surface for a subclass rider AT ALL: the only three that carried one (Champion, Evoker, Life
+ * Domain) were reachable purely because their class is HAND_AUTHORED and the whole record is copied
+ * through. `draconic-resilience` is the worked example that proves the mechanism end to end.
+ */
+export const SUBCLASS_MECHANICS: Readonly<Record<string, Readonly<Record<string, FeatureMechanics>>>> = {
+  "draconic-sorcery": {
+    /**
+     * "While you aren't wearing armor, your base Armor Class equals 10 plus your Dexterity and
+     * Charisma modifiers" - the `unarmored-defense` variant, spelled with the ability the SRD prints.
+     *
+     * WHAT STAYS PROSE, deliberately (ADR-0008): the Hit Point half ("+3, and +1 whenever you gain
+     * another Sorcerer level") is a level-3 lump plus a per-level step, and `hit-points-per-level`
+     * has no lump. Authoring `amount: 1` would be wrong for every level below 3 and short by 2 above
+     * it, so the description carries it instead of the record carrying it incorrectly.
+     */
+    "draconic-resilience": {
+      modifiers: [{ type: "unarmored-defense", ability: "cha" }]
+    }
+  }
+};
 
 /**
  * Printed columns that STOP being display-only because the overlay wired them to a real pool.

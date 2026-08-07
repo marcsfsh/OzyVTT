@@ -786,6 +786,55 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
   });
 });
 
+/**
+ * THE TWO STRUCTURAL BLOCKERS THE PRE-STAGE-4 AUDIT NAMED, held open from the read side.
+ *
+ * Both were invisible to every existing test: a subclass overlay that is never merged and a table
+ * that is thrown away both produce records that PARSE, so only an assertion about the content itself
+ * can tell the difference. These are the committed artefact's half - `build-class-bundle.ts` guards
+ * regeneration, and the two fail independently.
+ */
+describe("the subclass authoring surface, and the tables the parser used to throw away", () => {
+  const classes = loadClasses();
+  const subclasses = loadSubclasses();
+  const featureOf = (records: Array<{ id: string; features: FeatureRecord[] }>, recordId: string, featureId: string) =>
+    records.find((record) => record.id === recordId)!.features.find((feature) => feature.id === featureId)!;
+
+  it("merges SUBCLASS_MECHANICS into an ETL-GENERATED subclass", () => {
+    // Draconic Sorcery is generated (Sorcerer is not HAND_AUTHORED), so before the ETL imported
+    // SUBCLASS_MECHANICS there was no way for this rider to exist at all. Champion / Evoker / Life
+    // Domain are NOT the proof - their class is hand-authored and the whole record is copied through.
+    const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
+    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: false, when: [] }]);
+  });
+
+  it("carries the spell tables of the four subclass spell features into their descriptions", () => {
+    // Each of these used to end at the word "table", with the spells it promises nowhere in the
+    // record - one truncation per subclass that grants spells by level.
+    const draconic = featureOf(subclasses, "draconic-sorcery", "draconic-spells").description;
+    expect(draconic).toContain("Sorcerer Level 3: Alter Self, Chromatic Orb, Command, Dragon's Breath");
+    expect(draconic).toContain("Sorcerer Level 9: Legend Lore, Summon Dragon");
+    expect(featureOf(subclasses, "fiend-patron", "fiend-spells").description).toContain("Warlock Level 5: Fireball, Stinking Cloud");
+    expect(featureOf(subclasses, "oath-of-devotion", "oath-of-devotion-spells").description).toContain("Paladin Level 3: Protection from Evil and Good, Shield of Faith");
+    const land = featureOf(subclasses, "circle-of-the-land", "circle-of-the-land-spells").description;
+    for (const type of ["Arid Land", "Polar Land", "Temperate Land", "Tropical Land"]) expect(land).toContain(type);
+    expect(land).toContain("Druid Level 9: Insect Plague");
+  });
+
+  it("carries a CLASS feature's table too - the same parser bug, one level up", () => {
+    expect(featureOf(classes, "druid", "wild-shape").description).toContain("Druid Level 8: Known Forms 8, Max CR 1, Fly Speed Yes");
+    expect(featureOf(classes, "sorcerer", "font-of-magic").description).toContain("Spell Slot Level 5: Sorcery Point Cost 7, Min. Sorcerer Level 9");
+  });
+
+  it("leaves no subclass spell feature ending on the word that introduced its table", () => {
+    // The shape of the bug, not one instance of it: "...as shown in the X table." followed by nothing.
+    const truncated = subclasses.flatMap((record) => record.features
+      .filter((feature) => /\btables?\.?$/i.test(feature.description.trim()) || /\bSpells$/.test(feature.description.trim()))
+      .map((feature) => `${record.id}.${feature.id}`));
+    expect(truncated, `these descriptions stop at their table:\n  ${truncated.join("\n  ")}`).toEqual([]);
+  });
+});
+
 
 describe("content-record schema guards", () => {
   const fighter = loadClasses().find((entry) => entry.id === "fighter")!;

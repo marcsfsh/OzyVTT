@@ -65,7 +65,7 @@
     "id": "circle-of-the-land-spells",
     "name": "Circle of the Land Spells",
     "level": 3,
-    "description": "Whenever you finish a Long Rest, choose one type of land: arid, polar, temperate, or tropical. Consult the table below that corresponds to the chosen type; you have the spells listed for your Druid level and lower prepared. Arid Land Polar Land Temperate Land Tropical Land"
+    "description": "Whenever you finish a Long Rest, choose one type of land: arid, polar, temperate, or tropical. Consult the table below that corresponds to the chosen type; you have the spells listed for your Druid level and lower prepared. Arid Land Druid Level 3: Blur, Burning Hands, Fire Bolt; Druid Level 5: Fireball; Druid Level 7: Blight; Druid Level 9: Wall of Stone. Polar Land Druid Level 3: Fog Cloud, Hold Person, Ray of Frost; Druid Level 5: Sleet Storm; Druid Level 7: Ice Storm; Druid Level 9: Cone of Cold. Temperate Land Druid Level 3: Misty Step, Shocking Grasp, Sleep; Druid Level 5: Lightning Bolt; Druid Level 7: Freedom of Movement; Druid Level 9: Tree Stride. Tropical Land Druid Level 3: Acid Splash, Ray of Sickness, Web; Druid Level 5: Stinking Cloud; Druid Level 7: Polymorph; Druid Level 9: Insect Plague."
    },
    {
     "id": "lands-aid",
@@ -83,7 +83,7 @@
     "id": "natures-ward",
     "name": "Nature's Ward",
     "level": 10,
-    "description": "You are immune to the Poisoned condition, and you have Resistance to a damage type associated with your current land choice in the Circle Spells feature, as shown in the Nature's Ward table. Nature's Ward"
+    "description": "You are immune to the Poisoned condition, and you have Resistance to a damage type associated with your current land choice in the Circle Spells feature, as shown in the Nature's Ward table. Nature's Ward Land Type Arid: Resistance Fire, Land Type Temperate, Resistance Lightning; Land Type Polar: Resistance Cold, Land Type Tropical, Resistance Poison."
    },
    {
     "id": "natures-sanctuary",
@@ -141,13 +141,19 @@
     "id": "draconic-resilience",
     "name": "Draconic Resilience",
     "level": 3,
-    "description": "The magic in your body manifests physical traits of your draconic gift. Your Hit Point maximum increases by 3, and it increases by 1 whenever you gain another Sorcerer level. Parts of you are also covered by dragon-like scales. While you aren't wearing armor, your base Armor Class equals 10 plus your Dexterity and Charisma modifiers."
+    "description": "The magic in your body manifests physical traits of your draconic gift. Your Hit Point maximum increases by 3, and it increases by 1 whenever you gain another Sorcerer level. Parts of you are also covered by dragon-like scales. While you aren't wearing armor, your base Armor Class equals 10 plus your Dexterity and Charisma modifiers.",
+    "modifiers": [
+     {
+      "type": "unarmored-defense",
+      "ability": "cha"
+     }
+    ]
    },
    {
     "id": "draconic-spells",
     "name": "Draconic Spells",
     "level": 3,
-    "description": "When you reach a Sorcerer level specified in the Draconic Spells table, you thereafter always have the listed spells prepared. Draconic Spells"
+    "description": "When you reach a Sorcerer level specified in the Draconic Spells table, you thereafter always have the listed spells prepared. Draconic Spells Sorcerer Level 3: Alter Self, Chromatic Orb, Command, Dragon's Breath; Sorcerer Level 5: Fear, Fly; Sorcerer Level 7: Arcane Eye, Charm Monster; Sorcerer Level 9: Legend Lore, Summon Dragon."
    },
    {
     "id": "elemental-affinity",
@@ -239,7 +245,7 @@
     "id": "fiend-spells",
     "name": "Fiend Spells",
     "level": 3,
-    "description": "The magic of your patron ensures you always have certain spells ready; when you reach a Warlock level specified in the Fiend Spells table, you thereafter always have the listed spells prepared. Fiend Spells"
+    "description": "The magic of your patron ensures you always have certain spells ready; when you reach a Warlock level specified in the Fiend Spells table, you thereafter always have the listed spells prepared. Fiend Spells Warlock Level 3: Burning Hands, Command, Scorching Ray, Suggestion; Warlock Level 5: Fireball, Stinking Cloud; Warlock Level 7: Fire Shield, Wall of Fire; Warlock Level 9: Geas, Insect Plague."
    },
    {
     "id": "dark-ones-own-luck",
@@ -469,7 +475,7 @@
     "id": "oath-of-devotion-spells",
     "name": "Oath of Devotion Spells",
     "level": 3,
-    "description": "The magic of your oath ensures you always have certain spells ready; when you reach a Paladin level specified in the Oath of Devotion Spells table, you thereafter always have the listed spells prepared. Oath of Devotion Spells"
+    "description": "The magic of your oath ensures you always have certain spells ready; when you reach a Paladin level specified in the Oath of Devotion Spells table, you thereafter always have the listed spells prepared. Oath of Devotion Spells Paladin Level 3: Protection from Evil and Good, Shield of Faith; Paladin Level 5: Aid, Zone of Truth; Paladin Level 9: Beacon of Hope, Dispel Magic; Paladin Level 13: Freedom of Movement, Guardian of Faith; Paladin Level 17: Commune, Flame Strike."
    },
    {
     "id": "sacred-weapon",
