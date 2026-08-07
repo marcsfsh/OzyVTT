@@ -126,6 +126,26 @@ function offerOf(partial: Pick<ChoiceOffer, "key" | "kind" | "capacity" | "optio
 }
 
 /**
+ * EVERY PICK BUDGET AN `extraPicks` GRANT MAY NAME BY A FIXED KEY - the eight that are not a
+ * particular feature's own pick (which is spelled `feature:<featureId>` and validated against the
+ * features this build actually has).
+ *
+ * Six of them are the `listOffer` keys immediately below, and `listOffer` is typed to this union so
+ * the list and the calls cannot drift apart. The last two are the printed CLASS COLUMNS rather than
+ * offers - `cantripsKnown` and `preparedCount`/`spellsKnown`, read at step 9 - which is exactly why
+ * an unmatched key cannot simply be "no offer has this key".
+ *
+ * These strings are also the wizard's own offer keys, verbatim (`build-payload.ts` `computeOffers`).
+ * That is the whole client/server agreement: one namespace, spelled once on each side, so a grant
+ * the wizard honours is a grant this validator honours.
+ */
+export const NAMED_PICK_BUDGETS = [
+  "class-skills", "class-tools", "background-skills", "background-tools",
+  "background-languages", "species-languages", "class-cantrips", "class-spells"
+] as const;
+export type NamedPickBudget = (typeof NAMED_PICK_BUDGETS)[number];
+
+/**
  * A chosen inline option IS a feature: identical rider fields, identical meanings (see the content
  * package's `FeatureOptionSchema`). Re-shaping it into a `FeatureRecord` means one interpreter runs
  * for class features, species traits, feats AND chosen options - no second code path to keep honest.
@@ -583,7 +603,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // Initiate's cantrips, Skilled's skills) - those second-order offers must exist before pass B
   // matches the remaining rows.
   const offers: ChoiceOffer[] = [];
-  const listOffer = (key: string, kind: string, label: string, list: { choose: number; from: readonly string[] } | undefined) => {
+  const listOffer = (key: NamedPickBudget, kind: string, label: string, list: { choose: number; from: readonly string[] } | undefined) => {
     if (list && list.choose > 0) offers.push(offerOf({ key, kind, capacity: list.choose, options: new Set(list.from), label }));
   };
   listOffer("class-skills", "skill", `${classRecord.name} skills`, classRecord.skillChoices);
@@ -754,15 +774,15 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
    * has plus the two printed class columns - reality, not a second hand-maintained list of legal keys
    * that would drift away from the offers it claims to describe.
    */
-  const CLASS_CANTRIP_BUDGET = "class-cantrips";
-  const CLASS_SPELL_BUDGET = "class-spells";
+  const CLASS_CANTRIP_BUDGET: NamedPickBudget = "class-cantrips";
+  const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
   const printedCantrips = levelRow.cantripsKnown ?? 0;
   const printedPrepared = levelRow.preparedCount ?? levelRow.spellsKnown ?? 0;
   for (const key of extraPickBudgets.keys()) {
     if (offers.some((candidate) => candidate.key === key)) continue;
     if (key === CLASS_CANTRIP_BUDGET && printedCantrips > 0) continue;
     if (key === CLASS_SPELL_BUDGET && printedPrepared > 0) continue;
-    reject(`A feature grants an extra pick to "${key}", which is not a pick this build has. Name an offer key ("class-cantrips", "class-spells", "class-skills", "class-tools", "background-skills", "background-tools", "background-languages", "species-languages") or a feature's own pick ("feature:<featureId>").`);
+    reject(`A feature grants an extra pick to "${key}", which is not a pick this build has. Name one of ${NAMED_PICK_BUDGETS.map((budget) => `"${budget}"`).join(", ")}, or a feature's own pick ("feature:<featureId>").`);
   }
 
   // Pass B: everything else. Rows the offer machinery does not own: the class's own prepared

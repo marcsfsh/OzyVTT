@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, resolveSpellcasting, type GameState } from "@vtt/domain";
 import { abilityModifier, meetsMulticlassPrerequisites } from "@vtt/rules-5e";
-import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
+import { buildCharacterDefinition, NAMED_PICK_BUDGETS, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";
@@ -538,6 +538,181 @@ describe("M4 - always-prepared grants are not charged to the prepared count", ()
     protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
     expect(() => buildCharacterDefinition(protector, library, defaultPolicy))
       .toThrowError(/Cleric knows 3 cantrips at level 3; got 4/);
+  });
+});
+
+/**
+ * `extraPicks` - the vocabulary by which a feature RAISES a pick budget, server side.
+ *
+ * The far end here is what `buildCharacterDefinition` ACCEPTS and REFUSES, because that is the only
+ * thing a wizard's offer can disagree with. Every capacity below is derived from the content records
+ * rather than typed as a literal, so a change to the composition rule fails these rather than
+ * quietly moving what the tests assert.
+ */
+describe("extra picks raise the budget the server validates against", () => {
+  const clericRecord = library.classRecord("cleric")!;
+  const divineOrder = clericRecord.features.find((feature) => feature.id === "divine-order")!;
+  const thaumaturge = divineOrder.choice!.options!.find((option) => option.id === "thaumaturge")!;
+  /** The printed column and the authored grant, read off the same records the wizard reads. */
+  const printedCantrips = clericRecord.levelTable[2].cantripsKnown!;
+  const grantedCantrips = thaumaturge.extraPicks
+    .filter((grant) => grant.offer === "class-cantrips")
+    .reduce((sum, grant) => sum + grant.amount, 0);
+
+  /** A Thaumaturge Cleric 3 whose untagged class cantrip rows number exactly `count`. */
+  const withCantrips = (count: number): MutableCreateInput => {
+    const input = clericInput();
+    input.choices = input.choices
+      .map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row)
+      // Drop the three untagged cantrips clericInput() carries; the Magic Initiate pair is TAGGED
+      // and belongs to the feat's own offer, so it must survive untouched.
+      .filter((row) => !(row.kind === "cantrip" && !row.payload));
+    const pool = ["light", "sacred-flame", "spare-the-dying", "mending", "thaumaturgy", "guidance"];
+    for (let index = 0; index < count; index += 1) input.choices.push({ level: 1, kind: "cantrip", id: pool[index] });
+    return input;
+  };
+
+  it("accepts exactly `printed + granted` class cantrips, and refuses one more", () => {
+    // THE CLIENT/SERVER AGREEMENT, at the only place it can be observed from this side: the number
+    // the server accepts is `printed + granted` off the shared content record, computed with the
+    // same sum and keyed on the same string ("class-cantrips") that `computeOffers` builds its
+    // cantrip offer under. `extra-picks.test.ts` asserts the wizard offers this same number.
+    const composed = printedCantrips + grantedCantrips;
+    expect(composed).toBe(4);
+    expect(() => buildCharacterDefinition(withCantrips(composed), library, defaultPolicy)).not.toThrow();
+    expect(() => buildCharacterDefinition(withCantrips(composed + 1), library, defaultPolicy))
+      .toThrowError(new RegExp(`Cleric knows ${composed} cantrips at level 3; got ${composed + 1}`));
+    // The four are really on the sheet, not merely counted past a cap.
+    const built = buildCharacterDefinition(withCantrips(composed), library, defaultPolicy);
+    const cantrips = (built.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id);
+    for (const id of ["light", "sacred-flame", "spare-the-dying", "mending"]) expect(cantrips).toContain(id);
+  });
+
+  it("SUMS two grants of +1 into +2 (composition, not last-one-wins)", () => {
+    // A species trait raising the same budget Thaumaturge already raises. "Last grant wins" and
+    // "first grant wins" both pass every single-grant test in this file and fail exactly here.
+    const boosted = libraryWith({
+      speciesRecord: (id: string) => {
+        const real = library.speciesRecord(id);
+        if (!real || id !== "human") return real;
+        return { ...real, traits: [...real.traits, {
+          id: "arcane-echo", name: "Arcane Echo", description: "You know one extra cantrip.",
+          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-cantrips", amount: 1 }]
+        }] };
+      }
+    });
+    expect(() => buildCharacterDefinition(withCantrips(5), boosted, defaultPolicy)).not.toThrow();
+    expect(() => buildCharacterDefinition(withCantrips(6), boosted, defaultPolicy))
+      .toThrowError(/Cleric knows 5 cantrips at level 3; got 6/);
+    // ...and the SAME trait on a Protector Cleric adds its +1 to the printed 3, not to 4.
+    const protector = clericInput();
+    protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
+    expect(() => buildCharacterDefinition(protector, boosted, defaultPolicy)).not.toThrow();
+    const overCap = clericInput();
+    overCap.choices.push({ level: 1, kind: "cantrip", id: "mending" }, { level: 1, kind: "cantrip", id: "thaumaturgy" });
+    expect(() => buildCharacterDefinition(overCap, boosted, defaultPolicy))
+      .toThrowError(/Cleric knows 4 cantrips at level 3; got 5/);
+  });
+
+  it("raises a LIST offer's capacity (class skills), which the level row has nothing to do with", () => {
+    const scholarly = libraryWith({
+      speciesRecord: (id: string) => {
+        const real = library.speciesRecord(id);
+        if (!real || id !== "human") return real;
+        return { ...real, traits: [...real.traits, {
+          id: "temple-scholar", name: "Temple Scholar", description: "One additional Cleric skill.",
+          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-skills", amount: 1 }]
+        }] };
+      }
+    });
+    // The Cleric prints two skill choices. With the trait it owes THREE - and an offer that is not
+    // filled is as loud a rejection as one that is overfilled, which is what proves the capacity
+    // moved rather than the check being skipped.
+    const twoSkills = clericInput();
+    expect(() => buildCharacterDefinition(twoSkills, scholarly, defaultPolicy))
+      .toThrowError(/"Cleric skills" needs 3 pick\(s\) of kind "skill"; got 2/);
+    const threeSkills = clericInput();
+    threeSkills.choices.push({ level: 1, classId: "cleric", kind: "skill", id: "insight" });
+    expect(() => buildCharacterDefinition(threeSkills, scholarly, defaultPolicy)).not.toThrow();
+    // Without the trait, the third skill is refused - the negative control for the same input.
+    expect(() => buildCharacterDefinition(threeSkills, library, defaultPolicy))
+      .toThrowError(/exceeds what this build may choose/);
+  });
+
+  it("raises the PREPARED-SPELL budget, and the sheet reports the composed number", () => {
+    const studious = libraryWith({
+      speciesRecord: (id: string) => {
+        const real = library.speciesRecord(id);
+        if (!real || id !== "human") return real;
+        return { ...real, traits: [...real.traits, {
+          id: "zealous-study", name: "Zealous Study", description: "One additional prepared Cleric spell.",
+          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-spells", amount: 1 }]
+        }] };
+      }
+    });
+    // clericInput() already sits exactly on the printed cap of 6 charged prepared spells; `bane` is
+    // the seventh, which the base build refuses (asserted in M4 above) and this one allows.
+    const seventh = clericInput();
+    seventh.choices.push({ level: 1, kind: "spell", id: "bane" });
+    const built = buildCharacterDefinition(seventh, studious, defaultPolicy);
+    expect(built.spellcasting?.classes?.[0]).toMatchObject({ classId: "cleric", prepared: 7 });
+    const eighth = clericInput();
+    eighth.choices.push({ level: 1, kind: "spell", id: "bane" }, { level: 1, kind: "spell", id: "command" });
+    expect(() => buildCharacterDefinition(eighth, studious, defaultPolicy))
+      .toThrowError(/Cleric prepares 7 spells at level 3; got 8/);
+  });
+
+  it("holds EVERY authored extraPicks key in the bundles to a budget that exists", () => {
+    // THE STAGE-4 GUARD. 226 content records are about to be authored and every budget-raising one
+    // goes through this vocabulary; a mistyped key is caught here, at `npm run test`, rather than by
+    // one player discovering at Create that their character cannot be made. The census walks the
+    // SUMMARIES rather than the records deliberately - those are exactly what the wizard receives,
+    // so a key that survives here is a key both sides can honour.
+    const featureIds = new Set<string>();
+    const authored: Array<{ where: string; offer: string }> = [];
+    const visit = (where: string, features: readonly { id: string; extraPicks: readonly { offer: string }[]; choice: { options: readonly { id: string; extraPicks: readonly { offer: string }[] }[] } | null }[]) => {
+      for (const feature of features) {
+        featureIds.add(feature.id);
+        for (const grant of feature.extraPicks) authored.push({ where: `${where}.${feature.id}`, offer: grant.offer });
+        for (const option of feature.choice?.options ?? []) {
+          featureIds.add(option.id);
+          for (const grant of option.extraPicks) authored.push({ where: `${where}.${feature.id}:${option.id}`, offer: grant.offer });
+        }
+      }
+    };
+    for (const record of library.classSummaries()) visit(record.id, record.features);
+    for (const record of library.subclassSummaries()) visit(record.id, record.features);
+    for (const record of library.speciesSummaries()) visit(record.id, record.features);
+    for (const record of library.backgroundSummaries()) visit(record.id, record.features);
+    for (const record of library.featSummaries()) visit(record.id, [record.feature]);
+
+    const named = new Set<string>(NAMED_PICK_BUDGETS);
+    const unresolvable = authored.filter(({ offer }) =>
+      !named.has(offer) && !(offer.startsWith("feature:") && featureIds.has(offer.slice("feature:".length))));
+    expect(unresolvable.map((entry) => `${entry.where} -> ${entry.offer}`)).toEqual([]);
+    // ...and the census is not vacuously empty: Thaumaturge is authored today and must be seen.
+    expect(authored).toContainEqual({ where: "cleric.divine-order:thaumaturge", offer: "class-cantrips" });
+  });
+
+  it("REJECTS a grant naming a budget this build has no pick for, loudly and actionably", () => {
+    // The failure this vocabulary exists to end: a rider that parses, validates, writes its ledger
+    // row and then adds zero looks exactly like one that works. A key naming nothing is an authoring
+    // error and it stops the build with the legal keys named.
+    const misnamed = libraryWith({
+      speciesRecord: (id: string) => {
+        const real = library.speciesRecord(id);
+        if (!real || id !== "human") return real;
+        return { ...real, traits: [...real.traits, {
+          id: "typo-gift", name: "Typo Gift", description: "Grants a pick to a budget that does not exist.",
+          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-cantrip", amount: 1 }]
+        }] };
+      }
+    });
+    let thrown: unknown;
+    try { buildCharacterDefinition(clericInput(), misnamed, defaultPolicy); } catch (error) { thrown = error; }
+    expect(thrown).toBeInstanceOf(CommandRejectedError);
+    expect((thrown as Error).message).toMatch(/grants an extra pick to "class-cantrip", which is not a pick this build has/);
+    expect((thrown as Error).message).toMatch(/feature:<featureId>/);
   });
 });
 
