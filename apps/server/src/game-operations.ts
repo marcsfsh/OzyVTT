@@ -112,11 +112,19 @@ function requireGmGrade(principal: GamePrincipal, message: string) {
  * GM-only audit line for a party-visibility tier. The GM-FACING words on the settings page are the
  * client's (Off · Name and class · Full sheet · Sheet + resources); this is the log's own sentence, so
  * the two read naturally in their own places without either owning the other's copy. `off` says what
- * players KEEP as well as what they lose, because "nothing" would misdescribe it - a combatant is
+ * players KEEP as well as what they lose, because "nothing" would misdescribe it - a character is
  * still on the map and in the turn order at every tier.
+ *
+ * THE `off` LINE USED TO CONTRADICT THE SENTENCE ABOVE IT. It read "nothing ... beyond the tokens on
+ * the map", which omits the turn order - the one thing this very docblock says the tier keeps, and a
+ * surface that names every character in the fight. A GM reading it would have set `off` believing it
+ * hid more than it does. The tier is right and was always right (`projections.ts` argues the case:
+ * strip the entry and a player gets a name in the turn order and an empty square where their
+ * teammate was standing); the SENTENCE was wrong. What `off` actually removes is the SHEET - no
+ * party list, nothing to open, no resources - so that is what it now says.
  */
 const PARTY_VISIBILITY_LOG: Readonly<Record<PartyVisibility, string>> = {
-  off: "Players no longer see anything of each other's characters beyond the tokens on the map.",
+  off: "Players no longer read anything of each other's sheets. Each other's characters stay on the map and in the turn order.",
   "name-and-class": "Players now see each other's name and class.",
   "full-sheet": "Players can now read each other's full sheets.",
   "sheet-and-resources": "Players can now read each other's full sheets and live resources."

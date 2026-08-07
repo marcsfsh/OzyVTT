@@ -74,6 +74,10 @@ const ABILITY_METHODS: ReadonlyArray<Readonly<{ id: BuilderAbilityMethod; label:
  * client's ruling and the GM's whole mental model of the feature**; the wire says
  * `off | name-and-class | full-sheet | sheet-and-resources` and `apps/server/src/projections.ts` is
  * the only thing that enforces them. Nothing here filters anything — a withheld field never arrives.
+ * (One clarification, because the two are easy to confuse: `PartyStrip` consults the tier to decide
+ * whether to MOUNT at all, which is a rendering decision about a surface, not a filter over data.
+ * Which FIELDS reach a player is still the projection's alone, and always will be — see rule 3 in
+ * `projections.ts`'s field table.)
  *
  * A `Select`, not a `SegmentedControl`: four labels this long are unreadable in a segment at 320px,
  * and the health-display row beside it already sets the precedent for a picker with many options.
@@ -85,8 +89,15 @@ const PARTY_VISIBILITY_OPTIONS = [
   { value: "sheet-and-resources", label: "Sheet + resources" }
 ] as const;
 
+/**
+ * These four strings are the PROMISE the GM reads before choosing, so they are held to what the tier
+ * actually does rather than to what it sounds like. `off` used to end "and nothing else — no party
+ * list": the second half is true (the party strip is gone at this tier), the first half was not —
+ * a character at `off` is still named in the turn order, and their token still carries a health band
+ * and condition dots. What `off` removes is the SHEET. Say that.
+ */
 const PARTY_VISIBILITY_HELP: Readonly<Record<PartyVisibility, string>> = {
-  off: "Players see each other's tokens on the map and nothing else — no party list.",
+  off: "Players see each other's tokens and turn order — no party list, and no sheet to open.",
   "name-and-class": "Players see who's in the party and what they play.",
   "full-sheet": "Players can open each other's sheets, read-only.",
   "sheet-and-resources": "Players also see each other's spell slots, inventory and hit dice."
