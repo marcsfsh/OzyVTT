@@ -579,31 +579,18 @@
 .encounter-move-guide { pointer-events: none; }
 .encounter-move-line { stroke: var(--cyan); stroke-width: 3; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 
-@media (max-width: 650px) { .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-token-tray-list { justify-content: flex-start; } }
+/* The COLUMN tray that used to live at ≤650 is gone, not moved: the one-row rule in the 979 block at
+   the bottom of this file applies at every width this one did and is later in the file, so it won
+   everywhere and this was a rule that could not fire. Its `justify-content: flex-start` went with it
+   and is restated there, where it is now load-bearing rather than inherited. */
 /* The phone form of the map (§E). The toolbar collapses to its `Tools` button in JS at the same
    rung (MapToolbar's COMPACT_QUERY); these rules keep the two floating clusters in OPPOSITE bottom
    corners so a saved right-dock can never stack the scene cluster on top of the toolbar. */
 @media (max-width: 560px) {
   .encounter-map-stage { min-height: 14rem; }
-  /* A full tray must not eat a phone's whole map. The tray floats over the map's top edge, so every
-     row of it is map you cannot drop onto — and the ≤650 rule above turns it into a COLUMN, which is
-     what made it 92px of a 224px band (41%) with the list already `nowrap` beneath the label. Taking
-     the column back off puts label and list on one line: 92px -> ~58px, 41% -> ~26%. The tray's own
-     `min-height: 3.6rem` then bounds it exactly, which is why the `max-height: 8.5rem` + `overflow-y`
-     pair that used to sit here is gone rather than converted — measured with five unplaced tokens at
-     390 and 375, the tray is one 58px row and scrollHeight === clientHeight. Decision Q4: the BAND
-     does not grow while the tray is up (a map that jumps under the GM's finger mid-setup is worse
-     than a smaller tray), so the tray is what gives. */
-  .encounter-token-tray { flex-direction: row; align-items: center; gap: .3rem; }
-  .encounter-token-tray > div:first-child { flex: 0 0 auto; }
-  /* `justify-content` stays flex-START here (the ≤650 rule sets it and this must not take it back):
-     with `nowrap` + `overflow-x`, flex-end pushes the overflow off the START edge, where `scrollLeft`
-     cannot reach it — measured, the first staged token sat at page x = -8 and could not be grabbed. */
-  .encounter-token-tray-list { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
-  .encounter-token-tray-list > .tray-token { flex: none; }
-  /* The standing hint wraps to three lines at this width and costs more map than it is worth: the
-     prep panel below already says "drag them from the tray above the map to place them". */
-  .encounter-token-tray > div:first-child span { display: none; }
+  /* The one-row tray moved DOWN to the 979 block with the rest of the band arithmetic — see the note
+     there. It was written here, and everything it argued is still true; it was simply true one rung
+     too low. */
   .encounter-token-name { display: none; }
   .encounter-shape-editor { width: 12rem; }
   .encounter-map-zoom, .encounter-map-zoom.zoom-dock-right { right: .7rem; left: auto; justify-content: flex-end; max-width: calc(100% - 8rem); }
@@ -763,10 +750,31 @@
    is 375x667, whose pane is 623px after the tab bar; a 44px top line, a status line and a sheet that
    is still worth opening leave a ceiling of ~254px, and 224 sits under it with room for the frame's
    gaps. It is the same number at 844px tall, deliberately — a band that grew with the screen is what
-   `min(52vh, 30rem)` used to do to the empty state, and the sheet is what should get the extra. */
+   `min(52vh, 30rem)` used to do to the empty state, and the sheet is what should get the extra.
+
+   AND IN LANDSCAPE THAT ARITHMETIC HAS NO SOLUTION AT 14rem, WHICH IS WHY THE CEILING IS BELOW.
+   The shrink the paragraph above promises ("a shorter frame can still take it down to a floor
+   instead of overflowing") never fires: `section.table` is `flex: 0 0 auto` in styles.css, so it is
+   sized by its content and no deficit is ever handed down for `flex-shrink` to spend. Measured
+   2026-08-07, GM in combat, a clean load — the pane's content came to a flat **384px** at both
+   landscape rungs (10 + 224 stage + 10, an 8px gap, and `.table-sidebar`'s 132px floor) against a
+   331px pane at 667x375 and a 346px one at 844x390: **53px and 38px of overflow.** What that costs is
+   not cosmetic. The staging tray floats over the stage's top edge, so the pane's scroll drags it
+   under the 44px tab bar (the first chip row at y=39 with `elementFromPoint` returning
+   `BUTTON.nh-tab`, 5px hidden at 844x390 and 20px at 667x375), and the dock's own body runs to y=428
+   in a 375px window, which is what put "Next turn" outside the viewport at rest.
+   So the band takes a ceiling that is the frame's own leftover: the pane is `100dvh - 44px` of tab
+   bar, and the sheet under the map needs 132 + 20 of `section.table` padding + an 8px gap = 160.
+   `100dvh - 204px` — 12.75rem — is what is left, exactly. It is inert wherever the window is tall
+   enough to want the full band (568 and 844 tall both compute a ceiling above 14rem, so the basis
+   still wins and nothing moves), it bites only where the frame genuinely cannot hold 14rem, and
+   `min-height: 9rem` still floors it. `100dvh` is the frame's own lock unit (styles.css:13), not a
+   new viewport fraction — check (g) exempts it by name, and there is no ratchet row to add.
+   The 204 is read off boxes that live in `styles.css`; if that file's sheet floor or the pane's gap
+   moves, this number moves with it. */
 @media (max-width: 979px) {
   .encounter-map-interaction:not(.enlarged) { flex: 0 1 auto; min-height: 0; }
-  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: 0 1 14rem; min-height: 9rem; height: auto; }
+  .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: 0 1 14rem; min-height: 9rem; max-height: calc(100dvh - 12.75rem); height: auto; }
   /* The status line FOLDS instead of floating. `min-height: 1.25rem` reserves 27px against a layout
      jump that a laptop column can afford and a 224px band cannot; `:empty` is the resting state (the
      message is "" almost always), so below the rung it costs nothing until there is something to
@@ -777,6 +785,31 @@
      candidate and would land on the compact toolbar's own bottom-left corner. */
   .encounter-map-interaction:not(.enlarged) .encounter-map-feedback { min-height: 0; margin: var(--space-1) 0 0; }
   .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty { display: none; }
+  /* ONE ROW OF TRAY, AT EVERY RUNG WHERE THE MAP IS A BAND — this was written for ≤560 and its whole
+     argument is the sentence above it: below the rung the map is a band that does not grow, so the
+     tray is what gives. That is true at 560 and it is true at 844 and 667; only the rule stopped at
+     560. Measured 2026-08-07 with all ten combatants staged and the band at its new ceiling: the tray
+     wrapped to **217px over a 171px stage at 667x375 — 127% of the map — and reached y=271 against a
+     dock head at 243**, so `elementFromPoint` at "Turn order", "Dice" and "Log" all returned
+     `DIV.encounter-token-tray`. A tray that covers the dock's own tab bar is worse than any amount of
+     tray. One row and a horizontal scroller is the arrangement the 560 rung already proved: 165 ->
+     ~62px at 844x390, 217 -> ~62 at 667x375, and the portrait rungs keep the box they had.
+     `justify-content: flex-start` IS STATED HERE and that is a real difference from the 560 version,
+     which inherited it from the ≤650 rule above and only had to promise not to take it back. Between
+     651 and 979 nothing sets it, so the base rule's `flex-end` applies — and `flex-end` with `nowrap`
+     + `overflow-x` pushes the overflow off the START edge, where `scrollLeft` cannot reach it. That is
+     the failure the 560 note recorded (the first staged token at page x = -8, ungrabbable), and it
+     reproduced here on the first measurement of this block: `elementFromPoint` at the first chip's
+     own centre returned **null** at both 844x390 and 667x375 until this line existed.
+     The standing hint goes with it: it wraps to three lines in a one-line tray, and the prep panel
+     below already says "drag them from the tray above the map to place them".
+     This block is the LAST tray rule in the file on purpose — the ≤650 rule above turns the tray into
+     a column, and equal specificity means source order decides. */
+  .encounter-token-tray { flex-direction: row; align-items: center; gap: .3rem; }
+  .encounter-token-tray > div:first-child { flex: 0 0 auto; }
+  .encounter-token-tray > div:first-child span { display: none; }
+  .encounter-token-tray-list { flex: 1 1 auto; min-width: 0; justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; }
+  .encounter-token-tray-list > .tray-token { flex: none; }
 }
 
 /* RULING 12 — the map's Scenes button became the menu that holds BOTH errands, because the top-left

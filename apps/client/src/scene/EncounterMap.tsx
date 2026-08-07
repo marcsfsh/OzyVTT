@@ -21,7 +21,9 @@ type Camera = Readonly<{ center: Point; zoom: number }>;
 /** The pointer mode. Owned by the toolbar, which is the only thing that sets it. */
 type Tool = MapTool;
 type Gesture =
-  | Readonly<{ kind: "token"; actorId: string; point: Point | null; origin: Point | null }>
+  /** `pressClient` is where the pointer went DOWN, in CLIENT pixels (`origin`/`point` are map space);
+      with `fromTray` it is what tells a tap on a staging chip from a drag out of the tray. */
+  | Readonly<{ kind: "token"; actorId: string; point: Point | null; origin: Point | null; pressClient: Readonly<{ x: number; y: number }>; fromTray: boolean }>
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
@@ -32,6 +34,9 @@ type FogState = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 6;
+/** How far a pointer may travel and still be a tap. The same 8px `continueGesture` already uses to
+    decide a touch has moved far enough to cancel a long press. */
+const TAP_SLOP = 8;
 
 /** The reveal words (D28) in their short form, for the per-shape editor's read-only line. */
 const VISIBILITY_SHORT: Record<AnnotationVisibility, string> = { public: "Shown to players", "gm-only": "GM only", "owner-only": "Only me", "owner-gm": "Only me and the GM", "gm-actor": "GM and one character" };
@@ -398,7 +403,7 @@ export function EncounterMap({
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
       setSelectedId(null);
       const origin = tokensById.get(tokenId)?.position ?? null;
-      setMessage(""); setGesture({ kind: "token", actorId: tokenId, point: origin, origin });
+      setMessage(""); setGesture({ kind: "token", actorId: tokenId, point: origin, origin, pressClient: { x: event.clientX, y: event.clientY }, fromTray: target.closest(".encounter-token-tray") !== null });
       if (event.pointerType === "touch") {
         const captureEl = event.currentTarget, pointerId = event.pointerId, startX = event.clientX, startY = event.clientY;
         clearLongPress();
@@ -469,10 +474,28 @@ export function EncounterMap({
       const mapPoint = gesture.point;
       const trayBounds = trayRef.current?.getBoundingClientRect();
       const overTray = Boolean(trayBounds && event.clientX >= trayBounds.left && event.clientX <= trayBounds.right && event.clientY >= trayBounds.top && event.clientY <= trayBounds.bottom);
+      /* TAP-TO-PLACE, RESOLVED HERE BECAUSE THE CHIP'S OWN CLICK NEVER ARRIVES.
+         The staging tray lives INSIDE `.encounter-map-interaction`, the pointer-gesture root, and its
+         chips carry `data-token-id` because a chip is also the handle you drag a token out by. So a
+         press on a chip takes the token-drag branch above, which calls `setPointerCapture` on the
+         WRAPPER — and pointer capture retargets the resulting `click` to the capture element, so
+         `.tray-token`'s `onClick` never runs. Measured 2026-08-07, GM at 1280x900: mouse click on a
+         chip left the tray at 8 of 8 with the click's target reported as
+         `DIV.encounter-map-interaction`; `touchscreen.tap` at 844x390 left it at 7 of 7. Only the
+         keyboard worked (8 -> 7), because a focused <button> dispatches its click directly. The tray's
+         own copy has promised the tap since it was written, and on a phone there is no keyboard, so
+         the tray had no working tap route at all.
+         The handler was never the problem — `placeAtCenter` is what the keyboard path proves works —
+         so this fixes the POINTER path and nothing else. Guarding `beginGesture` against the tray was
+         the other candidate and it disarms the feature next door: dragging a chip onto the map is that
+         same branch, measured working at HEAD (7 -> 6 on mouse), and an early return kills it. A press
+         that never moved is a tap; a press that travelled is a drag; everything else is untouched. */
+      const tapped = gesture.fromTray && Math.hypot(event.clientX - gesture.pressClient.x, event.clientY - gesture.pressClient.y) <= TAP_SLOP;
       setGesture(null);
       const originalToken = tokensById.get(actorId);
       const unchanged = Boolean(mapPoint && originalPosition && Math.hypot(mapPoint.x - originalPosition.x, mapPoint.y - originalPosition.y) < (originalToken?.gridSizePx ? originalToken.gridSizePx * .45 : .5));
-      if (overTray) void submitMove(actorId, null);
+      if (tapped) placeAtCenter(actorId);
+      else if (overTray) void submitMove(actorId, null);
       else if (unchanged) setMessage("Token stayed in the same space.");
       else if (mapPoint) void submitMove(actorId, mapPoint);
       else setMessage("Move cancelled. Drop the token on the map or in the tray.");
@@ -567,6 +590,10 @@ export function EncounterMap({
       <div className="encounter-token-tray-list">{unplaced.map((encounterToken) => {
         const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
         const gmOnly = actor.visibility === "gm-only";
+        /* `onClick` is the KEYBOARD route: a focused <button> dispatches its click directly, so this
+           fires for Enter/Space and never for a pointer — the wrapper's pointer capture retargets a
+           real click away from the chip. The pointer's tap lands in `finishGesture`, which explains
+           the split; both end in `placeAtCenter`. */
         return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${gmOnly ? " hidden" : ""}`} disabled={busyActorId !== null}
           title={gmOnly ? `${actor.name} · GM only` : `${actor.name} · Shown to players`}
           onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;

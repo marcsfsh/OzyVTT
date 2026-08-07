@@ -30,6 +30,71 @@ function emitCommand(event: CommandEvent, payload: CommandPayload) {
 
 const validInitiativeScore = (value: string | undefined) => value !== undefined && value.trim() !== "" && Number.isInteger(Number(value)) && Number(value) >= -1000 && Number(value) <= 1000;
 
+/* ── THE ⋯ FIGHT MENU'S GEOMETRY ────────────────────────────────────────────────────────────────
+   Breathing room from every viewport edge, the gap between the trigger and the box, and the box's
+   own width — the same three numbers the old inline `place()` used, named so the placement rule
+   below and the measurement that feeds it cannot drift apart. */
+const MENU_MARGIN = 8;
+const MENU_GAP = 6;
+const MENU_WIDTH = 24 * 16;
+/**
+ * The floor under "there is room on this side". Measured on the live menu: one `.rules-mode-control`
+ * (its label plus the select) is 68px, `.encounter-end` is 39px and the box's own padding is 22px —
+ * so 160px is one control, the End button and the top of the next. A side that cannot hold that is
+ * not a side the menu should open on, however arithmetically "more" its room is.
+ */
+const MENU_FLOOR = 160;
+
+const menuWidthFor = (viewportWidth: number) => Math.min(MENU_WIDTH, viewportWidth - MENU_MARGIN * 2);
+
+export type FightMenuPlacement = Readonly<{ top: number | "auto"; bottom: number | "auto"; left: number; width: number; maxHeight: number }>;
+
+/**
+ * WHERE THE ⋯ FIGHT MENU GOES — the rule, pulled out of the effect so it can be tested without a
+ * browser (`fight-menu-placement.test.tsx` beside this file).
+ *
+ * The version this replaces computed ONE candidate — below the trigger — clamped its `top` into the
+ * viewport and then derived the height from whatever was left:
+ * `top = min(rect.bottom + gap, innerHeight - margin)`, `maxHeight = max(0, innerHeight - top - margin)`.
+ * On a landscape phone "whatever was left" is nothing. Measured 2026-08-07 at 844x390 and 667x375,
+ * GM in combat: inline `max-height: 0px`, a **24px** box over 1028px of content, and `elementFromPoint`
+ * at "End the fight" returning `DIV.encounter-menu-backdrop` — the fight could not be ended.
+ * There was no upward branch and no floor; both are here now.
+ *
+ * NOTHING BELOW IS NEW — it is the two working counter-examples in this repo, joined:
+ *  · the FLIP is `packages/ui/src/primitives/Menu.tsx`'s exactly — `height > roomBelow &&
+ *    roomAbove > roomBelow` — so a menu that does not need to flip never does, and when neither
+ *    side fits it takes the side with more room. No ancestor walk is copied with it: that menu is
+ *    an in-flow popover whose clipping ancestors bite, and this one is `position: fixed` in a
+ *    portal on <body>, where the viewport is the only bound.
+ *  · the natural-height measurement and the LAST-RESORT COLUMN are
+ *    `apps/client/src/scene/TokenContextMenu.tsx`'s — when the box cannot fit anywhere useful it
+ *    is pinned to the margin and given the viewport's own column to scroll itself in. Its comment
+ *    names the failure this menu had ("an earlier pass capping the box"), which is why the cap here
+ *    is always real room and never `max(0, …)`.
+ *
+ * The upward branch anchors by `bottom`, not by `top`: the box then grows away from the trigger if
+ * its content changes while open (a combatant added, a select's help line) instead of creeping over
+ * the button that opened it.
+ */
+export function placeFightMenu(
+  trigger: Readonly<{ top: number; bottom: number; right: number }>,
+  naturalHeight: number,
+  viewport: Readonly<{ width: number; height: number }>
+): FightMenuPlacement {
+  const width = menuWidthFor(viewport.width);
+  const left = Math.max(MENU_MARGIN, Math.min(trigger.right - width, viewport.width - width - MENU_MARGIN));
+  const roomBelow = viewport.height - trigger.bottom - MENU_GAP - MENU_MARGIN;
+  const roomAbove = trigger.top - MENU_GAP - MENU_MARGIN;
+  const up = naturalHeight > roomBelow && roomAbove > roomBelow;
+  const room = up ? roomAbove : roomBelow;
+  if (room < MENU_FLOOR) return { top: MENU_MARGIN, bottom: "auto", left, width, maxHeight: Math.max(0, viewport.height - MENU_MARGIN * 2) };
+  return up
+    ? { top: "auto", bottom: viewport.height - trigger.top + MENU_GAP, left, width, maxHeight: room }
+    : { top: trigger.bottom + MENU_GAP, bottom: "auto", left, width, maxHeight: room };
+}
+
+
 export const DOCK_POSITIONS = ["sidebar", "left", "right"] as const;
 export type DockPosition = (typeof DOCK_POSITIONS)[number];
 type DockControl = Readonly<{ position: DockPosition; onChange: (position: DockPosition) => void }>;
@@ -686,26 +751,44 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
-  // Anchor the ⋯ menu just under its button, right-aligned to it, clamped into the viewport (it
-  // scrolls internally when tall). Still portaled out, so it clears the dock/enlarged stacking.
+  // Anchor the ⋯ menu to its button, right-aligned to it — under it where there is room and OVER it
+  // where there is not (`placeFightMenu` above holds the rule and the reasoning). Still portaled out,
+  // so it clears the dock/enlarged stacking.
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<FightMenuPlacement | null>(null);
   useLayoutEffect(() => {
     if (!menuOpen) { setMenuPos(null); return; }
     const place = () => {
-      const button = menuButtonRef.current;
-      if (!button) return;
-      const rect = button.getBoundingClientRect();
-      const margin = 8, gap = 6;
-      const width = Math.min(24 * 16, window.innerWidth - margin * 2);
-      const left = Math.max(margin, Math.min(rect.right - width, window.innerWidth - width - margin));
-      const top = Math.min(rect.bottom + gap, window.innerHeight - margin);
-      setMenuPos({ top, left, width, maxHeight: Math.max(0, window.innerHeight - top - margin) });
+      const button = menuButtonRef.current, menu = menuRef.current;
+      if (!button || !menu) return;
+      // Measure the box's NATURAL height with the cap off — an earlier pass may have capped it, and a
+      // menu that has since gained room should get it back rather than stay pinned at a stale cap
+      // (TokenContextMenu.tsx makes the same move for the same reason). The width is applied for the
+      // measurement too, because the height of a wrapping menu depends on it.
+      // AND THE MENU'S OWN SCROLL POSITION IS PUT BACK. Uncapping the box removes its scrollable
+      // overflow, which zeroes `scrollTop`; with `place` also bound to `scroll` below, that turned
+      // every scroll of the menu into a snap back to the top — measured, a wheel of 1200px moved it
+      // 1px and "End the fight" stayed 340px below the fold at 1280x900, unreachable by pointer on a
+      // surface whose hit test said it was there. The listener below then skips the menu's own
+      // scrolls anyway; this restore is the belt, because a resize mid-scroll would do it too.
+      const cappedHeight = menu.style.maxHeight, cappedWidth = menu.style.width, scrolled = menu.scrollTop;
+      menu.style.maxHeight = "none";
+      menu.style.width = `${menuWidthFor(window.innerWidth)}px`;
+      const natural = menu.offsetHeight;
+      menu.style.maxHeight = cappedHeight;
+      menu.style.width = cappedWidth;
+      menu.scrollTop = scrolled;
+      setMenuPos(placeFightMenu(button.getBoundingClientRect(), natural, { width: window.innerWidth, height: window.innerHeight }));
     };
+    // Capture-phase, because the scroll that moves the trigger is some ancestor scroller's, not the
+    // window's — but the menu scrolling ITSELF never moves the trigger, so it is not a reason to
+    // re-place anything.
+    const onScroll = (event: Event) => { if (event.target !== menuRef.current) place(); };
     place();
     window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+    window.addEventListener("scroll", onScroll, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", onScroll, true); };
   }, [menuOpen]);
   // A legendary creature acting off-turn (SRD Legendary Actions): the acting console temporarily
   // switches to it; cleared whenever the real turn advances.
@@ -974,10 +1057,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         <div className="turn-controls"><button className="encounter-primary turn-prev" disabled={busy} onClick={previous} title="Previous turn" aria-label="Previous turn">‹</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}<span className="nav-arrow" aria-hidden="true">→</span></button></div>
         {/* Mid-fight reinforcements are a combat action, not a setting - one visible tap. */}
         <button type="button" className="encounter-menu-toggle" disabled={busy} title="Add monsters to this fight (SRD)" aria-label="Add monsters to this fight" onClick={() => setBrowsing(true)}>+</button>
-        <button type="button" ref={menuButtonRef} className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Fight options - rules assistant, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
+        {/* The name is the LABEL, not only the tooltip: `⋯` is what a screen reader reads otherwise,
+            and its `+` sibling one line up has carried an `aria-label` all along. */}
+        <button type="button" ref={menuButtonRef} className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" aria-label="Fight options" title="Fight options - rules assistant, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && createPortal(<>
           <div className="encounter-menu-backdrop" onPointerDown={() => setMenuOpen(false)} />
-          <div className="encounter-menu anim-dialog scroll-y" role="menu" aria-label="Fight options" style={menuPos ? { top: menuPos.top, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
+          <div ref={menuRef} className="encounter-menu anim-dialog scroll-y" role="menu" aria-label="Fight options" style={menuPos ? { top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
             <label className="rules-mode-control">Rules assistant
               <Select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.` : result.message ?? "The rules assistant could not be changed.")); }}>
                 <option value="strict">Enforce - blocks illegal moves; you can allow them</option>

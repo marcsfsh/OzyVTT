@@ -47,6 +47,39 @@
    file matches here too, at the same specificity and later — it re-zeroed this floor when the rule
    was written with one class fewer (measured: the floor silently did nothing). */
 .dock-tabs > .dock-tabs-body > .encounter-panel.combat-active { min-height: 11rem; }
+/* THE TURN ROW IS PINNED TO THE SHEET'S SCROLLER, NOT PARKED SOMEWHERE INSIDE IT.
+   "Next turn" is the everything-else-follows control and on a landscape phone it was reachable at
+   neither end of the dock's scroll. Measured 2026-08-07, GM in combat at 844x390: on arrival
+   `.dock-tabs-body` sat at `scrollTop: 93` of 103 with the row at y=282 against a scroller whose own
+   client top is 326 — 44px ABOVE its top edge, `elementFromPoint` at the button's centre returning
+   `DIV.nh-tabs.dock-tabs-bar`. Forced to `scrollTop: 0` it was no better: the row landed at 375-419
+   in a 390px window, centre off-screen, `elementFromPoint` -> null. 667x375 measured identically.
+   Reachable only in a ~40px band of scroll offsets, which is not a control.
+   `position: sticky` takes it out of the scroll equation: pinned to the scroller's client top at
+   EVERY offset. `order: -1` is the other half and is why this is not the one-liner it looks like —
+   sticky only pins from the moment the element would leave the top, so with the "N of M tokens
+   placed" nudge above it the row still started 49px down the 78px body and hung out of the window at
+   rest. As the flex column's first item it starts pinned. (The player's topbar is already first, so
+   `order` is a no-op there; both trackers get the pin, because a player's turn is the case that
+   matters — ruling 36.)
+   The plate is not decoration either: the list scrolls UNDER a pinned row, so the row needs a ground.
+   `--material-plate` is the panel's own, the one `.encounter-round` inside this bar already wears.
+   The margin goes because a sticky box is pinned by its MARGIN edge — .6rem of it would leave a strip
+   of scrolling list showing above the bar. z-index 2 clears the rows and stays under
+   `.row-tools-popover`'s 41, so a row's tools card still opens over the bar rather than behind it.
+   The other half of the same failure was that this body ran PAST the window (to y=428 in a 375px
+   one), which no amount of pinning inside it can reach. That is the landscape band's arithmetic and
+   it is fixed where it lives, in `scene/encounter-map.css` — see the ceiling on
+   `.encounter-map-stage` there. The two are independent: the pin answers "where in the scroll", the
+   ceiling answers "is the scroller on screen at all", and the measurements needed both. */
+.dock-tabs-body > .encounter-panel.combat-active > .encounter-topbar {
+  order: -1;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-top: 0;
+  background: var(--material-plate);
+}
 /* Dice keeps no card chrome here — the tab bar is the frame — but it keeps the SIDE gutter: zeroing
    the horizontal padding too put "Who sees it?", Digital/Manual and the d4-d20 row flush against x=0
    and x=width while Turn kept 17.6px and Log 16px. .5rem is what the quick-dice row can afford (see
