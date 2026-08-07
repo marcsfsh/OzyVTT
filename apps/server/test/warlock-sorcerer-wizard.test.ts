@@ -520,3 +520,261 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
     expect(spellOf(withoutInvocation(), "find-familiar")).toBeUndefined();
   });
 });
+
+// -------------------------------------------------------------------------------------------------
+// SORCERER
+// -------------------------------------------------------------------------------------------------
+
+/** A Human Acolyte Draconic Sorcerer. CHA 15 + the Acolyte's +2 = 17 (+3) before any ASI. */
+const sorcererInput = (level: number, extra: readonly Row[] = []): CharacterCreateRequestInput => ({
+  name: "Ilde", speciesId: "human", backgroundId: "acolyte", classId: "sorcerer", level,
+  // The subclass arrives at level 3; below that the builder refuses one, so the low-level cases
+  // below (Font of Magic at 1 and 2) run without it.
+  ...(level >= 3 ? { subclassId: "draconic-sorcery" } : {}), abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, classId: "sorcerer", kind: "skill", id: "arcana" },
+    { level: 1, classId: "sorcerer", kind: "skill", id: "deception" },
+    { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    ...(level >= 3 ? [{ level: 3, classId: "sorcerer", kind: "subclass", id: "draconic-sorcery" }] : []),
+    { level: 1, kind: "equipment", id: "sorcerer-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" },
+    ...extra
+  ] as CharacterCreateRequestInput["choices"]
+});
+
+/** Metamagic: two at level 2, two more at 10, two more at 17 - the SRD's six. */
+const metamagic = (level: number, ids: readonly string[]): Row[] =>
+  ids.map((id) => ({ level, classId: "sorcerer", kind: "metamagic", id, payload: { featureId: "metamagic" } } as Row));
+const sorcererAsi = (level: number, ability: "cha" | "dex" = "dex"): Row[] => ([
+  { level, classId: "sorcerer", kind: "asi-or-feat", id: "ability-score-improvement" },
+  { level, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } },
+  { level, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } }
+] as Row[]);
+/** Everything a Sorcerer of this level owes beyond the base rows: metamagic, ASIs, the affinity. */
+const sorcererFor = (level: number, affinity = "fire"): Row[] => [
+  ...(level >= 2 ? metamagic(2, ["careful-spell", "distant-spell"]) : []),
+  ...(level >= 10 ? metamagic(10, ["quickened-spell", "subtle-spell"]) : []),
+  ...(level >= 17 ? metamagic(17, ["twinned-spell", "empowered-spell"]) : []),
+  ...[4, 8, 12, 16].filter((at) => at <= level).flatMap((at) => sorcererAsi(at)),
+  ...(level >= 6 ? [{ level: 6, classId: "sorcerer", kind: "damage-type", id: affinity, payload: { featureId: "elemental-affinity" } } as Row] : [])
+];
+const sorcerer = (level: number, affinity = "fire") =>
+  buildCharacterDefinition(sorcererInput(level, sorcererFor(level, affinity)), library, POLICY);
+
+describe("Sorcerer: Font of Magic turns the printed Sorcery Points column into a real pool", () => {
+  it("reads the column at the character's own level, and spends down to the refusal", () => {
+    // The printed column: 2 at level 2, 5 at level 5. A `by-level` table retyped beside the column
+    // it duplicates is the second copy that drifts - `class-resource` reads the column itself.
+    expect(actionOf(table(sorcerer(2)), "font-of-magic").uses).toMatchObject({ limit: 2, pool: "sorcery-points", per: "long-rest" });
+
+    const built = table(sorcerer(5));
+    expect(actionOf(built, "font-of-magic").uses).toMatchObject({ limit: 5, pool: "sorcery-points" });
+    for (let spent = 0; spent < 5; spent += 1) {
+      resolveDefinitionAction(built.state, actionOf(built, "font-of-magic"),
+        { actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-00000000006${spent}` }, deps(built, []));
+    }
+    expect(built.hero.actionUses["sorcery-points"]).toBe(5);
+    expect(() => resolveDefinitionAction(built.state, actionOf(built, "font-of-magic"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000069" }, deps(built, []))).toThrow();
+  });
+
+  it("has no pool at level 1, because the feature is not granted and the column is blank", () => {
+    const built = table(buildCharacterDefinition(sorcererInput(1), library, POLICY));
+    expect(effectiveActions(built.definition, built.hero, built.catalog).some((entry) => entry.id === "font-of-magic")).toBe(false);
+  });
+});
+
+describe("Sorcerer: Innate Sorcery is a Bonus Action, a timer and a twice-a-day counter", () => {
+  it("grants a 10-round tagged effect and refuses the third use", () => {
+    const built = table(sorcerer(5));
+    const action = actionOf(built, "innate-sorcery");
+    expect(action.activation).toBe("bonus-action");
+    expect(action.uses).toMatchObject({ limit: 2, per: "long-rest" });
+
+    resolveDefinitionAction(built.state, action,
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000070" }, deps(built, []));
+    // 1 minute is exactly ten rounds, and the tag is what "while your Innate Sorcery is active" reads.
+    expect(built.hero.effects).toHaveLength(1);
+    // The live effect counts DOWN (`remaining`), which is the engine's own shape for a rounds grant.
+    expect(built.hero.effects[0]).toMatchObject({ name: "Innate Sorcery", tags: ["innate-sorcery"], duration: { type: "rounds", remaining: 10 } });
+
+    expect(built.hero.actionUses["innate-sorcery"]).toBe(1);
+
+    // The POOL's own refusal, on a fresh turn so the Bonus Action economy is not what refuses.
+    const spent = table(sorcerer(5));
+    spent.hero.actionUses = { "innate-sorcery": 2 };
+    expect(() => resolveDefinitionAction(spent.state, actionOf(spent, "innate-sorcery"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000072" }, deps(spent, []))).toThrow();
+    expect(spent.hero.actionUses["innate-sorcery"]).toBe(2); // the refusal spent nothing
+  });
+
+  it("does NOT hand out advantage on a plain weapon swing", () => {
+    // The reason the effect carries no `roll-mode`: an effect modifier is normalised through
+    // `toRollModes`, which drops its `when`, so `attack-kind-is: ["spell"]` inside an effect would
+    // be ignored and this dagger would roll two dice. It rolls one.
+    const built = table(sorcerer(5));
+    resolveDefinitionAction(built.state, actionOf(built, "innate-sorcery"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000073" }, deps(built, []));
+    const swung = resolveDefinitionAction(built.state, actionOf(built, "item-dagger"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000074" }, deps(built, [11, 3]));
+    expect(swung.rollMode).toBeUndefined();
+    expect(swung.attack!.naturalRoll).toBe(11);
+  });
+});
+
+describe("Sorcerer: Sorcerous Restoration and Epic Boon (audit row 6, the Sorcerer's)", () => {
+  it("gives Sorcerous Restoration one use per Long Rest", () => {
+    const built = table(sorcerer(5));
+    expect(actionOf(built, "sorcerous-restoration").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    resolveDefinitionAction(built.state, actionOf(built, "sorcerous-restoration"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000080" }, deps(built, []));
+    expect(() => resolveDefinitionAction(built.state, actionOf(built, "sorcerous-restoration"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000081" }, deps(built, []))).toThrow();
+  });
+
+  it("offers the Epic Boon at 19, and refuses the build that skips it", () => {
+    const boon = (rows: readonly Row[]) => buildCharacterDefinition(
+      sorcererInput(19, [...sorcererFor(19), ...rows]), library, POLICY);
+    const built = boon([
+      { level: 19, classId: "sorcerer", kind: "feat", id: "boon-of-dimensional-travel", payload: { featureId: "epic-boon" } } as Row,
+      { level: 19, kind: "ability-score", id: "cha", payload: { featureId: "boon-of-dimensional-travel" } } as Row
+    ]);
+    expect((built.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
+    expect(thrown(() => boon([]))).toMatch(/"Epic Boon" needs 1 pick\(s\) of kind "feat"/);
+  });
+});
+
+describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Magic opens", () => {
+  it("debits the shared counter, so a Metamagic option and Font of Magic spend one supply", () => {
+    // Careful Spell prints "Cost: 1 Sorcery Point", so the chosen OPTION carries a use of the same
+    // `sorcery-points` pool - which is the whole difference between Metamagic as a paragraph and
+    // Metamagic as a button that spends. Before this the ten options carried no rider at all.
+    const built = table(sorcerer(5));
+    expect(actionOf(built, "careful-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
+
+    resolveDefinitionAction(built.state, actionOf(built, "careful-spell"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000100" }, deps(built, []));
+    expect(built.hero.actionUses["sorcery-points"]).toBe(1);
+
+    // ...and the four points left are Font of Magic's four, not four more: ONE pool, two doors.
+    for (let spent = 0; spent < 4; spent += 1) {
+      resolveDefinitionAction(built.state, actionOf(built, "font-of-magic"),
+        { actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-00000000011${spent}` }, deps(built, []));
+    }
+    expect(built.hero.actionUses["sorcery-points"]).toBe(5);
+    expect(() => resolveDefinitionAction(built.state, actionOf(built, "distant-spell"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000119" }, deps(built, []))).toThrow();
+  });
+
+  it("gives the two-point options NO counter, because a use is not a cost", () => {
+    // `ActionUsesSchema` counts uses and has no notion of one costing two, so Quickened Spell
+    // ("Cost: 2 Sorcery Points") stays prose rather than debiting one where the book takes two.
+    // Subtle Spell, chosen at the same level and priced at one, does land.
+    const built = table(sorcerer(10));
+    const ids = effectiveActions(built.definition, built.hero, built.catalog).map((entry) => entry.id);
+    expect(ids).toContain("subtle-spell");
+    expect(ids).not.toContain("quickened-spell");
+    // Both are still on the sheet as prose - the trait carries what the counter cannot.
+    expect((built.definition.extensions?.["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name))
+      .toContain("Quickened Spell");
+  });
+});
+
+describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 23)", () => {
+  it("hands over the level-3 Draconic Spells tier, free of the prepared budget", () => {
+    const built = sorcerer(5);
+    for (const [id, level] of [["alter-self", 2], ["chromatic-orb", 1], ["command", 1], ["dragons-breath", 2]] as const) {
+      expect(spellOf(built, id)).toMatchObject({ id, level, alwaysPrepared: true, prepared: true });
+    }
+    // Command is a Cleric/Bard/Paladin spell - not on the Sorcerer list at all, so the grant is the
+    // only route to it. And the level-9 tier is deliberately absent (see the overlay's comment).
+    expect(spellOf(built, "summon-dragon")).toBeUndefined();
+    // A level-5 Sorcerer prepares 9; the four granted spells ride free on top of that number.
+    expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "sorcerer", prepared: 9 });
+  });
+
+  it("resists the affinity damage type the player chose, and only that one", () => {
+    const fiery = table(sorcerer(6, "fire"));
+    expect(fiery.definition.damageResistances).toEqual(["fire"]);
+    const burned = applyDamageDetailed(fiery.state, IDS.hero, { amount: 13, parts: [{ amount: 13, type: "fire" }] },
+      { role: "gm" }, { resolveDefinition: () => fiery.definition, catalog: fiery.catalog });
+    expect(burned.application.totalApplied).toBe(6); // 13 halved, rounded down
+
+    expect(sorcerer(6, "poison").damageResistances).toEqual(["poison"]);
+    // Necrotic is not one of the five the SRD prints for this feature.
+    expect(thrown(() => sorcerer(6, "necrotic"))).toMatch(/not an offered option/);
+    expect(thrown(() => buildCharacterDefinition(sorcererInput(6, sorcererFor(6).filter((row) => row.kind !== "damage-type")), library, POLICY)))
+      .toMatch(/"Elemental Affinity" needs 1 pick\(s\) of kind "damage-type"/);
+  });
+
+  it("adds the Sorcerer's Charisma to a damage roll of the type it names, and to no other", () => {
+    /**
+     * The other half of row 23, and the half that needs a rolled number. The builder does not mint
+     * spell ACTIONS, so the cantrip is supplied here exactly as Agonizing Blast's proof supplies
+     * Eldritch Blast - but the rider comes from the real bundle, off the real chosen option, through
+     * the real derivation and the real resolver.
+     */
+    const bolt = (type: string) => ({
+      id: "fire-bolt", name: "Fire Bolt", activation: "action" as const,
+      description: "You hurl a mote of fire at a creature or an object within range.",
+      attack: { bonus: 6 }, damage: [{ formula: "2d10", type }], spellId: "fire-bolt"
+    });
+    const cast = (affinity: string, type: string, commandId: string) => {
+      const built = table(sorcerer(6, affinity));
+      return resolveDefinitionAction(built.state, bolt(type),
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId }, deps(built, [15, 6, 4]));
+    };
+
+    // CHA 17 (+3) at level 6 - the two ASI points went to Dexterity. Same two dice in all three.
+    const burned = cast("fire", "fire", "50000000-0000-4000-8000-000000000120");
+    expect(burned.damage).toEqual([
+      { formula: "2d10", type: "fire", total: 10 },
+      { formula: "3", type: "fire", total: 3 }
+    ]);
+    expect(burned.damageTotal).toBe(13);
+
+    // A different damage type from the same Sorcerer: the gate filters, so nothing is added.
+    const chilled = cast("fire", "cold", "50000000-0000-4000-8000-000000000121");
+    expect(chilled.damage).toEqual([{ formula: "2d10", type: "cold", total: 10 }]);
+    // ...and the same fire spell cast by a Sorcerer who chose Poison: also nothing. The rider is the
+    // player's answer, not an authored default.
+    const unaffiliated = cast("poison", "fire", "50000000-0000-4000-8000-000000000122");
+    expect(unaffiliated.damage).toEqual([{ formula: "2d10", type: "fire", total: 10 }]);
+  });
+
+  it("keeps Draconic Resilience's Charisma AC, which is the subclass overlay's original proof", () => {
+    // Unarmoured: 10 + Dex 3 (14, +2 from the level-4 ASI) + Cha 3 (17) = 16, and the Sorcerer's
+    // starting kit is a spear and a dagger - no armor anywhere near it.
+    expect(sorcerer(5).armorClass).toBe(16);
+    // The negative control: a level-2 Sorcerer has no subclass, so no Charisma in the AC at all.
+    expect(buildCharacterDefinition(sorcererInput(2, sorcererFor(2)), library, POLICY).armorClass).toBe(12);
+  });
+});
+
+describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily use", () => {
+  const level18 = () => table(sorcerer(18));
+
+  it("gives Dragon Wings a Bonus Action and one use per Long Rest", () => {
+    const built = level18();
+    expect(actionOf(built, "dragon-wings")).toMatchObject({ activation: "bonus-action", uses: { limit: 1, per: "long-rest" } });
+    resolveDefinitionAction(built.state, actionOf(built, "dragon-wings"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000090" }, deps(built, []));
+    expect(() => resolveDefinitionAction(built.state, actionOf(built, "dragon-wings"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000091" }, deps(built, []))).toThrow();
+  });
+
+  it("hands Dragon Companion its Summon Dragon, which no Sorcerer could otherwise prepare", () => {
+    const built = level18();
+    expect(spellOf(built.definition, "summon-dragon")).toMatchObject({ id: "summon-dragon", level: 5, alwaysPrepared: true });
+    expect(actionOf(built, "dragon-companion").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    // ...and a level-17 Sorcerer, one level short, has neither.
+    expect(spellOf(sorcerer(17), "summon-dragon")).toBeUndefined();
+  });
+});
