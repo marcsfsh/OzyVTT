@@ -15,6 +15,7 @@
  * Run with `npm run build-class-bundle -w @vtt/content-srd-5.2.1`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, applyMechanics } from "./class-mechanics.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -541,6 +542,7 @@ for (const section of sections()) parsed.set(section.name.toLowerCase(), parseCl
 /** Build the 20 level rows plus the feature ids each row grants. */
 function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
   const { columns, rows } = entry.table;
+  const entryId = entry.id;
   /** feature id -> the FIRST level that grants it, for FeatureRecord.level. */
   const featureIds = new Map<string, number>();
   const table: ClassLevelRow[] = rows.map((cells) => {
@@ -572,7 +574,11 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
       if (spec === "pact-level") { pact = { ...(pact ?? { level: 1, slots: 0 }), level: intOf(cell) ?? 1 }; return; }
       const amount = spec.dice ? strip(cell).toLowerCase().replace(/^d/, "1d") : intOf(cell);
       if (amount === null || amount === "") return;
-      (row.classResources as unknown[]).push({ id: spec.id, name: spec.name, amount, ...(spec.display ? { display: true } : {}) });
+      // `display: true` says "ink only", and it comes off the moment the MECHANICS OVERLAY wires the
+      // column to a real pool - see `LIVE_CLASS_RESOURCES`. Deriving it here rather than editing
+      // fourteen column specs keeps one statement of which columns are live.
+      const live = (LIVE_CLASS_RESOURCES[entryId] ?? []).includes(spec.id);
+      (row.classResources as unknown[]).push({ id: spec.id, name: spec.name, amount, ...(spec.display && !live ? { display: true } : {}) });
     });
     // The features column is positional: always index 2 in every printed class table. A level that
     // grants nothing prints an em dash, which slugs to "" - drop those rather than emit a blank id.
@@ -595,6 +601,8 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
 const built: unknown[] = [];
 const builtSubclasses: unknown[] = [];
 const report: string[] = [];
+/** Overlay keys that matched no generated feature - a renamed id whose riders would otherwise vanish. */
+const overlayMisses: string[] = [];
 
 for (const [id, entry] of parsed) {
   if (HAND_AUTHORED.has(id)) continue;
@@ -661,11 +669,28 @@ for (const [id, entry] of parsed) {
     levelTable: table,
     features
   };
+  // THE MECHANICS OVERLAY. The SRD markdown carries no riders - there is no sentence in it that says
+  // `{type: "damage-resistance", ...}` - so the prose is generated and the mechanics are authored,
+  // and they meet HERE rather than by freezing the class into HAND_AUTHORED and hand-maintaining its
+  // 20-odd descriptions to gain somewhere to hang three lines. See `class-mechanics.ts`.
+  overlayMisses.push(...applyMechanics(id, features));
+  // PARSE THE FINISHED RECORD. The overlay is hand-authored TypeScript merged into generated data,
+  // so this is the one point where the two are checked together - an authoring mistake stops the
+  // build here rather than surfacing as a load failure in whatever runs next.
+  ClassReferenceSchema.parse(record);
   built.push(record);
-  report.push(`${entry.name}: ${table.length} rows, ${features.length} features, ${equipment.length} equipment options`);
+  const overlaid = Object.keys(CLASS_MECHANICS[id] ?? {}).length;
+  report.push(`${entry.name}: ${table.length} rows, ${features.length} features, ${equipment.length} equipment options${overlaid ? `, ${overlaid} with mechanics` : ""}`);
 }
 
 console.log(report.join("\n"));
+// A rider authored against a feature id the ETL no longer emits is the silent drop this whole area
+// exists to end, so it fails the build rather than quietly producing a class without its mechanics.
+if (overlayMisses.length) {
+  console.error(`\nMechanics overlay keys matching no generated feature (${overlayMisses.length}):`);
+  for (const key of overlayMisses) console.error(`  ${key}`);
+  process.exit(1);
+}
 if (unresolvedItems.length) {
   console.error(`\nUnresolved equipment ids (${unresolvedItems.length}):`);
   for (const item of unresolvedItems) console.error(`  ${item}`);

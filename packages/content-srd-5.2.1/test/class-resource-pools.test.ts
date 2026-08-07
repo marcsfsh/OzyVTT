@@ -18,10 +18,11 @@ import { loadClasses, loadSubclasses, type ClassReference, type FeatureRecord, t
  *   - it MATCHES a `uses.pool` (or a lone action id) somewhere on that class or its subclasses, or
  *   - it carries `display: true`, which says "ink only" out loud.
  *
- * Today the nine ETL-generated classes are entirely the second kind, because Stage 4 has not
- * authored their mechanics yet - and that is exactly the point of writing it down. When Rage becomes
- * a real pool, its `display: true` comes off in `scripts/build-class-bundle.ts` and this test starts
- * requiring the pool that the flag was standing in for.
+ * The ETL-generated classes started out entirely the second kind, because Stage 4 has not authored
+ * their mechanics yet - and Barbarian's Rage is the first to cross over. Naming a column in
+ * `LIVE_CLASS_RESOURCES` (`scripts/class-mechanics.ts`) drops its `display: true`, at which point
+ * this test stops accepting the annotation and starts requiring the pool it was standing in for.
+ * That is the whole ratchet: every column Stage 4 wires up tightens the check by one.
  */
 
 const classes = loadClasses();
@@ -97,5 +98,53 @@ describe("every printed class resource is either a real pool or marked display-o
     const secondWind = fighter.levelTable.flatMap((row) => row.classResources).filter((resource) => resource.id === "second-wind");
     expect(secondWind.length).toBeGreaterThan(0);
     expect(secondWind.some((resource) => resource.display === true)).toBe(false);
+  });
+});
+
+/**
+ * **The mechanics overlay reached the bundle** - the Stage 4 mechanism, proved on one feature.
+ *
+ * `classes.v1.json` is GENERATED, and the SRD markdown it is generated from contains no riders. The
+ * overlay in `scripts/class-mechanics.ts` is where a human authors them and the ETL merges the two,
+ * so that prose stays derived and mechanics stay authored. Barbarian's Rage is the worked example;
+ * these assertions are what make it a mechanism rather than a plan.
+ */
+describe("the mechanics overlay merges over generated prose", () => {
+  const barbarian = classes.find((entry) => entry.id === "barbarian")!;
+  const rage = barbarian.features.find((feature) => feature.id === "rage")!;
+
+  it("keeps the ETL's prose AND carries the authored riders on the same record", () => {
+    // One record, both halves. If the overlay had replaced the feature rather than merged into it,
+    // the description would be the short authored one instead of the SRD's own paragraph.
+    expect(rage.description).toContain("primal power called Rage");
+    expect(rage.description.length).toBeGreaterThan(500);
+    expect(rage.level).toBe(1);
+    // ...and the mechanics the markdown could never have said.
+    expect(rage.uses).toEqual({ scaling: { type: "class-resource", id: "rage" }, per: "long-rest" });
+    expect(rage.actions.map((action) => action.id)).toEqual(["rage"]);
+    expect(rage.actions[0].grants?.tags).toEqual(["raging"]);
+    expect(rage.actions[0].grants?.modifiers.map((modifier) => modifier.type))
+      .toEqual(["damage-resistance", "roll-mode", "roll-mode"]);
+  });
+
+  it("scales its uses off the printed Rages column, which stopped being display-only", () => {
+    // The two halves of piece 4 meeting: a `class-resource` scaling reads the column, and the column
+    // drops `display: true` because a live pool now answers to it.
+    const rages = (level: number) => barbarian.levelTable[level - 1].classResources.find((resource) => resource.id === "rage")!;
+    expect(rages(1).amount).toBe(2);
+    expect(rages(3).amount).toBe(3);
+    expect(rages(1).display).toBeUndefined();
+    // Its NEIGHBOUR on the same table is still ink: Rage Damage scales off a column the effect
+    // vocabulary cannot express yet, so it is left prose rather than authored wrong.
+    expect(barbarian.levelTable[0].classResources.find((resource) => resource.id === "rage-damage")!.display).toBe(true);
+  });
+
+  it("left every other generated class untouched, so the overlay is opt-in per feature", () => {
+    // A merge that leaked would show up as riders on classes nobody authored any for.
+    const withMechanics = classes
+      .filter((entry) => entry.features.some((feature) => feature.actions.length > 0 || feature.uses !== undefined))
+      .map((entry) => entry.id)
+      .sort();
+    expect(withMechanics).toEqual(["barbarian", "cleric", "fighter", "wizard"]);
   });
 });
