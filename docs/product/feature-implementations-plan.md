@@ -1,7 +1,18 @@
 # Feature implementations — the client's issue register and the plan to work it
 
-**Status:** issues logged 2026-08-07; **D1–D7 decided 2026-08-07**; **4-agent intake complete
-2026-08-07**. Plans not yet written. Nothing implemented.
+**Status:** issues logged 2026-08-07; **D1–D7 decided**; **4-agent intake complete**; **plans written**.
+**Area 1 in progress** — see below. Areas 2, 3 and 4 not started.
+
+**Area 1 landed so far** (verified, not asserted): Stage 0 (`6205a01`) — `apps/server/tsconfig.json` is
+`"include": ["src", "test"]` and the drift it hid is fixed. Stage 1 / `2a` (`78cc194`) — **149 class-feature
+stubs → 0**, counted. Issues `1`, `2b`, `2c` (`d1f01cf`) — complete with 8 tests incl. negative controls.
+Stage 2 / `2e` (`e60656d`) — **code written, NOT verified**: `feature-riders.test.ts` does not exist, so
+nothing proves a class feature's rider reaches a roll. Read that commit's message before trusting it.
+**Still open in Area 1:** Stage 2's far-end tests · Stage 3 (all four gaps absent) · Stage 4 content ·
+Stage 5 weapon mastery · Stage 6 generator · **the `HAND_AUTHORED`-vs-overlay question, which blocks Stage 4.**
+
+Tiers at `e60656d`: `npm run check` exit 0 · `npm run test` 162 files / **2,231 tests** / 0 failures
+(baseline was 161 / 2,215).
 **Read this when:** picking up this work, or after a context compaction lost the thread.
 
 This document exists because the work below spans many sessions and must outlive any one of them.
