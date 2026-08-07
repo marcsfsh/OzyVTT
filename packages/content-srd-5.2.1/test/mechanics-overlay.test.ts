@@ -85,9 +85,24 @@ describe("the mechanics overlay", () => {
   it("composes the same three exports the ETL consumed before the per-class split", () => {
     // The split is a refactor: the ETL's inputs must be the same objects, shaped the same way.
     expect(CLASS_MECHANICS.barbarian?.rage?.uses).toEqual({ scaling: { type: "class-resource", id: "rage" }, per: "long-rest" });
-    expect(LIVE_CLASS_RESOURCES).toEqual({ barbarian: ["rage"] });
+    // NOT a snapshot of the whole map: Stage 4 wires a printed column live in four parallel lanes,
+    // so an equality against every class would be a merge conflict per lane and would say nothing
+    // about the shape. Pin the entry the split was verified against, and hold every entry - whoever
+    // authored it - to the invariant that makes the export meaningful: a non-empty list of ids that
+    // really are printed columns on that class's own table (`class-resource-pools.test.ts` then
+    // proves a live pool answers to each).
+    expect(LIVE_CLASS_RESOURCES.barbarian).toEqual(["rage"]);
+    for (const [classId, resources] of Object.entries(LIVE_CLASS_RESOURCES)) {
+      const printed = new Set(loadClasses().find((entry) => entry.id === classId)!.levelTable
+        .flatMap((row) => row.classResources.map((resource) => resource.id)));
+      expect(resources.length).toBeGreaterThan(0);
+      expect(resources.filter((id) => !printed.has(id))).toEqual([]);
+    }
     // A class contributing nothing is OMITTED rather than mapped to `{}`, so `applyMechanics` still
-    // short-circuits on it exactly as it did when the overlay was one literal.
-    expect(CLASS_MECHANICS.monk).toBeUndefined();
+    // short-circuits on it exactly as it did when the overlay was one literal. Stated as the
+    // PROPERTY rather than by naming a class that happens to be empty today: Stage 4 authors all
+    // twelve in parallel, and "Monk contributes nothing" stopped being true the hour its lane began.
+    expect(Object.entries(CLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
+    expect(Object.entries(SUBCLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
   });
 });

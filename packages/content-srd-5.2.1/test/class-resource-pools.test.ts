@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CLASS_MECHANICS } from "../scripts/class-mechanics/index.js";
 import { loadClasses, loadSubclasses, type ClassReference, type FeatureRecord, type SubclassReference } from "../src/index.js";
 
 /**
@@ -139,12 +140,22 @@ describe("the mechanics overlay merges over generated prose", () => {
     expect(barbarian.levelTable[0].classResources.find((resource) => resource.id === "rage-damage")!.display).toBe(true);
   });
 
-  it("left every other generated class untouched, so the overlay is opt-in per feature", () => {
+  it("leaves every class NOBODY authored untouched, so the overlay is opt-in per feature", () => {
     // A merge that leaked would show up as riders on classes nobody authored any for.
+    //
+    // NOT a snapshot of which classes have mechanics: Stage 4 authors all twelve in four parallel
+    // lanes, so a fixed list would be a merge conflict per lane and would go stale the day it was
+    // written. The leak check is the same either way - a class may carry riders only if SOMEONE put
+    // them there, which means its overlay module authored something, or it is one of the three whose
+    // riders live in `classes.v1.json` itself.
+    const HAND_AUTHORED = ["cleric", "fighter", "wizard"];
+    const permitted = new Set([...Object.keys(CLASS_MECHANICS), ...HAND_AUTHORED]);
     const withMechanics = classes
       .filter((entry) => entry.features.some((feature) => feature.actions.length > 0 || feature.uses !== undefined))
       .map((entry) => entry.id)
       .sort();
-    expect(withMechanics).toEqual(["barbarian", "cleric", "fighter", "wizard"]);
+    expect(withMechanics.filter((id) => !permitted.has(id))).toEqual([]);
+    // ...and not vacuous: the classes proved end to end elsewhere in this file really are in there.
+    expect(withMechanics).toEqual(expect.arrayContaining(["barbarian", "cleric", "fighter", "wizard"]));
   });
 });
