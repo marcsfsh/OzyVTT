@@ -47,8 +47,67 @@ reflected — `projectPlayerView` has no content catalog and must stay a pure fu
 *Viewer safety:* `pools` ships under `resourcesVisible`, strictly narrower than the `sheetVisible` gate
 under which the whole definition (every `uses.limit` included) already ships. Viewer projection untouched.
 
-Tiers at `6a109a9`, verified independently by the lead: `npm run check` exit 0, 0 TS errors ·
-`npm run test` **164 files / 2,281 passed / 1 skipped / 0 failures** (baseline was 161 / 2,215).
+### Pre-Stage-4 pass — COMPLETE (2026-08-07)
+
+The client reviewed the shipped builder in the running app and found three things. All are fixed.
+
+| Issue | Commit | Outcome |
+|---|---|---|
+| `1` **re-opened** | `8a9c99e` | **The fold is DELETED, not gated.** The lead's `COLLAPSE_THRESHOLD` compromise did not match the client's rule, which is universal: any multi-select, at capacity, greys every unchosen option. Replaced by a **bounded scroll region** (`ChoiceGrid` `bounded` prop, `.scroll-y` in markup per ratchet (h), `max-height: 21rem`). |
+| `2f` **new** | `c50a4ae`, `2992ee2` | **`extraPicks`** — a feature may RAISE a pick budget. Thaumaturge's extra cantrip exists. |
+| `2g` **new** | `8a9c99e` | Info glyph centred; card type line re-scaled. |
+
+**Measured, in a real browser, Wizard L20 answered (14 offers / 468 cards):** answered step
+**5,238px** at 1280 and **5,963px** at 375 — versus **17,089 / 44,949px** for the naive "just delete the
+fold" fix, and versus **13,434px** that the same step used to cost merely *on arrival*. Arrival itself
+improved 3.6× (13,434 → 3,705). **Nothing in the flow is taller than it already was.**
+
+**`2f`'s shape — `extraPicks: [{offer, amount}]`, a sibling of `choice`.** `offer` is the offer key both
+sides already share verbatim (`class-cantrips`, `feature:<id>`, …) so there is no second namespace to
+drift. An unknown key is a **loud rejection** (`character-build.ts:781-785`), never a silent zero.
+Non-vacuity measured per line: **12 tests fail** with composition disabled (7 of 9 client, 5 of 52 server).
+A **census test** now walks every feature and inline option of every record and fails on any authored key
+that resolves to nothing — the guard for Stage 4's authoring.
+**Known limit:** `amount` is a flat 1–5. Level-scaled capacity (Invocations, Weapon Mastery) is not yet
+expressible; see the audit's three column-scaled cases.
+
+> **Correction to D8 — the overlay does NOT apply to every class.** The plan said to author mechanics
+> through `class-mechanics.ts`. That is right for the **nine generated classes** and **wrong for cleric,
+> fighter and wizard**: `applyMechanics` runs only over the generated set
+> (`build-class-bundle.ts:608`), and the three `HAND_AUTHORED` classes are carried over verbatim
+> (`:33`, `:770`). `FeatureMechanics` also cannot express an inline **option**'s fields at all, and
+> Thaumaturge is an option inside Divine Order. Thaumaturge was therefore hand-authored into
+> `classes.v1.json:2301`, and **the lead verified the edit survives a rebuild** — `npm run build-class-bundle`
+> leaves `git diff -- bundles/` empty and the record intact.
+
+### The pick-promise audit — the client's "is this a microcosm?" answered
+
+`docs/product/pre-stage-4-pick-promise-audit.md` (`10d5a5d`). **66 of 373 feature-bearing records promise
+a pick or grant no rider delivers.** Warlock owns 25. Nine of twelve classes lose their level-19 Epic Boon.
+**Species and lineages are a confirmed zero** — 75 records nobody needs to touch. Backgrounds have no
+`features[]` at all. **65% is plain authoring; the awkward 35% is five design questions, not 23 tasks.**
+
+**Two structural blockers Stage 4 hits immediately:**
+1. **`SUBCLASS_MECHANICS` is exported but the ETL never imports it** — 10 of the 11 subclass gaps have
+   **no authoring surface at all.** Wire this before any subclass work.
+2. **The subclass parser strips `<table>` blocks** — which is why Draconic/Fiend/Oath/Circle spell
+   features have both truncated prose *and* no riders. One bug, two symptoms.
+
+**Also found, worth its own line:** a record may carry only one `choice` and one `maxSpellLevel`, so
+**Magic Initiate silently drops its level-1 spell** (`magic-initiate-wizard` has `{kind:"cantrip",
+choose:2, maxSpellLevel:0}` against text promising two cantrips *and* a level-1 spell). Acolyte and Sage
+both hand that feat to level-1 characters. **Replacement clauses (33 of them) are the largest unmodelled
+family** — they edit a choice already made rather than raising a budget, so `extraPicks` does not reach them.
+
+### Environment caveat — applies to every tier run in this branch
+
+**`node --version` is v22.22.2; `package.json` requires `>=24` and `CLAUDE.md` says Node 24+.** Every
+verification recorded here ran on Node 22 without complaint. Treat "green" as green-on-22 until the
+container is corrected. There is also still **no physical touch-device pass** (BUILD_PLAN GAP-001);
+Area 3's `4f` will need one to be meaningfully verified.
+
+Tiers at `4d03488`, verified independently by the lead: `npm run check` exit 0, 0 TS errors ·
+`npm run test` **165 files / 2,298 passed / 1 skipped / 0 failures** (baseline was 161 / 2,215).
 **Read this when:** picking up this work, or after a context compaction lost the thread.
 
 This document exists because the work below spans many sessions and must outlive any one of them.
