@@ -207,6 +207,26 @@ export const druid: ClassMechanicsModule = {
        */
       "natures-ward": {
         grants: { conditionImmunities: ["poisoned"] }
+      },
+
+      /**
+       * NATURE'S SANCTUARY - the third feature that spends the Wild Shape counter, and the reason
+       * the shared `pool` matters rather than being tidy: a Druid who has shaped twice cannot also
+       * raise the sanctuary, and only one key can say so.
+       *
+       * WHAT STAYS PROSE: the 15-foot Cube, Half Cover, moving the Cube as a Bonus Action, and
+       * "your allies gain the current Resistance of your Nature's Ward" - which is the same
+       * choice read-back that leaves the resistance half of row 65 prose in the first place.
+       */
+      "natures-sanctuary": {
+        actions: [{
+          id: "natures-sanctuary",
+          name: "Nature's Sanctuary",
+          activation: "action",
+          description: "As a Magic action, expend a use of your Wild Shape to make spectral trees and vines appear in a 15-foot Cube on the ground within 120 feet of yourself. They last 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward there. As a Bonus Action you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
+          damage: []
+        }],
+        uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" }
       }
 
       /**

@@ -316,6 +316,20 @@ describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
   });
 });
 
+describe("Nature's Sanctuary - the third feature on the one Wild Shape counter", () => {
+  it("spends the same key at level 14, so three spenders share one budget", () => {
+    const definition = build(druid(14, [primalOrder("warden"), elementalFury("primal-strike")]));
+    expect(actionOf(definition, "natures-sanctuary")?.uses).toMatchObject({ pool: "wild-shape", limit: 3 });
+    const state = encounterWith(definition);
+    for (const id of ["natures-sanctuary", "lands-aid", "wild-shape"]) {
+      resolveDefinitionAction(state, actionOf(definition, id)!, { actorId: HERO, targetIds: id === "lands-aid" ? [FOE] : [], commandId: command() }, deps(definition));
+    }
+    expect(state.actors[0].actionUses["wild-shape"]).toBe(3);
+    expect(() => resolveDefinitionAction(state, actionOf(definition, "natures-sanctuary")!, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition)))
+      .toThrowError(/no uses remaining \(3\/long rest\)/);
+  });
+});
+
 describe("Nature's Ward - the half of audit row 65 that is authorable", () => {
   it("makes a level-10 Circle of the Land Druid immune to Poisoned", () => {
     const ten = build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")]));
