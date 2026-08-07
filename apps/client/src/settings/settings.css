@@ -26,9 +26,13 @@
    box, so the rim lands exactly where the 1px border used to and nothing reflows. Every value
    is a shared token, so ruling 29's daybreak translation arrives for free.
 
-   `.surface-glass` RETIRES HERE (revised ruling 23). SettingsPage.tsx still puts the class on
-   the group and that file is another lane's; the material replaces what it painted, so the
-   blur and the 72% wash are switched off from this side rather than left to double-paint. */
+   `.surface-glass` RETIRED HERE (revised ruling 23), and as of the QA fix pass the class is off
+   the markup too — `SettingsPage.tsx` no longer puts it on the group. The rules below that switch
+   off the blur and the 72% wash are kept deliberately: measured before removal, `backdrop-filter`
+   already computed `none` on all three groups in all three themes, so this is what made the class
+   inert and it stays as the backstop if a future edit re-adds it. Revised ruling 23 keeps
+   `.surface-glass` alive where the material has NOT replaced it — `/viewer-controls`, where both
+   columns really do compute `blur(8px) saturate(1.15)`. Do not delete the class. */
 .settings-group,
 .settings-exceptions {
   position: relative;
