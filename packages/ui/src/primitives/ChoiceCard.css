@@ -44,6 +44,13 @@
   flex: none;
   display: grid;
   place-items: center;
+  /* PADDING: 0 IS LOAD-BEARING, not tidiness. The consuming app styles bare elements — its
+     `button { padding: 1.3rem }` (client styles.css) is (0,0,1) and this rule is (0,1,0), so it
+     applied here and left a 44px box with a 2.4px content area. The glyph rendered BELOW the
+     button's midline: measured at 1280px, box centre 544.4 against glyph centre 553.4, a 9px drop
+     against a card whose own centre was 544.4. `.nh-choice` never showed it because it declares
+     its own padding. State it, and the 44px box is 44px of centred content. */
+  padding: 0;
   width: var(--tap-min);
   height: var(--tap-min);
   border: 1px solid var(--line);
@@ -51,6 +58,9 @@
   background: var(--surface-1);
   color: var(--text-dim);
   font-size: 1.15rem;
+  /* The glyph is the only child and it is `display: block`; a leading of 1 keeps the grid area
+     the height of the box rather than of a 1.5-line strut. */
+  line-height: 1;
   cursor: pointer;
 }
 .nh-choice-info:hover { background: var(--surface-2); border-color: var(--line-strong); color: var(--text); }

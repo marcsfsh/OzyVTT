@@ -59,6 +59,23 @@ export interface ChoiceGridProps {
   /** Accessible name for that control. Defaults to "About <title>". */
   inspectLabel?: (option: ChoiceOption) => string;
 
+  /**
+   * Cap the card list and scroll it INSIDE the grid, instead of letting it push the page.
+   *
+   * This is the alternative to hiding options once a choose-N list is full, and it exists because
+   * hiding them was the bug: a player must be able to see what they did NOT take, at every list
+   * length, and a chosen card must stay tappable so the pick can be swapped. Unmounting the grid
+   * bought page height at the cost of both. A `max-height` buys the same height and costs neither
+   * — every option stays mounted, greyable and reachable, and the search box above it (which
+   * outlives the cap, being a sibling) is what makes a 203-card region navigable.
+   *
+   * The cap rides `.nh-choicegrid-items` itself rather than a wrapper, which is only safe because
+   * a `max-height` is NOT a definite block size: the grid's auto rows still size from their cards
+   * (the same reading `map-picker.css` measured at 320/375/560/561/1280). The region is declared
+   * with `.scroll-y` in the markup, per design-language.md §7.
+   */
+  bounded?: boolean;
+
   searchable?: boolean;
   searchPlaceholder?: string;
   /** Debounce for the search box, ms. 0 filters on every keystroke. */
@@ -101,6 +118,7 @@ export function ChoiceGrid({
   options, value, onChange, ariaLabel,
   selection = "single", values, onToggle, max, maxReachedReason,
   onInspect, inspectLabel = (option) => `About ${option.title}`,
+  bounded = false,
   searchable = true, searchPlaceholder = "Search…", searchDelay = 160,
   facets, facetValue, onFacetChange, facetLabel = "Filter", facetAllValue = "all",
   emptyTitle = "No matches", emptyText = "Try a different search or clear the filters.", emptyAction,
@@ -234,7 +252,13 @@ export function ChoiceGrid({
             {emptyAction}
           </div>
         ) : (
-          <div className="nh-choicegrid-items" role={multiple ? "group" : "radiogroup"} aria-label={ariaLabel}>
+          // `.scroll-y` IS THE DECLARATION, and it belongs in the markup — a bare `overflow-y` in
+          // the stylesheet is an undeclared region (design-language.md §7, ratchet (h)).
+          <div
+            className={cx("nh-choicegrid-items", bounded && "nh-choicegrid-items--bounded", bounded && "scroll-y")}
+            role={multiple ? "group" : "radiogroup"}
+            aria-label={ariaLabel}
+          >
             {shown.map((option) => {
               const byCapacity = capacityLocked(option);
               const locked = option.disabled === true || byCapacity;

@@ -12,10 +12,11 @@ import type {
  * `apps/client/src/builder/` had no component test at all before this file, which is most of why all
  * three shipped: every one of them is about what the STEP SHOWS, and nothing was reading the step.
  *
- *   - **`1`** — an answered offer hid every option the player did not take. The fold that did it is
- *     load-bearing above a threshold (a Wizard's answered level-20 features step is 1,933px folded
- *     and 24,222px open), so it is gated on option count rather than deleted; below the threshold the
- *     grid stays, and at capacity the unchosen options grey rather than vanish.
+ *   - **`1`** — an answered offer hid every option the player did not take. The first fix gated the
+ *     fold on option count, which left the rule true for a three-option skill pick and still false
+ *     for every long list; the client rejected exactly that. The fold is now DELETED and the page
+ *     height it bought comes from `ChoiceGrid bounded` — a capped, internally scrolling card list —
+ *     so at every length every option stays mounted and greys at capacity rather than vanishing.
  *   - **`2b`** — the features step invited a subclass pick that does not exist below level 3, and
  *     said so in a pane a phone cannot see.
  *   - **`2c`** — 203 spell names with no way to read what any of them does.
@@ -26,14 +27,14 @@ import type {
  * The catalogs arrive over the socket, so the socket is mocked to answer each `content:*` emit
  * synchronously from the fixtures below. They are deliberately SMALL and shaped like the real SRD
  * records they stand for (an Elf whose Keen Senses is choose-1-of-3, a Cleric whose subclass lands at
- * level 3), plus one deliberately over-threshold spell list — the fold's negative control needs a
- * list long enough to fold.
+ * level 3), plus one deliberately long spell list — the rule is universal, so proving it needs a
+ * list long enough that the old threshold would have hidden it.
  */
 
 // ── fixtures ────────────────────────────────────────────────────────────────────────────────────
 
 const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSummary, "id" | "name">): ContentFeatureSummary => ({
-  level: null, description: "", tags: [], choice: null, grantedAtLevels: [], ...over
+  level: null, description: "", tags: [], choice: null, grantedAtLevels: [], extraPicks: [], ...over
 });
 const choice = (kind: string, chooseCount: number, from: readonly string[]) =>
   ({ kind, choose: chooseCount, from, fromCatalog: null, maxSpellLevel: null, options: [] });
@@ -43,7 +44,8 @@ const skills: readonly ContentSkillSummary[] = SKILL_IDS.map((id) => ({
   id, name: id.charAt(0).toUpperCase() + id.slice(1), description: "", ability: "wis"
 }));
 
-/** Twelve cantrips: over `COLLAPSE_THRESHOLD`, so the answered offer still folds — the fold's control. */
+/** Twelve cantrips: over `SEARCH_THRESHOLD`, so this offer earns a search box — and, under the old
+    threshold, was the list that vanished when answered. It is the long case the rule must also hold for. */
 const CANTRIPS = ["Guidance", "Light", "Mending", "Resistance", "Sacred Flame", "Spare the Dying",
   "Thaumaturgy", "Toll the Dead", "Word of Radiance", "Druidcraft", "Message", "Prestidigitation"];
 const spell = (name: string, level: number): ContentSpellSummary => ({
@@ -208,8 +210,8 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
     await user.click(within(keen()).getByRole("radio", { name: /Perception/ }));
 
     // THE DEFECT: this offer used to fold to a single "Perception" chip the moment it was answered,
-    // and Insight and Survival left the DOM. Three options is below `COLLAPSE_THRESHOLD`, so the
-    // whole question stays on screen with the answer marked on it.
+    // and Insight and Survival left the DOM. Nothing folds now, at any length, so the whole
+    // question stays on screen with the answer marked on it.
     expect(Object.keys(cardsIn(keen()))).toEqual(["Insight", "Perception", "Survival"]);
     expect(within(keen()).getByRole("radio", { name: /Perception/ })).toHaveAttribute("aria-checked", "true");
     expect(within(keen()).queryByRole("button", { name: "Change" })).toBeNull();
@@ -250,25 +252,80 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
     expect(within(lore()).queryByText(/You have already chosen 2/)).toBeNull();
   });
 
-  it("still folds a LONG offer once it is answered — the collapse is gated, not deleted", async () => {
+  /**
+   * THE REPLACEMENT for "still folds a LONG offer once it is answered — the collapse is gated, not
+   * deleted", which encoded the behaviour the client then rejected on sight. Their rule, verbatim:
+   * *"it needs to be any time the player is choosing multiple options, once they've selected the
+   * max, all unselected options are greyed out."* No threshold — so a 12-option offer must behave
+   * exactly like the 3-option one above, and the page height that the fold was buying is bought by
+   * the grid's own bounded scroll region instead.
+   */
+  it("keeps a LONG answered offer's options mounted and greys them — the fold is deleted, not gated", async () => {
     const user = userEvent.setup();
     mount();
     await toClassFeatures(user, 1);
 
     const cantrips = () => offerNamed("Cleric cantrips");
-    // Twelve options, over the threshold: the grid is on screen, and it carries a search box.
+    // Twelve options, over `SEARCH_THRESHOLD`: the grid is on screen, and it carries a search box.
     expect(Object.keys(cardsIn(cantrips()))).toHaveLength(12);
     expect(within(cantrips()).getByRole("searchbox")).toBeInTheDocument();
 
     for (const name of ["Guidance", "Light", "Mending"]) {
       await user.click(within(cantrips()).getByRole("checkbox", { name: new RegExp(`^${name}`) }));
     }
-    // 3 of 3: the grid folds to its answer plus the way back in. This is the 24,222px case.
-    expect(Object.keys(cardsIn(cantrips()))).toHaveLength(0);
-    expect(within(cantrips()).getByRole("button", { name: "Change" })).toBeInTheDocument();
+
+    // 3 of 3, and ALL TWELVE cards are still in the DOM: the three chosen enabled (so the pick can
+    // be swapped), the nine declined greyed, and no Change / Done button anywhere — there is
+    // nothing left to reopen.
+    const cards = cardsIn(cantrips());
+    expect(Object.keys(cards)).toHaveLength(12);
+    expect(Object.entries(cards).filter(([, disabled]) => disabled)).toHaveLength(9);
     for (const name of ["Guidance", "Light", "Mending"]) {
-      expect(within(cantrips()).getByText(name)).toBeInTheDocument();
+      const card = within(cantrips()).getByRole("checkbox", { name: new RegExp(`^${name}`) }) as HTMLButtonElement;
+      expect(card).toHaveAttribute("aria-checked", "true");
+      expect(card.disabled).toBe(false);
     }
+    expect(within(cantrips()).queryByRole("button", { name: "Change" })).toBeNull();
+    expect(within(cantrips()).queryByRole("button", { name: "Done" })).toBeNull();
+
+    /**
+     * ...and the height the fold was buying is bought HERE. jsdom computes no layout, so this
+     * asserts the mechanism rather than the pixels: the card list is a DECLARED scroll region
+     * (`.scroll-y` in the markup, design-language.md §7) carrying the cap class. The measured
+     * numbers live in the report — Wizard L20's answered step at 1280px.
+     */
+    const items = cantrips().querySelector(".nh-choicegrid-items");
+    expect(items).toHaveClass("scroll-y");
+    expect(items).toHaveClass("nh-choicegrid-items--bounded");
+  });
+
+  /**
+   * The client watched this work for a Cleric's SKILL picks and reported it as broken everywhere
+   * else — which was accurate, because the offers that hid their options were the long ones, and
+   * the long ones are spells, cantrips, feats and equipment. Greying is a fact about an offer's
+   * CAPACITY and never about its kind, so this holds the rule on a spell offer end to end.
+   */
+  it("greys at capacity on a NON-SKILL offer, and un-picking one puts every option back", async () => {
+    const user = userEvent.setup();
+    mount();
+    await toClassFeatures(user, 1);
+
+    const cantrips = () => offerNamed("Cleric cantrips");
+    const disabledIn = () => Object.entries(cardsIn(cantrips())).filter(([, off]) => off).map(([name]) => name);
+    expect(disabledIn()).toEqual([]);
+
+    for (const name of ["Guidance", "Light", "Mending"]) {
+      await user.click(within(cantrips()).getByRole("checkbox", { name: new RegExp(`^${name}`) }));
+    }
+    expect(disabledIn()).toHaveLength(9);
+    expect(disabledIn()).toContain("ResistanceCantrip");
+    expect(within(cantrips()).getByText(/You have already chosen 3/)).toBeInTheDocument();
+
+    // One tap on their own pick puts the other nine back — the reported expectation, on a kind the
+    // client never saw it work on.
+    await user.click(within(cantrips()).getByRole("checkbox", { name: /^Light/ }));
+    expect(disabledIn()).toEqual([]);
+    expect(within(cantrips()).queryByText(/You have already chosen 3/)).toBeNull();
   });
 });
 
@@ -371,9 +428,7 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     for (const name of ["Guidance", "Light", "Mending"]) {
       await user.click(within(cantrips()).getByRole("checkbox", { name: new RegExp(`^${name}`) }));
     }
-    // The offer folded (12 options), so reopen it to reach the locked cards.
-    await user.click(within(cantrips()).getByRole("button", { name: "Change" }));
-
+    // The locked cards are simply still there — nothing has to be reopened to reach them.
     const locked = within(cantrips()).getByRole("checkbox", { name: /^Resistance/ }) as HTMLButtonElement;
     expect(locked.disabled).toBe(true);
     const info = within(cantrips()).getByRole("button", { name: "Read the Resistance rules" }) as HTMLButtonElement;

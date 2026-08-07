@@ -6,7 +6,7 @@ import {
   validateAbilityFormula, type Ability, type HitDie
 } from "@vtt/rules-5e";
 import {
-  AbilityScoreAllocator, Alert, Badge, Button, Chip, ChoiceGrid, DiceInputRow, FeatureList, NameField,
+  AbilityScoreAllocator, Alert, Badge, Button, ChoiceGrid, DiceInputRow, FeatureList, NameField,
   ReviewSummary, SegmentedControl, Select, Stepper, useToast, WizardShell, type ChoiceOption, type DiceEntryMode,
   type FeatureItem, type ReviewSection, type StepItem
 } from "@vtt/ui";
@@ -68,20 +68,21 @@ export type CharacterBuilderProps = Readonly<{
 const CREATE_ACK_TIMEOUT_MS = 10_000;
 
 /**
- * How many options an offer has to carry before its ANSWERED form is worth folding down to chips —
- * and, at the same number, before the grid earns a search box.
+ * How many options an offer has to carry before its grid earns a search box.
  *
- * One constant for both because they are the same judgement: a list long enough to need searching is
- * a list long enough that leaving it open after it has been answered costs more than it says. Below
- * it, the whole question fits on screen and the answered grid IS the answer — every option the
- * player did not take is still there, greyed once the offer is full, and one tap on their own pick
- * puts the rest back. That is the reported defect: an Elf's Keen Senses (three options) folded to a
- * single chip the moment it was answered, so the two skills that were declined vanished.
+ * This number used to do a second job — it also decided which answered offers folded away to chips
+ * — and that second job was the reported defect, twice. Filed as `1` ("exhausted option lists hide
+ * their unselected options"), it was first fixed only BELOW this line, so an Elf's three Keen Senses
+ * skills stayed while a Wizard's 203 prepared spells still vanished the moment the 25th was picked.
+ * The rule the client actually asked for has no threshold in it: whenever a player is choosing
+ * several options, reaching the maximum greys the unchosen ones — it never hides them.
  *
- * The fold itself is LOAD-BEARING above the threshold and must not be deleted to close that: a
- * Wizard's answered level-20 features step measures 1,933px with it and 24,222px without.
+ * So the fold is gone and the page height it was buying is bought by `ChoiceGrid bounded` instead:
+ * the grid caps its own height and scrolls internally, which costs a scroll rather than the one
+ * thing a player needs to see. Searching survives as the only job this constant has left, and it is
+ * what makes the capped region navigable at 203 cards.
  */
-const COLLAPSE_THRESHOLD = 8;
+const SEARCH_THRESHOLD = 8;
 
 /** The offer kinds whose options are spells, and therefore have rules worth reading while choosing. */
 const SPELL_KINDS: ReadonlySet<string> = new Set(["spell", "cantrip"]);
@@ -124,6 +125,10 @@ const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.sli
 const featSummary = (catalogs: BuilderCatalogs, id: string) =>
   catalogs.choice.feats.find((entry) => entry.id === id)?.summary ?? undefined;
 
+/** What an option's `level` says on the card. Only the spell catalogs carry one; 0 is a cantrip. */
+const spellLevelLine = (level: number | null | undefined) =>
+  level == null ? undefined : level === 0 ? "Cantrip" : `Level ${level}`;
+
 /**
  * Provenance for an OFFER option, by id.
  *
@@ -148,30 +153,22 @@ const offerSource = (catalogs: BuilderCatalogs, id: string): string | undefined 
   ?? catalogs.choice.feats.find((entry) => entry.id === id)?.source;
 
 /**
- * One pick offered by the content: heading, count, and the grid that answers it — until it IS
- * answered, at which point the grid folds down to the answer.
+ * One pick offered by the content: heading, count, and the grid that answers it.
  *
- * A level-5 Wizard's fourth step asks seven questions and, once every one of them has been answered,
- * was still showing all 183 cards it asked them with: nine thousand pixels of scroll whose entire
- * content was options already declined. An answered question is a line, not a grid. Reopening it is
- * one press of Change, in the place the answer is.
+ * THE GRID NEVER LEAVES. An answered offer used to fold down to chips, which is how the wizard kept
+ * a level-20 Wizard's fourth step from being twenty-four thousand pixels of declined options — and
+ * it is also exactly the defect filed as `1`: at capacity the player could no longer see what they
+ * had not chosen. The height is bought by the grid capping ITSELF now (`ChoiceGrid bounded`), so
+ * every option stays mounted at every list length, greys when the offer is full, and a chosen card
+ * stays tappable so the pick can be swapped. One rule, no threshold, every offer kind.
  */
 function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   offer: BuilderOffer; draft: BuilderDraft; catalogs: BuilderCatalogs;
   onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
 }>) {
   const picks = draft.picks[offer.key] ?? [];
-  const complete = picks.length === offer.capacity;
-  const [expanded, setExpanded] = useState(false);
-  /** Only a list long enough to be worth hiding hides. See `COLLAPSE_THRESHOLD`. */
-  const foldable = offer.options.length > COLLAPSE_THRESHOLD;
-  /**
-   * DERIVED, never stored. An offer whose picks are pruned away by a change upstream (a new class,
-   * a granted origin feat) becomes incomplete, and therefore open again, with no stale "collapsed"
-   * flag anywhere to invalidate. It is also why an offer whose capacity exceeds its option count —
-   * a choose-5-of-4 content gap — can never fold: it can never be complete.
-   */
-  const collapsed = foldable && complete && !expanded;
+  /** Long enough to earn a search box. See `SEARCH_THRESHOLD`. */
+  const long = offer.options.length > SEARCH_THRESHOLD;
   /**
    * The spell whose rules are open, or null. Client-side and free: `catalogs.choice.spells` is the
    * same catalog the offer's options were resolved from, already loaded, so reading one costs no
@@ -179,17 +176,6 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
    */
   const [reading, setReading] = useState<ContentSpellSummary | null>(null);
   const spells = SPELL_KINDS.has(offer.kind) ? catalogs.choice.spells : null;
-  const changeRef = useRef<HTMLButtonElement | null>(null);
-  const wasCollapsed = useRef(collapsed);
-  useEffect(() => {
-    const justCollapsed = collapsed && !wasCollapsed.current;
-    wasCollapsed.current = collapsed;
-    // The last pick unmounts the grid the finger (or the Space bar) was in, and focus falls to
-    // <body> — a keyboard walk would then restart from the top of the page. Hand it to the control
-    // that stands where the grid was. Only when it really was lost: a mouse user who never had
-    // focus in the grid keeps whatever they had.
-    if (justCollapsed && document.activeElement === document.body) changeRef.current?.focus();
-  }, [collapsed]);
 
   if (offer.unresolvable) {
     return <section className="cb-offer">
@@ -210,9 +196,16 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
     title: option.name,
     // Every feat in the catalog carries a summary; showing it turns a grid of bare names
     // ("Alert", "Savage Attacker") into a choice that can actually be made from the card.
-    description: isFeat ? featSummary(catalogs, option.id) : undefined,
+    //
+    // A spell's TYPE LINE — "Cantrip", "Level 3" — rides the same slot rather than `meta`, and that
+    // is the typography fix, not a rename. `meta` is the card's mono micro-label (`.tabular`,
+    // --fs-xs, Space Mono): right for the numbers it was built for — a hit die, "+2 STR" — and
+    // wrong for a word, which came out as 11px Space Mono under a 15px Manrope name, two sizes and
+    // two faces apart on a card carrying two labels. `description` is --fs-sm in the body face, one
+    // rung under the title: the same "name over a smaller grey line" the client asked for, in
+    // tokens the scale already has. Nothing else on an offer card ever set `meta`.
+    description: isFeat ? featSummary(catalogs, option.id) : spellLevelLine(option.level),
     badge: sourceBadge(offerSource(catalogs, option.id)),
-    meta: option.level != null && option.level > 0 ? `Level ${option.level}` : option.level === 0 ? "Cantrip" : undefined,
     // A proficiency this build already holds stays IN the list and greys out, saying where it
     // came from. Picked from a different source it would be merged away server-side, costing the
     // player the pick and leaving them one proficiency short with nothing said.
@@ -222,9 +215,6 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
     keywords: option.id
   }));
   const many = offer.capacity > 1;
-  const nameOf = (id: string) => offer.options.find((option) => option.id === id)?.name ?? titleize(id);
-  /* The heading is byte-identical in both states: the question and its count do not change just
-     because it has been answered, and a heading that moved would cost the collapse its whole point. */
   return <section className="cb-offer">
     <div className="cb-offer-head">
       <h3 className="cb-offer-title">{offer.label}</h3>
@@ -235,37 +225,31 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
           names this very offer. The slot is a readout, not a seventh vocabulary. */}
       {many && <span className="cb-offer-count tabular" role="status">{picks.length} of {offer.capacity} chosen</span>}
     </div>
-    {collapsed
-      /* DISPLAY chips, never `.nh-chip--pressable`: a readout is not a second place the pick can be
-         made (the rule the count beside it already obeys). Change is the one way back in. */
-      ? <div className="cb-offer-picks">
-          {picks.map((pick) => <Chip key={pick}>{nameOf(pick)}</Chip>)}
-          <Button ref={changeRef} variant="ghost" size="sm" onClick={() => setExpanded(true)}>Change</Button>
-        </div>
-      : <>
-          {offer.help && <p className="cb-offer-help">{offer.help}</p>}
-          <ChoiceGrid
-            ariaLabel={offer.label}
-            options={options}
-            searchable={foldable}
-            searchPlaceholder="Search options…"
-            selection={many ? "multiple" : "single"}
-            value={many ? null : picks[0] ?? null}
-            onChange={(value) => onSet(offer, [value])}
-            values={many ? picks : undefined}
-            max={many ? offer.capacity : undefined}
-            onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
-            /* Choosing six spells out of 203 names is not a choice; it is a lottery. The rules open
-               beside the list, in a modal, and answer nothing — `onInspect` never touches `picks`. */
-            onInspect={spells ? (id) => setReading(spells.find((spell) => spell.id === id) ?? null) : undefined}
-            inspectLabel={(option) => `Read the ${option.title} rules`}
-          />
-          {/* Only ever offered once the question is answered, so exactly one of Change / Done is on
-              screen at a time. Reopening a finished offer needs a way back out that is not a pick.
-              Only where there is something to go back OUT of: below the fold threshold the grid never
-              left, so Done would be a button that did nothing visible. */}
-          {foldable && complete && <div className="cb-offer-picks"><Button variant="ghost" size="sm" onClick={() => setExpanded(false)}>Done</Button></div>}
-        </>}
+    {offer.help && <p className="cb-offer-help">{offer.help}</p>}
+    <ChoiceGrid
+      ariaLabel={offer.label}
+      options={options}
+      /* THE HEIGHT FIX, and the reason nothing here unmounts. A capped, internally scrolling grid
+         keeps a twelve-offer step readable without taking a single option off the screen. */
+      bounded
+      searchable={long}
+      searchPlaceholder="Search options…"
+      selection={many ? "multiple" : "single"}
+      value={many ? null : picks[0] ?? null}
+      onChange={(value) => onSet(offer, [value])}
+      values={many ? picks : undefined}
+      /* `max` is what greys the unchosen cards at capacity, in `ChoiceGrid` — every kind, every
+         length, no threshold. It is set for every choose-N offer there is: skills, spells,
+         cantrips, feats, equipment, languages, tools, expertise. A choose-ONE offer is a
+         radiogroup and passes none: greying the alternatives there would leave a keyboard player
+         locked into their first answer with nowhere to arrow to. */
+      max={many ? offer.capacity : undefined}
+      onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
+      /* Choosing six spells out of 203 names is not a choice; it is a lottery. The rules open
+         beside the list, in a modal, and answer nothing — `onInspect` never touches `picks`. */
+      onInspect={spells ? (id) => setReading(spells.find((spell) => spell.id === id) ?? null) : undefined}
+      inspectLabel={(option) => `Read the ${option.title} rules`}
+    />
     {reading && <SpellCard spell={reading} onClose={() => setReading(null)} />}
   </section>;
 }
@@ -374,7 +358,10 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
     {route !== "asi" && <ChoiceGrid
       ariaLabel={`Level ${offer.level} feat`}
       options={featOptions}
-      searchable={featOptions.length > 8}
+      /* Bounded for the same reason every other offer's grid is: five ASI levels on a level-20
+         build is five feat lists, and a step is not five lists long. */
+      bounded
+      searchable={featOptions.length > SEARCH_THRESHOLD}
       searchPlaceholder="Search feats…"
       value={route === "feat" ? picks[0] ?? null : null}
       onChange={(value) => onSet(offer, [value])}
