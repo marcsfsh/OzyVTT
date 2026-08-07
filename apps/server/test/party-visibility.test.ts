@@ -97,8 +97,8 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
     for (const tier of TIERS) {
       const state = tableAt(tier);
       state.combat = { ...state.combat, active: true, turnActorId: MINE, mapAssetId: "50000000-0000-5000-8000-000000000001",
-        initiative: [{ actorId: MINE, score: 18 }, { actorId: THEIRS, score: 13 }, { actorId: GOBLIN, score: 9 }],
-        tokens: [MINE, THEIRS, GOBLIN].map((actorId) => ({ actorId, position: { x: 10, y: 10 }, sizePx: 40, gridSizePx: 50 })) };
+        initiative: [{ actorId: MINE, score: 18, tieBreaker: 0 }, { actorId: THEIRS, score: 13, tieBreaker: 0 }, { actorId: GOBLIN, score: 9, tieBreaker: 0 }],
+        tokens: [MINE, THEIRS, GOBLIN].map((actorId) => ({ actorId, position: { x: 10, y: 10 }, sizePx: 40, sizeCells: 1, gridSizePx: 50, gridRotationRadians: 0 })) };
       const view = projectPlayerView(GameStateSchema.parse(state), ME, () => null);
       const ids = new Set(view.actors.map((actor) => actor.id));
       expect(view.combat.initiative.some((entry) => entry.actorId === THEIRS), `ally missing from the turn order at ${tier}`).toBe(true);

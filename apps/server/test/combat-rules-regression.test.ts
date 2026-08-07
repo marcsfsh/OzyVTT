@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import { ActorSchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
@@ -432,7 +432,7 @@ describe("effect lifecycle - Frenzy's Exhaustion and Rage duration", () => {
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     // Sable is not in this fight - a parked scene's effect on her must survive the sweep.
     const sable = game.actors.find((actor) => actor.id === IDS.sable)!;
-    sable.effects = [{ id: "parked", name: "Parked Blessing", tags: [], sourceActorId: null, sourceName: null, sourceActionId: null, startedRound: 1, duration: { type: "encounter" }, endsWhenSourceDefeated: false, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: [], endsWithTag: null }];
+    sable.effects = [{ id: "parked", name: "Parked Blessing", tags: [], sourceActorId: null, sourceName: null, sourceActionId: null, startedRound: 1, duration: { type: "encounter" }, endsWhenSourceDefeated: false, voidWhileIncapacitated: false, concentration: false, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: [], endsWithTag: null }];
     endEncounterEffects(game, game.combat.initiative.map((entry) => entry.actorId));
     expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toEqual([]);
     expect(sable.effects).toHaveLength(1);
@@ -739,7 +739,7 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     torva.effects = [{
       id: "grip", name: "Grappled by Giant Crocodile", tags: ["grapple"], sourceActorId: IDS.croc1, sourceName: "Giant Crocodile",
       sourceActionId: "bite:0", startedRound: 1, duration: { type: "manual" }, endsWhenSourceDefeated: true, endsWithTag: null,
-      modifiers: [], linkedConditionIds: ["grappled"], escapeDc: 15, onEnd: []
+      voidWhileIncapacitated: false, concentration: false, modifiers: [], linkedConditionIds: ["grappled"], escapeDc: 15, onEnd: []
     }];
     const versusOther = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc2] }, [15, 3]);
     expect(versusOther.rollMode?.disadvantage).toContain("Attacker is Grappled (target isn't the grappler)");
@@ -807,7 +807,7 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     torva.effects = [{
       id: "charm", name: "Charmed", tags: [], sourceActorId: IDS.croc1, sourceName: "Giant Crocodile",
       sourceActionId: null, startedRound: 1, duration: { type: "manual" }, endsWhenSourceDefeated: true, endsWithTag: null,
-      modifiers: [], linkedConditionIds: ["charmed"], escapeDc: null, onEnd: []
+      voidWhileIncapacitated: false, concentration: false, modifiers: [], linkedConditionIds: ["charmed"], escapeDc: null, onEnd: []
     }];
     try {
       resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []);
@@ -965,7 +965,7 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
   it("builtins resolve for a combatant with no definition at all", () => {
     const game = buildGame();
     const extraId = "10000000-0000-4000-8000-00000000000e";
-    game.actors.push({ id: extraId, name: "Hired Guard", kind: "npc", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, conditions: [], effects: [], deathSaves: null, actionUses: {}, conditionImmunities: [] });
+    game.actors.push(ActorSchema.parse({ id: extraId, name: "Hired Guard", kind: "npc", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, conditions: [], effects: [], deathSaves: null, actionUses: {}, conditionImmunities: [] }));
     game.combat = { ...game.combat, initiative: [...game.combat.initiative, { actorId: extraId, score: 1, tieBreaker: 0 }] };
     const dodge = resolveBuiltin(game, "dodge", { actorId: extraId }, []);
     expect(dodge.effectGranted?.name).toBe("Dodging");
@@ -1010,7 +1010,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     const dash = buildGame();
     dash.actors.find((actor) => actor.id === IDS.torva)!.effects = [{
       id: "d", name: "Dashing", tags: ["dashing"], sourceActorId: IDS.torva, sourceName: "Torva Grimtusk", sourceActionId: "dash",
-      startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false,
+      startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false, concentration: false,
       endsWithTag: null, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: []
     }];
     moveRules(dash, IDS.torva, { x: 0, y: 0 }, { x: 70, y: 0 }); // 70 ≤ 80 with Dash
@@ -1045,7 +1045,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     place(safe, IDS.croc1, 0, 0);
     safe.actors.find((actor) => actor.id === IDS.torva)!.effects = [{
       id: "dis", name: "Disengaged", tags: ["disengaged"], sourceActorId: IDS.torva, sourceName: "Torva Grimtusk", sourceActionId: "disengage",
-      startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false,
+      startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false, concentration: false,
       endsWithTag: null, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: []
     }];
     expect(moveRules(safe, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
@@ -1288,11 +1288,11 @@ describe("rests (SRD Resting) - short rests re-arm only per-short-rest pools", (
   const buildResting = () => {
     const game = buildGame();
     game.definitions.push({ id: "import-fighter", definition: withSecondWind });
-    game.actors.push({
+    game.actors.push(ActorSchema.parse({
       id: FIGHTER_ID, name: "Hired Fighter", kind: "player-character", visibility: "public",
       hp: { current: 6, maximum: 20, temporary: 0 }, ownerSessionId: null, conditions: [], effects: [],
       deathSaves: null, actionUses: { "second-wind": 1, "action-surge": 1 }, conditionImmunities: [], definitionId: "import-fighter"
-    });
+    }));
     return game;
   };
   const resolveDef = (game: GameState) => (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition;
@@ -1460,7 +1460,7 @@ describe("creature size and distance - footprint-aware, edge-to-edge (SRD Creatu
   });
 
   it("gridless maps with a saved scale subtract each token's radius beyond its central cell", () => {
-    const scaled = { width: 900, height: 600, calibration: null, scale: { distancePerPixel: 0.1, unit: "ft" } } as const;
+    const scaled = { width: 900, height: 600, calibration: null, scale: { kind: "image-scale", distancePerPixel: 0.1, unit: "ft" } } as const;
     // Centers 100 px apart -> 10 ft raw; the huge token's extra radius (146 - 146/3)/2 ≈ 48.7 px trims it to ~5.1 ft.
     const value = creatureDistance(scaled, medium(100, 100), { position: { x: 200, y: 100 }, sizeCells: 3, sizePx: 146 })!.value;
     expect(value).toBeCloseTo(5.13, 1);
@@ -1819,7 +1819,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
 
   function buildDiceGameInCombat(): GameState {
     const game = buildGame();
-    game.actors = game.actors.map((actor) => actor.id === IDS.torva ? { ...actor, hitDice: { die: "d12" as const, maximum: 7, remaining: 7 } } : actor);
+    game.actors = game.actors.map((actor) => actor.id === IDS.torva ? { ...actor, hitDice: { die: "d12" as const, maximum: 7, remaining: 7, entries: [{ die: "d12" as const, maximum: 7, remaining: 7 }] } } : actor);
     return game;
   }
 

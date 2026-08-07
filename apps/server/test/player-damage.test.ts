@@ -114,14 +114,14 @@ describe("player damage part/reaction helpers", () => {
     expect(playerHitOwesDamage(resolutionOf({}))).toBe(true);
     expect(playerHitOwesDamage(resolutionOf({ attack: { targetId: IDS.monster, targetName: "Goblin", total: 7, naturalRoll: 12, targetAc: null, outcome: "unknown" } }))).toBe(true);
     // A parked reaction means the damage resolves in the turn order, not here - do not park/apply it.
-    expect(playerHitOwesDamage(resolutionOf({ reactionPrompts: [{ id: "90000000-0000-4000-8000-000000000001", actorId: IDS.monster, actionName: "Uncanny Dodge" }] as ActionResolution["reactionPrompts"] }))).toBe(false);
+    expect(playerHitOwesDamage(resolutionOf({ reactionPrompts: [{ actorId: IDS.monster, actorName: "Goblin", actionName: "Uncanny Dodge" }] }))).toBe(false);
     expect(playerHitOwesDamage(resolutionOf({ preview: true }))).toBe(false);
     expect(playerHitOwesDamage(resolutionOf({ attack: { targetId: IDS.monster, targetName: "Goblin", total: 3, naturalRoll: 2, targetAc: 10, outcome: "miss" }, damage: [], damageTotal: 0 }))).toBe(false);
   });
 
   it("settlePlayerHit parks nothing and applies nothing when the hit is reaction-owned", () => {
     const game = combat();
-    const reactionOwned = resolutionOf({ reactionPrompts: [{ id: "90000000-0000-4000-8000-000000000002", actorId: IDS.monster, actionName: "Uncanny Dodge" }] as ActionResolution["reactionPrompts"] });
+    const reactionOwned = resolutionOf({ reactionPrompts: [{ actorId: IDS.monster, actorName: "Goblin", actionName: "Uncanny Dodge" }] });
     expect(settlePlayerHit(game, reactionOwned, "Alpha", IDS.attacker, "direct", damageDeps())).toBeNull();
     expect(game.combat.pendingDamage).toHaveLength(0);
     expect(goblinHp(game)).toBe(15); // untouched - the reaction handles it in the turn order

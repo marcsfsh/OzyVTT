@@ -3,7 +3,7 @@ import { BuilderPolicySchema, GameStateSchema, resolveSpellcasting, type GameSta
 import { abilityModifier, meetsMulticlassPrerequisites } from "@vtt/rules-5e";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
-import { ContentLibrary } from "../src/content-library.js";
+import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
@@ -21,7 +21,17 @@ const library = new ContentLibrary().forAudience("gm");
 const defaultPolicy = BuilderPolicySchema.parse({});
 const ACTOR_ID = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 
-const fighterInput = (): CharacterCreateRequestInput & { choices: Array<CharacterCreateRequestInput["choices"][number]> } => ({
+/**
+ * The request input is `Readonly` on the wire; the negative-path tests below build a valid input and
+ * then mutate ONE field to make it illegal. This mapped type strips that readonly (and the nested
+ * `choices` array's), so those mutations typecheck without a cast per line.
+ */
+type MutableCreateInput = { -readonly [K in keyof CharacterCreateRequestInput]: CharacterCreateRequestInput[K] } & {
+  choices: Array<CharacterCreateRequestInput["choices"][number]>;
+  backgroundBonusAllocation: Array<{ ability: CharacterCreateRequestInput["backgroundBonusAllocation"][number]["ability"]; amount: number }>;
+};
+
+const fighterInput = (): MutableCreateInput => ({
   name: "Borin",
   speciesId: "human",
   backgroundId: "soldier",
@@ -51,7 +61,7 @@ const fighterInput = (): CharacterCreateRequestInput & { choices: Array<Characte
   ]
 });
 
-const wizardInput = (): CharacterCreateRequestInput & { choices: Array<CharacterCreateRequestInput["choices"][number]> } => ({
+const wizardInput = (): MutableCreateInput => ({
   name: "Ilyana",
   speciesId: "elf",
   backgroundId: "sage",
@@ -159,8 +169,8 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.character?.feats.map((feat) => feat.id).sort()).toEqual(["ability-score-improvement", "alert", "defense", "savage-attacker"]);
     // The ledger is the input's rows VERBATIM, plus the rolled hit points the build consumed (D14) -
     // the rows that make a level-down/level-up round trip land on the same maximum.
-    expect(definition.character?.choices.filter((row) => row.kind !== "hp-roll")).toEqual(fighterInput().choices);
-    expect(definition.character?.choices.filter((row) => row.kind === "hp-roll"))
+    expect((definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll")).toEqual(fighterInput().choices);
+    expect((definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll"))
       .toEqual((fighterInput().hp.entries ?? []).map((roll, index) => ({ level: index + 2, kind: "hp-roll", id: "hp", payload: { roll } })));
     expect(definition.summary).toContain("Level 5 Human Fighter (Champion)");
     expect(definition.spellcasting).toBeUndefined();
@@ -358,11 +368,11 @@ describe("buildCharacterDefinition - loud rejections", () => {
 // =================================================================================================
 
 /** The real library with one accessor swapped, so a malformed content SHAPE can be exercised without touching the bundles. */
-function libraryWith(overrides: Partial<ContentLibrary>): ContentLibrary {
-  return Object.assign(Object.create(library) as ContentLibrary, overrides);
+function libraryWith(overrides: Partial<ContentView>): ContentView {
+  return Object.assign(Object.create(library) as ContentView, overrides);
 }
 
-const clericInput = (): CharacterCreateRequestInput & { choices: Array<CharacterCreateRequestInput["choices"][number]> } => ({
+const clericInput = (): MutableCreateInput => ({
   name: "Sister Ael",
   speciesId: "human",
   backgroundId: "acolyte",
@@ -533,7 +543,7 @@ describe("M7 - a feature whose only rider is limited USES still lands as a track
     const state = emptyState();
     importActorDefinition(state, definition, ACTOR_ID, "public");
     const other = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d11";
-    state.actors.push({ ...state.actors[0], id: other, name: "Sparring Partner", definitionId: null });
+    state.actors.push({ ...state.actors[0], id: other, name: "Sparring Partner", definitionId: undefined });
     startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: other, score: 20 }, { actorId: ACTOR_ID, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
     const surge = definition.actions.find((action) => action.id === "action-surge")!;
     const deps: ResolveDependencies = { random: () => 1, newRollId: () => "40000000-0000-4000-8000-000000000001", gmSessionId: "30000000-0000-4000-8000-00000000000a", now: () => "2026-07-27T00:00:00.000Z", definition };
@@ -553,7 +563,7 @@ describe("M5 - an action that shares a pool is gated on the POOL's size", () => 
   function encounter(): GameState {
     const state = emptyState();
     importActorDefinition(state, definition, CLERIC, "public");
-    state.actors.push({ ...state.actors[0], id: FOE, name: "Ghoul", kind: "monster", definitionId: null, actionUses: {} });
+    state.actors.push({ ...state.actors[0], id: FOE, name: "Ghoul", kind: "monster", definitionId: undefined, actionUses: {} });
     // The FOE holds the turn, so the action-economy slot never masks the limited-use gate.
     startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: FOE, score: 20 }, { actorId: CLERIC, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
     return state;

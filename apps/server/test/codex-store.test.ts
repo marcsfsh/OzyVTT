@@ -1965,14 +1965,14 @@ describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
     const quest = seed();
     // Called directly, with no SQL in front of it. `PLAYER_VISIBLE_SQL` would already have dropped this
     // row over HTTP, which is exactly why breaking this arm is invisible from there.
-    expect(projectPlayerSearchHit({ kind: "quest", quest })).toBeNull();
+    expect(projectPlayerSearchHit({ kind: "quest", quest }, playerSessionNumbers())).toBeNull();
     // The GM's hit exists for the same record, so the null is the reveal gate and not a missing arm.
     expect(projectGmSearchHit({ kind: "quest", quest })).toMatchObject({ kind: "quest", id: quest.id, title: "The Wyrmwood Contract" });
   });
 
   it("emits a REVEALED quest as a uniform hit row: no body, no reveal flag, and `tags: []`", () => {
     const revealed = store.setQuestRevealed(seed().id, true);
-    const hit = projectPlayerSearchHit({ kind: "quest", quest: revealed })!;
+    const hit = projectPlayerSearchHit({ kind: "quest", quest: revealed }, playerSessionNumbers())!;
     // The same key set every other kind emits — a row renderer must never branch on which kind it got.
     expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
     // Quests carry no tags at all (not in the spec's column list), so this is `[]` rather than a missing
@@ -5060,7 +5060,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     setEntryRevealed: (s) => { s.setEntryRevealed(s.createEntry({ playerText: "A" }).id, true); },
     deleteEntry: (s) => { s.deleteEntry(s.createEntry({ playerText: "A" }).id); },
     createSession: (s) => { s.createSession({ sessionNumber: 1 }); },
-    updateSession: (s) => { s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined); },
+    updateSession: (s) => { s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined, "gm"); },
     setSessionRevealed: (s) => { s.setSessionRevealed(s.createSession({ sessionNumber: 1 }).id, true); },
     deleteSession: (s) => { s.deleteSession(s.createSession({ sessionNumber: 1 }).id); },
     setActiveSession: (s) => { s.setActiveSession(s.createSession({ sessionNumber: 1 }).id); },

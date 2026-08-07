@@ -102,9 +102,9 @@ export interface ContentView {
  * `forAudience(audience)` with a REQUIRED argument, so `tsc` enumerates every call site in `src`
  * and the compiler becomes the auditor. A defaulted `audience = "player"` parameter would be safer
  * by default but would still let a new call site silently miss the decision; a required argument
- * cannot be missed. (`apps/server/tsconfig.json` includes only `src`, so call sites under `test/`
- * are caught by the suite rather than the compiler - which is why the visibility regression test
- * enumerates the operations object itself instead of trusting a hand-written list.)
+ * cannot be missed. (`apps/server/tsconfig.json` now includes `test` as well, so the compiler
+ * enumerates test call sites too - the visibility regression test still enumerates the operations
+ * object itself rather than a hand-written list, because that catches a MISSING call, not a wrong one.)
  */
 export class ContentLibrary {
   readonly attribution: string;

@@ -78,10 +78,10 @@ describe("homebrew id minting", () => {
   });
 
   it("throws rather than logs when an id would exceed the budget", () => {
-    expect(() => assertMintable(`hb-${"a".repeat(70)}`)).toThrow(/60/);
-    expect(() => assertMintable("hb-Blood-Hunter")).toThrow(/match/);
-    expect(() => assertMintable("blood-hunter-a1b2c3")).toThrow(/hb-/);
-    expect(() => assertMintable("hb-wizard-spells")).toThrow(/reserved/);
+    expect(() => assertMintable(`hb-${"a".repeat(70)}`, "class")).toThrow(/60/);
+    expect(() => assertMintable("hb-Blood-Hunter", "class")).toThrow(/match/);
+    expect(() => assertMintable("blood-hunter-a1b2c3", "class")).toThrow(/hb-/);
+    expect(() => assertMintable("hb-wizard-spells", "spell-list")).toThrow(/reserved/);
   });
 
   it("slugifies to a hyphen boundary and falls back when nothing survives", () => {

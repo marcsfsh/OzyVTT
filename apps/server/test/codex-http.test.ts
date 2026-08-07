@@ -82,8 +82,8 @@ const del = (base: string, path: string, headers: Record<string, string>, payloa
  * is `apps/server/test/realtime-presence.test.ts`, which observes the real emit and pins its key set.
  *
  * The compile-time half is `notifyChanged: () => void` on `CodexRouterOptions` plus
- * `CodexChangedEvent = { codexRevision }` in `@vtt/domain`; neither is checked by this suite
- * (`apps/server/test` is not typechecked), so the argument list is asserted here.
+ * `CodexChangedEvent = { codexRevision }` in `@vtt/domain`. `apps/server/test` IS typechecked now,
+ * so the compiler holds the signature; this asserts the RUNTIME argument list, which it cannot.
  */
 describe("codex:changed carries no content (D22, router half)", () => {
   it("calls its notifier with no arguments at all, whichever surface was written", async () => {

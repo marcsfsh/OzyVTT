@@ -26,7 +26,13 @@ function state() {
   ] });
 }
 
-const liveOf = (combat: ReturnType<typeof state>["combat"]) => ({ active: combat.active, round: combat.round, turnActorId: combat.turnActorId, initiative: combat.initiative, tokens: combat.tokens, annotations: combat.annotations, turn: combat.turn, reactionsUsed: combat.reactionsUsed, pendingSaves: combat.pendingSaves });
+/**
+ * The nine LIVE fields a fight is made of. Typed as exactly those keys rather than as the whole
+ * `combat` block, because it is called with BOTH the table's combat and a parked scene's - and a
+ * scene carries no `scenes`/`activeSceneId`/`mapAssetId`/history cursor of its own.
+ */
+type LiveCombat = Pick<ReturnType<typeof state>["combat"], "active" | "round" | "turnActorId" | "initiative" | "tokens" | "annotations" | "turn" | "reactionsUsed" | "pendingSaves">;
+const liveOf = (combat: LiveCombat) => ({ active: combat.active, round: combat.round, turnActorId: combat.turnActorId, initiative: combat.initiative, tokens: combat.tokens, annotations: combat.annotations, turn: combat.turn, reactionsUsed: combat.reactionsUsed, pendingSaves: combat.pendingSaves });
 
 describe("scene preparation", () => {
   it("creates a prepared (inactive) scene with score-0 initiative and unplaced tokens, and stays schema-valid", () => {

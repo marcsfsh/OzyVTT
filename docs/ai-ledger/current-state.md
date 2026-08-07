@@ -137,9 +137,6 @@ projection. Idempotent by `commandId`, revision-checked, with presence and recon
 Individual defects are in `known-bugs.md` — every entry there is broken at HEAD or it is deleted.
 The structural gaps worth knowing before you plan:
 
-- **`apps/server/test/` is not typechecked** (`"include": ["src"]`; every server test sits outside it).
-  Adding it surfaces **46 errors in 10 of 91 files** (2026-08-05), all test-side fixture/signature
-  drift — its own task. The client's 47 test files live inside `src/`, so those ARE checked.
 - **No browser baseline and no physical-device pass.** No `browserslist`, no Vite `build.target`, no
   degraded-browser fallback, no iOS/Android acceptance run (BUILD_PLAN GAP-001).
 

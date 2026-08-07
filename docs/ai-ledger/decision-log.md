@@ -800,7 +800,9 @@ traced path.
 6. **A required argument beats a safe default when you want an audit.** `forAudience(audience)` and
    `isMintedHomebrewId(id, type)` both take required arguments so `tsc` names every call site. Known
    limit: `apps/server`'s tsconfig includes only `src`, so the property stops at the test boundary —
-   a stale test call compiles and fails at runtime instead.
+   a stale test call compiles and fails at runtime instead. **Reversed 2026-08-07** (plan decision
+   D4): `apps/server/tsconfig.json` is `"include": ["src", "test"]`, the 50 latent errors this hid
+   are fixed, and the property now holds across the whole workspace.
 
 **On process, from the same pass.** Five HIGH defects survived nine commits, four planning documents
 and six research intakes; not one was found by reading. Each came from running the flow — duplicate

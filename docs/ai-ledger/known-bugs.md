@@ -114,13 +114,6 @@ Format: `[area] — description — suspected cause / status`.
   spec asks for. The stricter alternative — refusing to demote a faction that has standing — was rejected as
   the worse trade: it blocks an ordinary edit to protect a rule nothing depends on.
 
-- **[repo/tooling] `apps/server/test/**` is not typechecked by anything.** `apps/server/tsconfig.json` is
-  `"include": ["src"]`, so `npm run check` sees no server test file. There are **41 pre-existing type errors**
-  across nine non-codex test files (`character-build` 14, `combat-rules-regression` 9,
-  `viewer-presentation` 8, …), and M12 briefly added four more to M11's downtime assertions that no command
-  in the repo would have reported. Found by an agent typechecking with a temporary config. Fixing the 41 is
-  its own job; the gap itself is worth knowing about before trusting "check is clean" for a test-only change.
-
 - **[codex/client] `clampStanding(Infinity)` returns 0, not 100.** `Math.trunc(Infinity)` is not finite, so
   a non-finite value falls through to the `Uninvested` centre rather than the `Exalted` end. Not reachable
   from the bounded number input; documented as intentional in the helper. Recorded because "an overflowing

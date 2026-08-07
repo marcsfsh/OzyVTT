@@ -68,7 +68,25 @@ export type RiderBlockLike = Readonly<{
   actions?: readonly RiderActionLike[];
   /** Standing effects the item carries while active (see `itemEffectCarrier`). */
   effects?: readonly ItemEffectLike[];
-  uses?: Readonly<{ limit: number; per: string; pool?: string; recharge?: number }>;
+  uses?: RiderUsesLike;
+}>;
+/**
+ * Limited uses as the AUTHORING vocabulary actually prints them. `FeatureUsesSchema.limit` is
+ * OPTIONAL - a `scaling` rule is the second way to express a count - and an item spreads the very
+ * same `featureRiders` object a class feature does, so an item's `uses` carries `scaling` too.
+ *
+ * This view used to claim `limit: number`. It was wrong, and because `apps/server/test/` was outside
+ * the TypeScript program (hazard H1) the compile-time claim in `item-riders.test.ts` could not say
+ * so: `EquipmentReferenceSchema`'s own output type has never been assignable to `EquipmentRecordLike`.
+ * `usesOf` resolves the printed forms against the bearer, the same way `character-build.ts`'s
+ * `resolvedUseLimit` does for a feature.
+ */
+export type RiderUsesLike = Readonly<{
+  limit?: number; per: string; pool?: string; recharge?: number;
+  scaling?:
+    | Readonly<{ type: "proficiency-bonus" }>
+    | Readonly<{ type: "ability-modifier"; ability: RiderAbility; minimum?: number }>
+    | Readonly<{ type: "by-level"; table: readonly Readonly<{ level: number; limit: number }>[] }>;
 }>;
 /**
  * A `FeatureAction` as synthesised here.
@@ -89,7 +107,7 @@ export type RiderActionLike = Readonly<{
   }>;
   save?: Readonly<{ ability: RiderAbility; dc: FeatureSaveDcLike }>;
   damage?: readonly Readonly<{ formula: string; type: string }>[];
-  uses?: Readonly<{ limit: number; per: string; pool?: string; recharge?: number }>;
+  uses?: RiderUsesLike;
 }>;
 /** `FeatureSaveDcSchema`'s three printed forms: the character's own spell DC, a flat number, or `base + ability (+ PB)`. */
 export type FeatureSaveDcLike = "spellcasting" | number | Readonly<{ base?: number; ability: RiderAbility; proficiencyBonus?: boolean }>;
@@ -126,7 +144,7 @@ export type ItemSpellCastLike = Readonly<{
   saveDc?: number;
   /** Whether casting it also spends one of the bearer's own spell slots. */
   consumesSpellSlot?: boolean;
-  uses?: Readonly<{ limit: number; per: string; pool?: string }>;
+  uses?: RiderUsesLike;
 }>;
 /** The catalog's spell record, as the cast synthesis reads it (`SpellReference`). */
 export type SpellRecordLike = Readonly<{
@@ -610,10 +628,37 @@ const ACTION_ID_PREFIX = "item-";
 export const itemActionId = (itemId: string, suffix?: string) => `${ACTION_ID_PREFIX}${itemId}${suffix ? `-${suffix}` : ""}`;
 export const isItemActionId = (id: string) => id.startsWith(ACTION_ID_PREFIX);
 
-function usesOf(uses: RiderBlockLike["uses"]): ActorAction["uses"] | undefined {
+/** The bearer's total character level, for a `by-level` use table. Absent (a bare token) reads as 1. */
+function bearerLevel(definition: ActorDefinition | undefined): number {
+  const classes = definition?.character?.classes ?? [];
+  const total = classes.reduce((sum, entry) => sum + entry.level, 0);
+  return total >= 1 ? total : 1;
+}
+
+/**
+ * `uses` -> `ActionUsesSchema`, resolving the scaling forms against the bearer.
+ *
+ * `ActionUsesSchema.limit` is a REQUIRED 1-20 integer, while the authored `FeatureUsesSchema.limit`
+ * is optional whenever a `scaling` rule supplies the count. Emitting `{ limit: undefined }` produced
+ * an action the actor schema rejects, so a homebrew item printing "proficiency bonus per long rest"
+ * (schema-valid, publishable) broke its own bearer. Mirror `character-build.ts`'s `resolvedUseLimit`
+ * and its `limit >= 1` / `Math.min(20, ...)` clamps: below 1 the item simply has no charges yet.
+ */
+function usesOf(uses: RiderUsesLike | undefined, definition: ActorDefinition | undefined): ActorAction["uses"] | undefined {
   if (!uses) return undefined;
   const per = uses.per as NonNullable<ActorAction["uses"]>["per"];
-  return { limit: uses.limit, per, ...(uses.pool ? { pool: uses.pool } : {}), ...(uses.recharge !== undefined ? { recharge: uses.recharge } : {}) };
+  const limit = uses.limit ?? scaledLimit(uses.scaling, definition);
+  if (limit === undefined || limit < 1) return undefined;
+  return { limit: Math.min(20, limit), per, ...(uses.pool ? { pool: uses.pool } : {}), ...(uses.recharge !== undefined ? { recharge: uses.recharge } : {}) };
+}
+
+function scaledLimit(scaling: RiderUsesLike["scaling"], definition: ActorDefinition | undefined): number | undefined {
+  if (!scaling) return undefined;
+  if (scaling.type === "proficiency-bonus") return definition?.proficiencyBonus ?? 0;
+  if (scaling.type === "ability-modifier") return Math.max(scaling.minimum ?? 1, scoreModifierOf(definition, scaling.ability));
+  const level = bearerLevel(definition);
+  const rows = [...scaling.table].filter((row) => row.level <= level).sort((left, right) => left.level - right.level);
+  return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
 
 /**
@@ -665,7 +710,7 @@ function itemAction(itemId: string, declared: RiderActionLike, itemName: string,
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
     damage: (declared.damage ?? []).map((part) => ({ ...part })),
-    ...(usesOf(declared.uses) ? { uses: usesOf(declared.uses)! } : {})
+    ...(usesOf(declared.uses, definition) ? { uses: usesOf(declared.uses, definition)! } : {})
   };
 }
 
@@ -699,7 +744,7 @@ function castAction(itemId: string, cast: ItemSpellCastLike, itemName: string, d
     activation: "action",
     description: spell?.description ?? `Cast ${spellName} from ${itemName}.`,
     damage: [],
-    ...(usesOf(cast.uses) ? { uses: usesOf(cast.uses)! } : {}),
+    ...(usesOf(cast.uses, definition) ? { uses: usesOf(cast.uses, definition)! } : {}),
     // The bearer's OWN slot, on top of the item's charges, when the item says so.
     ...(cast.consumesSpellSlot === true && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {})
   };

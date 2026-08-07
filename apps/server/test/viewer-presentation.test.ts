@@ -18,11 +18,11 @@ describe("viewer presentation state", () => {
     state = applyViewerCommand(state, command("measure", { type: "viewer.measurement.set", measurement: { id: "ruler-1", points: [{ x: 10, y: 20 }, { x: 110, y: 20 }], distanceLabel: "30 ft" } })).state;
     state = applyViewerCommand(state, command("ping", { type: "viewer.ping", id: "ping-1", point: { x: 80, y: 90 }, label: "Look here", durationMs: 1_000 }), 1_000).state;
     state = applyViewerCommand(state, command("encounter", { type: "viewer.encounter.set", initiative: { visible: true, round: 2, hiddenTurn: false, entries: [
-      { actorId: "fighter", name: "Fighter", initiative: 18, active: true },
-      { actorId: "goblin", name: "Goblin", initiative: 12, active: false }
-    ] }, encounter: { mapAssetId: "map-1", tokens: [
-      { actorId: "fighter", name: "Fighter", kind: "player-character", position: { x: 120, y: 140 }, sizePx: 40, active: true },
-      { actorId: "goblin", name: "Goblin", kind: "monster", position: { x: 220, y: 140 }, sizePx: 40, active: false }
+      { actorId: "fighter", name: "Fighter", initiative: 18, active: true, health: "healthy" as const, conditions: [] },
+      { actorId: "goblin", name: "Goblin", initiative: 12, active: false, health: "healthy" as const, conditions: [] }
+    ] }, encounter: { mapAssetId: "map-1", annotations: [], tokens: [
+      { actorId: "fighter", name: "Fighter", kind: "player-character" as const, position: { x: 120, y: 140 }, sizePx: 40, active: true, health: "healthy" as const, conditions: [] },
+      { actorId: "goblin", name: "Goblin", kind: "monster" as const, position: { x: 220, y: 140 }, sizePx: 40, active: false, health: "healthy" as const, conditions: [] }
     ] } })).state;
 
     const projection = projectViewerPresentation(state, 1_500);
@@ -63,12 +63,12 @@ describe("viewer presentation state", () => {
     expect(state.pings).toEqual([]);
     expect(() => applyViewerCommand(state, command("bad-zoom", { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: 0 } }))).toThrow("zoom");
     expect(() => applyViewerCommand(state, command("bad-initiative", { type: "viewer.initiative.set", initiative: { visible: true, round: 1, hiddenTurn: false, entries: [
-      { actorId: "same", name: "One", initiative: 10, active: true },
-      { actorId: "same", name: "Two", initiative: 9, active: true }
+      { actorId: "same", name: "One", initiative: 10, active: true, health: "healthy" as const, conditions: [] },
+      { actorId: "same", name: "Two", initiative: 9, active: true, health: "healthy" as const, conditions: [] }
     ] } }))).toThrow();
-    expect(() => applyViewerCommand(state, command("bad-tokens", { type: "viewer.encounter.set", initiative: { visible: true, round: 1, hiddenTurn: false, entries: [] }, encounter: { mapAssetId: "two", tokens: [
-      { actorId: "same", name: "One", kind: "monster", position: { x: 1, y: 2 }, sizePx: 40, active: false },
-      { actorId: "same", name: "Two", kind: "monster", position: { x: 3, y: 4 }, sizePx: 40, active: false }
+    expect(() => applyViewerCommand(state, command("bad-tokens", { type: "viewer.encounter.set", initiative: { visible: true, round: 1, hiddenTurn: false, entries: [] }, encounter: { mapAssetId: "two", annotations: [], tokens: [
+      { actorId: "same", name: "One", kind: "monster" as const, position: { x: 1, y: 2 }, sizePx: 40, active: false, health: "healthy" as const, conditions: [] },
+      { actorId: "same", name: "Two", kind: "monster" as const, position: { x: 3, y: 4 }, sizePx: 40, active: false, health: "healthy" as const, conditions: [] }
     ] } }))).toThrow("unique");
   });
 });
