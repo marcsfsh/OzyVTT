@@ -400,6 +400,35 @@ function validateBackgroundAllocation(input: CharacterCreateRequestInput, backgr
   }
 }
 
+/**
+ * The `{kind, sourceId, id}` triples for every granted feature that has an origin, deduped and in
+ * grant order. Issue `2e`: this array IS the sheet's claim on its feature records, and without it
+ * `characterFeatureCarriers` reads `features ?? []` and finds nothing to build a carrier from - the
+ * shape of the bug this closes, where a class feature's roll-time riders were authored, validated,
+ * and then silently dropped.
+ *
+ * BOUNDED at the schema's 80, and the truncation is deliberate rather than a `reject`: the array is
+ * an additive mechanical enrichment, so a hypothetical 81-feature homebrew class must lose the 81st
+ * feature's riders rather than lose the ability to build the character at all. Nothing in the SRD
+ * comes close - the fattest bundled level-20 sheet is well under half of it - so this is a guard, not
+ * a live limit, and `features-cap` in `feature-riders.test.ts` pins the real headroom.
+ */
+function dedupeFeatureRefs(
+  granted: ReadonlyArray<{ record: FeatureRecord; origin: CharacterFeatureOrigin | null }>
+): CharacterFeatureRef[] {
+  const seen = new Set<string>();
+  const refs: CharacterFeatureRef[] = [];
+  for (const { record, origin } of granted) {
+    if (!origin) continue; // already on `character.feats`; a second carrier would double its riders
+    const ref = { id: record.id, kind: origin.kind, sourceId: origin.sourceId };
+    const key = `${ref.kind} ${ref.sourceId} ${ref.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    refs.push(ref);
+  }
+  return refs.slice(0, 80);
+}
+
 /** The feature records the class's level rows 1..level grant (with grant counts), plus the row for `level` itself. */
 function grantedClassFeatures(entry: ClassReference, level: number): { features: Map<string, { record: FeatureRecord; count: number }>; row: ClassLevelRow } {
   const byId = new Map(entry.features.map((feature) => [feature.id, feature]));
@@ -732,12 +761,11 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   }
 
   // ---- 6. Interpret every granted feature (class, subclass, species, background, chosen feats). ----
-  // This fold owns 8 of the 21 rider variants; the other 13 are roll-time and are read from the
-  // character's FEATS as carriers by `deriveEquipment` (see `CARRIER_RIDER_DISPOSITION`). Feats are
-  // reachable there because `character.feats` records their ids; a class feature, subclass feature,
-  // species trait, background feature or chosen inline OPTION is not recorded by id on the
-  // definition at all, so its 13 roll-time riders still stop here. Closing that needs somewhere on
-  // the definition to record which feature records a sheet holds, which is a schema change.
+  // This fold owns 8 of the 21 rider variants; the other 13 are roll-time and reach the table as
+  // RIDER CARRIERS (see `CARRIER_RIDER_DISPOSITION`). A feat gets there because `character.feats`
+  // records its id; a class/subclass/species/lineage/background feature and a chosen inline OPTION
+  // get there because `heldFeatures` below records theirs. Both halves are read by the same
+  // `collectRiders` a magic item's riders go through - see `deriveEquipment`.
   const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
   const context: BuildContext = { level: input.level, proficiencyBonus, finalScores, spellcastingAbility: casting?.ability ?? null };
   const interpreted: InterpretedFeatures = {
@@ -747,6 +775,19 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     armorClassBonus: 0, armorClassBonusWhileArmored: 0, initiativeBonus: 0, extraAttacks: 0, unarmoredDefense: null
   };
   for (const { record } of granted) interpretFeature(record, interpreted, context);
+  /**
+   * WHICH FEATURE RECORDS THIS SHEET HOLDS - the payload of `definition.character.features`, and the
+   * whole reason `origin` rides along on every `granted` row (issue `2e`).
+   *
+   * `origin: null` is skipped deliberately: the origin feat and every chosen feat are ALREADY on
+   * `character.feats`, whose carriers `deriveEquipment` builds separately. Recording them here too
+   * would build a second carrier for the same record and double every rider on it.
+   *
+   * Deduped on the full `{kind, sourceId, id}` triple, because `granted` may legitimately name one
+   * record twice (a level row that grants a feature again for its count, an option reachable from two
+   * offers) and a carrier per duplicate would apply its riders twice.
+   */
+  const heldFeatures = dedupeFeatureRefs(granted);
   for (const increase of interpreted.abilityIncreases) {
     finalScores[increase.ability] = Math.min(increase.maximum ?? 20, finalScores[increase.ability] + increase.amount);
   }
@@ -992,6 +1033,10 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         ...(originFeat ? [{ id: originFeat.id, name: originFeat.name, description: originFeat.feature.description.slice(0, 4000) }] : []),
         ...chosenFeats.map((feat) => ({ id: feat.id, name: feat.name, description: feat.feature.description.slice(0, 4000) }))
       ],
+      // Ids and provenance ONLY - never the riders themselves, which stay on the catalog record and
+      // are recomputed on every read. This is what lets a class/subclass/species/lineage/background
+      // feature's 13 roll-time riders reach the table (`2e`); see `dedupeFeatureRefs`.
+      features: heldFeatures,
       // The provenance ledger, VERBATIM - level-up and respec prefill from exactly these rows -
       // plus the ROLLED HIT POINTS (D14). The rolls used to be consumed and forgotten, so a
       // level-down/level-up round trip could not restore the character it started from: nothing
