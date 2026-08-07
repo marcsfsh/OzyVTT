@@ -488,8 +488,14 @@
      the screen is the page and its edges are cut, not rounded — panels, cards, inputs and
      controls sit square, and the big-choice surfaces wear the .chamfer cut below instead.
      The tokens stay (reversing the ruling is one edit here); only the values flipped.
-     --radius-pill SURVIVES: gauges stay gauges — HP/progress bars, status pills, chips
-     and token rings keep their round form. */
+
+     --radius-pill SURVIVES, BUT NOT FOR PILLS. Rulings 10 and 24 de-pill all four families —
+     status labels, whole rows wearing a pill, tags and filter chips, and counts — so this
+     token is NOT a licence for any of them; an earlier version of this comment said "status
+     pills, chips" and was cited to keep them. What stays round is where the ROUND IS THE
+     MEANING: gauges (HP and progress bars), token rings, dots, swatches, avatars, and the
+     remove/clear ✕ (`Chip.css` and `Combobox.css` protect theirs by name). If what you are
+     styling would read the same as a rectangle, it is not on this list. */
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;

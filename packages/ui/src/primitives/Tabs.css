@@ -74,10 +74,18 @@
    RULING 3: the arcade face sets tab labels now. The SIZE is the thing to watch — see the
    measurements in the report: 13px Russo One clears AA in daybreak on both the active and the
    resting label, so the size stays at `--fs-sm` and the tabs did not need a bump. */
+/* THE LABEL AND ITS BADGE NEED A GAP, and the reason they had none is a flex rule rather than a
+   forgotten margin: the call site writes `<>Codex <Badge>2 new</Badge></>`, and in a flex container
+   a contiguous text run that is ONLY white space generates no flex item at all — so the space was
+   never rendered. Measured on a player's first screen at 390x844 before this line: the "Codex" text
+   run ended at x=297.1 and the badge box began at x=297.1. Not an overlap — a 0px gap.
+   `gap` is self-limiting here: a tab whose label is a bare string is one anonymous flex item and
+   nothing is spaced. */
 .nh-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: var(--tap-min);
   padding: var(--space-3) var(--space-4);
   border: 0;

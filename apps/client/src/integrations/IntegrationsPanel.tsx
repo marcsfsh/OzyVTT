@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IntegrationScopeSchema, type CredentialAuditEvent, type IntegrationCredentialMetadata, type IntegrationScope } from "@vtt/api-contract";
 import { Button, Input } from "@vtt/ui";
 import { ApiReference } from "./ApiReference";
@@ -26,6 +26,15 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [auditEvents, setAuditEvents] = useState<CredentialAuditEvent[]>([]);
   const { confirm, dialog } = useConfirm();
+  /* RULING 55's door on this surface. The single next thing to do is name a credential, and the
+     field for it is already on this screen — so the door goes to it rather than to another address.
+     A ref, not an anchor: the form is a sibling, and focusing the field is what actually starts the
+     job (`scrollIntoView` alone leaves the caret nowhere). */
+  const nameField = useRef<HTMLInputElement>(null);
+  const startCredential = () => {
+    nameField.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    nameField.current?.focus();
+  };
 
   const loadCredentials = () => {
     api("/api/v1/gm/integration-credentials", gmToken).then((body) => setCredentials(body.data.credentials)).catch((error) => setFeedback((error as Error).message));
@@ -93,13 +102,17 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       {!copyConfirmed && <p className="integration-secret-warning">You have not confirmed a copy yet. Dismissing without saving this secret means it is lost for good.</p>}
     </div>}
     <form className="integration-form" onSubmit={createCredential}>
-      <label>Name<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Stream overlay" required maxLength={100} /></label>
+      <label>Name<Input ref={nameField} value={name} onChange={(event) => setName(event.target.value)} placeholder="Stream overlay" required maxLength={100} /></label>
       <fieldset><legend>Scopes</legend>{SCOPES.map((scope) => <label key={scope} className="integration-scope"><input type="checkbox" checked={scopes.has(scope)} onChange={() => toggleScope(scope)} />{scope}</label>)}</fieldset>
       <label>Expires (optional)<input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></label>
       <Button type="submit" variant="primary">Create credential</Button>
     </form>
     <p className="roster-feedback" aria-live="polite">{feedback}</p>
-    {credentials.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🔌</span><span className="nh-empty-title">No credentials yet</span><span className="nh-empty-text">Create an API credential above to let stream overlays and other tools read from this game.</span></div> : <ul className="integration-list">
+    {/* RULING 55 — ONE DOOR, and the sentence is the next thing to do rather than a report that
+        nothing is here. "No credentials yet" was the retired phrasing and the state carried no door
+        at all: the instruction was body text, which is a sentence about a control rather than the
+        control. */}
+    {credentials.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🔌</span><span className="nh-empty-title">Issue your first credential</span><span className="nh-empty-text">A scoped credential lets a stream overlay or another tool read from this game. Name it, pick what it may reach, and create it — the secret is shown once.</span><Button variant="primary" onClick={startCredential}>Name a credential</Button></div> : <ul className="integration-list">
       {credentials.map((credential) => <li key={credential.id} className="integration-row">
         <div className="integration-row-heading"><strong>{credential.name}</strong><span>{credential.revokedAt ? "Revoked" : credential.expiresAt && new Date(credential.expiresAt) <= new Date() ? "Expired" : "Active"}</span></div>
         <p className="integration-scopes">{credential.scopes.join(", ")}{credential.gameId && ` · game ${credential.gameId}`}</p>

@@ -6,7 +6,7 @@ import "./styles.css";
 import { ClaimCharacter } from "./actors/ClaimCharacter";
 import { PartyRosterTab } from "./actors/PartyRosterTab";
 import { PartyStrip } from "./actors/PartyStrip";
-import { MyCharacter } from "./actors/MyCharacter";
+import { MyCharacter, partyVisibilityOf } from "./actors/MyCharacter";
 import { CharacterBuilder } from "./builder/CharacterBuilder";
 import { LevelFlow } from "./builder/LevelFlow";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -705,9 +705,16 @@ function App() {
           <div className="table-topline">
             {/* D15/D32 — the party is part of the TABLE, out of combat only: in combat the turn order
                 already carries the same people. */}
+            {/* RULINGS 5/8/19 — THE PARTY STRIP IS A PARTY SURFACE, so `off` removes it. The tier is
+                what the server APPLIED (`projections.ts` — "`off` is … NO PARTY SURFACE"), and it is
+                read here rather than inferred from which fields arrived: at `off` every ally is still
+                in `state.actors` on purpose, because `combat.initiative` names them and
+                `combat.tokens` carries their token. Entries being present is not permission to list
+                them. **The GM arm is untouched** — the tier governs what a PLAYER sees of ANOTHER
+                player's character and nothing else. */}
             {!previewScene && !state.combat.active && (mode === "gm"
               ? <PartyStrip role="gm" state={state as GmView} onOpenRoster={() => navigate(pathForGmTab("roster"))} />
-              : playerHasClaimed ? <PartyStrip role="player" state={state as PlayerView} /> : null)}
+              : playerHasClaimed && partyVisibilityOf(state as PlayerView) !== "off" ? <PartyStrip role="player" state={state as PlayerView} /> : null)}
           </div>
           {/* A player who has claimed nobody gets the picker, never stranded by the roster's removal.
               WHERE it goes is the one thing about it that changed (decision Q3): 539px of cards is more

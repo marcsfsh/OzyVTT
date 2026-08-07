@@ -103,8 +103,16 @@ type Ack = Readonly<{ ok: boolean; message?: string }>;
 
 /**
  * One settings group. The `--{id}` modifier is what the ≥1280 two-column rule places by name
- * (The table on the left, Mine + Players on the right — settings.css); `.surface-glass` is the
- * scene tier (§9): these panels stand on the surface's sky rather than on flat app ground.
+ * (The table on the left, Mine + Players on the right — settings.css).
+ *
+ * **`.surface-glass` is gone from here, and revised ruling 23 is why it went now rather than
+ * earlier.** That ruling keeps the class *until the material replaces it* — and on this surface the
+ * material has: `settings.css` paints ruling 2's rim, bezel and scanline fill on `.settings-group`
+ * and switches `backdrop-filter` off in the same block, so the class was computing `none` and doing
+ * nothing but reserving the name. It still does real work on the shared screen's two control columns
+ * (`viewer-controls.css`, a live `blur(8px) saturate(1.15)`), which ruling 34 gave *more* identity,
+ * so it stays there. Removing it from a surface the material has taken over is the ruling; removing
+ * it from one the material has not reached would be the thing the ruling was written to stop.
  *
  * `gmOnly` takes the violet role rim (§9). It says something the GM cannot otherwise see on this
  * page: THESE are the groups a player is never handed — *Mine* renders for both roles, the other
@@ -119,7 +127,7 @@ type Ack = Readonly<{ ok: boolean; message?: string }>;
  * Eyebrow is the section's accessible name, so a screen reader reaches it.
  */
 function Group({ id, label, gmOnly = false, children }: Readonly<{ id: string; label: string; gmOnly?: boolean; children: React.ReactNode }>) {
-  return <section className={`settings-group settings-group--${id} surface-glass${gmOnly ? " rim-gm" : ""}`} aria-labelledby={`settings-${id}`}>
+  return <section className={`settings-group settings-group--${id}${gmOnly ? " rim-gm" : ""}`} aria-labelledby={`settings-${id}`}>
     <Eyebrow id={`settings-${id}`}>{label}{gmOnly ? " · GM only" : ""}</Eyebrow>
     {children}
   </section>;

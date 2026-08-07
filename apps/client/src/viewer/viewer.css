@@ -188,7 +188,10 @@
    rows scrolling under it show through. `--void` is within a couple of steps of the wash's top stop
    (#030210), so it reads as the top of the sky rather than as a band laid on it. */
 .viewer-initiative-head { position: sticky; top: 0; z-index: 1; padding: clamp(.9rem, 2vw, 2rem) 0 clamp(.6rem, 1.2vw, 1.1rem); background: var(--void); }
-.viewer-initiative-round { display: inline-flex; align-items: center; padding: .35em .85em; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); color: var(--text); font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 var(--font-mono); white-space: nowrap; }
+/* RULING 24 — the round counter is a count badge, and counts are the fourth de-pilled family. Square
+   on the shared screen too: it is the surface the whole table looks at, so a lone pill there reads as
+   a leftover from a different app. */
+.viewer-initiative-round { display: inline-flex; align-items: center; padding: .35em .85em; border-radius: 0; background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); color: var(--text); font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 var(--font-mono); white-space: nowrap; }
 .viewer-hidden-turn { margin: 0 0 clamp(.5rem, 1vw, 1rem); padding: .6rem .9rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--violet-hi); font-weight: 800; }
 .viewer-initiative ol { list-style: none; margin: 0; padding: 0; }
 .viewer-initiative li { display: flex; align-items: stretch; justify-content: space-between; gap: var(--space-4); padding: clamp(.5rem, 1.2vw, 1.1rem) clamp(.5rem, 1.2vw, 1.1rem); border-top: 1px solid var(--line); font-size: clamp(1rem, 1.65vw, 1.65rem); }
@@ -216,7 +219,8 @@
 .viewer-initiative .init-row-name { min-width: 0; }
 .viewer-fullscreen { position: fixed; z-index: 5; left: 1rem; top: 1rem; padding: .55rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); cursor: pointer; opacity: .25; transition: opacity var(--dur-hover); }
 .viewer-fullscreen:hover, .viewer-fullscreen:focus-visible { opacity: 1; }
-.viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-2) 66%, var(--cyan)); color: var(--text); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+/* RULING 24 — a status label, square like every other one. */
+.viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: 0; background: color-mix(in srgb, var(--surface-2) 66%, var(--cyan)); color: var(--text); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-connection.reconnecting { background: color-mix(in srgb, var(--surface-2) 66%, var(--caution)); }
 @keyframes viewer-pulse { from { opacity: 1; transform: scale(.45); } to { opacity: 0; transform: scale(1.25); } }
 @media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; border-left: 0; border-top: 1px solid var(--line); } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid var(--line); } .viewer-connection { right: 1rem; } }
@@ -227,8 +231,10 @@
   .viewer-token-turn,
   .viewer-initiative li.active { animation: none; }
 }
-/* Health band + conditions on the shared screen (bands only, never exact numbers). */
-.viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem var(--space-2); border-radius: var(--radius-pill); font: 800 .55em/1.6 var(--font-body); letter-spacing: .05em; vertical-align: middle; }
+/* Health band + conditions on the shared screen (bands only, never exact numbers).
+   RULING 24 — a status label. The GAUGES stay round (`--radius-pill` survives for HP/progress bars
+   and token rings); this is the word "Bloodied" in a box, not a gauge. */
+.viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem var(--space-2); border-radius: 0; font: 800 .55em/1.6 var(--font-body); letter-spacing: .05em; vertical-align: middle; }
 .viewer-health-bloodied { background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta)); color: var(--magenta-hi); }
 .viewer-health-down { background: color-mix(in srgb, var(--surface-3) 60%, var(--danger)); color: var(--danger-hi); }
 .viewer-conditions { display: block; margin-top: .15rem; color: var(--violet-hi); font-size: .6em; }

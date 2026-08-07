@@ -800,12 +800,18 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .table-layout > .table { min-width: 0; }
 .party-strip-row { display: flex; gap: var(--space-2); min-width: 0; max-width: 100%; margin: 0; padding: 0 0 var(--space-1); list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .party-strip-item { flex: 0 0 auto; }
-.party-strip-entry { display: flex; align-items: center; gap: var(--space-2); min-height: 3.5rem; max-width: 13rem; padding: var(--space-2) .8rem var(--space-2) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); text-align: left; }
+/* RULING 24 — a whole ROW wearing a pill is the second family the de-pilling names, and this is a
+   live one: the strip renders out of combat for both roles. Square, like every other row. */
+.party-strip-entry { display: flex; align-items: center; gap: var(--space-2); min-height: 3.5rem; max-width: 13rem; padding: var(--space-2) .8rem var(--space-2) var(--space-2); border: 1px solid var(--line); border-radius: 0; background: var(--surface-2); color: var(--text); text-align: left; }
 button.party-strip-entry { cursor: pointer; }
 button.party-strip-entry:hover { border-color: var(--line-strong); }
 .party-strip-item.is-mine .party-strip-entry { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
 .party-strip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
 .party-strip-hp { flex: 0 0 auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .8rem; color: var(--text-dim); }
+/* The `name-and-class` tier's second fact, where HP is not this player's to read (rulings 5/8/19).
+   Body face, not the numeric one — it is a class line, not a game number (ruling 50) — and it
+   ellipsizes rather than widening the chip, which the strip's 13rem cap depends on. */
+.party-strip-line { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; color: var(--text-dim); }
 .party-strip-claim { flex: 0 0 auto; width: .5rem; height: .5rem; border-radius: 50%; background: var(--text-muted); }
 .party-strip-claim--claimed { background: var(--violet-hi); }
 .party-strip-claim--mine { background: var(--cyan-hi); }
@@ -868,7 +874,9 @@ button.party-strip-entry:hover { border-color: var(--line-strong); }
    read as one left-to-right unit instead of being flung to four corners. */
 .roll-card-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
 .roll-meta { flex: 0 1 auto; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.roll-badge { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: .16rem .55rem; border-radius: var(--radius-pill); font: 700 var(--fs-2xs)/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* RULING 10/24 — the STATUS LABEL family, on the most-used surface in the app: 30 of these render
+   at once in the table's roll log. Square, like the `Badge` primitive they are a hand-rolled twin of. */
+.roll-badge { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: .16rem .55rem; border-radius: 0; font: 700 var(--fs-2xs)/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roll-badge--attack { background: color-mix(in srgb, var(--magenta) 26%, var(--surface-3)); }
 .roll-badge--damage { background: color-mix(in srgb, var(--magenta) 15%, var(--surface-3)); }
 .roll-badge--save { background: color-mix(in srgb, var(--cyan) 26%, var(--surface-3)); }

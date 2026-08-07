@@ -165,12 +165,28 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
           >
             {page.entityType !== "note" && <EntityIcon type={page.entityType} className="codex-tree-icon" />}
             <span className="codex-list-title">{page.title}</span>
-            {/* D18's one badge — but only on the EXCEPTIONAL state. The Codex is secret by default, so on a
-              dense tree "Hidden from players" on every row would be noise on the majority and would bury
-              the one row that is actually shared. The full phrase still appears wherever the state is the
-              subject: list rows, the editor, the reveal audit. */}
-          {page.revealedToPlayers && <VisibilityBadge revealed />}
           </button>
+          {/* RULING 58 — ONE REVEAL LANGUAGE EVERYWHERE, and it is a SAFETY property rather than
+              tidiness: reveal is the control where a GM misreading the state leaks something to the
+              table, so the mark is the same glyph in the same place every time they meet it. That
+              means the VALUE is passed, never gated on — a row with no mark is UNREADABLE, because
+              "hidden from players" and "no reveal state at all" then look identical. This used to
+              render only when `revealedToPlayers` was true, on the argument that a mark on every row
+              of a dense tree is noise; measured on this tree it left 1 row in 7 carrying nothing.
+              Density is a styling question, not a rendering one. Every other call site already
+              passes the value — `PagesView.tsx`, `QuestsView.tsx`, `SessionsView.tsx`,
+              `SessionConsole.tsx` — and `VisibilityBadge` renders both states, the off one being the
+              struck-through eye with its own accessible name.
+
+              IT IS A SIBLING OF THE ROW'S CONTROL, NOT A CHILD OF IT, and that is the a11y half of
+              the same ruling: `Reveal.tsx` builds this as a STATUS ("deliberately not a switch and
+              not focusable"), and a status nested inside a button becomes part of that button's
+              accessible NAME. Rendered inside, the tree item stopped being called "Barovia" and
+              started being called "Barovia Hidden from players" — the page's name and its reveal
+              state fused into one string. Outside, the item keeps its title and the mark keeps its
+              own name. Visually unchanged: `.codex-tree-page` takes `flex: 1`, so the mark sits at
+              the row's trailing edge either way. */}
+          <VisibilityBadge revealed={page.revealedToPlayers} />
           <button type="button" className="codex-tree-page-move tap-target" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}><IconDrag /></button>
         </div>
       ))}

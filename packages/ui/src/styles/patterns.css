@@ -25,7 +25,15 @@
 .nh-statlist dt { color: var(--text-muted); font: 800 var(--fs-xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
 .nh-statlist dd { margin: 2px 0 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; font-family: var(--font-mono); }
 
-/* ---- Empty state (no data yet / no results) ---- */
+/* ---- Empty state (no data yet / no results) ----
+   RULING 55 — NO DASHED BOXES. The dashed rim was this pattern's whole visual idea and it said the
+   wrong thing: a dashed outline reads as a placeholder, a drop zone or something half-built, on a
+   screen whose job is to name the one next thing to do. It goes here rather than per-surface because
+   the border is declared once and reaches every call site at the same time (measured population:
+   `ClaimCharacter.tsx`, `IntegrationsPanel.tsx`, `CharacterBuilder.tsx` x2, `HomebrewPanel.tsx`,
+   `StyleGuide.tsx`). A solid hairline keeps the box legible as a bounded region — the ruling retires
+   the DASH, not the boundary — and it is `--line` rather than `--line-strong` so an empty surface
+   reads as quiet rather than as an alert. */
 .nh-empty {
   display: grid;
   place-items: center;
@@ -33,7 +41,7 @@
   min-height: 12rem;
   padding: var(--space-6);
   text-align: center;
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   color: var(--text-dim);
 }

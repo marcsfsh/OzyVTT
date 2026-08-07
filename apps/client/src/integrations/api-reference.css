@@ -80,14 +80,23 @@
    Same construction as `.nh-panel::before` (packages/ui Panel.css): the cut, the rim and the fill
    ride a BACKING LAYER, never the element, because `clip-path` clips hit-testing and the summary
    row is the control that opens it. `inset: -1px` spans the border box, so the rim lands where the
-   1px border used to and nothing reflows. Ruling 28: it is the outermost panel here, so it takes
-   the scanline and nothing inside it does. No rest glow — not a hero surface. */
+   1px border used to and nothing reflows. No rest glow — not a hero surface.
+
+   RULING 28 — RIM AND BEZEL, NO SCANLINE, because this panel is NESTED and not outermost. It reads
+   as standalone in this file and is not: on `/settings` it renders inside `.settings-group--table`,
+   whose own `::before` already computes the repeating gradient, and two scanline fields at the same
+   period stacked one inside the other is exactly the moiré ruling 28 exists to remove. Measured on
+   `/settings` at 1280x900 before this changed: `.api-reference.closest(".settings-group")` returned
+   `settings-group settings-group--table` and BOTH `::before`s computed `repeating-linear-gradient`.
+   `.api-reference` has exactly one call site — the `<details>` on `/settings` (`ApiReference`); the
+   standalone address (`/settings/api`, ruling 61) renders `ApiReferenceBody` on a `.pane-frame` and
+   never takes this class — so there is no route on which this panel is the outermost one. */
 .api-reference {
   position: relative;
   isolation: isolate;
   border-radius: 0;
   background: none;
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-plate);
 }
 .api-reference::before {
   content: "";

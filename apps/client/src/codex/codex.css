@@ -678,8 +678,10 @@
 .codex-graph-bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .codex-graph-hint { font-size: var(--fs-sm); color: var(--text-muted); }
 .codex-graph-legend { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-left: auto; }
-/* CF-3 §4 route 1: these wrap into rows, so growing the paint is harmless and avoids any overhang. */
-.codex-graph-legenditem { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
+/* CF-3 §4 route 1: these wrap into rows, so growing the paint is harmless and avoids any overhang.
+   RULING 24 — a 54x44 filter chip is a filter chip whatever it is called, so it is square. Its `i`
+   swatch below stays a circle: shape is meaning there, and the ruling protects dots and swatches. */
+.codex-graph-legenditem { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: 0; padding: var(--space-1) var(--space-2); cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
 .codex-graph-legenditem:hover { border-color: var(--line); color: var(--text); }
 .codex-graph-legenditem.is-off { opacity: 0.4; text-decoration: line-through; }
 .codex-graph-legenditem i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }

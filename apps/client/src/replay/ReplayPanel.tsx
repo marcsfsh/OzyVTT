@@ -441,8 +441,14 @@ export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm
   };
 
   /* THE FRAME (§7): the heading (and the player's way back) never move; the rows are the one
-     region. Not a `.card` any more — the list IS the surface, so it stands on the scene sky and
-     the rows are the cards on it. */
+     region. Not a `.card` any more — the list IS the surface, so it stands on the scene sky.
+     RULING 47 finishes the thought: the rows are not cards on it either. They were `.nh-card`s,
+     which put a fill and a full four-sided rim on a backing layer behind each row — seven boxes
+     where the ruling (which names replays) asks for one list with a 1px rule between its rows.
+     They are plain `<li>`s now and `replay.css` draws the rules. The counter-argument — that a
+     list standing on a scene may legitimately make its rows the cards — is recorded there and
+     flagged for the client in `docs/product/refresh-round-2-fixes.md` §5; it is not settled by
+     reverting this. */
   return <section className="replay-panel replay-list-page pane-frame pane-scene scanlines frame-col anim-view">
     <div className="pane-sky" aria-hidden="true" />
     <header className="replay-list-head neon-beam">
@@ -462,7 +468,7 @@ export function ReplayList({ role, token, onOpen, onBack }: Readonly<{ role: "gm
     {archives !== null && archives.length > 0 && <ul className="replay-rows">
       {archives.map((archive) => {
         const duration = durationOf(archive.startedAt, archive.endedAt);
-        return <li key={archive.id} className="nh-card replay-row">
+        return <li key={archive.id} className="replay-row">
           <div className="replay-row-text">
             <span className="replay-row-title">{dateOnly(archive.endedAt)}</span>
             <span className="replay-row-meta tabular">{archive.turnCount} turns{duration ? ` · ${duration}` : ""}</span>
