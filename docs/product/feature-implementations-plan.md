@@ -1,6 +1,7 @@
 # Feature implementations — the client's issue register and the plan to work it
 
-**Status:** issues logged 2026-08-07. Intake not started. No plan written yet. Nothing implemented.
+**Status:** issues logged 2026-08-07; **D1, D2 and D3 decided 2026-08-07**. Intake not started. No
+plan written yet. Nothing implemented.
 **Read this when:** picking up this work, or after a context compaction lost the thread.
 
 This document exists because the work below spans many sessions and must outlive any one of them.
@@ -73,7 +74,7 @@ to a pointer at an external document.
 **Recon note.** This is the visible surface of a content gap, not a rendering bug. The 2026-08-07
 intake measured **9 of 12 classes carrying zero mechanical class features**, and 130 of 185 class
 features being prose-only. Warlock in particular has 28 Eldritch Invocation options, **none** of
-which carry any mechanical rider. Scope of the fix depends on decision **D1** below.
+which carry any mechanical rider. Scope is settled by **D1**: all 12 classes, all levels.
 
 ---
 
@@ -318,10 +319,12 @@ if a parked scene genuinely blocks it, the UI must offer the unpark, and if it d
 block it, the check is wrong. Launch reuses tonight's existing characters rather than minting
 suffixed duplicates.
 
-**Recon note.** The cloning is *deliberate* today: `replay-launch.ts` clones everyone under new ids
-specifically so that tonight's characters are never rewritten by a historical replay. This issue is
-therefore a **design reversal, not a bug fix** — intake must surface what the clone protects before
-we remove it. Related and separate: recon confirmed players cannot see a shared replay's map at all
+**Settled by D3.** The cloning is deliberate — `replay-launch.ts` clones everyone under new ids so a
+historical replay can never rewrite tonight's characters — and it **stays**. What changes is that
+the clones become invisible: scoped to the replay session, absent from the roster, no `"(Replay)"`
+suffix, cleaned up when the replay ends. The unpark half is a straight bug and is fixed regardless.
+
+**Recon note.** Related and separate: players cannot see a shared replay's map at all
 (`apps/server/src/server.ts:438` refuses archived replay maps), which is worth fixing while we are here.
 
 ---
@@ -439,13 +442,57 @@ the client. Adding an era is a **stored-data change** — expect a migration and
 
 ---
 
-## Decisions the client owes us
+## Decisions taken  (2026-08-07)
 
-| # | Decision | Why it blocks |
-|---|---|---|
-| **D1** | For `2a`/`2e`/`3b`: do we **fix the plumbing so authored content reaches combat**, or **also author the missing mechanical content for the 9 classes that have none**? | These are different by an order of magnitude. Plumbing alone leaves a Cleric with few actions because the content is prose. Content alone cannot reach the table because class features are not recorded by id on the definition. Needed before the Area 1 plan is written. |
-| **D2** | For `4f` (pinch-to-zoom): build or defer? | The client asked us to hold if it is a significant lift. Intake will size it; the call is the client's. |
-| **D3** | For `4i`: is reusing existing characters on replay launch acceptable given that cloning exists to stop a historical replay rewriting tonight's characters? | This is a design reversal, not a bug fix. |
+### D1 — Class content: **all 12 classes, all levels**
+
+Both halves are in scope:
+
+1. **Plumbing.** Class, species and background features must be recorded by id on the definition so
+   their riders reach the table. Today 13 of 21 rider variants are dropped for these carriers
+   (`apps/server/src/character-build.ts:716-722`) because only `character.feats` carriers survive
+   into `deriveEquipment`. This is a schema change and it gates everything else.
+2. **Content.** Author the missing mechanical content for the 9 hollow classes **and** bring cleric,
+   fighter and wizard to full parity — levels 1 through 20, subclasses included. Metamagic (10
+   options), Eldritch Invocations (28 options) and the three inert fighting styles are all in scope.
+
+This is the largest single body of work in the PR. `2a`, `2b`, `2e`, `2d` and `3b` are all
+downstream of it.
+
+**Reference material — the client has approved `foundryvtt/dnd5e` as an aid.**
+Verified 2026-08-07: that repository is **MIT licensed** (Copyright 2021 Andrew Clayton). Commercial
+use, modification and redistribution are permitted; the copyright notice and licence text must
+travel with any substantial portion used. Its `LICENSE.txt` carries no separate content terms.
+
+**How to use it, and how not to.** The rules *text* for every missing feature is **already vendored
+here** — `bundles/attribution.json` records `dnd-5e-srd-markdown` as covering *"classes, subclasses,
+class spell lists, species, backgrounds, feats."* The gap has never been missing text; it is that
+the text was never translated into mechanical riders. So:
+
+- **Use Foundry as a modelling reference** — how to represent Rage, Sneak Attack, Ki or an
+  Invocation *as data*: which fields, what shape, where the edges are. That is where it is genuinely
+  valuable and it keeps the licensing surface small.
+- **Take rules text from our own SRD bundle**, not from Foundry. It is the source we already
+  attribute under CC-BY-4.0 and it keeps the content internally consistent.
+- **If any substantial structure is lifted**, add Foundry to `additionalSources` in
+  `packages/content-srd-5.2.1/bundles/attribution.json` and carry the MIT notice. The mechanism
+  already exists; use it rather than inventing a second one.
+
+### D2 — Pinch-to-zoom (`4f`): **the client's original rule stands**
+
+Intake returns a real estimate. If it is a contained change to the map's existing input handling, it
+ships with Area 3. If it needs a rework of the gesture or viewport model, **stop and bring the
+client the number before spending anything.** Do not start this item on an agent's own judgement.
+
+### D3 — Replay characters (`4i`): **keep the clone, hide the clone**
+
+The safeguard stays — a historical replay must never rewrite tonight's characters. What changes is
+its visibility: clones are scoped to the replay session, never appear in the roster, never render a
+`"(Replay)"` suffix, and are cleaned up when the replay ends.
+
+The **other half of `4i` is unaffected and is a straight bug**: launch is blocked behind a demand to
+unpark a prepared scene that the UI offers no way to satisfy. Fix that regardless — either the UI
+offers the unpark, or the check is wrong.
 
 ## Standing hazards
 
