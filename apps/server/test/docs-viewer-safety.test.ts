@@ -39,6 +39,11 @@ const PINS: ReadonlyArray<readonly [phrase: string, provingTest: string]> = [
   ["exact HP never reaches others", "apps/server/test/encounter-projections.test.ts"],
   ["keeping the map/fog but no tokens", "apps/server/test/encounter-projections.test.ts"],
   ["reaches players and the viewer verbatim", "apps/server/test/fog.test.ts"],
+  // D26: the player's replay is the newest projection boundary in the repo, so it is pinned like
+  // the rest - the sentence in the document and the test titles that prove it are the same words.
+  ["hides a combatant until the turn it was revealed", "apps/server/test/replay-projection.test.ts"],
+  ["never carries a session id, the journal, the raw states, the notes, or the stat blocks", "apps/server/test/replay-projection.test.ts"],
+  ["drops every roll that is not public", "apps/server/test/replay-projection.test.ts"],
 ];
 
 /**

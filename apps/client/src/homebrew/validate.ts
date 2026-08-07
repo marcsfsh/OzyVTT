@@ -1,18 +1,36 @@
 /**
- * Why publishing is blocked — **the first unmet requirement, as an instruction.**
+ * Why publishing is blocked — **every outstanding requirement, each as an instruction.**
  *
- * ## Drafts show no errors at all
+ * ## Drafts still show no errors at all
  *
  * This is the whole reason this file exists instead of a `required` asterisk. A draft is
  * GM-only and is *allowed* to be invalid — that is what the state is for. So while
- * drafting there is no asterisk, no red border, no per-field message and no "ready to
- * publish" checklist. The requirement surfaces exactly once, as one sentence, beneath
- * the button it blocks.
+ * drafting there is no asterisk, no red border and no per-field message. The requirements
+ * surface in exactly one place: beneath the button they block.
  *
  * That is a different thing from `FieldDef.validate`, which DOES fire inline: a
  * malformed dice formula is the field being wrong *now*, not a requirement not yet met.
  * Keeping the two apart is what makes "drafts may be invalid, publish requires validity"
  * legible instead of a red-asterisk hunt.
+ *
+ * ## What changed: a list, and it is the SERVER'S list
+ *
+ * This used to return the FIRST unmet requirement, from a hand-written subset of what the
+ * server actually demands. Both halves were wrong, and together they are the whole of the
+ * "homebrew items cannot be published" report:
+ *
+ *  - **The subset.** The checks here were a DESCRIPTION of nine server schemas, maintained by
+ *    memory. For equipment it was looser than the schema, so Publish enabled on a body the store
+ *    refused. The GM met the refusal as a 409 whose first Zod issue rendered "Fill in range." — on
+ *    a mace. `publishIssues` now runs `HOMEBREW_BODY_SCHEMAS`, the very map the publish gate's
+ *    tier 1 and the store's read-back parse use. Drift is not policed; it is impossible.
+ *  - **The one sentence.** Fixing "Fill in range." earned "Fill in long range.", which earned
+ *    another — a serial dead-end with no way to see how deep it went. Everything outstanding is
+ *    listed at once, so "three things left" is a fact on screen rather than a discovery.
+ *
+ * This is NOT the client becoming a second rules engine (the sin documented at length below, and
+ * the reason `brokenCatalog` refuses to answer questions it cannot). Running one shared parser
+ * decides nothing: the server re-runs it, authoritatively, and its answer still wins.
  *
  * ## One copy template
  *
@@ -26,20 +44,30 @@
  * still rides on every reason — it is what the jump control needs — but the WORD belongs
  * to the control alone. Say the thing once.
  *
- * Never a boolean, never a list. Shaped exactly like the character builder's
- * `stepBlockedReason`, which buys "progress means done, not visited" and "state a
- * constraint once per group" for free — and the five sentence shapes the readiness pass
- * deleted at source do not come back.
+ * The five sentence shapes the readiness pass deleted at source do not come back.
  */
 
+import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
+import { forStorage } from "./defaults";
 import { getAt } from "./paths";
 // One vocabulary, one place it is spelled: the gating list's kinds come from the form
 // that offers them, so a condition added there is checked here without a second table.
 import { modifierLabel, triggerKindOf } from "./RiderEditor";
 import { isDiceFormula, namesOwnRecord, type Draft, type SchemaContext } from "./schema";
+import { fieldAt } from "./schemas";
 import { TYPE_WORDS, typeLabel, type HomebrewType } from "./types";
 
-export type BlockedReason = Readonly<{ text: string; sectionId?: string }>;
+export type BlockedReason = Readonly<{
+  text: string;
+  sectionId?: string;
+  /**
+   * The dotted path this requirement is about, when it has one. Used for ONE thing: keeping the
+   * hand-written sentence and the schema's own issue about the same field from both appearing.
+   * The hand-written one always wins — "Pick this class's primary ability." beats "Fill in primary
+   * abilities.", and the schema is there to catch what nobody wrote a sentence for.
+   */
+  path?: string;
+}>;
 
 const blank = (value: unknown): boolean =>
   value === null ||
@@ -48,12 +76,13 @@ const blank = (value: unknown): boolean =>
   (Array.isArray(value) && value.length === 0);
 
 const need = (draft: Draft, path: string, text: string, sectionId: string): BlockedReason | null =>
-  blank(getAt(draft, path)) ? { text, sectionId } : null;
+  blank(getAt(draft, path)) ? { text, sectionId, path } : null;
 
-/** The first non-null of a list of checks. Order IS the priority: name before anything,
-    then the fields without which the record cannot be built at all. */
-const first = (...checks: ReadonlyArray<BlockedReason | null>): BlockedReason | null =>
-  checks.find((check) => check !== null) ?? null;
+/** Every non-null check, in declaration order. Order IS the priority: name before anything, then
+    the fields without which the record cannot be built at all — so the head of the list is the
+    sentence this function used to return on its own, and the tail is what it used to hide. */
+const all = (...checks: ReadonlyArray<BlockedReason | null>): readonly BlockedReason[] =>
+  checks.filter((check): check is BlockedReason => check !== null);
 
 /** Every `{ formula }` in a rider bag that is present and unparseable. Reported as a
     publish blocker AS WELL AS inline, because a formula the engine cannot read is
@@ -272,14 +301,25 @@ const SHOWN_TO_PLAYERS: Partial<Record<HomebrewType, Readonly<{ path: string; te
   }
 };
 
-export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: SchemaContext): BlockedReason | null {
+/**
+ * The requirements this side can state BETTER than the schema can, in priority order.
+ *
+ * Everything here either (a) has copy a Zod message could never produce ("it's the whole card a
+ * player picks this class from"), or (b) is a rule no schema expresses — a rider gated on a filter
+ * with no moment, a choice granted at no level, a `fromCatalog` slug that resolves to nothing.
+ * Anything that is merely "the schema requires this key" belongs to `schemaIssues` and must NOT be
+ * restated here: two sentences about one field is the duplication the `path` dedupe exists to stop.
+ */
+function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): readonly BlockedReason[] {
   const word = typeLabel(type);
   const named = need(draft, "name", `Give this ${word} a name.`, "basics");
-  if (named) return named;
+  // The name is the record's identity everywhere — the rail, the pickers, the checklist's own
+  // sentences — so a nameless record gets one instruction and nothing else. Every other message
+  // would be noise beside "this thing has no name yet".
+  if (named) return [named];
 
   const shown = SHOWN_TO_PLAYERS[type];
   const blankCard = shown && !shown.unless?.(draft) ? need(draft, shown.path, shown.text, "basics") : null;
-  if (blankCard) return blankCard;
 
   const formula = badFormula(draft);
   const formulaBlocker: BlockedReason | null = formula
@@ -290,7 +330,8 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
     case "class": {
       const spellcasting = draft.spellcasting as Record<string, unknown> | null | undefined;
       const listId = typeof spellcasting?.spellListId === "string" ? spellcasting.spellListId : "";
-      return first(
+      return all(
+        blankCard,
         need(draft, "hitDie", "Choose a hit die.", "progression"),
         need(draft, "primaryAbilities", "Pick this class's primary ability.", "progression"),
         need(draft, "savingThrows", "Pick the two saving throws this class is proficient in.", "progression"),
@@ -308,7 +349,8 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
     }
 
     case "subclass":
-      return first(
+      return all(
+        blankCard,
         // NOT "…belongs to", which is the section's own title: the sentence printed
         // "Say which class this subclass belongs to." and the jump control rendered
         // "Belongs to ›" immediately beside it, so the last two words were said twice.
@@ -325,7 +367,8 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       );
 
     case "species":
-      return first(
+      return all(
+        blankCard,
         need(draft, "speedFeet", "Give this species a walking speed.", "body"),
         need(draft, "sizes", "Choose at least one size.", "body"),
         formulaBlocker,
@@ -334,7 +377,8 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       );
 
     case "background":
-      return first(
+      return all(
+        blankCard,
         need(draft, "originFeatId", "Choose the feat this background grants.", "origin"),
         formulaBlocker,
         brokenCatalog(draft, ctx, "features"),
@@ -342,7 +386,8 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       );
 
     case "feat":
-      return first(
+      return all(
+        blankCard,
         // Same rule, same trap: the section IS titled "Category", so the sentence must
         // not be "Choose a category." followed by a control reading Category.
         need(draft, "category", "Say what kind of feat this is. Nothing offers one without it.", "category"),
@@ -355,7 +400,8 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       );
 
     case "spell":
-      return first(
+      return all(
+        blankCard,
         need(draft, "description", "Describe what this spell does.", "basics"),
         need(draft, "school", "Give this spell a school.", "casting"),
         need(draft, "castingTime", "Say how long this spell takes to cast.", "casting"),
@@ -371,18 +417,29 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
     case "spell-list": {
       const add = Array.isArray(draft.add) ? draft.add : [];
       const basedOn = Array.isArray(draft.basedOn) ? draft.basedOn : [];
-      return add.length === 0 && basedOn.length === 0
-        ? { text: "Add at least one spell to this list — a class using an empty list can't be created.", sectionId: "contents" }
-        : null;
+      return all(
+        blankCard,
+        add.length === 0 && basedOn.length === 0
+          ? { text: "Add at least one spell to this list — a class using an empty list can't be created.", sectionId: "contents" }
+          : null
+      );
     }
 
     case "equipment": {
       const weapon = draft.weapon as Record<string, unknown> | null | undefined;
       const casts = Array.isArray(draft.casts) ? (draft.casts as Array<Record<string, unknown>>) : [];
-      return first(
+      return all(
+        blankCard,
         need(draft, "category", "Give this item a category.", "basics"),
+        // The weapon block is all-or-nothing on the server (five required keys) and the editor now
+        // seeds all five the moment one is touched — so the only half-authored weapon left is one
+        // with no dice, and that is a real hole rather than a schema artefact: `weaponAction` reads
+        // `damageDice` and an empty one is an attack that rolls nothing.
+        weapon && blank(weapon.damageDice)
+          ? { text: "Give this weapon its damage, or clear the whole Weapon section — a weapon with no dice rolls nothing.", sectionId: "weapon", path: "weapon.damageDice" }
+          : null,
         weapon && !blank(weapon.damageDice) && blank(weapon.damageType)
-          ? { text: "Give this item a damage type.", sectionId: "weapon" }
+          ? { text: "Give this item a damage type.", sectionId: "weapon", path: "weapon.damageType" }
           : null,
         weapon && typeof weapon.damageDice === "string" && weapon.damageDice.trim() !== "" && !isDiceFormula(weapon.damageDice)
           ? { text: `Fix the damage formula “${weapon.damageDice}”.`, sectionId: "weapon" }
@@ -407,7 +464,8 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       // Challenge rating lives in the `open5e.srd-2024` extension bag, which is where the
       // bestiary reads it from — not at the top level of an `ActorDefinition`.
       const statblock = (draft.extensions as Record<string, Record<string, unknown>> | undefined)?.["open5e.srd-2024"];
-      return first(
+      return all(
+        blankCard,
         typeof statblock?.challengeRating !== "number"
           ? { text: "Give this creature a challenge rating.", sectionId: "identity" }
           : null,
@@ -423,30 +481,30 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
     }
 
     default:
-      return null;
+      return all(blankCard);
   }
 }
 
 /**
- * The SERVER's first validity issue, in the SAME sentence shape.
+ * ONE validity issue — the server's, or the shared schema's — in the SAME sentence shape.
  *
- * A stored record can be invalid for a reason the client cannot know (its own schema is
- * the server's), and the raw Zod message for that is `"Required"` — a word with no
- * subject, no location and no instruction, which is exactly the shape §7 exists to
- * delete. The issue carries a machine-addressable `path`, so the label and the section
- * come from the schema and the sentence comes out the same as every other one.
+ * The raw Zod message is `"Required"`: a word with no subject, no location and no instruction,
+ * which is exactly the shape this file exists to delete. Every issue carries a machine-addressable
+ * `path`, so the label and the section come from the form schema and the sentence comes out like
+ * every other one.
  */
-export function serverBlockedReason(
+export function issueReason(
   type: HomebrewType,
   issue: { path: ReadonlyArray<string | number>; message: string } | undefined,
-  lookup: (path: ReadonlyArray<string | number>) => Readonly<{ label: string; sectionId: string; sectionTitle: string }> | null
+  lookup: (path: ReadonlyArray<string | number>) => Readonly<{ label: string; sectionId: string; sectionTitle: string }> | null = (path) => fieldAt(type, path)
 ): BlockedReason | null {
   if (!issue) return null;
+  const dotted = issue.path.filter((segment) => typeof segment === "string").join(".");
   const found = lookup(issue.path);
   if (!found) {
-    // No field owns this path (a whole-record rule, an extension bag). Pass the server's
-    // own sentence through — those ARE written as instructions — rather than inventing one.
-    return { text: issue.message };
+    // No field owns this path (a whole-record rule, an extension bag). Pass the message through —
+    // those ARE written as instructions — rather than inventing one.
+    return { text: issue.message, path: dotted || undefined };
   }
   const required = /required/i.test(issue.message);
   // Zod messages arrive without terminal punctuation; the template supplies it exactly once.
@@ -456,8 +514,92 @@ export function serverBlockedReason(
     text: required
       ? `Fill in ${found.label}.`
       : `Fix ${found.label} — ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
-    sectionId: found.sectionId
+    sectionId: found.sectionId,
+    path: dotted || undefined
   };
+}
+
+/** Kept as the head of `publishIssues`: the caller that wants one sentence still gets the same
+    one, chosen by the same priority order, without knowing a list exists. */
+export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: SchemaContext, recordId = ctx.recordId): BlockedReason | null {
+  return publishIssues(type, draft, ctx, recordId)[0] ?? null;
+}
+
+/**
+ * The BODY the store would hold, built from the draft exactly as the save path builds it.
+ *
+ * Three transformations, and each one matters to the answer: `forStorage` drops the `rowId` keys
+ * `RowEditor` mints (the rider unions are `.strict()`, so one would fail the whole record); the
+ * record's `id` is forced to the row key, which is what `normalizeBody` does server-side and what
+ * every id-shaped schema check reads; and a creature's `source.externalId` is forced to the same
+ * id, because that is the identity the bestiary and `Actor.definitionId` key on.
+ *
+ * Get this wrong and the checklist answers about a body that never existed — which is worse than
+ * the subset it replaces, because it would be confidently wrong.
+ */
+export function bodyForPublish(type: HomebrewType, draft: Draft, recordId: string): Record<string, unknown> {
+  const body: Record<string, unknown> = { ...forStorage(draft), id: recordId };
+  // The row owns the type; a `type` key inside an equipment body is an unrecognised key to a
+  // `.strict()` schema, which is why the store strips it on the way in.
+  delete body.type;
+  if (type === "monster") {
+    const source = body.source && typeof body.source === "object" && !Array.isArray(body.source) ? (body.source as Record<string, unknown>) : {};
+    body.source = { ...source, externalId: recordId };
+  }
+  return body;
+}
+
+/**
+ * **What the record's OWN schema says — the same schema the server's publish gate runs.**
+ *
+ * `HOMEBREW_BODY_SCHEMAS` is the map `homebrew-validate.ts` uses for tier 1 and `homebrew-store.ts`
+ * uses to read a body back. Running it here is what makes the button and the store agree by
+ * construction rather than by maintenance, and it is the fix for the reported defect: a homebrew
+ * item whose weapon block was half-written enabled Publish and then took a 409.
+ *
+ * A blank record is UNNAMED and therefore short-circuits before this runs, so the GM never meets
+ * twenty schema issues for a record they just created.
+ */
+function schemaIssues(type: HomebrewType, draft: Draft, recordId: string): readonly BlockedReason[] {
+  const schema = HOMEBREW_BODY_SCHEMAS[type];
+  if (!schema) return [];
+  const parsed = schema.safeParse(bodyForPublish(type, draft, recordId)) as {
+    success: boolean;
+    error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> };
+  };
+  if (parsed.success) return [];
+  const out: BlockedReason[] = [];
+  for (const issue of parsed.error?.issues ?? []) {
+    const path = issue.path.map((key) => (typeof key === "number" ? key : String(key)));
+    // `id` is forced by the store, never authored, so an id complaint is about the record's
+    // identity rather than about anything on screen — `homebrewIdProblem` (server tier 2) says it
+    // far better, and it is the one that reaches the GM.
+    if (path[0] === "id") continue;
+    const reason = issueReason(type, { path, message: issue.message });
+    if (reason) out.push(reason);
+  }
+  return out;
+}
+
+/** A schema issue about a field a hand-written sentence already covers is dropped: the sentence is
+    always the better one, and two lines about `weapon.damageType` reads as two problems. */
+const coveredBy = (owned: ReadonlySet<string>, path: string | undefined): boolean =>
+  path !== undefined && [...owned].some((prefix) => path === prefix || path.startsWith(`${prefix}.`));
+
+/**
+ * EVERYTHING outstanding, in priority order: the sentences this side writes better, then whatever
+ * the record's own schema still refuses.
+ *
+ * `RecordDetail` renders the lot. That is D19's "full checklist" and the end of the serial
+ * dead-end — a GM fixing one line can see how many are left, which is the difference between
+ * finishing and giving up.
+ */
+export function publishIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext, recordId = ctx.recordId): readonly BlockedReason[] {
+  const local = localIssues(type, draft, ctx);
+  // An unnamed record says one thing and nothing else; running the schema over it would bury that.
+  if (local.length === 1 && local[0].path === "name") return local;
+  const owned = new Set(local.map((reason) => reason.path).filter((path): path is string => !!path));
+  return [...local, ...schemaIssues(type, draft, recordId).filter((issue) => !coveredBy(owned, issue.path))];
 }
 
 /** "Another class is also called Frost Warden." — annotated, never blocked (rule 1).

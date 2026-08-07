@@ -41,10 +41,30 @@ there is no reduced mobile mode, and a mouse-only control is a bug.
 
 ## Gotchas
 
-- `viewer.css` is shared by the standalone viewer **and** the GM in-tab preview — the page
-  reset (`overflow:hidden`) is deliberately isolated in `viewer-page.css` (imported only by
-  `viewer-main.tsx`). Don't merge it in.
+- `viewer.css` is shared by the standalone viewer **and** the GM in-tab preview — the
+  viewer entry's page reset stays isolated in `viewer-page.css` (imported only by
+  `viewer-main.tsx`); the SPA's own lock lives in `apps/client/src/styles.css` (`body`
+  lock + the `<main>` grid frame). Keep the two resets separate.
+- Keyboard safety under the locked shell: a `focusin` helper in `apps/client/src/main.tsx`
+  nudges the focused field into view within its own scrolling region, and regions carry
+  `scroll-padding` + safe-area bottoms (`.pane-frame > .scroll-y`; the wizard layer's own
+  padding).
+  Verified in emulation only — the physical-device pass is still GAP-001.
+- **Card grids halve their density at the 560 rung.** The scenes gallery is the pattern
+  (`apps/client/src/scenes/scene-gallery.css`): the 1:1 card a laptop shows becomes a two-column
+  compact card — the thumbnail drops back to its 16/10 shape, the meta line clamps to one line, and
+  the two actions stack so each keeps a full-width 44px target. A phone gets four cards where it
+  used to get one and a bit.
+- **A card that reorders by dragging needs a keyboard/menu route once its container scrolls.**
+  There is no edge-autoscroll during a drag, so a card scrolled out of view cannot be reached with
+  the grip; the scenes gallery's ⋯ menu carries Move earlier / Move later for exactly that (and for
+  keyboard users, who never had the grip).
 - Token name labels are hidden `@media (max-width:560px)`.
+- The map toolbar (`apps/client/src/scene/MapToolbar.tsx`) collapses at that same 560 rung, but in
+  **JS** (`matchMedia`), not CSS — the phone form is a different tree (one `Tools` button opening a
+  vertical rail), not the wide bar restyled. Change the rung in both places or neither.
+- Its group labels (Draw / Fog / View) are visible text at every width **on purpose**: a phone has
+  no hover, so a control whose name lives only in a `title` has no name. Tooltips are supplementary.
 - No `browserslist` / Vite `build.target` is pinned (baseline = Vite 6 modern-ESM default);
   a degraded-browser fallback UI and a physical iOS/Android acceptance pass **do not exist
   yet** (BUILD_PLAN GAP-001) — don't claim device coverage you haven't run.

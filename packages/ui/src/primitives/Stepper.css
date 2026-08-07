@@ -1,5 +1,13 @@
 .nh-stepper { display: inline-flex; align-items: center; gap: var(--space-3); }
+/* Same font shorthand as `.nh-field-label` (forms.css), deliberately — a labeled Stepper standing in a
+   form row IS a field, and its label has to occupy the identical band or the row stops lining up. */
 .nh-stepper-label { color: var(--text-dim); font: 600 var(--fs-sm) / 1.3 var(--font-body); }
+/* D23a — a VISIBLE label stacks into the band instead of sitting beside the control, so the −/+ group's
+   top lands level with the input wells either side of it in a FieldGrid. `--space-2` (not the row's
+   `--space-3`) because the band is `.nh-field`'s gap and this is the same gap by definition.
+   The unlabeled form (aria-label only, e.g. the six ability steppers) keeps the inline layout: the band
+   exists only where a label does, so no phantom space appears in a non-form context. */
+.nh-stepper--labeled { display: grid; gap: var(--space-2); justify-items: start; }
 .nh-stepper-controls {
   display: inline-flex;
   align-items: stretch;

@@ -1,7 +1,41 @@
+/* RULING 26 — THE BAR GETS ITS OWN MATERIAL, AND NO GLOW. Rim, bezel and fill, so the bar reads
+   as a piece of chrome rather than a strip of background. The glow budget stays unspent on
+   purpose: the tab bar sits next to regions that do glow (ruling 2's hero surfaces), and the
+   restraint rule allows one glowing element per region at rest.
+
+   THE MATERIAL IS PAINTED IN BACKGROUND LAYERS ON THE ELEMENT, not on a `::before` backing layer
+   like every other primitive in this wave, and that is forced rather than chosen:
+   `.nh-tabs--horizontal` is a scroll container, and an absolutely-positioned pseudo inside a
+   scroller sits in the scrollable overflow area and scrolls away with the tabs. Backgrounds are
+   painted on the element's own box and stay put. The bar takes no corner cut either — it is a
+   full-width strip with no free corner to cut — so nothing here needs clipping and the whole
+   hit-testing problem the other files solve does not arise.
+
+   RULING 44 DOES NOT APPLY HERE AND THE DIRECTOR HAS SAID SO ON THE RECORD. The scrollbar stays
+   hidden and the edge-fade mask stays, because the fade is the only thing telling a phone user
+   there are more tabs, and ruling 44's stated justification is discoverability. Do not "fix" it. */
 .nh-tabs { display: flex; gap: var(--space-1); }
 .nh-tabs--horizontal {
   flex-direction: row;
-  border-bottom: 1px solid var(--line);
+  /* THE FILL IS TRANSLUCENT ON PURPOSE, and this is a measured constraint rather than a taste.
+     The app shell wraps this bar in `.frame-tabbar` (apps/client/src/styles.css), which already
+     paints two things of its own on the box underneath: the role WASH that says whose seat this
+     is (`--rim-gm-wash` / `--rim-player-wash`, ruling 51's ancestor) and the chrome-tier
+     scanline. An opaque fill here erases the role signal outright, and a second scanline at the
+     same 3px gap offset by this element's padding is ruling 28's moiré, exactly. A translucent
+     fill lets both through and still reads as chrome. */
+  background-color: color-mix(in srgb, var(--surface-2) 62%, transparent);
+  /* THE RIM IS A BACKGROUND LAYER, NOT `border-bottom`, and that is a TAP-AREA fix. The active
+     tab used to hang over the border with `margin-bottom: -1px` so its underline met the bar's
+     line — but `overflow-x: auto` computes `overflow-y` to `auto` too, so the hung-over strip was
+     clipped out of the tab's hit area. Measured with elementFromPoint: the bottom row of a 44px
+     tab returned the BAR, not the tab. Painting the rim inside the box lets the tab sit flush and
+     restores the full 44px, and the underline still lands on the rim because they share an edge.
+     Three layers, first on top: the rim, the bezel a `--bezel-inset` above it, the fill's sheen. */
+  background-image:
+    linear-gradient(to top, var(--rim-color) 0 var(--rim-w), transparent var(--rim-w)),
+    linear-gradient(to top, transparent 0 calc(var(--bezel-inset) - 1px), var(--bezel-color) calc(var(--bezel-inset) - 1px) var(--bezel-inset), transparent var(--bezel-inset)),
+    linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 60%);
   overflow-x: auto;
   scrollbar-width: none;
   /* 24px, kept in step with SCROLL_PAD in Tabs.tsx and with the mask widths below.
@@ -35,25 +69,44 @@
 }
 
 /* The active tab already owns ::after (the underline), so the 44px floor
-   (decision 16) is real paint here rather than a `.tap-target` extension. */
+   (decision 16) is real paint here rather than a `.tap-target` extension.
+
+   RULING 3: the arcade face sets tab labels now. The SIZE is the thing to watch — see the
+   measurements in the report: 13px Russo One clears AA in daybreak on both the active and the
+   resting label, so the size stays at `--fs-sm` and the tabs did not need a bump. */
+/* THE LABEL AND ITS BADGE NEED A GAP, and the reason they had none is a flex rule rather than a
+   forgotten margin: the call site writes `<>Codex <Badge>2 new</Badge></>`, and in a flex container
+   a contiguous text run that is ONLY white space generates no flex item at all — so the space was
+   never rendered. Measured on a player's first screen at 390x844 before this line: the "Codex" text
+   run ended at x=297.1 and the badge box began at x=297.1. Not an overlap — a 0px gap.
+   `gap` is self-limiting here: a tab whose label is a bare string is one anonymous flex item and
+   nothing is spaced. */
 .nh-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: var(--tap-min);
   padding: var(--space-3) var(--space-4);
   border: 0;
   background: transparent;
   color: var(--text-dim);
-  font: 600 var(--fs-sm) / 1 var(--font-body);
+  font: 700 var(--fs-sm) / 1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .05em;
   white-space: nowrap;
   cursor: pointer;
 }
-.nh-tab:hover:not(:disabled) { color: var(--text); }
+/* Ruling 40's touch clause: `:active` carries what `:hover` carries. */
+.nh-tab:hover:not(:disabled), .nh-tab:active:not(:disabled) { color: var(--text); }
 .nh-tab:disabled { color: var(--text-muted); cursor: not-allowed; }
 
-/* Horizontal — 2px magenta underline with a faint steady glow */
-.nh-tabs--horizontal .nh-tab { margin-bottom: -1px; scroll-snap-align: start; }
+/* Horizontal — 2px magenta underline. NO GLOW (ruling 26): the bar's material is what makes it
+   read as chrome, and the region's glow budget is deliberately left unspent. */
+/* No negative margin: see the rim note at the top of the file — the hung-over strip was
+   clipped out of the hit area by the scroller. The tab sits flush and its underline shares an
+   edge with the rim, which is what the overhang was for. */
+.nh-tabs--horizontal .nh-tab { scroll-snap-align: start; }
 .nh-tabs--horizontal .nh-tab--active { color: var(--text); }
 .nh-tabs--horizontal .nh-tab--active::after {
   content: "";
@@ -61,14 +114,13 @@
   left: var(--space-3);
   right: var(--space-3);
   bottom: 0;
-  height: 2px;
+  height: var(--rim-w);
   background: var(--magenta);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--glow-magenta);
+  border-radius: 0;
 }
 
 /* Vertical rail — left 2px accent bar */
-.nh-tabs--vertical .nh-tab { text-align: left; border-radius: var(--radius-md); }
+.nh-tabs--vertical .nh-tab { text-align: left; border-radius: 0; }
 .nh-tabs--vertical .nh-tab--active { color: var(--text); background: var(--surface-2); }
 .nh-tabs--vertical .nh-tab--active::before {
   content: "";
@@ -76,7 +128,7 @@
   left: 0;
   top: var(--space-2);
   bottom: var(--space-2);
-  width: 2px;
+  width: var(--rim-w);
   background: var(--magenta);
-  border-radius: var(--radius-pill);
+  border-radius: 0;
 }

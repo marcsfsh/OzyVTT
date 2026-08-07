@@ -231,6 +231,8 @@ const MilestoneCreateSchema = JournalWriteSchema.extend({ milestone: MilestoneIn
 const SessionNumberSchema = z.number().int().min(0).max(100_000).nullable();
 const AttendeesSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 const SessionStatusSchema = z.enum(["planned", "played"]);
+/** D31: scene attachments. 20 is the table's own scene cap - a session cannot stage more scenes than exist. */
+const SessionSceneIdsSchema = z.array(z.string().uuid()).max(20);
 const SessionCreateSchema = z.object({
   sessionNumber: SessionNumberSchema.optional(),
   realDate: z.string().max(40).nullable().optional(),
@@ -241,6 +243,8 @@ const SessionCreateSchema = z.object({
   status: SessionStatusSchema.optional(),
   /** D10: the codex-wide tag vocabulary, `TagsSchema` verbatim - one bound for every taggable record. */
   tags: TagsSchema.optional(),
+  /** D31: scenes staged for this session. Capped at the TABLE's scene cap, which the store re-applies. */
+  sceneIds: SessionSceneIdsSchema.optional(),
   commandId: CommandIdSchema
 }).strict();
 /** No `revealedToPlayers`: reveal is its own route, so a PATCH cannot publish a recap as a side effect of an edit. */
@@ -252,6 +256,7 @@ const SessionUpdateSchema = z.object({
   recapBody: z.string().max(100_000).optional(),
   status: SessionStatusSchema.optional(),
   tags: TagsSchema.optional(),
+  sceneIds: SessionSceneIdsSchema.optional(),
   expectedRev: z.number().int().nonnegative().optional(),
   commandId: CommandIdSchema
 }).strict();

@@ -66,6 +66,10 @@ const renderEditor = (page = PAGE()) =>
 const dialog = () => screen.findByRole("dialog");
 
 beforeEach(() => {
+  // Ruling 11: a page's properties and its connections live in the summonable Details panel.
+  // These tests are about what the panel holds, not about summoning it, so the remembered
+  // preference is seeded open.
+  localStorage.setItem("codex-page-details", "open");
   getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: false, intervalSeconds: 1 }, revisionHistory: { enabled: true, windowMinutes: 10 } });
   updatePage.mockImplementation(async (_t: string, _id: string, input: Record<string, unknown>) => ({ ...PAGE(), ...input, rev: 4 }));
   markersForPage.mockResolvedValue([]);

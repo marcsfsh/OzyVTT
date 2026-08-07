@@ -94,7 +94,13 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `effect.end` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
-| `encounter.set-roll-mode` | `combat:write` |
+| `rules.set-policy` | `combat:write` |
+| `action.use` | `combat:write` |
+| `save.roll` | `combat:write` |
+| `rules.ask` | `combat:write` |
+| `rules.answer` | `combat:write` |
+| `table.set-staging-defaults` | `combat:write` |
+| `table.set-party-visibility` | `combat:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
@@ -125,6 +131,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `actor.set-health-display` | `actor:write` |
 | `actor.set-visibility` | `actor:write` |
 | `actor.set-archived` | `actor:write` |
+| `actor.set-sheet-preview` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
 | `scene.create` | `scene:write` |
 | `scene.rename` | `scene:write` |
@@ -133,6 +140,9 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `scene.set-combatants` | `scene:write` |
 | `scene.duplicate` | `scene:write` |
 | `scene.reorder` | `scene:write` |
+| `replay.launch` | `combat:write` |
+| `character.rebuild` | `actor:write` |
+| `builder.roll-abilities` | `actor:write` |
 | `fog.set-enabled` | `scene:write` |
 | `fog.paint` | `scene:write` |
 | `fog.reset` | `scene:write` |
@@ -331,9 +341,10 @@ Starts an encounter on a calibrated battlemap with initial combatants (GM-grade 
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mapAssetId` | string (uuid) | yes |  |
-| `rulesMode` | `strict` \| `assisted` \| `freeform` | no | Rules-engine enforcement for this fight; omitted keeps the table's current mode |
+| `rulesMode` | `strict` \| `assisted` \| `freeform` | no | Rules-engine enforcement for this fight; omitted seeds from the table's standing rules policy |
+| `ruleExceptions` | RuleExceptions | no | Per-family exceptions for this fight; omitted seeds from the table's standing rules policy |
 | `playersRollInitiative` | boolean | no | When true, claimed player-characters (without an explicit score) roll their own initiative; a provisional auto-roll parks them until they do |
-| `entries` | object[] | yes |  |
+| `entries` | object[] | no | Combatants to start with. Omit the whole field while a prepared scene is live to start on exactly the combatants staged in it (the server owns that list). Archived characters are rejected. |
 | `entries[].actorId` | string (uuid) | yes |  |
 | `entries[].score` | integer (-1000–1000) | no | Omit to roll initiative server-side |
 | `entries[].surprised` | boolean | no | 2024 surprise: the server rolls this combatant's initiative with disadvantage |
@@ -555,6 +566,7 @@ Instantiates a bundled SRD monster onto the roster (GM-grade only). The response
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `definitionId` | string (pattern) | yes |  |
 | `visibility` | `public` \| `gm-only` | no | Default: `"public"`. |
+| `joinEncounter` | boolean | no | Also drop the new combatant into the running fight - roster, initiative and tray token in ONE command and one revision. Ignored when no encounter is running |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -961,22 +973,7 @@ Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mode` | `strict` \| `assisted` \| `freeform` | yes |  |
-
-**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
-
-### `POST /api/v1/game/encounter/roll-mode`
-
-Sets the table's roll preference (GM-grade only): `auto` rolls each encounter roll for you (with a typed override and adv/disadv after a d20), `manual` waits for a typed physical-dice result (with a Roll button to auto-roll instead).
-
-**Auth:** Integration credential with `combat:write` · GM session
-
-**Request body** (JSON):
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `commandId` | string (uuid) | no |  |
-| `expectedRevision` | integer (≥ 0) | no |  |
-| `mode` | `auto` \| `manual` | yes |  |
+| `exceptions` | RuleExceptions | no | Per-family overrides for the LIVE fight; omitting the field leaves the stored exceptions untouched |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1194,9 +1191,9 @@ Sets a character's identity (class/level/race/background/feats) on its editable 
 
 ### `POST /api/v1/game/characters`
 
-Creates a character from CHOICES rather than a finished sheet (GM-grade only in this phase): identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.
+Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open (D13), in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.
 
-**Auth:** Integration credential with `actor:write` · GM session
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
 
 **Request body** (JSON):
 
@@ -1233,6 +1230,113 @@ Creates a character from CHOICES rather than a finished sheet (GM-grade only in 
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/actors/{actorId}/rebuild`
+
+Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `speciesId` | string (pattern) | yes |  |
+| `backgroundId` | string (pattern) | yes |  |
+| `classId` | string (pattern) | yes |  |
+| `level` | integer (1–20) | yes | The level to rebuild AT - lower than the current level is a level-down, and is supported |
+| `subclassId` | string (pattern) | no |  |
+| `abilityMethod` | `standard-array` \| `point-buy` \| `roll` \| `custom` | yes |  |
+| `baseScores` | object | yes |  |
+| `baseScores.str` | integer (1–30) | yes |  |
+| `baseScores.dex` | integer (1–30) | yes |  |
+| `baseScores.con` | integer (1–30) | yes |  |
+| `baseScores.int` | integer (1–30) | yes |  |
+| `baseScores.wis` | integer (1–30) | yes |  |
+| `baseScores.cha` | integer (1–30) | yes |  |
+| `backgroundBonusAllocation` | object[] | yes |  |
+| `backgroundBonusAllocation[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `backgroundBonusAllocation[].amount` | integer (1–3) | yes |  |
+| `hp` | object | yes |  |
+| `hp.mode` | `average` \| `entries` | yes |  |
+| `hp.entries` | integer (1–12)[] | no |  |
+| `choices` | object[] | yes |  |
+| `choices[].level` | integer (1–20) | yes |  |
+| `choices[].classId` | string (pattern) | no |  |
+| `choices[].kind` | string (pattern) | yes |  |
+| `choices[].id` | string (pattern) | yes |  |
+| `choices[].payload` | object (free-form) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/builder/ability-rolls`
+
+Rolls six ability scores SERVER-SIDE for the character builder (D14), through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed. Character creation still bound-checks submitted scores rather than binding them to this roll: physical dice at the table stay a supported path.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `method` | `roll` \| `custom` | yes | roll = the SRD 4d6kh3; custom = the GM's configured formula |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/rules/policy`
+
+Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. The `slots` family ships as `assisted` so slot tracking advises rather than blocks until a GM opts in.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `dial` | `strict` \| `assisted` \| `freeform` | yes | The standing enforcement level every new fight inherits |
+| `exceptions` | RuleExceptions | no | Standing per-family overrides; omitting the field keeps the stored ones |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/table/staging-defaults`
+
+Sets the table's staging defaults (GM-grade only): the token visibility a newly staged combatant starts at. A surface initializes its "Shown to players / GM only" toggle from this; the per-add `visibility` argument stays explicit on the wire, so a command still says exactly what it did.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `visibility` | `public` \| `gm-only` | yes | What a newly staged combatant's token visibility starts at |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/table/party-visibility`
+
+Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface - the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card - the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection - a withheld field is never sent. A player's own claimed character is unaffected at every tier.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `visibility` | `off` \| `name-and-class` \| `full-sheet` \| `sheet-and-resources` | yes | How much a player sees of another player's character; the default is name-and-class |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/builder/policy`
 
 Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing "custom" is only actionable while a formula is set. The stored policy is projected to every player verbatim.
@@ -1247,6 +1351,8 @@ Sets the character-builder table policy (GM-grade only; task-packet decision 10)
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `allowedAbilityMethods` | `standard-array` \| `point-buy` \| `roll` \| `custom`[] | yes | Which ability-score methods the wizard offers players (task-packet decision 10); duplicates rejected |
 | `customFormula` | string \| null | no | The GM's custom roll formula (e.g. 3d6, 2d6+6), validated through the server dice grammar and 1-30 bounds; null clears it. Omitting the field keeps the stored formula |
+| `maxLevel` | integer (1–20) | no | Highest character level this table builds to (default 20). Enforced by the builder AND by the sheet's identity edit; omitting the field keeps the stored cap |
+| `playerBuilder` | `open` \| `gm-only` | no | Whether players may run the character builder themselves (default open). Stored policy: character creation is still GM-gated at this version, and the projected value is what a player's wizard reads to know whether its door is open. Omitting the field keeps the stored setting |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1467,7 +1573,7 @@ Force-releases a claimed character (GM-grade only) - the recovery path for a los
 
 ### `POST /api/v1/game/actors/{actorId}/token-image`
 
-Sets or clears (null) a combatant's token image from the uploaded token library (GM-grade only).
+Sets or clears (null) a combatant's token image from the uploaded token library: the GM for any combatant, a player for their own claimed character (D18).
 
 **Auth:** Integration credential with `actor:write` · GM session
 
@@ -1521,7 +1627,7 @@ Moves a combatant between the shared layer (public) and the GM-only layer (GM-gr
 
 ### `POST /api/v1/game/actors/{actorId}/archived`
 
-Archives or restores a character (GM-grade only). Archived characters are hidden from players and excluded from the encounter builder; a character in the running encounter must be removed first.
+Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.
 
 **Auth:** Integration credential with `actor:write` · GM session
 
@@ -1533,7 +1639,25 @@ Archives or restores a character (GM-grade only). Archived characters are hidden
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
-| `archived` | boolean | yes | true archives (hides from players + encounter builder); false restores |
+| `archived` | boolean | yes | true archives (hides from players, refuses claims, and is rejected by scene/encounter staging) and releases any claim; false restores |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/sheet-preview`
+
+Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Default hidden - a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `enabled` | boolean | yes | true shares this archived character's sheet with players read-only; false hides it again (the default) |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1587,7 +1711,8 @@ Prepares a staged scene on a battlemap, privately, without touching the live tab
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `name` | string | yes |  |
 | `mapAssetId` | string (uuid) | yes |  |
-| `combatantIds` | string (uuid)[] | yes |  |
+| `combatantIds` | string (uuid)[] | yes | Archived characters are rejected |
+| `activate` | boolean | no | Go live on the new scene in the same command (prepare-and-go), parking whatever was live |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1746,6 +1871,82 @@ Clears every fog stroke - with fog enabled the whole map is hidden again (GM-gra
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `sceneId` | string (uuid) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actions/use`
+
+Uses an action and lets the SERVER decide what that means (D10 - the routing used to be a client-side boolean, so the same tap meant different things on different clients). In the fight on this creature's turn it delegates to the full structured resolution and acks `route: "resolved"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, touches no combat state, and acks `route: "loose"` with the roll ids. No hit points ever move on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `actionId` | string (pattern) | yes |  |
+| `targetIds` | string (uuid)[] | no |  |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no |  |
+| `includeDamage` | boolean | no | Loose route only: roll the action's damage parts in the same tap. Opt-in so a sheet rendering its own damage chip cannot double-roll. Ignored in the fight, where the resolver rolls damage itself. |
+| `override` | object | no | GM-grade only: waves the off-turn refusal (and the resolver's own economy blocks) through, remembers the family for the rest of the turn, and audits the line. The reason is optional. |
+| `override.reason` | string | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/saves/roll`
+
+Rolls a saving throw for one character (D10). When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`; the sheet's save chip used to roll a loose die that ignored the open prompt entirely. With nothing open it rolls a loose, attributed save at the same modifier the resolver would use, and acks `route: "loose"`. Supply `total` for an off-screen die. GM-grade for anyone; a player session only for their own claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no |  |
+| `total` | integer (-50–100) | no | Hand-entered final total (an off-screen die), used verbatim instead of rolling |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/rules/ask`
+
+Asks the GM to allow a command the rules engine just blocked (D8 - a blocked player is never a silent dead end). Send the ORIGINAL request as `payload`; the server revalidates it with that command's own schema and re-runs it under YOUR authority with no override, so an action that would now succeed simply succeeds (`ran: true`) and nothing is parked. A still-blocked command is parked as one question per character (a second replaces the first, up to ten at the table) and the response carries `askId` plus the `blocked` details. Player sessions may ask only about their own claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `type` | `action.resolve` \| `action.use` \| `token.move` \| `actor.set-condition` | yes | Which command was blocked - a closed list, because Allow replays it under GM authority |
+| `payload` | object (free-form) | yes | The original request body, verbatim. Revalidated with the named command's own schema before it runs again; its `expectedRevision` is stripped on replay (the ask-time revision would always conflict) and its `commandId` is replaced by the server-minted ask id, which is what makes a repeated Allow idempotent. |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/rules/answer`
+
+Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override - the `reason` is optional and the audit line falls back to "GM override" - and the rules engine remembers the rule's FAMILY for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. `allow: false` clears it and tells the player. A question that no longer exists is a 409.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `askId` | string (uuid) | yes |  |
+| `allow` | boolean | yes | true replays the parked command with an override; false declines it and tells the player |
+| `reason` | string | no | Optional audit note; omitted lines read "GM override" |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -2043,7 +2244,7 @@ Permanent, machine-readable records of ended encounters - see the archive docume
 
 ### `GET /api/v1/encounters`
 
-Permanent records of ended encounters, newest first (GM sessions and integration credentials only - never player sessions).
+Permanent records of ended encounters, newest first. ROLE-AWARE (D26): a GM sees every archive, a player session sees only the ones the GM has shared (`playerVisible`).
 
 **Auth:** Integration credential with `combat:read` · GM session
 
@@ -2051,7 +2252,7 @@ Permanent records of ended encounters, newest first (GM sessions and integration
 
 ### `GET /api/v1/encounters/{id}`
 
-One archive's full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. GM-grade data - hidden combatants included; never reaches player sessions.
+One archive, projected for the caller. A GM receives the full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. A PLAYER session receives a computed player replay instead - per-turn player projections, public rolls only, no journal, no raw states, no stat blocks, no session ids - and only for an archive the GM has shared; an unshared or missing archive is 404 either way, never 403.
 
 **Auth:** Integration credential with `combat:read` · GM session
 
@@ -2068,6 +2269,40 @@ Permanently deletes one archived encounter (GM session or an admin-scoped creden
 **Parameters:** `id` (path) - integer (≥ 1)
 
 **Responses:** `200` Deleted - envelope of `EncounterArchiveDeletedData` · errors `400` `401` `403` `404`
+
+### `POST /api/v1/encounters/{id}/visibility`
+
+Shares (or un-shares) one archived encounter with players (GM sessions and integration credentials only). Hidden by default - an ended fight is the GM's record until the GM says otherwise. Sharing makes the archive appear in a player's `GET /encounters` list and lets `GET /encounters/{id}` answer them with the computed player replay; un-sharing takes both away again.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Parameters:** `id` (path) - integer (≥ 1)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `playerVisible` | boolean | yes | true shares this archived fight with players; false hides it again (the default) |
+
+**Responses:** `200` The stored visibility - envelope of `EncounterArchiveVisibilityData` · errors `400` `401` `403` `404`
+
+### `POST /api/v1/encounters/{id}/launch`
+
+Launch-from-here (D25): parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it. The moment's combatants are CLONED under new ids (tonight's characters are never rewritten) and the parked scene resumes any time through scene.activate. GM-grade only.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Parameters:** `id` (path) - integer (≥ 1)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no | Idempotency identity; the server mints one when omitted |
+| `turnIndex` | integer (≥ 0) | yes | Index into the archive document's turns array - the moment to make live |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` The launched scene and the cloned combatants - envelope of `EncounterArchiveLaunchData` · errors `400` `401` `403` `404` `409`
 
 ## Map assets & calibration
 
@@ -2935,6 +3170,7 @@ Creates a session. Every field is optional - an empty POST opens a blank `planne
 | `status` | `planned` \| `played` | no |  |
 | `revealedToPlayers` | boolean | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
+| `sceneIds` | string (uuid)[] | no | Prepared scenes staged for this session (D31). Capped at the table's scene cap. |
 | `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
 **Responses:** `201` Success - envelope of `CodexSessionData` · errors `400` `401` `403`
@@ -2968,6 +3204,7 @@ Edits a session; an omitted field is left alone. `expectedRev` rejects a stale w
 | `recapBody` | string | no |  |
 | `status` | `planned` \| `played` | no |  |
 | `tags` | string[] | no | Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present. |
+| `sceneIds` | string (uuid)[] | no | Prepared scenes staged for this session (D31); replaces the stored list. |
 | `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the session moved on. |
 | `commandId` | string (uuid) | no | Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write. |
 
@@ -4184,6 +4421,7 @@ One play session: the GM's prep for an evening at the table, and the recap of it
 | `sessionNumber` | integer \| null | yes | "Session 12" - the session's DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID (D9) and resolve this live, so renumbering a session relabels every one of its entries with no journal write. |
 | `realDate` | string \| null | yes | The real-world date the group played, as the GM typed it. Free text, not a calendar instant - a session sits on the real calendar, never the world's, which is why sessions are their own route and not rows on `/codex/timeline`. |
 | `attendees` | string[] | yes | Who was at the table. GM-only; absent from a player projection. |
+| `sceneIds` | string (uuid)[] | yes | D31: the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS - stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then. |
 | `prepBody` | string | yes | GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not - revealing a session publishes its recap, never its prep. |
 | `recapBody` | string | yes | The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`. |
 | `revealedToPlayers` | boolean | yes | GM-only field; absent from a player projection (a player only ever receives revealed sessions). |
@@ -4587,6 +4825,15 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `id` | integer (≥ 1) | yes |  |
 | `document` | object (free-form) | yes | archiveSchemaVersion 3 (additive over 1 and 2): { archiveSchemaVersion, startedAt, endedAt, turnCount, turns[{index,kind,label,revision,at,state}], log[], journal[{seq,commandId,type,actorId,principal,payload,revision,at}], finalState, postEncounterState, rolls[], definitions[{id,source,definition}], attribution } |
 
+### `EncounterArchiveLaunchData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revision` | integer (≥ 0) | yes |  |
+| `duplicate` | boolean | yes |  |
+| `sceneId` | string | yes | The new live scene holding the restored moment |
+| `actorIds` | string[] | yes | The cloned combatants, so a client can offer to remove them with the replay scene |
+
 ### `EncounterArchiveListData`
 
 | Field | Type | Required | Notes |
@@ -4602,6 +4849,14 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `startedAt` | string \| null | yes |  |
 | `endedAt` | string (date-time) | yes |  |
 | `turnCount` | integer (≥ 0) | yes |  |
+| `playerVisible` | boolean | yes | Has the GM shared this record with players? False until shared |
+
+### `EncounterArchiveVisibilityData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | integer (≥ 1) | yes |  |
+| `playerVisible` | boolean | yes |  |
 
 ### `GameCommandCatalogData`
 
@@ -5055,6 +5310,8 @@ A rollable action a feature adds to the sheet (Second Wind, Channel Divinity, Br
 | `reaction.response` | const `"half-damage"` | yes |  |
 | `legendary` | object | no | SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool. Pairs with activation "other" |
 | `legendary.cost` | integer (1–5) | yes |  |
+| `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
+| `spellSlot.level` | integer (1–9) | yes |  |
 | `attack` | HomebrewFeatureAttack | no |  |
 | `save` | HomebrewFeatureSave | no |  |
 | `damageByLevel` | object[] | no | Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite) |
@@ -5805,6 +6062,8 @@ A stat block's action, in the exact `ActionSchema` vocabulary the live rules eng
 | `reaction.response` | const `"half-damage"` | yes |  |
 | `legendary` | object | no | SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool. Pairs with activation "other" |
 | `legendary.cost` | integer (1–5) | yes |  |
+| `spellSlot` | object | no | Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge |
+| `spellSlot.level` | integer (1–9) | yes |  |
 | `attack` | object | no | A printed to-hit bonus - the stat block knows its own numbers |
 | `attack.bonus` | integer | yes |  |
 | `attack.reachFeet` | integer (≥ 1) | no |  |
@@ -6185,6 +6444,18 @@ One of the following:
 | --- | --- | --- | --- |
 | `token` | string | yes | Bearer token for player-limited calls; long-lived, not individually revocable (LAN trust). |
 | `sessionId` | string (uuid) | yes |  |
+
+### `RuleExceptions`
+
+Per-family overrides of the dial (movement, economy, resources, targeting, slots). An absent family follows the dial. Wire values stay `strict`/`assisted`/`freeform`; the GM-facing words Enforce/Advise/Off are surface copy only.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `movement` | `strict` \| `assisted` \| `freeform` | no |  |
+| `economy` | `strict` \| `assisted` \| `freeform` | no |  |
+| `resources` | `strict` \| `assisted` \| `freeform` | no |  |
+| `targeting` | `strict` \| `assisted` \| `freeform` | no |  |
+| `slots` | `strict` \| `assisted` \| `freeform` | no |  |
 
 ### `SystemCapabilities`
 

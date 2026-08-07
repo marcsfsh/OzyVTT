@@ -16,8 +16,7 @@
  */
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { Badge, Button, Field, Input, Select } from "@vtt/ui";
-import { GmOnlyTag } from "../codex/SecretMarkers";
+import { Badge, Button, Field, GmOnlyTag, Input, Select } from "@vtt/ui";
 import type { HomebrewRecordSummary } from "./api";
 import { HOMEBREW_TYPES, STATUS_FILTERS, isHomebrewType, typePlural, type HomebrewType, type StatusFilter } from "./types";
 
@@ -52,7 +51,7 @@ export function applyFilters(records: readonly HomebrewRecordSummary[], filters:
     heavy in the red-pink-magenta band and reserves violet for GM-only, so hue can
     never be the thing that carries the meaning. */
 function StateBadge({ record }: Readonly<{ record: HomebrewRecordSummary }>) {
-  if (record.deletedAt) return <Badge tone="neutral">Removed</Badge>;
+  if (record.deletedAt) return <Badge tone="neutral">Archived</Badge>;
   if (record.state === "draft") return <Badge tone="caution">Draft</Badge>;
   if (record.visibleToPlayers) return <Badge tone="success">Shown</Badge>;
   return <GmOnlyTag />;
@@ -186,7 +185,7 @@ export function HomebrewRail({
         </Field>
       </div>
 
-      <nav className="hb-list" aria-label="Homebrew records">
+      <nav className="hb-list scroll-y" aria-label="Homebrew records">
         {shown.length === 0
           ? empty()
           : groups

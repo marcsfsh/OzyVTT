@@ -42,13 +42,27 @@
 
 .nh-wizard-resume { padding: 0 var(--space-4); }
 
-/* GROW into spare space, never SHRINK below the content. `flex: 1 1 auto` with `min-height: 0`
+/* THE STEP BODY IS THE REGION (design-language §7): it takes the leftover height and scrolls
+   itself, with `.scroll-y` declaring that in the markup.
+   This inverts the earlier composition, and the reason it was earlier written `flex: 1 0 auto`
+   deserves to travel with it: while the LAYER above scrolled, `flex: 1 1 auto` + `min-height: 0`
    let this item compress inside the shell's `min-height: 100dvh` column, so a step taller than the
-   viewport overflowed its own box: the shell stayed exactly one screen tall, the page had nothing
-   to scroll, and every card below the fold sat unreachable under the sticky footer. Caught by
-   driving the first real consumer (the character builder) in a browser — the styleguide demo's
-   steps are all short enough to never hit it. */
-.nh-wizard-body { flex: 1 0 auto; padding: 0 var(--space-4); }
+   viewport overflowed its own box — the shell stayed one screen tall, nothing scrolled, and every
+   card below the fold sat unreachable under the sticky footer (found by driving the character
+   builder in a browser; the styleguide demo's steps are short enough never to hit it). Now that
+   the BODY is the scroller, the same compression is the mechanism: the column is exactly its box,
+   the head and foot stay put, and the overflow lives here where the scrollbar belongs.
+   The scroll-padding is inherited from the layer this moved out of: the head and foot are sticky
+   OVER this box, so a card the browser scrolls to — keyboard focus, an anchor — would otherwise
+   land underneath them. */
+.nh-wizard-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-4);
+  overscroll-behavior: contain;
+  scroll-padding-top: var(--space-6);
+  scroll-padding-bottom: calc(var(--space-16) + var(--space-6));
+}
 .nh-wizard-main { min-width: 0; }
 
 /* Detail / preview pane. */
@@ -117,9 +131,10 @@
 .nh-wizard-blocked.is-clear { color: transparent; }
 .nh-wizard-blocked.is-clear .nh-wizard-blocked-icon { display: none; }
 
+/* Inside the step column now (see WizardShell.tsx), so it takes the body's padding and needs only
+   the gap that separates it from the step's last card. */
 .nh-wizard-footnote {
-  margin: 0;
-  padding: 0 var(--space-4);
+  margin: var(--space-6) 0 0;
   color: var(--text-muted);
   font-size: var(--fs-xs);
   line-height: var(--lh-body);
@@ -158,11 +173,13 @@
   }
   /* Stay beside the list. A step body can run well past a screen (a class's feature set, a
      66-spell picker), and a preview you have scrolled away from previews nothing — the column
-     just becomes empty gutter. It clears the sticky header, and scrolls inside itself rather
-     than growing past the viewport. */
+     just becomes empty gutter. It sticks to the TOP OF THE REGION now (`top: 0`): the head it
+     used to clear is outside the scroller, so the old offset would have parked it a header's
+     height down the empty gutter. The cap stays a viewport fraction — an upper bound, since the
+     region is shorter than the viewport and clips anything past it. */
   .nh-wizard-detail {
     position: sticky;
-    top: calc(var(--space-16) + var(--space-12));
+    top: 0;
     max-height: calc(100dvh - var(--space-16) * 2 - var(--space-12));
     overflow-y: auto;
   }

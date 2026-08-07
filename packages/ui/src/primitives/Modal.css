@@ -13,35 +13,84 @@
    sheets, browsers) stops hand-rolling its own max-height overrides. */
 .nh-modal--full { max-width: min(100vw - 2rem, 72rem); }
 .nh-modal--full .nh-modal-surface { max-height: min(94vh, 60rem); }
+/* RULING 41 — the scrim is DARKEN PLUS A VIGNETTE, so the dialog sits in a pool of light.
+   A scanline scrim was rejected on ruling 28's own grounds: it would lie directly over the
+   scanlined surface beneath it, which is where moiré lives. The dialog is the outermost panel
+   while open and carries the scanline (see `.nh-modal-surface`); the scrim must not.
+   The vignette is a second pass of `--overlay` itself rather than a new colour, so it deepens
+   correctly in all three themes — in daybreak `--overlay` is a low-alpha ink and doubling it at
+   the edges darkens, where a `--void`-based vignette would have brightened them. */
 .nh-modal::backdrop {
-  background: var(--overlay);
+  background:
+    radial-gradient(ellipse 125% 115% at 50% 42%, transparent 30%, var(--overlay) 100%),
+    var(--overlay);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
 
+/* The dialog is the outermost panel while it is open (ruling 28), so it takes the full material:
+   2px rim, scanline-over-gradient fill, inner bezel. On a backing layer, because a modal is
+   nothing but tap targets. */
 .nh-modal-surface {
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   max-height: min(88vh, 48rem);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  box-shadow: var(--shadow-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   overflow: hidden;
 }
-.nh-modal--accent-magenta::before,
-.nh-modal--accent-cyan::before,
-.nh-modal--accent-violet::before {
+.nh-modal-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background-color: var(--surface-2);
+  background-image:
+    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 45%);
+  background-repeat: repeat, no-repeat;
+  background-size: 100% var(--scanline-gap), 100% 100%;
+  background-origin: border-box;
+  background-clip: border-box;
+  /* The inner bezel — a quieter line just inside the rim, the landing cabinet's own detail.
+     Painted as two inset shadows, the first re-laying the fill over the gap so the bezel reads
+     as a separate line rather than as a thicker rim. */
+  box-shadow:
+    inset 0 0 0 var(--bezel-inset) var(--surface-2),
+    inset 0 0 0 calc(var(--bezel-inset) + 1px) var(--bezel-color);
+  /* A dialog floats over the whole app, so it keeps its lift — as a filter, since box-shadow
+     cannot follow the cut and is already spoken for by the bezel. */
+  filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--void) 60%, transparent));
+}
+/* THE ACCENT HAIRLINE RIDES `::after`, AND THAT IS THE WHOLE FIX FOR A TRANSPARENT DIALOG.
+   `nh-modal--accent-*` is set on `.nh-modal-surface` (Modal.tsx:64), the same element whose
+   `::before` is the material's backing layer three rules up — so this block used to reach into
+   that layer and destroy it: `inset: 0 0 auto 0` + `height: 2px` collapsed the plate to a 2px
+   strip, and the `background` SHORTHAND cleared `background-color: var(--surface-2)` AND the
+   scanline/sheen images with it. `accent` defaults to "magenta", so EVERY modal in the app was
+   painting no plate at all — measured on the character sheet, whose body copy sat directly on
+   the blurred roster sky behind it (the client's "too transparent to read against"). The
+   surface uses no `::after` of its own and is not a tap target, so the hairline lives there. */
+.nh-modal--accent-magenta::after,
+.nh-modal--accent-cyan::after,
+.nh-modal--accent-violet::after {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
   z-index: 1;
+  pointer-events: none;
 }
-.nh-modal--accent-magenta::before { background: var(--magenta); }
-.nh-modal--accent-cyan::before { background: var(--cyan); }
-.nh-modal--accent-violet::before { background: var(--violet); }
+.nh-modal--accent-magenta::after { background: var(--magenta); }
+.nh-modal--accent-cyan::after { background: var(--cyan); }
+.nh-modal--accent-violet::after { background: var(--violet); }
 
 .nh-modal-head {
   /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:
@@ -78,15 +127,33 @@
   text-align: center;
   font-size: 1rem;
   line-height: 1;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-dim);
   cursor: pointer;
+  isolation: isolate;
+  --nh-rim: var(--rim-color);
 }
-.nh-modal-close:hover { color: var(--text); border-color: var(--line-strong); }
+/* Ruling 49 reaches the close ✕ too — cut on a backing layer, never on the button. */
+.nh-modal-close::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: polygon(0 .3rem, .3rem 0, 100% 0, 100% calc(100% - .3rem), calc(100% - .3rem) 100%, 0 100%);
+  border: 1px solid var(--nh-rim);
+  background: var(--surface-3);
+  transition: border-color var(--dur-hover);
+}
+.nh-modal-close:hover, .nh-modal-close:active { color: var(--text); --nh-rim: var(--rim-color-hi); }
 
-.nh-modal-body { padding: var(--space-6); overflow-y: auto; }
+/* overscroll-behavior: a flick past this region's end must chain nowhere — the app's page is locked
+   behind it, and rubber-banding a dead page reads as breakage. Every app-side region carries this;
+   the two primitive scrollers were the gap. */
+.nh-modal-body { padding: var(--space-6); overflow-y: auto; overscroll-behavior: contain; }
 .nh-modal-foot {
   display: flex;
   justify-content: flex-end;
@@ -108,9 +175,9 @@
   .nh-modal--full .nh-modal-surface {
     height: 100dvh;
     max-height: 100dvh;
-    border: 0;
-    border-radius: 0;
   }
+  /* An edge-to-edge sheet has no corner to cut and no edge to rim — the viewport is its frame. */
+  .nh-modal--full .nh-modal-surface::before { clip-path: none; border: 0; box-shadow: none; filter: none; }
   .nh-modal--full .nh-modal-body { padding: var(--space-4); }
   .nh-modal--full .nh-modal-foot { padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
 }

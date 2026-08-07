@@ -12,8 +12,9 @@
  */
 
 import { newId } from "../lib/ids";
+import { SUB_OBJECT_DEFAULTS } from "./defaults";
 import { getAt } from "./paths";
-import { basicsSection, damagePartsField, diceValidate, humanise, opt, type Draft, type FieldDef, type HomebrewSchema, type SchemaContext, type SectionDef } from "./schema";
+import { basicsSection, damagePartsField, diceValidate, humanise, inContainer, opt, type Draft, type FieldDef, type HomebrewSchema, type SchemaContext, type SectionDef } from "./schema";
 import type { HomebrewType } from "./types";
 
 const ABILITIES = [
@@ -145,10 +146,17 @@ const startingEquipment = (): FieldDef => ({
   ]
 });
 
+/**
+ * Proficiency slugs are OPEN sets — `character-build.ts` folds whatever a class declares — so these
+ * stay free-tag inputs and the suggestions are the well-known members rather than a closed list.
+ * Tools widen from the equipment catalog, which is where the table's real tool names live (the SRD
+ * bundle's `tool` category, plus any the GM has authored), so a class can be given "smiths-tools"
+ * by picking it rather than by spelling it.
+ */
 const proficiencyFields = (): readonly FieldDef[] => [
   { key: "armorProficiencies", label: "Armour training", kind: "tags", suggestions: ["light-armor", "medium-armor", "heavy-armor", "shields"] },
-  { key: "weaponProficiencies", label: "Weapon training", kind: "tags", suggestions: ["simple-weapons", "martial-weapons"] },
-  { key: "toolProficiencies", label: "Tool proficiencies", kind: "tags", suggestions: ["thieves-tools", "herbalism-kit"] }
+  { key: "weaponProficiencies", label: "Weapon training", kind: "tags", suggestions: (ctx) => ["simple-weapons", "martial-weapons", ...ctx.equipment.filter((entry) => entry.keywords === "weapon").map((entry) => entry.id)] },
+  { key: "toolProficiencies", label: "Tool proficiencies", kind: "tags", suggestions: (ctx) => ctx.equipment.filter((entry) => entry.keywords === "tool").map((entry) => entry.id) }
 ];
 
 /** `key` is the record's own: every type stores a LIST under `features` (or `traits`)
@@ -283,7 +291,7 @@ const SPECIES_SCHEMA: HomebrewSchema = {
         { key: "sizes", label: "Size", kind: "multiselect", required: true, options: SIZES },
         { key: "speedFeet", label: "Walking speed", kind: "number", required: true, min: 0, max: 120, unit: "ft" },
         { key: "darkvisionFeet", label: "Darkvision", kind: "number", min: 0, max: 240, unit: "ft", note: "Display only — the rules engine doesn't grant darkvision yet." },
-        { key: "creatureType", label: "Creature type", placeholder: "humanoid" }
+        { key: "creatureType", label: "Creature type", placeholder: "humanoid", suggestions: (ctx) => ctx.creatureTypes }
       ]
     },
     {
@@ -400,8 +408,10 @@ const FEAT_SCHEMA: HomebrewSchema = {
       // which is why it is stated here, once, rather than guessed at.
       blurb: "A feat is only offered where something asks for its category. Origin feats come from backgrounds; general feats from ability score improvements.",
       fields: [
-        { key: "category", label: "Category", kind: "select", required: true, options: (ctx) => ctx.featCategories },
-        { key: "repeatable", label: "Can be taken more than once", kind: "switch" },
+        // An open slug in `FeatReferenceSchema`, so a closed select meant a category the table
+        // has never used before was unauthorable from the form that exists to author new things.
+        { key: "category", label: "Category", required: true, placeholder: "general", suggestions: (ctx) => ctx.featCategories.map((option) => option.value) },
+        { key: "repeatable", label: "Can be chosen more than once", kind: "switch" },
         {
           key: "prerequisite",
           label: "Prerequisites",
@@ -431,7 +441,7 @@ const SPELL_SCHEMA: HomebrewSchema = {
       title: "Casting",
       fields: [
         { key: "level", label: "Spell level", kind: "stepper", min: 0, max: 9, help: "0 is a cantrip." },
-        { key: "school", label: "School", required: true, placeholder: "evocation" },
+        { key: "school", label: "School", required: true, placeholder: "evocation", suggestions: (ctx) => ctx.schools },
         { key: "castingTime", label: "Casting time", required: true, placeholder: "1 action" },
         {
           key: "reactionCondition",
@@ -444,8 +454,8 @@ const SPELL_SCHEMA: HomebrewSchema = {
           label: "Range",
           kind: "group",
           rows: [
-            { key: "range.distance", label: "Distance", kind: "number", min: 0, max: 5280 },
-            { key: "range.unit", label: "Unit", kind: "select", options: [opt("feet", "Feet"), opt("miles", "Miles"), opt("self", "Self"), opt("touch", "Touch")] },
+            { key: "range.distance", label: "Distance", kind: "number", min: 0, max: 5280, emptyValue: "null" },
+            { key: "range.unit", label: "Unit", kind: "select", emptyValue: "null", options: [opt("feet", "Feet"), opt("miles", "Miles"), opt("self", "Self"), opt("touch", "Touch")] },
             { key: "range.text", label: "Or say it in words", placeholder: "Self (30-foot cone)" }
           ]
         },
@@ -471,14 +481,14 @@ const SPELL_SCHEMA: HomebrewSchema = {
       title: "Effect",
       fields: [
         { key: "attackRoll", label: "Needs an attack roll", kind: "switch" },
-        { key: "save", label: "Saving throw", kind: "select", options: [...ABILITIES] },
+        { key: "save", label: "Saving throw", kind: "select", emptyValue: "null", options: [...ABILITIES] },
         {
           key: "damage",
           label: "Damage",
           kind: "group",
           rows: [
             { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate },
-            { key: "damage.types", label: "Types", kind: "tags", suggestions: ["fire", "cold", "lightning", "acid", "thunder", "necrotic", "radiant", "psychic", "force", "poison"] }
+            { key: "damage.types", label: "Types", kind: "tags", suggestions: (ctx) => ctx.damageTypes }
           ]
         },
         {
@@ -486,8 +496,8 @@ const SPELL_SCHEMA: HomebrewSchema = {
           label: "Target",
           kind: "group",
           rows: [
-            { key: "target.type", label: "Targets", kind: "select", options: [opt("creature", "Creatures"), opt("object", "Objects"), opt("point", "A point"), opt("area", "An area"), opt("self", "Yourself")] },
-            { key: "target.count", label: "How many", kind: "number", min: 1, max: 20 }
+            { key: "target.type", label: "Targets", kind: "select", emptyValue: "null", options: [opt("creature", "Creatures"), opt("object", "Objects"), opt("point", "A point"), opt("area", "An area"), opt("self", "Yourself")] },
+            { key: "target.count", label: "How many", kind: "number", min: 1, max: 20, emptyValue: "null" }
           ]
         },
         {
@@ -495,10 +505,16 @@ const SPELL_SCHEMA: HomebrewSchema = {
           label: "Area",
           kind: "group",
           visibleWhen: (draft) => (draft.target as Draft | undefined)?.type === "area",
-          rows: [
+          // `shape.sizeFeet` was written here for a column called `size`. `SpellReferenceSchema` is
+          // not `.strict()`, so the typo was STRIPPED in silence and the two real keys came back
+          // "Required" — an area spell could be authored and never published. Same class of defect
+          // as the item sub-objects, same repair: the right key names, and a whole container on
+          // first touch.
+          rows: inContainer("shape", SUB_OBJECT_DEFAULTS.spell!.shape, [
             { key: "shape.type", label: "Shape", kind: "select", options: [opt("sphere", "Sphere"), opt("cube", "Cube"), opt("cone", "Cone"), opt("line", "Line"), opt("cylinder", "Cylinder")] },
-            { key: "shape.sizeFeet", label: "Size", kind: "number", min: 0, max: 1000, unit: "ft" }
-          ]
+            { key: "shape.size", label: "Size", kind: "number", min: 0, max: 1000, unit: "ft", emptyValue: "null" },
+            { key: "shape.unit", label: "Measured in", suggestions: ["feet", "miles"], emptyValue: "null" }
+          ])
         },
         { key: "higherLevel", label: "At higher levels", kind: "textarea", wide: true }
       ]
@@ -575,7 +591,9 @@ const SLOTS = [
   opt("none", "Just carried", "Everything else")
 ];
 
-const RARITIES = [opt("common", "Common"), opt("uncommon", "Uncommon"), opt("rare", "Rare"), opt("very-rare", "Very rare"), opt("legendary", "Legendary"), opt("artifact", "Artifact")];
+/** The six printed rarities, as SLUGS: `rarity` is an open `ContentIdSchema` in the schema, so the
+    control offers these and still accepts "unique" or "table-only". */
+const RARITY_IDS: readonly string[] = ["common", "uncommon", "rare", "very-rare", "legendary", "artifact"];
 
 /** Turning magic off must take the whole magic half with it. Left behind, `isMagic: false`
     plus an orphan rider is a record `.strict()` rejects and a GM cannot see to fix. */
@@ -605,8 +623,8 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           options: SLOTS,
           help: "This is what makes it derive armour class or an attack. Leave it unset and the category is used instead."
         },
-        { key: "costGp", label: "Cost", kind: "number", min: 0, max: 1000000, unit: "gp", allowDecimal: true },
-        { key: "weightLb", label: "Weight", kind: "number", min: 0, max: 1000, unit: "lb", allowDecimal: true }
+        { key: "costGp", label: "Cost", kind: "number", min: 0, max: 1000000, unit: "gp", allowDecimal: true, emptyValue: "null" },
+        { key: "weightLb", label: "Weight", kind: "number", min: 0, max: 1000, unit: "lb", allowDecimal: true, emptyValue: "null" }
       ]
     },
     {
@@ -625,7 +643,10 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             return cleared;
           }
         },
-        { key: "rarity", label: "Rarity", kind: "select", options: RARITIES, visibleWhen: (draft) => draft.isMagic === true },
+        // An OPEN slug in the schema, so a CLOSED select was the inverse of the usual bug: the six
+        // printed rarities and no way to write "unique". Complete list plus other, like every other
+        // open-slug field in the editor.
+        { key: "rarity", label: "Rarity", suggestions: RARITY_IDS, placeholder: "uncommon", emptyValue: "omit", visibleWhen: (draft) => draft.isMagic === true },
         {
           key: "attunement.required",
           label: "Requires attunement",
@@ -711,26 +732,30 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
     {
       id: "weapon",
       title: "Weapon",
+      // The RANGE fields say what leaving them empty means, because that is the sentence the old
+      // failure never got to say: a mace has no range, its two range keys are null, and the record
+      // publishes. The GM used to be told "Fill in range." and then "Fill in long range." — one at
+      // a time, on a melee weapon, with no way to comply.
       blurb: "Fill these in only for a weapon. The category has to be “weapon” too, or nothing here is read.",
-      fields: [
+      fields: inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
         { key: "weapon.category", label: "Weapon kind", kind: "select", options: [opt("simple", "Simple"), opt("martial", "Martial")] },
         { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
-        { key: "weapon.damageType", label: "Damage type", placeholder: "slashing" },
-        { key: "weapon.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft" },
-        { key: "weapon.longRangeFeet", label: "Long range", kind: "number", min: 1, max: 5000, unit: "ft" }
-      ]
+        { key: "weapon.damageType", label: "Damage type", placeholder: "slashing", suggestions: (ctx) => ctx.damageTypes },
+        { key: "weapon.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", emptyValue: "null", help: "Leave both empty for a melee weapon." },
+        { key: "weapon.longRangeFeet", label: "Long range", kind: "number", min: 1, max: 5000, unit: "ft", emptyValue: "null" }
+      ])
     },
     {
       id: "armor",
       title: "Armour",
       blurb: "Fill these in only for armour or a shield.",
-      fields: [
+      fields: inContainer("armor", SUB_OBJECT_DEFAULTS.equipment!.armor, [
         { key: "armor.acBase", label: "Base armour class", kind: "number", min: 2, max: 25 },
         { key: "armor.addDexModifier", label: "Adds Dexterity", kind: "switch" },
-        { key: "armor.dexModifierCap", label: "Dexterity cap", kind: "number", min: 0, max: 10 },
-        { key: "armor.strengthRequired", label: "Strength minimum", kind: "number", min: 0, max: 20 },
+        { key: "armor.dexModifierCap", label: "Dexterity cap", kind: "number", min: 0, max: 10, emptyValue: "null" },
+        { key: "armor.strengthRequired", label: "Strength minimum", kind: "number", min: 0, max: 20, emptyValue: "null" },
         { key: "armor.stealthDisadvantage", label: "Disadvantage on Stealth", kind: "switch" }
-      ]
+      ])
     }
   ]
 };
@@ -771,7 +796,7 @@ const MONSTER_SCHEMA: HomebrewSchema = {
       fields: [
         ...basicsSection("creature", { summary: true }).fields,
         { key: "size", label: "Size", kind: "select", required: true, options: SIZES },
-        extensionField("type", "Creature type", { placeholder: "humanoid" }),
+        extensionField("type", "Creature type", { placeholder: "humanoid", suggestions: (ctx) => ctx.creatureTypes }),
         extensionField("challengeRating", "Challenge rating", { kind: "number", required: true, min: 0, max: 30, allowDecimal: true }),
         { key: "speedFeet", label: "Speed", kind: "number", required: true, min: 0, max: 200, unit: "ft" }
       ]
@@ -782,13 +807,13 @@ const MONSTER_SCHEMA: HomebrewSchema = {
       fields: [
         { key: "armorClass", label: "Armour class", kind: "number", required: true, min: 1, max: 40 },
         { key: "hitPoints.maximum", label: "Hit points", kind: "number", required: true, min: 1, max: 1000 },
-        { key: "hitPoints.formula", label: "Hit dice", placeholder: "19d12 + 133", validate: diceValidate, help: "Like 19d12 + 133. Without it, short rests give this creature no hit dice." },
+        { key: "hitPoints.formula", label: "Hit dice", placeholder: "19d12 + 133", validate: diceValidate, help: "Like 19d12 + 133. Without it, short rests give this monster no hit dice." },
         { key: "proficiencyBonus", label: "Proficiency bonus", kind: "number", min: 0, max: 12 },
         { key: "initiativeBonus", label: "Initiative bonus", kind: "number", min: -20, max: 30, allowNegative: true },
-        { key: "damageResistances", label: "Damage resistances", kind: "tags", suggestions: ["fire", "cold", "lightning", "acid", "thunder", "necrotic", "radiant", "psychic", "force", "poison"] },
-        { key: "damageImmunities", label: "Damage immunities", kind: "tags" },
-        { key: "damageVulnerabilities", label: "Damage vulnerabilities", kind: "tags" },
-        { key: "conditionImmunities", label: "Condition immunities", kind: "tags", suggestions: ["charmed", "frightened", "grappled", "paralyzed", "poisoned", "prone", "restrained", "stunned"] }
+        { key: "damageResistances", label: "Damage resistances", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
+        { key: "damageImmunities", label: "Damage immunities", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
+        { key: "damageVulnerabilities", label: "Damage vulnerabilities", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
+        { key: "conditionImmunities", label: "Condition immunities", kind: "tags", suggestions: (ctx) => ctx.conditions }
       ]
     },
     {

@@ -3,8 +3,14 @@ import { healthBandOf } from "./hit-points.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
 
-/** Party members stay exact for each other; monster/NPC hit points reach players only as a coarse band. */
-function playerHp(actor: GameState["actors"][number]): PlayerHp {
+/**
+ * Party members stay exact for each other; monster/NPC hit points reach players only as a coarse band.
+ *
+ * EXPORTED so the replay projection (`replay-projection.ts`) applies the identical rule to an
+ * archived state instead of restating it. No field is added or widened by the export - the point is
+ * that there is ONE definition of what a player may know about a creature's hit points.
+ */
+export function playerHp(actor: GameState["actors"][number]): PlayerHp {
   return actor.kind === "player-character"
     ? { kind: "exact", current: actor.hp.current, maximum: actor.hp.maximum, temporary: actor.hp.temporary }
     : { kind: "band", band: healthBandOf(actor.hp) };
@@ -75,7 +81,11 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
       // Hidden turn: movement spent would narrate a hidden combatant's activity - reset with the rest.
       : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
     rulesMode: state.combat.rulesMode,
-    rollMode: state.combat.rollMode,
+    // The per-family exceptions ride to players for exactly the reason `rulesMode` already does: they
+    // are the table's rules CONFIGURATION, not its secrets, and a player's sheet has to know whether a
+    // tap is about to be blocked, warned, or waved through before they take it. Copied, never a live
+    // reference into GameState.
+    ruleExceptions: { ...state.combat.ruleExceptions },
     // The policy (not the GM-only pendingDamage proposals) rides to players so the runner can say
     // whether a hit is handed to the GM or applied directly.
     playerDamageMode: state.combat.playerDamageMode,
@@ -104,6 +114,13 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
         // concentration effect references (endsEffects) are server bookkeeping and are stripped.
         ...(entry.onFailEffect ? { onFailEffect: { ...entry.onFailEffect, sourceActorId: null, sourceName: entry.onFailEffect.sourceActorId !== null && !publicActorIds.has(entry.onFailEffect.sourceActorId) ? "A hidden threat" : entry.onFailEffect.sourceName } } : {})
       })),
+    // ASK THE GM (D8), same boundary as saves and reaction prompts: a player sees ONLY their own
+    // claimed character's parked asks - never another player's question, and never the GM's
+    // deliberation about it. The parked `command` is dropped entirely: its payload can name target ids
+    // the asker is not allowed to know, and reading their own pending question needs none of it.
+    pendingRuleAsks: state.combat.pendingRuleAsks
+      .filter((entry) => { const actor = state.actors.find((candidate) => candidate.id === entry.actorId); return actor !== undefined && actor.ownerSessionId !== null && actor.ownerSessionId === playerSessionId; })
+      .map(({ command: _command, ...entry }) => entry),
     // Same boundary as saves: a player sees only their own claimed character's reaction prompts,
     // with the source actor id stripped and a hidden source's name masked.
     pendingReactions: state.combat.pendingReactions
@@ -121,46 +138,146 @@ function playerEffect(effect: GameState["actors"][number]["effects"][number], pu
   return { ...visible, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : effect.sourceName };
 }
 
+/**
+ * "Fighter 7" / "Fighter 5 / Rogue 2" - the identity card's second line, computed here because a
+ * player projection carries no `definitions` list to derive it from. Null when the sheet records no
+ * class identity, so the field is OMITTED rather than sent as an empty string.
+ */
+function classLineOf(definition: GameState["definitions"][number]["definition"] | undefined): string | null {
+  const classes = definition?.character?.classes ?? [];
+  return classes.length === 0 ? null : classes.map((entry) => `${entry.name} ${entry.level}`).join(" / ");
+}
+
+/**
+ * **PARTY VISIBILITY - the per-tier field table (rulings 5/8/19).**
+ *
+ * `GameState.partyVisibility` governs exactly one thing: what a player receives about ANOTHER
+ * PLAYER'S CLAIMED CHARACTER. It is enforced here, in the projection, and nowhere else. A tier
+ * filtered in the client would be decorative - the data would still be on the wire.
+ *
+ * **Who each column applies to.** `mine` is the requesting player's own claimed character.
+ * `theirs` is a player-character claimed by ANOTHER session. Monsters, NPCs and UNCLAIMED characters
+ * are governed by neither and are unchanged by this setting at every tier - an unclaimed character is
+ * nobody's, and the claim screen (`ClaimCharacter.tsx`) is the surface that would break if `off`
+ * swept it up.
+ *
+ * | Field                                   | mine | off | name-and-class | full-sheet | sheet-and-resources |
+ * | --------------------------------------- | ---- | --- | -------------- | ---------- | ------------------- |
+ * | (the actor entry exists at all)         |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | id, name, kind, visibility              |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | armorClass, initiative, speedFeet       |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | size, sizeCells, tokenAssetId           |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | definitionId, conditions, deathSaves    |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | hp (exact for a PC), effects (masked)   |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | claimStatus, presence, healthDisplay    |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | classLine                               |  -   |  -  |       Y        |     Y      |          Y          |
+ * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
+ * | actionUses, hitDice                     |  Y   |  -  |       -        |     -      |          Y          |
+ * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
+ * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
+ * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview: NEVER, at any tier, to anyone. |
+ *
+ * **`off` KEEPS THE ENTRY, and that is deliberate - do not "restore" the drop.** The first cut of this
+ * feature removed another player's character from the array entirely at `off`. Measured against a live
+ * fight, that is not a stricter privacy tier, it is a broken table: `projectPlayerCombat` still names
+ * the ally in `combat.initiative` and still carries their token in `combat.tokens` (neither is governed
+ * by this setting), while `EncounterMap.tsx` bails on a token whose actor it cannot find - so a player
+ * got a name in the turn order and an empty square where their teammate was standing. A GM choosing
+ * "Off" is saying *my players don't read each other's sheets*; they are not saying *delete my players
+ * from the battle map*. So `off` is **the base actor entry and nothing a sheet is made of**: exactly
+ * what the map, the tokens and the turn order need to stay coherent. What it removes is the PARTY
+ * SURFACE - no identity card, no sheet to open, no resources - which is what D9 actually described.
+ *
+ * **Three rules for whoever adds the next field.**
+ * 1. **The `mine` column is not negotiable.** A player always gets their own full sheet whatever the
+ *    tier says. Never gate a field on the tier without excluding `mine` first.
+ * 2. **A field belongs above the `off` line only if the MAP, THE TOKENS OR THE TURN ORDER need it.**
+ *    That is the whole test for the `off` column, and it is why `off` is not empty.
+ * 3. **A new field belongs to a tier, and the default is the strictest one that still works.** Adding
+ *    a field to a player projection is a viewer-safety change (CLAUDE.md rule 3). When in doubt, omit.
+ *
+ * `classLine` is deliberately absent on `mine`: the owner already holds the whole `definition` and can
+ * read the class off it, so duplicating it would be a second source of the same truth.
+ */
 export function projectPlayerView(state: GameState, playerSessionId: string | undefined, presenceFor: PresenceLookup, now = Date.now()): PlayerView {
   // Archived characters (GM management, v4 #10) are hidden from players entirely, like gm-only actors.
   const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id));
+  const tier = state.partyVisibility;
   return {
     revision: state.revision,
+    // The tier the server APPLIED, so the client renders the shape it was handed rather than guessing
+    // one from which fields happen to be present ("no sheet" and "sheet withheld" look identical
+    // otherwise). It describes work already done here; nothing downstream is trusted to enforce it.
+    partyVisibility: tier,
     // The GM's builder policy travels verbatim (GM-set, player-read - decision 10): it holds no
-    // secrets, and a player's wizard must know which ability methods to offer. Copied, never a
-    // live reference into GameState.
-    builderPolicy: { allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods], customFormula: state.builderPolicy.customFormula },
+    // secrets, and a player's wizard must know which ability methods to offer. Copied FIELD BY FIELD,
+    // never spread: this list is the viewer-safety review point for the builder policy, so a field
+    // added to BuilderPolicySchema reaches players only when someone writes it here on purpose.
+    //   - maxLevel: the cap the player's own wizard must enforce in its UI before the server refuses.
+    //   - playerBuilder: whether the wizard door is open to them at all. A dial about the player, told
+    //     to the player; it names no character, no monster and no GM plan.
+    builderPolicy: {
+      allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods],
+      customFormula: state.builderPolicy.customFormula,
+      maxLevel: state.builderPolicy.maxLevel,
+      playerBuilder: state.builderPolicy.playerBuilder
+    },
+    // The door to an archived character's shared sheet, and nothing more: id + name, only for archived
+    // characters the GM explicitly shared, and only ones that were public to begin with. Everything
+    // else about them - hit points, conditions, claim, notes, the definition - is omitted. Empty for
+    // every table that has not used the feature, which is the default.
+    archivedCharacters: state.actors
+      .filter((actor) => actor.archived && actor.sheetPreview && actor.visibility === "public")
+      .map((actor) => ({ id: actor.id, name: actor.name })),
     combat: projectPlayerCombat(state, playerSessionId, now),
+    // No tier removes an actor from this array - `partyVisibility` subtracts FIELDS, never entries.
+    // The two things that do remove one are above: gm-only visibility, and archived. See the field
+    // table on this function for why `off` is a narrower entry rather than a missing one.
     actors: state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((source) => {
       // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
       // actionUses (limited-use spending names stat-block action ids - own claimed character only),
       // conditionImmunities and legendary resources (monster defenses are GM knowledge),
       // hitDice (a healing resource that tracks with exact HP - own claimed character only), and
-      // archived (GM-only management flag).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, ...actor } = source;
+      // archived and sheetPreview (GM-only management flags - the shared-archived door is the
+      // name-and-id-only `archivedCharacters` list above, never a flag on a live actor).
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, sheetPreview: _sheetPreview, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
+      // ANOTHER PLAYER'S CHARACTER: the one and only thing `partyVisibility` governs. A monster, an
+      // NPC and an unclaimed character are all outside it - see the field table above this function.
+      const theirs = !mine && source.kind === "player-character" && ownerSessionId !== null;
+      // `mine` is never gated by the tier - a player always gets their own full sheet and resources.
+      // For `theirs`, each of the three below is the tier line it is named for; at `off` all three are
+      // false and what survives is the base entry the map and the turn order need.
+      const cardVisible = mine || (theirs && tier !== "off");
+      const sheetVisible = mine || (theirs && (tier === "full-sheet" || tier === "sheet-and-resources"));
+      const resourcesVisible = mine || (theirs && tier === "sheet-and-resources");
       // Effective token-health display = the per-token override or the table default. The richer
       // bar/ring reaches players only when the GM aimed it at everyone (audience "all"); band stays
       // the coarse badge. Only the style crosses - the client derives the fill from `hp` (exact for
       // the owner, coarse band otherwise), so exact HP never leaks for someone else's token.
       const effectiveDisplay = source.healthDisplay ?? state.combat.healthDisplay;
       const sharedDisplayStyle = effectiveDisplay.audience === "all" && effectiveDisplay.style !== "band" ? effectiveDisplay.style : null;
-      // Only your own claimed character's imported sheet travels to you; nobody else's does.
-      const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
+      // The stored sheet is READ for your own character and for a party member whose card you may see
+      // (the class line is derived from it); whether it is SENT is `sheetVisible`, decided above. At
+      // `off` it is not even looked up - nothing of another player's sheet is touched on that path.
+      const storedSheet = cardVisible && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
+      // The identity card's second line - a party member's, never your own (you hold the definition).
+      const classLine = theirs && cardVisible ? classLineOf(storedSheet) : null;
       return {
         ...actor,
         hp: playerHp(source),
         effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
         claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
-        ...(ownDefinition ? { definition: ownDefinition } : {}),
-        ...(mine ? { actionUses: { ...actionUses } } : {}),
+        ...(classLine !== null ? { classLine } : {}),
+        ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
+        ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),
         // The pool's `entries` array is copied too - a player projection must never hand out a live
         // reference into GameState (same deep-copy rule as spellSlots/inventory below).
-        ...(mine && hitDice ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } } : {}),
-        // Sheet resources reach ONLY the owning player - never another player, never the viewer (which
-        // projects separately). Same owner-gate as actionUses/hitDice above; viewer safety by construction.
-        ...(mine ? { spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })), pactSlots: pactSlots === null ? null : { ...pactSlots }, preparedSpellIds: [...preparedSpellIds], inventory: inventory.map((item) => ({ ...item })), currency: { ...currency } } : {}),
+        ...(resourcesVisible && hitDice ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } } : {}),
+        // Sheet resources reach the owning player always, and another player ONLY at the top tier -
+        // never the viewer, which projects separately and has no tier at all.
+        ...(resourcesVisible ? { spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })), pactSlots: pactSlots === null ? null : { ...pactSlots }, preparedSpellIds: [...preparedSpellIds], inventory: inventory.map((item) => ({ ...item })), currency: { ...currency } } : {}),
         ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
       };
     }),

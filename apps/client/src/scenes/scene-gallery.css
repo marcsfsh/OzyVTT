@@ -1,12 +1,44 @@
 /* GM scene-prep hub — the gallery of prepared scenes. The cards, grid, and live/staging states all
    come from the shared @vtt/ui `.nh-gallery` / `.nh-card` pattern; this file is just the hub frame. */
 .scene-gallery-hub { display: flex; flex-direction: column; gap: var(--space-4); }
-.scene-gallery-head { display: flex; flex-direction: column; gap: var(--space-1); }
+/* A ROW, not a stack. The head used to be three stacked rows (eyebrow, heading, a two-line helper);
+   the eyebrow is gone and the helper is one short clause, so it rides the heading's baseline and
+   costs the card grid nothing. `flex-wrap` is deliberate: below ~560px the helper returns to its
+   own row, which is correct where the vertical budget is not the question. */
+.scene-gallery-head { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); }
 .scene-gallery-head h2 { margin: 0; color: var(--text); font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h1); }
-.scene-gallery-head p { margin: var(--space-1) 0 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.scene-gallery-head p { margin: 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 
 /* Command bar above the gallery — the primary "New scene" action (and Manage maps) always in reach. */
 .scene-gallery-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* RULING 2 — THIS IS THE HERO SURFACE'S DOOR, so it takes the rest glow. Ruling 2 names Scenes as a
+   hero surface and gives hero surfaces "the full landing door, rest glow included"; measured at the
+   end of round 2, Scenes had none. The door here is not a panel — this is a gallery, and the thing
+   that plays the landing door's part is the one action that takes you IN. `--nh-glow` is the
+   Button primitive's own hook (`Button.css`), which paints a drop-shadow on the backing layer so it
+   follows the chamfer cut; primary buttons already light it on hover, and this makes it the resting
+   state HERE ONLY. Nothing new is invented and no `.rim-lit` is involved — that utility replaces the
+   backing layer's background, which on a button is its fill. */
+.scene-gallery-bar .nh-btn--primary { --nh-glow: var(--glow-drop-magenta); }
+
+/* AND THE ROW ACTION STOPS COMPETING WITH IT — ruling 2's restraint rule ("at most one glowing
+   element per region at rest") cannot be satisfied by adding a glow alone. A nine-card gallery shows
+   nine "Go live" buttons, each a solid magenta block identical to the door above them, so the door
+   read as one more row action and a glow on it would have been lost in the field. This is the same
+   defect the client named on the initiative panel — "it seriously overdid the coloring (the
+   all-magenta look is just too much)" — on a surface nobody had re-checked for it.
+
+   MAGENTA BECOMES THE EDGE INSTEAD OF THE FIELD, which is the shape `.nh-btn--destructive` already
+   uses for a coloured button that must not shout (rim + ink, no fill), and the same move that fixed
+   the initiative panel. `variant="primary"` STAYS in the markup: Go live really is the card's primary
+   action and the semantics are true — what changes is how nine of them read at once. Hover keeps the
+   primitive's own fill and glow, so the pressed/hover state is unchanged. */
+.nh-card-actions .nh-btn--primary:not(:hover):not(:active):not(:focus-visible) {
+  --nh-fill: transparent;
+  --nh-rim: var(--magenta);
+  color: var(--magenta-hi);
+}
 
 /* Prepare (secondary) sits opposite Go live (primary); the shared .nh-card-actions row spaces them.
    On a live card the actions row instead carries a quiet "live now" caption at the start. */
@@ -28,13 +60,48 @@
 .scene-gallery-hub .nh-card-thumb { flex: 1 1 auto; aspect-ratio: auto; min-height: 0; }
 .scene-gallery-hub .nh-card--new { aspect-ratio: 1 / 1; height: auto; min-height: 0; }
 
+/* AS THE SURFACE (the Scenes tab) the hub is the frame: the heading and the command bar are pinned
+   rows and the card grid is the one region (§7). Inside the picker Modal the same component is
+   content — the modal body is already the region — so these rules are scoped to `.pane-frame`,
+   which only the surface instance carries. The region is the WRAPPER, never the grid (see the
+   markup note): a grid with a definite block size stops sizing its auto rows from their cards.
+   The wrapper keeps a small gutter so a card's hover lift and its ⋯ popover are not clipped
+   against the scroller's edge. */
+.scene-gallery-grid { min-width: 0; }
+/* The inline --space-1 is the card glow's room; the BOTTOM is the sky's reserved horizon band
+   (styles.css `.pane-scene > .scroll-y`), restated here because this selector is more specific
+   than the shared one and would otherwise let the last row of cards rest in the grid floor. */
+.scene-gallery-hub.pane-frame > .scene-gallery-grid {
+  padding: var(--space-1) var(--space-1) calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
+}
+
+/* PHONE DENSITY HALVES (§8). A 1:1 card at 390px is a 358px square: eight prepared scenes were a
+   ~3200px scroll, most of it thumbnail. Two columns of the card's own 16/10 thumb put the same eight
+   in reach — the square is a laptop luxury, not the card's identity — and the two actions stack so
+   each keeps a full-width 44px target instead of splitting a 160px row.
+   DRAG-VS-SCROLL (§7.6): the reorder grip stays pointer-driven and `touch-action: none`, and its
+   hit-testing is viewport-space, so a scrolling grid keeps the coordinates right. There is no
+   edge-autoscroll, so a card that is off-screen cannot be reached mid-drag; the ⋯ menu's Move
+   earlier / Move later is the accepted answer for those (it is also the keyboard route). */
+@media (max-width: 560px) {
+  .scene-gallery-hub .nh-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+  .scene-gallery-hub .nh-card { aspect-ratio: auto; }
+  .scene-gallery-hub .nh-card--new { aspect-ratio: auto; min-height: 9rem; }
+  .scene-gallery-hub .nh-card-thumb { flex: none; aspect-ratio: 16 / 10; }
+  /* One line of meta at this width: the map name and the head-count already say it, and a
+     three-line wrap costs more height than the thumbnail it sits under. */
+  .scene-gallery-hub .nh-card-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scene-gallery-hub .nh-card-actions { flex-direction: column; align-items: stretch; }
+}
+
 /* The picker popup widens the dialog and sizes its columns so the squares have room to breathe. */
 .nh-modal.scenes-modal { max-width: min(100vw - 2rem, 68rem); }
 .scenes-modal .nh-gallery { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
 
-/* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). */
-.scenes-maps-view { display: flex; flex-direction: column; gap: var(--space-3); }
-.scenes-back { align-self: flex-start; }
+/* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). Since C2
+   that surface owns its own frame, so `.scenes-maps-view` is `MapManager`'s root class and its
+   rules live in `maps/map-manager.css` — including the back row, which is a row IN the frame now
+   rather than a button stranded above a staged region. Nothing for this file to say about it. */
 
 /* Drag-to-reorder handle (pointer + touch); keyboard reorder uses the ⋯ menu's Move earlier/later.
    It matches its neighbour the ⋯ trigger by construction: same 1.75rem square paint, same 44px hit

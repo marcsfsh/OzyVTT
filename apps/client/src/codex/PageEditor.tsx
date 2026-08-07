@@ -1,17 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Field, Input, Modal, SaveState, SegmentedControl, Select, TagInput, Textarea } from "@vtt/ui";
+import { Alert, Button, Field, GmOnlyTag, IconButton, IconX, Input, Modal, RevealSwitch, SaveState, SegmentedControl, Select, TagInput, Textarea } from "@vtt/ui";
 import { calendarApi, codexApi, uploadCodexAsset, type CodexAutosaveSettings, type CodexCalendar, type CodexPage, type CodexPageConnection, type CodexPageRevision, type CodexPageSummary, type CodexSettings } from "./api";
 import { CodexImage } from "./CodexImage";
 import { CodexEditor } from "./CodexEditor";
 import { PageTimeline } from "./PageTimeline";
 import { PageMarkers } from "./PageMarkers";
 import { ConnectionsPanel } from "./ConnectionsPanel";
-import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 type BodyTab = "player" | "gm";
+
+/**
+ * Ruling 11 — **the context column is summonable, and so is everything else that is not the writing.**
+ *
+ * The ruling names connections, atlas pins and the journal as what moves behind a toggle. Measured, that
+ * is not enough to deliver its second half ("writing gets full width and full height"): at 1280x900 with
+ * the context column already hidden and the centre at its full 680px, a `location` page's own frontmatter
+ * — banner 32 + kind/folder/tags 214 + typed fields 242 + the body tab bar 44 + the editor toolbar 44,
+ * plus gaps — stands 636px tall inside a 659px frame. The writing surface would get 23px. So the panel
+ * holds the page's PROPERTIES as well as its connections, and the centre column holds exactly one thing:
+ * the body being written. That is what takes the textarea from 224px to the frame's height.
+ *
+ * The panel is an overlay inside the detail column, not a `Drawer`: it belongs to the page, not to the
+ * app, and the shell already has a right-edge drawer (Session prep) that a second fixed panel would
+ * fight. It is remembered per browser, closed by default, because the writing is the reason to be here.
+ */
+const DETAILS_KEY = "codex-page-details";
+const DETAILS_ID = "codex-page-details";
 
 /**
  * `dateYear`/`dateMonth`/`dateDay` are the in-world date that puts an `event` page on the chronicle.
@@ -62,6 +79,18 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
   const [saveError, setSaveError] = useState<string | null>(null);
   const revRef = useRef(page.rev);
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const detailsRef = useRef<HTMLElement>(null);
+  const [detailsOpen, setDetailsOpen] = useState(() => {
+    try { return localStorage.getItem(DETAILS_KEY) === "open"; } catch { return false; }
+  });
+  const showDetails = useCallback((open: boolean) => {
+    setDetailsOpen(open);
+    try { localStorage.setItem(DETAILS_KEY, open ? "open" : "closed"); } catch { /* private mode - fine */ }
+  }, []);
+  // Summoning a panel that nothing focuses leaves a keyboard user where they were, with the controls they
+  // asked for somewhere behind them. Focus the panel itself rather than its first field: the heading is
+  // what tells them where they landed.
+  useEffect(() => { if (detailsOpen) detailsRef.current?.focus(); }, [detailsOpen]);
 
   /**
    * D6 — one autosave, the GM's cadence. Identical to the old hand-rolled behaviour when the setting is
@@ -212,6 +241,7 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
           {/* D6: with autosave off, saving is an explicit act — and this view's one primary action. */}
           {!autosave.enabled && <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>Save</Button>}
           <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
+          <Button variant="ghost" size="sm" aria-expanded={detailsOpen} aria-controls={DETAILS_ID} onClick={() => showDetails(!detailsOpen)}>Details</Button>
           <Button variant="ghost" size="sm" onClick={openRevisions}>History</Button>
           <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
         </div>
@@ -220,6 +250,30 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
 
       <div className="codex-editor-cols">
         <div className="codex-editor-center">
+          <div className="codex-body-bar">
+            <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
+              options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM only" }]} />
+          </div>
+
+          {/* D13: the ONE editor. Toolbar, `[[` autocomplete, image drop/paste and the Edit/View switch
+              are the primitive's; the Codex supplies its reader, its page list and its violet chrome.
+              `fill` is ruling 11's second half: the surface takes the frame's height instead of the
+              primitive's 14rem floor. */}
+          <CodexEditor token={gmToken} value={body} onChange={setBody} fill
+            ariaLabel={tab === "player" ? "Player-facing body" : "GM secret body"}
+            placeholder={tab === "player" ? "Player-facing description…" : "GM-only notes: secrets, hooks, stats…"}
+            pages={pages} excludePageId={page.id} onNavigate={onNavigate} gmLayer={tab === "gm"} />
+        </div>
+
+        {detailsOpen && (
+        <aside id={DETAILS_ID} className="codex-editor-context scroll-y" aria-label="Page details" tabIndex={-1} ref={detailsRef}
+          /* Scoped, never global: a keypress that started inside the panel closes it, and one that started
+             in the body being written belongs to the body. Same contract as `Drawer`. */
+          onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); showDetails(false); } }}>
+          <div className="codex-context-head">
+            <h3 className="codex-backlinks-title">Page details</h3>
+            <IconButton label="Close page details" size="sm" onClick={() => showDetails(false)}><IconX /></IconButton>
+          </div>
           {draft.bannerAssetId
             ? <div className="codex-banner"><CodexImage assetId={draft.bannerAssetId} token={gmToken} alt="Page banner" className="codex-banner-img" /><div className="codex-banner-actions"><Button variant="ghost" size="sm" onClick={() => bannerInputRef.current?.click()}>Change</Button><Button variant="ghost" size="sm" onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}>Remove banner</Button></div></div>
             : <Button variant="ghost" size="sm" className="codex-banner-add" onClick={() => bannerInputRef.current?.click()}>Add banner image</Button>}
@@ -278,26 +332,6 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
             </div>
           )}
 
-          <div className="codex-body-bar">
-            <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
-              options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM only" }]} />
-          </div>
-
-          {/* D13: the ONE editor. Toolbar, `[[` autocomplete, image drop/paste and the Edit/View switch
-              are the primitive's; the Codex supplies its reader, its page list and its violet chrome. */}
-          <CodexEditor token={gmToken} value={body} onChange={setBody}
-            ariaLabel={tab === "player" ? "Player-facing body" : "GM secret body"}
-            placeholder={tab === "player" ? "Player-facing description…" : "GM-only notes: secrets, hooks, stats…"}
-            pages={pages} excludePageId={page.id} onNavigate={onNavigate} gmLayer={tab === "gm"} />
-        </div>
-
-        <aside className="codex-editor-context" aria-label="Page details">
-          {/* ≤560 the rail sits below a tall editor, so an anchor row keeps the interconnectivity tools
-              reachable instead of buried under half a viewport of textarea. */}
-          <nav className="codex-context-jump" aria-label="Jump to">
-            <span className="codex-context-jumplabel">Jump to:</span>
-            <a href="#codex-connections-h">Connections</a>
-          </nav>
           {/**
             * ONE region answering ONE question — *where else does this entity appear?* — with a
             * sub-block per place it can: other records, the atlas, the journal, the graph.
@@ -318,6 +352,7 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
             <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} onOpenEntry={(entryId) => onOpenConnection("journal", entryId)} />
           </section>
         </aside>
+        )}
       </div>
 
       {revisionsOpen && (

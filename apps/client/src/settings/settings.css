@@ -1,0 +1,140 @@
+/* Settings — three groups (D24). No tabs inside a tab: the groups are stacked sections with
+   Eyebrow headers, so a phone reads one column and a laptop reads the same order — until 1280,
+   where the width buys a second column instead of a longer scroll (§7 "spend the width").
+
+   THE FRAME (§7): `.settings-page` is the surface's frame — the pane's one child, a column that
+   never scrolls — and `.settings-body` is its one region. The shared `.pane-frame` gives the page
+   column its gutter and the region its safe-area bottom; the width cap lives on the two children
+   rather than the frame, because the frame is now full-bleed: it paints the sky. */
+
+.settings-page { gap: 1.4rem; }
+.settings-head, .settings-body { width: 100%; max-width: 56rem; margin-inline: auto; }
+.settings-head h2 { margin: 0; font: 700 1.4rem/1.2 var(--font-display); }
+.settings-head p { margin: .3rem 0 0; color: var(--text-dim); font-size: .92rem; }
+.settings-body { display: flex; flex-direction: column; gap: 1.4rem; }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════
+   `.settings-group` is this surface's OUTERMOST panel, so it takes the full recipe including
+   the scanline fill; `.settings-exceptions` nests inside it and takes rim + bezel over a plain
+   plate (ruling 28 — two horizontal rhythms at different periods is where moiré appears).
+   No rest glow: ruling 2 gives that to hero surfaces only, and settings is not one.
+
+   The construction is `.nh-panel::before`'s (packages/ui Panel.css), written against the
+   selectors this file already owns because the markup is not this lane's to change. The cut,
+   the rim and the fill ride a BACKING LAYER, never the element — `clip-path` clips
+   hit-testing, and a settings group is full of tap targets. `inset: -1px` spans the border
+   box, so the rim lands exactly where the 1px border used to and nothing reflows. Every value
+   is a shared token, so ruling 29's daybreak translation arrives for free.
+
+   `.surface-glass` RETIRED HERE (revised ruling 23), and as of the QA fix pass the class is off
+   the markup too — `SettingsPage.tsx` no longer puts it on the group. The rules below that switch
+   off the blur and the 72% wash are kept deliberately: measured before removal, `backdrop-filter`
+   already computed `none` on all three groups in all three themes, so this is what made the class
+   inert and it stays as the backstop if a future edit re-adds it. Revised ruling 23 keeps
+   `.surface-glass` alive where the material has NOT replaced it — `/viewer-controls`, where both
+   columns really do compute `blur(8px) saturate(1.15)`. Do not delete the class. */
+.settings-group,
+.settings-exceptions {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.settings-group::before,
+.settings-exceptions::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.settings-group { --material-fill: var(--material-scanline), var(--material-plate); }
+.settings-exceptions { --material-fill: var(--surface-2); }
+/* The role edge has to MOVE to the backing layer, not merely survive. `.rim-gm` is an inset
+   box-shadow on the element, and a negative-z-index pseudo paints above its originator's own
+   background AND shadow — so the material would bury the one mark that says "GM only". Restated
+   here it also follows the cut, which the element-level shadow never did. */
+.settings-group.rim-gm { box-shadow: none; }
+.settings-group.rim-gm::before { box-shadow: inset 3px 0 0 0 var(--rim-gm); }
+.settings-group.rim-player { box-shadow: none; }
+.settings-group.rim-player::before { box-shadow: inset 3px 0 0 0 var(--rim-player); }
+
+.settings-group { display: flex; flex-direction: column; gap: .2rem; padding: var(--space-4) 1.1rem 1.2rem; border: 1px solid transparent; }
+.settings-group > .nh-eyebrow { margin-bottom: .6rem; }
+
+.settings-row { display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; padding: .8rem 0; border-top: 1px solid var(--line); }
+.settings-group > .settings-row:first-of-type { border-top: 0; padding-top: .2rem; }
+.settings-row.stacked { flex-direction: column; align-items: stretch; }
+.settings-row-text { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.settings-row-title { font-weight: 600; font-size: .95rem; }
+.settings-row-help { color: var(--text-dim); font-size: .82rem; }
+.settings-row-control { display: flex; flex-direction: column; gap: .6rem; align-items: flex-start; }
+.settings-row.stacked .settings-row-control { width: 100%; }
+.settings-row:not(.stacked) .settings-row-control { align-items: flex-end; }
+
+.settings-note { margin: 0; color: var(--text-muted); font-size: .78rem; }
+.settings-subhead { font: 700 .78rem/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+.settings-inline { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.settings-inline-label { color: var(--text-dim); font-size: .85rem; }
+
+.settings-exceptions { display: flex; flex-direction: column; gap: .45rem; width: 100%; padding: .7rem .8rem; border: 1px solid transparent; }
+.settings-exception { display: flex; gap: .6rem; align-items: center; justify-content: space-between; }
+.settings-methods { display: flex; flex-wrap: wrap; gap: var(--space-2) 1.2rem; }
+
+.settings-subsection { display: flex; flex-direction: column; gap: .8rem; margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.settings-session { display: flex; flex-wrap: wrap; gap: .6rem; }
+
+/* Ruling 55: no dashed boxes. An empty list inside a group says the one next thing and stands
+   on the group's own ground — the dashes were the only thing here that read as a placeholder. */
+.settings-empty { margin: 0; padding: 1.2rem; text-align: center; color: var(--text-dim); font-size: .9rem; }
+/* Ruling 47 — LIST ROWS ARE HAIRLINE RULES, NO FILL. A filled card per player put a second
+   rectangle inside a rectangle for a row that is a name and two buttons. `gap: 0` because the
+   rule IS the separation now; the last row keeps no trailing line. Zebra was rejected upstream:
+   an alternating tint under the group's scanline is two horizontal rhythms at different
+   periods, which is where interference appears. */
+.settings-players { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.settings-player { display: flex; gap: .7rem; align-items: center; padding: .6rem .2rem; border-bottom: 1px solid var(--line); }
+.settings-player:last-child { border-bottom: 0; }
+.settings-player-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.settings-player-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-player-meta { color: var(--text-dim); font-size: .78rem; }
+.settings-player-actions { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: flex-end; }
+
+/* THE LAPTOP RUNG (§3, added 2026-08-04). A 1080p screen showed one 56rem column with a 2000px
+   scroll beside 700px of empty desk. Two columns instead: The table — the GM's big group, two
+   thirds of the page — on the left, and the two short people groups (Mine, then Players) stacked
+   on the right. `:has()` keeps this to the GM's page: a player is handed the Mine group and
+   nothing else, and one lonely column beside an empty one is worse than the centred page. */
+@media (min-width: 1280px) {
+  .settings-page:has(.settings-group--table) .settings-head,
+  .settings-page:has(.settings-group--table) .settings-body { max-width: 84rem; }
+  .settings-page:has(.settings-group--table) .settings-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-content: start;
+  }
+  .settings-group--table { grid-column: 1; grid-row: 1 / span 2; }
+  .settings-group--mine { grid-column: 2; grid-row: 1; }
+  .settings-group--players { grid-column: 2; grid-row: 2; }
+}
+
+@media (max-width: 650px) {
+  /* Every row stacks: a control pushed to the right edge of a 390px screen is a control with no room
+     for its own label, and the segmented dials here are three words wide. */
+  .settings-row { flex-direction: column; align-items: stretch; }
+  .settings-row:not(.stacked) .settings-row-control { align-items: stretch; }
+  .settings-player { flex-wrap: wrap; }
+  .settings-player-actions { width: 100%; justify-content: flex-start; }
+  .settings-player-actions > * { flex: 1 1 auto; }
+}

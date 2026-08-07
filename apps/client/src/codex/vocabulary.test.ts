@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readSource, scanCopy } from "../copy-scan";
 import { SECTION_TITLE, GM_SIDEBAR, PLAYER_SIDEBAR } from "./routes";
 import { CHRONICLE_KIND_META } from "./chronicle";
 
@@ -38,6 +39,26 @@ import { CHRONICLE_KIND_META } from "./chronicle";
  * assumed, because a silently-empty scan is exactly the failure mode this file exists to prevent.
  */
 const CODEX_DIR = `${process.cwd()}/src/codex/`;
+
+/**
+ * The reveal control moved out (`SecretMarkers.tsx` → `packages/ui/src/primitives/Reveal.tsx`), because
+ * every surface in the product now asks the same question and the Codex should not own the answer.
+ *
+ * **That is a MOVE, not a loosening, and the difference is worth stating.** Weakening is coverage lost
+ * with nothing put in its place; tracking is the same assertion following the code to where the code
+ * went. Measured on the day of the move: the corpus fell from 923 strings / 48 files to 919 / 47, the
+ * exact four strings `SecretMarkers.tsx` contributed ("Hidden from players" ×2, "Shown to players",
+ * "GM only"). Both floors below are unchanged and both still hold with room to spare — nothing was
+ * lowered to accommodate this.
+ *
+ * The words themselves gained a pin they never had here: the block at the bottom of this file reads the
+ * primitive's own source and requires the four phrases verbatim, and requires the Codex corpus to hold
+ * NONE of the two record-axis phrases — so a future hand-rolled toggle in `src/codex/` fails with the
+ * primitive named instead of quietly re-growing the control this move deleted. The behavioural half
+ * (that the switch renders them, and which one in which state) is asserted where the component now
+ * lives, in `packages/ui/src/primitives/reveal.test.tsx`.
+ */
+const REVEAL_PRIMITIVE = `${process.cwd()}/../../packages/ui/src/primitives/Reveal.tsx`;
 
 /** Each rule is a retired word plus the word that replaced it, so a failure tells you what to type. */
 const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
@@ -80,54 +101,25 @@ const ALLOWED = new Set<string>([
   "Secret agenda"
 ]);
 
-type Found = Readonly<{ file: string; line: number; text: string }>;
-
+/**
+ * The scanner itself now lives in `apps/client/src/copy-scan.ts`, because the play surfaces
+ * needed the same one and two copies of it would drift — the exact disease these locks exist
+ * to catch, inside the enforcement layer. It moved verbatim: the props list, the calls list and
+ * all three extraction branches are the ones written here, unchanged, and every floor and pin
+ * below is the number it measured before the move. That is the proof the extraction changed
+ * nothing. `play-vocabulary.test.ts` reads the same function over the play directories with its
+ * own glossary.
+ */
 function codexSources(): readonly string[] {
   return readdirSync(CODEX_DIR)
     .filter((file) => /\.tsx?$/.test(file) && !file.includes(".test."))
     .sort();
 }
 
-/** The props that carry copy. Both spellings — `help="…"` in JSX and `help: "…"` in a confirm/meta object. */
-const COPY_PROPS = [
-  "aria-label", "ariaLabel", "label", "placeholder", "title", "empty", "emptyLabel", "heading",
-  "help", "hint", "body", "summary", "confirmLabel", "cancelLabel", "removeLabel", "maxReachedReason"
-].join("|");
-/** The three calls that put a sentence on screen with no prop to hang it on. */
-const COPY_CALLS = "setError|setNotice|toast";
-
-/** JSX text nodes, label-ish props and message calls — the strings a person actually reads. */
-function userFacingStrings(file: string): readonly Found[] {
-  const found: Found[] = [];
-  readFileSync(`${CODEX_DIR}${file}`, "utf8").split("\n").forEach((line, index) => {
-    // `[:=]` catches the object-literal half, and the backtick branch catches template literals —
-    // between them, `confirm({ title: "Delete marker", body: \`…\` })` becomes visible for the first
-    // time. The two branches are separate so a template literal may contain a double quote of its own,
-    // which the atlas's `Delete map "${name}"?` does.
-    const quoted = `(?:"([^"\\n]+)"|\`([^\`\\n]+)\`)`;
-    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_PROPS})\\s*[:=]\\s*\\{?${quoted}`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
-    }
-    for (const match of line.matchAll(new RegExp(`\\b(?:${COPY_CALLS})\\(\\s*${quoted}`, "g"))) {
-      found.push({ file, line: index + 1, text: match[1] ?? match[2] });
-    }
-    // A JSX text node runs from the `>` that closed a tag up to the next `<` or `{`. The old form
-    // required a literal `<` to close it, so any sentence interrupted by an interpolation vanished
-    // whole — including MarkerInspector's "is hidden from them. Players cannot see either.{onRevealMap …".
-    // `(?<!=)` is what keeps that widening honest: without it every arrow function's `=>` opens a
-    // "text node" and the body of the Codex's own code is scanned as copy.
-    for (const match of line.matchAll(/(?<!=)>([^<>{}\n]*[A-Za-z][^<>{}\n]*)(?=[<{])/g)) {
-      const text = match[1].trim();
-      // A backtick is the tell for the other thing a `>` closes: a generic type argument, as in
-      // `request<{ marker: CodexMarker }>(token, \`/markers/…\`)`. No sentence a GM reads has one.
-      if (text.length > 1 && !text.includes("`")) found.push({ file, line: index + 1, text });
-    }
-  });
-  return found;
-}
-
 describe("The canonical glossary (D5)", () => {
-  const strings = codexSources().flatMap(userFacingStrings);
+  const strings = scanCopy(
+    codexSources().map((file) => ({ file, read: readSource(`${CODEX_DIR}${file}`) }))
+  );
 
   it("reads enough of the Codex to be worth trusting", () => {
     // A guard that silently matched nothing would pass forever. This is the tripwire on the tripwire:
@@ -162,6 +154,34 @@ describe("The canonical glossary (D5)", () => {
       const rescued = strings.filter((entry) => entry.text === allowed && RETIRED.some(({ pattern }) => pattern.test(entry.text)));
       expect(rescued.length, `exemption ${JSON.stringify(allowed)} rescues nothing`).toBeGreaterThan(0);
     }
+  });
+
+  /** The two halves of the reveal control's relocation — see `REVEAL_PRIMITIVE` above. */
+  it("keeps the reveal words locked after the control left this directory", () => {
+    const source = readFileSync(REVEAL_PRIMITIVE, "utf8");
+    // Reading the file at all is the tripwire: a rename or another move makes this throw, which is the
+    // point — the pin must break loudly rather than pass over a control that is no longer there.
+    for (const phrase of ["Shown to players", "Hidden from players", "GM only", "Show to players"]) {
+      expect(
+        source.includes(`"${phrase}"`),
+        `packages/ui/src/primitives/Reveal.tsx no longer says ${JSON.stringify(phrase)}.\n` +
+          `These four are D28's visibility words and the whole product reads them off this one component.\n` +
+          `Fix: restore the phrase. If it is genuinely being retired, retire it HERE too (RETIRED above) and in the\n` +
+          `packages/ui reveal tests, in the same commit — never in one place only.`
+      ).toBe(true);
+    }
+  });
+
+  it("never re-grows a reveal control inside the Codex — the record-axis phrases come from the primitive", () => {
+    // Zero on the day the control moved out, and it must stay zero: a Codex surface that types
+    // "Shown to players" into its own JSX has hand-rolled the toggle again, which is exactly the drift
+    // the promotion exists to end. (The CONTENT pill's "GM only" is a different axis and legitimately
+    // still appears in Codex copy — the atlas descend-lock and two field labels — so it is not listed.)
+    const offenders = strings.filter((entry) => /Shown to players|Hidden from players/.test(entry.text));
+    expect(
+      offenders.map((entry) => `${entry.file}:${entry.line}  ${JSON.stringify(entry.text)}`),
+      `Fix: import { RevealSwitch } or { VisibilityBadge } from "@vtt/ui" instead of writing the words.`
+    ).toEqual([]);
   });
 });
 

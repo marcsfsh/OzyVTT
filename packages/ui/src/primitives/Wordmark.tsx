@@ -11,7 +11,7 @@ export interface WordmarkProps extends HTMLAttributes<HTMLSpanElement> {
 
 /** The app wordmark: chunky arcade face with the chrome-gradient fill + bevel
     (via .wordmark-name from the token layer). Wordmark and top-level titles only. */
-export function Wordmark({ children = "OzyVTT", chromatic = false, className, ...rest }: WordmarkProps) {
+export function Wordmark({ children = "OZYVTT", chromatic = false, className, ...rest }: WordmarkProps) {
   return (
     <span className={cx("nh-wordmark", "wordmark-name", chromatic && "chromatic", className)} {...rest}>
       {children}

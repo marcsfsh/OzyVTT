@@ -1,68 +1,101 @@
 import { useState } from "react";
-import type { GmActor, Scene } from "@vtt/domain";
-import { MonsterBrowser } from "../encounter/MonsterBrowser";
+import type { GmActor, Scene, StagingDefaults } from "@vtt/domain";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
+import { useMapCatalog } from "../maps/map-catalog";
+import { ScenePrepPanel } from "./ScenePrepPanel";
 import "./scene-panel.css";
+// The frame rules for this panel live beside the room they wrap, not in scene-panel.css: that file
+// is the two prep surfaces' chrome, and `.scene-builder-body` IS the prep room's region.
+import "./scene-prep.css";
 import { usePrompt } from "../components/feedback";
 
 /**
- * The encounter-builder shown in the sidebar while the GM stages a scene privately. It's the same
- * kind of tool as the live setup - choose who's in this scene, add SRD monsters to the roster - but
- * it edits THIS scene's own combatant list (scene:set-combatants), never the live table. Token
- * placement happens on the staged map; initiative is rolled when the scene is started after going live.
+ * The full prep door (D1): the workspace panel beside the privately staged map. Same parts as the
+ * table's quick-start panel — map line, staging tray, the two Add buttons, Recent — because they are
+ * literally the same component (`ScenePrepPanel`); only what an add COMMITS to differs. Here every
+ * change edits this scene's own combatant list (`scene:set-combatants`), never the live table, and
+ * the tokens it creates sit unplaced in the tray until the GM drags them onto the staged map.
+ *
+ * Making the scene live is the map cluster's button, not a second copy here — one action, one place.
+ *
+ * THE PANEL IS A FRAME (§7), and that is what lets it sit in the phone table's sheet row. It is the
+ * row's one child, so it takes the row's height (`frame-col frame-fill`, the @vtt/ui utilities): the
+ * head is a fixed row, the prep room below it is the ONE region — `.scroll-y` in the MARKUP, the
+ * blessed marker — and the feedback line is the bottom row, so an error is never scrolled away from.
+ * Before this it rendered at natural height (84 + 540 = 681px inside a 413px row at 390x844) and the
+ * sheet ROW carried a `.scroll-y` bridge to keep the overflow reachable; the bridge is gone with it,
+ * and every arm of that row is a frame column again.
  */
-export function SceneBuilder({ scene, actors, revision }: Readonly<{ scene: Scene; actors: readonly GmActor[]; revision: number }>) {
+export function SceneBuilder({ scene, actors, revision, stagingDefaults }: Readonly<{
+  scene: Scene;
+  actors: readonly GmActor[];
+  revision: number;
+  /** The table's standing "new tokens" visibility. Absent = the schema default (shown to players). */
+  stagingDefaults?: StagingDefaults;
+}>) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [browsing, setBrowsing] = useState(false);
-  // Monsters added via the browser during this staging session. The picker lists the party (PCs/NPCs)
-  // always, but a monster only once it's staged in this scene or was just added here - so a scene
-  // starts as "just the party" rather than the whole accumulated bestiary.
-  const [addedIds, setAddedIds] = useState<ReadonlySet<string>>(() => new Set());
-  const inScene = new Set(scene.combat.initiative.map((entry) => entry.actorId));
-  const visible = actors.filter((actor) => actor.kind !== "monster" || inScene.has(actor.id) || addedIds.has(actor.id));
   const { prompt, dialog } = usePrompt();
+  const { maps } = useMapCatalog();
+  const staged = scene.combat.initiative.map((entry) => entry.actorId);
+  const placedIds = new Set(scene.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId));
+  const mapName = (maps ?? []).find((map) => map.id === scene.mapAssetId)?.name ?? null;
 
   const setCombatants = (ids: readonly string[]) => {
     setBusy(true); setMessage("");
     socket.emit("scene:set-combatants", { commandId: newId(), sceneId: scene.id, combatantIds: ids, expectedRevision: revision }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
-      if (!result.ok) setMessage(result.message ?? "The scene's combatants could not be updated.");
+      if (!result.ok) setMessage(result.message ?? "The scene's list could not be updated.");
     });
   };
-  const toggle = (actorId: string) => setCombatants(inScene.has(actorId) ? [...inScene].filter((id) => id !== actorId) : [...inScene, actorId]);
+  // Adds carry no expectedRevision: an add from the browser has just bumped the revision itself, and
+  // this is solo private staging, so the optimistic-concurrency guard would only reject the GM's own
+  // immediate follow-up.
+  const stageAdd = (actorId: string) => {
+    if (staged.includes(actorId)) return;
+    setBusy(true); setMessage("");
+    socket.emit("scene:set-combatants", { commandId: newId(), sceneId: scene.id, combatantIds: [...staged, actorId] }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      if (!result.ok) setMessage(result.message ?? "The scene's list could not be updated.");
+    });
+  };
+  const rename = async () => {
+    const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
+    if (!next || next === scene.name) return;
+    setBusy(true); setMessage("");
+    socket.emit("scene:rename", { commandId: newId(), sceneId: scene.id, name: next }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      if (!result.ok) setMessage(result.message ?? "The scene could not be renamed.");
+    });
+  };
 
-  return <section className="scene-builder" aria-labelledby="scene-builder-heading">
-    <div className="scene-builder-head"><span className="eyebrow">STAGING · GM ONLY</span>
+  return <section className="scene-builder frame-col frame-fill" aria-labelledby="scene-builder-heading">
+    <div className="scene-builder-head"><span className="eyebrow">ARRANGING · GM ONLY</span>
       <h2 id="scene-builder-heading">{scene.name}
-        <button type="button" className="scene-rename" disabled={busy} title="Rename this scene" aria-label={`Rename ${scene.name}`} onClick={async () => {
-          const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
-          if (!next || next === scene.name) return;
-          setBusy(true); setMessage("");
-          socket.emit("scene:rename", { commandId: newId(), sceneId: scene.id, name: next }, (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setMessage(result.message ?? "The scene could not be renamed."); });
-        }}>✎</button>
+        <button type="button" className="scene-rename" disabled={busy} title="Rename this scene" aria-label={`Rename ${scene.name}`} onClick={() => void rename()}>✎</button>
       </h2>
-      <p>Pick who's in this scene, then drag their tokens onto the map. Players don't see any of this until you make it live.</p></div>
-    {visible.length === 0
-      ? <p className="scene-builder-empty">Your party appears here. Add monsters below to build the encounter.</p>
-      : <ul className="scene-builder-list">{visible.map((actor) => <li key={actor.id}>
-          <label><input type="checkbox" checked={inScene.has(actor.id)} disabled={busy} onChange={() => toggle(actor.id)} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""}</small></span></label>
-        </li>)}</ul>}
-    <button type="button" className="scene-builder-add" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
-    <p className="scene-builder-count">{inScene.size} combatant{inScene.size === 1 ? "" : "s"} staged</p>
+      <p>Players see none of this until you make the scene live.</p></div>
+    <div className="scene-builder-body scroll-y frame-fill">
+      <ScenePrepPanel
+        heading="In this scene"
+        actors={actors}
+        staged={staged}
+        placedIds={placedIds}
+        onAdd={stageAdd}
+        onRemove={(actorId) => setCombatants(staged.filter((id) => id !== actorId))}
+        mapName={mapName}
+        // A scene owns its map for life: there is no command to swap it, and its staged token positions
+        // are in that map's pixels. Prepare another scene to use another map.
+        mapLocked
+        selectedMapId={scene.mapAssetId}
+        stagingRevealed={(stagingDefaults?.visibility ?? "public") !== "gm-only"}
+        combatActive={false}
+        busy={busy}
+        emptyNote="No one in this scene yet. The party is added the moment you tap Add characters; monsters come from the browser."
+      />
+    </div>
     {message && <p className="scene-builder-feedback" role="status">{message}</p>}
-    {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} onAdded={(actorId) => {
-      // A just-added monster joins this scene checked by default. No expectedRevision: the add itself
-      // just bumped the revision, and this is solo private staging, so skip the optimistic-concurrency
-      // guard that would otherwise reject this immediate follow-up.
-      setAddedIds((prev) => new Set(prev).add(actorId));
-      setBusy(true); setMessage("");
-      socket.emit("scene:set-combatants", { commandId: newId(), sceneId: scene.id, combatantIds: [...inScene, actorId] }, (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) setMessage(result.message ?? "The scene's combatants could not be updated.");
-      });
-    }} />}
     {dialog}
   </section>;
 }

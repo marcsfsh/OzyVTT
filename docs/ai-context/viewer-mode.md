@@ -71,6 +71,13 @@ change one and you must change the other, and a check enforces it.
   until combat is active. The fog mask reaches players and the viewer verbatim: it
   *is* the render input.
 
+- **A recorded fight is projected for a player, never filtered.** `projectPlayerReplay`
+  (`apps/server/src/replay-projection.ts`) builds a new document from an allow-list over the
+  archive's per-turn states, so it hides a combatant until the turn it was revealed, and never
+  carries a session id, the journal, the raw states, the notes, or the stat blocks. A `gmOnly`
+  filter alone would not be enough: a self-only roll is stored `gm_only = 0` because it IS visible
+  — to its roller — and the replay reader is any player, so it drops every roll that is not public.
+
 **The rule for a new field, and the only rule you need:** a field may reach the viewer
 projection *only if everything it carries is already public, and it carries no exact quantity
 and no identity, position or existence of a non-public thing*. Concretely, that is why the

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, SegmentedControl } from "@vtt/ui";
 import "./api-reference.css";
 
@@ -109,7 +109,7 @@ const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }>
   { title: "Player sessions", match: (path) => path.startsWith("/api/v1/sessions") },
   { title: "Live game", match: (path) => path.startsWith("/api/v1/game") },
   { title: "Reference content", match: (path) => path.startsWith("/api/v1/content") },
-  { title: "Encounter archives (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
+  { title: "Fight replays (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
   { title: "Map assets & calibration", match: (path) => path.startsWith("/api/v1/map-assets") },
   { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") },
   // Title follows the Codex glossary ("pages", "atlas", "journal", "calendar") so the API panel and the
@@ -117,7 +117,7 @@ const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }>
   // codex surface grows: it renders the live document, so new paths, scopes and role-projected `oneOf`
   // shapes appear on their own, and `ungrouped` below catches anything a matcher misses.
   { title: "Codex (pages, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") },
-  { title: "Homebrew authoring (GM-only)", match: (path) => path.startsWith("/api/v1/homebrew") }
+  { title: "Homebrew authoring (GM only)", match: (path) => path.startsWith("/api/v1/homebrew") }
 ];
 
 /**
@@ -343,7 +343,23 @@ function exportSpec(document: OpenApiDocument) {
   URL.revokeObjectURL(url);
 }
 
-export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
+/**
+ * RULING 61 — the reference is also a real address (`/settings/api`), GM-only, full window width.
+ *
+ * Two presentations, one body. The Settings page keeps the `<details>` disclosure it has always had;
+ * `/settings/api` is the same content given the whole pane, bookmarkable and deep-linkable, with an
+ * "open in a new tab" action beside it. Opening that tab lands on the app's own GM sign-in card and
+ * takes the password once — accepted explicitly, because the GM token is deliberately memory-only and
+ * every alternative (token in the URL, token in localStorage, a `postMessage` handshake) copies a
+ * credential somewhere it should not go.
+ *
+ * **Still owed, and not a bug fix:** at roughly 31,700px this is a 36-screen document with no
+ * navigation, and full width does not make that readable. It needs a table of contents, per-group
+ * collapse or a filter — design work, recorded in ruling 61's own closing paragraph.
+ */
+const API_REFERENCE_PATH = "/settings/api";
+
+function ApiReferenceBody({ gmToken }: Readonly<{ gmToken: string }>) {
   const [state, setState] = useState<{ status: "idle" | "loading" | "ready" | "error"; document: OpenApiDocument | null; commands: readonly CatalogCommand[]; message: string }>({ status: "idle", document: null, commands: [], message: "" });
   const [language, setLanguage] = useState<Language>("shell");
 
@@ -358,17 +374,28 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
       .catch(() => setState({ status: "error", document: null, commands: [], message: "The reference could not be loaded from the server." }));
   };
 
+  /**
+   * Fetched on mount rather than on a disclosure toggle, because BOTH presentations mount this body
+   * only when it is about to be read: the settings disclosure renders it only while open, and the
+   * page is the address. Idempotent by the guard above — a second call while loading or ready is a
+   * no-op, which is what makes StrictMode's double-mount safe here.
+   */
+  useEffect(() => { load(); }, []);
+
   const document = state.document;
   const components = document?.components?.schemas ?? {};
   const origin = window.location.origin;
   const operationCount = document ? Object.values(document.paths).reduce((total, operations) => total + Object.keys(operations).length, 0) : 0;
 
-  return <details className="api-reference" onToggle={(event) => { if ((event.target as HTMLDetailsElement).open) load(); }}>
-    <summary><strong>API reference</strong><span>Every endpoint this server exposes, straight from its own contract - click one for its full spec.</span></summary>
+  return <>
     <div className="api-reference-body">
       <p className="api-reference-intro">
         Base URL: <code>{origin}/api/v1</code> · Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> - a credential from above, your GM session, or a player session.
-        The machine-readable contract lives at <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>; a full generated write-up ships in the repo at <code>docs/api-reference.md</code>.
+        {/* Route 2 (design-language §4): the one CONTROL in this paragraph is a 19px line of text, so
+            the hit AREA grows to the floor and the paint stays prose. Its overhang can only reach
+            more prose — the paragraph holds no second control — so nothing is stolen. Measured by
+            `scripts/tap-audit.mjs 375`, which caught it the moment this page got an address. */}
+        The machine-readable contract lives at <a className="tap-target" href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>; a full generated write-up ships in the repo at <code>docs/api-reference.md</code>.
       </p>
       {/**
         * D19: the idempotency and revision rules are READ FROM THE SERVED CONTRACT, never restated here.
@@ -432,5 +459,42 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
         </section>}
       </>}
     </div>
+  </>;
+}
+
+/**
+ * The Settings-page presentation: the disclosure the GM has always had, plus the door to the address.
+ */
+export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
+  const [open, setOpen] = useState(false);
+  return <details className="api-reference" open={open} onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
+    <summary><strong>API reference</strong><span>Every endpoint this server exposes, straight from its own contract - click one for its full spec.</span></summary>
+    {/* Mounted only while open, so the fetch is still paid on the first disclosure rather than on
+        every visit to Settings — the behaviour the `onToggle` load used to buy. */}
+    {open && <ApiReferenceBody gmToken={gmToken} />}
   </details>;
+}
+
+/**
+ * `/settings/api` — the reference at its own address, full window width (ruling 61).
+ *
+ * It owns its frame (§7): a heading row carrying the two doors over one scrolling region. The
+ * "open in a new tab" action is a plain link with `target="_blank"`, not a `window.open` handshake:
+ * the new tab authenticates by asking for the GM password once, which is the whole point of the
+ * ruling — no credential is copied into a second document.
+ */
+export function ApiReferencePage({ gmToken, onBack }: Readonly<{ gmToken: string; onBack: () => void }>) {
+  return <section className="api-reference-page pane-frame pane-scene scanlines frame-col anim-view" aria-label="API reference">
+    <div className="pane-sky" aria-hidden="true" />
+    <div className="api-reference-page-head neon-beam">
+      <h2>API reference</h2>
+      <div className="api-reference-page-actions">
+        <Button variant="ghost" onClick={onBack}>Back to Settings</Button>
+        <Button variant="secondary" title="The new tab asks for the GM password once — the GM token is never persisted." onClick={() => window.open(API_REFERENCE_PATH, "_blank", "noopener")}>Open in a new tab</Button>
+      </div>
+    </div>
+    <div className="api-reference-page-body scroll-y frame-fill">
+      <ApiReferenceBody gmToken={gmToken} />
+    </div>
+  </section>;
 }

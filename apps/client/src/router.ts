@@ -226,25 +226,42 @@ export function useRoute(): Route {
 
 // ----- The app shell's address table (D3) -----
 
-export type GmTab = "scenes" | "table" | "roster" | "codex" | "homebrew" | "viewer" | "replay" | "setup";
+export type GmTab = "scenes" | "table" | "roster" | "codex" | "homebrew" | "viewer" | "replay" | "settings";
 
 /**
  * One address per GM tab. **`/viewer-controls`, not `/viewer`** — the server reserves `GET /viewer` as a
  * 307 to the standalone TV viewer in both prod and dev, so the SPA can never receive that address; and
  * "viewer controls" is what the tab actually is (the controls for the shared screen).
+ *
+ * D28/D29: the table's address is `/table` for BOTH roles — one address, the projection decides what
+ * renders. `/encounter` (three names for one tab: id `table`, label "Encounter", path `/encounter`) and
+ * `/setup` (now Settings) are retired, and `RETIRED_PATHS` redirects them so old bookmarks still land.
  */
 const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
-  table: "/encounter",
+  table: "/table",
   scenes: "/scenes",
   roster: "/roster",
   codex: "/codex",
   homebrew: "/homebrew",
   viewer: "/viewer-controls",
   replay: "/replays",
-  setup: "/setup"
+  settings: "/settings"
 };
 
 export function pathForGmTab(tab: GmTab): string { return GM_TAB_PATHS[tab]; }
+
+/**
+ * Addresses that used to mean something and now mean somewhere else. A redirect rather than a
+ * not-found: a GM who bookmarked `/encounter` in the last build must land on the table, not on a card
+ * telling them nothing lives there.
+ */
+const RETIRED_PATHS: Readonly<Record<string, string>> = { "/encounter": "/table", "/setup": "/settings" };
+
+/** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too. */
+export function redirectForRetiredPath(path: string, query: URLSearchParams): string | null {
+  if (path === "/scenes" && query.get("view") === "maps") return "/scenes/maps";
+  return RETIRED_PATHS[path] ?? null;
+}
 
 /** Which GM tab an address renders, or null when the address is not a GM tab at all. */
 export function gmTabForPath(path: string): GmTab | null {
@@ -253,12 +270,53 @@ export function gmTabForPath(path: string): GmTab | null {
   return found ? found[0] : null;
 }
 
-/** Addresses only the GM may reach. A player asking for one gets the not-found view (never a 403-alike). */
+/**
+ * Which tab LIGHTS for an address (A2 "tab lighting for layer addresses").
+ *
+ * A layer address belongs to a tab even though it is not that tab's own address: a character sheet and
+ * the builder are the Roster's kind of thing, so the Roster arm stays lit while one is open. Without
+ * this, `/characters/<id>` fell through `gmTabForPath` to null and the shell lit Table — the lit-tab lie
+ * D1 exists to kill.
+ */
+export function litGmTab(path: string): GmTab | null {
+  const head = path.split("/").filter(Boolean)[0] ?? "";
+  if (head === "characters" || head === "builder") return "roster";
+  return gmTabForPath(path);
+}
+
+/**
+ * Addresses only the GM may reach. A player asking for one gets the not-found view (never a 403-alike).
+ *
+ * D29 shrinks this list: `/table`, `/settings`, `/replays`, `/replays/<id>`, `/characters/*` and
+ * `/builder` are player-reachable **as addresses**. Whether a player may see the thing AT that address
+ * is a data guard (their claim, the GM's share, the builder policy) that renders not-found on failure —
+ * the same indistinguishable answer, decided one level in where the data is.
+ */
 export function isGmOnlyPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
   if (segments[0] === "codex") return ["audit", "backup", "settings"].includes(segments[1] ?? "");
+  /**
+   * Ruling 61 — `/settings/api` is the API reference as a real address, and it is the GM's alone.
+   * Settings itself is shared (a player gets the Mine group), so the head cannot decide this: the
+   * SECOND segment does. A player asking for it gets the not-found view, indistinguishable from an
+   * address that means nothing, which is the same answer `/roster` gives them.
+   */
+  if (segments[0] === "settings") return segments[1] === "api";
   const tab = gmTabForPath(path);
-  return tab !== null && tab !== "codex";
+  if (tab === null) return false;
+  return tab !== "codex" && tab !== "table" && tab !== "settings" && tab !== "replay";
+}
+
+/**
+ * The mirror of `isGmOnlyPath`: an address only a PLAYER may reach.
+ *
+ * There is exactly one — `/me`, the My Character tab (D9) — and it is not a symmetry for its own
+ * sake. The tab is about the character you claimed, and the GM claims nobody; a GM who follows the
+ * address gets the same not-found card a player gets at `/roster`. Kept out of `isGmOnlyPath`'s
+ * negation because "not GM-only" means "shared", which is what every other address is.
+ */
+export function isPlayerOnlyPath(path: string): boolean {
+  return path.split("/").filter(Boolean)[0] === "me";
 }
 
 /**
@@ -268,13 +326,61 @@ export function isGmOnlyPath(path: string): boolean {
  * disagreed on `/codex/tags` and `/codex/journal/j1`, and a disagreement between "does this exist" and
  * "what does it render" puts a not-found card on top of a working surface. `router.test.ts` asserts the
  * two answers stay locked together over the whole table.
+ *
+ * The id-bearing heads (`/characters/<id>`, `/scenes/<id>`, `/replays/<id>`) answer "yes" for any
+ * well-shaped id: whether THAT id exists, is claimed, or was shared is data the router does not hold,
+ * and the surface renders not-found when its own guard says no.
  */
 export function isKnownPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
   if (segments.length === 0) return true;
-  if (segments[0] === "table") return segments.length === 1;
   if (segments[0] === "codex") return codexSectionOf(segments) !== null;
+  if (segments[0] === "builder") return segments.length === 1;
+  if (segments[0] === "characters") {
+    if (segments.length === 2) return segments[1].length > 0;
+    return segments.length === 3 && segments[2] === "level";
+  }
+  if (segments[0] === "scenes") return segments.length === 1 || (segments.length === 2 && segments[1].length > 0);
+  // D9 — the player's own tab. One segment, no records under it.
+  if (segments[0] === "me") return segments.length === 1;
+  /**
+   * Ruling 61 — `/settings/api` is the ONE two-segment settings address. `gmTabForPath` already
+   * answered "settings" for it (it reads the head), so the tab lit and the not-found card painted on
+   * top: the surface existed and the router denied it. Everything else under `/settings` stays
+   * unknown, which is why this is a single named segment rather than a length check.
+   */
+  if (segments[0] === "settings") return segments.length === 1 || (segments.length === 2 && segments[1] === "api");
+  // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
+  if (segments[0] === "replays") return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));
   return gmTabForPath(path) !== null && segments.length === 1;
+}
+
+/**
+ * A LAYER open on top of a tab: the sheet, the builder, the level flow, a replay, a scene-prep
+ * workspace, the maps library. Each used to be component state (`builderOpen`, `previewSceneId`,
+ * `?archive=`, `?view=maps`, five sheet openers) — D29 gives each an address, and this is the one place
+ * that reads one back out, so the shell branches on a value rather than on five parallel booleans.
+ */
+export type AddressLayer =
+  | Readonly<{ kind: "sheet"; actorId: string }>
+  | Readonly<{ kind: "level"; actorId: string }>
+  | Readonly<{ kind: "builder" }>
+  | Readonly<{ kind: "replay"; archiveId: number }>
+  | Readonly<{ kind: "scene-prep"; sceneId: string | null }>
+  | Readonly<{ kind: "maps" }>;
+
+export function layerOf(path: string): AddressLayer | null {
+  const segments = path.split("/").filter(Boolean);
+  if (segments[0] === "characters" && segments[1]) {
+    return segments[2] === "level" ? { kind: "level", actorId: segments[1] } : { kind: "sheet", actorId: segments[1] };
+  }
+  if (segments[0] === "builder" && segments.length === 1) return { kind: "builder" };
+  if (segments[0] === "replays" && segments.length === 2) return { kind: "replay", archiveId: Number(segments[1]) };
+  if (segments[0] === "scenes" && segments.length === 2) {
+    if (segments[1] === "maps") return { kind: "maps" };
+    return { kind: "scene-prep", sceneId: segments[1] === "new" ? null : segments[1] };
+  }
+  return null;
 }
 
 // ----- Resume-last-location (D2) -----
@@ -334,7 +440,8 @@ export function lastLocationForTab(role: "gm" | "player", head: string): string 
 export function resumeTarget(role: "gm" | "player", currentPath: string): string | null {
   if (currentPath !== "/") return null;
   const stored = lastLocation(role);
-  const fallback = role === "gm" ? "/encounter" : "/table";
+  // D29: one address for the table, both roles. There is no second front door any more.
+  const fallback = "/table";
   // A player is never resumed onto a GM-only address. The not-found view would catch it, but being
   // *sent* there on sign-in is a worse shape than deep-linking there deliberately: the app would be
   // volunteering the address rather than declining to answer it.

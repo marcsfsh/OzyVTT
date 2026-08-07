@@ -97,6 +97,17 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
 
 // ----- Journal entries -----
 
+
+/**
+ * Ruling 57: an entry's filing — session, in-world date, attached page, tags — lives in the composer's
+ * summonable Details panel, not stacked under the writing. Asked rather than assumed, because the
+ * panel's state is REMEMBERED across mounts.
+ */
+const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
+  const details = await screen.findByRole("button", { name: "Details" });
+  if (details.getAttribute("aria-expanded") !== "true") await user.click(details);
+};
+
 describe("Journal entry tags (CI-2)", () => {
   const renderJournal = async (records: CodexChronicleRecord[]) => {
     chronicle.mockResolvedValue(records);
@@ -119,6 +130,7 @@ describe("Journal entry tags (CI-2)", () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByLabelText("Player-facing summary"), "They crossed the mists.");
+    await openEntryDetails(user);
     // Two words with a capital: the server would REJECT "Session Recap" outright.
     await user.type(screen.getByLabelText("Tags"), "Session Recap{Enter}");
     await user.click(screen.getByRole("button", { name: "Add entry" }));
@@ -136,6 +148,7 @@ describe("Journal entry tags (CI-2)", () => {
     // composer's two bodies, so an unscoped "Edit" is now three buttons. The one under test is the row's.
     const row = within(await screen.findByRole("article"));
     await user.click(row.getByRole("button", { name: "Edit" }));
+    await openEntryDetails(user);
     expect(await screen.findByRole("list", { name: /chosen/i })).toHaveTextContent("dark-gift");
 
     await user.type(screen.getByLabelText("Tags"), "Ravenloft{Enter}");

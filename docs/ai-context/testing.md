@@ -43,6 +43,29 @@ for p in "hides all presentation content while disabled" "rejects non-GM control
   grep -qF "$p" docs/ai-context/viewer-mode.md || echo "MISSING: $p"; done
 ```
 
+## The checks that fail on a design or vocabulary regression
+
+Three client suites enforce things a reviewer used to have to notice. They are ordinary
+`npm test` failures — there is no separate command — and each names the fix in its message.
+
+| Suite | What fails |
+|---|---|
+| `apps/client/src/play-vocabulary.test.ts` | A retired word in user copy anywhere under `apps/client/src` (minus a pinned exclusion list) or in `packages/ui/src/primitives`. Also pins the structured copy the scan cannot see: `CLAIM_WORD`, `ROLL_VISIBILITY_WORD`, `SETTINGS_GROUPS`, the rules dial, the GM tab labels. |
+| `apps/client/src/codex/vocabulary.test.ts` | The same, for the Codex's own glossary. Both read one scanner, `apps/client/src/copy-scan.ts`. |
+| `apps/client/src/design-conventions.test.ts` | A text glyph where an icon belongs, a raw `<input type="search"\|number">`, a second `.eyebrow`, a hand-typed colour, an inline feedback banner, an off-ladder breakpoint, a viewport-fraction cap on in-flow content, an undeclared scroll region (a bare `overflow-y: auto` in app CSS). |
+
+Every allowlist in those files is **shrink-only**, and its size is pinned in
+`apps/client/src/design-conventions-shape.ts` — so fixing a violation costs a deleted row plus
+a decremented number, and *weakening* a check costs two deliberate edits in two files. The
+dead-entry detectors mean a fixed violation fails until its row is removed. Do not add a row to
+go green; the failure message tells you what to type instead.
+
+Two limits, so a green run is not over-read: the scan reads copy, not code, so a literal inside
+a JSX expression (`{claimed ? "Claimed" : "Available"}`) is invisible — those cases are pinned
+at their definition instead; and a regex matches tokens, not senses, which is why the terms D28
+KEEPS (fog Reveal/Hide, Initiative the score, Save the throw, Claim/Release) are asserted
+PRESENT rather than merely left un-ruled.
+
 ## What CI runs
 
 `.github/workflows/ci.yml` (job "Test, type-check, and build"), Node 24:
@@ -70,8 +93,16 @@ automated does.**
   `/viewer.html` and confirm nothing GM-only appears. For Codex changes, use the GM's player
   preview (`POST /api/v1/codex/preview-session`) rather than reasoning about it.
 - **Touch targets:** `node scripts/tap-audit.mjs 375` measures the 44px floor across GM and
-  player surfaces and exits non-zero if anything is sub-floor *or* any surface goes
+  player surfaces — the Codex and the play shell's routes; a new address is one line in its
+  surface tables — and exits non-zero if anything is sub-floor *or* any surface goes
   unmeasured. Quote its output; do not quote a number from a document.
+- **The layout law (design-language.md §7):** `node scripts/no-scroll-audit.mjs` drives the
+  route × role table (landing, viewer entry, a real GM session, a real player session) at
+  1280×900, 1280×720 and 390×844 and exits non-zero if any route's document scrolls on
+  either axis *or* any route goes unmeasured. Same terms as the tap audit: needs a browser
+  and a live dev server, so it is a thing you run, not a thing that runs. The shell lock
+  took the whole table green (staged pane regions absorb unconverted surfaces), so any red
+  cell is a regression; the (g)/(h) ratchets carry the remaining conversion debt.
 
 Say what you ran and what you saw. A tier you did not execute is not verification, and
 "should work now" is not a result.

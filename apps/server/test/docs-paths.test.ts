@@ -39,7 +39,10 @@ const KNOWN_EXTERNAL: readonly string[] = [];
  * Empty today, and short is the point: every entry is a claim this check can no longer verify.
  * Prefer archiving the whole document when the whole document describes a past state.
  */
-const REMOVED_ON_PURPOSE: ReadonlyArray<readonly [path: string, why: string]> = [];
+const REMOVED_ON_PURPOSE: ReadonlyArray<readonly [path: string, why: string]> = [
+  ["apps/client/src/scene/RendererProof.tsx",
+   "deleted with the PixiJS dependency; ADR-0003 records that removal as its own consequence"],
+];
 
 const format = (r: RepoReference): string => `${r.file}:${r.line} -> ${r.ref}`;
 

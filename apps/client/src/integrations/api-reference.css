@@ -1,22 +1,25 @@
-.api-reference { margin-top: 2rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); }
-.api-reference > summary { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; padding: 1rem 1.25rem; cursor: pointer; list-style-position: inside; }
+.api-reference { margin-top: var(--space-8); border: 1px solid transparent; }
+.api-reference > summary { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; padding: var(--space-4) var(--space-5); cursor: pointer; list-style-position: inside; }
 .api-reference > summary strong { font-family: var(--font-display); font-size: 1.15rem; }
 .api-reference > summary span { color: var(--text-muted); font-size: 0.85rem; }
-.api-reference-body { padding: 0 1.25rem 1.25rem; }
+.api-reference-body { padding: 0 var(--space-5) var(--space-5); }
 .api-reference-intro { font-size: 0.9rem; }
 .api-reference-intro a { color: var(--cyan); }
 .api-reference-count { color: var(--text-muted); font-size: 0.8rem; }
 .api-reference-error { color: var(--danger-hi); }
-.api-reference-group { margin-top: 1.25rem; }
-.api-reference-group h3 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--text); }
+.api-reference-group { margin-top: var(--space-5); }
+.api-reference-group h3 { margin: 0 0 var(--space-2); font-size: 1rem; color: var(--text); }
 .api-endpoint-list { display: grid; gap: 0.55rem; }
-.api-endpoint { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.api-endpoint > summary { list-style: none; cursor: pointer; padding: 0.55rem 0.7rem; display: grid; gap: 0.25rem; }
+/* Ruling 47: forty endpoints are the longest list on this surface. A hairline rule between rows,
+   no per-row fill and no per-row card — the disclosure's own open border is what separates a row
+   from its body. The list's `gap` is what separates one row from the next. */
+.api-endpoint { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+.api-endpoint > summary { list-style: none; cursor: pointer; padding: 0.55rem 0.7rem; display: grid; gap: var(--space-1); }
 .api-endpoint > summary::-webkit-details-marker { display: none; }
 .api-endpoint[open] > summary { border-bottom: 1px solid var(--line); }
-.api-endpoint > summary:hover { background: var(--surface-3); }
+.api-endpoint > summary:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .api-endpoint-summary { font-size: 0.8rem; color: var(--text-dim); }
-.api-reference-route { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.api-reference-route { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .api-method { font-weight: 800; font-size: 0.72rem; letter-spacing: 0.05em; padding: 0.15rem 0.45rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--info) 30%, transparent); color: var(--text); }
 .api-method-post { background: color-mix(in srgb, var(--success) 25%, transparent); color: var(--text); }
 .api-method-delete { background: color-mix(in srgb, var(--danger) 30%, transparent); color: var(--text); }
@@ -33,23 +36,22 @@
 .api-detail-block h4 { margin: 0 0 0.4rem; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 .api-detail-empty { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
 .api-field-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-.api-field-table th, .api-field-table td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.api-field-table th, .api-field-table td { text-align: left; padding: 0.3rem var(--space-2); border-bottom: 1px solid var(--line); vertical-align: top; }
 .api-field-table th { color: var(--text-muted); font-weight: 600; }
 .api-field-table td:first-child code { color: var(--cyan); }
 .api-field-table td:nth-child(2) { color: var(--text-dim); white-space: nowrap; }
-.api-code { margin: 0; padding: 0.7rem 0.8rem; border-radius: var(--radius-sm); background: var(--void); border: 1px solid var(--line); overflow-x: auto; }
+.api-code { margin: 0; padding: 0.7rem 0.8rem; border-radius: 0; background: var(--void); border: 1px solid var(--line); overflow-x: auto; }
 .api-code code { font-size: 0.78rem; color: var(--text-dim); white-space: pre; }
 .api-code-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
 .api-code-header h4 { margin: 0; }
 .api-code-lang { font-size: 0.72rem; color: var(--text-muted); }
-.api-copy { margin-left: auto; padding: 0.25rem 0.6rem; font-size: 0.72rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text-dim); text-align: center; }
+.api-copy { margin-left: auto; padding: var(--space-1) 0.6rem; font-size: 0.72rem; border: 1px solid var(--line); border-radius: 0; background: var(--surface-3); color: var(--text-dim); text-align: center; }
 .api-copy:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 
-.api-reference-toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
-.api-lang-tabs { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.api-reference-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4); }
+.api-lang-tabs { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .api-lang-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
 .api-export-spec { margin-left: auto; padding: 0.45rem 0.9rem; text-align: center; white-space: nowrap; }
-@media (max-width: 700px) { .api-export-spec { margin-left: 0; } }
 .api-response { padding: 0.35rem 0 0.35rem 0.6rem; border-left: 2px solid var(--line); }
 .api-response + .api-response { margin-top: 0.4rem; }
 .api-response-ok { border-left-color: var(--success); }
@@ -57,4 +59,58 @@
 .api-response p { margin: 0 0 0.3rem; font-size: 0.82rem; }
 .api-response-code { font-weight: 800; color: var(--text); }
 .api-response-schema { color: var(--text-dim); font-style: normal; }
-@media (max-width: 700px) { .api-auth { margin-left: 0; width: 100%; } .api-field-table td:nth-child(2) { white-space: normal; } }
+/* The ladder's 760 rung (§3), one block for the whole file: below it nothing in this panel keeps a
+   right-hand column — the auth chips, the export button and the type column all give up their gutter. */
+@media (max-width: 760px) { .api-auth { margin-left: 0; width: 100%; } .api-field-table td:nth-child(2) { white-space: normal; } .api-export-spec { margin-left: 0; } }
+
+/* ── RULING 61: the reference at its own address (`/settings/api`), full window width ──
+   The page IS the surface, so it takes the pane's whole width rather than the 72rem reading
+   measure Settings gives its groups: this is a reference to scan, not prose to read, and the
+   endpoint rows and the command table are the widest things in the app.
+   `.api-reference-body`'s own left/right padding is dropped here — the frame's gutter
+   (`.pane-frame`) already supplies it, and paying twice inset the content by 40px a side. */
+.api-reference-page-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); }
+.api-reference-page-head h2 { margin: 0; }
+.api-reference-page-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
+.api-reference-page-body > .api-reference-body { padding-inline: 0; }
+.api-reference-page-body .api-reference-toolbar { margin-top: var(--space-2); }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   One panel on this surface — the reference itself, a `<details>` standing on the settings page.
+   Same construction as `.nh-panel::before` (packages/ui Panel.css): the cut, the rim and the fill
+   ride a BACKING LAYER, never the element, because `clip-path` clips hit-testing and the summary
+   row is the control that opens it. `inset: -1px` spans the border box, so the rim lands where the
+   1px border used to and nothing reflows. No rest glow — not a hero surface.
+
+   RULING 28 — RIM AND BEZEL, NO SCANLINE, because this panel is NESTED and not outermost. It reads
+   as standalone in this file and is not: on `/settings` it renders inside `.settings-group--table`,
+   whose own `::before` already computes the repeating gradient, and two scanline fields at the same
+   period stacked one inside the other is exactly the moiré ruling 28 exists to remove. Measured on
+   `/settings` at 1280x900 before this changed: `.api-reference.closest(".settings-group")` returned
+   `settings-group settings-group--table` and BOTH `::before`s computed `repeating-linear-gradient`.
+   `.api-reference` has exactly one call site — the `<details>` on `/settings` (`ApiReference`); the
+   standalone address (`/settings/api`, ruling 61) renders `ApiReferenceBody` on a `.pane-frame` and
+   never takes this class — so there is no route on which this panel is the outermost one. */
+.api-reference {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+  --material-fill: var(--material-plate);
+}
+.api-reference::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}

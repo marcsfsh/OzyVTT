@@ -1,8 +1,15 @@
+/* The name is OZYVTT. It is written that way at every call site, and the casing is asserted here as
+   well rather than left to the typeface: Bungee carries no lowercase glyphs, so for as long as the
+   font loads the wordmark reads as caps whatever string it is given — and the moment the font does
+   NOT load (a slow first paint is enough; it was caught in a screenshot) the fallback face renders
+   the raw string and the brand reads wrong. Two independent guarantees, because this is the one
+   piece of text in the app that is a logo. */
 .nh-wordmark {
   font-family: var(--font-wordmark);
   font-size: var(--fs-display);
   line-height: 1;
   letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
 }
 .nh-eyebrow {
   display: inline-block;

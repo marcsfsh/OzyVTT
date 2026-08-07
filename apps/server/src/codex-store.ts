@@ -523,6 +523,11 @@ export type CodexSessionRow = Readonly<{
   status: CodexSessionStatus;
   /** D10 / CI-2: the same single-layer tag vocabulary every other codex record carries. */
   tags: readonly string[];
+  /**
+   * D31: the scenes staged for this session - GM prep, and GM-ONLY in every projection (ruling R2).
+   * Ids into `GameState.combat.scenes`; a dangling one is expected and rendered honestly.
+   */
+  sceneIds: readonly string[];
   rev: number;
   createdAt: string;
   updatedAt: string;
@@ -537,6 +542,8 @@ export type CodexSessionCreateInput = Readonly<{
   revealedToPlayers?: boolean;
   status?: CodexSessionStatus;
   tags?: readonly string[];
+  /** Scenes staged for this session (D31); capped at the scene cap itself. */
+  sceneIds?: readonly string[];
 }>;
 /** No `revealedToPlayers`: reveal has its own endpoint and its own recency rule, exactly as `CodexPageUpdateInput` omits it. */
 export type CodexSessionUpdateInput = Readonly<{
@@ -547,6 +554,7 @@ export type CodexSessionUpdateInput = Readonly<{
   recapBody?: string;
   status?: CodexSessionStatus;
   tags?: readonly string[];
+  sceneIds?: readonly string[];
 }>;
 
 /**
@@ -1569,6 +1577,20 @@ export const MIGRATIONS = [{
   // nulls age out on their own. No backfill: there is no way to recover a fingerprint from a stored body,
   // and inventing one would be worse than admitting it is unknown.
   sql: `ALTER TABLE codex_command_receipts ADD COLUMN fingerprint TEXT;`
+}, {
+  version: 25,
+  // D31: session prep lists TONIGHT'S SCENES. The marker precedent verbatim (`codex_markers.scene_ids_json`,
+  // v11): a JSON id array with a '[]' default, so every existing session reads back "no scenes attached"
+  // and nothing has to be back-filled.
+  //
+  // NO foreign key and no cascade, which is the codex's stated convention for cross-store references:
+  // scene ids live in GameState, sessions live here, and there is no transaction spanning the two. A
+  // dangling id is EXPECTED after `scene.remove` and is rendered honestly ("this link points at a scene
+  // that no longer exists"), exactly as a marker's dangling scene link already is.
+  //
+  // Ruling R2: `sceneIds` is GM-ONLY in projections ALWAYS - stricter than "follows the session reveal",
+  // because a revealed session's player half is the RECAP and tonight's planned fights are spoilers.
+  sql: `ALTER TABLE codex_sessions ADD COLUMN scene_ids_json TEXT NOT NULL DEFAULT '[]';`
 }];
 
 /**
@@ -1698,9 +1720,9 @@ type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id:
 const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, is_party, created_at, updated_at";
 type StandingRowRaw = { id: string; faction_page_id: string; value: number; revealed: number; created_at: string; updated_at: string };
 const STANDING_COLUMNS = "id, faction_page_id, value, revealed, created_at, updated_at";
-type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string; tags_json: string };
+type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string; tags_json: string; scene_ids_json: string };
 /** One column list per session read, the same discipline PAGE_COLUMNS / JOURNAL_COLUMNS follow. */
-const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at, tags_json";
+const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at, tags_json, scene_ids_json";
 type QuestRowRaw = { id: string; title: string; status: string; player_body: string; gm_body: string; objectives_json: string; entity_ids_json: string; revealed: number; rev: number; created_at: string; updated_at: string; tags_json: string };
 /** One column list per quest read, and the INSERT's value order is bound to it - the SESSION_COLUMNS discipline. */
 const QUEST_COLUMNS = "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json";
@@ -1945,6 +1967,14 @@ function idArray(value: readonly string[] | null | undefined): string[] {
   const out: string[] = [];
   for (const raw of value) { const v = id(raw); if (!out.includes(v)) out.push(v); if (out.length >= 24) break; }
   return out;
+}
+/**
+ * A session's staged scenes (D31). Capped at the SCENE cap itself (20, `scenes.ts`) rather than the
+ * marker helper's 24: attaching more scenes than the table can hold is an authoring mistake, not a
+ * thing to store.
+ */
+function sessionSceneIds(value: readonly string[] | null | undefined): string[] {
+  return idArray(value).slice(0, 20);
 }
 /** Parse a JSON id-array column (null/garbage → []). */
 function parseIdArray(json: string | null | undefined): string[] {
@@ -2503,6 +2533,8 @@ function normalizeBundle(raw: unknown): CodexImportBundle {
       realDate: shortLabel(nullableText(row.realDate), 40, "date"), attendees: attendees(Array.isArray(row.attendees) ? (row.attendees as string[]) : []),
       prepBody: body(text(row.prepBody)), recapBody: body(text(row.recapBody)), revealedToPlayers: flag(row.revealedToPlayers),
       status: sessionStatus(typeof row.status === "string" ? row.status : undefined), tags: tags(Array.isArray(row.tags) ? (row.tags as string[]) : []),
+      // D31: a bundle written before scene attachments existed simply has none.
+      sceneIds: sessionSceneIds(Array.isArray(row.sceneIds) ? (row.sceneIds as string[]) : []),
       rev: Math.max(1, count(row.rev, 1)), createdAt: stamp(row.createdAt), updatedAt: stamp(row.updatedAt)
     } satisfies CodexSessionRow;
   });
@@ -3164,12 +3196,12 @@ export class CodexStore {
       for (const path of parsed.folders) this.registerFolderPath(path, this.stamp());
 
       // 4. Sessions BEFORE journal, so the entries' session ids resolve against rows that exist.
-      const insertSession = database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const insertSession = database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const sessionByNumber = new Map<number, string>();
       for (const session of parsed.sessions) {
-        insertSession.run(session.id, session.sessionNumber, session.realDate, JSON.stringify(session.attendees), session.prepBody, session.recapBody, session.revealedToPlayers ? 1 : 0, session.status, session.rev, session.createdAt, session.updatedAt, JSON.stringify(session.tags));
+        insertSession.run(session.id, session.sessionNumber, session.realDate, JSON.stringify(session.attendees), session.prepBody, session.recapBody, session.revealedToPlayers ? 1 : 0, session.status, session.rev, session.createdAt, session.updatedAt, JSON.stringify(session.tags), JSON.stringify(session.sceneIds));
         if (session.sessionNumber !== null) sessionByNumber.set(session.sessionNumber, session.id);
-        this.indexSession({ id: session.id, session_number: session.sessionNumber, real_date: session.realDate, attendees_json: JSON.stringify(session.attendees), prep_body: session.prepBody, recap_body: session.recapBody, revealed: session.revealedToPlayers ? 1 : 0, status: session.status, rev: session.rev, created_at: session.createdAt, updated_at: session.updatedAt, tags_json: JSON.stringify(session.tags) });
+        this.indexSession({ id: session.id, session_number: session.sessionNumber, real_date: session.realDate, attendees_json: JSON.stringify(session.attendees), prep_body: session.prepBody, recap_body: session.recapBody, revealed: session.revealedToPlayers ? 1 : 0, status: session.status, rev: session.rev, created_at: session.createdAt, updated_at: session.updatedAt, tags_json: JSON.stringify(session.tags), scene_ids_json: JSON.stringify(session.sceneIds) });
         this.rebuildLinksFor("session", session.id, session.recapBody, session.prepBody);
       }
       const sessionIds = new Set(parsed.sessions.map((session) => session.id));
@@ -3196,11 +3228,11 @@ export class CodexStore {
             if (resolved === undefined) {
               resolved = this.freshId();
               const stamp = this.stamp();
-              insertSession.run(resolved, entry.sessionNumber, null, "[]", "", "", 0, "played", 1, stamp, stamp, "[]");
+              insertSession.run(resolved, entry.sessionNumber, null, "[]", "", "", 0, "played", 1, stamp, stamp, "[]", "[]");
               // Indexed like every other session written here. The bundled-session loop above does it; this
               // arm did not, so a synthesized placeholder was the one session in the codex that could not be
               // found by typing "Session 9" into the palette - and nothing repairs a search row at read time.
-              this.indexSession({ id: resolved, session_number: entry.sessionNumber, real_date: null, attendees_json: "[]", prep_body: "", recap_body: "", revealed: 0, status: "played", rev: 1, created_at: stamp, updated_at: stamp, tags_json: "[]" });
+              this.indexSession({ id: resolved, session_number: entry.sessionNumber, real_date: null, attendees_json: "[]", prep_body: "", recap_body: "", revealed: 0, status: "played", rev: 1, created_at: stamp, updated_at: stamp, tags_json: "[]", scene_ids_json: "[]" });
               sessionByNumber.set(entry.sessionNumber, resolved);
             }
             sessionId = resolved;
@@ -4751,12 +4783,13 @@ export class CodexStore {
       revealed: input.revealedToPlayers ? 1 : 0,
       status: sessionStatus(input.status),
       rev: 1, created_at: stamp, updated_at: stamp,
-      tags_json: JSON.stringify(tags(input.tags))
+      tags_json: JSON.stringify(tags(input.tags)),
+      scene_ids_json: JSON.stringify(sessionSceneIds(input.sceneIds))
     };
     this.guardSessionNumber(row.session_number, () => {
       this.transaction(() => {
-        database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at, row.tags_json);
+        database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at, row.tags_json, row.scene_ids_json);
         this.indexSession(row);
         // D13: recap is the PLAYER layer, prep is the GM layer - the session's own two-layer split, so a
         // page named only in prep yields a GM-only connection.
@@ -4790,6 +4823,7 @@ export class CodexStore {
       recap_body: input.recapBody === undefined ? existing.recap_body : body(input.recapBody),
       status: input.status === undefined ? existing.status : sessionStatus(input.status),
       tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
+      scene_ids_json: input.sceneIds === undefined ? existing.scene_ids_json ?? "[]" : JSON.stringify(sessionSceneIds(input.sceneIds)),
       // `rev` and `updated_at` move TOGETHER on an edit: the conflict token and the recency stamp both
       // describe "this record was written", and splitting them is what CI-9's exceptions below are for.
       rev: existing.rev + 1,
@@ -4797,8 +4831,8 @@ export class CodexStore {
     };
     this.guardSessionNumber(next.session_number, () => {
       this.transaction(() => {
-        database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, tags_json = ?, rev = ?, updated_at = ? WHERE id = ?")
-          .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.tags_json, next.rev, next.updated_at, sessionId);
+        database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, tags_json = ?, scene_ids_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+          .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.tags_json, next.scene_ids_json, next.rev, next.updated_at, sessionId);
         this.indexSession(next);
         this.rebuildLinksFor("session", sessionId, next.recap_body, next.prep_body);
         this.bumpRevision();
@@ -4981,6 +5015,8 @@ export class CodexStore {
       // `toEntry` applies to a journal row's `kind`.
       status: row.status === "played" ? "played" : "planned",
       tags: parseTags(row.tags_json),
+      // D31 / R2: read here so the row type carries it, projected ONLY into the GM session view.
+      sceneIds: parseIdArray(row.scene_ids_json),
       rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
     };
   }

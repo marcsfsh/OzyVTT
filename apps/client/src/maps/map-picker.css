@@ -1,0 +1,84 @@
+/* The embedded map picker (D5): folders, then art, then the flow you were already in.
+   No @media rules on purpose — the grid is auto-fill, so a 390px phone gets one column and a laptop
+   gets four without a breakpoint deciding anything. */
+.map-picker { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: .55rem; border: 1px solid transparent; }
+/* One scrolling chip row, never a wrapping block that pushes the grid off-screen on a phone. */
+.map-picker-folders { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
+.map-picker-folders > * { flex: none; }
+.map-picker-search { width: 100%; }
+/* The cap is the picker's own: embedded in a panel it is content, not a frame, so nothing above it
+   hands it a height and 21rem is what stops five maps becoming a page of scrolling. The SCROLL is
+   declared in the markup (`.scroll-y` on the `<ul>` in MapPicker.tsx) — check (h) reads the class,
+   and a bare `overflow-y` here was the last undeclared region in the client. This is the one case
+   where `.scroll-y` sits ON a grid rather than on a wrapper (the scene-gallery lesson,
+   scene-gallery.css:31-38): that lesson is about a grid given a DEFINITE block size, which stops it
+   sizing its auto rows from its cards. A `max-height` is not one — the rows still size from the
+   tiles, measured unchanged at 320/375/560/561/1280. The maps rail neutralises the cap
+   (`.map-rail .map-picker-grid { max-height: none }`) and scrolls a wrapper, so it is untouched. */
+.map-picker-grid { display: grid; min-width: 0; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: var(--space-2); margin: 0; padding: 0; list-style: none; max-height: 21rem; overscroll-behavior: contain; }
+.map-tile { display: flex; flex-direction: column; gap: .2rem; width: 100%; min-height: var(--tap-min); padding: .35rem; border: 1px solid transparent; color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; }
+.map-tile:hover { border-color: var(--line-hover); }
+.map-tile.is-selected { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+/* Cap the art: a one-column grid inside a 390px modal would otherwise give each tile a 4:3 slab
+   ~280px tall, and three maps would be a page of scrolling. */
+.map-tile-art { display: grid; place-items: center; aspect-ratio: 4 / 3; max-height: 5.5rem; overflow: hidden; border-radius: var(--radius-sm); background: var(--void); }
+.map-tile-art img { width: 100%; height: 100%; object-fit: cover; }
+.map-tile-art-empty { width: 100%; height: 100%; background: var(--grad-horizon); opacity: .25; }
+.map-tile-name { font-size: .78rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-tile-meta { color: var(--text-muted); font-size: .68rem; }
+.map-tile--upload { border-style: dashed; }
+.map-tile--upload .map-tile-art { color: var(--cyan); background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); }
+/* The real input stays in the DOM (the tile clicks it) but never takes layout or focus order.
+   `width/height: 1px` is not enough on its own: Chromium gives a file input an intrinsic size from
+   its shadow "Choose File" button, so the border box measured ~27.59px here — a control the tap
+   audit reads as 27.6px with reach 0 and cannot tell from a real one. `min-*: 0` plus zeroed padding
+   and border collapse that contribution, so the box is the 1px this rule always claimed. Same fix,
+   same reason, as `.map-upload-input` (map-manager.css); this one was only ever missed because no
+   audited surface opens the embedded picker. */
+.map-picker-file { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); }
+.map-picker-empty, .map-picker-note { margin: 0; color: var(--text-dim); font-size: .74rem; }
+.map-picker-note strong { color: var(--text); }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
+   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
+   daybreak translation arrives for free.
+   RULING 28: the picker is the outermost panel here and takes the scanline; a tile inside it is
+   nested and takes rim + bezel over a flat plate, so two horizontal rhythms never stack.
+   The tile is a real button, so it also takes the cue wedge on hover / focus / press (ruling 40 —
+   press carries what hover carries, because half this table has no hover). */
+.map-picker,
+.map-tile {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.map-picker::before,
+.map-tile::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.map-picker { --material-fill: var(--material-scanline), var(--material-plate); }
+.map-tile { --material-fill: var(--material-plate); }
+.map-tile:hover:not(:disabled)::before,
+.map-tile:focus-visible::before,
+.map-tile:active:not(:disabled)::before {
+  border-color: var(--rim-color-hi);
+  background: var(--cue-mark) no-repeat var(--cue-inset) center / var(--cue-w) var(--cue-h), var(--material-fill);
+}
+.map-tile { --cue-w: .3rem; --cue-h: .6rem; --cue-inset: .28rem; }

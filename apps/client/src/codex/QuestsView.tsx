@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, RevealSwitch, SaveState, SegmentedControl, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
 import { questApi, type CodexAutosaveSettings, type CodexQuest, type CodexQuestObjective, type CodexQuestStatus } from "./api";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
 import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";
-import { GmOnlyTag, RevealSwitch, VisibilityBadge } from "./SecretMarkers";
 import { CodexIcon, EntityIcon } from "./icons";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
@@ -96,7 +95,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
             </Select>
           </div>
           {listError && <Alert tone="danger">{listError}</Alert>}
-          <nav className="codex-list" aria-label="Quests">
+          <nav className="codex-list scroll-y" aria-label="Quests">
             {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
             {!loading && quests.length === 0 && !error && <p className="codex-list-empty">No quests yet. Create one to start tracking objectives.</p>}
             {!loading && quests.length > 0 && shown.length === 0 && <p className="codex-list-empty">No quests match.</p>}
@@ -114,7 +113,7 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
           </nav>
         </aside>
 
-        <section className="codex-main">
+        <section className="codex-main scroll-y">
           {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenQuest(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All quests</Button>}
           {/* R4: this surface's own failure. The log reads one feed; a silent one is an empty log that
               looks exactly like a campaign that has never had a quest. */}
@@ -139,12 +138,35 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
  * your work" exists to end. `expectedRev` still travels, so the 409 path is unchanged.
  */
 type QuestDraft = Readonly<{ title: string; status: CodexQuestStatus; playerBody: string; gmBody: string; objectives: readonly CodexQuestObjective[]; entityIds: readonly string[]; tags: readonly string[] }>;
+type QuestBodyTab = "player" | "gm";
+
+/**
+ * Ruling 57 — **a quest is a document, so it wears the page editor's shape and not one of its own.**
+ *
+ * Literally the same classes (`.codex-editor`, `-head`, `-cols`, `-center`, `-context`) and the same two
+ * controls: one body at a time behind a Player-facing / GM only switch, and everything that is not the
+ * writing behind Details. Two shapes in the Codex, not five — per-surface composition is what produced
+ * the "stitched-together panels" complaint, and a quest editor that stacked title, status, objectives,
+ * tags, TWO 224px writing fields and a link picker down one scrolling column was one of the five.
+ */
+const QUEST_DETAILS_KEY = "codex-quest-details";
+const QUEST_DETAILS_ID = "codex-quest-details";
 
 function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, onOpenPage, onDeleted }: Readonly<{
   gmToken: string; quest: CodexQuest; pages: readonly QuestPage[]; autosave: CodexAutosaveSettings; onPickTag?: (tag: string) => void;
   onChanged: () => void | Promise<void>; onOpenPage: (pageId: string) => void; onDeleted: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const [tab, setTab] = useState<QuestBodyTab>("player");
+  const detailsRef = useRef<HTMLElement>(null);
+  const [detailsOpen, setDetailsOpen] = useState(() => {
+    try { return localStorage.getItem(QUEST_DETAILS_KEY) === "open"; } catch { return false; }
+  });
+  const showDetails = useCallback((open: boolean) => {
+    setDetailsOpen(open);
+    try { localStorage.setItem(QUEST_DETAILS_KEY, open ? "open" : "closed"); } catch { /* private mode - fine */ }
+  }, []);
+  useEffect(() => { if (detailsOpen) detailsRef.current?.focus(); }, [detailsOpen]);
   const [draft, setDraft] = useState<QuestDraft>({
     title: quest.title, status: quest.status, playerBody: quest.playerBody, gmBody: quest.gmBody,
     objectives: quest.objectives, entityIds: quest.entityIds, tags: quest.tags
@@ -196,94 +218,108 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
   };
 
   return (
-    <Panel accent="cyan" className="codex-quest-editor">
-      <div className="codex-composer-head">
-        <strong>{quest.title}</strong>
-        <div className="codex-composer-head-actions">
+    <div className="codex-editor codex-quest-editor">
+      <div className="codex-editor-head">
+        <div className="codex-editor-titlewrap">
+          <Input variant="title" className="codex-title-input" value={draft.title} placeholder="Untitled quest" aria-label="Quest"
+            onChange={(event) => patch({ title: event.target.value })} />
+        </div>
+        <div className="codex-editor-actions">
           <SaveState status={saveStatus} onRetry={() => void flush()} onReload={() => void flush()} />
           {!autosave.enabled && <Button variant="primary" size="sm" disabled={!dirty} onClick={() => void flush()}>Save</Button>}
           <Badge tone={questStatusTone(quest.status)}>{QUEST_STATUS_LABEL[quest.status]}</Badge>
           <RevealSwitch revealed={quest.revealedToPlayers} onChange={reveal} ariaLabel="Show this quest to players" />
+          <Button variant="ghost" size="sm" aria-expanded={detailsOpen} aria-controls={QUEST_DETAILS_ID} onClick={() => showDetails(!detailsOpen)}>Details</Button>
+          <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
         </div>
       </div>
 
       {error && <Alert tone="danger">{error}</Alert>}
 
-      <div className="codex-composer-meta">
-        <Field label="Quest" htmlFor="q-title"><Input id="q-title" value={draft.title} placeholder="Untitled quest" onChange={(event) => patch({ title: event.target.value })} /></Field>
-        {/* D11: the server writes a dated Journal record on every status change, so the control says so. */}
-        <Field label="Status" htmlFor="q-status" help="Only Active quests appear on Home. Status changes are recorded in the Journal.">
-          <Select id="q-status" value={draft.status} onChange={(event) => patch({ status: event.target.value as CodexQuestStatus })}>
-            <option value="active">{QUEST_STATUS_LABEL.active}</option>
-            <option value="completed">{QUEST_STATUS_LABEL.completed}</option>
-            <option value="failed">{QUEST_STATUS_LABEL.failed}</option>
-          </Select>
-        </Field>
-      </div>
-
-      {/* Not wrapped in a `Field`: a checklist has no single control for a `<label for>` to point at, so
-          it names itself through `ariaLabel` instead of growing a label that points nowhere. */}
-      <div className="codex-quest-objectives">
-        <div className="codex-quest-objectives-head">
-          <h4 className="codex-quest-subhead">Objectives</h4>
-          {progress.total > 0 && <span className="codex-quest-progress">{progress.label}</span>}
+      <div className="codex-editor-cols">
+        <div className="codex-editor-center">
+          <div className="codex-body-bar">
+            <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as QuestBodyTab)}
+              options={[{ value: "player", label: "What the party was told" }, { value: "gm", label: "GM notes" }]} />
+          </div>
+          {/* D13: the SAME writing surface a page body gets, so a quest body renders as markdown for the
+              party instead of as the deliberate plain text it used to be. R5 is unchanged: the GM layer
+              still wears the violet block and the "GM only" pill, now as the tab's own surface. */}
+          {tab === "player"
+            ? <CodexEditor id="q-player" token={gmToken} value={draft.playerBody} onChange={(playerBody) => patch({ playerBody })} fill
+                ariaLabel="What the party was told" placeholder="What players have been told about this quest"
+                pages={pages} onNavigate={() => undefined} />
+            : <CodexEditor id="q-gm" token={gmToken} value={draft.gmBody} onChange={(gmBody) => patch({ gmBody })} fill
+                ariaLabel="GM notes" placeholder="Details players cannot see"
+                pages={pages} onNavigate={() => undefined} gmLayer />}
+          <p className="codex-composer-hint">
+            {tab === "player" ? "Players see this once the quest is shown to them." : "Never sent to a player, whatever the quest's reveal state."}
+          </p>
         </div>
-        <p className="codex-inspector-hint">Objectives are shown to players whenever the quest is.</p>
-        <Checklist items={draft.objectives} ariaLabel="Objectives" max={24}
-          onChange={(objectives: readonly CodexQuestObjective[]) => patch({ objectives })}
-          /* The CALLER appends, because the caller owns what a blank item means here: a fresh row the GM
-             is about to type into, which the server accepts precisely so this flow works. */
-          onAdd={() => patch({ objectives: [...draft.objectives, { text: "", done: false }] })}
-          addLabel="Add objective" />
-      </div>
 
-      {/* D10: quests are taggable, on the same vocabulary and the same slug rules pages use. */}
-      <Field label="Tags" htmlFor="q-tags">
-        <TagInput id="q-tags" ariaLabel="Tags" placeholder="main-arc, faction" values={draft.tags}
-          onChange={(tags: readonly string[]) => patch({ tags })} max={24} maxReachedReason="A quest may carry at most 24 tags." />
-      </Field>
-      {onPickTag && draft.tags.length > 0 && (
-        <div className="codex-editor-tagjumps">
-          {draft.tags.map((tag) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}</button>)}
-        </div>
-      )}
+        {detailsOpen && (
+        <aside id={QUEST_DETAILS_ID} className="codex-editor-context scroll-y" aria-label="Quest details" tabIndex={-1} ref={detailsRef}
+          onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); showDetails(false); } }}>
+          <div className="codex-context-head">
+            <h3 className="codex-backlinks-title">Quest details</h3>
+            <IconButton label="Close quest details" size="sm" onClick={() => showDetails(false)}><IconX /></IconButton>
+          </div>
 
-      {/* D13: the SAME writing surface a page body gets, so a quest body renders as markdown for the
-          party instead of as the deliberate plain text it used to be. */}
-      <Field label="What the party was told" help="Players see this once the quest is shown to them." htmlFor="q-player">
-        <CodexEditor id="q-player" token={gmToken} value={draft.playerBody} onChange={(playerBody) => patch({ playerBody })}
-          ariaLabel="What the party was told" placeholder="What players have been told about this quest"
-          pages={pages} onNavigate={() => undefined} rows={7} />
-      </Field>
+          {/* D11: the server writes a dated Journal record on every status change, so the control says so. */}
+          <Field label="Status" htmlFor="q-status" help="Only Active quests appear on Home. Status changes are recorded in the Journal.">
+            <Select id="q-status" value={draft.status} onChange={(event) => patch({ status: event.target.value as CodexQuestStatus })}>
+              <option value="active">{QUEST_STATUS_LABEL.active}</option>
+              <option value="completed">{QUEST_STATUS_LABEL.completed}</option>
+              <option value="failed">{QUEST_STATUS_LABEL.failed}</option>
+            </Select>
+          </Field>
 
-      {/* R5: GM-only content is ALWAYS the violet block plus the "GM only" pill — the same pair the
-          journal composer, the page editor and the session log use, never a new marking of its own. */}
-      <Field label={<span className="codex-composer-gm-label">GM notes <GmOnlyTag /></span>} htmlFor="q-gm">
-        <CodexEditor id="q-gm" token={gmToken} value={draft.gmBody} onChange={(gmBody) => patch({ gmBody })}
-          ariaLabel="GM notes" placeholder="Details players cannot see"
-          pages={pages} onNavigate={() => undefined} gmLayer rows={7} />
-      </Field>
-
-      <Field label="Pages this quest concerns" help="Players see only the pages already shown to them.">
-        <div className="codex-quest-links">
-          {linked.map((page) => (
-            <div key={page.id} className="codex-quest-link">
-              <button type="button" className="codex-quest-link-open" onClick={() => onOpenPage(page.id)}>
-                <EntityIcon type={page.entityType} /> <span className="codex-list-title">{page.title}</span>
-              </button>
-              <IconButton label={`Unlink ${page.title}`} size="sm" onClick={() => patch({ entityIds: draft.entityIds.filter((id) => id !== page.id) })}><IconX /></IconButton>
+          {/* Not wrapped in a `Field`: a checklist has no single control for a `<label for>` to point at, so
+              it names itself through `ariaLabel` instead of growing a label that points nowhere. */}
+          <div className="codex-quest-objectives">
+            <div className="codex-quest-objectives-head">
+              <h4 className="codex-quest-subhead">Objectives</h4>
+              {progress.total > 0 && <span className="codex-quest-progress">{progress.label}</span>}
             </div>
-          ))}
-          <Combobox options={unlinked.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
-            value={null} onChange={(id) => id && patch({ entityIds: [...draft.entityIds, id] })}
-            ariaLabel="Link a page" placeholder="Link a page" />
-        </div>
-      </Field>
+            <p className="codex-inspector-hint">Objectives are shown to players whenever the quest is.</p>
+            <Checklist items={draft.objectives} ariaLabel="Objectives" max={24}
+              onChange={(objectives: readonly CodexQuestObjective[]) => patch({ objectives })}
+              /* The CALLER appends, because the caller owns what a blank item means here: a fresh row the GM
+                 is about to type into, which the server accepts precisely so this flow works. */
+              onAdd={() => patch({ objectives: [...draft.objectives, { text: "", done: false }] })}
+              addLabel="Add objective" />
+          </div>
 
-      <div className="codex-composer-foot">
-        <Button variant="ghost" size="sm" onClick={remove}>Delete quest</Button>
+          {/* D10: quests are taggable, on the same vocabulary and the same slug rules pages use. */}
+          <Field label="Tags" htmlFor="q-tags">
+            <TagInput id="q-tags" ariaLabel="Tags" placeholder="main-arc, faction" values={draft.tags}
+              onChange={(tags: readonly string[]) => patch({ tags })} max={24} maxReachedReason="A quest may carry at most 24 tags." />
+          </Field>
+          {onPickTag && draft.tags.length > 0 && (
+            <div className="codex-editor-tagjumps">
+              {draft.tags.map((tag) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}</button>)}
+            </div>
+          )}
+
+          <Field label="Pages this quest concerns" help="Players see only the pages already shown to them.">
+            <div className="codex-quest-links">
+              {linked.map((page) => (
+                <div key={page.id} className="codex-quest-link">
+                  <button type="button" className="codex-quest-link-open" onClick={() => onOpenPage(page.id)}>
+                    <EntityIcon type={page.entityType} /> <span className="codex-list-title">{page.title}</span>
+                  </button>
+                  <IconButton label={`Unlink ${page.title}`} size="sm" onClick={() => patch({ entityIds: draft.entityIds.filter((id) => id !== page.id) })}><IconX /></IconButton>
+                </div>
+              ))}
+              <Combobox options={unlinked.map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type={page.entityType} /> }))}
+                value={null} onChange={(id) => id && patch({ entityIds: [...draft.entityIds, id] })}
+                ariaLabel="Link a page" placeholder="Link a page" />
+            </div>
+          </Field>
+        </aside>
+        )}
       </div>
       {confirmDialog}
-    </Panel>
+    </div>
   );
 }

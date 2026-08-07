@@ -119,7 +119,7 @@ export function EquipmentPicker({ ownedCounts, busy, onAdd, onClose }: Readonly<
     </div>
     {catalog.length === 0 ? <p className="sheet-picker-empty">Loading the catalog…</p>
       : results.length === 0 ? <p className="sheet-picker-empty">No equipment matches that search.</p>
-      : <ul className="sheet-picker-list">
+      : <ul className="sheet-picker-list scroll-y">
         {results.map((item) => {
           const owned = ownedCounts.get(item.id) ?? 0;
           return <li key={item.id}>

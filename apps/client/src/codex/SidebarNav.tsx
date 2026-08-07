@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { IconButton } from "@vtt/ui";
 import { CodexIcon } from "./icons";
 import type { SidebarGroup, SidebarItem } from "./routes";
@@ -38,11 +39,55 @@ function isActive(itemPath: string, activePath: string): boolean {
   return activePath === itemPath || activePath.startsWith(`${itemPath}/`);
 }
 
+/**
+ * **The rail's scroll affordance, and it is CONDITIONAL on real overflow.**
+ *
+ * Wave 1 aligned the collapsed rail's three columns by taking `scrollbar-gutter: stable` off this
+ * region — which put the ⌘K glyph, the thirteen nav icons and the collapse chevron on one 44.0px centre
+ * line, at the cost of the region's visible scrollbar. Measured after that change: 0px of overflow at
+ * ≥850px of viewport height, but **75px hidden at 1366×768 and 143px at 1280×700**. Wheel, trackpad,
+ * touch and keyboard all still scroll it; what left was the only thing saying there was more.
+ *
+ * A fade mask stands in — the same remedy `Tabs.css` uses for the same trade, and ruling 44's own stated
+ * justification (discoverability) is what earns it. It is measured rather than assumed on both counts:
+ * an unconditional fade would claim "there is more below" at every height where there is not, and a
+ * bottom-only fade would keep claiming it after the GM has scrolled to the end. So each edge is drawn
+ * only while there is content past it, which also makes the fade a live readout of where you are.
+ *
+ * `ResizeObserver` watches the region AND its content, because both change without a scroll event: the
+ * viewport shortens, or the 761–849 band strips the labels and the list gets shorter.
+ */
+function useScrollEdges(active: boolean, contentKey: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState<{ top: boolean; bottom: boolean }>({ top: false, bottom: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !active) { setEdges({ top: false, bottom: false }); return; }
+    const measure = () => {
+      const room = el.scrollHeight - el.clientHeight;
+      // 1px, not 0: sub-pixel layout leaves fractional room on boxes that do not actually overflow.
+      setEdges({ top: room > 1 && el.scrollTop > 1, bottom: room > 1 && el.scrollTop < room - 1 });
+    };
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    for (const child of Array.from(el.children)) observer.observe(child);
+    return () => { el.removeEventListener("scroll", measure); observer.disconnect(); };
+  }, [active, contentKey]);
+  return { ref, edges };
+}
+
 export function SidebarNav({ groups, activePath, collapsed = false, onNavigate, onAction, header, footer }: SidebarNavProps) {
+  // Only the rail hides its scrollbar (`codex.css`), so only the rail needs the stand-in. The group count
+  // is the content key: a group added or removed changes which children the observer has to watch.
+  const { ref: groupsRef, edges } = useScrollEdges(collapsed, groups.length);
   return (
     <nav className={`codex-sidebar${collapsed ? " is-rail" : ""}`} aria-label="Codex sections">
       {header && <div className="codex-sidebar-head">{header}</div>}
-      <div className="codex-sidebar-groups">
+      {/* The rail's own region (§7): thirteen destinations and three eyebrows do not fit a 720p laptop,
+          and the ones that fall off the end are Tools — where Settings and Backup live. */}
+      <div ref={groupsRef} className={`codex-sidebar-groups scroll-y${edges.top ? " has-fade-top" : ""}${edges.bottom ? " has-fade-bottom" : ""}`}>
         {groups.map((group, index) => (
           <div key={group.label ?? `group-${index}`} className={`codex-sidebar-group${group.label === "Tools" ? " is-tools" : ""}`}>
             {group.label && !collapsed && <span className="codex-sidebar-grouplabel eyebrow">{group.label}</span>}

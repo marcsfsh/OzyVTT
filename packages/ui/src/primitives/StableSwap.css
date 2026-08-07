@@ -1,0 +1,10 @@
+/* One cell, two occupants: the visible face and the width the other state would need. The cell takes
+   the wider of the two, so the control's box is identical in both states (D23c). */
+.nh-stableswap { display: inline-grid; }
+.nh-stableswap > * { grid-area: 1 / 1; }
+/* The reservation. `visibility: hidden` rather than `opacity: 0` or a clip: it keeps the box in flow
+   (which is the entire point) while taking it out of the paint AND out of the accessibility tree, so
+   nothing announces the state the control is NOT in. `white-space: pre` because the reserved string is
+   generated content: a trailing or doubled space in a label must reserve the width it will really cost. */
+.nh-stableswap-ghost { visibility: hidden; white-space: pre; }
+.nh-stableswap-ghost::after { content: attr(data-stable-swap-alt); }

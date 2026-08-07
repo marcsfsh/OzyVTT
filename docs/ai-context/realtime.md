@@ -34,8 +34,12 @@ event + new projection in one SQLite transaction and bumps `revision` → broadc
 
 Server→client events come in two kinds, and the difference is a safety rule, not a style
 choice. **Projected channels** carry content and are therefore computed per recipient:
-`state:updated`, and also `table:event` and `log:entry`, each of which has a GM-only variant
-gated at the broadcast site. **Ping channels** carry a revision and nothing else —
+`state:updated`, `table:event`, and `log:entry`. `log:entry` is computed **per socket**, not
+in two GM/player variants: since rolls joined the feed it can carry a `self-only` roll, which
+is player-visible but belongs to exactly one player. `projectFeedRow`
+(`apps/server/src/combat-log.ts`) is the only place that decides, and the only place that
+strips the roller's `initiatorSessionId`. The public viewer never receives `log:entry` at all.
+**Ping channels** carry a revision and nothing else —
 `codex:changed`, `homebrew:changed` — because naming *what* changed would tell every player
 which part of the world the GM is working in. The declaration is `ServerToClientEvents` in
 `packages/domain`; read it there.
@@ -72,6 +76,16 @@ before "offline".
 - `state:updated` is a `PlayerView | GmView` union — clients must handle both.
 - Snapshots every 50 revisions; `rolls` capped at 200. Ephemeral annotations need
   `scheduleAnnotationExpiry` to re-broadcast on expiry.
+- **Broadcasting IS the write.** `broadcastTableEvent` already appends its own feed line, so a
+  handler must not call `appendLog` with the same entry beside it — that printed every damage,
+  reaction and death save twice. Pass `logged: false` only when you are writing a richer row for
+  the same moment yourself (initiative does). `table-feed.test.ts` fails on a reintroduced pair.
+- **Two roll surfaces, one truth.** `GameState.rolls` is the live 200-roll hot window that
+  rides every projection; the combat-log store is THE TABLE FEED — the durable history, where
+  every roll also lands as a `kind: "roll"` row. They share `RollRecord.id`, so a client that
+  reads both must dedupe on it. Every roll goes through `recordRoll`
+  (`apps/server/src/roll-history.ts`) and every feed row through `publishRolls` in
+  `game-operations.ts`; never push `state.rolls` by hand.
 - Commands serialize through a `commandQueue` promise chain.
 
 ## Relevant ADRs

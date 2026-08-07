@@ -1,35 +1,76 @@
+/* DE-PILLED (rulings 10 + 24). The badge was `border-radius: var(--radius-pill)`; it is now the
+   app's one silhouette — the same cut corner as the button, scaled to a ~20px box.
+
+   THE CUT IS ON A BACKING LAYER even though a badge is usually a `<span>` and therefore not a tap
+   target. Ruling 14 is the house technique now, not an escape hatch, and a badge is a component
+   anyone may put inside a control (the scene card's status badge sits over a stretched
+   `.nh-card-open`); a `clip-path` that arrives there later would clip hit-testing silently.
+
+   `--chamfer-cut` is redeclared HERE rather than merely re-sizing `--chamfer`, because a custom
+   property's computed value has its `var()`s already substituted at the element that declares it:
+   `--chamfer-cut` computes on `:root` and inherits down as a literal 9.6px polygon, so overriding
+   `--chamfer` further down does nothing. Measured, not assumed — `.nh-btn--sm` was written that way
+   first and reported a 9.6px cut. */
 .nh-badge {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   padding: 1px var(--space-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
-  background: var(--surface-3);
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-dim);
   font: 700 var(--fs-xs) / 1.5 var(--font-body);
   letter-spacing: .03em;
   white-space: nowrap;
+  --chamfer: .3rem;
+  --chamfer-cut: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%);
+  --nh-fill: var(--surface-3);
+  --nh-rim: var(--line-strong);
 }
+.nh-badge::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  /* 1px, not `--rim-w`: two 2px rims on a 20px box close most of the interior, and the badge's
+     edge is a boundary rather than the material's rim. The rim proper lives on surfaces and
+     controls; ruling 39's leading rule is the badge-scale answer to "carry a tone on an edge". */
+  border: 1px solid var(--nh-rim);
+  background: var(--nh-fill);
+}
+
 /* Soft outline tones — a colored edge + readable tinted text, surface stays quiet. */
-.nh-badge--primary { border-color: var(--magenta); color: var(--magenta-hi); }
-.nh-badge--success { border-color: var(--success); color: var(--cyan-hi); }
-.nh-badge--caution { border-color: var(--caution); color: var(--caution-hi); }
-.nh-badge--danger  { border-color: var(--danger); color: var(--danger-hi); }
-.nh-badge--info    { border-color: var(--info); color: var(--indigo); }
-:root[data-theme="light"] .nh-badge--info { color: var(--info); }
+.nh-badge--primary { --nh-rim: var(--magenta); color: var(--magenta-hi); }
+.nh-badge--success { --nh-rim: var(--success); color: var(--cyan-hi); }
+.nh-badge--caution { --nh-rim: var(--caution); color: var(--caution-hi); }
+.nh-badge--danger  { --nh-rim: var(--danger); color: var(--danger-hi); }
+.nh-badge--info    { --nh-rim: var(--info); color: var(--indigo); }
+/* Daybreak's outline info badge needs the deeper ink; `--indigo` is a light accent on a pale
+   surface. `:not(.nh-badge--solid)` is LOAD-BEARING and not tidiness: without it this rule is
+   (0,2,0) and beats `.nh-badge--solid`'s (0,1,0) `--text-on-neon`, so the SOLID info badge
+   painted `--info` ink on an `--info` fill — measured rgb(61,80,214) on rgb(61,80,214),
+   contrast **1.00**, an invisible block where the Codex tab's "N new" count should be. The
+   override was always about the outline variant; now it says so. (Night and the sunset hour
+   never took this rule and measured 4.66 / 7.73.) */
+:root[data-theme="light"] .nh-badge--info:not(.nh-badge--solid) { color: var(--info); }
 
 /* Solid — filled tone for counts / high emphasis. Dark ink on neon per §5.1. */
-.nh-badge--solid { border-color: transparent; color: var(--text-on-neon); }
-.nh-badge--solid.nh-badge--primary { background: var(--primary); }
-.nh-badge--solid.nh-badge--success { background: var(--success); }
-.nh-badge--solid.nh-badge--caution { background: var(--caution); }
-.nh-badge--solid.nh-badge--danger  { background: var(--danger); }
-.nh-badge--solid.nh-badge--info    { background: var(--info); }
-.nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not([class*="nh-badge--caution"]):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]) { background: var(--line-strong); color: var(--text); }
+.nh-badge--solid { --nh-rim: transparent; color: var(--text-on-neon); }
+.nh-badge--solid.nh-badge--primary { --nh-fill: var(--primary); }
+.nh-badge--solid.nh-badge--success { --nh-fill: var(--success); }
+.nh-badge--solid.nh-badge--caution { --nh-fill: var(--caution); }
+.nh-badge--solid.nh-badge--danger  { --nh-fill: var(--danger); }
+.nh-badge--solid.nh-badge--info    { --nh-fill: var(--info); }
+.nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not([class*="nh-badge--caution"]):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]) { --nh-fill: var(--line-strong); color: var(--text); }
 
 /* Violet — reserved for GM-only content and nothing else (design-language §2 / invariant 8).
    It is a tone rather than a bespoke pill so `GmOnlyTag` and `HiddenFromPlayers` stop being
    two hand-rolled lookalikes of this component. */
-.nh-badge--violet { border-color: var(--violet); color: var(--violet-hi); }
-.nh-badge--solid.nh-badge--violet { background: var(--violet); }
+.nh-badge--violet { --nh-rim: var(--violet); color: var(--violet-hi); }
+.nh-badge--solid.nh-badge--violet { --nh-fill: var(--violet); }

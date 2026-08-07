@@ -1,4 +1,5 @@
-import type { ActorDefinition, EncounterStartEntry, GameState, InitiativeEntry } from "@vtt/domain";
+import type { ActorDefinition, EncounterStartEntry, GameState, InitiativeEntry, RuleExceptions, RuleMode } from "@vtt/domain";
+import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode, collectRiders, type RollModeSource } from "@vtt/rules-5e";
 import { deriveEquipment } from "./equipment-derivation.js";
@@ -10,7 +11,9 @@ import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
   entries: readonly EncounterStartEntry[];
-  rulesMode?: "strict" | "assisted" | "freeform";
+  rulesMode?: RuleMode;
+  /** Per-family exceptions for this fight; omitted keeps whatever the seeded/previous fight carried. */
+  ruleExceptions?: RuleExceptions;
   /** When true, each claimed player-character without an explicit score gets a provisional auto-roll AND is
    * parked in `pendingInitiative` for its owner to roll (combat.playerInitiativeMode picks immediate/wait). */
   playersRollInitiative?: boolean;
@@ -62,6 +65,16 @@ export function initiativeRollMode(state: GameState, actorId: string, resolveDef
   return aggregateRollMode(advantage, disadvantage).mode;
 }
 
+/**
+ * Told about every initiative die the server actually rolls, so the caller can put it in the table feed
+ * (D11: "initiative rolls land in the feed like everything else"). Player-rolled initiative used to write
+ * a combat-log SENTENCE and no `RollRecord` at all - the one roll at the table that left no dice behind.
+ *
+ * The sink is optional and takes no session/principal knowledge: encounter.ts stays a pure rules module
+ * and `game-operations.ts` decides who rolled and how the row is attributed.
+ */
+export type InitiativeRollSink = (roll: Readonly<{ actorId: string; natural: number; modifier: number; total: number; mode: "advantage" | "disadvantage" | "normal" }>) => void;
+
 /** Roll one initiative d20 under an aggregated roll mode. */
 function rollUnderMode(rollD20: () => number, mode: "advantage" | "disadvantage" | "normal"): number {
   if (mode === "advantage") return Math.max(rollD20(), rollD20());
@@ -77,7 +90,7 @@ function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
     || left.actorId.localeCompare(right.actorId));
 }
 
-export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry, resolveDefinition?: (definitionId: string) => ActorDefinition | undefined, now: number = Date.now(), catalog?: EquipmentCatalog) {
+export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry, resolveDefinition?: (definitionId: string) => ActorDefinition | undefined, now: number = Date.now(), catalog?: EquipmentCatalog, onRoll?: InitiativeRollSink) {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200) throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
   // When a prepared scene is live, the encounter must run on that scene's map so park/resume stays coherent.
@@ -97,6 +110,8 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     actorIds.add(entry.actorId);
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!actor) throw new CommandRejectedError("One of the selected combatants no longer exists.");
+    // An archived character is out of play; the picker filters were never the guard (server authority).
+    assertNotArchived(state, entry.actorId);
     actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
     const tieBreaker = actor.initiative ?? 0;
     // 2024 Surprise: a surprised combatant rolls initiative with disadvantage (two d20s, keep lower).
@@ -106,8 +121,10 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     const mode = entry.surprised === true
       ? aggregateRollMode(itemMode === "advantage" ? [{ source: "item", label: "Item" }] : [], [{ source: "surprised", label: "Surprised" }]).mode
       : itemMode;
-    const rolled = entry.score === undefined ? rollUnderMode(rollD20, mode) + tieBreaker : entry.score;
+    const natural = entry.score === undefined ? rollUnderMode(rollD20, mode) : null;
+    const rolled = natural === null ? entry.score! : natural + tieBreaker;
     if (!validScore(rolled)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+    if (natural !== null) onRoll?.({ actorId: actor.id, natural, modifier: tieBreaker, total: rolled, mode });
     if (input.playersRollInitiative && entry.score === undefined && actor.kind === "player-character" && actor.ownerSessionId !== null) pendingInitiative.push(actor.id);
     return { actorId: actor.id, score: rolled, tieBreaker };
   });
@@ -127,12 +144,16 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     annotations: [],
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
+    ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
     underwater: false,
     reactionsUsed: [],
     legendaryUsed: {},
     pendingSaves: [],
     pendingReactions: [],
     pendingDamage: [],
+    // A new fight starts with nobody waiting on the GM: an ask parked in the last fight is about a
+    // situation that no longer exists (D8 - asks die with the fight, and park/resume with the scene).
+    pendingRuleAsks: [],
     pendingInitiative,
     // A fresh fight starts live on the timeline; the handler wipes any prior fight's snapshots and
     // captures this start state as the baseline the GM can rewind all the way back to.
@@ -143,15 +164,18 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its token. GM-only at the command layer. */
-export function addCombatant(state: GameState, actorId: string, score: number | undefined, rollD20: () => number, tokenGeometry: TokenMapGeometry, now: number = Date.now()) {
+export function addCombatant(state: GameState, actorId: string, score: number | undefined, rollD20: () => number, tokenGeometry: TokenMapGeometry, now: number = Date.now(), onRoll?: InitiativeRollSink) {
   if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  assertNotArchived(state, actorId);
   if (state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("That combatant is already in the encounter.");
   if (state.combat.initiative.length >= 200) throw new CommandRejectedError("This encounter already has 200 combatants.");
   const tieBreaker = actor.initiative ?? 0;
-  const rolled = score === undefined ? rollD20() + tieBreaker : score;
+  const natural = score === undefined ? rollD20() : null;
+  const rolled = natural === null ? score! : natural + tieBreaker;
   if (!validScore(rolled)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+  if (natural !== null) onRoll?.({ actorId, natural, modifier: tieBreaker, total: rolled, mode: "normal" });
   actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
   state.combat = {
     ...state.combat,
@@ -165,7 +189,7 @@ export function endEncounter(state: GameState) {
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
   // Fog persists through the spread below: what the party has revealed stays revealed after the fight.
-  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], legendaryUsed: {}, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingInitiative: [], historyCursor: null, historyDirty: false };
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], legendaryUsed: {}, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingRuleAsks: [], pendingInitiative: [], historyCursor: null, historyDirty: false };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {
@@ -188,7 +212,7 @@ export function setInitiativeScore(state: GameState, actorId: string, score: num
  * is supplied, honoring adv/disadv), setting their score and clearing their pending flag. In wait mode,
  * clearing the last pending entry begins turns on the now-final order. Returns the final score for the log.
  */
-export function rollSelfInitiative(state: GameState, actorId: string, options: Readonly<{ natural?: number; rollMode?: "advantage" | "disadvantage" | "normal" }>, rollD20: () => number): number {
+export function rollSelfInitiative(state: GameState, actorId: string, options: Readonly<{ natural?: number; rollMode?: "advantage" | "disadvantage" | "normal" }>, rollD20: () => number, onRoll?: InitiativeRollSink): number {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before rolling Initiative.");
   const entry = state.combat.initiative.find((candidate) => candidate.actorId === actorId);
   if (!entry) throw new CommandRejectedError("That actor is not in this encounter.");
@@ -202,6 +226,9 @@ export function rollSelfInitiative(state: GameState, actorId: string, options: R
     : rollD20();
   const score = natural + tieBreaker;
   if (!validScore(score)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+  // A hand-typed `natural` is an off-screen die the player already rolled: recording it as a server roll
+  // would claim dice the server never threw, so only server-rolled initiative reaches the feed.
+  if (options.natural === undefined) onRoll?.({ actorId, natural, modifier: tieBreaker, total: score, mode: options.rollMode ?? "normal" });
   state.combat = {
     ...state.combat,
     initiative: ordered(state, state.combat.initiative.map((candidate) => candidate.actorId === actorId ? { ...candidate, score } : candidate)),
@@ -212,14 +239,17 @@ export function rollSelfInitiative(state: GameState, actorId: string, options: R
 }
 
 /** GM rolls initiative for every combatant still pending (starting the fight in wait mode), clearing the gather. */
-export function rollRemainingInitiative(state: GameState, rollD20: () => number) {
+export function rollRemainingInitiative(state: GameState, rollD20: () => number, onRoll?: InitiativeRollSink) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before rolling Initiative.");
   if (state.combat.pendingInitiative.length === 0) return;
   const pending = new Set(state.combat.pendingInitiative);
   const rolledEntries = state.combat.initiative.map((entry) => {
     if (!pending.has(entry.actorId)) return entry;
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
-    return { ...entry, score: rollD20() + (actor?.initiative ?? 0) };
+    const natural = rollD20();
+    const modifier = actor?.initiative ?? 0;
+    onRoll?.({ actorId: entry.actorId, natural, modifier, total: natural + modifier, mode: "normal" });
+    return { ...entry, score: natural + modifier };
   });
   state.combat = { ...state.combat, initiative: ordered(state, rolledEntries), pendingInitiative: [] };
   settleGatherIfComplete(state);

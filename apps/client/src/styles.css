@@ -1,25 +1,732 @@
-/* App shell + shared surfaces, migrated to the OzyVTT tokens (@vtt/ui).
-   Base surface/text/body type come from the token `body` rule; the theme root is
-   data-theme on <html>. Layout is unchanged; only color/type/radius/state moved
-   to tokens. Reusable controls should prefer the @vtt/ui primitives; these legacy
-   classes are the app-specific surfaces those primitives don't cover. */
+/* App shell + shared surfaces, in the OzyVTT tokens (@vtt/ui). Base surface/text/body
+   type come from the token `body` rule; the theme root is data-theme on <html>. The shell
+   frame (the locked page, §7) lives at the top of this file; reusable controls should
+   prefer the @vtt/ui primitives — these legacy classes are the app-specific surfaces those
+   primitives don't cover. */
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
-main { width: min(100% - 2rem, 1720px); margin: 0 auto; padding: clamp(1.5rem, 5vw, 4rem) 0; }
-/* Height of the fixed connection strip (see .connection-banner). Declared here so the page
-   padding, the strip, and the builder's top inset all read one number. */
-:root { --connection-banner-h: 2.5rem; }
-header { max-width: 40rem; }
+/* THE SHELL LOCK (design-language.md §7 — the screen is the page). The body is the viewport
+   and never scrolls; `<main>` below is the frame. This file is also loaded by sheet.html —
+   whose content is exactly one 100dvh column, so the lock is a no-op there — but NOT by
+   viewer.html (its own reset, viewer-page.css) or styleguide.html (a reference document
+   that deliberately scrolls). */
+body { margin: 0; min-width: 320px; height: 100dvh; overflow: hidden; }
+/* The frame: one viewport-high grid, rows [connection strip][tab bar][content pane]. Rows
+   1-2 size to their content and collapse to nothing when absent; the pane takes the rest —
+   minmax(0, 1fr) both ways so it may shrink below its content (a grid item's automatic
+   minimum size is its CONTENT's: the party-strip lesson, one level up). Children take
+   explicit grid-row assignments (each rule below), so a stray in-flow child cannot silently
+   reshape the frame. --pane-gutter reproduces the retired page column
+   (width: min(100% - 2rem, 1720px); margin auto) as inline padding, so the chrome rows and
+   the staged panes align to one column. */
+main {
+  --pane-gutter: max(1rem, calc((100% - 1720px) / 2));
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  /* ===== RULING 51 — THE WHOLE CHROME CARRIES THE ROLE HUE =====
+     The reason is operational, not decorative: the client runs a GM window and a player window
+     side by side, and ACTING AS THE WRONG ROLE is the mistake this prevents. So the hue is a
+     property of the FRAME, declared once here and inherited by every piece of chrome under it —
+     the connection strip, the tab bar, the table's panel rims — instead of each site re-deriving
+     it from a class it cannot see.
 
-h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1; letter-spacing: var(--tracking-display); margin: .35rem 0 1rem; }
-h2 { font-family: var(--font-display); font-size: var(--fs-h1); line-height: var(--lh-snug); margin: 0 0 .5rem; }
+     THE SOURCE OF TRUTH IS THE TAB BAR'S OWN `.rim-*` CLASS, read with `:has()`. The frame has
+     no role of its own in the markup (`main.tsx` puts the class on frame row 2), and inventing a
+     second place to say "this window is the GM's" is exactly the kind of duplicate signal that
+     drifts. Anything that inherits --role-hue is therefore role-tinted for free and anything that
+     does not is untouched, which is what keeps this to the chrome.
+
+     TWO CONSTRAINTS FROM THE RULING, BOTH LOAD-BEARING:
+     - A ROLE HUE IS NOT A SECURITY BOUNDARY. Projection is (apps/server/src/projections.ts).
+       Nothing may become GM-only *because* it is tinted; the tint sits on top of a boundary
+       enforced on the server, and every rimmed site still names its role in words.
+     - THE PUBLIC VIEWER TAKES NO ROLE HUE AT ALL. It is the shared screen, it has no role, and a
+       GM tint on the screen the players look at would be actively wrong. That is structural here
+       rather than a rule to remember: `viewer.html` never loads this stylesheet, so there is no
+       `main` and no --role-hue in that document.
+     The fallback is --rim-color, the neutral structural edge, so the chrome is complete before
+     auth (the landing) and in any state where no bar has rendered yet. */
+  --role-hue: var(--rim-color);
+  /* THE CHROME PLATE (rulings 26, 48). A lit-top/shaded-bottom gradient is what makes a strip
+     read as a PIECE rather than as background — flat fill is the thing the client called "square
+     and basic". Tinted with the role hue rather than merely standing on a 7% wash of it: the wash
+     alone had to survive whatever the plate put over it, and diluting the role signal to buy a
+     material would trade ruling 51 for ruling 26. Adding the hue INTO the fill spends neither. */
+  --chrome-plate: linear-gradient(180deg,
+    color-mix(in srgb, var(--role-hue) 13%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--role-hue) 6%, var(--surface-1)) 100%);
+  /* The chrome-tier scanline, hoisted so row 1 and row 2 spend ONE texture (they are one piece of
+     chrome after ruling 48). `--scanline-color` is the CHROME strength (.22 / .14 / .05); the
+     shared `.scanlines` utility halves it with `opacity: .5` for the SCENE tier, which is why the
+     sky is at .11 and this bar is at .22 — two strengths of one texture, not a contradiction. */
+  --chrome-scanline: linear-gradient(to bottom,
+    transparent 0,
+    transparent calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) var(--scanline-gap));
+}
+main:has(> .frame-tabbar.rim-gm)     { --role-hue: var(--rim-gm); }
+main:has(> .frame-tabbar.rim-player) { --role-hue: var(--rim-player); }
+/* Daybreak drops the texture and keeps the geometry (ruling 29): the identity is carried by the
+   plate, the rim and the bezel, never by luminance. Matches `.scanlines`' own light-theme rule. */
+[data-theme="light"] main { --chrome-scanline: none; }
+/* Height of the connection strip row — the row's box AND its entrance animation's target
+   read this one number (see .connection-banner). */
+:root { --connection-banner-h: 2.5rem; }
+/* Row 3 — the content pane. One element, always rendered, owning the canvas for whatever
+   the address says: the landing, a full-page layer, or the active tab surface. Flex, so its
+   one in-flow child fills it exactly; fixed and top-layer children (viewer preview, every
+   <dialog>) take no box here. */
+.app-pane { grid-row: 3; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.app-pane > * { flex: 1 1 auto; min-width: 0; min-height: 0; }
+/* EVERY SURFACE'S FRAME. The staging rule that used to sit here (`.pane-stage`, refresh hazard
+   H1) is RETIRED as of Phase C: it wrapped a surface that had not adopted the locked frame yet
+   in one temporary scroll region so the clipped pane could not strand content below it, and the
+   last surface riding it — the Scenes arm — recomposed in C2. Nothing stages any more, so this
+   is what EVERY surface is: the pane's one child, a `.frame-col` (@vtt/ui) whose chrome rows sit
+   above one `.scroll-y .frame-fill` region. This class carries only what the staging wrapper used
+   to hand out for free — the page column's inline gutter, the top breathing room — so a surface's
+   own file is left saying what is different about it, not repeating the frame. The REGION carries
+   the bottom padding, the safe area and the scroll behaviour, because those belong to the thing
+   that actually scrolls (§7.5, refresh risk #7). */
+.pane-frame { padding: var(--space-4) var(--pane-gutter) 0; }
+/* The not-found page's region: the view inside it carries `margin: auto`, which only centres against
+   a flex parent — so the region is one, and an unanswered address puts its message in the middle of
+   the pane instead of pinned to the top of it. */
+.notfound-stage { display: flex; }
+.pane-frame > .scroll-y {
+  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-6);
+}
+/* THE SCENE TIER (§9 + the refresh's scope ruling: content-light surfaces stand on a sky, the
+   table never does). A LITERAL sky since the 2026-08-04 reversal — stars, a sun cresting a
+   glowing horizon, a receding grid floor — where this rule used to paint "one quiet vertical
+   wash, no sun, no horizon, no stars". Every value is a --sky-* token (design-tokens.css), so
+   the three hours come free and nothing here is hand-typed. The CRT tile is the shared
+   `.scanlines` utility (add the class beside this one), already display:none in daybreak —
+   that is why "scanlines in night and dusk" needs no rule of its own. Panels standing on the
+   sky take `.surface-glass` (the scene tier of the two glass tiers), and that is not decoration:
+   it is the structural half of the legibility guarantee, because a scroll region's last row
+   lands in the floor band and the opacity budget alone cannot carry bare copy there.
+
+   THE WASH IS THIS ELEMENT'S OWN BACKGROUND and the drive is the `.pane-sky` child, for two
+   reasons. (1) One layer, no size/repeat list — the invariant the token block states. (2) The
+   floor's perspective transform throws its paint box ~500px past each edge, and `.pane-scene`
+   computes `overflow: visible`: left here that spill grows `document.scrollHeight` and fails
+   `scripts/no-scroll-audit.mjs` on every scene route. The clip belongs on a decoration-only
+   layer, never on this one, which hosts menus and `<dialog>`s.
+
+   `isolation` is what makes the negative z-indexes land between the sky and the content: a
+   negative-index child paints above the background of its nearest STACKING CONTEXT, so without
+   one here the tile would slide behind the sky and vanish. `isolation` creates that context
+   WITHOUT creating a containing block, so every fixed overlay (sheet float, drawer, viewer
+   preview) still measures against the viewport — the trap `.anim-view`'s fill-mode lesson
+   records. NEVER put transform, filter, backdrop-filter, perspective, will-change or
+   contain:paint on THIS element: any one of them makes it the containing block for all of them
+   and re-breaks what A1 verified. The transforms below are all on decoration that has no
+   descendants. */
+.pane-scene {
+  position: relative;
+  isolation: isolate;
+  background: var(--sky-wash);
+}
+.pane-scene.scanlines::after { z-index: -1; }
+/* ===== RULING 28 — SCANLINES ON THE OUTERMOST PANEL ONLY =====
+   Nested surfaces keep the rim and the bezel and drop the TEXTURE. The reason is moiré where
+   surfaces stack — two 3px combs at slightly different sub-pixel offsets beat against each other
+   — and it costs nothing, because every screen has an outermost panel and that is the one wearing
+   it. This is a scoping rule, not a new utility: `.scanlines` is unchanged and every existing call
+   site keeps its class, so a surface that stops being nested gets its texture back automatically.
+   One line rather than a list of surfaces, because the condition is structural — "there is already
+   a textured surface between me and the viewport" — and a list would go stale the first time a
+   panel moved. */
+.scanlines .scanlines::after { display: none; }
+/* THE HORIZON BAND IS RESERVED, and this one rule is what makes the sky's legibility a
+   STRUCTURE rather than a hope. Everything bright in the scene — the sun's crest, the beam,
+   its glow, the ember, the grid — lives within --sky-horizon-inset + --sky-sun-crown of the
+   pane's bottom edge. Re-measured 2026-08-04 after the sun became a hemisphere (Chromium,
+   WCAG 2.1, every pixel of the bare sky — content hidden, so the wash and .pane-sky alone —
+   row-scanned for a run of >= 4 consecutive failing pixels): the band that fails AA for
+   --text-muted is at most 157px at 1920x1080 and 130px at 390x844 across all three hours,
+   against a reserve of 176px / 144px — strictly taller in every cell, by 19px and 14px.
+
+   THE RUN RULE IS THE CAVEAT, AND IT IS LOAD-BEARING: it sets POINT FEATURES aside. A star is
+   one 1-1.5px dot of near-white, it can land anywhere in the pane, and no bottom reserve can
+   bound it — scanned per-pixel instead, the failing band is the whole pane in night and the
+   sunset hour (0 in daybreak, where --sky-star is transparent). The residual is a dot narrower
+   than a glyph stem, and if it ever needs answering the fix is --sky-star's alpha or a mask
+   over the content column, not a taller reserve. Read the guarantee as "no BAND of unsafe sky
+   above the reserve", never as "every pixel".
+
+   So the region simply cannot put a row down there, and a surface that adds bare copy tomorrow
+   inherits the guarantee instead of re-deriving it. This is what the style guide does too — its
+   content column reserves 150px against a 112px floor. It costs a scroller some trailing space
+   and cuts off nothing: the padding is INSIDE the scroll, so every row is still reachable.
+   Specificity ties `.pane-frame > .scroll-y` above and wins on source order. */
+.pane-scene > .scroll-y {
+  padding-bottom: calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
+}
+/* THE DRIVE. One aria-hidden, pointer-inert child; `overflow: clip` (not `hidden` — nothing
+   here scrolls, and `clip` creates no scroll container) contains the floor's spill locally.
+   Ten background layers, first paints topmost: the horizon beam, its glow, seven stars, the
+   bloom. The beam's own `background-position` puts its BOTTOM edge exactly
+   --sky-horizon-inset from the pane's, which is the one number the rest of the scene is
+   measured against. Stars tile the whole pane rather than stopping at the horizon — the
+   style guide's own scroller does the same, and the brightening wash swallows the low ones. */
+.pane-sky {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: clip;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, transparent 0%, var(--sky-horizon-a) 22%, var(--sky-horizon-b) 50%, var(--sky-horizon-a) 78%, transparent 100%),
+    var(--sky-horizon-glow),
+    radial-gradient(1px 1px at 22px 31px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 121px 87px, var(--sky-star-dim) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 193px 22px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 71px 140px, var(--sky-star-dim) 50%, transparent 51%),
+    radial-gradient(1px 1px at 160px 171px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 45px 213px, var(--sky-star-dim) 50%, transparent 51%),
+    radial-gradient(1px 1px at 227px 129px, var(--sky-star) 50%, transparent 51%),
+    var(--sky-bloom);
+  background-size:
+    100% 2px, 100% 100%,
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile),
+    100% 100%;
+  background-position: 0 calc(100% - var(--sky-horizon-inset)), 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, no-repeat;
+}
+/* The grid floor. `transform-origin: center top` is the whole illusion — it pins the near edge
+   at the horizon and throws the far edge toward the vanishing point. Rows are denser than
+   columns (44 vs 56) because that is what reads as recession once the tilt lands. The mask puts
+   the densest lines mid-band and goes quiet at both the horizon join and the pane's bottom edge,
+   where a region's last row sits; the opacity is the measured per-theme ceiling on top of it. */
+.pane-sky::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--sky-grid-bleed));
+  right: calc(-1 * var(--sky-grid-bleed));
+  bottom: 0;
+  height: var(--sky-horizon-inset);
+  background-image:
+    repeating-linear-gradient(to right, var(--sky-grid-x) 0 2px, transparent 2px var(--sky-grid-col)),
+    repeating-linear-gradient(to bottom, var(--sky-grid-y) 0 2px, transparent 2px var(--sky-grid-row));
+  transform: perspective(var(--sky-grid-perspective)) rotateX(var(--sky-grid-tilt));
+  transform-origin: center top;
+  opacity: var(--sky-floor-opacity);
+  -webkit-mask-image: var(--sky-floor-mask);
+  mask-image: var(--sky-floor-mask);
+}
+/* The sun, as a CREST. The box is the crown above the horizon and nothing more; the mask cuts
+   it to the top of a --sky-sun-d circle centred on the line. The landing needs an
+   overflow-hidden sky band and a slat gradient over the disc's lower half to get this read;
+   here the horizon does the cutting and the hidden half is exactly the slatted half, so neither
+   is needed. The fill is transparent at the top and strongest at the line, which puts the
+   brightest ink furthest from the text.
+
+   THE BOX AND THE CIRCLE MUST HOLD A RATIO OR THERE IS NO SUN, and that is why the token
+   derives the diameter from the crown (2:1 — a hemisphere). Set them independently and the
+   mask's cap flattens into a chord: shipped at 24rem under a 3.25rem crown this rendered a
+   394x54px slab with 8.8% taper and hard vertical sides. Nothing in this rule enforces the
+   ratio; design-tokens.css does. */
+.pane-sky::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - var(--sky-sun-d) / 2);
+  bottom: var(--sky-horizon-inset);
+  width: var(--sky-sun-d);
+  height: var(--sky-sun-crown);
+  background-image: var(--sky-sun);
+  opacity: var(--sky-sun-opacity);
+  -webkit-mask-image: var(--sky-sun-mask);
+  mask-image: var(--sky-sun-mask);
+}
+/* Reduced transparency degrades the scene rather than deleting it: the wash and the horizon
+   stay, because they are what distinguishes the three hours and hiding them would make night
+   and the sunset hour identical — that is a transparency preference, not a contrast one. What
+   goes is the two layers that sit closest to the words: the floor's mesh and the sun's film.
+   (`.scanlines`/`.static-noise` already answer the same preference in design-tokens.css, and
+   `.surface-glass` goes solid there, which is what carries the text.) */
+@media (prefers-reduced-transparency: reduce) {
+  .pane-sky::before, .pane-sky::after { display: none; }
+}
+/* An EMPTY STATE ON A SCENE is a moment, not a dashed box: one line, and one door standing in
+   the sky. The door is the primary Button (chamfered since §9, glow on drop-shadow filters),
+   sized up here to read as a tile rather than a form control. Where a surface has no action to
+   offer — the replays list fills itself when a fight ends — the line stands alone. */
+.scene-empty { display: grid; place-items: center; align-content: center; gap: var(--space-5); min-height: 14rem; padding: var(--space-10) var(--space-4); text-align: center; }
+.scene-empty p { max-width: 34rem; margin: 0; color: var(--text-dim); font-size: var(--fs-body); }
+.scene-empty .nh-btn--primary { min-height: 3.25rem; padding-inline: var(--space-8); font-size: var(--fs-body); }
+/* Pane-level entrances are OPACITY-led. `.anim-view`'s view-in animates transform, and Blink
+   keeps an animated (and, with `both` fill, a settled) transform as the containing block for
+   position: fixed descendants — which would clamp every in-place fixed overlay (enlarged
+   map, sheet float, drawer, viewer preview) to the pane instead of the viewport. The old
+   `.table-layout.anim-view { animation-fill-mode: backwards }` patch covered that one arm;
+   the pane generalizes the entrance instead: same timing, opacity only, nothing to trap. */
+@keyframes pane-in { from { opacity: 0; } to { opacity: 1; } }
+/* ===== RULING 25 — THE SCANLINE WIPE, ON TAB AND PAGE TRANSITIONS ONLY =====
+   "Scanline wipe, but dont overdo it" — and the qualifier is the spec: <=180ms, ONE band, ONE
+   pass, no repeat, no trailing bloom, no second band, and it moves no layout.
+
+   THIS SELECTOR IS THE WHOLE SCOPING ARGUMENT, so it is written out rather than left to be
+   re-derived. `.app-pane > .anim-view` is the pane's one child, and the pane's one child changes
+   exactly when the address does — a tab, a route, a full-page layer. It is a NEW element every
+   time, which is what makes a CSS animation fire once with no state to reset. Panel expands,
+   drawer opens, list updates and accordion sections are all inside that child and match nothing
+   here. An implementer who adds this to a fifth surface has broken the ruling, not extended it.
+
+   IT IS A MASK, NOT AN OVERLAY, and the reason is the pseudo budget: `::after` is `.tap-target`'s
+   and `.scanlines`', `::before` is the material's, and these surfaces belong to three other
+   stylesheets besides this one. A mask needs no pseudo and no box, so it moves no layout — which
+   is the property that made the wipe beat the slide in the first place.
+   Verified before it was written, because this file's whole history is the fixed-overlay trap:
+   `mask-image` does NOT make a containing block for `position: fixed` descendants in Chromium
+   (probed with a fixed child of a masked box — getBoundingClientRect top/left stayed 0/0 with and
+   without the mask). `fill-mode: none` on this leg also means the mask is gone the instant the
+   180ms is up, so nothing carries it.
+
+   The band DIMS rather than reveals: mask alpha never reaches 0, so the surface stays legible for
+   the whole pass and what travels is one dark scanline, not a curtain.
+
+   THE ARITHMETIC, ONCE, BECAUSE IT IS THE PART THAT SILENTLY BREAKS. The tile is 200% of the box
+   and the band sits at 47-50% OF THE TILE, i.e. 94-100% of the box. `mask-position` in percent
+   resolves against (box - image) = -100% of the box, so position 100% puts the band at the box's
+   TOP edge and position 0% puts it at the BOTTOM: sweeping 100% -> 0% is one downward pass.
+   `no-repeat` is what keeps it ONE band — the default `repeat` would tile the mask and give the
+   surface a moving comb — and it is only safe because a 200% tile still covers the whole box at
+   both ends of that range, so nothing outside the band is ever masked away.
+   `prefers-reduced-motion` falls back to the plain opacity fade — not to nothing — below. */
+.app-pane > .anim-view {
+  animation-name: pane-in, pane-wipe;
+  animation-duration: var(--dur-enter), 180ms;
+  animation-timing-function: var(--ease-settle), linear;
+  animation-fill-mode: both, none;
+  -webkit-mask-size: 100% 200%;   mask-size: 100% 200%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+@keyframes pane-wipe {
+  from {
+    -webkit-mask-image: var(--pane-wipe-band); mask-image: var(--pane-wipe-band);
+    -webkit-mask-position: 0 100%; mask-position: 0 100%;
+  }
+  to {
+    -webkit-mask-image: var(--pane-wipe-band); mask-image: var(--pane-wipe-band);
+    -webkit-mask-position: 0 0%; mask-position: 0 0%;
+  }
+}
+/* Only the ALPHA of this gradient is read (a mask image's alpha channel is the mask), so the hue
+   is irrelevant — but it still goes through a token, because check (d) is a rule about what a
+   stylesheet may contain and "this one is not really a colour" is exactly the argument that puts
+   the first literal in. `--void` is opaque in all three themes; the mix is the band. */
+:root {
+  --pane-wipe-band: linear-gradient(to bottom,
+    var(--void) 0 45%,
+    color-mix(in srgb, var(--void) 34%, transparent) 47.4%,
+    color-mix(in srgb, var(--void) 34%, transparent) 49%,
+    var(--void) 51.4% 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-pane > .anim-view { animation-name: pane-in; -webkit-mask-image: none; mask-image: none; }
+}
+/* THE SETTLE NO LONGER RE-REVEALS THE APP, and this is the second half of ruling 27's defect —
+   found on a filmstrip of the drive, not by reading. `.anim-cascade` (design-tokens.css) fades and
+   drifts every child of `main` when `entry` becomes "settle", and it was written for an entry where
+   the curtain was still opaque at that moment. It is not: `entry-clear` holds to 74% and then fades
+   over the last 390ms, so the chrome rows and the pane are ALREADY fully visible through it — and
+   then the cascade started them again from opacity 0. The filmstrip caught the result as a black
+   frame between the sun cresting and the app arriving, which is exactly the "glitch" the client
+   described and exactly the thing a longer duration would have made worse rather than better.
+
+   The reveal belongs to the curtain and happens once. `main.tsx` still sets the class — it is the
+   marker for "the entry is finishing" — and this rule is what makes the phase silent.
+   `.anim-view` inside the pane is untouched: that is the SURFACE's own entrance, it ran at mount
+   behind the curtain, and it is not a second reveal of the frame. */
+main.anim-cascade > * { animation: none; }
+/* (No bare `header` rule. One lived here — `max-width: 40rem`, written for the old left-aligned landing
+   hero — and it clamped EVERY <header> in the app to 640px, including the character builder's sticky
+   header and the Codex entry heads: known-bugs.md's `[ui] bare header` entry. D30's landing owns its
+   own width (`.home-hero`, `.landing`), so the global goes rather than gets scoped.) */
+
+h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1; letter-spacing: var(--tracking-display); margin: .35rem 0 var(--space-4); }
+h2 { font-family: var(--font-display); font-size: var(--fs-h1); line-height: var(--lh-snug); margin: 0 0 var(--space-2); }
 p { color: var(--text-dim); line-height: var(--lh-body); }
 .eyebrow { display: inline-block; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
 
-.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 3rem; max-width: 46rem; }
-.choices button { position: relative; }
-.choices .nav-arrow { position: absolute; top: 1.3rem; right: 1.3rem; margin: 0; font-size: 1.15rem; line-height: 1; color: var(--cyan); }
+/* ============ D30 — THE LANDING: an 80s retro-cyber title screen ============
+   The one screen that COMMITS. A full-viewport drive: star field, slatted sun,
+   an energized grid rolling toward the viewer, the wordmark as a lit neon sign,
+   two chamfered arcade doors. It escapes `main`'s column (full-bleed margins)
+   and paints its own sky — every raw colour lives in the --landing-* tokens,
+   which the theme toggle re-skins: night (dark), the sunset hour (dusk),
+   daybreak (light). Same composition, three skies.
+   Motion honours prefers-reduced-motion by FREEZING, never by vanishing. */
+.landing {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  /* The title screen IS the pane: pre-auth the frame has no chrome rows, so the pane is the
+     whole viewport and the scene fills it edge to edge — the pane sizes it (.app-pane > *).
+     The full-bleed negative-margin hacks and the html:has() overflow pin retired with the
+     shell lock: the page they compensated for and pinned no longer exists to scroll. */
+  padding: clamp(1.25rem, 4vh, 3rem) 1rem 4rem; text-align: center;
+  background: var(--landing-sky);
+}
+/* Two exclusions, and both are load-bearing.
+   The FLARE is neither scene nor content: it has to paint OVER the vignette and the scanlines (z-2)
+   and over the content (z-3), which a child of the z-0 scene layer could never do — that layer is
+   its own stacking context.
+   The THEME SWITCH is excluded because this rule would otherwise size and position it. It parks
+   itself in the corner (`position: absolute`, below), and every `:not()` here ADDS specificity —
+   adding the flare's raised this rule above the switch's own and dragged it into the middle of the
+   scene, on top of the doors. Naming the switch takes it out of this rule's reach entirely, which is
+   the fix rather than an arms race of counter-specificity. */
+.landing > *:not(.landing-scene):not(.landing-flare):not(.home-theme-switch) { position: relative; z-index: 3; width: 100%; }
+/* CRT dressing over the whole scene, under the content: vignette then scanlines. */
+.landing::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--landing-vignette); }
+.landing::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .75;
+  /* A one-gap TILE (background-size) rather than one huge repeating-linear-gradient: the repeating
+     form rasterized unevenly over a full-viewport layer (a visible band at the left edge, nothing
+     mid-field), and a 3px tile paints the same everywhere. Opacity .5 → .75 with it — the judges'
+     "one notch", so the CRT reads at 1280 while the labels (content sits ABOVE, z-index 3) stay crisp. */
+  background-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--scanline-gap) - 1px), var(--landing-scanline) calc(var(--scanline-gap) - 1px), var(--landing-scanline) var(--scanline-gap));
+  background-size: 100% var(--scanline-gap);
+}
+
+/* ---- The scene layers (all aria-hidden, all pointer-transparent) ---- */
+.landing-scene { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+/* Two star layers: near (bright, slow twinkle) and far (dim violet, blurred). The sky
+   above the horizon only — stars in the grid would read as dust on the screen. */
+.landing-stars, .landing-stars-far {
+  position: absolute; inset: 0 0 36% 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 11% 22%, var(--landing-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 27% 64%, var(--landing-star) 50%, transparent 51%),
+    radial-gradient(2px 2px at 38% 12%, var(--landing-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 52% 44%, var(--landing-star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 64% 18%, var(--landing-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 58%, var(--landing-star) 50%, transparent 51%),
+    radial-gradient(2px 2px at 88% 30%, var(--landing-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 95% 74%, var(--landing-star) 50%, transparent 51%);
+  background-size: 320px 260px;
+}
+.landing-stars-far { background-size: 480px 380px; opacity: .5; filter: blur(.5px); background-image:
+    radial-gradient(1px 1px at 18% 34%, var(--landing-star-dim) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 42% 70%, var(--landing-star-dim) 50%, transparent 51%),
+    radial-gradient(1px 1px at 58% 26%, var(--landing-star-dim) 50%, transparent 51%),
+    radial-gradient(1px 1px at 82% 48%, var(--landing-star-dim) 50%, transparent 51%); }
+/* The sky band clips the rising sun at the horizon. */
+.landing-skyband { position: absolute; inset: 0 0 36% 0; overflow: hidden; }
+.landing-sun {
+  --sun-d: clamp(15rem, 36vw, 27rem);
+  position: absolute; left: 50%; bottom: calc(var(--sun-d) * -0.28); transform: translateX(-50%);
+  width: var(--sun-d); aspect-ratio: 1; border-radius: 50%; overflow: hidden;
+  background: var(--landing-sun); box-shadow: var(--landing-sun-glow);
+}
+/* The genre's signature slat cuts across the sun's lower half. */
+.landing-sun::after { content: ""; position: absolute; inset: 46% 0 0 0; background: repeating-linear-gradient(to bottom, transparent 0 .5rem, var(--landing-slat) .5rem 1rem); }
+.landing-horizon { position: absolute; left: -4%; right: -4%; top: 64%; height: 2px; background: var(--landing-horizon); box-shadow: var(--landing-horizon-glow); }
+/* The grid floor, anchored at the horizon and rolling toward the viewer. Its own class,
+   not the .grid-floor utility: the utility is theme-gated and this scene is not. */
+.landing-grid {
+  position: absolute; left: -32%; right: -32%; top: 64%; bottom: -3%;
+  background-image:
+    repeating-linear-gradient(to right, var(--landing-grid-x) 0 2px, transparent 2px var(--landing-grid-cell)),
+    repeating-linear-gradient(to bottom, var(--landing-grid-y) 0 2px, transparent 2px var(--landing-grid-cell));
+  transform: perspective(340px) rotateX(63deg); transform-origin: center top;
+}
+/* The night's quiet companion: a small ringed planet, upper right — subtle by token
+   opacity, gone at daybreak. The ring is a tilted, squashed circle border. */
+.landing-planet { position: absolute; right: 11%; top: 9%; width: clamp(3.25rem, 6vw, 5.5rem); aspect-ratio: 1; border-radius: 50%; background: var(--landing-planet); box-shadow: var(--landing-planet-glow); opacity: var(--landing-planet-opacity); }
+.landing-planet::after { content: ""; position: absolute; inset: 26% -38%; border: 2px solid var(--landing-planet-ring); border-radius: 50%; transform: rotate(-18deg); }
+
+/* Analog grain over the whole scene — the last 2% of the CRT. Its own layer with a per-theme
+   opacity token, because the .static-noise utility is display:none in light and daybreak
+   still wants a whisper of it. */
+.landing-noise { position: absolute; inset: 0; background-image: var(--noise); background-size: 140px 140px; opacity: var(--landing-noise-opacity); mix-blend-mode: screen; }
+
+/* The sun's own light, held at the horizon until the drive needs it. Dormant at rest (scale 0,
+   transparent) so the title screen is unchanged; the entry blooms it to clear the frame. Its colour
+   is the scene's, not a new one — the star white at the core through the brand magenta, both tokens,
+   because check (d) allows no hand-typed literal here or anywhere. */
+/* Centred on where the sun ARRIVES, not where it starts, so the bloom belongs to the sun rather than
+   to the camera — this is the sun's corona opening, not a flash. Deliberately restrained: an earlier
+   pass peaked near-opaque and whited the whole frame, which drowned the road the drive is supposed to
+   be about and made a full-viewport luminance jump on a dark theme. It stays a bloom you can see
+   through, and the curtain's own fade does the actual reveal. */
+.landing-flare {
+  position: absolute; left: 50%; top: 52%; z-index: 4; pointer-events: none;
+  width: 12vmax; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0); opacity: 0;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--landing-star) 62%, transparent) 0%,
+    color-mix(in srgb, var(--magenta) 46%, transparent) 30%,
+    color-mix(in srgb, var(--violet) 26%, transparent) 56%,
+    transparent 76%);
+}
+
+/* ================= THE ENTRY DRIVE — landing → app (§7.7) =================
+   The brief, in the client's words: the doors travel past the screen as if you were driving down
+   the grid road, the sun rises above you, and that clears the space for the app to appear.
+
+   ===== RULING 27 — 1.75-2.0s, BOTH ELEMENTS, STAGED. THE 3s CEILING IS DEAD. =====
+   The drive runs --entry-drive (1500ms) and `main.tsx` hands over to the settle 400ms later, so
+   the whole landing->app entry is 1.9s. That supersedes the earlier 2-2.5s figure, which was the
+   client's estimate of how much SLOWER the entry needed to feel while they still assumed the
+   jumpiness was inherent to the timing. It was not — it was a defect (below) — and with the defect
+   fixed, less time is needed to feel deliberate. `--entry-drive` here and the two timers in
+   `main.tsx` are one number in two places; move them together or the curtain gets cut mid-run.
+
+   TWO BEATS, so neither element has to move unnaturally slowly to fill the run. Beat one is the
+   road and the doors (0-1000ms): the grid rushes first. Beat two is the sun and the flare
+   (560-1500ms), and it is timed against the curtain deliberately — `entry-clear` holds opaque to
+   74% and fades over the last 390ms, so the sun is still cresting while the app resolves
+   underneath it. That overlap IS the staging the ruling asks for.
+
+   ===== THE JUMP WAS A DEFECT, AND HERE IS THE MEASUREMENT =====
+   Instrumented over rAF at 1280x900 before this rewrite: THREE properties changed value
+   discontinuously in the single frame the drive class landed, because the drive REPLACED the
+   resting animations that already owned them.
+     - `.landing-grid` background-position   0% calc(0% + 46.0px)  ->  0px 0px   (a 46px snap; up
+       to one whole 56px cell, since `landing-grid-roll` loops through exactly one)
+     - `.landing-stars` opacity              0.550 -> 1
+     - `.landing-stars-far` opacity          0.594 -> 0.5
+   And the run itself was not composited: 16 frames in 950ms (median 50.1ms, max 183ms), with a
+   single-frame road step of 107px — two cells teleported at once — because `background-position`
+   is a MAIN-THREAD property and the app's entire mount was running on that thread behind the
+   curtain. "Everything animated is transform/opacity" was the claim in this comment's previous
+   version and the road had never been either.
+
+   THE FIX IS THAT NOTHING IS REPLACED ANY MORE. The resting animations keep running through the
+   drive and the drive rides properties they do not touch:
+     - the road's texture goes on streaming on `background-position` (`landing-grid-roll`, never
+       interrupted, so there is nothing to snap) while the drive scales the PLANE on `transform`,
+       anchored at `transform-origin: center top` — the horizon — so the road rushes without the
+       far edge ever leaving the sky. That also answers why the plane is not translated: the old
+       comment's ~254px void at the horizon is exactly what scaling from the horizon cannot open.
+     - the stars go on twinkling on `opacity` while the drive fades them on `filter: opacity()`,
+       which composes multiplicatively instead of contesting the same property.
+     - the sun's resting rise moved to the `translate` property (see `landing-sunrise`), leaving
+       `transform` free for the drive, so an early click no longer snaps it either.
+   And the layers are promoted AT REST rather than on the frame the animation starts, because
+   creating a compositor layer is itself main-thread work and doing it inside the run is the one
+   thing guaranteed to cost the first frames.
+
+   It becomes a fixed CURTAIN for its beat. The frame's chrome rows mount the instant auth lands, and
+   without the cover you would watch the tab bar pop in beneath a scene that is still driving. z-70
+   clears the tallest thing in the app (the token menu at 60); nothing here survives, because the
+   whole subtree unmounts when the beat ends.
+
+   The subtree unmounting is also what keeps `perspective` safe: a perspective (like a transform)
+   makes a containing block for position:fixed descendants, which is the trap that made the pane's
+   own entrance opacity-led (refresh risk #2). Nothing fixed lives inside the landing, and none of
+   this outlives the beat.
+
+   Reduced motion never reaches here — main.tsx declines to enter the state at all, so the swap is
+   instant rather than frozen mid-drive. */
+:root { --entry-drive: 1500ms; }
+.landing--drive {
+  position: fixed; inset: 0; z-index: 70; pointer-events: none;
+  perspective: 900px; perspective-origin: 50% 42%;
+  animation: entry-clear var(--entry-drive) linear forwards;
+}
+/* The content — wordmark, doors, or the GM's sign-in card, whichever the door answered from —
+   accelerates INTO the camera. `translateZ` against the container's perspective is what makes it
+   grow and slide off-frame the way a thing you drive past does; an ease-in curve is the acceleration.
+   The rule outranks `.anim-view`'s entrance on the same elements, which has already finished.
+   It clears the frame well before the curtain lifts: the doors are beat one. */
+.landing--drive > *:not(.landing-scene):not(.landing-flare) {
+  will-change: transform, opacity;
+  animation: entry-pass 820ms cubic-bezier(.55, .06, 1, .5) forwards;
+}
+/* The road. `landing-grid-roll` is re-declared FIRST in each of these lists on purpose: an
+   `animation` shorthand replaces the whole list, so the resting animation has to be restated or it
+   stops — and stopping it is the 46px snap the comment above measured. Two animations, two
+   different properties, no contest. */
+.landing--drive .landing-grid {
+  animation: landing-grid-roll 1.5s linear infinite,
+             entry-road var(--entry-drive) cubic-bezier(.36, 0, .62, 1) forwards;
+}
+/* The sun crests as the app resolves — beat two. Its resting rise lives on `translate` now, so it
+   is untouched by this and there is nothing to restate. */
+.landing--drive .landing-sun { animation: entry-sunrise 940ms cubic-bezier(.22, .58, .3, 1) 560ms forwards; }
+.landing--drive .landing-horizon { animation: entry-horizon 1000ms ease-in forwards; }
+/* Parallax: the near field opens faster than the far one, which is the whole of the depth cue. */
+.landing--drive .landing-stars {
+  animation: landing-twinkle 5.5s ease-in-out infinite,
+             entry-stars 1150ms cubic-bezier(.5, 0, .9, .8) forwards;
+}
+.landing--drive .landing-stars-far {
+  animation: landing-twinkle 7s ease-in-out infinite reverse,
+             entry-stars-far 1150ms cubic-bezier(.5, 0, .9, .8) forwards;
+}
+.landing--drive .landing-flare { animation: entry-flare 620ms cubic-bezier(.3, 0, .25, 1) 880ms forwards; }
+
+@keyframes entry-pass {
+  from { transform: translateZ(0); opacity: 1; }
+  55% { opacity: 1; }
+  to { transform: translateZ(640px); opacity: 0; }
+}
+/* Scale, not translate, and not background-position: see the fix note above. 1.62 from the horizon
+   is what reads as ten cells of road arriving; the fade is the road clearing the frame for the app. */
+@keyframes entry-road {
+  from { transform: perspective(340px) rotateX(63deg) scale(1); opacity: 1; }
+  72% { opacity: 1; }
+  to { transform: perspective(340px) rotateX(63deg) scale(1.62); opacity: 0; }
+}
+@keyframes entry-sunrise {
+  from { transform: translateX(-50%) scale(1); }
+  to { transform: translateX(-50%) translateY(-46%) scale(1.28); }
+}
+@keyframes entry-horizon {
+  from { transform: scaleX(1); opacity: 1; }
+  to { transform: scaleX(1.4); opacity: 0; }
+}
+/* `filter: opacity()` rather than `opacity`, so `landing-twinkle` keeps the property it owns. */
+@keyframes entry-stars {
+  from { transform: scale(1); filter: opacity(1); }
+  to { transform: scale(1.5); filter: opacity(0); }
+}
+@keyframes entry-stars-far {
+  from { transform: scale(1); filter: opacity(1); }
+  to { transform: scale(1.18); filter: opacity(0); }
+}
+@keyframes entry-flare {
+  from { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  50% { opacity: .52; }
+  to { transform: translate(-50%, -50%) scale(11); opacity: 0; }
+}
+/* The curtain holds opaque while the drive happens and only lets go at the very end, once the flare
+   has washed the frame — so what appears underneath is the settled app, never the swap itself.
+   74% of 1500ms puts the reveal at 1110-1500ms, inside the sun's own 560-1500ms crest: the app
+   resolves WHILE the sun is still rising, which is the staging ruling 27 names. */
+@keyframes entry-clear {
+  0%, 74% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- The sign. The banded sunset fill is RE-ASSERTED here because the light theme swaps
+   `.wordmark-name` to solid ink — right everywhere else in the app, wrong on this scene.
+   Legibility comes from the BAND PLACEMENT (client refs): the warm top half stands on dark
+   sky, the violet bottom half stands on the sun's bright crown, so the outline drops to a
+   hairline and the glow to one solid extrusion + one tight halo — crisp, not hazy.
+   (Upright: the earlier reference lean read as a narrow italic and was taken back out.) ---- */
+.landing .home-hero { padding-bottom: clamp(1rem, 3.5vh, 2rem); }
+.landing .home-hero-title .nh-wordmark {
+  display: block; font-size: clamp(3.4rem, 16vw, 10.5rem); line-height: .92;
+  background: var(--landing-sign); -webkit-background-clip: text; background-clip: text; color: transparent;
+  -webkit-text-stroke: 0.5px var(--landing-stroke);
+  filter: var(--landing-title-glow);
+}
+
+/* ---- The doors: two arcade choices, magenta and cyan. Chamfered HUD panels (clip-path cuts
+   the top-left and bottom-right corners), a faint inner edge line, scanlined glass fill, and a
+   blinking cue triangle on hover — glow rides drop-shadow FILTERS because box-shadow cannot
+   follow a clip-path cut. Colours come from the per-theme --landing-* set. ---- */
+.choices { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(1rem, 3vw, 1.75rem); margin-top: clamp(1.5rem, 4.5vh, 2.75rem); }
+.choices .nh-btn {
+  position: relative; flex: 0 1 18rem; justify-content: center; min-height: 3.5rem; padding: 1.05rem 2.4rem;
+  font-family: var(--font-display); font-size: 1.02rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em;
+  border-radius: 0;
+  clip-path: polygon(0 .6rem, .6rem 0, 100% 0, 100% calc(100% - .6rem), calc(100% - .6rem) 100%, 0 100%);
+  transition: color var(--dur-hover), background var(--dur-hover), filter var(--dur-hover), transform var(--dur-press) var(--ease-settle);
+}
+/* The inner edge line: a second, quieter outline just inside the cut, like a cabinet bezel. */
+.choices .nh-btn::after { content: ""; position: absolute; inset: 4px; pointer-events: none; border: 1px solid currentColor; opacity: .22; clip-path: polygon(0 .45rem, .45rem 0, 100% 0, 100% calc(100% - .45rem), calc(100% - .45rem) 100%, 0 100%); }
+/* The cue: a small solid triangle that appears and blinks while the door is under the pointer
+   or focused — drawn with clip-path, no glyph character anywhere near the copy scanners. */
+.choices .nh-btn::before { content: ""; position: absolute; left: .95rem; top: 50%; width: .55rem; height: .85rem; transform: translateY(-50%); background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); opacity: 0; }
+.choices .nh-btn:hover:not(:disabled)::before, .choices .nh-btn:focus-visible::before { opacity: 1; }
+.choices .nh-btn:focus-visible { outline: 2px solid currentColor; outline-offset: -6px; }
+.choices .nh-btn--primary {
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-bg);
+  border: 2px solid var(--landing-door-play-rim); color: var(--landing-door-label); filter: var(--landing-door-play-glow);
+}
+.choices .nh-btn--primary:hover:not(:disabled), .choices .nh-btn--primary:focus-visible { filter: var(--landing-door-play-glow-strong) brightness(1.15); transform: translateY(-1px); }
+.choices .nh-btn--secondary {
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-bg);
+  border: 2px solid var(--landing-door-gm-rim); color: var(--landing-door-label); filter: var(--landing-door-gm-glow);
+}
+.choices .nh-btn--secondary:hover:not(:disabled), .choices .nh-btn--secondary:focus-visible { filter: var(--landing-door-gm-glow-strong) brightness(1.15); transform: translateY(-1px); }
+.choices .nav-arrow { color: currentColor; }
+@media (prefers-reduced-motion: no-preference) {
+  .choices .nh-btn:hover:not(:disabled)::before, .choices .nh-btn:focus-visible::before { animation: landing-cue-blink 1.1s steps(2, jump-none) infinite; }
+}
+@keyframes landing-cue-blink { 50% { opacity: .25; } }
+
+/* Quiet, and out of the column: the theme switch is the only other control on the page. It STANDS
+   on the scene, so it wears the scene's chrome — dark glass, a cyan-tinted edge, a neon-lit active
+   segment — pinned to the --landing-* set: the stock grey pill followed the theme, and nothing on
+   the one screen whose night never changes may do that. Size, position and labels are untouched. */
+.landing .home-theme-switch { position: absolute; right: .75rem; bottom: .75rem; width: auto; margin: 0; opacity: .8; }
+.landing .home-theme-switch:hover, .landing .home-theme-switch:focus-within { opacity: 1; }
+.landing .home-theme-switch .nh-segmented { background: var(--landing-glass); border-color: color-mix(in srgb, var(--landing-door-gm-rim) 38%, transparent); backdrop-filter: blur(4px); }
+/* The switch stands on violet glass in every sky, so its resting labels read from the
+   label ink, never the theme's text ink (light's deep indigo vanished on the glass). */
+.landing .home-theme-switch .nh-segmented-option { color: color-mix(in srgb, var(--landing-door-label) 72%, transparent); }
+.landing .home-theme-switch .nh-segmented-option { color: color-mix(in srgb, var(--landing-star) 66%, transparent); }
+.landing .home-theme-switch .nh-segmented-option:hover { color: var(--landing-star); }
+.landing .home-theme-switch .nh-segmented-option[aria-pressed="true"] { background: color-mix(in srgb, var(--landing-door-gm-rim) 16%, transparent); color: var(--landing-door-label); box-shadow: var(--glow-violet); }
+.landing .notice { max-width: 32rem; margin-inline: auto; text-align: left; }
+/* The GM sign-in is the scene's THIRD DOOR (the judges' one unanimous revision): the doors' dark
+   glass, a cyan neon edge with the doors' glow, the heading lit cyan, the CRT texture carried
+   across the glass — and every colour pinned to the --landing-* set, because the card too stands
+   on the night that never re-themes (a theme-following panel here reads as another app's modal). */
+.landing .card { position: relative; overflow: hidden; margin-inline: auto; text-align: left; background: var(--landing-glass); backdrop-filter: blur(8px); border-color: var(--landing-door-gm-rim); box-shadow: var(--glow-violet); }
+.landing .card::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .4; border-radius: inherit; background-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--scanline-gap) - 1px), var(--landing-scanline) calc(var(--scanline-gap) - 1px), var(--landing-scanline) var(--scanline-gap)); background-size: 100% var(--scanline-gap); }
+.landing .card > * { position: relative; z-index: 1; }
+.landing .card h2 { color: var(--landing-door-label); }
+.landing .card p { color: color-mix(in srgb, var(--landing-star) 82%, transparent); }
+.landing .card input { border-color: color-mix(in srgb, var(--landing-door-gm-rim) 45%, transparent); background: color-mix(in srgb, var(--landing-ink-deep) 62%, transparent); color: var(--landing-door-label); }
+.landing .card input::placeholder { color: color-mix(in srgb, var(--landing-star) 55%, transparent); }
+.landing .card input:focus { border-color: var(--landing-door-gm-rim); box-shadow: var(--glow-violet); }
+/* Its actions are doors too. "Enter table" rests as a cyan door and fills on hover exactly like
+   ENTER AS GM; disabled keeps the full cyan treatment and lets the global disabled opacity dim it
+   — dormant neon, never grey plastic. Back is a low-key pink ghost so both belong to the scene. */
+/* THESE SET `--nh-fill`/`--nh-rim`, NOT `background`/`border-color`, and that is load-bearing.
+   Since round 2 wave 2 every `.nh-btn` paints its fill and rim on a `::before` backing layer — the
+   only way to give a tap target a chamfer, because `clip-path` clips hit-testing and would eat the
+   button's own 44px. That layer sits ABOVE the element's own background, so a rule here setting
+   `background` would be painted over and this card's third door would come out as the app's magenta
+   primary. It regressed exactly that way before this comment existed. The `.choices` doors above
+   are unaffected — their `::before` at (0,2,0) already overrides the primitive's. */
+.landing .card .nh-btn--primary { --nh-fill: var(--landing-glass); --nh-rim: var(--landing-door-gm-rim); --nh-tex: transparent; color: var(--landing-door-label); filter: var(--landing-door-gm-glow); font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; }
+.landing .card .nh-btn--primary:hover:not(:disabled), .landing .card .nh-btn--primary:focus-visible { --nh-fill: var(--landing-door-gm-rim); --nh-rim: var(--landing-door-gm-rim); color: var(--landing-ink-deep); filter: var(--landing-door-gm-glow-strong); }
+.landing .card .nh-btn--primary:disabled { --nh-fill: var(--landing-glass); --nh-rim: var(--landing-door-gm-rim); color: var(--landing-door-label); filter: var(--landing-door-gm-glow); }
+.landing .card .link { color: color-mix(in srgb, var(--landing-door-play-rim) 80%, transparent); }
+.landing .card .link:hover:not(:disabled) { color: var(--landing-door-label); background: color-mix(in srgb, var(--landing-door-play-rim) 14%, transparent); }
+
+/* ---- Motion: ignition, twinkle, and the drive. Freeze under reduced motion. ----
+   `will-change` is declared HERE, at rest, and not in the drive rule where it used to live. The
+   previous version promoted these four layers on the same frame the drive's keyframes started,
+   which is the frame least able to afford the layer creation — measured at 16 frames in 950ms with
+   a 183ms stall. These elements already run infinite compositor animations at rest, so the layers
+   exist anyway; declaring the promotion is what stops it being re-decided mid-run.
+   Nothing `position: fixed` lives inside the landing, so the containing block `will-change` creates
+   costs nothing here (it is the trap that made the pane's own entrance opacity-led). */
+@media (prefers-reduced-motion: no-preference) {
+  .landing .home-hero-title .nh-wordmark { animation: landing-ignite 1.1s steps(1, end) both; }
+  .landing-stars { animation: landing-twinkle 5.5s ease-in-out infinite; will-change: transform, filter; }
+  .landing-stars-far { animation: landing-twinkle 7s ease-in-out infinite reverse; will-change: transform, filter; }
+  .landing-grid { animation: landing-grid-roll 1.5s linear infinite; will-change: transform, opacity; }
+  .landing-sun { animation: landing-sunrise 1.6s var(--ease-settle) both; will-change: transform; }
+  .landing-horizon { will-change: transform, opacity; }
+}
+@keyframes landing-ignite { 0% { opacity: 0; } 12% { opacity: 1; } 18% { opacity: .25; } 26% { opacity: 1; } 34% { opacity: .45; } 41% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes landing-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@keyframes landing-grid-roll { to { background-position: 0 0, 0 var(--landing-grid-cell); } }
+/* THE RESTING RISE OWNS `translate`, NOT `transform`, and that is the whole reason it is written
+   this way. The individual transform properties (translate/rotate/scale) compose WITH `transform`
+   rather than replacing it, so the base rule's `translateX(-50%)` centring survives and — the point
+   — the entry drive can animate `transform` without ever contesting this. Before the split, a door
+   clicked inside the first 1.6s snapped the sun by 6% of its own height in one frame. */
+@keyframes landing-sunrise { from { translate: 0 6%; } to { translate: 0 0; } }
 
 /* Base controls. Reusable buttons should use @vtt/ui <Button>; this styles the
    raw <button>/<input>/<select> that remain, in the token vocabulary. */
@@ -40,10 +747,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 summary { transition: color var(--dur-hover), background var(--dur-hover), border-color var(--dur-hover); }
 button strong, button span { display: block; }
 button strong { font-size: 1.1rem; }
-button span { color: var(--text-dim); font-size: .9rem; margin-top: .25rem; }
+button span { color: var(--text-dim); font-size: .9rem; margin-top: var(--space-1); }
 .secondary { background: transparent; }
 
-.card, .table, .dice-proof, .roster { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.card, .table, .dice-proof { margin-top: var(--space-10); padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .card { max-width: 32rem; }
 
 /* Code/identifiers use the branded mono face (Space Mono), not the browser default monospace. */
@@ -51,63 +758,102 @@ code, pre, kbd, samp { font-family: var(--font-mono); }
 input, select, textarea { width: 100%; padding: .8rem; margin-top: .4rem; border: 1px solid var(--line); background: var(--surface-3); color: var(--text); transition: border-color var(--dur-hover), box-shadow var(--dur-hover); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-.card input { margin-bottom: 1rem; }
-/* Primary action button (magenta fill, dark ink) */
-.card button { text-align: center; background: var(--primary); color: var(--text-on-neon); border: 0; margin-right: .5rem; }
-.card button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
+.card input { margin-bottom: var(--space-4); }
+/* Primary action button (magenta fill, dark ink) — a bare-element rule from before <Button> existed,
+   kept for the hand-rolled `<button>`s still inside cards. It sets `--nh-fill`/`--nh-rim` rather than
+   `background`, because since round 2 wave 2 every `.nh-btn` paints on a `::before` backing layer
+   (the only way a tap target can carry a chamfer — `clip-path` clips hit-testing). At (0,1,1) this
+   used to out-specify `.nh-btn { background: transparent }` and paint magenta UNDER that layer,
+   which showed through anywhere the layer is translucent. It did: the landing's GM sign-in door is
+   72% glass, and it came out muddied with the app's magenta. Bare `<button>`s in a card still get
+   the fill via the `background` on the second line, which the primitive's own layer covers. */
+.card button { text-align: center; --nh-fill: var(--primary); --nh-rim: var(--magenta-hi); color: var(--text-on-neon); border: 0; margin-right: var(--space-2); }
+.card button:not(.nh-btn) { background: var(--primary); }
+.card button:hover:not(:disabled) { --nh-fill: var(--magenta-hi); box-shadow: var(--glow-magenta); }
+.card button:not(.nh-btn):hover:not(:disabled) { background: var(--magenta-hi); }
 .card .link { background: transparent; color: var(--text-dim); }
 .card .link:hover:not(:disabled) { color: var(--text); box-shadow: none; }
 
-.notice { margin-top: 1.5rem; padding: .8rem 1rem; border-left: 3px solid var(--primary); border-radius: var(--radius-sm); background: var(--surface-2); }
-.empty { margin-top: 2rem; min-height: 14rem; display: grid; place-content: center; text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--text-dim); }
+.notice { margin-top: var(--space-6); padding: .8rem var(--space-4); border-left: 3px solid var(--primary); border-radius: var(--radius-sm); background: var(--surface-2); }
+.empty { margin-top: var(--space-8); min-height: 14rem; display: grid; place-content: center; text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--text-dim); }
 .empty strong, .empty span { display: block; }
 .empty strong { color: var(--text); font-family: var(--font-display); font-weight: 400; }
 .empty span { margin-top: .4rem; }
 
-.roster-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+/* Shared by the Integrations panel's heading/feedback rows (the roster that used to own these classes
+   is gone — its party is the strip below and its management moved to the Roster tab). */
+.roster-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-8); }
 .roster-heading h2 { font-size: var(--fs-h1); }
 .roster-heading p { max-width: 23rem; margin: 0; font-size: .9rem; text-align: right; }
-
-.actor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; margin-top: 1.3rem; }
-.actor-card { display: flex; flex-direction: column; min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.actor-card-owned { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
-.actor-card-title { display: flex; align-items: center; gap: .75rem; }
-.actor-card h3 { margin: 0 0 .2rem; font: 400 1rem/1.2 var(--font-display); }
-.actor-card-status { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .25rem; }
 .presence { display: inline-flex; align-items: center; font-size: .7rem; color: var(--text-muted); }
 .presence-online { color: var(--cyan-hi); }
 .presence-reconnecting { color: var(--violet-hi); }
 .presence-offline { color: var(--text-muted); }
-.actor-card dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; margin: 1rem 0; }
-.actor-card dl div { padding: .55rem .35rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
-.actor-card dt { color: var(--text-muted); font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; }
-.actor-card dd { margin: .15rem 0 0; font-weight: 700; font-family: var(--font-mono); }
-/* Card CTA now renders as <Button variant="primary|secondary" block> (@vtt/ui);
-   only the pin-to-card-bottom layout hook stays local (block gives full width). */
-.actor-action { margin-top: auto; }
 .roster-feedback { min-height: 1.4rem; margin: .8rem 0 0; font-size: .85rem; }
 
-.renderer-proof { margin-top: 3rem; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-1); }
-.proof-heading { padding: 1.25rem 1.5rem .8rem; display: flex; justify-content: space-between; gap: 1rem; align-items: end; }
-.proof-heading h2 { font-size: var(--fs-h2); }
-.proof-heading p { margin: 0; max-width: 24rem; font-size: .85rem; text-align: right; }
-.proof-canvas { height: min(58vw, 430px); min-height: 280px; touch-action: none; outline: none; }
-.proof-canvas:focus-visible { box-shadow: var(--glow-cyan); }
+/* ---- The party strip (D15): the whole roster, out of combat, in one ~56px row ----
+   `min-width: 0` on the strip and on the map column is load-bearing, not defensive dressing: a grid
+   item's automatic minimum size is its CONTENT's, so a party of five pills (5 x 13rem) widened the
+   whole table column past the phone — measured in Chromium's 390px emulation as a 706px layout
+   viewport, i.e. the entire app zoomed out. The row scrolls; the page must not. */
+.party-strip { min-width: 0; max-width: 100%; margin: 0 0 .9rem; }
+.table-layout > .table { min-width: 0; }
+.party-strip-row { display: flex; gap: var(--space-2); min-width: 0; max-width: 100%; margin: 0; padding: 0 0 var(--space-1); list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.party-strip-item { flex: 0 0 auto; }
+/* RULING 24 — a whole ROW wearing a pill is the second family the de-pilling names, and this is a
+   live one: the strip renders out of combat for both roles. Square, like every other row. */
+.party-strip-entry { display: flex; align-items: center; gap: var(--space-2); min-height: 3.5rem; max-width: 13rem; padding: var(--space-2) .8rem var(--space-2) var(--space-2); border: 1px solid var(--line); border-radius: 0; background: var(--surface-2); color: var(--text); text-align: left; }
+button.party-strip-entry { cursor: pointer; }
+button.party-strip-entry:hover { border-color: var(--line-strong); }
+.party-strip-item.is-mine .party-strip-entry { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.party-strip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.party-strip-hp { flex: 0 0 auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .8rem; color: var(--text-dim); }
+/* The `name-and-class` tier's second fact, where HP is not this player's to read (rulings 5/8/19).
+   Body face, not the numeric one — it is a class line, not a game number (ruling 50) — and it
+   ellipsizes rather than widening the chip, which the strip's 13rem cap depends on. */
+.party-strip-line { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; color: var(--text-dim); }
+.party-strip-claim { flex: 0 0 auto; width: .5rem; height: .5rem; border-radius: 50%; background: var(--text-muted); }
+.party-strip-claim--claimed { background: var(--violet-hi); }
+.party-strip-claim--mine { background: var(--cyan-hi); }
+.party-strip-empty { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+.party-strip-empty p { margin: 0; font-size: .85rem; }
+
+/* ---- The player's pre-claim picker (B4.2) ----
+   It is a REGION, not a row: 539px of cards measured at 390x844, which is more than the whole map
+   band's allowance. `.scroll-y` rides it in the markup at every width — above the rung that stops it
+   shoving the map down its own column, and below the rung it IS the sheet's body (decision Q3: the
+   picker takes the sheet, and the band stays live above it, because an unclaimed player in a running
+   fight still gets a map and hiding one is worse than making them scroll a picker). */
+.claim-view { min-height: 0; margin-bottom: 1.2rem; }
+.claim-heading h2 { font-size: var(--fs-h2); }
+.claim-heading p { margin: 0 0 var(--space-4); font-size: .9rem; }
+.claim-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .8rem; margin: 0; padding: 0; list-style: none; }
+.claim-card { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); text-align: center; }
+.claim-card-name { margin: 0; font: 400 1.05rem/1.2 var(--font-display); }
+.claim-card-action { margin-top: auto; }
+.claim-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: var(--space-4); }
 
 /* Dice */
 .dice-proof h2 { font-size: var(--fs-h2); }
-.dice-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.dice-visibility { display: flex; align-items: center; gap: .5rem; color: var(--text-dim); font-size: var(--fs-sm); }
-.dice-visibility select { width: auto; margin-top: 0; }
-.dice-quick { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; align-items: center; }
-.dice-quick button { padding: .65rem 1rem; text-align: center; background: var(--surface-2); }
+.dice-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.dice-visibility { display: flex; align-items: center; gap: var(--space-2); min-width: 0; white-space: nowrap; color: var(--text-dim); font-size: var(--fs-sm); }
+/* A `<select>`'s min-content width is its WIDEST OPTION, and the longest roll audience is
+   "Hidden from players — you and the GM see it" (349px at 390). Left unshrinkable it made the
+   QUESTION the only thing that could give: measured at 390x844, `.dice-visibility` overflowed
+   its heading by 5.8px and "Who sees it?" broke onto THREE lines of 29px. `min-width: 0` lets
+   the control shrink (the UA truncates the chosen option, which is a readout — the full text is
+   in the open list), `white-space: nowrap` above keeps the question on one line, and the label
+   is what the row is FOR. */
+.dice-visibility select { flex: 1 1 auto; width: auto; min-width: 0; margin-top: 0; }
+.dice-quick { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); align-items: center; }
+.dice-quick button { padding: .65rem var(--space-4); text-align: center; background: var(--surface-2); }
 .dice-quick button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
-.dice-armed { margin: .6rem 0 0; padding: .5rem .75rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--magenta-hi); font-size: var(--fs-sm); font-weight: 700; }
-.dice-roll-pref { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; align-items: center; }
-.dice-adv-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; align-items: stretch; }
-.dice-adv-row .secondary { padding: .65rem 1rem; text-align: center; }
+.dice-armed { margin: .6rem 0 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--magenta-hi); font-size: var(--fs-sm); font-weight: 700; }
+.dice-roll-pref { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: .6rem; align-items: center; }
+.dice-adv-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); align-items: stretch; }
+.dice-adv-row .secondary { padding: .65rem var(--space-4); text-align: center; }
 .dice-adv-row .secondary[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
-.dice-custom { margin-top: 1rem; color: var(--text-muted); font-size: var(--fs-sm); }
+.dice-custom { margin-top: var(--space-4); color: var(--text-muted); font-size: var(--fs-sm); }
 .dice-custom summary { cursor: pointer; }
 .dice-custom .dice-form { margin-top: .8rem; }
 .dice-hint { margin: .6rem 0 0; font-size: var(--fs-sm); }
@@ -117,73 +863,111 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .dice-form button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .dice-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: var(--fs-body); }
 /* Roll-list header (Table/Mine filter now renders as a SegmentedControl from @vtt/ui). */
-.roll-list-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: 1rem; }
+.roll-list-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: var(--space-4); }
 .roll-list-title { margin: 0; font: 800 var(--fs-xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
-.roll-list { display: grid; gap: .4rem; max-height: 19rem; overflow-y: auto; padding-right: .25rem; margin-top: .5rem; }
-.roll-card { padding: .5rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+/* The feed is a declared region: `.scroll-y` rides it in DicePanel's markup (check (h) — a scroller
+   the stylesheet declares on its own is a scroller no reader of the component can see). The cap stays
+   for the standalone panel; inside the dock accordion `max-height: none` hands it the section instead. */
+.roll-list { display: grid; gap: .4rem; max-height: 19rem; padding-right: var(--space-1); margin-top: var(--space-2); }
+.roll-card { padding: var(--space-2) .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 /* v6 #4: the roll's KIND leads (a badge), the roller/audience is a muted footer, and faces · formula = total
    read as one left-to-right unit instead of being flung to four corners. */
 .roll-card-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
 .roll-meta { flex: 0 1 auto; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.roll-badge { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: .16rem .55rem; border-radius: var(--radius-pill); font: 700 var(--fs-2xs)/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* RULING 10/24 — the STATUS LABEL family, on the most-used surface in the app: 30 of these render
+   at once in the table's roll log. Square, like the `Badge` primitive they are a hand-rolled twin of. */
+.roll-badge { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; padding: .16rem .55rem; border-radius: 0; font: 700 var(--fs-2xs)/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roll-badge--attack { background: color-mix(in srgb, var(--magenta) 26%, var(--surface-3)); }
 .roll-badge--damage { background: color-mix(in srgb, var(--magenta) 15%, var(--surface-3)); }
 .roll-badge--save { background: color-mix(in srgb, var(--cyan) 26%, var(--surface-3)); }
 .roll-badge--check { background: color-mix(in srgb, var(--cyan) 15%, var(--surface-3)); }
 .roll-badge--manual { background: var(--surface-3); color: var(--text-muted); }
-.roll-readout { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .5rem; margin-top: .5rem; }
+.roll-readout { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem var(--space-2); margin-top: var(--space-2); }
 .dice-faces { display: flex; flex-wrap: wrap; gap: .3rem; }
 .die { display: grid; place-items: center; min-width: 2rem; height: 2rem; padding: 0 .35rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); font-weight: 700; font-family: var(--font-mono); }
 .die.discarded { opacity: .35; text-decoration: line-through; }
 .roll-formula { color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); }
 .roll-eq { color: var(--text-muted); font-family: var(--font-mono); }
 .roll-total { margin-left: auto; font-family: var(--font-display); font-size: var(--fs-h2); color: var(--text); }
+/* ===== RULING 35 — THE ROLL RESULT FLARES; THE DICE DO NOT TUMBLE =====
+   One-shot bloom on the TOTAL, ~250ms. The reasoning generalises and is the part worth keeping:
+   rolling is the app's most repeated action, so any beat between the click and the answer is
+   charged forty times a session. A flare costs nothing because it plays ON the answer rather than
+   before it — the number is already correct on the first frame and the bloom decays off it.
 
-.gm-session-controls { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+   SCOPED TO THE NEWEST CARD, not to every total, and that is what makes it one-shot rather than a
+   flurry. `.roll-card` is keyed by roll id (DicePanel.tsx), so an arriving roll mounts one new
+   element and the thirty below it keep their DOM nodes and never re-animate; `:first-child` is
+   belt and braces for the case where the whole panel remounts — toggling a dock section — where
+   without it every visible total would bloom at once.
+
+   REDUCED MOTION KEEPS THE COLOUR AND DROPS THE BLOOM, which is what the ruling asks for rather
+   than freezing to nothing: the global reduced-motion rule collapses every animation to 0.001ms,
+   so the flare is stated a second time as a static accent on the newest total. */
+@keyframes roll-flare {
+  from { color: var(--magenta-hi); text-shadow: 0 0 10px var(--magenta), 0 0 26px color-mix(in srgb, var(--magenta) 55%, transparent); }
+  70%  { color: var(--magenta-hi); }
+  to   { color: var(--text); text-shadow: none; }
+}
+.roll-list > .roll-card:first-child .roll-total { animation: roll-flare 250ms var(--ease-settle) 1; }
+@media (prefers-reduced-motion: reduce) {
+  .roll-list > .roll-card:first-child .roll-total { color: var(--magenta-hi); }
+}
+
+.gm-session-controls { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: var(--space-4); }
 .gm-session-controls button { flex: 0 0 auto; padding: .7rem 1.1rem; text-align: center; }
 /* Destructive control (mirrors <Button variant="destructive">) */
 .danger { background: transparent; border: 1px solid var(--danger); color: var(--danger-hi); }
 .danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 
 /* Integrations (VTT Setup) */
-.integrations { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.integrations { margin-top: var(--space-10); padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .integration-secret { border-left-color: var(--cyan); }
 .integration-secret strong { display: block; margin-bottom: .3rem; }
 .integration-token { display: block; margin: .8rem 0; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); color: var(--cyan-hi); word-break: break-all; font-size: .9rem; font-family: var(--font-mono); }
 .integration-secret-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
-.integration-secret-actions button { padding: .7rem 1rem; }
+.integration-secret-actions button { padding: .7rem var(--space-4); }
 .integration-secret-warning { margin-top: .8rem; color: var(--danger-hi); font-size: .85rem; }
-.integration-form { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1rem; margin-top: 1.5rem; align-items: start; }
+.integration-form { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--space-4); margin-top: var(--space-6); align-items: start; }
 .integration-form label { display: block; color: var(--text-dim); font-size: .8rem; }
-.integration-form fieldset { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: var(--radius-md); padding: .8rem 1rem; display: flex; flex-wrap: wrap; gap: .6rem .9rem; }
+.integration-form fieldset { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: var(--radius-md); padding: .8rem var(--space-4); display: flex; flex-wrap: wrap; gap: .6rem .9rem; }
 .integration-form legend { padding: 0 .4rem; color: var(--text-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
-.integration-scope { display: flex; align-items: center; gap: .4rem; width: auto; font-size: .85rem; color: var(--text); }
+/* Route 1 (design-language §4), and the route that section's exception table already names for this
+   control: the box is a replaced `<input type="checkbox">` that cannot take `::after`, so the WRAPPING
+   LABEL carries the floor. It measured 19.2px around a 13x13 box. The scopes wrap in a flex row with a
+   .6rem cross-gap, so a taller label steals no neighbour's taps. */
+.integration-scope { display: flex; align-items: center; gap: .4rem; width: auto; min-height: var(--tap-min); font-size: .85rem; color: var(--text); }
 .integration-scope input { width: auto; margin: 0; }
 .integration-form button[type="submit"] { grid-column: 1 / -1; background: var(--primary); color: var(--text-on-neon); border: 0; padding: .85rem 1.2rem; }
 .integration-form button[type="submit"]:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
-.integration-list { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: .8rem; }
-.integration-row { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.integration-row-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.integration-list { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; gap: .8rem; }
+.integration-row { padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.integration-row-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .integration-scopes { margin: .3rem 0 0; color: var(--text-muted); font-size: .8rem; }
-.integration-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: .9rem 0; }
-.integration-meta div { padding: .5rem .4rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
+.integration-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); margin: .9rem 0; }
+.integration-meta div { padding: var(--space-2) .4rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
 .integration-meta dt { color: var(--text-muted); font-size: .6rem; text-transform: uppercase; letter-spacing: .05em; }
 .integration-meta dd { margin: .15rem 0 0; font-size: .75rem; }
-.integration-row-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.integration-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .integration-row-actions button { padding: .6rem .9rem; }
 .integration-audit { list-style: none; margin: .8rem 0 0; padding: .6rem .8rem; border: 1px dashed var(--line); border-radius: var(--radius-md); font-size: .75rem; color: var(--text-muted); display: grid; gap: .3rem; }
 
 @media (max-width: 760px) {
   .dice-form { grid-template-columns: 1fr 1fr; }
-  .actor-grid { grid-template-columns: 1fr; }
   .integration-form { grid-template-columns: 1fr; }
   .integration-meta { grid-template-columns: repeat(2, 1fr); }
+  .import-preview div { grid-template-columns: 1fr; gap: .1rem; }
 }
 @media (max-width: 560px) {
-  .choices { grid-template-columns: 1fr; }
-  .roster-heading, .proof-heading { display: block; }
-  .roster-heading p, .proof-heading p { text-align: left; margin-top: .8rem; }
-  .proof-canvas { height: 68vw; min-height: 310px; }
+  /* The two landing doors sit side by side above this rung and stack full-width below it (§E).
+     Stacked, they sit directly ON the sun's slatted half, so the glass goes near-opaque (~90% ink):
+     at .68 the slats striped straight through the label band and the pink door lost figure-ground
+     against the pink sun — the judges' one shared 390px note. Borders and glow are unchanged. */
+  .choices .nh-btn { flex: 1 1 100%; }
+  .party-queue-actions { width: 100%; margin-left: 0; }
+  .party-queue-actions .nh-btn { flex: 1 1 auto; }
+  .roster-heading { display: block; }
+  .roster-heading p { text-align: left; margin-top: .8rem; }
   .dice-form { grid-template-columns: 1fr; }
   .gm-session-controls { flex-direction: column; }
   .gm-session-controls button { width: 100%; }
@@ -195,126 +979,485 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .notice-info { border-left-color: var(--info); }
 /* `useConfirm`'s optional "don't ask again" row. Separated from the body prose by a rule so it reads as a
    setting rather than as another sentence of the warning it turns off. */
-.confirm-suppress { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); }
-/* "The table is offline" outranks whatever is on top of the page, because every command the surface
-   above it can issue is one that will not land. As a STATIC in-flow <p> it had no z-index to compare
-   at all, so any positioned overlay won by default and the builder (`.cb-page`, z-index 40) simply
-   painted over it.
-   41 is chosen against the app's whole ladder, not just the builder: it clears the full-viewport
-   40s (.cb-page, .encounter-overlay-backdrop, .encounter-map-interaction.enlarged, .nh-menu) and
-   stays UNDER everything transient that is answering a live gesture — .encounter-menu (42),
-   Tooltip (50), .sheet-float / .token-context-menu / .codex-palette-scrim (60), Toast (80) — and
-   under every Modal, which is a native <dialog> in the top layer and so above all of these.
-   Its placement and its `pointer-events` are explained on the rule itself. */
+.confirm-suppress { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+/* "The table is offline" is frame row 1 — a real row the frame makes room for, not a fixed
+   strip painting over whatever happened to be at the top (its previous life; the
+   `main:has(> .connection-banner)` padding dance that reserved its room retired with it,
+   and so did its z-index — nothing renders beneath an in-flow row, and a role="status"
+   readout that overlaps nothing catches no taps either). It HEIGHT-animates in (200ms
+   settle) so the tab bar and pane step down instead of jumping; unmount on reconnect is
+   instant — good news needs no ceremony. Fixed height, not min-height: the height is the
+   animated property, and the message fits one line down to the 320px floor.
+
+   ===== RULING 48 — THE STRIP FOLDS INTO THE TAB BAR'S MATERIAL =====
+   One piece of chrome instead of two stacked bands. What went is the `border-bottom: 1px solid
+   var(--line-strong)` that used to sit between this row and the bar: that line WAS the horizontal
+   seam at the top of every screen, and with both rows on one plate there is nothing left for it
+   to separate. The block's single structural edge is the tab bar's bottom rim, below.
+
+   IT IS STATUS, NOT NAVIGATION, AND SHARING A MATERIAL MUST NOT MAKE IT LOOK TAPPABLE. Three
+   things keep that true and each is deliberate: the plate is INVERTED (dark at the top, so the
+   row reads as a well set into the chrome rather than as a raised key), there is no hover, focus
+   or press treatment anywhere on it, and no cue triangle — `.cue` is the app's "this responds"
+   mark and putting one here would be a lie. It stays a `<p role="status">`, so it is not
+   focusable and takes no tap.
+
+   THE CAUTION EDGE SURVIVES THE ROLE HUE and outranks it here: this row exists to say something
+   is wrong, and ruling 51's own constraint is that a role hue must not collide with --caution.
+   So the hue tints the plate (the row still belongs to this window) while the leading 3px bar
+   stays the caution colour (the row still says what it is). It moves from `border-left` to an
+   inset shadow so it costs no layout — the message is centred against the row, not against the
+   row minus 3px, which matters at the 320px floor where it fits on exactly one line. */
 .connection-banner {
-  /* FIXED, not in flow. In flow it takes `main`'s page padding, which put it 88px down the viewport
-     — straight across the builder's step rail, hiding all seven step labels behind an opaque card.
-     Floating it as a centred pill instead only moved the collision: at 375px it clipped the wizard's
-     title and half of Save & close, because a full-viewport surface leaves no empty band at phone
-     width. So it takes a strip of its own at the very top and the page GIVES it that strip (below),
-     rather than painting over whatever happens to be there. */
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 41;
-  /* A role="status" readout is never clicked, so it must never catch a click. Measured: without
-     this it swallowed the taps on two step-rail buttons that were still visible either side of it. */
-  pointer-events: none;
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--connection-banner-h);
+  height: var(--connection-banner-h);
+  overflow: hidden;
   margin: 0;
-  padding: .5rem 1rem;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line-strong);
-  border-left: 3px solid var(--caution);
+  padding: 0 var(--space-4);
+  border: 0;
+  background-color: var(--surface-2);
+  background-image: var(--chrome-scanline), linear-gradient(180deg,
+    color-mix(in srgb, var(--caution) 9%, var(--surface-3)) 0%,
+    color-mix(in srgb, var(--role-hue) 7%, var(--surface-2)) 100%);
+  background-size: 100% var(--scanline-gap), auto;
+  box-shadow: inset 3px 0 0 0 var(--caution);
   color: var(--text-dim);
   font-size: .9rem;
   text-align: center;
+  animation: connection-in var(--dur-base) var(--ease-settle);
 }
-/* Reserve the strip's room. `:has()` keys off the banner's own presence, so nothing needs to be
-   told the connection dropped: the page's top padding grows by exactly the strip, and the one
-   full-viewport surface that would otherwise start underneath it starts below it instead. */
-main:has(> .connection-banner) { padding-top: calc(clamp(1.5rem, 5vw, 4rem) + var(--connection-banner-h)); }
-main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
+/* When no tab bar follows — a full-page layer before the shell mounts — this row IS the chrome,
+   so it carries the block's structural edge itself. `:has(~ .frame-tabbar)` is the only way to
+   ask "is something after me"; the negation is what makes the rim appear exactly once. */
+.connection-banner:not(:has(~ .frame-tabbar)) { border-bottom: var(--rim-w) solid var(--role-hue); }
+@keyframes connection-in { from { height: 0; opacity: 0; } to { height: var(--connection-banner-h); opacity: 1; } }
 
 /* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
    card, token library) now render through the shared @vtt/ui Modal primitive - no bespoke backdrops. */
 
-/* "You're playing" bar (v5 #7): always shown below the roster and above the dice/combat panels; your
-   claimed character = cyan selection accent. Head (name + HP) · labelled Conditions · HP tracker · buttons. */
-.you-are-playing { display: flex; align-items: center; justify-content: space-between; gap: 1rem 1.4rem; flex-wrap: wrap; margin-top: 1.3rem; padding: .9rem 1.2rem; border: 1px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--glow-cyan); }
-.you-are-playing-head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
-.you-are-playing .eyebrow { color: var(--cyan-hi); }
-.you-are-playing-head strong { font: 400 1.3rem var(--font-display); color: var(--text); }
-.you-are-playing-conditions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-/* v5 #7.1: the conditions control needs an explicit label so its "+ Add" isn't ambiguous. */
-.you-are-playing-cond-label { color: var(--text-muted); font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.you-are-playing-buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
-.you-are-playing button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
-.you-are-playing .roster-feedback { flex-basis: 100%; min-height: 0; margin: 0; }
-.you-badge { margin-left: .5rem; vertical-align: middle; }
+/* RULING 20 — THE CHARACTER BAR OVER THE MAP IS GONE, and with it 69px of a phone's map band.
+   It was `.you-are-playing`: a one-row pill saying who you are playing, how they are doing, and the
+   door to their sheet. All three facts live on the My character tab now (D9, actors/MyCharacter.tsx),
+   which is the player's FIRST tab — so nothing was lost and the map got the band back. Its teal
+   bubble border went with it, which is also a de-pilling instance (ruling 24).
+   The 69px is BANKED (ruling 32's fourth guardrail): a later pass may not hand it back as padding. */
 
-.own-hp { color: var(--cyan-hi); font-size: .85rem; font-weight: 700; }
-.own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
-.own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
-/* Damage/Heal/Temp now render as <Button size="sm"> (@vtt/ui); the flex row above places them. */
-/* Hit Point Dice (SRD short-rest healing): pool readout + stepper + one roll button. */
-.hit-dice-spender { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
-.hit-dice-pool { color: var(--text-dim); font-size: .8rem; font-weight: 700; }
-/* Roll & heal now renders as <Button size="sm"> (@vtt/ui). */
-.hit-dice-empty { margin: .6rem 0 0; color: var(--text-muted); font-size: .78rem; }
-.actor-rest { display: flex; gap: .5rem; margin: .6rem 0; }
-.actor-rest .nh-btn { flex: 1; }
 
-.table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; }
-/* .anim-view animates transform; with fill-mode:both Blink keeps .table-layout as a containing block
-   for position:fixed even after the entrance settles, which shrank the "Enlarge map" overlay
-   (.encounter-map-interaction.enlarged, inset:1rem) to this grid box instead of the viewport. Drop the
-   forward fill so the settled layout stops trapping fixed descendants — the entrance still plays (its
-   end state already equals the static layout). */
-.table-layout.anim-view { animation-fill-mode: backwards; }
-.table-sidebar > .dice-proof { margin-top: auto; }
+/* THE TABLE IS A FRAME (§7). It fills the pane exactly, the map takes the space that is left over,
+   and anything that can outgrow its share scrolls inside its own region. That is the difference the
+   client could feel: the surface used to be a document that happened to be about the height of a
+   screen, so at 1920x1080 it overflowed its pane by 51px, at 1280x720 by 411, and a player at 1080p
+   by 211 — "scroll a little bit to see it all" on the one tab where you cannot afford to look away.
+   Measured before the change; the same probe reads 0 after it, at every laptop width and in portrait.
+   `margin-top: 2.5rem` went with the staging wrapper that used to supply the page column.
+   `scrollbar-gutter: auto` overrides the `stable` that `.scroll-y` carries, and it is deliberate on
+   THIS box: the class here is a backstop that never engages above the rung (measured 0 at 980/1000/
+   1280/1440/1920, sidebar and docked alike), so a reserved gutter would be a permanent 10px tax on
+   the map column to prevent a jump that cannot happen. The arm that really scrolls — `.table-sidebar`
+   when docked — keeps the stable gutter, because there the scrollbar is real. */
+.table-layout { display: grid; gap: var(--pane-gap); height: 100%; min-height: 0; align-items: stretch; overscroll-behavior: contain; scrollbar-gutter: auto; }
+/* ===== RULING 22 — THE TABLE SKY: BEHIND THE CHROME, NEVER BEHIND THE MAP =====
+   A DATED REVERSAL, and it must be read as one: the earlier ruling said the table gets no sky at
+   all, and the entry naming it was explicitly flagged as something an agent must not "fix" later.
+   Its stated REASON — the map is the content, and a horizon competes with tokens and fog —
+   survives intact and is now a SCOPING rule: the dock, the sheet and the margins get the horizon;
+   the map stage stays a clean dark plate. The dated reversal in `docs/ai-ledger/decision-log.md`
+   is the director's, written after wave 5; until it is there, an agent reading only the old no-sky
+   entry will try to revert this believing it is fixing a mistake, which is why the reversal is
+   named here as well as there.
+
+   PAINTED AS BACKGROUND LAYERS ON THIS ELEMENT, not as a `.pane-sky` child, and the constraint
+   that decides it is the one every comment in this file circles: `.table-layout` has `position:
+   fixed` descendants (the enlarged map, the viewer preview, the drawer), so it may never take
+   `transform`, `filter`, `perspective`, `contain: paint` or `will-change` of any of them. That
+   rules out the scene tier's perspective grid floor, which is the one sky layer that needs one.
+   What is left — wash, horizon beam, its glow, the bloom — is exactly the HORIZON the ruling
+   names, and losing the floor mesh under a battle map is a gain rather than a compromise.
+
+   `background-attachment` stays at its default `scroll`, which is the behaviour this needs and
+   the name for it is a lie: the background is fixed to the ELEMENT's own box and does NOT travel
+   with its contents. Below the rung `.table-layout` really does scroll, and the horizon has to
+   stay at the bottom of the frame rather than sliding up out of it.
+
+   NOTHING PAINTS BEHIND THE MAP because the stage is opaque `--void` (encounter-map.css) and the
+   map column around it is a margin, not a panel — see the ≥980 rule below, which drops the slab
+   the column used to be. Reduced transparency needs no branch here: the wash and the horizon are
+   what distinguish the three hours, and there is no mesh or film layer to remove. */
+.table-layout {
+  background-image:
+    linear-gradient(90deg, transparent 0%, var(--sky-horizon-a) 22%, var(--sky-horizon-b) 50%, var(--sky-horizon-a) 78%, transparent 100%),
+    var(--sky-horizon-glow),
+    var(--sky-bloom),
+    var(--sky-wash);
+  background-size: 100% 2px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 calc(100% - var(--sky-horizon-inset)), 0 0, 0 0, 0 0;
+  background-repeat: no-repeat;
+}
+/* `.scroll-y` RIDES THIS ELEMENT IN THE MARKUP, and what it is for is narrow: on most cells the
+   frame fits and this class declares a scroll nothing uses. C1 took it off on exactly that
+   reasoning — both halves are frames now — and two arrangements proved it wrong, each by a
+   measurement:
+   - THE DOCKED ARM AT >=980 is not the accordion. `showDocked` renders a bare
+     `<DicePanel/><CombatLogPanel/>` stack (main.tsx), and `DicePanel` alone is 787px for a GM and
+     850px for a player inside an ~856px column: no flex arrangement fits it (the accordion's own
+     shape — dice rigid, log filling, `.combat-log-list` scrolling — was tried and still left
+     10-140px over), so the column has to declare a scroll. `.table-sidebar` takes `.scroll-y` there
+     for that reason and contains it; this class is the backstop. Without either, the PAGE scrolled
+     — 294px at 1280x900 for a GM, 429 for a player, 114 at 1920x1080 — which is the one invariant
+     the refresh exists to hold, and `dockPosition` persists in localStorage, so it stayed broken on
+     that device.
+   - BELOW THE RUNG a pane shorter than the frame's floors — a phone in landscape, or the same
+     phone with the soft keyboard up — genuinely cannot hold the rows. A scroll is the difference
+     between content one flick away and content that does not exist (the phone block below). */
+/* (The `.table-layout.anim-view { animation-fill-mode: backwards }` patch that kept a settled
+   transform from trapping the enlarged-map overlay is gone: pane-level entrances are
+   opacity-led now — the `pane-in` rule with the shell frame at the top of this file.) */
 .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; }
-.table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+/* The left column is a frame: the scene row, the party strip and the status line are fixed rows, and
+   the map underneath them is the one thing that grows. */
+.table-layout > .table { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.table-sidebar { display: flex; flex-direction: column; gap: var(--pane-gap); min-width: 0; min-height: 0; }
+/* ============ THE PHONE TABLE IS A FRAME TOO (C1) ============
+   The interim block this replaces named itself a placeholder, and the measurements are why: with the
+   dock's sections opened one at a time, `.table-layout` scrollHeight ran to several THOUSAND pixels
+   inside an 800px pane, while `document.scrollHeight` stayed exactly `innerHeight` in every one of
+   those states — the shell lock held, which is why `scripts/no-scroll-audit.mjs` never saw any of
+   it: the whole overflow lived INSIDE the pane, and that script measures the document. (The precise
+   before-triple is deliberately not quoted here. Three records of it disagree, and only the AFTER —
+   800px in every tab, both roles — was re-measured; reverting is the only way to reproduce a before.)
+
+   TWO ROWS AND AN ORDER OF YIELDING: free space goes to the sheet, a deficit comes out of the sheet
+   down to a STATED floor, and below that floor the frame scrolls rather than clipping.
+   - `section.table` is the map half — the top line, the band, the status line. `flex: 0 0 auto`,
+     because every one of those is a STATED size and it must never trade one away. Shrink is split in
+     proportion to flex-basis, and against a sheet whose content basis runs to thousands of pixels a
+     shrinkable map half loses most of itself: `flex: 0 1 auto` on its own resolved the 336px row to
+     107px at 390x844, with the sheet painting over the band.
+     A FLOORED version was measured and REJECTED, and the number is the reason. `flex: 0 1 auto;
+     min-height: 16rem` is a real gain in landscape — at 844x390 the section takes 256 instead of
+     336, the band reaches the 9rem floor it already declares, and the tab bar comes back on screen
+     — but a flat floor cannot be right for a section whose rigid rows vary by role and by whether
+     the top line wraps (44px, 82px in combat at the 320 floor, 138px out of it). Where the rigid
+     rows total more than the floor the children paint straight through the box: measured spill of
+     91.6px of the empty-state hero over the sheet at 320x420 and 320x380 for a claimed player out
+     of combat, 32.4px at 390x375, 15.2px at 568x320 — zero in all 45 probed cells without it. A
+     landscape phone wants a different COMPOSITION (map beside sheet, both at the pane's full
+     height), which is a phase and not a floor.
+   - `.table-sheet` is the shrinkable row, and `flex: 1 1 0` is the load-bearing part: a basis of
+     ZERO means it takes the leftover by GROWING and contributes nothing to the shrink distribution,
+     so a deficit is never handed to it in proportion to a content basis it cannot honour.
+     `min-height: 8.25rem` is the floor it can honour — 44px of tab bar plus 88px of body, two
+     initiative rows. Without it the sheet went to 0 FIRST and the rest became clipped, unreachable
+     content: 2px of sheet and a 0px body at 844x390, 0 and 0 at 667x375 and at 568x320, with
+     `elementFromPoint` at the tab bar's own centre returning `null` — no turn order, no dice, no
+     log, and no control to reach them, during a fight. It is B2's frame: Tabs over one scrolling
+     body, styled in encounter-panel.css. Everything here is the ROW, never its contents.
+   - THE FRAME DECLARES A SCROLL (`.scroll-y`, in main.tsx) for whatever is left below those floors.
+     `overflow: hidden` stood here and was called "the guarantee, not the fix" — the rows were sized
+     so nothing needed clipping, and the clip would stop a regression becoming a scrolling document
+     again. It did the opposite: under every pane the rows could not fit, the deficit became
+     UNREACHABLE content instead of a scroll. It also did not do the second job credited to it. The
+     claim was that it un-scrolls the container `EncounterPanel`'s `activeRow.scrollIntoView()`
+     reaches through on mount; it does not — `overflow: hidden` still creates a scroll container and
+     `scrollIntoView` still walks it (caught live at 667x375, first paint at scrollTop 13 with no
+     way back). What actually keeps that call harmless is the rows FITTING: where
+     `scrollHeight === clientHeight` there is nothing to scroll, and where they do not fit, a scroll
+     the user can undo beats a clip they cannot. */
+@media (max-width: 979px) {
+  /* The `scrollbar-gutter: auto` above matters most here, and the arithmetic is why. `stable`
+     reserves the scrollbar's width whether or not anything scrolls — 10px of a phone's content box,
+     measured — against a top line that was measured with ~7px of slack at 375
+     when it still carried the character bar (ruling 20 deleted it). Measured with the gutter reserved: a claimed player's top line
+     at 375x667 went 44px -> 82px, the row wrapped, and 38px came out of the sheet on the phase's
+     own shortest supported phone. A phone's scrollbar is an overlay and costs nothing anyway. */
+  .table-layout { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; }
+  /* The card chrome goes: a phone has no room to spend 24px a side plus a rule on a container that
+     is the surface rather than a panel standing on it. */
+  .table-layout > .table { flex: 0 0 auto; padding: var(--space-3); border: 0; border-radius: 0; background: none; }
+  .table-layout > .table-sheet { flex: 1 1 0; min-height: 8.25rem; gap: var(--space-2); }
+  /* ONE 44px TOP LINE — at 375 and up, and the exception is stated rather than wished away: at the
+     320 floor a claimed player's row is 82px in combat (the "You're playing" pill wraps) and 138px
+     out of it (the party strip drops below the pill), and the GM's is 100px out of combat. That
+     extra height is real INPUT to the frame's arithmetic, not a rounding error — it is the largest
+     single reason a 320px phone runs out of pane.
+     `display: contents` above the rung (below) leaves the laptop composition byte-identical — this
+     wrapper exists only so the phone can put the scene door, the player's own character and the
+     party on one line instead of three. `wrap` stays as the escape hatch: nothing here may be
+     crushed, so a line that genuinely cannot hold breaks instead of clipping. */
+  .table-topline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+  /* RULING 12 — the top-left scenes row is GONE (56px back to the map), so the rules that taught it
+     to yield the line go with it. Its function is a "View all scenes" entry in the map's own Scenes
+     menu, bottom-right, where the GM's hand already is. The 56px is BANKED (ruling 32). */
+  .table-topline > .party-strip { flex: 1 1 5rem; min-width: 0; margin: 0; }
+  /* Route 1 (design-language §4): the strip is a scrolling list of pills, so the floor is PAINT.
+     56px was a comfortable laptop row; 44 is the floor and the phone needs the other 12px. The
+     padding comes down with it or the avatar's own 2rem plus .5rem a side overshoots the floor and
+     the row costs 55px again — measured. */
+  .party-strip-entry { min-height: var(--tap-min); padding: var(--space-1) .7rem var(--space-1) var(--space-1); }
+  .table-status { margin: 0 0 var(--space-2); }
+  /* The staging banner is a frame ROW while the GM arranges a scene, and at this width its two
+     sentences wrapped to 127px — more than half the band. Tightened, not shortened: the copy is the
+     only instruction for a mode with no other chrome. (`.table-layout` on the selector for the same
+     reason as the empty hero above: the base rule is later in this file and @media adds no weight.) */
+  .table-layout .scene-preview-banner { gap: .4rem; margin-bottom: var(--space-2); padding: .4rem .6rem; font-size: .8rem; }
+  /* The empty state stands in for the map, so it takes the map's band rather than the map's leftover.
+     `.table-layout` is on the selector because the base rule is LATER in this file and a media query
+     adds no specificity — without it the hero kept its 12rem and overflowed its own box by 27px. */
+  .table-layout .map-empty-hero { flex: 0 1 14rem; min-height: 9rem; margin-top: 0; }
+  /* Q3: the picker IS the sheet below the rung — main.tsx renders it in this row instead of the dock.
+     So it takes the SHEET'S OWN FLOOR, for the sheet's own reason. `flex: 1 1 0` first: the picker's
+     basis is 539px of cards, and with `auto` that basis is what shrink is split by, so the box that
+     is the whole body was handed the entire deficit. And a floor after it, because `1 1 0` only ever
+     takes what is LEFT — out of combat the sheet also holds the replays shelf (171px) and "Leave
+     table" (44px), which between them leave nothing, and the picker resolved to **0px** at 320x568,
+     375x667 and every landscape phone: Claim buttons at y 545 and 755, clipped out of existence,
+     `elementFromPoint` returning the shelf. That is an unclaimed player who cannot join the table at
+     all, in the most ordinary state there is — someone opening the table before the fight starts.
+     With the floor the picker is 132px in all of those and the Claim button hit-tests; what no
+     longer fits comes out of the bottom of the sheet, which is the LAST row of the frame, so it
+     lands in the frame's declared scroll instead of on top of anything (measured: 0 spill over
+     `section.table` in every cell, and the frame's own overflow grows by exactly the floor).
+     The picker already carries `.scroll-y` in the markup (ClaimCharacter.tsx) — its 539px of cards
+     scroll inside it — so all it ever needed was a box with a height. */
+  .table-sheet > .claim-view { flex: 1 1 0; min-height: 8.25rem; margin: 0; }
+}
+/* The wrapper is invisible above the rung: its children go on being `section.table`'s own rows. */
+@media (min-width: 980px) { .table-topline { display: contents; } }
+.table-topline:empty { display: none; }
 @media (min-width: 980px) {
-  .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(21rem, 27rem); align-items: start; }
-  /* When the tracker is docked into the map, the sidebar is just the dice panel — stretch it to the
-     map's height and let the dice sit at the bottom so its lower edge lines up with the battlemap. */
-  .table-layout.docked { align-items: stretch; }
-  .table-layout.docked .table-sidebar { min-height: 100%; }
-  .viewer-preview-toggle { margin-top: .6rem; }
+  /* RULING 53 — THE DOCK IS PART OF THE SHELL, so the column gap goes. It was `--pane-gap` (8px)
+     of page background between the map and the dock, which is what made them read as two panels
+     that happen to be adjacent instead of one instrument. The seam is now the dock's own left
+     rim — one 2px line in the role hue rather than a gutter — and the dock reaches the frame's
+     right, top and bottom edges with no margin at all. An attached panel needs no surrounding
+     margin, which is also what the ruling means by "cheaper under the density pass". */
+  .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(var(--dock-w), 27rem); gap: 0; }
+  /* RULING 22 — THE MAP COLUMN IS A MARGIN, NOT A PANEL. It used to be an opaque `--surface-1`
+     slab with a 1px rule around it, covering two thirds of the pane: with a sky behind it, that
+     slab is the thing standing between the surface and its own ground, and the ruling's split
+     ("the dock, the sheet and the margins get the horizon; the map stage stays a clean dark
+     plate") puts the frame on the STAGE — ruling 30's rim and corner ticks — not on the column
+     around it. The phone has composed it this way since C1; this makes the laptop agree.
+     The padding stays: it is the map's gutter, and it is the only thing keeping the stage off
+     the pane's edges now that there is no border to do it. */
+  .table-layout > .table { border: 0; background: none; }
+  /* `.dice-proof { margin-top: auto }` and the `.docked` stretch pair retired here: both existed to
+     fake a shared height between two columns that were each sized by their own content. The frame
+     gives them one height for real, so bottom-aligning by margin would now fight it. */
+  /* RULING 13 — the "Preview what players see" anchor row is gone (53.6px back to the map); its
+     trigger is a map-toolbar tool now, so it has no row of its own to space. */
+}
+/* ===== RULING 53 — THE DOCK TAKES THE PANEL MATERIAL =====
+   Rim, bezel and a scanline-over-gradient fill, and NO SHADOW: the ruling asks for the dock to
+   read as part of the shell, and a drop shadow is the one thing that says "this is floating above
+   it". The rim is the LEFT edge only — the seam against the map — because the other three edges
+   are the frame's own and a rim there would draw a box around a thing that is not a box.
+
+   THE FILL IS TRANSLUCENT ON PURPOSE. Ruling 22 hands the dock the horizon, and an opaque plate
+   would take it straight back; at 88% the material reads as material and the sky reads as ground
+   under it. `prefers-reduced-transparency` takes the plate to solid, which is that preference's
+   whole job — the sky's own wash and horizon stay, so the hour is still legible.
+
+   Below the rung the dock is not a column at all — it is `.table-sheet`, the frame's second ROW,
+   and a left rim on a full-width row would be a stray vertical line. So the material is scoped to
+   the arrangement that has a seam to draw. */
+@media (min-width: 980px) {
+  /* No padding, deliberately. The dock's own panels carry theirs, and 16px of vertical breathing
+     room here would come straight out of the column that `scripts/no-scroll-audit.mjs` already
+     reports overflowing by 130px for a player at 1280x720. Attached means attached. */
+  .table-sidebar {
+    border-left: var(--rim-w) solid var(--role-hue);
+    background-image: var(--chrome-scanline), linear-gradient(180deg,
+      color-mix(in srgb, var(--surface-1) 88%, transparent) 0%,
+      color-mix(in srgb, var(--surface-2) 92%, transparent) 100%);
+    background-size: 100% var(--scanline-gap), auto;
+    outline: 1px solid var(--bezel-color);
+    outline-offset: calc(-1 * var(--bezel-inset));
+    box-shadow: none;
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .table-sidebar { background-image: linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%); }
+  }
 }
 
 .table-status { margin: 0 0 .8rem; color: var(--text-muted); font-size: .85rem; }
 
 /* GM-private scene staging = violet (special/preview state) */
-.scene-preview-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .8rem; padding: .7rem 1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); color: var(--violet-hi); font-size: .9rem; }
-.scene-preview-actions { display: flex; gap: .5rem; flex: none; }
-.scene-preview-actions button { padding: .5rem 1rem; text-align: center; }
+.scene-preview-banner { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: .8rem; padding: .7rem var(--space-4); border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); color: var(--violet-hi); font-size: .9rem; }
+.scene-preview-actions { display: flex; gap: var(--space-2); flex: none; }
+.scene-preview-actions button { padding: var(--space-2) var(--space-4); text-align: center; }
 
 /* Scene prep renders in the shared Modal; only the scene panel's top margin needs a reset there. */
 .scene-prep-modal .scene-panel { margin-top: 0; }
-.empty-scene-prep { margin-top: 1rem; padding: .6rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
+.empty-scene-prep { margin-top: var(--space-4); padding: .6rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
 
-/* Live-combat roster collapse: one quiet line instead of a wall of duplicate character cards. */
-.roster-collapsed { margin: 1.2rem 0 0; }
-.roster-collapsed > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
-.roster-collapsed > summary:hover { border-color: var(--line-strong); color: var(--text); }
-.roster-collapsed[open] > summary { margin-bottom: .4rem; }
+/* ============ THE DOCK ACCORDION (B1) ============
+   Three headers, one body. The accordion itself is the sidebar's frame column: the open section takes
+   the leftover height and scrolls inside itself, and the two closed ones cost exactly one header row
+   each. That is what lets the dock hold a turn order, the dice and the log in a column that has only
+   one height to give — the arrangement the blueprint calls the `<details>` idiom "made deliberate". */
+.dock-accordion { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-height: 0; }
+.dock-section { display: flex; flex-direction: column; min-height: 0; }
+/* The open one flexes; the closed ones are their header and nothing else. The 200ms is the handover
+   settling rather than a slide: `flex-grow` is the only thing that moves, so the sections trade height
+   instead of animating their contents, and reduced motion collapses it to an instant swap. */
+.dock-section.is-open { flex: 1; min-height: 0; }
+.dock-section { transition: flex-grow 200ms var(--ease-settle); }
+@media (prefers-reduced-motion: reduce) { .dock-section { transition: none; } }
+.dock-section-head { margin: 0; font: inherit; }
+/* The whole header row is the control, so the hit area is the row and not the words — `.tap-target`
+   carries the 44px floor. */
+.dock-section-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  /* The floor is met by the ROW's own height, not by an overlay: this is a real, always-visible
+     control in the busiest column on the surface, and it measured 42px on padding alone. */
+  width: 100%; min-height: var(--tap-min); padding: .55rem .8rem; border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--text-dim); font: 700 .82rem/1.3 var(--font-body); text-align: left; cursor: pointer;
+  transition: border-color var(--dur-hover), color var(--dur-hover), background var(--dur-hover);
+}
+.dock-section-toggle:hover { border-color: var(--line-strong); color: var(--text); }
+/* The open section's header reads as the live one — a quiet state marker, not a beam: neon marks what
+   is interactive, focused, selected or live (pillar 1), and three glowing headers would mark nothing. */
+.dock-section.is-open > .dock-section-head > .dock-section-toggle {
+  border-color: color-mix(in srgb, var(--magenta) 45%, var(--line));
+  background: var(--surface-3); color: var(--text);
+}
+/* `display: flex` is load-bearing, not tidiness. Without it this box is a block, so the
+   `flex: 1; min-height: 0` on `> .combat-log` below is inert: the LOG never scrolls and the BODY
+   does, which meant the accordion's Combat log opened scrolled to the top at >=980. Measured at
+   1280x900 before the fix: body scrollTop 0 of 8185, `.combat-log-list` scrollHeight ===
+   clientHeight, newest row at y=9039 against a body ending at y=900. */
+.dock-section-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
+/* Inside the accordion the panels are the section's contents, so they drop the standalone card's
+   outer margin, fill the section, and hand their own scrolling to the list that actually grows. */
+.dock-section-body > .encounter-panel, .dock-section-body > .dice-proof, .dock-section-body > .combat-log {
+  margin-top: 0; display: flex; flex-direction: column; flex: 1; min-height: 0;
+}
+/* The feeds lose their fixed caps here. `max-height: 19rem` and `16rem` were each a guess at how much
+   of a column a feed deserves; inside a section that already has a height, the honest answer is "the
+   rest of it". They stay the scrolling elements, which is what keeps the log's pin-to-newest and the
+   roll list's own scrolling working — the effects write to these nodes by ref. */
+.dock-section-body .roll-list, .dock-section-body .combat-log-list { flex: 1; min-height: 0; max-height: none; }
+/* RULING 6 — the log's DOOR where its section used to be. It wears the section header's paint so the
+   column still reads as one instrument, and it never grows: a door has no body to hold the flex.
+   `.dock-section` carries `flex-grow` transitions, so `flex: none` is stated rather than inherited. */
+.dock-section--door { flex: none; }
+
 .sidebar-collapsed { margin-top: .8rem; }
-.sidebar-collapsed > summary { padding: .5rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.sidebar-collapsed > summary { padding: var(--space-2) .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .sidebar-collapsed > summary:hover { border-color: var(--line-strong); color: var(--text); }
-.sidebar-collapsed > .dice-proof, .sidebar-collapsed > section { margin-top: .5rem; }
+.sidebar-collapsed > .dice-proof, .sidebar-collapsed > section { margin-top: var(--space-2); }
+
+/* ---- The Roster tab's management sections (B6). The party gallery itself is styled with the other
+   card galleries in encounter-panel.css; these are the pieces the tab gained when it became the
+   management home: the header's actions, the approval queue, the archived disclosure. ---- */
+/* The frame's two rows: the heading (never moves) and the one region under it. The width cap
+   that used to sit on `.party-roster` (72rem, encounter-panel.css) moved onto these, because the
+   surface itself is full-bleed now — it paints the scene. */
+.party-heading, .party-roster-body { width: 100%; max-width: 72rem; margin-inline: auto; }
+.party-heading-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0 0 1.4rem; }
+/* RULING 2 — THIS IS THE HERO SURFACE'S DOOR, so it takes the rest glow. Ruling 2 names Roster as a
+   hero surface and gives hero surfaces "the full landing door, rest glow included"; measured at the
+   end of round 2, Roster had NOTHING glowing at rest. The door on a gallery surface is not a panel —
+   it is the one action that takes you in, which here is "Create a character". `--nh-glow` is the
+   Button primitive's own hook, a drop-shadow on the backing layer so it follows the chamfer cut;
+   primary buttons already light it on hover and this makes it the resting state here only.
+   The restraint rule ("at most one glowing element per region at rest") is satisfied by measurement
+   rather than by hope: this surface's card actions are all `secondary`, so the heading's primary is
+   the only magenta fill on it and this glow is the only glow. Scenes needed a second edit to reach
+   the same state — see `scene-gallery.css` — because its cards each carry a `Go live`. */
+.party-heading-actions .nh-btn--primary { --nh-glow: var(--glow-drop-magenta); }
+.party-queue { margin: 0 0 1.6rem; padding: var(--space-4) 1.1rem; border: 1px solid var(--violet); border-radius: var(--radius-md); background: var(--surface-2); }
+.party-section-head { margin: 0 0 .7rem; font: 400 1.1rem/1.2 var(--font-display); color: var(--violet-hi); }
+.party-queue-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.party-queue-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: .6rem var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); }
+.party-queue-name { font-weight: 700; }
+.party-queue-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-left: auto; }
+.party-card-preview { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; padding: 0 .9rem .6rem; }
+.party-card-preview-label { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.party-archived { margin-top: 1.4rem; }
+/* Route 1 (design-language §4): a disclosure row in a stacked list grows its PAINT to the floor
+   — an invisible `::after` extension would reach over its neighbours and steal their taps. The
+   paint was 30px; `--tap-min` with the text centred in it is the whole fix. */
+.party-archived > summary { display: flex; align-items: center; min-height: var(--tap-min); padding: var(--space-2) .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.party-archived > summary:hover { border-color: var(--line-strong); color: var(--text); }
+.party-archived-note { margin: .7rem 0; font-size: .85rem; }
+.import-preview { display: grid; gap: var(--space-2); margin: 0; }
+.import-preview div { display: grid; grid-template-columns: 9rem 1fr; gap: .6rem; align-items: baseline; }
+.import-preview dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.import-preview dd { margin: 0; }
+.import-preview-abilities { display: flex; flex-wrap: wrap; gap: var(--space-2) .9rem; font-family: var(--font-mono); }
 
 /* Theme switch placements. */
 .home-theme-switch { margin-top: var(--space-6); }
 .setup-appearance { margin-top: var(--space-10); display: flex; flex-direction: column; gap: var(--space-3); align-items: start; }
 
-/* GM section tabs use the @vtt/ui <Tabs> primitive; this only adds outer spacing. */
-.gm-tabs { margin-top: var(--space-5); }
+/* FRAME ROW 2 IS THE WRAPPER, NOT THE BAR — and the split is a defect fix, not tidying.
+   The @vtt/ui <Tabs> primitive owns the bar's x-scroll and, once it overflows, an EDGE-FADE
+   MASK: `is-scrolled-start` makes the leftmost 24px of the element transparent. A mask erases
+   everything the element paints, so the role rim (an inset box-shadow) and the row's wash and
+   texture were being erased with it. Measured at 390x844 on the GM's /settings and /replays,
+   where the bar auto-scrolls the active tab into view (scrollLeft 344, `is-scrolled-start`
+   present): the bar's first device-pixel column read page background in all three hours, and
+   forcing scrollLeft to 0 in the same frame brought back rgb(159,107,255) — exactly --rim-gm.
+   The GM's rim was invisible on a phone on every route past the fold.
+
+   So the ROW is this wrapper and the BAR is its content. Row-level paint — the rim, the wash,
+   the chrome scanline — belongs to the box that never scrolls and is never masked; the fade
+   keeps doing its one job, telling a thumb there are more tabs. There is no way to do this on
+   the bar itself: mask applies after filter and after shadows, so no shadow, border, outline or
+   pseudo of a masked element survives it.
+
+   THE ROLE RIM ITSELF (§9). The bar is the one piece of chrome on screen on every route in both
+   roles, and the two roles' bars were otherwise pixel-identical — so the rim is the first thing
+   in the app that says whose seat this is: magenta for the player's, violet for the GM's. The
+   edge comes from the `.rim-*` utility in the markup; the wash pairs with it here because the
+   utility deliberately sets no background (it would clobber `.surface-glass` wherever else a rim
+   lands). It is never the only signal: each bar's aria-label names its role ("GM sections" /
+   "Player sections"), the tab sets differ, and the GM's bar is unreachable without a GM token.
+   The rim costs no layout (an inset shadow, not a border), so the gutter still puts the labels
+   on the same column as the surface headings below them. */
+/* ===== RULING 26 — THE TAB BAR'S MATERIAL, AND RULING 51'S HUE ON IT =====
+   THE RIM AND THE BEZEL ARE THE PRIMITIVE'S, NOT THIS ROW'S, and that is the composition rather
+   than a gap. `packages/ui/src/primitives/Tabs.css` paints ruling 26's material — a bottom rim, a
+   bezel a `--bezel-inset` above it, and a translucent fill — as BACKGROUND LAYERS on the bar
+   itself, because the bar is a scroll container and an absolutely-positioned pseudo inside a
+   scroller travels with the tabs. Measured before this rule was written: a second rim on a
+   `.frame-tabbar::before` at `z-index: -1` never appeared at all, because the bar is a full-size
+   in-flow child and its own background paints over any negative-index layer of its parent. Two
+   rims would have been wrong even if both had shown.
+
+   SO THE ROW'S JOB IS THE HUE, NOT A SECOND EDGE. `--rim-color` is redeclared here, which is what
+   makes the primitive's own rim and its interaction brightening come out in the ROLE colour —
+   magenta for the player's seat, violet for the GM's — with no knowledge of roles inside the
+   primitive and exactly one line on screen. `--rim-color` is only read by the bar inside this
+   row; the scrollbar tokens that also derive from it are declared on `:root` and were substituted
+   there, so nothing else moves.
+
+   AND THE ROW'S OWN PAINT IS THE PLATE. `--chrome-plate` is a lit-top/shaded-bottom gradient
+   carrying the role hue, under the chrome-tier scanline; the bar's fill is 62% translucent, so
+   both read through it. The plate replaces the flat 7% role WASH the row used to paint and
+   carries the hue at 13%/6% instead — a stronger role signal, not a weaker one, which is the
+   thing to check if this is ever retuned. The wash token stays as the background-color beneath it
+   so the row still has a role-tinted floor if the plate is ever taken off.
+
+   NO GLOW, and that is the ruling rather than an omission: the bar sits next to regions that do
+   glow, and leaving its budget unspent is what keeps the restraint rule meaningful. `.rim-lit`
+   must stay absent here. */
+.frame-tabbar {
+  grid-row: 2;
+  min-width: 0;
+  --rim-color: var(--role-hue);
+  --rim-color-hi: var(--role-hue);
+  background-image: var(--chrome-scanline), var(--chrome-plate);
+  background-size: 100% var(--scanline-gap), auto;
+}
+.gm-tabs, .player-view-tabs { padding-inline: var(--pane-gutter); }
+.frame-tabbar.rim-gm { background-color: var(--rim-gm-wash); }
+.frame-tabbar.rim-player { background-color: var(--rim-player-wash); }
 
 /* ---- Signature atmosphere (hero/empty zones + subtle app-shell CRT texture) ---- */
 
@@ -332,20 +1475,74 @@ main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
 [data-theme="light"] .app-texture { display: none; }
 @media (prefers-reduced-transparency: reduce) { .app-texture { display: none; } }
 
-/* Home hero: one bold moment — arcade wordmark over a receding grid + color bloom. */
-.home-hero { position: relative; overflow: hidden; max-width: none; padding: clamp(2rem, 7vw, 5rem) 0 clamp(3rem, 9vw, 6rem); }
-.home-hero > *:not(.home-hero-atmos) { position: relative; z-index: 1; }
-.home-hero > p { max-width: 40rem; }
+/* Home hero: one bold moment — arcade wordmark over a receding grid + color bloom. D30 makes it the
+   WHOLE statement: the wordmark, centred, and nothing else in the header at all. */
+.home-hero { position: relative; max-width: none; padding: 0 0 clamp(1.5rem, 5vw, 3rem); text-align: center; }
 .home-hero-atmos, .empty-atmos { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .home-hero-bloom { position: absolute; left: 6%; right: 6%; top: 4%; height: 46%; background: var(--grad-bloom); filter: blur(72px); opacity: .32; border-radius: 50%; }
 .home-hero-grid { position: absolute; left: -25%; right: -25%; bottom: -12%; height: 62%; opacity: .7; -webkit-mask-image: linear-gradient(to top, #000, transparent); mask-image: linear-gradient(to top, #000, transparent); }
-.home-hero-title { margin: .35rem 0 1.1rem; }
-.home-hero-title .nh-wordmark { font-size: clamp(2.6rem, 9vw, 5.5rem); line-height: .95; }
+/* Over a full-height column the bloom sits high behind the wordmark and the horizon runs across the
+   lower third — the receding-grid statement D30 asks for, instead of a 60px band behind one word. */
+.landing .home-hero-bloom { top: 12%; height: 40%; opacity: .38; }
+.landing .home-hero-grid { bottom: 0; height: 42%; opacity: .8; }
+.home-hero-title { margin: 0; }
+/* `block` + centred text, not an inline gradient span left where the flow put it: the wordmark's own
+   box has to be the centred thing, or it only LOOKS centred when the page column happens to be narrow. */
+.home-hero-title .nh-wordmark { display: block; font-size: clamp(3rem, 13vw, 8rem); line-height: .95; }
 
 /* Empty map = the hero moment built from grid + line + color, not an object (§6.5). It stands in for a
-   loaded battlemap, so it's sized like one — this also drives the map panel (and the --setup-h-matched
-   encounter panel beside it) to a comfortable height instead of a short stub. */
-.map-empty-hero { position: relative; overflow: hidden; min-height: min(52vh, 30rem); }
+   loaded battlemap, so it is sized like one — LITERALLY like one, since C1: it takes the frame's
+   leftover exactly as `.encounter-map-interaction` does, with the same 12rem floor, and below the rung
+   the band rule in encounter-map.css gives it the same 14rem band. `min-height: min(52vh, 30rem)` is
+   what that replaces, and the cap had gone wrong twice over: a viewport FRACTION on in-flow content
+   (check (g)), and a MIN that grew with the screen — 439px of empty state at 844px tall, which is more
+   than the phone band's whole allowance. (The `--setup-h-matched` panel this comment used to say it
+   drove has not existed since the ResizeObserver plumbing retired — main.tsx names its removal. There
+   is no paired height to re-check.) */
+.map-empty-hero { position: relative; overflow: hidden; flex: 1; min-height: 12rem; }
 .map-empty-hero > :not(.empty-atmos) { position: relative; z-index: 1; }
 .map-empty-hero .home-hero-bloom { top: 8%; height: 42%; opacity: .22; }
 .map-empty-hero .home-hero-grid { bottom: -14%; height: 58%; opacity: .55; }
+
+/* ═══════════ D9 — MY CHARACTER, the player's first tab (rulings 18, 20) ═══════════
+   The surface that replaced the 69px character bar over the map. It owns its frame (§7): a heading
+   row carrying the builder doors over one scrolling region, and it stands on its own sky like every
+   other tab-level surface. Same 72rem reading measure the Roster uses — this is a list of people,
+   not a reference to scan, so a full-bleed line length would be the wrong trade at a laptop width. */
+.my-character-head, .my-character-body { width: 100%; max-width: 72rem; margin-inline: auto; }
+.my-character-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); }
+.my-character-head h2 { margin: 0; }
+.my-character-head-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-left: auto; }
+/* The identity card: avatar, the three facts, the two doors. `min-width: 0` on the facts column for
+   the reason the deleted bar documented at length — a flex item's automatic minimum is its
+   min-content, and a long character name must give by ellipsis rather than pushing the doors off. */
+.my-character-card { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0 0; padding: var(--space-4); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-2); }
+.my-character-facts { display: flex; flex-direction: column; gap: .15rem; flex: 1 1 8rem; min-width: 0; }
+.my-character-name { font: 400 1.35rem/1.2 var(--font-display); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-character-line { color: var(--text-muted); font-size: .9rem; }
+.my-character-hp { color: var(--cyan-hi); font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .85rem; font-weight: 700; }
+.my-character-doors { display: flex; flex-wrap: wrap; gap: .5rem; margin-left: auto; }
+.my-character-party { margin-top: var(--space-6); }
+.my-character-party-head { margin: 0 0 var(--space-2); font: 400 1.1rem/1.2 var(--font-display); color: var(--text-dim); }
+.my-character-party-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+/* Ruling 47 — list rows are hairline-ruled, not filled, and the row IS the control at the tiers
+   where a sheet can be opened. Route 1 (§4): the paint reaches the 44px floor, because these rows
+   stack and an invisible `::after` extension would reach over the neighbours and steal their taps. */
+.my-character-party-row { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--tap-min); padding: var(--space-1) var(--space-2); border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; }
+button.my-character-party-row { cursor: pointer; }
+button.my-character-party-row:hover { border-bottom-color: var(--line-hover); }
+.my-character-party-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.my-character-party-line { flex: 1 1 4rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: .85rem; text-align: right; }
+/* A party member's read-only sheet, inside the Modal's own body region. Nothing here is a control. */
+.party-sheet { display: grid; gap: var(--space-3); }
+.party-sheet-line { margin: 0; color: var(--text-dim); font-size: .9rem; }
+.party-sheet-stats { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: 0; }
+.party-sheet-stats dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.party-sheet-stats dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.05rem; font-weight: 700; }
+.party-sheet-abilities { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.party-sheet-abilities li { display: grid; place-items: center; gap: .1rem; min-width: 3.5rem; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); }
+.party-sheet-ability { color: var(--text-muted); font-size: var(--fs-2xs); letter-spacing: .08em; }
+.party-sheet-mod { color: var(--cyan-hi); font-family: var(--font-mono); font-size: .85rem; font-weight: 700; }
+
+/* RULING 6 — the log's door in the docked-into-the-map arm, which has no dock to hold one. */
+.dock-log-door-standalone { flex: none; align-self: flex-start; }

@@ -1,11 +1,33 @@
+/* RULING 39 — severity is a LEADING RULE, not a fill. Text sits on a neutral ground in every
+   theme, which is what makes it survive daybreak: coloured-text-on-tint is the combination that
+   fails there first. The severity hues are unchanged, and `--caution` in particular keeps its
+   meaning (warning / not finished) — the segmented on-state does not borrow it (ruling 4/7).
+
+   The material rides a backing layer, not the element: an Alert routinely carries a Button in its
+   body (the builder's "Resume draft"), and `clip-path` clips hit-testing. */
 .nh-alert {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  --nh-rule: var(--line-strong);
+}
+.nh-alert::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
   border: 1px solid var(--line);
-  border-left-width: 3px;
-  border-radius: var(--radius-md);
+  /* The 2px leading rule. Was 3px; ruling 39 names 2. */
+  border-left: 2px solid var(--nh-rule);
   background: var(--surface-2);
 }
 .nh-alert-icon {
@@ -23,13 +45,14 @@
 .nh-alert-text { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 .nh-alert-title + .nh-alert-text { margin-top: 2px; }
 
-/* Tone: a colored left edge + matching icon; the surface stays quiet. */
-.nh-alert--info    { border-left-color: var(--info); }
+/* Tone: the leading rule + a matching icon; the surface stays quiet. The icon's own disc is the
+   one tinted thing left, and no text sits on it. */
+.nh-alert--info    { --nh-rule: var(--info); }
 .nh-alert--info    .nh-alert-icon { color: var(--indigo); background: color-mix(in srgb, var(--info) 22%, transparent); }
-.nh-alert--success { border-left-color: var(--success); }
+.nh-alert--success { --nh-rule: var(--success); }
 .nh-alert--success .nh-alert-icon { color: var(--cyan-hi); background: color-mix(in srgb, var(--cyan) 20%, transparent); }
-.nh-alert--warning { border-left-color: var(--caution); }
+.nh-alert--warning { --nh-rule: var(--caution); }
 .nh-alert--warning .nh-alert-icon { color: var(--caution-hi); background: color-mix(in srgb, var(--caution) 22%, transparent); }
-.nh-alert--danger  { border-left-color: var(--danger); }
+.nh-alert--danger  { --nh-rule: var(--danger); }
 .nh-alert--danger  .nh-alert-icon { color: var(--danger-hi); background: color-mix(in srgb, var(--danger) 20%, transparent); }
 :root[data-theme="light"] .nh-alert--info .nh-alert-icon { color: var(--info); }

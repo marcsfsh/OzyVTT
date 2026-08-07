@@ -486,7 +486,15 @@ export const ActorSchema = z.object({
   /** Coin purse, seeded from the definition's starting currency. Owner-only. Additive. */
   currency: CurrencySchema.default({}),
   /** GM-archived: hidden from players and excluded from the encounter builder / party. GM management flag; never projected to players or the viewer. Additive. */
-  archived: z.boolean().default(false)
+  archived: z.boolean().default(false),
+  /**
+   * The GM shared this ARCHIVED character's sheet back to players as a read-only keepsake (D26).
+   * Default false - hidden until shared, never the other way round. Meaningless while `archived` is
+   * false (a live character's sheet reaches only its owner, unchanged). The flag itself is GM
+   * management and is stripped from player projections; what players receive is the name-and-id-only
+   * `PlayerView.archivedCharacters` door. Additive.
+   */
+  sheetPreview: z.boolean().default(false)
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
@@ -567,6 +575,15 @@ export const ActionSchema = z.object({
   requiresEffectTag: EffectTagSchema.optional(),
   /** Limited uses; see ActionUsesSchema. */
   uses: ActionUsesSchema.optional(),
+  /**
+   * Resolving this action ALSO spends one of the bearer's own spell slots of this level - the
+   * mechanical half of an item cast authored with `consumesSpellSlot` ("expend a spell slot to
+   * cast it from the staff"). Absent = the action spends nothing but its own charges, which is
+   * every action that existed before this field. The slot is checked and spent by the same economy
+   * pass that owns limited uses, so a preview never spends and a refusal reads like every other
+   * "no uses remaining".
+   */
+  spellSlot: z.object({ level: z.number().int().min(1).max(9) }).strict().optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
   reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional(),
   /** SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool (definition `legendary.actionsPerRound`) that refills when the creature's own turn starts. Pairs with activation "other". */

@@ -1,9 +1,8 @@
 import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } from "@vtt/api-contract";
 import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
-import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import { type ActorDefinition } from "@vtt/schemas";
 import {
-  BackgroundReferenceSchema, ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema,
-  SpeciesReferenceSchema, SpellListReferenceSchema, SpellReferenceSchema, SubclassReferenceSchema,
+  HOMEBREW_BODY_SCHEMAS,
   resolveSpellLists, spellListMemberIds,
   type BackgroundReference, type ClassReference, type ContentSpellcasting, type FeatReference,
   type FeatureChoice, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
@@ -107,23 +106,23 @@ type Checks = Readonly<{
  * (ADR-0016: one shape, never a fork). A body that passes here parses identically when
  * `publishedFor` reads it back, which is what makes the store's fail-soft drop a
  * schema-tightening alarm rather than a routine occurrence.
+ *
+ * THE MAP ITSELF NOW LIVES IN THE CONTENT PACKAGE, and the reason is the publish bug this file used
+ * to be the far end of. The editor's own "why is Publish disabled" checklist was a hand-written
+ * DESCRIPTION of what these schemas require, so it green-lit bodies tier 1 refused and the GM met
+ * the refusal as a 409 reading "Required" with no subject. The checklist now imports
+ * `HOMEBREW_BODY_SCHEMAS` and runs the same parse; the `satisfies` below is what keeps the two type
+ * vocabularies (`HomebrewContentType` on the wire, `HomebrewBodyType` in the content package) from
+ * drifting apart without failing to compile.
  */
-const SCHEMAS: Record<HomebrewContentType, {
+const SCHEMAS = HOMEBREW_BODY_SCHEMAS satisfies Record<HomebrewContentType, {
+  safeParse: (value: unknown) => { success: boolean };
+}> as Record<HomebrewContentType, {
   safeParse: (value: unknown) => {
     success: boolean; data?: unknown;
     error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> };
   };
-}> = {
-  class: ClassReferenceSchema,
-  subclass: SubclassReferenceSchema,
-  species: SpeciesReferenceSchema,
-  background: BackgroundReferenceSchema,
-  feat: FeatReferenceSchema,
-  spell: SpellReferenceSchema,
-  equipment: EquipmentReferenceSchema,
-  monster: ActorDefinitionSchema,
-  "spell-list": SpellListReferenceSchema
-};
+}>;
 
 /**
  * Validate a stored body for publication.

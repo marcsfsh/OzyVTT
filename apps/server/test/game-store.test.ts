@@ -33,7 +33,7 @@ describe("SQLite GameStore", () => {
       expect((database.prepare("SELECT COUNT(*) AS count FROM domain_events").get() as { count: number }).count).toBe(50);
       expect((database.prepare("SELECT COUNT(*) AS count FROM command_receipts").get() as { count: number }).count).toBe(50);
       expect((database.prepare("SELECT COUNT(*) AS count FROM snapshots").get() as { count: number }).count).toBe(2);
-      expect((database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count: number }).count).toBe(5);
+      expect((database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count: number }).count).toBe(6);
       database.close();
     } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
   });
@@ -84,7 +84,8 @@ describe("SQLite GameStore", () => {
       reopened.close(); store = undefined;
 
       const persisted = new DatabaseSync(databasePath, { readOnly: true });
-      expect((persisted.prepare("SELECT COUNT(*) AS count FROM application_seeds").get() as { count: number }).count).toBe(1);
+      // Two seeds now: the placeholder roster backfill and the one-time example-party re-key.
+      expect((persisted.prepare("SELECT COUNT(*) AS count FROM application_seeds").get() as { count: number }).count).toBe(2);
       persisted.close();
     } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
   });

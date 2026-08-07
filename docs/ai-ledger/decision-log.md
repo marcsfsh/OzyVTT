@@ -13,6 +13,45 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-03 — One Language: the play glossary, and where it is kept honest
+
+The play-facing unification (D1–D33; the full decision record is the engagement's master plan,
+off-repo — what the repo must remember is here). The product had grown three vocabularies and no
+mechanism to keep them apart, so these are the words plus the thing that fails when they drift.
+
+- **The glossary, by concept (D28).** The playable thing is a **character**, a **monster** or an
+  **NPC** — never an "actor", a "combatant", or "creature" used as a generic. The list they act in
+  is **Turn order**; **Initiative** stays the score. The event is a **fight**; the place is the
+  **Table**. Visibility is **Shown to players / Hidden from players / GM only** — one pair of words
+  everywhere, which retired the five phrasings one `<select>` had for one roll audience. Claim states
+  are **Available / Claimed / Your character**, and the verbs are **Claim / Release**. A finished
+  fight's record is a **Replay**. Wire names are NOT copy and keep their spelling: `encounter.*`,
+  `strict|assisted|freeform`, `gm-only`, `battlemap`. The rejected alternative was a style guide —
+  the Codex had already proved that a paragraph nobody re-reads loses to a hurried label.
+- **The verb triad, and each verb's promise. Delete** is permanent, always confirmed, and the
+  confirm says "This cannot be undone." **Archive** is reversible and its copy offers the way back.
+  **Remove** takes something out of one list and the thing survives. A dialog whose verb and whose
+  consequence disagree is the defect this rule exists to name.
+- **Vocabulary is enforced as a test, over an EXCLUSION list.** `apps/client/src/copy-scan.ts` is the
+  one scanner (extracted from the Codex's, which now imports it — two copies would be the exact drift
+  the locks exist to catch). `play-vocabulary.test.ts` reads **everything under `apps/client/src`
+  minus a pinned exclusion list**, plus `packages/ui/src/primitives`. An include list was rejected:
+  this engagement alone added `settings/`, `builder/` and `replay/`, and every one of them would have
+  been born unlocked. Exemptions are **(file, string) pairs**, not global strings — SRD's "creature
+  type" is right in the homebrew monster form and was drift in the token picker — and an exemption
+  that stops rescuing anything fails until it is deleted.
+- **What the lock deliberately cannot do, so nobody mistakes green for proof.** It reads copy, not
+  code: a literal inside a JSX expression (`{claimed ? "Claimed" : "Available"}`) is invisible,
+  because widening the scan to every string literal would flag every wire value in the tree. The
+  classes that matter are pinned at their DEFINITION instead (`CLAIM_WORD`, `ROLL_VISIBILITY_WORD`,
+  `SETTINGS_GROUPS`, `DIAL_COPY`), which is stronger than pinning a rendering of them. And a regex
+  matches tokens, not senses — so the terms D28 keeps (fog Reveal/Hide, Initiative the score, Save
+  the throw, Claim/Release, the shared screen's Present) are asserted PRESENT, not merely un-ruled.
+- **The GM's roll picker lost its third option.** For a GM roller `self-only` and `gm-only` reach the
+  same eyes (`apps/server/src/combat-log.ts` gates a `self-only` row on the roller's session, and the
+  roller is the GM), so two of the five phrasings were two names for one audience. The wire value is
+  untouched and still labelled where a GM READS a player's roll; only the GM's own picker collapsed.
+
 ## 2026-08-01 — Codex final polish: five durable rules
 
 Settled while closing the decision-fidelity gaps and the client-reported sidebar bug. Each is a
@@ -1087,7 +1126,8 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   reflow). Rule: the raw date is the source of truth; the instant is a derived sort key, recomputed.
 - **Codex has ONE secret-language and ONE relationship vocabulary (2026-07-25).** A six-lens UX review
   found the "players see this / players don't" idea — the codex's signature concept — expressed ~5 ways.
-  Durable rule, enforced by shared components in `apps/client/src/codex/SecretMarkers.tsx`: (1) *record
+  Durable rule, enforced by shared components in `packages/ui/src/primitives/Reveal.tsx` (promoted out
+  of the Codex when the same question started being asked on every surface): (1) *record
   reveal* is always `<RevealSwitch>` → "Shown to players" / "GM only" (never "Map shown/secret",
   "Shown/Secret", etc.); (2) *GM-only content* is always `<GmOnlyTag>` + the `.codex-gm-block` violet
   accent, identical on secret fields, the GM body tab AND its preview, the journal composer's GM field,
@@ -1129,8 +1169,10 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
     GM's.
   - **One per-browser dice-input preference (2026-07-24).** The character sheet's manual/auto + bonus
     toggle is now a shared per-browser store (`apps/client/src/dice/roll-preference.ts`) read by every
-    roll surface, replacing the table-wide GM `combat.rollMode` (retired from the UI; field/command
-    left inert). The preference is **per person, not per table** (product decision): each player
+    roll surface, replacing the table-wide GM `combat.rollMode` (retired from the UI; the field and
+    `encounter.set-roll-mode` were left inert, then **deleted outright on 2026-08-03** — the one
+    approved breaking API change of the play-facing unification). The preference is
+    **per person, not per table** (product decision): each player
     controls how their own dice input works; the toggle lives on the sheet and in the DicePanel.
   - **Attacks from the sheet too (2026-07-24).** A player's stat-block attacks resolve from their OPEN
     sheet on their turn, not just the initiative list, via a per-browser `sheetAttackMode` in the same
@@ -1327,3 +1369,204 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
   `permissions.allow` list + auto memory. **ADR-0021 collision resolved:** the player character
   sheet keeps 0021 (fewer referrers, already bound in `CLAUDE.md`), manual fog renumbered →
   **ADR-0022**. Verified `check` + `test` + `build` green.
+- **2026-08-03 — Rules enforcement is a table policy with five families, not one table-wide switch.**
+  `GameState.rulesPolicy` (dial + per-family exceptions) is the standing setting every fight inherits
+  at `encounter.start`; `combat.rulesMode` + the additive `combat.ruleExceptions` are that fight's
+  live copy. The five families are `movement`, `economy`, `resources`, `targeting`, `slots`
+  (`rules-families.ts`), and `effectiveModeFor` is the single reader every rule site
+  now uses in place of a raw `combat.rulesMode` read — so switching movement policing off no longer
+  silences opportunity attacks' siblings in other families. Three consequences worth knowing:
+  (1) **the wire enum keeps its names.** `strict|assisted|freeform` is unchanged; Enforce/Advise/Off
+  is surface copy. Renaming would be a second breaking API change and only one was approved.
+  (2) **`slots` defaults to `assisted`, not to the dial** — slot enforcement is new, and inheriting a
+  default-strict dial would start hard-blocking casts that have always worked. The GM opts in.
+  (3) **an override is one tap and its reason is optional** (schemas loosened, audit falls back to
+  "GM override"), and it is remembered per FAMILY for the rest of that creature's turn
+  (`turn.rulesOverriddenFamilies`, superseding the two-prefix `turn.rulesOverridden` boolean, which
+  is kept so a mid-turn save written by an older build still parses and still behaves).
+- **2026-08-03 — Archived means out of play on the server, not just out of the picker.** The only
+  guard on archived characters was the player projection and some client `.filter()` calls, so any
+  caller replaying a known `actorId` could claim one or stage one. `claimCharacter`, `buildSceneCombat`
+  (scene create + set-combatants), `startEncounter` and `addCombatant` now refuse them outright rather
+  than silently filtering — a silent filter makes the GM's own selection lie back to them. Two paired
+  fixes make the state reachable again rather than a trap: archiving a claimed character releases the
+  claim in the same mutation, and an archived-but-still-claimed character can be deleted (releasing
+  the claim), which abandoned claims previously made impossible. A parked scene prepared before this
+  can still contain archived combatants; activation warns the GM in the feed and does **not** refuse —
+  refusing would strand the scene, and no stored prep is scrubbed.
+- **2026-08-03 — The example party ships as ordinary characters.** Their sheets were keyed `example-*`,
+  and two gates read the `import-` prefix as "this sheet belongs to one character and may be edited or
+  removed" — so the starter party could never be levelled, respecced or deleted. Fresh installs are
+  fixed at the source; existing saves are repaired once by the `example-party-normalization-v1` seed,
+  which re-keys the definition (body copied verbatim) and drops the orphaned row. Net zero against the
+  100-definition cap, idempotent, and it never touches a definition another actor still references.
+- **2026-08-04 — The landing is a title screen, and the toggle re-skins it.** D30's "full
+  statement" landed as a full-viewport scene: star field, slatted sun, a grid rolling toward the
+  viewer, the wordmark as a blue-steel chrome sign, two chamfered doors, CRT vignette + scanlines.
+  Midway the scene was declared theme-invariant ("an attract screen commits to its night"); the
+  client reversed that the same day — the toggle re-skins the drive. Three skies now share one
+  composition: night (dark), the sunset hour (dusk), daybreak (light), all via the `--landing-*`
+  token block (`packages/ui/src/styles/design-tokens.css`), which is the only thing the themes
+  override. The sign's final form came from client references: blue-steel chrome — a metal the
+  scene never wears — with a 13-stop smooth ramp, a softened mirror meet, a 0.5px hairline, and one
+  magenta halo. The doors live in the scene's language (deep-violet panels, white-hot labels,
+  magenta player rim / violet GM rim) and stand out by luminance, not borrowed hues; daybreak swaps
+  them to pale glass with deep-inked rims.
+- **2026-08-04 — Dusk is the sunset hour, not a washed-out dark.** The dusk theme's surfaces read
+  as dark-mode-lifted-and-drained; they deepened into a true twilight purple
+  (`--bg #2E2856 → #251A4E` and the surface ladder with it). Every text pair GAINED contrast:
+  caution 7.06/6.07/5.05 → 8.24/7.20/6.08, muted 6.55/5.63/4.68 → 7.64/6.68/5.64, re-measured and
+  recorded beside the values in `design-tokens.css`.
+- **2026-08-04 — THE SCREEN IS THE PAGE (adopted; implementation pending).** The landing's locked
+  viewport is promoted to the app-wide layout standard: the page itself never scrolls — only
+  designated regions inside a surface scroll. Targets: laptop 16:9 1080p using width AND height;
+  phone using vertical space. Adopted from the client's direction after the title screen shipped;
+  the standard, the layout system, the per-surface recomposition blueprints and the enforcement
+  plan live in `docs/ai-context/design-language.md` (v2) and the `/styleguide` route's Layout
+  sections, each marked **in force** or **adopted — lands with the refresh**. No app surface was
+  reworked under this entry; the refresh is a separate, client-gated engagement. Reference
+  implementations already conforming: the landing, the shared-screen viewer, the wizard layer,
+  Modal/Drawer.
+- **2026-08-04 — THE SQUARE STANDARD: surface radii are zero; pills survive; big choices wear the
+  chamfer.** Part of the client-approved "screen is the page" refresh (phase A foundation).
+  `--radius-sm/md/lg` flipped to 0 in `design-tokens.css` — the whole app squares off at once, which
+  is the intended blast radius; the tokens survive so reversing is one edit. `--radius-pill` is
+  deliberately untouched: gauges stay gauges (HP/progress bars, status pills, chips, token rings —
+  all pill sites read the token). The landing doors' cut is generalized as the `.chamfer` utility
+  (`--chamfer-cut` polygon + `--glow-drop-*` filter twins of the glow set, because box-shadow and
+  the outer focus ring cannot follow a clip-path cut — chamfered controls glow by filter and focus
+  by inset outline) and applied to the Button primitive's primary/destructive variants. One scoped
+  exception, and the reason is a hard invariant: `sm` buttons keep the plain square because
+  clip-path clips hit-testing and would destroy their `.tap-target` ::after hit area — the 44px
+  floor outranks the cut.
+- **2026-08-04 — Scene scope: where the sky may shine, and where only texture may.** Ruling for the
+  refresh's look: content-light surfaces (settings, roster, scenes, replays list, and the codex
+  everywhere — editors at higher glass opacity) get sky + scene-tier glass; the landing keeps its
+  full drive; **the table gets texture only** (grid/noise per theme) — the sky never renders behind
+  combat, though in-map docks may use scene-tier glass over the MAP, which is their canvas. The
+  scene tier shipped as `.surface-glass` beside `.surface-frost` (two tiers of one glass treatment,
+  never a third), with the reduced-transparency fallback going solid. Consumers arrive with the
+  surface phases; the tier itself is foundation.
+- **2026-08-04 — View-level motion, three flourishes, and nothing on scroll.** Motion for the
+  refresh stays at the view level (tab swap = `anim-view`, layers = `sheet-up`/`dialog-in`, drawers
+  = `--ease-drawer`) plus exactly three additions, all shipped as tokens/utilities riding the
+  existing anim vocabulary so the global reduced-motion kill covers them unchanged: the view-swap
+  **cascade** (`.anim-cascade`, capped stagger, containers never list items), the **theme-switch
+  sky moment** (`.theme-switching` + `--dur-theme` 400ms cross-fade recipe, deliberately not
+  !important so the reduced-motion kill always wins), and the one-shot **landing→app entry
+  transition** (`entry-dip`/`entry-settle` keyframes; the shell wires them when it locks). Still
+  ruled out, no reversals: scroll parallax and ambient loops.
+- **2026-08-04 (later the same day) — REVERSAL: the app wears the REAL sky, and the table stays
+  texture-only.** Phase A of the refresh built the scene tier as "one quiet vertical wash off the
+  theme's own surface ramp plus a single brand bloom — **no sun, no horizon, no stars**", and wrote
+  that into `design-language.md` §9. That was the director's own reading and it was wrong: the style
+  guide's "three skies" are three theme cards each rendering a LITERAL sky — a sun disc, a horizon
+  line, a receding perspective grid and stars — and its captions describe hours, not washes ("deep
+  indigo void, magenta grid"; "ember horizon over deep twilight purple"; "dawn over the same grid…
+  stars stand down"). **The client reversed the ruling: `.pane-scene` paints the drive.** Recorded
+  here rather than edited away, per CLAUDE.md. The scope ruling above is NOT superseded — which
+  surfaces stand on a sky is unchanged, and the codex sky it promises is still unbuilt behind B2.
+  What changed is what a sky IS.
+  - **The table gets no sky. This half has no backing in the style guide** — the guide never
+    mentions a table — so it is a director ruling and must not be "fixed" later by an agent
+    reconciling the two. A horizon behind a battle map competes with the map, and the map is the
+    canvas. Its CHROME does take the linework instead, so it does not read as left out: the tab bar
+    wears the chrome-tier scanline, and the dock's inner edge wears the horizon's own rule. *(The
+    dock's half was invisible as first shipped — the resize grip painted over it; see the correction
+    entry below.)*
+    > **SUPERSEDED IN PART, 2026-08-06 (round 2, ruling 22)** — see the entry below. The table now
+    > takes the horizon behind its CHROME; the ban survives, narrowed to the map stage. The
+    > sentence above forbidding a later "fix" was aimed at an agent reconciling the guide, not at
+    > the client — the client reversed it.
+  - **The sky is generalized FROM the landing, never shared WITH it.** New `--sky-*` tokens and a
+    `.pane-sky` layer; the `--landing-*` block and the landing's own rules are untouched (the entry
+    animation is a concurrent lane). Three departures make it a work screen: the horizon is a fixed
+    inset from the pane bottom rather than a percentage, so it cannot drift into content; the sun is
+    a masked CREST rather than a disc, so the landing's clipping sky band and slat gradient are both
+    unnecessary; and the floor rides a clipped decoration layer, because its perspective throws paint
+    ~500px past each edge and would otherwise grow `document.scrollHeight` and fail the no-scroll
+    audit on every scene route.
+  - **Legibility is structural, not dialled.** Row-scanned over every pixel of the bare sky for a
+    run of ≥4 consecutive failing pixels, the band failing AA for `--text-muted` is ≤157px at
+    1920×1080 and ≤130px at 390×844 in all three hours, so the scroll regions RESERVE
+    `--sky-horizon-inset + --sky-sun-crown` (176px / 144px) in their bottom padding. *(Numbers
+    re-measured the same day when the sun became a hemisphere — see the correction entry below;
+    the first cut measured 149/125 against 164/136.)* A surface that adds bare copy tomorrow
+    inherits the guarantee, with one named caveat: the run rule sets POINT FEATURES aside, because
+    a 1px star can land anywhere in the pane and no bottom reserve can bound it. The sunset hour's
+    wash is truncated at `#6E1B66` rather than run to the landing's ember `#E88A4A`, which measures
+    1.45:1 under `--text-dim` — dusk, not daybreak, was the real defect.
+- **2026-08-04 — The last two landing lessons get built: role rims and the sign.** `--rim-player` /
+  `--rim-gm` (+ `.rim-*`) and `--sign-chrome`/`--sign-stroke`/`--sign-glow` (+ `.sign`) were written
+  into §9 as lessons and never implemented. Now real. **The rim attaches to the GM-SECRET
+  TREATMENT, not to the hue:** "violet is GM-only" is not literally true — `--violet` is load-bearing
+  for magical/concentration (§2), NPC token strokes, condition dots, legendary actions and presence
+  across ~50 rules — so writing "violet = GM" as a colour rule would make the language a defect
+  against its own semantic table. The rim is never the only signal: every site that wears one names
+  its role in words a screen reader reaches. *(True as of the correction entry below — it shipped
+  false at three of the four sites, and the words were added there.)* The sign stays barred from
+  panel headers; one edit to `.nh-panel-title` would put the metal on every panel and it would stop
+  meaning anything.
+- **2026-08-04 — The sky's first cut is corrected: what the tokens promised and the pixels did not
+  deliver.** Three independent audits of the reversal above found the same class of defect — a
+  claim the code did not keep — and each was reproduced in the browser before it was touched.
+  Recorded here, not edited away, because the corrections change numbers the entries above quote.
+  - **The sun was a slab, not a disc.** `--sky-sun-d` and `--sky-sun-crown` shipped as independent
+    numbers (24rem under 3.25rem), and at that ratio the mask's circular cap degenerates into a
+    chord: the visible silhouette measured 394×54px, 7.3:1, 8.4% taper, hard vertical sides. The
+    diameter is derived now — `calc(--sky-sun-crown * 2)`, a hemisphere — because two numbers that
+    must hold a ratio should not both be typed. The reserve moved with the taller crown: worst
+    unsafe band 157px / 130px against 176px / 144px (was 148/125 against 164/136).
+  - **The reserve's guarantee has a caveat and it is now stated.** The band scan sets POINT
+    FEATURES aside; per-pixel, a star fails AA anywhere in the pane, and no bottom reserve can
+    bound a 1px dot. Read it as "no *band* of unsafe sky above the reserve".
+  - **The GM's rim was invisible on a phone.** `Tabs`' edge-fade mask erased the inset shadow that
+    is the rim on every route whose active tab sits past the fold. Frame row 2 is a
+    `.frame-tabbar` wrapper now: **a rim must never live on a masked element.**
+  - **Three of the four rim sites did not name their role in words**, which is exactly what the
+    entry above promises they do. Fixed rather than narrowed — the player bar is "Player sections",
+    and the settings `Group` appends "GM only" to its Eyebrow from the same flag that paints the
+    edge, so the two cannot drift.
+  - **The dock's beam was painted over** by the resize grip's flat `--line` bar, which sits at the
+    same x one z-index higher — so the table-chrome half of the ruling above was invisible in every
+    state. The grip is transparent at rest; the dock owns its edge and the grip owns its state.
+  - **`--sky-wash`'s stops crossed in a short box**, banding the ramp; every stop is horizon-relative
+    now, which is the rule the rest of the scene already followed.
+  - **Not-found joined the sky** — the most content-light surface in the app was the only one of its
+    kind on flat ground.
+  - Two contrast limits were measured and written down rather than left to be discovered: `.sign`
+    clears **AA-large only** in daybreak (valid at wordmark scale, nowhere smaller), and the light
+    `--danger` destructive label is under AA with or without the scene (known-bugs, with the sky's
+    −0.14 recorded so the token fix is sized against the composited value).
+- **2026-08-06 — REVERSAL IN PART: the table takes the horizon behind its CHROME, and the map stage
+  stays a clean dark plate.** Round 2, ruling 22, client's words: *"Sky behind the chrome, never the
+  map."* This reverses the no-sky half of the 2026-08-04 entry above — which was flagged at the time
+  as a director ruling an agent "must not 'fix' later", so it is reversed **by the client, on the
+  record, with a date**, and that sub-bullet now carries a superseded marker pointing here. Anyone
+  who reads only the old entry and starts stripping the sky is reverting a live ruling.
+  - **The reason survives; only its scope changes.** "A horizon behind a battle map competes with
+    the map, and the map is the canvas" was right and is still the rule — it is now a SCOPING rule
+    rather than a ban. The dock, the sheet and the margins get the horizon. Nothing paints behind
+    the map, and the mechanism is structural rather than a z-order convention: the stage is opaque
+    `--void` (`apps/client/src/scene/encounter-map.css`) and the column around it was demoted from
+    an opaque `--surface-1` panel to a margin, so there is no slab left to paint on.
+  - **It is the horizon WITHOUT the floor mesh, and that was forced, not chosen.** The sky is
+    painted as background layers on `.table-layout` (`apps/client/src/styles.css`) — wash, horizon
+    beam, its glow, the bloom — because `.table-layout` has `position: fixed` descendants (the
+    enlarged map, the viewer preview, the drawer) and therefore may never take `transform`,
+    `filter`, `perspective`, `contain: paint` or `will-change`. The scene tier's receding grid floor
+    is the one layer that needs a `perspective`, so the table cannot have it. Losing a perspective
+    grid under a battle grid is a gain.
+  - **`background-attachment` stays `scroll`, and the name is a lie.** The background is fixed to
+    the element's own box and does not travel with its contents — which is what this needs, because
+    below the rung where `.table-layout` really does scroll, the horizon has to stay at the bottom
+    of the frame rather than sliding out of it.
+  - Ruling 21 — chrome metal (`.sign`) on hero surfaces — is the other partial reversal round 2
+    settled, and it needs **no** entry here: measured at the end of round 2, `.sign` has exactly one
+    call site in the repo (the style guide) and was never applied to a hero surface. There is
+    nothing to reverse. Its own wording is permissive ("hero surfaces **may** use it"), so leaving
+    it unbuilt is not a violation. The bar barring it from panel headers stands unchanged.
+  - Full round-2 ruling set: `docs/product/refresh-round-2-decisions.md`. That document is the
+    primary source for round 2 and quotes the client directly; this entry exists so the two
+    reversals are discoverable from the log an agent actually reads before changing something
+    architectural.

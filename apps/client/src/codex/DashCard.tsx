@@ -22,7 +22,17 @@ export type DashCardProps = Readonly<{
   seeAll?: Readonly<{ label: string; onClick: () => void }>;
   loading?: boolean;
   error?: string | null;
-  /** What the card says when there is genuinely nothing — never a skeleton, never a silent gap. */
+  /**
+   * What the card says when there is genuinely nothing — never a skeleton, never a silent gap.
+   *
+   * **Ruling 55's shape for a card-sized empty state.** The ruling asks every empty surface for one
+   * door saying the single next thing to do, and a dashboard card usually has that door already: it
+   * is `seeAll`, which renders whether or not the card has content, so an empty *Deadlines* card
+   * still offers "See all deadlines". Where a card has neither content nor a `seeAll`, this line is
+   * the whole surface, so it says the next thing in a sentence ("Place one from any map's pin
+   * inspector") instead of reporting an absence. **Do not invent a door that lies** — a card whose
+   * subject genuinely has no action gets the deliberate no-action line, which is the default below.
+   */
   empty?: ReactNode;
   children?: ReactNode;
 }>;
@@ -42,7 +52,12 @@ export function DashCard({ title, iconId, count, seeAll, loading = false, error 
           : loading && isEmpty
           ? <div className="codex-list-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</div>
           : isEmpty
-          ? <p className="codex-dashcard-empty">{empty ?? "Nothing here yet."}</p>
+          /* RULING 55 retires "Nothing here yet." BY NAME, so it cannot be the fallback every card
+             that forgets to say something lands on. The replacement is the deliberate no-action
+             line: it says the section is empty *and* that emptiness is the normal resting state,
+             which is the honest thing to say when there is no action to offer. A card that does have
+             a next step passes `empty` and says it. */
+          ? <p className="codex-dashcard-empty">{empty ?? "Nothing to show — this fills itself as the campaign runs."}</p>
           : children}
       </div>
       {seeAll && (

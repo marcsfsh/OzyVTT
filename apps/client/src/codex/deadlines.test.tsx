@@ -122,6 +122,17 @@ const playerRowOf = (id: string) => document.getElementById(`codex-player-entry-
 
 beforeEach(() => sessionStorage.clear());
 
+
+/**
+ * Ruling 57: an entry's filing — session, in-world date, attached page, tags — lives in the composer's
+ * summonable Details panel, not stacked under the writing. Asked rather than assumed, because the
+ * panel's state is REMEMBERED across mounts.
+ */
+const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
+  const details = await screen.findByRole("button", { name: "Details" });
+  if (details.getAttribute("aria-expanded") !== "true") await user.click(details);
+};
+
 describe("A new kind reads by icon AND word (R2)", () => {
   it("every chronicle kind names an icon the registry actually has", () => {
     // `iconChildren` falls back to `pin` rather than throwing, so an invented id is silent at runtime:
@@ -290,6 +301,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
     const save = screen.getByRole("button", { name: "Save entry" });
     expect(save).not.toBeDisabled();                                  // as loaded, the date is there
 
+    await openEntryDetails(user);
     await user.clear(screen.getByLabelText("Year"));
     expect(save).toBeDisabled();
     expect(screen.getByText(/A deadline needs a date/)).toBeInTheDocument();
@@ -326,6 +338,7 @@ describe("A deadline cannot be written without a date (CT-5)", () => {
     expect(screen.getByRole("button", { name: "Add deadline" })).toBeDisabled();
     expect(screen.getByText(/A deadline needs a date/)).toBeInTheDocument();
 
+    await openEntryDetails(user);
     await user.type(screen.getByLabelText("Year"), "1492");
     await user.type(screen.getByLabelText("Day"), "10");
     await user.click(screen.getByRole("button", { name: "Add deadline" }));

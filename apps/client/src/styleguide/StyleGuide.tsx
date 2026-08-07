@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import {
+  type AbilityPoolValue,
   AbilityScoreAllocator,
   Alert,
   Avatar,
@@ -8,9 +9,10 @@ import {
   Button,
   Checklist,
   type ChecklistItem,
+  Chip,
   ChoiceCard,
   ChoiceGrid,
-  Chip,
+  type ChoiceOption,
   Combobox,
   DiceInputRow,
   Drawer,
@@ -18,20 +20,35 @@ import {
   FeatureList,
   Field,
   FieldGrid,
+  GmOnlyTag,
+  HiddenFromPlayers,
+  IconArrow,
   IconButton,
   IconCheck,
   IconChevron,
+  IconChevronLeft,
+  IconChevronRight,
+  IconCleanup,
+  IconColor,
   IconCopy,
   IconDie,
+  IconDownload,
   IconDrag,
+  IconDraw,
   IconEye,
   IconEyeOff,
+  IconFog,
   IconInfo,
+  IconMeasure,
   IconPencil,
+  IconPing,
   IconPlay,
   IconPlus,
+  IconScene,
   IconSearch,
+  IconSelect,
   IconShuffle,
+  IconStar,
   IconTrash,
   IconWarning,
   IconX,
@@ -40,35 +57,35 @@ import {
   LinkButton,
   MarkdownEditor,
   Menu,
-  Meter,
   MenuItem,
+  Meter,
   Modal,
   NameField,
   NumberField,
   Panel,
   PanelHeader,
+  RevealSwitch,
   ReviewSummary,
   RowEditor,
   SaveState,
+  type SaveStatus,
   SegmentedControl,
   Select,
   Skeleton,
   Stepper,
   Steps,
   Switch,
-  TagInput,
+  type TabItem,
   Tabs,
+  TagInput,
   Textarea,
   ThemeToggle,
-  Tooltip,
   ToastProvider,
+  Tooltip,
   useToast,
+  VisibilityBadge,
   WizardShell,
-  Wordmark,
-  type AbilityPoolValue,
-  type ChoiceOption,
-  type SaveStatus,
-  type TabItem
+  Wordmark
 } from "@vtt/ui";
 
 /** Living style guide for the OzyVTT design system. Dev-only reference
@@ -177,7 +194,7 @@ function MarkdownEditorDemo() {
         rows={6}
       />
       <p className="sg-muted">Type <code>[[</code> in the body to raise the page autocomplete. The Edit/View switch only appears because a <code>renderPreview</code> was supplied — an editor with no reader shows no switch.</p>
-      <h3 className="sg-h3">With an overlay — how the Codex marks its GM layer</h3>
+      <h3 className="sg-h3">With an overlay — how the Codex marks GM-only content</h3>
       <MarkdownEditor
         ariaLabel="GM-only notes"
         value={"Strahd already knows. He is letting them carry it."}
@@ -185,7 +202,7 @@ function MarkdownEditorDemo() {
         rows={3}
         overlay={<Badge tone="violet">GM only</Badge>}
       />
-      <p className="sg-muted">The overlay slot exists so the design system never learns what a “GM layer” is. Violet is the one hue reserved for it, and it is worn by the badge, not by the editor.</p>
+      <p className="sg-muted">The overlay slot exists so the design system never learns the app’s visibility words at all. Violet is the one hue reserved for it, and it is worn by the badge, not by the editor.</p>
     </div>
   );
 }
@@ -238,7 +255,9 @@ const OVERFLOW_TABS: TabItem[] = [
 
 const ICONS = [
   { name: "IconCheck", glyph: <IconCheck />, use: "the one chosen mark" },
-  { name: "IconChevron", glyph: <IconChevron />, use: "disclosure; rotate for back" },
+  { name: "IconChevron", glyph: <IconChevron />, use: "disclosure; rotate when open" },
+  { name: "IconChevronLeft", glyph: <IconChevronLeft />, use: "back / previous" },
+  { name: "IconChevronRight", glyph: <IconChevronRight />, use: "next / more this way" },
   { name: "IconSearch", glyph: <IconSearch />, use: "filter a catalog" },
   { name: "IconShuffle", glyph: <IconShuffle />, use: "generate; in flight" },
   { name: "IconDie", glyph: <IconDie />, use: "roll it for me" },
@@ -255,7 +274,23 @@ const ICONS = [
   // typed as characters. The close control was a literal "×" in five components (Manrope has no U+00D7
   // at the right weight, so it substituted), and the run/activate control was a "▶".
   { name: "IconX", glyph: <IconX />, use: "close / clear a chosen value" },
-  { name: "IconPlay", glyph: <IconPlay />, use: "make live / run" }
+  { name: "IconPlay", glyph: <IconPlay />, use: "make live / run" },
+  // The forward arrow was held back for years on an all-or-none argument, and the sweep that replaces
+  // every text glyph is the pass that finally pays for it — the landing hero, the roster and the sheet
+  // take it together. Rotate it for ← ↑ ↓; it is centred on the 24-box for exactly that.
+  { name: "IconArrow", glyph: <IconArrow />, use: "this takes you there" },
+  { name: "IconDownload", glyph: <IconDownload />, use: "keep a copy / export" },
+  // The map toolbar's tools, which were emoji until this set grew them: emoji take no token colour,
+  // draw differently per platform, and read as decoration in a row of controls that are not.
+  { name: "IconSelect", glyph: <IconSelect />, use: "select / move — the resting tool" },
+  { name: "IconPing", glyph: <IconPing />, use: "ping: look here" },
+  { name: "IconMeasure", glyph: <IconMeasure />, use: "distance" },
+  { name: "IconDraw", glyph: <IconDraw />, use: "draw shapes" },
+  { name: "IconFog", glyph: <IconFog />, use: "fog of war" },
+  { name: "IconColor", glyph: <IconColor />, use: "pick a drawing colour" },
+  { name: "IconCleanup", glyph: <IconCleanup />, use: "sweep the map's marks (not destructive)" },
+  { name: "IconScene", glyph: <IconScene />, use: "a scene" },
+  { name: "IconStar", glyph: <IconStar />, use: "legendary — always worded" }
 ];
 
 const SAVE_STATUSES: SaveStatus[] = ["idle", "dirty", "saving", "saved", "conflict", "error"];
@@ -740,13 +775,16 @@ export function StyleGuide() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerSide, setDrawerSide] = useState<"right" | "left">("right");
   const [cardPick, setCardPick] = useState("fighter");
+  const [charges, setCharges] = useState(3);
+  const [attuned, setAttuned] = useState(true);
+  const [revealed, setRevealed] = useState(false);
 
   return (
     <ToastProvider>
       <div className="sg">
         <header className="sg-header surface-frost">
           <div className="sg-header-brand">
-            <Wordmark>OzyVTT</Wordmark>
+            <Wordmark>OZYVTT</Wordmark>
             <Eyebrow>Design system reference</Eyebrow>
           </div>
           <ThemeToggle />
@@ -758,6 +796,42 @@ export function StyleGuide() {
             <code>@vtt/ui</code> primitive driven entirely by the design tokens — switch the theme above
             to see all three themes. Build new features from these; do not hand-roll bespoke controls.
           </p>
+
+          <Section id="layout" title="Layout — the screen is the page" blurb="Adopted 2026-08-04 (decision log; design-language.md §7). The app page never scrolls: a surface is a FRAME (chrome that never moves) plus REGIONS, and every region either fits its box or scrolls itself — the one blessed treatment is .scroll-y. One region per surface is the CANVAS and flex-fills what is left (flex: 1; min-height: 0). In force today: the shell itself is locked (body 100dvh, main is the frame), and the landing, the shared-screen viewer, Modal/Drawer, the wizard layer, Settings, the Roster, the Scenes gallery, the Replays list and the Sheet layer all own their frames. What is left — the Table, the Codex, Homebrew, the replay viewer, the shared-screen controls and map calibration — rides ONE staged pane region each until its phase lands. The miniature below is the whole idea: the outer frame never moves, the dock list scrolls itself, the canvas takes the remainder.">
+            <div className="sg-lock-demo" aria-label="Locked-viewport frame demonstration">
+              <div className="sg-lock-bar"><span className="sg-lock-tab is-on">Table</span><span className="sg-lock-tab">Scenes</span><span className="sg-lock-tab">Codex</span><span className="sg-lock-hint">frame — never scrolls</span></div>
+              <div className="sg-lock-body">
+                <div className="sg-lock-canvas"><span>canvas — flex-fills</span><span className="sg-lock-hint">min-height: 0</span></div>
+                <div className="sg-lock-dock">
+                  <div className="sg-lock-dockhead">dock region</div>
+                  <div className="sg-lock-list scroll-y">{Array.from({ length: 14 }, (_, i) => <div key={i} className="sg-lock-row">row {i + 1} — scrolls inside</div>)}</div>
+                </div>
+              </div>
+            </div>
+            <p className="sg-muted">Targets: laptop 16:9 1080p spends the width (rails, docks, columns) as well as the height; phone 390×844 spends the height. Wide content always gets its own overflow-x container. The NNvh internal-cap idiom converts to flex inside real frames during the refresh. Verify with <code>node scripts/no-scroll-audit.mjs</code> — scrollHeight over innerHeight at the document is a defect, same terms as tap-audit.</p>
+          </Section>
+
+          <Section id="layout-blueprints" title="Layout — surface blueprints (refresh)" blurb="How each surface recomposes under the standard, from the measured census: TRIVIAL wraps existing content in one declared region; RECOMPOSE re-places existing pieces into a frame; REDESIGN changes the pieces. Reference implementations to adopt rather than rebuild: landing, viewer, wizard layer, Modal/Drawer, the map’s docked/enlarged/fullscreen modes. Full table in design-language.md §8.">
+            <div className="sg-table-wrap"><table className="nh-table"><thead><tr><th>Surface</th><th>Grade</th><th>The move</th></tr></thead><tbody>
+              <tr><td>App shell</td><td>recompose</td><td>main becomes a 100dvh column: connection row · tab bar · content pane — unlocks everything below</td></tr>
+              <tr><td>Table (laptop)</td><td>recompose</td><td>map canvas flex-fills; the dock’s tracker/dice/log split one height — one flexes, others collapse</td></tr>
+              <tr><td>Table (phone)</td><td>redesign</td><td>map band + one tabbed sheet (Turn / Dice / Log) — three stacked panels cannot share 844px with a map</td></tr>
+              <tr><td>Maps + calibration</td><td>redesign</td><td>the long top-to-bottom sequence becomes steps with the canvas always visible</td></tr>
+              <tr><td>Codex · Homebrew</td><td>recompose</td><td>main pane is the scroller; per-view NNvh caps convert; editors own their height</td></tr>
+              <tr><td>Settings · Roster · Scenes · Replays list</td><td>done</td><td>one declared region each, standing on the scene sky; Settings is two columns at 1280+ so 1080p width is spent, and the scenes grid halves its card density at 560</td></tr>
+              <tr><td>Builder · Sheet · Landing · Viewer</td><td>done</td><td>the references the rest adopt — the wizard’s step body is its region, the sheet’s pane is its own</td></tr>
+            </tbody></table></div>
+          </Section>
+
+          <Section id="words" title="Words — the glossary in force" blurb="The D28 vocabulary, stated where an author reads rather than only where a test fails (the locks live in play-vocabulary.test.ts and codex/vocabulary.test.ts off one shared scanner — this page is scan-excluded precisely so it may name the retired words beside their replacements).">
+            <div className="sg-table-wrap"><table className="nh-table"><thead><tr><th>Say</th><th>Never</th><th>Because</th></tr></thead><tbody>
+              <tr><td>character · monster · NPC</td><td>actor, combatant, creature</td><td>the specific kind, always; a fight’s list is “Turn order”</td></tr>
+              <tr><td>the Table (the place) · a fight (the event)</td><td>“Encounter” as a place</td><td>the tab is where you sit; encounters are what happen there</td></tr>
+              <tr><td>Shown to players · Hidden from players · GM only</td><td>GM layer, shared layer, public, “Everyone”</td><td>one visibility vocabulary, carried by the Reveal family — never re-typed</td></tr>
+              <tr><td>Delete (forever, confirmed) · Archive (kept, reversible) · Remove (out of this list)</td><td>mixing them</td><td>the verb states the consequence; “cannot be undone” appears iff Delete</td></tr>
+              <tr><td>Enforce · Advise · Off</td><td>strict / assisted / freeform in copy</td><td>the wire keeps its enum; people get plain words</td></tr>
+            </tbody></table></div>
+          </Section>
 
           <Section id="color" title="Color" blurb="Magenta leads, cyan supports. Surfaces are dark and quiet; neon is reserved for edges and states.">
             <h3 className="sg-h3">Surfaces</h3>
@@ -779,7 +853,7 @@ export function StyleGuide() {
 
           <Section id="type" title="Typography" blurb="Arcade voice is fenced to the wordmark and top titles; body and mono stay neutral and legible.">
             <div className="sg-type-rows">
-              <div className="sg-type-row"><Wordmark>OzyVTT</Wordmark><code>--font-wordmark · wordmark only</code></div>
+              <div className="sg-type-row"><Wordmark>OZYVTT</Wordmark><code>--font-wordmark · wordmark only</code></div>
               <div className="sg-type-row"><span className="sg-display">Display / dice totals</span><code>--font-display · Russo One</code></div>
               <div className="sg-type-row"><span className="sg-body-sample">Body — stat blocks, chat, forms, controls stay in the neutral body face.</span><code>--font-body · Manrope</code></div>
               <div className="sg-type-row"><span className="tabular sg-mono-sample">2d6+3 · HP 42/58 · +5</span><code>--font-mono · Space Mono, tabular</code></div>
@@ -795,7 +869,7 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="icons" title="Icons" blurb="The system's own SVG glyphs — 24×24, filled with currentColor, sized in em, always aria-hidden so the control around them carries the name. A primitive never renders a glyph as TEXT: Manrope has no ⚠, so it silently falls back to a system face at the wrong size and iOS/Android give it emoji presentation — a yellow triangle, a hue this palette does not own. The set is deliberately small; the app's richer fantasy-cartography glyphs live in the client. There is no IconArrow: the forward → is all-or-none across seven existing call sites, and half-adopting it would mix a drawn arrow with a fallback glyph on the same screen.">
+          <Section id="icons" title="Icons" blurb="The system's own SVG glyphs — 24×24, filled with currentColor, sized in em, always aria-hidden so the control around them carries the name. A primitive never renders a glyph as TEXT: Manrope has no ⚠, so it silently falls back to a system face at the wrong size and iOS/Android give it emoji presentation — a yellow triangle, a hue this palette does not own. The app's richer fantasy-cartography glyphs still live in the client, but everything the CHROME needs is here — including the map tools, which were emoji (✏ 👁 🌫 🎨 📍 📏) until this set grew them, and IconArrow, which was held back for years on the grounds that the forward → is all-or-none across its call sites: half-adopting it would have mixed a drawn arrow with a font fallback on one screen, so it landed with the sweep that replaces the rest of them.">
             <div className="sg-icons">
               {ICONS.map((icon) => (
                 <div className="sg-icon" key={icon.name}>
@@ -810,7 +884,7 @@ export function StyleGuide() {
           <Section id="buttons" title="Buttons" blurb="One primary action per view. Variants map to semantic roles; labels are sentence case.">
             <div className="sg-row">
               <Button variant="primary">Roll initiative</Button>
-              <Button variant="secondary">Add combatant</Button>
+              <Button variant="secondary">Add monsters</Button>
               <Button variant="ghost">Cancel</Button>
               <Button variant="destructive">End encounter</Button>
               <Button variant="primary" disabled>Disabled</Button>
@@ -878,6 +952,27 @@ export function StyleGuide() {
                 </Field>
               ))}
             </FieldGrid>
+            <h3 className="sg-h3">The label band — four controls, one line</h3>
+            <p className="sg-muted">
+              A <code>Field</code> stacks a label over its control, so every input well in a grid row starts one
+              label-height plus one row-gap below the top of its cell. A <code>Stepper</code> used to put its label
+              BESIDE the control and a <code>Switch</code> had no band at all, so both began at the cell top —
+              about 25px high — and the stepper dragged its centred label up out of the label row with it. The
+              height is now one token, <code>--nh-label-band</code>, written once in <code>forms.css</code> as the
+              arithmetic of the two rules it has to match. A labeled Stepper stacks into it; a Switch
+              <em> reserves</em> it with <code>banded</code> and leaves the cell above the track empty, which is
+              the right answer — the track belongs level with the wells, not with the labels. Sight down the tops.
+            </p>
+            {/* `.sg-align-row` is the selector `scripts/primitive-align-check.mjs` measures — it compares
+                the control tops inside this row at 390px and 1280px. Rename it there in the same edit. */}
+            <FieldGrid className="sg-align-row" min="12rem">
+              <Field label="Display name" htmlFor="sg-align-name"><Input id="sg-align-name" placeholder="Frost Warden" /></Field>
+              <Field label="Rarity" htmlFor="sg-align-rarity">
+                <Select id="sg-align-rarity" defaultValue="rare"><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="legendary">Legendary</option></Select>
+              </Field>
+              <Stepper value={charges} onChange={setCharges} min={0} max={9} label="Charges" />
+              <Switch checked={attuned} onChange={setAttuned} label="Requires attunement" banded />
+            </FieldGrid>
           </Section>
 
           <Section id="numberfield" title="Number field" blurb="A free-typed number — 1250 gp, 133 hit points, a −2 ability bonus. Two decisions, each a bug the other way round. It is type='text' + inputMode, never type='number': that is the repo's established idiom, and the native control gives a spinner nobody uses at 375px, reports an empty value on a stray letter, and changes the number when the wheel rolls over a focused field. And it clamps on BLUR, never mid-typing — clamping per keystroke against min=10 eats the first digit of '12' the moment it is typed, so the field fights the GM. Stepper stays the control for small bounded nudges (an ability score, 'choose 3'); this is for the values where nudging by one twelve hundred times is absurd. The unit is a suffix, never part of the value, and it rides aria-describedby because '1250' and '1250 gp' are different facts.">
@@ -896,7 +991,7 @@ export function StyleGuide() {
             <MarkdownEditorDemo />
           </Section>
 
-          <Section id="palette" title="Command palette (a pattern, not a primitive)" blurb="Modal align='top' + an input + a result list. It is documented here as a COMPOSITION on purpose: nothing about it is reusable except the top alignment, which is the one thing the Modal primitive gained for it. A palette anchored in the vertical centre of the viewport puts the result list under the fold on a laptop and under the keyboard on a phone, so align='top' is the whole primitive change and the rest is three ordinary controls. In the app it is scoped to the Codex and deliberately not global — ⌘K means nothing on the Encounter tab, and a test locks that, because 'make it global' is the obvious next step and is out of scope.">
+          <Section id="palette" title="Command palette (a pattern, not a primitive)" blurb="Modal align='top' + an input + a result list. It is documented here as a COMPOSITION on purpose: nothing about it is reusable except the top alignment, which is the one thing the Modal primitive gained for it. A palette anchored in the vertical centre of the viewport puts the result list under the fold on a laptop and under the keyboard on a phone, so align='top' is the whole primitive change and the rest is three ordinary controls. In the app it is scoped to the Codex and deliberately not global — ⌘K means nothing on the Table tab, and a test locks that, because 'make it global' is the obvious next step and is out of scope.">
             <CommandPaletteDemo />
           </Section>
 
@@ -981,7 +1076,7 @@ export function StyleGuide() {
             </div>
             <p className="sg-muted">
               The <strong>record axis</strong> is a different question: whether a whole record has been shared
-              yet. These two axes collided once and were deliberately separated (see <code>SecretMarkers.tsx</code>),
+              yet. These two axes collided once and were deliberately separated (see the Reveal section below),
               so “Hidden from players” is <em>neutral with an eye-off icon</em> and never violet — a hidden page
               is one switch away from being shared, while a GM body never will be. Use <code>VisibilityBadge</code>
               rather than hand-rolling the pair.
@@ -1060,7 +1155,7 @@ export function StyleGuide() {
             <ul className="nh-gallery">
               <li className="nh-card is-live">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
-                <div className="nh-card-body"><h3 className="nh-card-title">Bridge Ambush</h3><span className="nh-card-meta">4 combatants</span></div>
+                <div className="nh-card-body"><h3 className="nh-card-title">Bridge Ambush</h3><span className="nh-card-meta">4 in the fight</span></div>
                 <span className="nh-card-status"><Badge tone="primary" solid>LIVE</Badge></span>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯" icon label="Scene actions" align="end">
@@ -1072,7 +1167,7 @@ export function StyleGuide() {
               </li>
               <li className="nh-card is-staging">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
-                <div className="nh-card-body"><h3 className="nh-card-title">Boss Chamber</h3><span className="nh-card-meta">6 combatants</span></div>
+                <div className="nh-card-body"><h3 className="nh-card-title">Boss Chamber</h3><span className="nh-card-meta">6 in the fight</span></div>
                 <span className="nh-card-status"><Badge>Staging</Badge></span>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯" icon label="Scene actions" align="end">
@@ -1085,7 +1180,7 @@ export function StyleGuide() {
               </li>
               <li className="nh-card">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
-                <div className="nh-card-body"><h3 className="nh-card-title">Escape Tunnels</h3><span className="nh-card-meta">2 combatants</span></div>
+                <div className="nh-card-body"><h3 className="nh-card-title">Escape Tunnels</h3><span className="nh-card-meta">2 in the fight</span></div>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
@@ -1099,20 +1194,60 @@ export function StyleGuide() {
             </ul>
           </Section>
 
-          <Section id="switch" title="Switch" blurb="On/off toggle for settings that take effect immediately (role=switch). Reach for a checkbox only inside a form that's submitted.">
+          <Section id="switch" title="Switch" blurb="On/off toggle for settings that take effect immediately (role=switch). Reach for a checkbox only inside a form that's submitted. Two props exist for the same failure — a switch that moves. banded reserves the label band above the track so it lines up with the input wells in a form row (see Field grid); labelAlternate reserves the width of the OTHER state's label so the track does not slide out from under the pointer on the click that changes it. Neither is on by default: a switch in a toolbar row has no band to match and a switch whose label never changes has nothing to reserve.">
             <div className="sg-row">
-              <Switch checked={switchOn} onChange={setSwitchOn} label="Shown to players" />
-              <Switch checked={!switchOn} onChange={(v) => setSwitchOn(!v)} label="GM-only" />
+              <Switch checked={switchOn} onChange={setSwitchOn} label="Auto-stage new monsters" />
+              <Switch checked={!switchOn} onChange={(v) => setSwitchOn(!v)} label="Announce rolls" />
               <Switch checked={false} onChange={() => {}} disabled aria-label="Disabled off" />
+            </div>
+            <h3 className="sg-h3">labelAlternate — toggle it; nothing moves</h3>
+            <p className="sg-muted">
+              Both switches say the same two things. The left one reserves the wider string and the right one
+              does not: click each a few times and watch the second one shove the text beside it. The label lives
+              inside the button (it is part of the tap target), so its width IS the control's width.
+            </p>
+            <div className="sg-row">
+              <Switch checked={switchOn} onChange={setSwitchOn} aria-label="With reservation"
+                label={switchOn ? "Shown to players" : "Hidden from players"}
+                labelAlternate={switchOn ? "Hidden from players" : "Shown to players"} />
+              <span className="sg-muted tabular">↤ stays put</span>
+            </div>
+            <div className="sg-row">
+              <Switch checked={switchOn} onChange={setSwitchOn} aria-label="Without reservation"
+                label={switchOn ? "Shown to players" : "Hidden from players"} />
+              <span className="sg-muted tabular">↤ shifts</span>
             </div>
           </Section>
 
-          <Section id="stepper" title="Stepper" blurb="Numeric −/+ spinner for small bounded quantities — ability scores, dice counts, HP nudges, limited uses. Clamps and disables the spent edge. Pass format to render signed modifiers or units.">
+          <Section id="stepper" title="Stepper" blurb="Numeric −/+ spinner for small bounded quantities — ability scores, dice counts, HP nudges, limited uses. Clamps and disables the spent edge. Pass format to render signed modifiers or units. A VISIBLE label stacks above the control in the label band, so a stepper standing in a form row top-aligns with the fields either side of it; with no visible label (aria-label only, as in the ability allocator below) the control renders on its own, because a band nothing fills is just a hole.">
             <div className="sg-row">
               <Stepper value={count} onChange={setCount} min={1} max={6} label="Dice" />
               <Stepper value={16} onChange={() => {}} min={1} max={20} label="STR" />
               <Stepper value={0} onChange={() => {}} min={0} max={9} label="Spell level" />
               <Stepper value={mod} onChange={setMod} label="Modifier" format={(v) => (v === 0 ? "±0" : v > 0 ? `+${v}` : `−${Math.abs(v)}`)} />
+            </div>
+            <h3 className="sg-h3">No visible label — no band</h3>
+            <div className="sg-row">
+              <Stepper value={count} onChange={setCount} min={1} max={6} aria-label="Dice" />
+            </div>
+          </Section>
+
+          <Section id="reveal" title="Reveal — one control for “do the players see this?”" blurb="Four components and three phrases, and the phrases are the decision. This began in the Codex, where the same idea had been written five ways — GM layer, shared layer, Add as GM-only, secret, public — and every surface that asked the question later asked it in its own words. It is a primitive now, so there is exactly one place the words can change: RevealSwitch for the record's own toggle, VisibilityBadge for that same fact stated read-only on a card, HiddenFromPlayers for a list that only marks what is withheld, and GmOnlyTag for the other axis entirely — a paragraph of a shared record that is the GM's alone. The two axes are deliberately different sentences: they once shared “GM only” and appeared eighty pixels apart on one journal row, answering two different questions with the same three words.">
+            <div className="sg-row">
+              <RevealSwitch revealed={revealed} onChange={setRevealed} ariaLabel="Show this page to players" />
+              <VisibilityBadge revealed={revealed} />
+              <span className="sg-muted">↤ toggle it; neither one changes width</span>
+            </div>
+            <h3 className="sg-h3">The record axis, read-only</h3>
+            <div className="sg-row sg-row-baseline">
+              <VisibilityBadge revealed />
+              <VisibilityBadge revealed={false} />
+              <HiddenFromPlayers />
+            </div>
+            <h3 className="sg-h3">The content axis — violet, and only ever this</h3>
+            <div className="sg-row sg-row-baseline">
+              <GmOnlyTag />
+              <span className="sg-muted">Violet means GM-only content and nothing else. A hidden record is one switch away from being shared; a GM body never will be — which is why the record axis above is neutral with an eye-off mark instead.</span>
             </div>
           </Section>
 
@@ -1165,10 +1300,10 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="wizard" title="Wizard shell" blurb="The multi-step frame behind the character builder: a full page on a laptop, a full-screen sheet on a phone — deliberately not a modal. Header and footer stick, so Back/Next stay put while the step body scrolls. Next is gated per step: when the step is incomplete the button disables AND the reason is shown and announced (a silent disabled button is a dead end). It also carries the resume-draft slot, Save & close, an optional preview pane, and the persistent CC BY footnote. The preview is the flow's ONE detail pane: a column on a laptop, and below 760px a master-detail swap with both halves — the way in (onOpenDetail) and the way back (onCloseDetail) — owned by the shell, so no consumer re-invents a 'Show preview' button. Shrink the window past 760px to watch it swap.">
+          <Section id="wizard" title="Wizard shell" blurb="The multi-step frame behind the character builder: a full page on a laptop, a full-screen sheet on a phone — deliberately not a modal. Header and footer stick, so Back/Next stay put while the step body scrolls. Next is gated per step: when the step is incomplete the button disables AND the reason is shown and announced (a silent disabled button is a dead end). It also carries the resume-draft slot, Save & close, an optional preview pane, and the CC BY footnote at the end of the step column. The preview is the flow's ONE detail pane: a column on a laptop, and below 760px a master-detail swap with both halves — the way in (onOpenDetail) and the way back (onCloseDetail) — owned by the shell, so no consumer re-invents a 'Show preview' button. Shrink the window past 760px to watch it swap.">
             <WizardDemo />
             <p className="sg-muted" style={{ marginTop: "var(--space-3)", fontSize: "var(--fs-sm)" }}>
-              Demoed inside a bounded scroll frame so the whole page stays readable; in the app it owns the viewport.
+              Demoed inside a 36rem box so the whole page stays readable; in the app that box is the shell&rsquo;s content pane. Either way the composition is the same one §7 asks for: the head and foot are the frame, and the step body is the region that scrolls (the footnote rides the step, at the end of the column).
             </p>
           </Section>
 
@@ -1203,7 +1338,7 @@ export function StyleGuide() {
             <ChoiceGridDemo />
           </Section>
 
-          <Section id="choicegrid-multi" title="Choice grid (choose N)" blurb="selection='multiple' turns the same grid into the choose-N list every content offer needs — three Weapon Masteries, six prepared spells, two Magic Initiate cantrips. Same cards, same single chosen treatment; only the semantics change (role=checkbox, and arrows move focus without ticking every card they pass). Pass max and the grid locks the UNCHOSEN cards at capacity with a reason, while the chosen ones stay tappable so a pick can always be swapped — capacity handled once here rather than re-derived by each step. The chosen cards keep their cyan edge and check but spend no glow: a choose-6 region has six answers, and §8.1 budgets one glowing element per region — six blooming cards is the wallpaper that rule exists to prevent.">
+          <Section id="choicegrid-multi" title="Choice grid (choose N)" blurb="selection='multiple' turns the same grid into the choose-N list every content offer needs — three Weapon Masteries, six prepared spells, two Magic Initiate cantrips. Same cards, same single chosen treatment; only the semantics change (role=checkbox, and arrows move focus without ticking every card they pass). Pass max and the grid locks the UNCHOSEN cards at capacity with a reason, while the chosen ones stay tappable so a pick can always be swapped — capacity handled once here rather than re-derived by each step. The chosen cards keep their cyan edge and check but spend no glow: a choose-6 region has six answers, and pillar 1 (design-language.md §1) budgets one glowing element per region — six blooming cards is the wallpaper that rule exists to prevent.">
             <ChoiceGridMultiDemo />
           </Section>
 
@@ -1353,6 +1488,90 @@ export function StyleGuide() {
               <div className="sg-texture static-noise"><span>static-noise</span></div>
               <div className="sg-texture sg-grid-demo"><div className="grid-floor" /><span>grid-floor</span></div>
             </div>
+          </Section>
+
+          {/* Owed since wave 2 and assigned to wave 5A. The material shipped as five utilities with
+              no reference entry anywhere, which is precisely how a utility gets re-invented per
+              surface — the failure ruling 64 measured (five of the six landing-door pieces had zero
+              call sites outside the landing). Everything below is real: the styleguide loads
+              design-tokens.css, where these live, so unlike the sky demo further down this one paints. */}
+          <Section id="material" title="The material — the landing door, carried inward (ruling 2)" blurb="Four composable utilities and a numeric face, expressing the one shape the app is made of: a 2px neon rim, a quieter bezel just inside it, a corner cut, a cue triangle that appears on interaction, and a scanline-over-gradient fill. Compose them; there is no single .door class, because a tab bar wants a rim without a corner and a badge wants a corner without a bezel. RULING 2 SPLITS THE GLOW: hero surfaces — Roster, Scenes, empty states, not-found, the builder gate — add .rim-lit for the rest glow; every other surface takes the material WITHOUT it, which is what keeps the restraint rule ('at most one glowing element per region at rest') meaningful on the surfaces where several controls share one region.">
+            <h3 className="sg-h3">The pieces</h3>
+            <div className="sg-material-grid">
+              <div className="sg-material rim"><code>.rim</code><span className="sg-muted">2px structural edge, --rim-color. Brightens on hover, focus AND press (ruling 40) — half the table&rsquo;s devices have no hover.</span></div>
+              <div className="sg-material bezel"><code>.bezel</code><span className="sg-muted">The cabinet&rsquo;s inner line: a 1px outline at --bezel-inset, in currentColor.</span></div>
+              <div className="sg-material chamfer chamfer"><code>.chamfer</code><span className="sg-muted">The corner cut, on a backing layer. Never a clip-path on the element itself.</span></div>
+              <div className="sg-material rim cue" tabIndex={0}><code>.cue</code><span className="sg-muted">Hover, focus or press me — the triangle appears. It does not blink; the landing&rsquo;s blink is a title-screen flourish.</span></div>
+            </div>
+
+            <h3 className="sg-h3">Composed — the door itself</h3>
+            <div className="sg-row">
+              <div className="sg-door chamfer chamfer rim bezel cue" tabIndex={0}>Ordinary surface</div>
+              <div className="sg-door sg-door-hero chamfer chamfer rim bezel cue rim-lit" tabIndex={0}>Hero surface · <code>.rim-lit</code></div>
+              <div className="sg-door chamfer chamfer rim bezel cue" aria-disabled="true">Inert</div>
+            </div>
+            <p className="sg-muted" style={{ marginTop: "var(--space-3)" }}>Inert is a material state, not only reduced opacity: the rim, the texture and the cue all go and a flat box stays.</p>
+
+            <h3 className="sg-h3">Three things that bite</h3>
+            <ul className="sg-material-notes">
+              <li><strong><code>.chamfer</code> paints BEHIND the content.</strong> An element with its own <code>background</code> gets a square fill under a cut outline. For any FILLED surface write the class twice — <code>.chamfer.chamfer</code> — which wins at (0,2,0), zeroes <code>background</code> and <code>border-color</code>, and moves the fill to <code>--material-fill</code>. Setting <code>background</code> on a chamfered element is the mistake this note exists to prevent, and it has already caused one visible regression.</li>
+              <li><strong>The material owns <code>::before</code>; never reach for <code>::after</code>.</strong> <code>::after</code> is spoken for twice — <code>.tap-target</code>&rsquo;s 44px hit area and <code>.scanlines</code>&rsquo; consumers — so a second pseudo on anything carrying <code>.tap-target</code> destroys a hit area. That is why the cue is a background layer and the bezel is an outline rather than a second ring.</li>
+              <li><strong>All four set <code>isolation: isolate</code>,</strong> which makes the element a stacking context. A surface relying on an absolutely-positioned popover escaping above a sibling needs a <code>z-index</code> lift once it takes the material.</li>
+            </ul>
+
+            <h3 className="sg-h3">The fill — <code>--material-fill</code></h3>
+            <p className="sg-muted">The knob a consumer sets, and it inherits like any custom property, so a nested surface picks up its ancestor&rsquo;s unless it sets its own. Ruling 2&rsquo;s &ldquo;scanline-over-gradient&rdquo; is <code>var(--material-scanline), var(--material-plate)</code> — exactly how the landing door stacks it. Default is <code>transparent</code>: a utility that repainted every surface it touched would not compose. This is NOT the <code>.scanlines</code> utility, which is a full-surface CRT overlay — and ruling 28 scopes THAT one to the outermost panel, so a nested panel keeps its rim and bezel and drops the texture.</p>
+            <div className="sg-row">
+              <div className="sg-door chamfer chamfer rim bezel" style={{ ["--material-fill" as string]: "var(--material-scanline), var(--material-plate)" }}>plate + scanline</div>
+              <div className="sg-door chamfer chamfer rim bezel" style={{ ["--material-fill" as string]: "var(--material-plate)" }}>plate only</div>
+              <div className="sg-door chamfer chamfer rim bezel">transparent (default)</div>
+            </div>
+
+            <h3 className="sg-h3">Game numbers — <code>.numeric</code></h3>
+            <p className="sg-muted">HP, AC, initiative and dice totals (ruling 50). Not counts, not page numbers: those stay in the body face so the distinction keeps meaning something. The face is Space Mono at 700 — the arcade faces ship no <code>tnum</code> at all, so <code>tabular-nums</code> does nothing on them. And tabular figures are not the whole fix: a value that loses a digit is genuinely narrower, so a slot that must not move also reserves its width in <code>ch</code>, where one <code>ch</code> is exactly one digit advance.</p>
+            <div className="sg-numeric-demo">
+              <div><span className="sg-muted">body face</span><strong>144</strong><strong>9</strong><strong>44</strong><strong>11</strong></div>
+              <div><span className="sg-muted"><code>.numeric</code></span><strong className="numeric">144</strong><strong className="numeric">9</strong><strong className="numeric">44</strong><strong className="numeric">11</strong></div>
+              <div><span className="sg-muted">+ <code>min-width: 3ch</code></span><strong className="numeric sg-numeric-slot">144</strong><strong className="numeric sg-numeric-slot">9</strong><strong className="numeric sg-numeric-slot">44</strong><strong className="numeric sg-numeric-slot">11</strong></div>
+            </div>
+          </Section>
+
+          <Section id="scene" title="The scene — sky, rims, beam, sign" blurb="Reversal, 2026-08-04 (decision log; design-language.md §9): the scene tier used to be one quiet wash and now it is a literal sky — a starfield, a sun cresting a lit horizon, a receding grid floor — off one --sky-* token set, so the theme toggle changes the HOUR. Three rules make it a work screen rather than a title screen. The horizon is a FIXED INSET from the pane's bottom (--sky-horizon-inset), never a percentage, so it cannot drift up into content as the pane grows. The sun is a CREST, not a disc, and the crown is exactly HALF the diameter so what stands above the line is a hemisphere: --sky-sun-d is derived from --sky-sun-crown rather than typed, because the first cut set them independently and the mask's cap flattened into a 394x54px slab. And the bright band is RESERVED — row-scanned over every pixel of the bare sky, the band that fails AA for --text-muted is at most 157px at 1920x1080 and 130px at 390x844 in all three hours, against a 176px / 144px reserve, so a scene surface's scroll region pads --sky-horizon-inset + --sky-sun-crown at the bottom and no row can rest in it. Legibility is a structure, not an opacity dial — with one named caveat: the scan sets point features aside, because a 1px star can land anywhere and no bottom reserve can bound it. REVERSED IN PART, 2026-08-06 (ruling 22): the table used to get no sky at all, and it now gets the horizon behind its chrome — the dock, the sheet and the margins — while the map STAGE stays a clean dark plate. The original reason survives as the scoping rule rather than as the ban: a horizon behind a battle map competes with the map, so nothing paints behind the map. The table's sky is painted as background layers rather than as a .pane-sky child, because .table-layout has position:fixed descendants and therefore may never take the perspective the grid floor needs — so it is the horizon without the floor mesh.">
+            <h3 className="sg-h3">The sky — switch the theme above to change the hour</h3>
+            {/* The box below is INERT on this page and the note says so rather than letting a reader
+                conclude the sky is broken. `.pane-scene` / `.pane-sky` live in the client's own
+                styles.css, which styleguide.html deliberately does not load (it carries the shell
+                lock, and a reference document has to scroll). Every other §9 utility — .chamfer,
+                .rim-*, .neon-beam, .sign, .surface-glass — is in design-tokens.css and demos fine;
+                the scene tier is the outlier. Moving it there is the fix and it is not free: the
+                reserve rule `.pane-scene > .scroll-y` currently wins over `.pane-frame > .scroll-y`
+                on SOURCE ORDER, and crossing the package boundary reverses that. */}
+            <p className="sg-muted">The markup below is the real composition, but this page cannot paint it: the scene tier lives in the client&rsquo;s <code>styles.css</code>, which the styleguide does not load. See it live on Settings, the Roster, Scenes, Replays or any unanswered address.</p>
+            <div className="sg-sky pane-scene scanlines">
+              <div className="pane-sky" aria-hidden="true" />
+              <div className="sg-sky-panel surface-glass">
+                <Eyebrow>On the sky</Eyebrow>
+                <p className="sg-muted">A panel standing on the scene takes <code>.surface-glass</code> — the scene tier of the two glass tiers. Never put <code>transform</code>, <code>filter</code> or <code>contain: paint</code> on <code>.pane-scene</code>: any one of them makes it the containing block for every fixed overlay.</p>
+              </div>
+            </div>
+
+            <h3 className="sg-h3">Neon linework — <code>.neon-beam</code></h3>
+            <p className="sg-muted">The sky&rsquo;s horizon, lent to the chrome. It marks a STRUCTURAL boundary — a surface&rsquo;s heading row against its region, the table dock&rsquo;s inner edge — and nothing else. It is scene language, not state language: pillar 1 keeps neon for what is interactive, focused, selected or live, so a beam never lands on a control, never marks a state, and never replaces a resting <code>--line</code> border just because one was there.</p>
+            <div className="sg-beam-demo">
+              <div className="neon-beam"><strong>Replays</strong><span className="sg-muted"> — the frame&rsquo;s chrome row</span></div>
+              <p className="sg-muted" style={{ marginTop: "var(--space-3)" }}>…and the region below it.</p>
+            </div>
+
+            <h3 className="sg-h3">Role rims — <code>.rim-player</code> / <code>.rim-gm</code></h3>
+            <p className="sg-muted">Magenta is the player&rsquo;s, violet is the GM&rsquo;s. The rim attaches to the GM-secret TREATMENT, never to a claim that the hue means GM — <code>--violet</code> is load-bearing for magical/concentration and ~50 other rules. It is never the only signal: every site that wears one names its role in words, as these two do — the bars in their <code>aria-label</code> (&ldquo;GM sections&rdquo; / &ldquo;Player sections&rdquo;), the settings groups in their Eyebrow. If a new site cannot name its role, it does not get a rim. The edge is an inset box-shadow, not a border, so it costs no layout and cannot be clobbered by a consumer&rsquo;s own <code>border</code> shorthand — but a shadow is still the element&rsquo;s own paint, so a rim must never sit on a MASKED element: <code>Tabs</code>&rsquo; edge fade erased the GM&rsquo;s outright until frame row 2 became a wrapper that carries it.</p>
+            <div className="sg-row">
+              <div className="sg-rim-demo rim-player"><Eyebrow>Player</Eyebrow><span className="sg-muted">Frame row 2, player</span></div>
+              <div className="sg-rim-demo rim-gm"><Eyebrow>GM only</Eyebrow><span className="sg-muted">Frame row 2, GM</span></div>
+            </div>
+
+            <h3 className="sg-h3">The sign — <code>.sign</code></h3>
+            <p className="sg-muted">A hero title wears a metal the scene does not, and its legibility rides the chrome STRUCTURE (light crown, deepening body, one softened mirror meet, flash, dark base), not an outline — which is why the stroke is a hairline. Reserved for a full-page moment that IS the screen. <strong>Never a panel header</strong>, never a section heading, never <code>.nh-panel-title</code>: one edit there would put the metal on every panel in the app and it would stop meaning anything.</p>
+            <div className="sg-sign-demo"><Wordmark className="sign">OzyVTT</Wordmark></div>
           </Section>
 
           <Section id="motion" title="Motion & interaction" blurb="One easing (--ease-settle), tiered durations. Smooth the moments that change context; leave dense lists alone. Nothing pulses; reduced-motion neutralizes all of it.">

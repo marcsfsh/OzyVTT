@@ -1,42 +1,157 @@
-/* The generic .card caps at 32rem; a replay needs the room the table gets. */
-.card.replay-panel { max-width: none; outline: none; }
-.replay-panel { outline: none; }
-.replay-panel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
-.replay-header { display: flex; align-items: flex-start; gap: 1rem; }
-.replay-header .replay-export { margin-left: auto; white-space: nowrap; }
-.replay-row-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
+/* ---- THE REPLAY VIEWER'S FRAME (§7, refresh B3) ----
+   The viewer is the pane's one child: `.replay-header`, the transport and the step label are
+   chrome rows that never move, and `.replay-layout` is the one region row that takes the
+   leftover height. It used to ride the shell's staged scroller (`.pane-stage`, retired in Phase C
+   once nothing was left staging) inside a `.card`, and the card was three separate mistakes at once
+   — a 32rem cap this surface had to undo, a 2.5rem top margin the frame already owns, and
+   `.card button` (styles.css) repainting every @vtt/ui Button in here as a primary regardless of
+   its variant.
+
+   NO SKY. The standing ruling that keeps the table off the scene tier is "a horizon behind a
+   battle map competes with the map", and this surface IS a battle map with a transport under it.
+   The replays LIST (below) is the content-light half of the pair and stands on the sky. */
+.replay-viewer { gap: var(--space-2); outline: none; }
+/* The frame is full-bleed to the pane, so an OUTER focus ring would be clipped at the edges. */
+.replay-viewer:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring-color); }
+/* `.pane-frame` gives no bottom padding (its region normally owns that); the region here runs to
+   the pane's edge, so the frame keeps the last list row off it. Two classes to win on specificity
+   rather than on bundle order. */
+.replay-viewer.pane-frame { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
+.replay-notice { gap: var(--space-3); align-items: flex-start; }
+
+/* THE PHONE X-OVERFLOW FIX. Three nowrap children in a nowrap row, and the third —
+   `.replay-header-actions`, two long buttons — had no rule in any stylesheet at all. Measured
+   before: the row itself ran 134px past its box at 390x844 (known-bugs.md's "~99px", which was
+   the staged region's 93px). It wraps now, and the actions wrap inside it. */
+.replay-header { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.replay-header-text { flex: 1 1 12rem; min-width: 0; }
+.replay-header-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
+.replay-row-actions { display: flex; gap: var(--space-2); justify-content: flex-end; flex-wrap: wrap; }
 .replay-header h2 { margin: 0; }
 .replay-meta { margin: 0.15rem 0 0; opacity: 0.75; font-size: 0.9rem; }
 .replay-error { color: var(--danger-hi); }
 
-.replay-transport { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0 0.25rem; flex-wrap: wrap; }
+.replay-transport { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .replay-transport input[type="range"] { flex: 1; min-width: 8rem; }
 .replay-position { font-family: var(--font-mono); font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
-.replay-step-label { margin: 0.25rem 0 0.75rem; }
+.replay-step-label { margin: 0; }
 
-.replay-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr); gap: 1rem; align-items: start; }
-.replay-stage svg { width: 100%; height: auto; max-height: 68vh; display: block; border-radius: var(--radius-md); background: var(--void); }
-.replay-stage-missing { display: grid; gap: 0.35rem; place-content: center; min-height: 14rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); padding: 1rem; text-align: center; opacity: 0.85; }
+/* The region row. `stretch`, not `start`: both columns are full height now, and the row is a
+   definite `1fr` so a long turn order cannot lengthen the surface. */
+.replay-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-3); align-items: stretch; }
+/* The stage, on the shared-screen viewer's shape (`.viewer-stage`, viewer.css): a centring grid
+   whose svg fills it and letterboxes by `preserveAspectRatio`. This is what replaced the
+   `max-height: 68vh` cap — measured binding EXACTLY at 1920x1080 (734px of an available 849). */
+.replay-stage { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; overflow: hidden; }
+/* `> svg`, not a descendant match: this rule is for the stage's own canvas. The third instance of
+   the shape that broke the map toolbar — a descendant `svg` selector catches every @vtt/ui glyph in
+   the subtree, because each is `<svg width="1em" height="1em">` and a class rule beats a
+   presentation attribute. Harmless here today (this stage holds only the canvas) and scoped anyway,
+   so it cannot arm itself the next time a control lands inside. */
+.replay-stage > svg { width: 100%; height: 100%; display: block; border-radius: 0; background: var(--void); }
+/* Ruling 55/56: a missing stage is an EMPTY SURFACE, not a placeholder — one designed frame (the
+   material, below), not a dashed rectangle apologising for itself. */
+.replay-stage-missing { position: relative; isolation: isolate; display: grid; gap: 0.35rem; place-content: center; border: 1px solid transparent; border-radius: 0; padding: var(--space-4); text-align: center; opacity: 0.85; }
 .replay-token-hidden { opacity: 0.65; }
 .replay-token-hidden .encounter-token-body { stroke-dasharray: 4 3; }
 
-.replay-side h3 { margin: 0.25rem 0 0.4rem; font-size: 0.95rem; }
-.replay-initiative, .replay-log { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.3rem; }
-.replay-initiative li { display: grid; grid-template-columns: 1fr auto; gap: 0 0.5rem; padding: 0.35rem 0.55rem; border-radius: var(--radius-sm); background: var(--surface-2); }
-.replay-initiative li.active { background: color-mix(in srgb, var(--magenta) 18%, transparent); box-shadow: inset 2px 0 0 var(--magenta), var(--glow-magenta-strong); }
+/* The side lists: one declared region (`.scroll-y` in the markup) holding both. The tab strip is
+   the narrow arm's control and is display:none until the rung below. */
+.replay-side { min-width: 0; gap: var(--space-2); }
+.replay-side-tabs { display: none; }
+.replay-side-scroll { display: flex; flex-direction: column; gap: var(--space-3); }
+.replay-side h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+.replay-initiative { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.replay-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+/* RULING 47 — the two side lists are the most repeated layout on this surface, so they are
+   hairline rules and no fill. `gap` goes to 0 because the rule is the separation now. */
+.replay-initiative li { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 0 var(--space-2); padding: 0.35rem 0.55rem; border-bottom: 1px solid var(--line); border-radius: 0; }
+/* The active combatant keeps its magenta — this is the one row on the surface whose whole job is
+   saying whose turn it is, and it is the region's single glowing element (§8.1). Ruling 7's
+   leading tick replaces the tint behind the words; the bar and the glow stay. */
+.replay-initiative li.active { padding-inline-start: 1.15rem; border-bottom-color: var(--magenta); box-shadow: inset 2px 0 0 var(--magenta), var(--glow-magenta-strong); }
+.replay-initiative li.active::before { content: ""; position: absolute; inset-inline-start: .4rem; top: 50%; width: var(--cue-w); height: var(--cue-h); transform: translateY(-50%); color: var(--magenta); background: var(--cue-mark); pointer-events: none; }
 .replay-initiative li > strong { grid-column: 2; grid-row: 1; font-family: var(--font-mono); }
 .replay-init-hp { font-family: var(--font-mono); font-size: 0.82rem; opacity: 0.8; grid-column: 1; }
 .replay-init-conditions { font-size: 0.78rem; opacity: 0.7; grid-column: 1 / -1; }
-.replay-hidden-tag { font-style: normal; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 0 0.3rem; margin-left: 0.4rem; }
-.replay-log li { padding: 0.3rem 0.55rem; border-left: 3px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); font-size: 0.88rem; }
+.replay-hidden-tag { font-style: normal; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; border: 1px solid currentColor; border-radius: 0; padding: 0 0.3rem; margin-left: 0.4rem; }
+.replay-log li { padding: 0.3rem 0.55rem; border-left: 2px solid var(--line-strong); border-radius: 0; font-size: 0.88rem; }
 .replay-log li.replay-log-gm { border-left-style: dashed; }
 .replay-log-empty { opacity: 0.7; }
 
-.replay-list { width: 100%; border-collapse: collapse; }
-.replay-list th, .replay-list td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); }
-.replay-list td:last-child { text-align: right; }
+/* ---- The replays LIST (its own surface; the viewer above is a different composition) ----
+   The frame's heading row, then the rows. (`.replay-list` lived here as a `<table>` skin with no
+   consumer at all. Deleted rather than restyled.)
 
-@media (max-width: 900px) {
-  .replay-layout { grid-template-columns: 1fr; }
-  .replay-stage svg { max-height: 50vh; }
+   RULING 47 — HAIRLINE RULES, NO FILL, and this list is one of the four the ruling names by name.
+   These rows were `.nh-card`s: the primitive puts its chrome on a backing layer, so each row
+   measured as a filled box (`::before` `background-color: rgb(22,17,43)`) inside a full four-sided
+   1px rim — seven separate boxes where the ruling asks for one list with rules between its rows.
+   The pattern is `.replay-initiative li` fifteen lines up, converted in the same round: a
+   `border-bottom`, `border-radius: 0`, and `gap: 0` on the container because the rule IS the
+   separation now. The last row keeps its rule off, so the list ends on content rather than on a
+   line hanging under it.
+
+   The COUNTER-ARGUMENT is recorded rather than deleted, because it is coherent and it is not this
+   agent's to settle: when a list stands directly on a scene rather than inside a card, the rows can
+   reasonably be read as the cards on it. Ruling 47 names replays explicitly and a ruling beats an
+   in-round recommendation, so the ruling ships; whether a list standing on a scene is an exception
+   is flagged for the client in `docs/product/refresh-round-2-fixes.md` §5.
+
+   The row is still the control and still meets the 44px floor (`--row-h`) — losing the card chassis
+   removed a 9rem minimum this list overrode anyway, not the tap target. */
+.replay-list-page .replay-list-head { max-width: 60rem; margin-inline: auto; width: 100%; }
+.replay-list-page .replay-list-body { max-width: 60rem; margin-inline: auto; width: 100%; }
+.replay-list-back { align-self: flex-start; margin-bottom: var(--space-2); }
+.replay-rows { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.replay-row { display: flex; flex-direction: row; align-items: center; gap: var(--space-3); min-height: var(--row-h); padding: var(--space-3); border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
+.replay-row:last-child { border-bottom: 0; }
+.replay-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.replay-row-title { color: var(--text); font-weight: 700; }
+.replay-row-meta { color: var(--text-muted); font-size: var(--fs-xs); }
+@media (max-width: 560px) { .replay-row { flex-wrap: wrap; } .replay-row-text { flex: 1 0 100%; } }
+
+/* THE 850 RUNG (§3 — this was an off-ladder `max-width: 900px`). Below it the two columns become
+   one: the map keeps a band and the side lists take the rest AS TABS, one at a time. That is the
+   dock accordion's bargain (`encounter/DockAccordion.tsx`) at its smallest — every choice stays
+   visible, exactly one body holds the space — and it is what replaced the second viewport cap
+   (`max-height: 50vh` on the stage svg). The rows are a 2:3 split with a 6rem floor under the map,
+   so the stage never collapses to nothing on a short phone. */
+@media (max-width: 849px) {
+  .replay-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(6rem, 2fr) minmax(0, 3fr); }
+  .replay-side-tabs { display: flex; }
+  .replay-side-tabs .nh-segmented-option { flex: 1 1 0; }
+  /* The tab says which list this is; the heading inside it would only say it twice. */
+  .replay-side-pane > h3 { display: none; }
+  .replay-side.is-order .replay-side-log,
+  .replay-side.is-log .replay-side-order { display: none; }
+}
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css): the cut, the rim and the fill
+   ride a BACKING LAYER, never the element, because `clip-path` clips hit-testing. `inset: -1px`
+   spans the border box, so the rim lands where the border used to and nothing reflows.
+
+   ONE panel here, and it is an EMPTY SURFACE — ruling 55 puts those on the hero list, so this is a
+   full landing door with the rest glow, not the reduced material. It is also the only thing on the
+   stage when it shows, so the region's glow budget is unspent (§8.1). The replays LIST is not a
+   panel at all now (ruling 47, above): rules between rows, no fill, no rim. */
+.replay-stage-missing {
+  --material-fill: var(--material-scanline), var(--material-plate);
+}
+.replay-stage-missing::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  filter: var(--rim-glow);
 }

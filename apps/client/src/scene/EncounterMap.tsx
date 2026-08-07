@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, GmView, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation, PlayerView } from "@vtt/domain";
-import { Button, Switch, useToastMute } from "@vtt/ui";
+import { Button, IconArrow, IconChevronLeft, IconPlay, IconScene, Menu, MenuItem, Switch, useToastMute } from "@vtt/ui";
+import { drawingAudienceOptions, MapToolbar, type MapTool } from "./MapToolbar";
 import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenHealthAura, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
@@ -17,9 +18,12 @@ type Actor = GmActor | PlayerActor;
 type Point = EncounterTokenPosition;
 type AnyAnnotation = Annotation | PlayerAnnotation;
 type Camera = Readonly<{ center: Point; zoom: number }>;
-type Tool = "select" | "measure" | "ping" | "fog-reveal" | "fog-hide" | AnnotationShapeKind;
+/** The pointer mode. Owned by the toolbar, which is the only thing that sets it. */
+type Tool = MapTool;
 type Gesture =
-  | Readonly<{ kind: "token"; actorId: string; point: Point | null; origin: Point | null }>
+  /** `pressClient` is where the pointer went DOWN, in CLIENT pixels (`origin`/`point` are map space);
+      with `fromTray` it is what tells a tap on a staging chip from a drag out of the tray. */
+  | Readonly<{ kind: "token"; actorId: string; point: Point | null; origin: Point | null; pressClient: Readonly<{ x: number; y: number }>; fromTray: boolean }>
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
@@ -30,23 +34,12 @@ type FogState = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 6;
-const TOOLS: ReadonlyArray<{ id: Tool; glyph: string; label: string }> = [
-  { id: "select", glyph: "▹", label: "Select and move" },
-  { id: "ping", glyph: "📍", label: "Ping a spot" },
-  { id: "measure", glyph: "📏", label: "Measure distance" },
-  { id: "circle", glyph: "◯", label: "Place a circle" },
-  { id: "cone", glyph: "◭", label: "Place a cone" },
-  { id: "line", glyph: "╱", label: "Place a line" },
-  { id: "square", glyph: "▢", label: "Place a square" }
-];
+/** How far a pointer may travel and still be a tap. The same 8px `continueGesture` already uses to
+    decide a touch has moved far enough to cancel a long press. */
+const TAP_SLOP = 8;
 
-type VisibilityOption = Readonly<{ value: AnnotationVisibility; label: string }>;
-function visibilityOptionsFor(role: "gm" | "player"): readonly VisibilityOption[] {
-  return role === "gm"
-    ? [{ value: "public", label: "Everyone" }, { value: "gm-only", label: "Just me" }, { value: "gm-actor", label: "Me + a character" }]
-    : [{ value: "public", label: "Everyone" }, { value: "owner-only", label: "Just me" }, { value: "owner-gm", label: "Just me and the GM" }];
-}
-const VISIBILITY_SHORT: Record<AnnotationVisibility, string> = { public: "Everyone", "gm-only": "Just GM", "owner-only": "Just me", "owner-gm": "Me + GM", "gm-actor": "Me + character" };
+/** The reveal words (D28) in their short form, for the per-shape editor's read-only line. */
+const VISIBILITY_SHORT: Record<AnnotationVisibility, string> = { public: "Shown to players", "gm-only": "GM only", "owner-only": "Only me", "owner-gm": "Only me and the GM", "gm-actor": "GM and one character" };
 
 function emitMove(payload: Parameters<ClientToServerEvents["token:move"]>[0]) {
   return new Promise<MutationResult>((resolve) => socket.emit("token:move", payload, resolve));
@@ -95,7 +88,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, staging, healthDisplay, state
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, onViewAllScenes, activeSceneName, viewerPreview, staging, healthDisplay, state
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -114,6 +107,16 @@ export function EncounterMap({
   moveSceneId?: string;
   /** GM scene-prep entry (map button) - opens the scene picker. */
   onScenePrep?: () => void;
+  /**
+   * RULING 12 — the gallery's ONE door. The top-left scenes row is deleted (56px back to the map) and
+   * its function is an entry in this menu. Absent ⇒ the map button stays the single-action button it
+   * was, which is what a player and a staging view get.
+   */
+  onViewAllScenes?: () => void;
+  /** Which scene is live, said in the menu rather than on a row over the map — the fact the deleted row carried. */
+  activeSceneName?: string;
+  /** RULING 13 — the "Preview what players see" trigger, now a map-toolbar tool beside Draw / Fog / View. */
+  viewerPreview?: Readonly<{ on: boolean; onToggle: () => void }>;
   /** Present while staging a prepared scene privately - adds "back to live" / "make live" controls to the map. */
   staging?: Readonly<{ onBackToLive: () => void; onMakeLive: () => void }>;
   /** Table-wide health-display default (read only for the GM view; a token's own actor.healthDisplay overrides it). Players receive the resolved per-token style server-side, so this is unused for them. */
@@ -146,32 +149,10 @@ export function EncounterMap({
   const [fullscreen, setFullscreen] = useState(false);
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [eyeOpen, setEyeOpen] = useState(false);
-  const [wrenchOpen, setWrenchOpen] = useState(false);
-  const [colorOpen, setColorOpen] = useState(false);
-  // Combat-first: only Select/Ping/Measure earn permanent icons; the drawing toolkit (shapes,
-  // color, visibility, layer, cleanup) sits behind one Draw toggle so the corner isn't icon soup.
-  const [drawOpen, setDrawOpen] = useState(false);
-  // Fog tools sit behind their own toggle for the same reason (GM only).
-  const [fogOpen, setFogOpen] = useState(false);
   const [fogBusy, setFogBusy] = useState(false);
-  // A slide-out that's mid-collapse stays mounted for one animation frame so it fades out instead of
-  // vanishing (report #8). Which tab is animating closed, cleared when the exit animation finishes.
-  const [closingTab, setClosingTab] = useState<"draw" | "fog" | null>(null);
-  // While opening, the tab animates its width so the buttons it pushes aside slide too (report #4);
-  // once settled the class drops so its dropdown menus can overflow. Same idea, reversed, for closing.
-  const [openingTab, setOpeningTab] = useState<"draw" | "fog" | null>(null);
-  const tabTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const beginOpen = (tab: "draw" | "fog") => {
-    setOpeningTab(tab); setClosingTab(null);
-    if (tabTimer.current) clearTimeout(tabTimer.current);
-    tabTimer.current = setTimeout(() => setOpeningTab(null), 190);
-  };
-  const beginClose = (tab: "draw" | "fog") => {
-    setClosingTab(tab); setOpeningTab(null);
-    if (tabTimer.current) clearTimeout(tabTimer.current);
-    tabTimer.current = setTimeout(() => setClosingTab(null), 190);
-  };
+  /** Measured height of the floating token tray, so the toolbar can clear it (0 when it is absent). */
+  const [trayHeight, setTrayHeight] = useState(0);
+  // "GM ink": new drawings land GM-only, and only GM-only drawings are interactive while it is on.
   const [gmLayer, setGmLayer] = useState(false);
   const { muted: notificationsMuted, setMuted: setNotificationsMuted } = useToastMute();
   const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ff2e9a" : PLAYER_COLORS[0]));
@@ -222,7 +203,7 @@ export function EncounterMap({
       if (!svgRef.current || !size) return;
       // Wheeling over an overlaid panel (a docked initiative tracker, an open menu, the shape editor)
       // must scroll that panel, not zoom the map behind it - mirror the pointer-down guard below.
-      if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-dock-resize, .encounter-map-overlay, .encounter-map-menu, .encounter-shape-editor, .encounter-target-bar")) return;
+      if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-dock-resize, .encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-target-bar")) return;
       event.preventDefault();
       zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
     };
@@ -324,7 +305,7 @@ export function EncounterMap({
     catch (error) { setMessage((error as Error).message); }
     finally { setAnnotationBusy(null); }
   };
-  // When the GM layer is active, new drawings go onto it (gm-only) regardless of the eye default.
+  // While GM ink is on, new drawings are GM only whatever the audience control says.
   const effectiveVisibility: AnnotationVisibility = role === "gm" && gmLayer ? "gm-only" : defaultVisibility;
   const submitAnnotationAdd = async (kind: "measurement" | "shape", shape: AnnotationShapeKind | undefined, origin: Point, target: Point) => {
     const commandId = newId();
@@ -340,7 +321,7 @@ export function EncounterMap({
   const removeAnnotation = (id: string) => runAnnotation(id, () => emitAnnotationRemove({ commandId: newId(), id, expectedRevision: revision }), "That could not be removed.");
   const setVisibility = (id: string, visibility: AnnotationVisibility, visibleToActorId: string | null) => runAnnotation(id, () => emitAnnotationSetVisibility({ commandId: newId(), id, visibility, visibleToActorId, expectedRevision: revision }), "The visibility could not be changed.");
   const setMovable = (id: string, movableByOthers: boolean) => runAnnotation(id, () => emitAnnotationSetMovable({ commandId: newId(), id, movableByOthers, expectedRevision: revision }), "Move control could not be changed.");
-  const clearAnnotations = (scope: "mine" | "players" | "all") => { setWrenchOpen(false); void runAnnotation("clear", () => emitAnnotationClear({ commandId: newId(), scope, expectedRevision: revision }), "Shapes could not be removed."); };
+  const clearAnnotations = (scope: "mine" | "players" | "all") => { void runAnnotation("clear", () => emitAnnotationClear({ commandId: newId(), scope, expectedRevision: revision }), "Shapes could not be removed."); };
 
   // Fog edits target the staged scene while previewing (moveSceneId), else the live table.
   const fogTarget = moveSceneId !== undefined ? { sceneId: moveSceneId } : {};
@@ -397,7 +378,7 @@ export function EncounterMap({
     const shapeId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
     if (tool === "select" && shapeId) {
       const annotation = annotationAt(shapeId);
-      // When the GM works on the GM layer, only GM-layer (gm-only) shapes are interactive.
+      // While GM ink is on, only the GM's own (gm-only) shapes are interactive.
       if (annotation && annotation.kind === "shape" && !(role === "gm" && gmLayer && annotation.visibility !== "gm-only")) {
         setSelectedId(shapeId);
         if (canMoveShape(annotation) && handleId) {
@@ -422,7 +403,7 @@ export function EncounterMap({
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
       setSelectedId(null);
       const origin = tokensById.get(tokenId)?.position ?? null;
-      setMessage(""); setGesture({ kind: "token", actorId: tokenId, point: origin, origin });
+      setMessage(""); setGesture({ kind: "token", actorId: tokenId, point: origin, origin, pressClient: { x: event.clientX, y: event.clientY }, fromTray: target.closest(".encounter-token-tray") !== null });
       if (event.pointerType === "touch") {
         const captureEl = event.currentTarget, pointerId = event.pointerId, startX = event.clientX, startY = event.clientY;
         clearLongPress();
@@ -493,10 +474,28 @@ export function EncounterMap({
       const mapPoint = gesture.point;
       const trayBounds = trayRef.current?.getBoundingClientRect();
       const overTray = Boolean(trayBounds && event.clientX >= trayBounds.left && event.clientX <= trayBounds.right && event.clientY >= trayBounds.top && event.clientY <= trayBounds.bottom);
+      /* TAP-TO-PLACE, RESOLVED HERE BECAUSE THE CHIP'S OWN CLICK NEVER ARRIVES.
+         The staging tray lives INSIDE `.encounter-map-interaction`, the pointer-gesture root, and its
+         chips carry `data-token-id` because a chip is also the handle you drag a token out by. So a
+         press on a chip takes the token-drag branch above, which calls `setPointerCapture` on the
+         WRAPPER — and pointer capture retargets the resulting `click` to the capture element, so
+         `.tray-token`'s `onClick` never runs. Measured 2026-08-07, GM at 1280x900: mouse click on a
+         chip left the tray at 8 of 8 with the click's target reported as
+         `DIV.encounter-map-interaction`; `touchscreen.tap` at 844x390 left it at 7 of 7. Only the
+         keyboard worked (8 -> 7), because a focused <button> dispatches its click directly. The tray's
+         own copy has promised the tap since it was written, and on a phone there is no keyboard, so
+         the tray had no working tap route at all.
+         The handler was never the problem — `placeAtCenter` is what the keyboard path proves works —
+         so this fixes the POINTER path and nothing else. Guarding `beginGesture` against the tray was
+         the other candidate and it disarms the feature next door: dragging a chip onto the map is that
+         same branch, measured working at HEAD (7 -> 6 on mouse), and an early return kills it. A press
+         that never moved is a tap; a press that travelled is a drag; everything else is untouched. */
+      const tapped = gesture.fromTray && Math.hypot(event.clientX - gesture.pressClient.x, event.clientY - gesture.pressClient.y) <= TAP_SLOP;
       setGesture(null);
       const originalToken = tokensById.get(actorId);
       const unchanged = Boolean(mapPoint && originalPosition && Math.hypot(mapPoint.x - originalPosition.x, mapPoint.y - originalPosition.y) < (originalToken?.gridSizePx ? originalToken.gridSizePx * .45 : .5));
-      if (overTray) void submitMove(actorId, null);
+      if (tapped) placeAtCenter(actorId);
+      else if (overTray) void submitMove(actorId, null);
       else if (unchanged) setMessage("Token stayed in the same space.");
       else if (mapPoint) void submitMove(actorId, mapPoint);
       else setMessage("Move cancelled. Drop the token on the map or in the tray.");
@@ -535,6 +534,19 @@ export function EncounterMap({
 
   const unplaced = tokens.filter((encounterToken) => encounterToken.position === null && canMove(encounterToken.actorId));
   const dragging = gesture?.kind === "token" ? gesture : null;
+  const trayShown = unplaced.length > 0 || dragging !== null;
+  // The token tray floats over the stage's top edge whenever a token is unplaced, and it used to
+  // land ON the tool cluster (I-01 §A3 clutter row: "the tray additionally overlays the map top
+  // edge"). Publish its measured height so the toolbar starts below it instead — measured, not
+  // guessed, because the tray reflows to a column at 650px and grows a row per unplaced token.
+  useEffect(() => {
+    const tray = trayRef.current;
+    if (!trayShown || !tray) { setTrayHeight(0); return; }
+    const observer = new ResizeObserver(() => setTrayHeight(tray.getBoundingClientRect().height));
+    observer.observe(tray);
+    setTrayHeight(tray.getBoundingClientRect().height);
+    return () => observer.disconnect();
+  }, [trayShown]);
   // Show the dragged token snapped to the grid live (mirrors the server snap on release).
   const draggingSizeCells = dragging ? tokens.find((token) => token.actorId === dragging.actorId)?.sizeCells ?? 1 : 1;
   const dragSnappedPoint = dragging?.point ? (calibration ? snapCellCenterPreview(calibration, dragging.point, draggingSizeCells) : dragging.point) : null;
@@ -565,75 +577,68 @@ export function EncounterMap({
   })();
 
   const selected = selectedId ? annotationAt(selectedId) : null;
-  const visibilityOptions = visibilityOptionsFor(role);
-  const wrenchScopes: ReadonlyArray<{ scope: "mine" | "players" | "all"; label: string }> = role === "gm"
-    ? [{ scope: "mine", label: "Remove all my shapes" }, { scope: "players", label: "Remove all player shapes" }, { scope: "all", label: "Remove all shapes" }]
-    : [{ scope: "mine", label: "Remove all my shapes" }];
+  const visibilityOptions = drawingAudienceOptions(role);
 
   return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onContextMenu={onContextMenu}>
     {/* No permanent tutorial captions (ux-principles: if it needs a banner, redesign it) - the tray
         appears only while it has tokens to place or a drag could drop one back in. */}
-    {(unplaced.length > 0 || dragging) && <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Unplaced token tray">
-      <div><strong>Token tray</strong><span>{unplaced.length ? "Drag onto the map, click to place near its center, or press Enter." : "Drag a token here to take it off the map."}</span></div>
+    {/* The staging tray, map side (D2/D3): the same list the prep panel shows, as the things you can
+        actually grab. Everything added lands here first and is explicitly NOT on the map until it is
+        dragged out — or tapped, which drops it at the centre, which is the touch and keyboard route. */}
+    {trayShown && <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Staging tray">
+      <div><strong>Staging tray</strong><span>{unplaced.length ? "Drag one onto the map, or tap it to drop it at the centre." : "Drag a token here to take it off the map."}</span></div>
       <div className="encounter-token-tray-list">{unplaced.map((encounterToken) => {
         const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
-        return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${actor.visibility === "gm-only" ? " hidden" : ""}`} disabled={busyActorId !== null} onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
+        const gmOnly = actor.visibility === "gm-only";
+        /* `onClick` is the KEYBOARD route: a focused <button> dispatches its click directly, so this
+           fires for Enter/Space and never for a pointer — the wrapper's pointer capture retargets a
+           real click away from the chip. The pointer's tap lands in `finishGesture`, which explains
+           the split; both end in `placeAtCenter`. */
+        return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${gmOnly ? " hidden" : ""}`} disabled={busyActorId !== null}
+          title={gmOnly ? `${actor.name} · GM only` : `${actor.name} · Shown to players`}
+          onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
       })}</div>
     </div>}
-    <div className={`encounter-map-stage${dock?.node ? ` has-dock has-dock-${dock.position}` : ""}`} ref={stageRef} style={dock?.node ? ({ "--dock-side-width": `${dock.width}px` } as React.CSSProperties) : undefined} aria-busy={image.status !== "ready"}>
+    <div className={`encounter-map-stage${dock?.node ? ` has-dock has-dock-${dock.position}` : ""}`} ref={stageRef} style={{ ...(dock?.node ? { "--dock-side-width": `${dock.width}px` } : {}), ...(trayHeight > 0 ? { "--tray-height": `${Math.round(trayHeight)}px` } : {}) } as React.CSSProperties} aria-busy={image.status !== "ready"}>
       {image.status === "ready" && size ? <>
-        <div className="encounter-map-overlay" role="group" aria-label="Map tools">
-          {TOOLS.filter((entry) => entry.id === "select" || entry.id === "ping" || entry.id === "measure").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id === "measure" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war - hide the map from players and reveal it area by area" onClick={() => { if (fogOpen) { if (tool === "fog-reveal" || tool === "fog-hide") setTool("select"); setFogOpen(false); beginClose("fog"); } else { setFogOpen(true); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); beginOpen("fog"); } }}>🌫</button>}
-          {(fogOpen || closingTab === "fog") && role === "gm" && <div className={`encounter-map-slideout${fogOpen ? (openingTab === "fog" ? " opening" : "") : " closing"}`} role="group" aria-label="Fog of war">
-            <button type="button" className="encounter-map-icon" aria-pressed={fog?.enabled ?? false} disabled={fogBusy} title={fog?.enabled ? "Fog is ON - players see only revealed areas. Turn off." : "Fog is OFF - turn on to hide the map from players."} onClick={() => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled: !(fog?.enabled ?? false), ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}>⏻</button>
-            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-reveal"} disabled={fogBusy || !fog?.enabled} title="Reveal - drag the areas players can see" onClick={() => setTool(tool === "fog-reveal" ? "select" : "fog-reveal")}>☀</button>
-            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-hide"} disabled={fogBusy || !fog?.enabled} title="Hide - drag an area to cover it again" onClick={() => setTool(tool === "fog-hide" ? "select" : "fog-hide")}>▩</button>
-            <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Reveal the whole map" onClick={() => { if (size) runFog(() => emitFogPaint({ commandId: newId(), op: "reveal", rect: { x: 0, y: 0, width: size.width, height: size.height }, ...fogTarget, expectedRevision: revision }), "The fog could not be revealed."); }}>⛶</button>
-            <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Hide the whole map again (clears every reveal)" onClick={() => runFog(() => emitFogReset({ commandId: newId(), ...fogTarget, expectedRevision: revision }), "The fog could not be reset.")}>◼</button>
-          </div>}
-          {/* ✏ sits directly left of the shape bar it toggles; the tools slide out to its right as one
-              grouped tab (report #11). Only shape/style/cleanup controls live in here - movement and
-              layer aids stayed on the bar. */}
-          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools - shapes, color, visibility, cleanup" onClick={() => { if (drawOpen) { if (tool === "circle" || tool === "cone" || tool === "line" || tool === "square") setTool("select"); setDrawOpen(false); beginClose("draw"); } else { setDrawOpen(true); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); beginOpen("draw"); } }}>✏</button>
-          {(drawOpen || closingTab === "draw") && <div className={`encounter-map-slideout${drawOpen ? (openingTab === "draw" ? " opening" : "") : " closing"}`} role="group" aria-label="Drawing tools">
-            <div className="encounter-map-tools">
-              {TOOLS.filter((entry) => entry.id === "circle" || entry.id === "cone" || entry.id === "line" || entry.id === "square").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={!calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-            </div>
-            <div className="encounter-map-eye">
-              <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={eyeOpen} title={`New drawings visible to: ${VISIBILITY_SHORT[defaultVisibility]}`} onClick={() => { setEyeOpen((v) => !v); setWrenchOpen(false); }}>👁</button>
-              {eyeOpen && <div className="encounter-map-menu" role="menu">
-                <p className="encounter-map-menu-title">New drawings visible to</p>
-                {visibilityOptions.map((option) => <button key={option.value} type="button" role="menuitemradio" aria-checked={defaultVisibility === option.value} className={defaultVisibility === option.value ? "selected" : ""} onClick={() => { setDefaultVisibility(option.value); if (option.value !== "gm-actor") setEyeOpen(false); }}>{option.label}</button>)}
-                {defaultVisibility === "gm-actor" && <label className="encounter-map-menu-select">Character<select value={defaultActorId ?? ""} onChange={(event) => setDefaultActorId(event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
-              </div>}
-            </div>
-            <div className="encounter-map-color">
-              <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={colorOpen} title={`Your drawing color: ${sessionColor}`} style={{ color: sessionColor }} onClick={() => { setColorOpen((v) => !v); setEyeOpen(false); setWrenchOpen(false); }}>🎨</button>
-              {colorOpen && <div className="encounter-map-menu" role="menu">
-                <p className="encounter-map-menu-title">Your color</p>
-                <div className="encounter-map-swatches">{PLAYER_COLORS.map((swatch) => <button key={swatch} type="button" aria-label={swatch} className={sessionColor.toLowerCase() === swatch ? "selected" : ""} style={{ background: swatch }} onClick={() => { setSessionColor(swatch); setColorOpen(false); }} />)}</div>
-                <label className="encounter-map-menu-select">Custom<input type="color" value={sessionColor} onChange={(event) => setSessionColor(event.target.value)} /></label>
-              </div>}
-            </div>
-            <div className="encounter-map-wrench">
-              <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>
-              {wrenchOpen && <div className="encounter-map-menu" role="menu">
-                {wrenchScopes.map((entry) => <button key={entry.scope} type="button" role="menuitem" onClick={() => clearAnnotations(entry.scope)}>{entry.label}</button>)}
-              </div>}
-            </div>
-          </div>}
-          {/* Movement + layer aids are always on the bar - they are not drawing tools and were wrongly
-              hidden behind ✏ (report #11): distance-while-moving, occupied-cell cost, and the GM layer. */}
-          <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
-          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on - extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
-          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active - new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
-        </div>
-        <div className="encounter-map-notify">
-          <button type="button" className="encounter-map-icon" aria-pressed={!notificationsMuted} aria-label={notificationsMuted ? "Notifications muted - click to unmute" : "Notifications on - click to mute"} title={notificationsMuted ? "Notifications muted for you - click to unmute" : "Mute notifications for you"} onClick={() => setNotificationsMuted(!notificationsMuted)}>{notificationsMuted ? "🔕" : "🔔"}</button>
-        </div>
+        <MapToolbar
+          role={role}
+          tool={tool}
+          onToolChange={setTool}
+          calibrated={calibration !== null}
+          audience={defaultVisibility}
+          onAudienceChange={setDefaultVisibility}
+          audienceActorId={defaultActorId}
+          onAudienceActorIdChange={setDefaultActorId}
+          characters={characters}
+          color={sessionColor}
+          onColorChange={setSessionColor}
+          colors={PLAYER_COLORS}
+          gmInk={gmLayer}
+          onGmInkChange={setGmLayer}
+          onClear={clearAnnotations}
+          fogEnabled={fog?.enabled ?? false}
+          fogBusy={fogBusy}
+          onFogEnabledChange={(enabled) => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled, ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}
+          onRevealAll={() => runFog(() => emitFogPaint({ commandId: newId(), op: "reveal", rect: { x: 0, y: 0, width: size.width, height: size.height }, ...fogTarget, expectedRevision: revision }), "The fog could not be revealed.")}
+          onHideAll={() => runFog(() => emitFogReset({ commandId: newId(), ...fogTarget, expectedRevision: revision }), "The fog could not be reset.")}
+          {...(viewerPreview ? { viewerPreview } : {})}
+          onZoom={zoomCenter}
+          onResetView={resetView}
+          enlarged={enlarged}
+          onToggleEnlarged={toggleEnlarged}
+          fullscreen={fullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          dock={dock ? { position: dock.position, onChange: dock.onChange } : undefined}
+          rulerWhileMoving={rulerWhileMoving}
+          onRulerWhileMovingChange={setRulerWhileMoving}
+          occupiedCost={showOccupied}
+          onOccupiedCostChange={setShowOccupied}
+          notificationsMuted={notificationsMuted}
+          onNotificationsMutedChange={setNotificationsMuted}
+        />
 
-        <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>
+        <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive tokens are layered above this map.`}>
           <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
 
           {/* Shapes render below tokens; measurements render above tokens (further down) so they read over the pieces. */}
@@ -709,16 +714,16 @@ export function EncounterMap({
             <div className="encounter-shape-editor-head"><strong>{selected.geometry.sizeFeet}ft {selected.shape}</strong>{center && <span>at {Math.round(center.x)}, {Math.round(center.y)}</span>}</div>
             {manage ? <>
               <label className="encounter-shape-editor-color">Color<input type="color" value={selected.color} disabled={busy} onChange={(event) => setColor(selected.id, event.target.value)} /></label>
-              <label>Visible to<select value={selected.visibility} disabled={busy} onChange={(event) => { const value = event.target.value as AnnotationVisibility; setVisibility(selected.id, value, value === "gm-actor" ? (selected.visibleToActorId ?? characters[0]?.id ?? null) : null); }}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              <label>Who sees this<select value={selected.visibility} disabled={busy} onChange={(event) => { const value = event.target.value as AnnotationVisibility; setVisibility(selected.id, value, value === "gm-actor" ? (selected.visibleToActorId ?? characters[0]?.id ?? null) : null); }}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
               {selected.visibility === "gm-actor" && <label>Character<select value={selected.visibleToActorId ?? ""} disabled={busy} onChange={(event) => setVisibility(selected.id, "gm-actor", event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
               <Switch className="encounter-shape-editor-check" label="Others can move this" checked={selected.movableByOthers} disabled={busy} onChange={(checked) => setMovable(selected.id, checked)} />
               <Button variant="destructive" disabled={busy} onClick={() => { setSelectedId(null); void removeAnnotation(selected.id); }}>Delete shape</Button>
-            </> : <p className="encounter-shape-editor-note">Visible to {VISIBILITY_SHORT[selected.visibility]}{selected.movableByOthers ? " · shared" : ""}</p>}
+            </> : <p className="encounter-shape-editor-note">{VISIBILITY_SHORT[selected.visibility]}{selected.movableByOthers ? " · anyone can move it" : ""}</p>}
           </div>;
         })()}
 
         {dock?.node && <>
-          <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>
+          <div className={`encounter-map-dock scroll-y dock-${dock.position}`}>{dock.node}</div>
           <div className={`encounter-map-dock-resize dock-resize-${dock.position}`} role="separator" aria-label="Drag to resize the docked tracker" title="Drag to resize" onPointerDown={beginDockResize} />
         </>}
 
@@ -727,10 +732,11 @@ export function EncounterMap({
           const names = activeTargeting.selected.map((id) => actorsById.get(id)?.name ?? "?");
           const label = isTemplate
             ? (activeTargeting.template?.placed ? " - placed; Roll to catch everyone under it" : ` - drag the ${activeTargeting.action.area?.sizeFeet}-ft ${activeTargeting.action.area?.shape} on the map`)
-            : names.length ? ` → ${names.join(", ")}` : activeTargeting.mode === "single" ? " - click a token to target it" : " - click tokens to target them";
+            : names.length ? null : activeTargeting.mode === "single" ? " - click a token to target it" : " - click tokens to target them";
           const ready = isTemplate ? Boolean(activeTargeting.template?.placed) : activeTargeting.selected.length > 0;
           return <div className="encounter-target-bar" role="group" aria-label={`Targets for ${activeTargeting.action.name}`}>
-            <span><strong>{activeTargeting.action.name}</strong>{label}</span>
+            {/* "{Action} → {targets}" — the arrow is the icon, never the character (design-language §icons). */}
+            <span><strong>{activeTargeting.action.name}</strong>{label ?? <> <span className="encounter-target-arrow" aria-hidden="true"><IconArrow /></span> {names.join(", ")}</>}</span>
             <span className="encounter-target-bar-buttons">
               <Button variant="secondary" disabled={targetingBusy} onClick={() => clearTargeting()}>Cancel</Button>
               <button type="button" className="encounter-primary" disabled={targetingBusy || !ready} onClick={() => resolveTargeting(revision, (ok, resultMessage) => setMessage(ok || resultMessage === undefined ? "" : resultMessage))}>Roll {activeTargeting.action.name}</button>
@@ -738,24 +744,32 @@ export function EncounterMap({
           </div>;
         })()}
 
-        <div className={`encounter-map-zoom${dock?.node ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Map controls">
+        {/* The scene cluster is all that floats in the bottom corner now: zoom, dock, enlarge and
+            fullscreen moved into the toolbar's View group (D4), so nothing here can wrap. While
+            arranging a scene it swaps for the two staging buttons (plan §B2.4, kept verbatim). */}
+        {(staging || onScenePrep) && <div className={`encounter-map-zoom${dock?.node ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Scene controls">
           {staging
             ? <span className="encounter-map-scene-live" role="group" aria-label="Staged scene controls">
-                <button type="button" className="scene-back" onClick={staging.onBackToLive} title="Return to the scene players see">◀ Live</button>
-                <button type="button" className="scene-golive" onClick={staging.onMakeLive} title="Make this the scene players see">Make live ⬆</button>
+                <Button variant="ghost" size="sm" onClick={staging.onBackToLive} title="Return to the scene players see"><span className="map-button-icon" aria-hidden="true"><IconChevronLeft /></span>Back to live</Button>
+                <Button variant="primary" size="sm" onClick={staging.onMakeLive} title="Make this the scene players see"><span className="map-button-icon" aria-hidden="true"><IconPlay /></span>Make live</Button>
               </span>
-            : onScenePrep && <button type="button" aria-label="Scene prep" title="Scene prep - stage and switch scenes (GM only)" onClick={onScenePrep}>🎬 Scenes</button>}
-          {dock && <span className="encounter-map-dock-control" role="group" aria-label="Dock the tracker">
-            <button type="button" aria-label="Dock tracker left" aria-pressed={dock.position === "left"} title="Dock tracker left" onClick={() => dock.onChange("left")}>◧</button>
-            <button type="button" aria-label="Dock tracker right" aria-pressed={dock.position === "right"} title="Dock tracker right" onClick={() => dock.onChange("right")}>◨</button>
-            <button type="button" aria-label="Move tracker to the sidebar" aria-pressed={dock.position === "sidebar"} title="Move tracker to the sidebar" onClick={() => dock.onChange("sidebar")}>▦</button>
-          </span>}
-          <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
-          <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
-          <button type="button" onClick={resetView}>Reset view</button>
-          <button type="button" onClick={toggleEnlarged} disabled={fullscreen}>{enlarged ? "Shrink map" : "Enlarge map"}</button>
-          <button type="button" onClick={toggleFullscreen}>{fullscreen ? "Exit fullscreen" : "Fullscreen"}</button>
-        </div>
+            : onScenePrep && (onViewAllScenes
+              /* RULING 12 — ONE DOOR. The top-left scenes row is gone; the map's own Scenes button
+                 became the menu that holds both errands, and the live scene's name rides the menu
+                 rather than a row over the map, so the fact survives and the 56px does not come back. */
+              ? <Menu
+                  className="encounter-map-scene-menu"
+                  triggerClassName="encounter-map-scene-trigger"
+                  align="end"
+                  label={activeSceneName ? `Scenes — ${activeSceneName} is live` : "Scenes"}
+                  trigger={<><span className="map-button-icon" aria-hidden="true"><IconScene /></span>Scenes</>}
+                >
+                  {activeSceneName && <p className="encounter-map-scene-live-name">Live: <strong>{activeSceneName}</strong></p>}
+                  <MenuItem onClick={onViewAllScenes}>View all scenes</MenuItem>
+                  <MenuItem onClick={onScenePrep}>New scene…</MenuItem>
+                </Menu>
+              : <Button variant="secondary" size="sm" title="Stage and switch scenes (GM only)" onClick={onScenePrep}><span className="map-button-icon" aria-hidden="true"><IconScene /></span>Scenes</Button>)}
+        </div>}
       </> : <p role="status">{image.status === "error" ? image.message : "Loading the battle map…"}</p>}
     </div>
     {busyActorId && <p className="encounter-map-saving" role="status">Saving move…</p>}

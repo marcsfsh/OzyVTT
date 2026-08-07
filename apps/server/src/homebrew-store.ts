@@ -2,10 +2,9 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { HomebrewContentTypeSchema, type HomebrewContentState, type HomebrewContentType } from "@vtt/api-contract";
-import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import { type ActorDefinition } from "@vtt/schemas";
 import {
-  BackgroundReferenceSchema, ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema,
-  SpeciesReferenceSchema, SpellListReferenceSchema, SpellReferenceSchema, SubclassReferenceSchema,
+  HOMEBREW_BODY_SCHEMAS,
   type BackgroundReference, type ClassReference, type EquipmentReference, type FeatReference,
   type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference
 } from "@vtt/content-srd-5.2.1";
@@ -660,17 +659,7 @@ export class HomebrewStore implements HomebrewContentSource {
  * literal): the merge in `content-library.ts` is a concat precisely because these are the very
  * schemas `loadClasses()` and friends already parse.
  */
-const BODY_SCHEMAS = {
-  class: ClassReferenceSchema,
-  subclass: SubclassReferenceSchema,
-  species: SpeciesReferenceSchema,
-  background: BackgroundReferenceSchema,
-  feat: FeatReferenceSchema,
-  spell: SpellReferenceSchema,
-  equipment: EquipmentReferenceSchema,
-  monster: ActorDefinitionSchema,
-  "spell-list": SpellListReferenceSchema
-} as const satisfies Record<HomebrewContentType, { safeParse: (value: unknown) => { success: boolean } }>;
+const BODY_SCHEMAS = HOMEBREW_BODY_SCHEMAS satisfies Record<HomebrewContentType, { safeParse: (value: unknown) => { success: boolean } }>;
 
 /** Fail-soft by contract: a body that no longer parses is dropped by the caller, never thrown from. */
 function parseBody(type: HomebrewContentType, json: string): unknown {

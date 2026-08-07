@@ -6,8 +6,9 @@
 > **Current through:** the spike's own date. **The question it was built to settle is closed.**
 > **What actually happened:** the shipped map surface is DOM/SVG on every surface, not WebGL.
 > The spike was abandoned rather than concluded, and `docs/adr/0003-renderer-choice.md` is the
-> closing record. `apps/client/src/scene/RendererProof.tsx` still exists and still compiles, but
-> it has **zero import sites** — PixiJS is a dependency nothing renders.
+> closing record. `apps/client/src/scene/RendererProof.tsx` had **zero import sites**, and on
+> 2026-08-05 it was deleted along with the PixiJS dependency — so **nothing described below is
+> in the tree any more.** This file is the record of what the spike showed, not of code you can run.
 > **So the "Still required before ADR-003 is accepted" list below is not an open work list.**
 > ADR-0003 was closed by the code, not by that evidence. Its device-testing items survive as
 > BUILD_PLAN GAP-001 (the physical-device pass), which is still genuinely open.
@@ -38,7 +39,7 @@ PixiJS, initialized directly from a React lifecycle component.
 
 - Type checking and production build succeed.
 - The renderer is isolated from authoritative state, socket commands, and persistence.
-- Production build emits a 519 kB minified entry chunk containing PixiJS; this is a baseline measurement, not yet a performance pass.
+- The spike's production build emitted a 519 kB minified entry chunk containing PixiJS; that was a baseline measurement, never a performance pass, and it stopped describing this repo when the dependency was removed.
 
 ## Still required before ADR-003 is accepted
 

@@ -148,6 +148,11 @@ const gmDefaults = () => {
 const openPage = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
   await user.click(await screen.findByRole("treeitem", { name: "Barovia" }));
+  // Ruling 11: connections are summoned, not standing in a third column. One control, and this is it.
+  // Asked rather than assumed: the panel's state is REMEMBERED across mounts, so an unconditional click
+  // would open it for one test in this file and close it for the next.
+  const details = await screen.findByRole("button", { name: "Details" });
+  if (details.getAttribute("aria-expanded") !== "true") await user.click(details);
   return within(await screen.findByRole("region", { name: "Connections" }));
 };
 

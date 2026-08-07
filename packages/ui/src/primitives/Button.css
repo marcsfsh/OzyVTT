@@ -1,49 +1,211 @@
+/* ============================================================================
+   THE BUTTON MATERIAL — rulings 49, 14, 40, 3.
+
+   THE CONSTRAINT THAT SHAPES THIS FILE: `clip-path` clips HIT-TESTING, not just
+   paint. This file used to exempt `--sm` from the chamfer for exactly that reason
+   — a clipped small button cut its own 44px tap area, because `.tap-target`'s
+   ::after extension lives inside the clip. Ruling 49 puts the cut corner on every
+   button, so the exemption is not a special case to preserve: it was the symptom
+   that the technique was wrong.
+
+   THE TECHNIQUE (ruling 14, promoted to the default by 49). The button element is
+   NEVER clipped. A backing layer — `::before`, `z-index: -1` inside the button's own
+   stacking context — carries the `clip-path` and paints the whole material: fill,
+   rim, texture, cue. Paint gets the silhouette; the tap area stays a whole rectangle.
+
+     - `isolation: isolate` is load-bearing. Without it a `z-index: -1` child escapes
+       the button and paints behind whatever ancestor last established a stacking
+       context, which is a button-shaped hole in the panel under it.
+     - `inset: -1px` spans the BORDER box, not the padding box (an absolutely
+       positioned child's containing block is the padding box). Two reasons: the
+       button's 1px border is kept purely so this file changes no geometry anywhere
+       in the app, and a negative-z-index pseudo paints ABOVE its originating
+       element's own background and border — so a backing layer that reaches the
+       border box covers any rectangle a consumer's stylesheet draws underneath it,
+       and one silhouette survives.
+     - The rim is a BORDER on the backing layer, and the cut leaves the two diagonals
+       bare. That is the landing door's own construction (`.choices .nh-btn` in
+       apps/client/src/styles.css), and matching it is the point of the exercise.
+     - Glow rides `filter: drop-shadow` on the backing layer, never `box-shadow`:
+       box-shadow cannot follow a clip-path cut. On the LAYER rather than the button,
+       so the label never blooms with it.
+
+   THE VARIANTS SET COLOURS, NOTHING ELSE. Four local properties (`--nh-fill`,
+   `--nh-rim`, `--nh-tex`, `--nh-cue`) and a filter; the geometry is written once.
+
+   IT IS THE SAME CONSTRUCTION AS `.chamfer` / `.rim` / `.cue` IN design-tokens.css, and the
+   duplication is deliberate: those are MARKUP utilities, and roughly a third of this app's
+   `.nh-btn`s are hand-rolled `<button className="nh-btn">` in app code that would never receive
+   the class. Expressed here it reaches every one of them. What is NOT duplicated is the values —
+   the rim, bezel and cue colours are the shared tokens, so ruling 29's daybreak translation (a
+   hard dark line where night has a lit one) arrives here for free and cannot drift.
+
+   TOUCH (ruling 40's constraint). Hover does not exist on half this table's devices,
+   so `:active` is in every selector `:hover` is in. A control whose only feedback is
+   `:hover` is the Steps.tsx bug repeated.
+   ============================================================================ */
+
 .nh-btn {
+  position: relative;
+  /* The backing layer's stacking context. See the header. */
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  /* 44px touch floor (decision 16): the default button carries it as real paint. */
+  /* 44px touch floor (decision 16): the default button carries it as real paint.
+     BOTH AXES. `min-height` alone was the floor for a long time, and it held only because the
+     horizontal padding happened to be wide enough — which made the width floor an accident of the
+     spacing scale rather than a rule. Round 2's density pass took --space-5 from 20px to 16px and
+     a "+" button on the map manager fell to 43px wide: still passing every height check, one pixel
+     under on an axis nothing was asserting. State the invariant instead of re-deriving it.
+     `--sm` and `.nh-iconbtn` are exempt because they reach the floor by route 2 (a centred 44px
+     `.tap-target::after`) rather than by paint, and widening their paint would change layout. */
   min-height: var(--tap-min);
   padding: var(--space-3) var(--space-5);
+  /* Geometry only — the visible edge is `--nh-rim` on the backing layer. Kept as a
+     border rather than folded into the padding so no button in the app changes size. */
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font: 600 var(--fs-body) / 1 var(--font-body);
-  color: var(--text);
+  border-radius: 0;
   background: transparent;
+  /* Ruling 3: the arcade face sets control labels now. Weight and tracking match the
+     landing doors (styles.css `.choices .nh-btn`) at the app's smaller size — .06em
+     rather than .12em because a button label is a word in a row, not a title. */
+  font: 700 var(--fs-body) / 1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
+
+  --nh-fill: transparent;
+  --nh-rim: transparent;
+  /* The texture (ruling 2's scanline-over-gradient, ruling 40's "the texture" that
+     disabled drops). Deliberately WEAKER than the `.scanlines` utility: a full-strength
+     --scanline-color band over the magenta fill measures 3.69:1 against --text-on-neon,
+     under the 4.5 floor, and a button label is normal-size text. At 35% the darkest band
+     measures 4.93:1. Measured, not chosen. It also keeps the interference faint where a
+     textured button sits on a textured panel (ruling 28's moiré). */
+  --nh-tex: color-mix(in srgb, var(--scanline-color) 35%, transparent);
+  --nh-cue: none;
+  --nh-glow: none;
+  /* The shared cue mark, at a button's scale. `--cue-inset: .95rem` is the landing door's, sized
+     for 2.4rem of padding; an app button has 20px and the triangle would sit on the label. The
+     1:2 w:h ratio is not free choice — the token's conic wedge is exact only at that ratio. */
+  --cue-w: .3rem;
+  --cue-h: .6rem;
+  --cue-inset: .34rem;
 }
+
+.nh-btn::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w, 2px) solid var(--nh-rim);
+  background-color: var(--nh-fill);
+  /* Three layers, first on top: the cue triangle, the scanline tile, the gradient sheen. The cue
+     is drawn in the BACKGROUND rather than on a pseudo-element because `::after` is spoken for —
+     `.tap-target::after` is the 44px hit-area extension on `--sm`, and overwriting it is the
+     exact regression this file exists to avoid. */
+  background-image:
+    var(--nh-cue),
+    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--nh-tex) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(to bottom, color-mix(in srgb, var(--text) 7%, transparent), transparent 60%);
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-size: var(--cue-w) var(--cue-h), 100% var(--scanline-gap), 100% 100%;
+  background-position: var(--cue-inset) center, 0 0, 0 0;
+  background-origin: border-box;
+  background-clip: border-box;
+  filter: var(--nh-glow);
+  transition: background-color var(--dur-hover), border-color var(--dur-hover), filter var(--dur-hover);
+}
+
 /* Small keeps its light visual weight; Button/LinkButton add `.tap-target`, which
-   grows the hit area back to the 44px floor without growing the paint. */
+   grows the hit area back to the 44px floor without growing the paint — and which
+   now survives, because the button itself is no longer clipped. The cut does NOT shrink
+   with the box: ruling 24 asks for one silhouette "from the largest button to the smallest
+   count badge", and `--chamfer-cut` computes on `:root` with its `var()` already substituted,
+   so re-sizing `--chamfer` here would have done nothing anyway — measured, and the reason
+   Badge.css redeclares the polygon rather than the size. */
+/* The width half of the floor. Scoped rather than folded into `.nh-btn` so the two route-2
+   controls keep their paint: `--sm` and the icon button reach 44px through `.tap-target::after`. */
+.nh-btn:not(.nh-btn--sm) { min-width: var(--tap-min); }
 .nh-btn--sm { min-height: 2rem; padding: var(--space-2) var(--space-3); font-size: var(--fs-sm); }
 .nh-btn--block { display: flex; width: 100%; }
 
 /* Primary — magenta fill, dark ink, glow only on hover (§5.1) */
-.nh-btn--primary { background: var(--primary); color: var(--text-on-neon); }
-.nh-btn--primary:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
+.nh-btn--primary { --nh-fill: var(--primary); --nh-rim: var(--magenta-hi); color: var(--text-on-neon); }
 
-/* Secondary — bordered, fills to surface-3 with a low-alpha cyan edge on hover */
-.nh-btn--secondary { border-color: var(--line-strong); color: var(--text); }
-.nh-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-3);
-  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
-}
+/* Secondary — the resting default: no fill, a rim that is the whole edge. It takes the shared
+   `--rim-color`, so daybreak gets ruling 29's hard dark line rather than an inverted neon. */
+.nh-btn--secondary { --nh-rim: var(--rim-color); color: var(--text); }
 
-/* Ghost — text only */
-.nh-btn--ghost { color: var(--text-dim); }
-.nh-btn--ghost:hover:not(:disabled) { color: var(--text); background: color-mix(in srgb, var(--surface-3) 60%, transparent); }
+/* Ghost — text only, so it has no rim at rest either; the cue and a quiet fill are
+   its entire interaction language. */
+.nh-btn--ghost { color: var(--text-dim); --nh-tex: transparent; }
 
 /* Destructive — danger edge at rest, fills on hover, always with a clear label */
-.nh-btn--destructive { border-color: var(--danger); color: var(--danger-hi); }
-.nh-btn--destructive:hover:not(:disabled) { background: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
+.nh-btn--destructive { --nh-rim: var(--danger); color: var(--danger-hi); }
 
-.nh-btn:disabled { background: var(--surface-2); color: var(--text-muted); border-color: transparent; cursor: not-allowed; box-shadow: none; }
+/* ---- Interaction (ruling 40): the rim brightens, the cue triangle appears. ----
+   `:active` carries exactly what `:hover` carries — see the header. */
+.nh-btn:hover:not(:disabled), .nh-btn:active:not(:disabled), .nh-btn:focus-visible { --nh-cue: var(--cue-mark); }
+.nh-btn--primary:hover:not(:disabled), .nh-btn--primary:active:not(:disabled), .nh-btn--primary:focus-visible {
+  --nh-fill: var(--magenta-hi);
+  --nh-rim: var(--magenta-hi);
+  --nh-glow: var(--glow-drop-magenta);
+}
+.nh-btn--secondary:hover:not(:disabled), .nh-btn--secondary:active:not(:disabled), .nh-btn--secondary:focus-visible {
+  --nh-fill: var(--surface-3);
+  --nh-rim: var(--rim-color-hi);
+}
+.nh-btn--ghost:hover:not(:disabled), .nh-btn--ghost:active:not(:disabled), .nh-btn--ghost:focus-visible {
+  color: var(--text);
+  --nh-fill: color-mix(in srgb, var(--surface-3) 60%, transparent);
+  --nh-rim: var(--rim-color);
+}
+.nh-btn--destructive:hover:not(:disabled), .nh-btn--destructive:active:not(:disabled), .nh-btn--destructive:focus-visible {
+  --nh-fill: var(--danger);
+  --nh-rim: var(--danger-hi);
+  color: var(--text-on-neon);
+  --nh-glow: var(--glow-drop-danger);
+}
+
+/* Ruling 40: DISABLED DROPS THE RIM AND THE TEXTURE AND KEEPS A FLAT BOX, so inert
+   reads as a material state and not only as reduced opacity. The cut corner stays —
+   ruling 49 makes it the app's silhouette, not a signal about availability. */
+.nh-btn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  --nh-fill: var(--surface-2);
+  --nh-rim: transparent;
+  --nh-tex: transparent;
+  --nh-cue: none;
+  --nh-glow: none;
+}
+.nh-btn:disabled::before { background-image: none; }
+
+/* (No `:focus-visible` outline override here any more. The inset outline existed
+   because the BUTTON carried the clip-path and an outer ring was clipped away; the
+   button is not clipped now, so the app-wide focus ring in design-tokens.css applies
+   unchanged — which is the director's ruling that the focus ring does not move in
+   this pass, honoured by deleting a workaround rather than by writing a new one.) */
 
 /* Icon-only square control. Paint stays compact for dense toolbars; `.tap-target`
-   (added by the component) lifts the hit area to the 44px floor. */
+   (added by the component) lifts the hit area to the 44px floor.
+
+   Ruling 49 reaches this too, so the same backing layer applies. NOTE FOR A LATER
+   LANE: the fill and the edge now live on `--nh-fill` / `--nh-rim`, so a consumer
+   stylesheet that sets `background` or `border-color` on `.nh-iconbtn` is painting
+   underneath an opaque layer and no longer has an effect — see the report. */
 .nh-iconbtn {
+  position: relative;
+  isolation: isolate;
   display: inline-grid;
   place-items: center;
   width: 2.25rem;
@@ -52,13 +214,30 @@
   /* line-height:1 so a glyph child (✕) centers on the grid instead of riding its
      inherited ~1.5 line box (which pushed the × visibly high — see sheet close). */
   line-height: 1;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-dim);
   cursor: pointer;
+  --nh-fill: var(--surface-2);
+  --nh-rim: var(--rim-color);
+  --nh-tex: transparent;
+  --nh-glow: none;
+}
+.nh-iconbtn::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w, 2px) solid var(--nh-rim);
+  background: var(--nh-fill);
+  filter: var(--nh-glow);
+  transition: background-color var(--dur-hover), border-color var(--dur-hover), filter var(--dur-hover);
 }
 .nh-iconbtn--sm { width: 1.85rem; height: 1.85rem; }
-.nh-iconbtn:hover:not(:disabled) { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.nh-iconbtn[aria-pressed="true"] { color: var(--text); border-color: var(--magenta); box-shadow: var(--glow-magenta); }
-.nh-iconbtn:disabled { color: var(--text-muted); cursor: not-allowed; }
+.nh-iconbtn:hover:not(:disabled), .nh-iconbtn:active:not(:disabled) { color: var(--text); --nh-rim: var(--rim-color-hi); }
+.nh-iconbtn[aria-pressed="true"] { color: var(--text); --nh-rim: var(--magenta); --nh-glow: var(--glow-drop-magenta); }
+.nh-iconbtn:disabled { color: var(--text-muted); cursor: not-allowed; --nh-rim: transparent; --nh-glow: none; }

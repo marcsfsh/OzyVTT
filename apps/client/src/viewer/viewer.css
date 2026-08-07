@@ -1,92 +1,283 @@
-/* Page-level reset (`:root`, `*`, `html, body, #viewer-root`, form fonts) lives in viewer-page.css,
-   imported ONLY by viewer-main.tsx. This file holds the `.viewer-*` component styles, which are also
-   loaded by the main app (via the GM's in-tab Viewer preview reusing MapStage/Initiative); a global
-   `overflow: hidden` reset here would kill the main SPA's page scroll. */
-.viewer-eyebrow { color: var(--text-dim); font-size: clamp(.72rem, 1.2vw, 1rem); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-/* Pairing/waiting are the viewer's hero zones: a magenta bloom on the void (§6.2 horizon glow). */
-.viewer-pairing, .viewer-waiting { width: 100%; height: 100%; display: grid; place-items: center; padding: 2rem; text-align: center; background: radial-gradient(circle at center, color-mix(in srgb, var(--magenta) 22%, var(--void)), var(--void) 65%); }
+/* The `.viewer-*` component styles for the shared screen. Page-level reset (`:root`, `*`,
+   `html, body, #viewer-root`, form fonts) lives in viewer-page.css.
+
+   BOTH files reach ONLY viewer.html: this one is imported by ViewerApp.tsx, which is rendered only
+   by viewer-main.tsx. The GM's in-tab "Preview what players see" is an `<iframe src="/viewer.html">`
+   — the same document, not a second consumer — so nothing here is ever loaded into the main SPA.
+   (Measured 2026-08-06. The header this replaces claimed the SPA reuses these components directly,
+   which was false, and made the split below look like a constraint the SPA imposed rather than the
+   separation of concerns it is.)
+
+   Keep the split anyway: a page-level reset belongs with the page it resets, and viewer.html is the
+   only page either file has. */
+/* ═══════ RULING 34 — THE SHARED SCREEN: MORE IDENTITY, LESS DENSITY ═══════
+   It is the only surface nobody touches and the only one read from across a room, so it takes
+   bigger type, the full sky and drama the interactive screens cannot afford.
+
+   THREE THINGS THIS FILE MUST NOT DO, all of them load-bearing:
+
+   1. IT TAKES NO ROLE HUE (ruling 51). Every other piece of chrome in the app tints itself so the
+      client can tell a GM window from a player window at a glance. This screen has no role — it is
+      what the table looks at — and a GM tint here would be actively wrong. Nothing below reads
+      `--rim-gm`, `--rim-player` or any of their washes, and nothing should be added that does.
+
+   2. IT KEEPS THE LOOSER SPACING SCALE. The `#viewer-root` block in viewer-page.css restores the
+      pre-tightening steps for this page and nowhere else (ruling 33 is uniform across the APP; this
+      surface is exempt). Do not re-tighten and do not delete that block.
+
+   3. IT IS PAINT ONLY. This file is inside the projection boundary. Nothing here may cause a field
+      to render that was not rendering before — a new field appearing on the shared screen is a leak,
+      not a feature. The viewer still shows names, initiative order and coarse health BANDS; exact HP
+      and GM-only tokens never reach this document, and nothing in this pass touches what does.
+
+   THIS PAGE IS ALWAYS NIGHT. `viewer-main.tsx` sets no `data-theme`, so the dusk/daybreak blocks in
+   design-tokens.css never match here. That is correct for a screen in a lit room at a table, and it
+   is why the values below are tuned once rather than three times. */
+.viewer-eyebrow { color: var(--text-dim); font-size: clamp(.8rem, 1.35vw, 1.15rem); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+/* Pairing/waiting are the viewer's hero zones, and they hold no map — so they take the FULL sky the
+   app's panes wear (ruling 22 scopes the sky away from the MAP, and there is no map on these two).
+   Bloom, stars and the horizon glow over the wash; the crest and the horizon rule ride `::after`. */
+.viewer-pairing, .viewer-waiting {
+  position: relative;
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+  padding: var(--space-8);
+  text-align: center;
+  overflow: hidden;
+  background-image:
+    linear-gradient(90deg, transparent 0%, var(--sky-horizon-a) 22%, var(--sky-horizon-b) 50%, var(--sky-horizon-a) 78%, transparent 100%),
+    var(--sky-bloom),
+    var(--sky-horizon-glow),
+    radial-gradient(1px 1px at 22px 31px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 193px 22px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 71px 140px, var(--sky-star-dim) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 45px 213px, var(--sky-star-dim) 50%, transparent 51%),
+    var(--sky-wash);
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat, repeat, repeat, no-repeat;
+  background-position: 0 calc(100% - var(--sky-horizon-inset)), 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-size: 100% 2px, auto, auto,
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    auto;
+}
+/* The crest. Its background is the sun, masked to the top of a --sky-sun-d circle whose centre sits
+   on the horizon rule above — the same construction, and the same crown-is-half-the-disc ratio, as
+   `.pane-sky::after` in styles.css. It is decoration on a screen nobody touches, so
+   `pointer-events: none` is belt and braces rather than a fix for a reported bug. */
+.viewer-pairing::after, .viewer-waiting::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - var(--sky-sun-d) / 2);
+  bottom: calc(var(--sky-horizon-inset) - var(--sky-sun-crown));
+  width: var(--sky-sun-d);
+  height: var(--sky-sun-crown);
+  background-image: var(--sky-sun);
+  opacity: var(--sky-sun-opacity);
+  -webkit-mask-image: var(--sky-sun-mask);
+  mask-image: var(--sky-sun-mask);
+  pointer-events: none;
+}
 .viewer-pairing form { width: min(100%, 34rem); padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-1); text-align: left; }
-.viewer-pairing h1, .viewer-waiting h1 { margin: .5rem 0; font: 400 clamp(2.5rem, 7vw, 5.5rem)/1 var(--font-display); }
-.viewer-pairing p, .viewer-waiting p { color: var(--text-dim); line-height: 1.5; }
-.viewer-pairing label { display: block; margin-top: 1.25rem; color: var(--text-dim); font-weight: 700; }
-.viewer-pairing input { width: 100%; margin-top: .4rem; padding: .9rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: 1.1rem; }
-.viewer-pairing button { width: 100%; margin-top: 1.5rem; padding: 1rem; border: 0; border-radius: var(--radius-md); background: var(--primary); color: var(--text-on-neon); font-weight: 800; cursor: pointer; }
+.viewer-pairing h1, .viewer-waiting h1 { margin: var(--space-2) 0; font: 400 clamp(2.5rem, 7vw, 5.5rem)/1 var(--font-display); }
+/* Read from across a room, not from a lap: the body line on the idle screens is sized for the far
+   end of the table. Ruling 34's "bigger type" is the whole point of this surface. */
+.viewer-pairing p, .viewer-waiting p { color: var(--text-dim); line-height: 1.5; font-size: clamp(1rem, 1.5vw, 1.45rem); }
+.viewer-pairing label { display: block; margin-top: var(--space-5); color: var(--text-dim); font-weight: 700; }
+.viewer-pairing input { width: 100%; margin-top: .4rem; padding: .9rem var(--space-4); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: 1.1rem; }
+.viewer-pairing button { width: 100%; margin-top: var(--space-6); padding: var(--space-4); border: 0; border-radius: var(--radius-md); background: var(--primary); color: var(--text-on-neon); font-weight: 800; cursor: pointer; }
 .viewer-pairing button:hover { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .viewer-pairing button:focus-visible, .viewer-pairing input:focus-visible, .viewer-fullscreen:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
 .viewer-feedback { min-height: 1.5rem; color: var(--danger-hi) !important; }
 .viewer-shell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) var(--viewer-initiative-width, clamp(16rem, 22vw, 30rem)); background: var(--void); }
 .viewer-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; cursor: grab; touch-action: none; }
 .viewer-stage:active { cursor: grabbing; }
-.viewer-stage svg { width: 100%; height: 100%; background: var(--void); }
+/* RULING 30, MIRRORED ONTO THE SHARED SCREEN. The room is looking at the same map the GM is, so it
+   is framed as the same instrument: four corner ticks inside a clean plate, and NOTHING painted
+   behind the map (ruling 22). The sky the idle screens above just took stops at this box's edge —
+   the initiative column carries it on the other side, which is exactly "behind the chrome, never
+   behind the map".
+
+   POINTER-EVENTS: NONE IS NOT OPTIONAL. `.viewer-stage` is the pan surface (onPointerDown/Move/Up in
+   ViewerApp) and this box spans all of it; without the line every drag on the shared screen would
+   land on a decoration. Same rule, same reason, as the table's stage. */
+.viewer-stage::after {
+  content: "";
+  position: absolute;
+  inset: var(--space-3);
+  z-index: 1;
+  pointer-events: none;
+  --map-tick-len: 2rem;
+  --map-tick-w: 3px;
+  --map-tick: linear-gradient(var(--rim-color-hi), var(--rim-color-hi));
+  background-image: var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick);
+  background-repeat: no-repeat;
+  background-size:
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len),
+    var(--map-tick-len) var(--map-tick-w), var(--map-tick-w) var(--map-tick-len);
+  background-position:
+    left top, left top,
+    right top, right top,
+    left bottom, left bottom,
+    right bottom, right bottom;
+}
+/* Direct child, matching `.encounter-map-stage > svg` (encounter-map.css). Measured, this stage
+   holds exactly one svg today and it IS the direct child (the zoom cluster's buttons are text), so
+   this scoping changes nothing now — it removes the trap before the first glyph lands here. On the
+   table the same descendant shape was sizing and painting every toolbar, dock and zoom glyph. */
+.viewer-stage > svg { width: 100%; height: 100%; background: var(--void); }
 .viewer-zoom { position: absolute; right: .8rem; bottom: .8rem; display: flex; gap: .4rem; }
-.viewer-zoom button { padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); font-weight: 700; cursor: pointer; opacity: .55; transition: opacity var(--dur-hover), border-color var(--dur-hover); }
+.viewer-zoom button { padding: var(--space-2) .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); font-weight: 700; cursor: pointer; opacity: .55; transition: opacity var(--dur-hover), border-color var(--dur-hover); }
 .viewer-zoom button:hover, .viewer-zoom button:focus-visible { opacity: 1; border-color: var(--cyan); }
 /* Tokens on the shared screen: team coding (§6.6). Glyph fills stay fixed light for legibility. */
 .viewer-token { pointer-events: none; }
 .viewer-token-body { fill: color-mix(in srgb, var(--cyan) 40%, var(--void)); stroke: var(--cyan-hi); stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
 .viewer-token.monster .viewer-token-body { fill: color-mix(in srgb, var(--magenta) 40%, var(--void)); stroke: var(--magenta-hi); }
 .viewer-token.npc .viewer-token-body { fill: color-mix(in srgb, var(--indigo) 45%, var(--void)); stroke: var(--violet-hi); }
-.viewer-token-turn { fill: rgb(255 46 154 / 18%); stroke: var(--magenta); stroke-width: 5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%)); }
+/* RULING 36, mirrored: one pulse when the turn arrives, then rest. The ring `<circle>` is rendered
+   only while the token is active, so it MOUNTS on the turn change and the animation runs exactly
+   once — an event, not an alarm. `transform-box: fill-box` because an SVG element's default
+   transform-box is the view-box, and `center` without it means the centre of the whole battlemap. */
+.viewer-token-turn { fill: rgb(255 46 154 / 18%); stroke: var(--magenta); stroke-width: 5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%)); transform-box: fill-box; transform-origin: center; animation: viewer-turn-pulse .72s ease-out 1; }
+@keyframes viewer-turn-pulse {
+  0%   { transform: scale(.72); opacity: 0; }
+  38%  { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
 .viewer-token-initials, .viewer-token-name { fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: var(--font-body); font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
 .viewer-token-initials { font-size: 18px; }
 .viewer-token-name { font-size: 13px; dominant-baseline: hanging; }
 .viewer-measurement { fill: none; stroke: var(--cyan); stroke-width: 4; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 2px #000); }
 .viewer-ping circle { fill: none; stroke: var(--magenta); stroke-width: 4; vector-effect: non-scaling-stroke; animation: viewer-pulse 1s ease-out 5; }
 .viewer-ping circle + circle { fill: var(--magenta); animation: none; }
-.viewer-distance, .viewer-ping-label { position: absolute; padding: .45rem .75rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 88%, transparent); color: var(--cyan-hi); font-size: clamp(1rem, 2vw, 1.6rem); font-weight: 800; box-shadow: var(--shadow-2); }
+.viewer-distance, .viewer-ping-label { position: absolute; padding: .45rem var(--space-3); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 88%, transparent); color: var(--cyan-hi); font-size: clamp(1rem, 2vw, 1.6rem); font-weight: 800; box-shadow: var(--shadow-2); }
 .viewer-distance { left: 50%; bottom: 2rem; transform: translateX(-50%); }
 .viewer-ping-label { top: 2rem; left: 50%; transform: translateX(-50%); color: var(--magenta-hi); }
 /* Drag-resizable column: the panel holds a pinned resize handle at its left edge; the content scrolls
-   inside a wrapper so the handle never scrolls away. */
-.viewer-initiative { position: relative; overflow: hidden; border-left: 1px solid var(--line); background: var(--surface-1); }
-.viewer-initiative-scroll { height: 100%; overflow: auto; padding: 0 clamp(.6rem, 1.4vw, 1.4rem) clamp(.6rem, 1.4vw, 1.4rem); }
+   inside a wrapper so the handle never scrolls away. The panel is a frame (`.frame-col` in the
+   markup) and the wrapper is its canvas (`.frame-fill .scroll-y`) — §7's declared region. Sizing the
+   wrapper by flex rather than `height: 100%` is what lets the SAME element scroll at both aspects:
+   the portrait block below caps the panel at 32vh and the canvas takes the clamped height, so the
+   scroll never has to be handed outward. */
+/* THE CHROME COLUMN TAKES THE SKY, AND THE RIM (rulings 22, 30, 34). This is the shared screen's
+   only piece of chrome, so it is where the horizon belongs — the map plate beside it stays clean.
+   The inner edge becomes the 2px rim rather than a 1px hairline: it is the boundary between the
+   instrument and its readout, which is the one structural line on this surface. */
+.viewer-initiative {
+  position: relative;
+  overflow: hidden;
+  border-left: var(--rim-w) solid var(--rim-color);
+  background-image:
+    radial-gradient(1px 1px at 22px 31px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 193px 22px, var(--sky-star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 71px 140px, var(--sky-star-dim) 50%, transparent 51%),
+    var(--sky-wash);
+  background-repeat: repeat, repeat, repeat, no-repeat;
+  background-size:
+    var(--sky-star-tile) var(--sky-star-tile), var(--sky-star-tile) var(--sky-star-tile),
+    var(--sky-star-tile) var(--sky-star-tile), auto;
+}
+.viewer-initiative-scroll { padding: 0 clamp(.6rem, 1.4vw, 1.4rem) clamp(.6rem, 1.4vw, 1.4rem); }
 .viewer-initiative-resize { position: absolute; z-index: 3; left: 0; top: 0; bottom: 0; width: 14px; cursor: col-resize; touch-action: none; }
 .viewer-initiative-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--line); transition: background .15s, width .15s; }
 .viewer-initiative-resize:hover::before, .viewer-initiative-resize:active::before { background: var(--cyan); width: 4px; }
 /* The shared screen mirrors the PLAYER panel (feedback #5): a compact Round-pill header, no big serif,
    scaled up for the room. It reads as a player with no active turn - no HP bars, no controls. */
-.viewer-initiative-head { position: sticky; top: 0; z-index: 1; padding: clamp(.9rem, 2vw, 2rem) 0 clamp(.6rem, 1.2vw, 1.1rem); background: var(--surface-1); }
-.viewer-initiative-round { display: inline-flex; align-items: center; padding: .35em .85em; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); color: var(--text); font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 var(--font-mono); white-space: nowrap; }
+/* The sticky head is now a plate over the sky, not over `--surface-1`: it has to be OPAQUE or the
+   rows scrolling under it show through. `--void` is within a couple of steps of the wash's top stop
+   (#030210), so it reads as the top of the sky rather than as a band laid on it. */
+.viewer-initiative-head { position: sticky; top: 0; z-index: 1; padding: clamp(.9rem, 2vw, 2rem) 0 clamp(.6rem, 1.2vw, 1.1rem); background: var(--void); }
+/* RULING 24 — the round counter is a count badge, and counts are the fourth de-pilled family. Square
+   on the shared screen too: it is the surface the whole table looks at, so a lone pill there reads as
+   a leftover from a different app. */
+.viewer-initiative-round { display: inline-flex; align-items: center; padding: .35em .85em; border-radius: 0; background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); color: var(--text); font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 var(--font-mono); white-space: nowrap; }
 .viewer-hidden-turn { margin: 0 0 clamp(.5rem, 1vw, 1rem); padding: .6rem .9rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--violet-hi); font-weight: 800; }
 .viewer-initiative ol { list-style: none; margin: 0; padding: 0; }
-.viewer-initiative li { display: flex; align-items: stretch; justify-content: space-between; gap: 1rem; padding: clamp(.5rem, 1.2vw, 1.1rem) clamp(.5rem, 1.2vw, 1.1rem); border-top: 1px solid var(--line); font-size: clamp(1rem, 1.65vw, 1.65rem); }
-/* Same soft, rounded active highlight as the player list - a magenta rounded-off left accent + glow. */
-.viewer-initiative li.active { border-top-color: transparent; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .3rem 0 0 var(--magenta), var(--glow-magenta-strong); padding-left: clamp(.7rem, 1.5vw, 1.4rem); }
+.viewer-initiative li { display: flex; align-items: stretch; justify-content: space-between; gap: var(--space-4); padding: clamp(.5rem, 1.2vw, 1.1rem) clamp(.5rem, 1.2vw, 1.1rem); border-top: 1px solid var(--line); font-size: clamp(1rem, 1.65vw, 1.65rem); }
+/* Same soft, rounded active highlight as the player list - a magenta rounded-off left accent + glow.
+   RULING 36: it also LIGHTS ONCE when the turn arrives. The `<li>` already exists when it gains
+   `.active`, and a CSS animation starts when an element begins matching its selector — so the flare
+   fires on the class change, not on mount, and does not repeat. The token on the map pulses in the
+   same beat (`viewer-turn-pulse` above), which is what ties the readout to the instrument. */
+.viewer-initiative li.active { border-top-color: transparent; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .3rem 0 0 var(--magenta), var(--glow-magenta-strong); padding-left: clamp(.7rem, 1.5vw, 1.4rem); animation: viewer-turn-flare .72s ease-out 1; }
+@keyframes viewer-turn-flare {
+  0%   { box-shadow: inset .3rem 0 0 var(--magenta), var(--glow-magenta-strong); filter: brightness(1); }
+  30%  { box-shadow: inset .9rem 0 0 var(--magenta), var(--glow-magenta-strong); filter: brightness(1.55); }
+  100% { box-shadow: inset .3rem 0 0 var(--magenta), var(--glow-magenta-strong); filter: brightness(1); }
+}
 .viewer-initiative li strong { color: var(--text); font-family: var(--font-mono); }
 /* The shared row scales up for the room display; its em-relative styles handle the rest (sized so a
-   typical monster name, dots, and the health tag share one line in the sidebar). */
-.viewer-initiative .init-row { font-size: clamp(.9rem, 1.05vw, 1.2rem); }
+   typical monster name, dots, and the health tag share one line in the sidebar).
+   RULING 34 raises the whole ramp — this is the surface read from the far end of the table, and it
+   was the one place in the app where the SHARED row was set SMALLER than its container. The name
+   still ellipsizes past ~8ch and the dots/health tag still wrap beneath it, so a wider name costs a
+   second line rather than a horizontal scroller (measured on the 9-viewport audit, all green). */
+.viewer-initiative .init-row { font-size: clamp(1.05rem, 1.3vw, 1.55rem); }
 /* Give the name the row's full first line before it ellipsizes; dots/health wrap beneath it. Widen
    the panel (drag handle) when a room needs more. */
 .viewer-initiative .init-row-name { min-width: 0; }
 .viewer-fullscreen { position: fixed; z-index: 5; left: 1rem; top: 1rem; padding: .55rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); cursor: pointer; opacity: .25; transition: opacity var(--dur-hover); }
 .viewer-fullscreen:hover, .viewer-fullscreen:focus-visible { opacity: 1; }
-.viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-2) 66%, var(--cyan)); color: var(--text); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+/* RULING 24 — a status label, square like every other one. */
+.viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: 0; background: color-mix(in srgb, var(--surface-2) 66%, var(--cyan)); color: var(--text); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-connection.reconnecting { background: color-mix(in srgb, var(--surface-2) 66%, var(--caution)); }
 @keyframes viewer-pulse { from { opacity: 1; transform: scale(.45); } to { opacity: 0; transform: scale(1.25); } }
-@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; overflow: auto; border-left: 0; border-top: 1px solid var(--line); } .viewer-initiative-scroll { height: auto; overflow: visible; } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid var(--line); } .viewer-connection { right: 1rem; } }
-@media (prefers-reduced-motion: reduce) { .viewer-ping circle { animation: none; } }
-/* Health band + conditions on the shared screen (bands only, never exact numbers). */
-.viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem .5rem; border-radius: var(--radius-pill); font: 800 .55em/1.6 var(--font-body); letter-spacing: .05em; vertical-align: middle; }
+@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; border-left: 0; border-top: 1px solid var(--line); } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid var(--line); } .viewer-connection { right: 1rem; } }
+/* Frozen, not removed: the active row still lights and the ring still appears — they simply arrive
+   instead of pulsing. Ruling 36 is an event marker, and the marker survives the freeze. */
+@media (prefers-reduced-motion: reduce) {
+  .viewer-ping circle,
+  .viewer-token-turn,
+  .viewer-initiative li.active { animation: none; }
+}
+/* Health band + conditions on the shared screen (bands only, never exact numbers).
+   RULING 24 — a status label. The GAUGES stay round (`--radius-pill` survives for HP/progress bars
+   and token rings); this is the word "Bloodied" in a box, not a gauge. */
+.viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem var(--space-2); border-radius: 0; font: 800 .55em/1.6 var(--font-body); letter-spacing: .05em; vertical-align: middle; }
 .viewer-health-bloodied { background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta)); color: var(--magenta-hi); }
 .viewer-health-down { background: color-mix(in srgb, var(--surface-3) 60%, var(--danger)); color: var(--danger-hi); }
 .viewer-conditions { display: block; margin-top: .15rem; color: var(--violet-hi); font-size: .6em; }
 .token-health { stroke: var(--void); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .token-health-bloodied { fill: var(--magenta); }
 .token-health-down { fill: var(--danger); }
-/* Richer token-health indicators mirrored on the shared screen (audience "all"); fill color inlined. */
+/* Richer token-health indicators mirrored on the shared screen (audience "all").
+
+   THE BAND CLASS CARRIES A COLOUR, NOT A SET OF PROPERTIES — the same contract as the table's block
+   in encounter-map.css, and it must stay the same on both surfaces. `healthFillClass()`
+   (mapImage.tsx:185) returns ONE class for THREE element kinds needing three different properties:
+   the ring `<circle>` wants `stroke` and no `fill`, the bar `<rect>` wants `fill` and no `stroke`,
+   the aura's `<stop>`s want `stop-color`. While `.hp-fill-*` declared all three, the suppressors
+   below lost to it on order at equal (0,1,0) specificity, so on the shared screen too the ring
+   painted a solid disc instead of an annulus and the bar painted a stroke it was told not to have.
+   Mapping one custom property to the one property each consumer needs removes the collision rather
+   than re-deciding who wins it; this file and encounter-map.css are near-duplicates and that
+   duplication is exactly why "just reorder it" would not have held.
+
+   PAINT ONLY. Nothing here is read by the server and nothing here changes what is projected: the
+   band->colour mapping is untouched (healthy > 50% cyan, bloodied > 25% magenta, else danger —
+   mapImage.tsx:187-189), and the viewer still derives its fraction from the coarse band it is sent
+   (`bandFraction`, ViewerApp.tsx:179). Exact HP still never reaches this surface. */
 .token-health-bar-track { fill: var(--void); fill-opacity: .8; }
-.token-health-bar-fill { stroke: none; }
+.token-health-bar-fill { fill: var(--hp-band); stroke: none; }
 .token-health-ring-track { fill: none; stroke: var(--void); stroke-opacity: .5; }
-.token-health-ring-fill { fill: none; }
+.token-health-ring-fill { fill: none; stroke: var(--hp-band); }
 .token-health-aura { pointer-events: none; }
-/* Theme-aware health fill mirrored on the shared screen: bar fill, ring stroke, and aura stop-color
-   resolve the same themed brand token, so map health follows dark/dusk/light. */
-.hp-fill-healthy { fill: var(--cyan); stroke: var(--cyan); stop-color: var(--cyan); }
-.hp-fill-bloodied { fill: var(--magenta); stroke: var(--magenta); stop-color: var(--magenta); }
-.hp-fill-down { fill: var(--danger); stroke: var(--danger); stop-color: var(--danger); }
-/* Fog of war on the shared screen: solid --void cover — the audience sees only what the GM revealed. */
-.fog-overlay-player { fill: var(--void); }
+/* The third consumer. It never had a suppressor to lose to, so its paint is unchanged. */
+.token-health-aura stop { stop-color: var(--hp-band); }
+/* Theme-aware health band mirrored on the shared screen: the themed brand token, so map health
+   follows dark/dusk/light. */
+.hp-fill-healthy { --hp-band: var(--cyan); }
+.hp-fill-bloodied { --hp-band: var(--magenta); }
+.hp-fill-down { --hp-band: var(--danger); }
+/* Fog of war on the shared screen: solid --void cover — the audience sees only what the GM revealed.
+   RULING 38 REACHES THIS FILE AS A CONSTRAINT, NOT A LICENCE. The table's GM veil got hue and value
+   identity because the GM's fog is a working state; the room's fog is an ABSENCE and stays a flat,
+   fully opaque plate. `fill-opacity: 1` is stated rather than implied because it is the one
+   declaration on this surface whose value is a safety property: the boundary is the projection, but
+   a translucent cover here would show the table what the GM hid. The edge is the SVG mask's own
+   binary alpha cut — no feather, ever. */
+.fog-overlay-player { fill: var(--void); fill-opacity: 1; }
 
 .token-condition circle { fill: color-mix(in srgb, var(--surface-3) 65%, var(--violet)); stroke: var(--violet); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .token-condition text { fill: var(--violet-hi); font-weight: 800; text-anchor: middle; dominant-baseline: central; }

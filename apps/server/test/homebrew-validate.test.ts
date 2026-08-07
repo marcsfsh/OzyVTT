@@ -66,6 +66,41 @@ describe("tier 1 - the record's own schema", () => {
     expect(validity.issues.every((issue) => issue.path[0] === "classId")).toBe(true);
     expect(messages(validity)).not.toContain("Publish the class");
   });
+
+  /**
+   * **The server end of the "homebrew items cannot be published" repair.**
+   *
+   * The client half — every one of the eleven reported authoring paths, driven through the real
+   * editor machinery — lives in `apps/client/src/homebrew/publish-paths.test.ts`, and it runs
+   * `HOMEBREW_BODY_SCHEMAS`, the same map tier 1 uses. These two cases pin the far end from here:
+   * the exact bodies the repaired editor now produces are bodies this gate accepts, so the client's
+   * green checklist and the server's answer cannot be about different things.
+   */
+  it("accepts a melee weapon whose ranges are null - the flagship authoring path", () => {
+    const mace = {
+      id: "hb-club-of-ruin-a1b2c3", name: "Club of Ruin", source: "homebrew",
+      category: "weapon", costGp: 0, weightLb: 0, description: null,
+      // Null ranges ARE a melee weapon: every SRD melee row carries exactly this shape. The report
+      // was that a GM had to type a number into "Range" to get past this check.
+      weapon: { category: "simple", damageDice: "1d6", damageType: "bludgeoning", rangeFeet: null, longRangeFeet: null }
+    };
+    expect(validateForPublish("equipment", mace, contextWith())).toEqual({ valid: true, issues: [] });
+  });
+
+  it("accepts armour seeded from one touched control, and an item with the optional enums absent", () => {
+    const shape = (extra: Record<string, unknown>) => ({
+      id: "hb-thing-a1b2c3", name: "Thing", source: "homebrew", category: "armor", costGp: 0, weightLb: 0, description: "A thing.", ...extra
+    });
+    // Three of the five armour keys are required with honest empties; touching "Adds Dexterity"
+    // used to leave them missing and the GM got `dexModifierCap: Required`.
+    expect(validateForPublish("equipment", shape({
+      armor: { acBase: 14, addDexModifier: true, dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null }
+    }), contextWith()).valid).toBe(true);
+    // `slot` and `rarity` are `.optional()`: ABSENT is right, `null` is a refusal. Returning either
+    // select to "Not set" used to write the null.
+    expect(validateForPublish("equipment", shape({}), contextWith()).valid).toBe(true);
+    expect(validateForPublish("equipment", shape({ slot: null }), contextWith()).valid).toBe(false);
+  });
 });
 
 describe("tier 2 - identity", () => {

@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Checklist, Meter, Skeleton, type ChecklistItem } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Meter, Skeleton, VisibilityBadge, type ChecklistItem } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
 import { sessionTitle } from "./sessions";
 import { openQuests, questProgress } from "./quests";
 import { CHRONICLE_KIND_META, STANDING_METER_MAX, deadlineStateLabel, deadlineStateTone, standingLabel, standingMeterTone, standingMeterValue, standingTone, standingValueLabel } from "./chronicle";
 import { DashCard } from "./DashCard";
-import { VisibilityBadge } from "./SecretMarkers";
 import type { CodexChronicleKind, CodexQuestStatus } from "./api";
 
 /**
@@ -201,7 +200,15 @@ export function CampaignHome({
           </DashCard>
         )}
         {!party && showReveal && (
-          <DashCard title="Party location" iconId="pin" empty="No party pin yet. Place one from any map's pin inspector." />
+          /* RULING 55 — the door goes where the action IS, which is why this one is honest. The line
+             already named the next step ("place a pin from a map's pin inspector") and left the
+             reader to find it; pins are placed in the Atlas, and `onSeeAll("atlas")` is the same
+             destination the Atlas card 150 lines down already offers. Making the instruction
+             clickable is not inventing a door — it is the difference between telling someone where
+             to go and taking them. */
+          <DashCard title="Party location" iconId="pin"
+            empty="No party pin yet. Drop one from a map's pin inspector and the party shows up here."
+            seeAll={onSeeAll ? { label: "Open the Atlas", onClick: () => onSeeAll("atlas") } : undefined} />
         )}
 
         {/* 3. Open quests. */}
@@ -385,8 +392,19 @@ export function CampaignHome({
           ) : null}
         </DashCard>
 
-        {/* 11. Tags. */}
-        <DashCard title="Tags" iconId="flag" empty="Nothing tagged yet.">
+        {/* 11. Tags. RULING 55 — "Nothing tagged yet." was the retired family exactly: an absence
+             reported and nothing offered. Tags are typed into a page's own Tags field while you edit
+             it (`PageEditor.tsx`'s `TagInput`), so the next step is a page, and `onSeeAll("recent")`
+             is the door the Recent card already uses for the same destination.
+
+             THE DOOR IS ON THE EMPTY STATE ONLY, and that is the chassis's rule rather than an
+             exception to it: `tags` is unbounded (no `.slice`), so a populated card IS the full list
+             and `DashCard`'s own contract says `seeAll` is "omitted when this card IS the full
+             list". An empty card is not the full list of anything — it is a dead end, which is the
+             one thing ruling 55 exists to stop. */}
+        <DashCard title="Tags" iconId="flag"
+          empty="No tags yet. Tags are added on a page while you write it, and every one you use collects here."
+          seeAll={tags.length === 0 && onSeeAll ? { label: "See all pages", onClick: () => onSeeAll("recent") } : undefined}>
           {tags.length > 0 ? (
             <div className="codex-campaign-tags">
               {tags.map(([tag, count]) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}<span className="codex-tag-count">{count}</span></button>)}

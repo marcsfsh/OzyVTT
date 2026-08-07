@@ -130,8 +130,8 @@ export const CHECK_SHAPE = {
    */
   liveMarkdownFloor: 80,
 
-  /** C6. Seven phrase pins and six symbols — and each must be SEEN to run, not merely declared. */
-  pins: 7,
+  /** C6. Ten phrase pins and six symbols — and each must be SEEN to run, not merely declared. */
+  pins: 10,
   symbols: 6,
 
   /**

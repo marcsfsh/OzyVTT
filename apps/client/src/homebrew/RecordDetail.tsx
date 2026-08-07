@@ -21,8 +21,7 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, IconChevron, Menu, MenuItem, SaveState } from "@vtt/ui";
-import { RevealSwitch } from "../codex/SecretMarkers";
+import { Alert, Badge, Button, IconChevron, Menu, MenuItem, RevealSwitch, SaveState } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { HomebrewRequestError, homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
 import { FeatureEditor } from "./FeatureEditor";
@@ -34,13 +33,42 @@ import { forStorage, withDefaults } from "./defaults";
 import { SCHEMAS, fieldAt, sectionTitle } from "./schemas";
 import { useAutosave } from "./useAutosave";
 import { useSchemaContext } from "./useSchemaContext";
-import { duplicateNameNote, publishBlockedReason, serverBlockedReason } from "./validate";
+import { duplicateNameNote, issueReason, publishIssues, type BlockedReason } from "./validate";
 import type { CustomRenderer } from "./FieldRenderer";
-import { typeLabel } from "./types";
+import { typeLabel, type HomebrewType } from "./types";
 
 type Body = Readonly<Record<string, unknown>>;
 
 const nameOf = (record: Body): string => (typeof record.name === "string" ? record.name : "");
+
+/** How many checklist lines are printed before the tail collapses into a count. Six fills the
+    region without pushing the form off a phone screen, and a record with more than six outstanding
+    requirements is one whose next fix will re-shorten the list anyway. */
+const CHECKLIST_SHOWN = 6;
+
+/** One requirement: the sentence, then its section as a control. The section is NEVER in the
+    words — see the "one copy template" note in `validate.ts`. */
+function ChecklistLine({
+  reason,
+  type,
+  onJump
+}: Readonly<{ reason: BlockedReason; type: HomebrewType; onJump: (sectionId: string) => void }>) {
+  const section = reason.sectionId ? sectionTitle(type, reason.sectionId) : null;
+  return (
+    <>
+      {reason.text}
+      {section && reason.sectionId && (
+        <>
+          {" "}
+          <Button variant="secondary" size="sm" className="tap-target hb-blocked-jump" onClick={() => onJump(reason.sectionId!)}>
+            {section}
+            <span className="hb-blocked-jump-icon" aria-hidden="true"><IconChevron /></span>
+          </Button>
+        </>
+      )}
+    </>
+  );
+}
 
 export function RecordDetail({
   gmToken,
@@ -127,31 +155,46 @@ export function RecordDetail({
   };
 
   /**
-   * Why publishing is blocked, as ONE sentence, in ONE place, beneath the button it
-   * blocks. Never a red asterisk, never a checklist, never per-field errors: **drafts
-   * show no errors at all** — a draft is allowed to be invalid, so "this requirement is
-   * not met yet" is a different thing from "this field is wrong now" and must not look
-   * like it. (The second thing — a malformed dice formula — still shows inline, on its
-   * own field, because that IS wrong now.)
+   * What is left before this can be published — **everything outstanding, in one place, beneath
+   * the button it blocks.** Still never a red asterisk, never a red border, never a per-field
+   * message: **drafts show no errors at all**, because a draft is allowed to be invalid and "this
+   * requirement is not met yet" is a different thing from "this field is wrong now". (The second
+   * thing — a malformed dice formula — still shows inline, on its own field, because that IS
+   * wrong now.)
    *
-   * Two sources, one slot: the client's own `publishBlockedReason` disables the button
-   * before the call, so the server's 409 is the rare server-wins case and renders in the
-   * same sentence. Never a second error region.
+   * It is a LIST rather than one sentence, and that is the D19 repair. One sentence turned a
+   * half-filled item into a serial dead-end: fix "Fill in range", get "Fill in long range", get
+   * another, with no way to see how deep it went — the shape of the "items cannot be published"
+   * report. `publishIssues` runs the record's own server schema, so the list is complete and
+   * cannot be looser than the store.
+   *
+   * Two sources, one region: this list, plus the server's 409 for the tiers a schema cannot
+   * express (identity, cross-references). Never a second error region.
    */
-  const blocked = useMemo(() => {
-    const local = publishBlockedReason(doc.type, draft, ctx);
-    if (local) return local;
-    if (doc.validity.valid) return null;
-    return serverBlockedReason(doc.type, doc.validity.issues[0], (path) => fieldAt(doc.type, path));
-  }, [doc.type, doc.validity, draft, ctx]);
-  const blockedReason = blocked?.text ?? null;
-  const blockedSection = blocked?.sectionId ? sectionTitle(doc.type, blocked.sectionId) : null;
+  const issues = useMemo(
+    () => publishIssues(doc.type, draft, ctx, doc.id),
+    [doc.type, doc.id, draft, ctx]
+  );
+  /**
+   * The server's own outstanding issues, for the tiers the shared schema does NOT cover: identity
+   * (tier 2) and cross-record references (tiers 3-4, "no subclass names this class yet"). Shown
+   * only once the local list is empty — while the body still fails its own schema, the stored
+   * record's cross-reference verdict is about a body that has already moved on.
+   */
+  const serverIssues = useMemo(
+    () =>
+      issues.length > 0 || doc.validity.valid
+        ? []
+        : doc.validity.issues.map((issue) => issueReason(doc.type, issue, (path) => fieldAt(doc.type, path))).filter((reason) => reason !== null),
+    [issues.length, doc.type, doc.validity]
+  );
+  const checklist = issues.length > 0 ? issues : serverIssues;
+  const blockedReason = checklist[0]?.text ?? null;
 
-  /** Scroll to the section the reason names and focus it — one control, no restatement,
+  /** Scroll to the section a reason names and focus it — one control per line, no restatement,
       and it removes the hunt. */
-  const jumpToSection = () => {
-    if (!blocked?.sectionId) return;
-    const element = document.getElementById(sectionDomId(doc.type, blocked.sectionId));
+  const jumpToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionDomId(doc.type, sectionId));
     if (!element) return;
     element.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     (element as HTMLElement).focus?.();
@@ -180,9 +223,11 @@ export function RecordDetail({
       <RiderEditor
         value={draft}
         onChange={setDraft}
-        // `grants` is deliberately absent for an item: there is no model for an item
-        // conferring a proficiency, and authoring one would produce records the server
-        // silently ignores. See the table at the top of RiderEditor.tsx.
+        // An item gets everything except `choice` — it never asks a question at character
+        // creation, and there is no code path from an item to the wizard. `grants` IS included:
+        // an item's grants are layered over the sheet and removed when the item comes off.
+        // (This comment used to say `grants` was deliberately absent, which `ITEM_RIDERS` one
+        // import away had already contradicted. See the table at the top of RiderEditor.tsx.)
         enabled={doc.type === "equipment" ? ITEM_RIDERS : doc.type === "monster" ? ["actions", "tags"] : undefined}
         scope={doc.type === "equipment" ? "item" : "feature"}
         ctx={ctx}
@@ -243,9 +288,9 @@ export function RecordDetail({
     // `danger: false` on purpose: nothing is lost, so this is caution, not danger.
     // Rose-red is reserved for actual destruction.
     const confirmed = await confirm({
-      title: "Remove from pickers",
-      body: `"${name}" stops appearing in the character builder, the encounter picker and inventory lists. Characters already built from it are unaffected. You can restore it later.`,
-      confirmLabel: "Remove",
+      title: "Archive this?",
+      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.`,
+      confirmLabel: "Archive",
       danger: false
     });
     if (!confirmed) return;
@@ -288,14 +333,14 @@ export function RecordDetail({
   const published = doc.state === "published";
 
   return (
-    <article className="hb-detail">
+    <article className="hb-detail scroll-y">
       <header className="hb-detail-head">
         <h2 className="hb-detail-title" tabIndex={-1} ref={titleRef}>
           {nameOf(draft).trim() || `Untitled ${typeLabel(doc.type)}`}
         </h2>
 
         <div className="hb-state">
-          {removed ? <Badge tone="neutral">Removed</Badge> : published ? <Badge tone="neutral">Published</Badge> : <Badge tone="caution">Draft</Badge>}
+          {removed ? <Badge tone="neutral">Archived</Badge> : published ? <Badge tone="neutral">Published</Badge> : <Badge tone="caution">Draft</Badge>}
           {/* No `GmOnlyTag` here, deliberately: the `RevealSwitch` a few inches to the
               right already renders the literal words "GM only", and stamping the pill
               beside it puts the same constraint on one line twice (readiness rule 4).
@@ -307,7 +352,7 @@ export function RecordDetail({
               <Button
                 variant="primary"
                 onClick={() => void publish()}
-                disabled={!!blockedReason || busy}
+                disabled={checklist.length > 0 || busy}
                 aria-describedby={blockedReason || actionError ? reasonId : undefined}
               >
                 Publish
@@ -329,27 +374,53 @@ export function RecordDetail({
           </div>
         </div>
 
-        {/* ONE sentence slot, shared by the local blocker and the server's rejection.
-            `{Section}` is a CONTROL and the only place the section is named — the sentence
-            no longer repeats it (`validate.ts`, "one copy template"). It is `secondary`
-            with the system's own jump chevron, not a `ghost`: a ghost at `--text-dim`
-            beside a `--caution-hi` sentence was dimmer than the words it followed and did
-            not read as a button at all. `.tap-target` because `.nh-btn--sm` paints 32px
-            (design-language §4, route 2) and the only things it can steal taps from here
-            are the words either side of it. */}
-        {(blockedReason || actionError) && !removed && (
-          <p className="hb-blocked" id={reasonId} role={actionError ? "alert" : undefined}>
-            {actionError ?? blockedReason}
-            {!actionError && blockedSection && (
+        {/* ONE region, shared by the checklist and by an action's error. Each line owns its
+            `{Section}` CONTROL, which is the only place the section is named — the sentence never
+            repeats it (`validate.ts`, "one copy template"). `secondary` with the system's own jump
+            chevron, not a `ghost`: a ghost at `--text-dim` beside a `--caution-hi` sentence was
+            dimmer than the words it followed and did not read as a button at all. `.tap-target`
+            because `.nh-btn--sm` paints 32px (design-language §4, route 2) and the only things it
+            can steal taps from here are the words either side of it.
+
+            A single outstanding requirement renders as the bare sentence it always did — a
+            one-item bulleted list would be ceremony around one line. Two or more become a list,
+            capped, because at some point a raw imported record has thirty and a wall of them is
+            no more actionable than one at a time was. */}
+        {actionError && !removed && (
+          <p className="hb-blocked" id={reasonId} role="alert">
+            {actionError}
+          </p>
+        )}
+        {!actionError && checklist.length > 0 && !removed && (
+          <div className="hb-blocked" id={reasonId}>
+            {checklist.length === 1 ? (
+              <p className="hb-blocked-line">
+                <ChecklistLine reason={checklist[0]} type={doc.type} onJump={jumpToSection} />
+              </p>
+            ) : (
               <>
-                {" "}
-                <Button variant="secondary" size="sm" className="tap-target hb-blocked-jump" onClick={jumpToSection}>
-                  {blockedSection}
-                  <span className="hb-blocked-jump-icon" aria-hidden="true"><IconChevron /></span>
-                </Button>
+                {/* A PUBLISHED record with outstanding issues is a different sentence and a more
+                    urgent one: it is still live and still visible, and the store demotes it to an
+                    invisible draft on the next write that re-validates. Saying "before this can be
+                    published" there would be flatly wrong — it already is. */}
+                <p className="hb-blocked-count">
+                  {published
+                    ? `${checklist.length} things need fixing, or the next edit puts this back to Draft.`
+                    : `${checklist.length} things left before this can be published.`}
+                </p>
+                <ul className="hb-blocked-list">
+                  {checklist.slice(0, CHECKLIST_SHOWN).map((reason, index) => (
+                    <li key={`${reason.path ?? reason.sectionId ?? ""}-${index}`} className="hb-blocked-line">
+                      <ChecklistLine reason={reason} type={doc.type} onJump={jumpToSection} />
+                    </li>
+                  ))}
+                </ul>
+                {checklist.length > CHECKLIST_SHOWN && (
+                  <p className="hb-blocked-count">…and {checklist.length - CHECKLIST_SHOWN} more.</p>
+                )}
               </>
             )}
-          </p>
+          </div>
         )}
 
         {/* "In use" is the sixth state and it is a count, not a badge — a badge would

@@ -76,9 +76,11 @@ export function Initiative({ presentation, onResize }: Readonly<{ presentation: 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
-  return <aside ref={asideRef} className="viewer-initiative" aria-label={`Initiative, round ${round}`}>
+  return <aside ref={asideRef} className="viewer-initiative frame-col" aria-label={`Initiative, round ${round}`}>
     {onResize && <div className="viewer-initiative-resize" role="separator" aria-orientation="vertical" aria-label="Drag to resize the initiative panel" onPointerDown={startResize} />}
-    <div className="viewer-initiative-scroll">
+    {/* The one declared scroll region on this screen (§7), at BOTH aspects: the panel is the frame,
+        this is its canvas. Portrait caps the frame at 32vh; this box takes what is left and scrolls. */}
+    <div className="viewer-initiative-scroll frame-fill scroll-y">
       <div className="viewer-initiative-head"><strong className="viewer-initiative-round">Round {round}</strong></div>
       {hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
       <ol>{ordered.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>

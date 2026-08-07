@@ -14,3 +14,8 @@ data/
 # it is regenerated from a seeded throwaway database every time and would otherwise add ~26 PNGs
 # per pass to the history.
 verify-shots/
+
+# node_modules as a SYMLINK, not just a directory. A worktree set up by linking to the main
+# checkout's tree — or a link that ends up pointing at its own path, which is how this one
+# arrived — is a file, and `node_modules/` does not match a file. It reached the index once.
+node_modules

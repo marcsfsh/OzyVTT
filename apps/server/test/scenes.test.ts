@@ -122,6 +122,40 @@ describe("scene park and resume", () => {
     expect(() => GameStateSchema.parse(game)).not.toThrow();
   });
 
+  it("counts staging as use, so a prep-heavy GM's Recent list stays honest", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "Ambush", mapAssetId: IDS.map1, combatantIds: [IDS.alpha, IDS.beta] }, GEOMETRY, 1_700_000_000_000);
+    // The monster the GM just staged is now recent...
+    expect(game.actors.find((actor) => actor.id === IDS.beta)!.lastUsedAt).toBe(1_700_000_000_000);
+    // ...and the standing party is not, so it cannot push the monsters off the list.
+    expect(game.actors.find((actor) => actor.id === IDS.alpha)!.lastUsedAt).toBeUndefined();
+    setSceneCombatants(game, IDS.sceneA, [IDS.extra], GEOMETRY, 1_700_000_001_000);
+    expect(game.actors.find((actor) => actor.id === IDS.extra)!.lastUsedAt).toBe(1_700_000_001_000);
+  });
+
+  it("parks and resumes the per-family rule exceptions with the rest of the fight", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "Fight", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    createScene(game, { sceneId: IDS.sceneB, name: "Next room", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    startEncounter(game, { mapAssetId: IDS.map1, entries: [{ actorId: IDS.alpha, score: 18 }], ruleExceptions: { movement: "freeform" } }, () => 10, GEOMETRY);
+    expect(game.combat.ruleExceptions).toEqual({ movement: "freeform" });
+
+    // Miss this in the snapshot list and a parked scene resumes under the WRONG rules.
+    activateScene(game, IDS.sceneB, IDS.implicit);
+    expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneA)!.combat.ruleExceptions).toEqual({ movement: "freeform" });
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    expect(game.combat.ruleExceptions).toEqual({ movement: "freeform" });
+  });
+
+  it("gives a newly prepared scene the table's current rule exceptions, not bare defaults", () => {
+    const game = state();
+    game.combat = { ...game.combat, rulesMode: "assisted", ruleExceptions: { targeting: "freeform" } };
+    const scene = createScene(game, { sceneId: IDS.sceneA, name: "Prepped", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    expect(scene.combat.rulesMode).toBe("assisted");
+    expect(scene.combat.ruleExceptions).toEqual({ targeting: "freeform" });
+  });
+
   it("keeps actor HP global across scene swaps (damage persists) and rejects re-activating the live scene", () => {
     const game = state();
     createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);

@@ -3,7 +3,18 @@
    control can push the document past the viewport at 375px. */
 body { margin: 0; }
 
-.sg { min-height: 100vh; }
+/* The root scroll recipe, this entry's own copy. It used to live in design-tokens.css and
+   retired from there with the shell lock (the SPA page no longer scrolls); this reference
+   document still scrolls and still jumps to #motion, so it keeps the smooth behavior and
+   pads anchor landings clear of its sticky .sg-header (78px measured + 10px clearance). */
+html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* The lock unit, not `100vh`: on a phone the URL bar makes `vh` taller than the screen, which
+   is why the standard reads dvh everywhere (§7) — even here, on the one entry that scrolls on
+   purpose, where the only job of this line is to let the page background reach the bottom of a
+   short section. */
+.sg { min-height: 100dvh; }
 
 .sg-header {
   position: sticky;
@@ -98,17 +109,20 @@ body { margin: 0; }
   font-size: var(--fs-sm);
 }
 
-/* Wizard demo — the shell owns the viewport in the app, so the style guide bounds it
-   in a scroll frame to keep this page readable. The sticky header/footer stick to
-   the frame instead of the window, which is exactly what they do in the app. */
+/* Wizard demo — the shell owns a whole surface in the app, so the style guide bounds it in a
+   36rem box to keep this page readable. That box is now the shell's viewport: the wizard column
+   fills it, its sticky head and foot pin to the box's edges, and the STEP BODY scrolls inside
+   them (`.nh-wizard-body`) — exactly the composition the builder ships, which is the point of a
+   demo. The frame itself declares no scroll: the region does, in the markup. */
 .sg-wizard-frame {
   height: 36rem;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--bg);
 }
-.sg-wizard-frame .nh-wizard { min-height: 100%; }
+.sg-wizard-frame .nh-wizard { flex: 1; min-height: 0; }
 .sg-wizard-step { display: grid; gap: var(--space-3); padding-bottom: var(--space-4); }
 /* No hand-rolled "Show preview" button here any more: WizardShell owns both halves of the
    master-detail swap (onOpenDetail / onCloseDetail) and shows each at the right width. */
@@ -131,6 +145,53 @@ body { margin: 0; }
 .sg-grid-demo .grid-floor { position: absolute; inset: 0; }
 .sg-texture span { position: relative; z-index: 1; }
 
+/* The material demo (ruling 2). Every box below is a real utility composition, so these rules carry
+   ONLY size, layout and type — the moment one of them sets `background` on a `.chamfer` box it stops
+   being a demo of the thing and becomes a demo of the bug the section warns about. The fill goes
+   through --material-fill, which is what a consumer actually does. */
+.sg-material-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+.sg-material {
+  --material-fill: var(--material-plate);
+  display: flex; flex-direction: column; gap: var(--space-2);
+  min-height: 7rem; padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+  color: var(--text); font-size: var(--fs-sm);
+}
+.sg-material code { color: var(--violet-hi); font-family: var(--font-mono); }
+.sg-door {
+  --material-fill: var(--material-scanline), var(--material-plate);
+  display: grid; place-items: center;
+  min-width: 12rem; min-height: 3.5rem; padding: var(--space-3) var(--space-6) var(--space-3) var(--space-8);
+  color: var(--text); font: 700 var(--fs-sm)/1.2 var(--font-display);
+  letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; text-align: center;
+}
+/* A hero repaints --rim-color and gets its glow in that hue for free: --rim-glow is derived from
+   the rim rather than being a colour of its own. That is the whole reason the glow is separable. */
+.sg-door-hero { --rim-color: var(--magenta); --rim-color-hi: var(--magenta-hi); }
+.sg-material-notes { margin: var(--space-3) 0 0; padding-left: var(--space-5); color: var(--text-dim); font-size: var(--fs-sm); display: grid; gap: var(--space-2); }
+.sg-material-notes code { font-family: var(--font-mono); color: var(--violet-hi); }
+.sg-material-notes strong { color: var(--text); }
+.sg-numeric-demo { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.sg-numeric-demo > div { display: flex; align-items: baseline; gap: var(--space-4); }
+.sg-numeric-demo > div > span:first-child { min-width: 11rem; font-size: var(--fs-sm); }
+.sg-numeric-demo strong { font-size: var(--fs-h3); color: var(--text); }
+.sg-numeric-slot { display: inline-block; min-width: 3ch; text-align: right; }
+
+/* The scene demo (§9). Tall enough that --sky-horizon-inset (7rem) reads as a horizon with sky
+   above it rather than as a stripe. No `overflow` of its own on purpose — `.pane-sky` clips the
+   floor's spill itself, and the demo should behave exactly as a real pane does. */
+.sg-sky { position: relative; height: 20rem; margin-top: var(--space-4); border: 1px solid var(--line); }
+.sg-sky-panel { max-width: 30rem; margin: var(--space-6); padding: var(--space-4); border: 1px solid var(--line); }
+.sg-sky-panel p { margin: var(--space-2) 0 0; }
+.sg-beam-demo { margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--line); background: var(--surface-1); }
+.sg-rim-demo { display: flex; flex-direction: column; gap: var(--space-1); min-width: 13rem; padding: var(--space-3) var(--space-4); background: var(--surface-1); }
+/* The sign stands on a sky, because "a metal the scene does not wear" is the whole point — but
+   --sky-wash's stops are calc()'d against --sky-horizon-inset, so in a SHORT box the ramp's knee
+   lands near the top and the last two stops compress into a visible step. At the old ~130px it
+   drew a hard band across the wordmark. Tall enough that the ramp resolves, like `.sg-sky` above;
+   the token is written for a pane and a demo of it has to be pane-shaped. */
+.sg-sign-demo { display: grid; place-items: center; min-height: 16rem; margin-top: var(--space-4); padding: var(--space-6) var(--space-4); text-align: center; background: var(--sky-wash); }
+.sg-sign-demo .nh-wordmark { font-size: clamp(2.5rem, 8vw, 4.5rem); line-height: 1; }
+
 /* Command-palette demo (D25). Deliberately local to the styleguide: the palette is a COMPOSITION, so
    shipping a `.nh-palette` class would be the design system quietly growing a component it does not own. */
 .sg-palette-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
@@ -144,3 +205,17 @@ body { margin: 0; }
   color: var(--text); font: inherit; cursor: pointer;
 }
 .sg-palette-item:hover { background: var(--surface-2); border-color: var(--line); }
+
+/* Layout section: the locked-frame miniature (tokens only; the demo is the doctrine). */
+.sg-lock-demo { display: flex; flex-direction: column; height: 20rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); overflow: hidden; background: var(--bg); }
+.sg-lock-bar { display: flex; gap: var(--space-2); align-items: center; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); background: var(--surface-1); }
+.sg-lock-tab { font: 600 var(--fs-sm)/1 var(--font-body); color: var(--text-dim); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
+.sg-lock-tab.is-on { color: var(--text); box-shadow: inset 0 -2px 0 var(--magenta); }
+.sg-lock-hint { margin-left: auto; font: 400 var(--fs-2xs)/1.3 var(--font-mono); color: var(--text-muted); }
+.sg-lock-body { display: flex; flex: 1; min-height: 0; }
+.sg-lock-canvas { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); color: var(--text-dim); font: 600 var(--fs-sm)/1.3 var(--font-body); background: repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)), repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)); }
+.sg-lock-dock { width: 13rem; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--surface-1); }
+.sg-lock-dockhead { padding: var(--space-2) var(--space-3); font: 700 var(--fs-xs)/1.3 var(--font-body); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--line); }
+.sg-lock-list { flex: 1; min-height: 0; }
+.sg-lock-row { padding: var(--space-2) var(--space-3); font: 400 var(--fs-sm)/1.3 var(--font-body); color: var(--text-dim); border-bottom: 1px solid var(--line); }
+@media (max-width: 560px) { .sg-lock-dock { width: 9rem; } }

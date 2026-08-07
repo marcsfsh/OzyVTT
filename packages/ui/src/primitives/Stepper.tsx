@@ -8,7 +8,8 @@ export interface StepperProps {
   min?: number;
   max?: number;
   step?: number;
-  /** Optional visible label to the left of the control. */
+  /** Optional visible label. Rendered as a label BAND above the control (D23a) so a labeled Stepper
+      top-aligns with the Field-wrapped inputs beside it; without one the control renders inline. */
   label?: ReactNode;
   /** Render the value display (e.g. signed modifiers `+3` / `±0`). Defaults to `String(value)`. */
   format?: (value: number) => ReactNode;
@@ -33,7 +34,7 @@ export function Stepper({ value, onChange, min, max, step = 1, label, format, di
   const atMax = max != null && value >= max;
   const groupLabel = aria["aria-label"] ?? (typeof label === "string" ? label : "Value");
   return (
-    <div className={cx("nh-stepper", className)}>
+    <div className={cx("nh-stepper", label != null && "nh-stepper--labeled", className)}>
       {label != null && <span className="nh-stepper-label">{label}</span>}
       <div className="nh-stepper-controls" role="group" aria-label={groupLabel} aria-describedby={aria["aria-describedby"]}>
         <button type="button" className="nh-stepper-btn interactive" aria-label="Decrease" disabled={disabled || atMin} onClick={() => onChange(clamp(value - step))}>−</button>

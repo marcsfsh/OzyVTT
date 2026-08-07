@@ -1,6 +1,5 @@
-import { Alert, Badge, Button, Drawer, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, Drawer, GmOnlyTag, Skeleton, VisibilityBadge } from "@vtt/ui";
 import { CodexMarkdown } from "./CodexMarkdown";
-import { GmOnlyTag, VisibilityBadge } from "./SecretMarkers";
 import { sessionTitle } from "./sessions";
 import type { CodexSession } from "./api";
 

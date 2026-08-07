@@ -93,8 +93,15 @@ off screens that hold dense text.
   bloodied magenta, critical danger, temp-HP a violet segment; always show the number
   in mono with `tabular-nums`. (On the shared screen a player sees a *band*, never a
   number — `viewer-mode.md`.)
-- **Combat state (hue shift):** encounter + map panels take `.combat-active` (a
-  quiet magenta tint) while an encounter is live; eases in/out, never pulses.
+- **Combat state (hue shift):** the encounter panel takes `.combat-active` while an
+  encounter is live, and the tint rides its **rim**, never its ground — the plate stays
+  the app's ordinary material. It used to warm `--material-plate` and `--rim-color`,
+  which are inherited custom properties, so one tint reached every surface and every
+  edge inside the panel: measured 2026-08-06, 77% of the panel's pixels (94% in dusk)
+  sat in the magenta hue band, against 9% for the scene-prep staging tray the client
+  named as the reference. Accent, never field (rulings 2, 47). It eases in, never pulses.
+  Nothing in the map's own stylesheet reads `.combat-active`; the turn token's `--magenta`
+  ring above is what says the fight is live there.
 
 ---
 
@@ -205,5 +212,19 @@ reveal-ahead warning names both dates, the kind-change confirm names each field
 at risk and softens its recovery promise when version history is off. Cut the
 flourish, keep the fact.
 
-The glossary in `apps/client/src/codex/vocabulary.test.ts` fails the build on
-retired words. Reaching for a plainer phrase is exactly when one slips back in.
+**One product, one set of words (D28).** The playable thing is a **character**, a
+**monster** or an **NPC** — never an "actor" or a "combatant". The list is **Turn
+order** and **Initiative** is the score. The event is a **fight**; the place is the
+**Table**. Visibility is **Shown to players / Hidden from players / GM only**,
+everywhere, in that spelling. Claim states are **Available / Claimed / Your
+character**; the verbs are **Claim / Release**. The verb triad means what it says:
+**Delete** is permanent and its confirm says "This cannot be undone", **Archive** is
+reversible and its copy offers the way back, **Remove** takes a thing out of one list
+and the thing survives. Wire names are not copy and keep their spelling.
+
+Two glossaries fail the build on a retired word, off one shared scanner
+(`apps/client/src/copy-scan.ts`): `codex/vocabulary.test.ts` for the Codex's dialect
+and `apps/client/src/play-vocabulary.test.ts` for everything else — the play lock
+reads the whole client tree minus a pinned exclusion list, so a new surface is scanned
+without being registered anywhere. Reaching for a plainer phrase is exactly when a
+retired word slips back in.

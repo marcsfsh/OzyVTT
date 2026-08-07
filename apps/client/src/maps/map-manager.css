@@ -1,55 +1,145 @@
-.map-manager { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
-.map-manager-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
-.map-manager-heading h2 { margin: .2rem 0 0; font-size: var(--fs-h1); font-family: var(--font-display); }
-.map-manager-heading p { max-width: 26rem; margin: 0; text-align: right; }
-.map-upload { display: grid; grid-template-columns: 1.4fr 1fr .8fr auto; gap: .8rem; align-items: end; margin-top: 1.25rem; }
-.map-upload label, .wizard-fields label, .point-editor label { color: var(--text-dim); font-size: .8rem; }
+/* THE MAPS LIBRARY + GRID CALIBRATION, AS A FRAME (§7/§8, refresh C2).
+   The surface used to be a `.card` riding a staged scroll region: heading, a four-field upload
+   grid, the map list, then a single calibration column that ran mode → instruction → crosshair
+   controls → canvas → point summary → a `<details>` of coordinates → the wizard → a `<details>`
+   of fine-tune controls. Measured at 1280x720 in a 676px pane that column was 1592-1793px tall,
+   and the canvas had 0px on screen on landing, 5px with a map selected, and 215 of its 666px once
+   the fine-tune fields were scrolled to — the GM was nudging a 3x3 block that was above the fold.
+   At 390x844 `.map-calibration` started at y=1215.
+
+   Now the frame is `back · heading · upload row` and the body is `rail | calibration pane`. The
+   pane is a four-step layout whose CANVAS IS THE ONE FLEX-FILLING CHILD: mounted once, never
+   inside a step panel, never conditionally unmounted, and never scrolled away from.
+
+   THE ORDER OF YIELDING, and it was inverted until the fix stage. In the one-column pane the
+   canvas is `flex: 1 1 0` and the step body `flex: 0 1 auto`, so a SHRINK is distributed by
+   `shrink × flex-basis` — the canvas's basis is 0, so it contributes nothing, and the step body
+   absorbs 100% of any deficit down to its floor. That is right for a phone (the canvas is the
+   thing; the step body is a declared `.scroll-y` region and scrolling it costs nothing) and it
+   was catastrophic for a SHORT WIDE pane, where the deficit is bigger than the whole step body:
+   measured on the fields step at 850x640 the body was 0px with 355px of content and the action
+   row sat 64px BELOW THE FOLD, with the page itself scrolling — the exact failure this redesign
+   exists to prevent, relocated. A floor on the step body cannot fix that (measured: it takes
+   850x640 from 64px of overflow to 192px), because the deficit is structural: the pane's chrome
+   is 243px and its canvas floor 176px against a 355px pane. The fix is the COMPOSITION — the
+   two-column pane below now starts at 561 instead of 1280, so a short pane stacks half as much.
+
+   NO SKY HERE (director's C2 decision Q1), for the same reason the table has none: a horizon
+   competes with a map canvas, and this surface's whole point is the canvas.
+
+   Ladder: 560/561 (phone density; one column vs canvas | steps), 849/850 (rail XOR pane vs
+   rail + pane), 1280 (the rail stops flexing). The old `max-width: 850px` is gone — it
+   double-fired against three `min-width: 850px` queries at exactly 850px. */
+
+/* ─────────────────────────────── the frame ─────────────────────────────── */
+/* `.scenes-maps-view` lives on THIS element now (it used to be the staging wrapper's in
+   main.tsx). Both audit scripts use it as the /scenes/maps ready selector — keep it. */
+.scenes-maps-view { gap: var(--space-3); }
+.map-manager-head { display: flex; flex-direction: column; gap: var(--space-2); }
+.map-manager-back { align-self: flex-start; }
+.map-manager-title { display: flex; align-items: end; justify-content: space-between; gap: var(--space-4); }
+.map-manager-title h2 { margin: .2rem 0 0; font: 400 var(--fs-h1) var(--font-display); }
+.map-manager-title p { max-width: 26rem; margin: 0; color: var(--text-dim); font-size: var(--fs-sm); text-align: right; }
+
+/* THE UPLOAD ROW. One primary "Add map…" (a real file input, hidden the way the embedded picker
+   hides its own) plus an inline reveal of name/type/folder. Below the 560 rung the reveal waits
+   for a file: the old four-field grid was a 376px block of chrome above the map list on a phone,
+   and collapsing it to one ~56px row is what turns 203px of usable body into ~600px. */
+.map-upload { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); }
+.map-upload-details { display: contents; }
+.map-upload label { display: flex; flex-direction: column; flex: 1 1 9rem; gap: .3rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
 .map-upload-optional { color: var(--text-muted); }
-.map-upload input, .map-upload select, .wizard-fields input, .wizard-fields select, .point-editor input { width: 100%; margin-top: .35rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); }
-.map-upload button, .grid-wizard button { padding: .75rem 1rem; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--primary); color: var(--text-on-neon); text-align: center; cursor: pointer; }
-.map-upload button:hover:not(:disabled), .grid-wizard button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
-.map-upload button:disabled, .grid-wizard button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
-.map-feedback { min-height: 1.4rem; color: var(--text-dim); }
-.map-workspace { display: grid; grid-template-columns: minmax(12rem, .32fr) minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
-.map-list { display: flex; flex-direction: column; gap: .55rem; }
-.map-list button { padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: inherit; text-align: left; cursor: pointer; }
-.map-list button.selected { border-color: var(--cyan); box-shadow: inset 3px 0 var(--cyan); }
-.map-list strong, .map-list span, .map-list small { display: block; }
-.map-list span, .map-list small { margin-top: .2rem; color: var(--text-muted); font-size: .73rem; }
-.map-calibration { min-width: 0; }
-.grid-mode-choice { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem; margin-bottom: .7rem; }
-.grid-mode-choice button { padding: .75rem; border: 1px solid var(--line); background: var(--surface-2); text-align: left; }
-.grid-mode-choice button[aria-pressed="true"] { border-color: var(--magenta); box-shadow: inset 3px 0 var(--magenta); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); }
-.grid-mode-choice strong, .grid-mode-choice span { display: block; }
-.grid-mode-choice span { margin-top: .2rem; color: var(--text-muted); font-size: .72rem; line-height: 1.35; }
-.calibration-instruction { margin-bottom: .75rem; padding: .85rem 1rem; border-left: 4px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); }
-.calibration-instruction > span { display: block; color: var(--magenta-hi); font-size: .65rem; font-weight: 800; letter-spacing: .1em; }
-.calibration-instruction > strong { display: block; margin-top: .2rem; font: 400 1.05rem var(--font-display); }
-.calibration-instruction p { margin: .3rem 0 0; color: var(--text-dim); font-size: .85rem; }
-.calibration-instruction small { display: block; margin-top: .55rem; color: var(--text-dim); }
-.map-preview { position: relative; width: 100%; min-height: 4rem; display: grid; place-items: center; overflow: hidden; border: 2px solid var(--line-strong); border-radius: var(--radius-md); background: var(--void); cursor: crosshair; line-height: 0; transition: border-color var(--dur-hover); }
-.map-preview.grid-area-mode { cursor: crosshair; touch-action: none; }
-.map-preview.movable { cursor: move; touch-action: none; }
-.map-preview.resizing { cursor: nwse-resize; touch-action: none; }
-.grid-crosshair { pointer-events: none; }
-.grid-crosshair line { stroke-width: 2.25; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 90%)); }
-.grid-area-handle { fill: #7CEFFF; stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.pending-area-actions { margin-top: .6rem; }
-.crosshair-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .75rem; padding: .5rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); font-size: .78rem; color: var(--text-dim); }
-.crosshair-controls > span { color: var(--magenta-hi); font-weight: 700; }
-.crosshair-swatches { display: flex; gap: .3rem; }
-.crosshair-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); cursor: pointer; }
-.crosshair-swatches button[aria-pressed="true"] { outline: 2px solid var(--cyan-hi); outline-offset: 1px; }
-.crosshair-color, .crosshair-opacity { display: flex; align-items: center; gap: .35rem; }
-.crosshair-color input { width: 2rem; height: 1.6rem; margin: 0; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: none; }
-.crosshair-opacity input { width: 6rem; margin: 0; }
-.crosshair-style { padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .72rem; cursor: pointer; }
-.crosshair-style[aria-pressed="true"] { border-color: var(--magenta); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); }
-.crosshair-hint { color: var(--text-muted); font-size: .68rem; }
+.map-upload-file { flex: 0 1 auto; max-width: 100%; gap: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The real input stays in the DOM (the button clicks it) but never takes layout or focus order.
+   `width`/`height: 1px` is NOT enough on its own for `type="file"`: Chromium gives the input an
+   intrinsic size from its shadow "Choose File" button, so the border box measured 27.59px while
+   `clip-path` and `position` from this same rule applied normally — the tap audit saw a 27.6px
+   control with reach 0 and could not tell it from a real one. `min-*: 0` plus zeroed padding and
+   border collapse the intrinsic contribution, so the box is the 1px this rule always claimed. */
+.map-upload-input { position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; border: 0; clip-path: inset(50%); }
+
+/* ─────────────────────────────── the body ─────────────────────────────── */
+/* One row, one or two columns. Below the 850 rung the rail and the pane share the single column
+   and one of them is showing — which is what kills the 1215px scroll-to-reach on a phone. */
+.map-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--space-3); min-width: 0; min-height: 0; }
+
+.map-rail { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; }
+.map-rail-filters { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Folders up front (D5): one scrolling chip row above the picture grid. */
+.map-folder-chips { display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .15rem; scrollbar-width: thin; }
+.map-folder-chips > * { flex: none; }
+/* THE REGION IS THE WRAPPER, NEVER THE `<ul>` (scene-gallery.css:31-38): a grid with a definite
+   block size stops sizing its auto rows from its cards. `.scroll-y` is on this element in the
+   markup; the shared picker's own 21rem cap is neutralised below so only one thing scrolls. */
+.map-rail-list { min-height: 0; padding-right: var(--space-1); }
+.map-rail .map-picker-grid { max-height: none; }
+/* Ruling 55 — NO DASHED BOXES. Both of these were a dashed placeholder rectangle saying nothing
+   is here yet; an empty surface gets one designed frame and the single next thing to do. The
+   frame is the material (below); the copy is the component's. */
+.map-list-empty { margin: var(--space-2) 0 0; padding: var(--space-4); border: 1px solid transparent; text-align: center; color: var(--text-dim); font-size: var(--fs-sm); }
+.map-empty { margin: 0; padding: var(--space-8); border: 1px solid transparent; text-align: center; color: var(--text-dim); }
+.map-pane-empty { display: grid; place-items: center; }
+
+/* ───────────────────────── the calibration pane ───────────────────────── */
+/* A column of chrome rows around ONE flex-filling canvas and ONE bounded, scrolling step body. */
+.map-pane { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; }
+.map-pane > * { flex: none; }
+.map-pane-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.map-pane-back { flex: none; margin-inline-start: calc(var(--space-3) * -1); }
+.map-pane-title { display: flex; flex-direction: column; min-width: 0; margin-inline-end: auto; }
+.map-pane-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-pane-title span { color: var(--text-muted); font-size: var(--fs-xs); }
+.map-folder-move { display: flex; align-items: center; gap: var(--space-2); }
+.map-folder-move select { width: auto; }
+
+.map-steps { flex: none; }
+/* ONE per-step instruction line, and the surface's only live region. */
+.map-step-note { margin: 0; padding: .55rem var(--space-3); border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
+
+/* THE CANVAS COLUMN — the pane's one flex-filling child. `flex-basis: 0` so it takes the leftover
+   height rather than its content's, and a min-height floor so it survives even when the flex
+   algorithm is shrinking rather than growing. This pair is the measured guarantee: >0px of canvas
+   on screen in every step, at every rung.
+   THE FLOOR MUST NEVER BE BELOW THE COLUMN'S OWN MINIMUM CONTENT — preview 7rem + the gap + a
+   44px tools row = 164px. A floor under that does not shrink the column, it makes the tools row
+   paint OUTSIDE it, over `.map-step-body`, which is later in DOM order and therefore wins the
+   hit test: at 375x667 the `−`/`+` buttons had 15 of 44px reachable, and a real tap on "Zoom out"
+   6px above its own bottom edge hit whatever the step body was showing there — the mode choice on
+   step 0, which flips the calibration type and discards a placed area.
+   11rem clears 164 here; the ≤560 rung states the same floor arithmetically. */
+.map-canvas-col { display: flex; flex-direction: column; gap: var(--space-2); flex: 1 1 0; min-height: 11rem; }
+.map-canvas-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.map-zoom-level { color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* The drag surface. `touch-action: none` is UNCONDITIONAL: this element is a pointer-capture drag
+   target and never a scroller, and the old modifier-class route (`.grid-area-mode` etc.) silently
+   left it computing `auto` the moment a wizard existed — measured. The explicit single grid track
+   is deliberate, not `place-items` alone: a percentage max-height against a content-sized row is
+   circular, and the svg would size the row that is meant to bound it (the ViewerControls lesson). */
+.map-preview {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  flex: 1 1 0;
+  min-height: 7rem;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--void);
+  cursor: crosshair;
+  line-height: 0;
+  touch-action: none;
+  transition: border-color var(--dur-hover);
+}
+.map-preview.movable { cursor: move; }
+.map-preview.resizing { cursor: nwse-resize; }
 .map-preview:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .map-preview:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
 .map-preview p { line-height: 1.5; }
-.map-preview svg { display: block; width: 100%; height: 100%; user-select: none; }
+/* Intrinsic size from the svg's width/height attributes, bounded by the canvas — so the box IS
+   the image and every click lands on it, with no letterbox gutter to click into. */
+.map-preview svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; user-select: none; }
 /* Calibration grid preview: cyan minor lines, magenta major lines (fixed hexes — SVG attributes don't resolve var()). */
 .map-preview line { stroke: rgb(45 226 255 / 0.6); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .map-preview line.major { stroke: rgb(255 46 154 / 0.85); stroke-width: 1.5; }
@@ -57,52 +147,239 @@
 .map-preview .grid-area-preview line { stroke: #FF2E9A; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .map-preview circle { fill: #2DE2FF; stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .map-preview text { fill: #0a0805; font: 700 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
-.point-summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .65rem; padding: .55rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
-.point-summary > div { display: flex; flex-wrap: wrap; gap: .5rem; }
-.point-summary span { color: var(--text-muted); font-size: .72rem; }
-.point-summary span strong { color: var(--text); font-family: var(--font-mono); }
-.point-summary button { flex: 0 0 auto; padding: .45rem .65rem; border: 1px solid var(--line-strong); background: transparent; font-size: .72rem; text-align: center; }
-.advanced-points { margin-top: .55rem; color: var(--text-muted); font-size: .75rem; }
-.advanced-points summary { cursor: pointer; }
-.point-editor { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; margin-top: .75rem; }
-.point-editor fieldset { display: flex; gap: .45rem; margin: 0; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.grid-crosshair { pointer-events: none; }
+.grid-crosshair line { stroke-width: 2.25; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 90%)); }
+.grid-area-handle { fill: #7CEFFF; stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+/* THE STEP BODY. Bounded, and that bound is the thesis: without it the fields step grows until
+   the canvas it is adjusting is off-screen, which is exactly what the old column did. `.scroll-y`
+   is on this element in the markup — the blessed region marker, so this file still declares no
+   bare overflow of its own.
+   It carries NO floor on purpose. In the one-column pane it is the row that yields (see the
+   header's order-of-yielding note): a floor here does not buy the GM a taller body, it pushes the
+   action row off the bottom edge, because in every cell where the body is starved the pane is
+   already shorter than canvas-floor + chrome. Its content stays reachable because it scrolls. */
+.map-step-body { flex: 0 1 auto; min-height: 0; max-height: 40%; }
+.map-step-panel { display: flex; flex-direction: column; gap: var(--space-3); }
+.map-step-hint { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
+.map-step-hint strong { color: var(--text); }
+/* The action row: one primary per step, pinned to the pane's bottom. */
+.map-step-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-1); }
+.map-step-actions .nh-btn { flex: 1 1 10rem; justify-content: center; }
+
+/* Mode step — `ChoiceCard`s, which carry aria-checked and a real 44px paint, in place of the
+   hand-rolled aria-pressed buttons that only approximated both. */
+.map-mode-choice { gap: var(--space-2); }
+
+/* Fields step.
+   EVERY GRID HERE SIZES FROM ITS OWN WIDTH, not the viewport's. Above the 560 rung the step body
+   is a COLUMN beside the canvas, 224-646px wide depending on the pane — so a viewport-keyed
+   `@media` cannot tell it how many columns fit, and the fixed `1.6fr 1fr 1fr` it used to carry
+   squeezed "− Smaller" to 36.7px at 1280 and to 18px once the two-column pane reached 850.
+   `auto-fit` + a real minimum is the honest expression: 1 column in a phone-width pane column,
+   2 at a laptop's, 3 at 1080p — and it needs no rung at all. */
+.grid-detected { margin: 0; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--cyan-hi); font-weight: 700; }
+.point-editor { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
+.point-editor fieldset { display: flex; flex: 1 1 11rem; gap: .45rem; min-width: 0; margin: 0; padding: var(--space-2); border: 1px solid transparent; }
 .point-editor legend { color: var(--text-muted); font-size: .7rem; font-weight: 800; }
-.point-editor input { width: 6rem; }
-.grid-wizard { margin-top: .8rem; padding: 1rem; border-radius: var(--radius-md); background: var(--surface-2); }
-.grid-wizard h3 { margin: 0; font: 400 1.05rem var(--font-display); }
-.grid-wizard p { margin: .45rem 0 .8rem; font-size: .85rem; }
-.wizard-example { padding: .6rem .75rem; border-radius: var(--radius-sm); background: var(--surface-3); }
-.wizard-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: .65rem; margin-bottom: .75rem; }
-.grid-detected { margin: 0 0 .8rem; padding: .6rem .75rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--cyan-hi); font-weight: 700; }
-.grid-wizard-actions { display: flex; gap: .6rem; }
-.grid-wizard-actions .secondary { background: transparent; }
-.grid-wizard .save-map { background: var(--primary); color: var(--text-on-neon); border-color: transparent; font-size: 1rem; padding: .85rem 1.3rem; }
-.grid-fine-tune { margin-top: 1rem; padding-top: .8rem; border-top: 1px dashed var(--line); color: var(--text-muted); font-size: .8rem; }
-.grid-fine-tune summary { cursor: pointer; }
-.grid-fine-tune > *:not(summary) { margin-top: .7rem; }
-.grid-wizard .wizard-primary { padding: .8rem 1.1rem; border-color: transparent; background: var(--primary); color: var(--text-on-neon); font-weight: 700; }
-.adjustment-groups { display: grid; grid-template-columns: 1.5fr 1fr .8fr; gap: .55rem; }
-.adjustment-groups fieldset { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; min-width: 0; margin: 0; padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.point-editor label { display: flex; flex: 1 1 4rem; flex-direction: column; gap: var(--space-1); min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
+.point-editor input { width: 100%; min-width: 0; }
+/* `.nh-btn` is `white-space: nowrap` by design, which is right for a verb and wrong for this
+   sentence: at 320 it overflowed the step body by 21.5px before the column existed at all. */
+.point-editor > .nh-btn { flex: 1 1 100%; white-space: normal; }
+.adjustment-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: .55rem; }
+.adjustment-groups fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; min-width: 0; margin: 0; padding: .55rem; border: 1px solid transparent; }
 .adjustment-groups legend { padding: 0 .3rem; color: var(--text-muted); font-size: .68rem; font-weight: 800; }
-.adjustment-groups button { min-width: 0; padding: .55rem .35rem; background: var(--surface-2); font-size: .72rem; }
-.verification-card { padding: .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); }
+.adjustment-groups .nh-btn { justify-content: center; padding-inline: var(--space-2); font-size: var(--fs-sm); }
+.wizard-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; }
+.wizard-fields label { display: flex; flex-direction: column; gap: .3rem; min-width: 0; color: var(--text-dim); font-size: var(--fs-xs); }
+
+/* Verify / review step. */
+.verification-card { display: flex; flex-direction: column; align-items: start; gap: .4rem; padding: .8rem; border: 1px solid transparent; }
 .verification-card strong { font: 400 .95rem var(--font-display); }
-.verification-card p { margin: .2rem 0 .6rem; }
-.verification { padding: .55rem .7rem; border-left: 3px solid; }
+.verification-card p { margin: 0 0 .3rem; color: var(--text-dim); font-size: var(--fs-sm); }
+.verification { margin: 0; padding: .55rem .7rem; border-left: 3px solid; font-size: var(--fs-sm); }
 .verification.accepted { border-color: var(--success); color: var(--cyan-hi); }
 .verification.rejected { border-color: var(--danger); color: var(--danger-hi); }
-.map-empty { padding: 2rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); }
-@media (max-width: 850px) { .map-upload { grid-template-columns: 1fr 1fr; } .map-workspace { grid-template-columns: 1fr; } .map-list { display: grid; grid-template-columns: repeat(2, 1fr); } .adjustment-groups { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .map-manager-heading { display: block; } .map-manager-heading p { margin-top: .6rem; text-align: left; } .map-upload, .wizard-fields, .map-list, .adjustment-groups, .grid-mode-choice { grid-template-columns: 1fr; } .point-summary { align-items: stretch; flex-direction: column; } .grid-wizard-actions { flex-direction: column; } }
+.map-review { display: grid; gap: .3rem; margin: 0; }
+.map-review > div { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); padding: .35rem 0; border-top: 1px solid var(--line); }
+.map-review dt { color: var(--text-muted); font-size: var(--fs-xs); }
+.map-review dd { margin: 0; color: var(--text); font-family: var(--font-mono); font-size: var(--fs-sm); }
 
-.map-list-column { display: flex; flex-direction: column; gap: .8rem; min-width: 0; }
-.map-list-filters { display: flex; flex-direction: column; gap: .5rem; }
-.map-list-filters input { margin-top: 0; }
-.map-list-empty { margin: 0; padding: 1rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .85rem; }
-.map-folder-group { display: grid; gap: .5rem; }
-.map-folder-group + .map-folder-group { margin-top: .6rem; }
-.map-folder-label { margin: 0; font: 700 .68rem/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
-.map-folder-move { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.map-folder-move span { color: var(--text-muted); font-size: .8rem; }
-.map-folder-move select { width: auto; margin-top: 0; }
-.map-folder-move button { padding: .5rem .8rem; text-align: center; font-size: .82rem; }
+/* The one recoverable failure: the server's 30-minute wizard TTL. An explicit state with one way
+   back to the canvas step, mode preserved — not a silent re-measure and not a dead end. */
+.map-expired { display: flex; flex-direction: column; gap: .35rem; padding: .8rem; border-left: 4px solid var(--caution); border-radius: var(--radius-sm); background: var(--surface-2); }
+.map-expired p { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
+
+/* Alignment crosshair controls — beside the canvas step, which is where the crosshair is drawn.
+   EVERY control here is at the 44px floor by PAINT (route 1), not by a `.tap-target` overhang:
+   the swatches sit 4px apart in a row, so a centred 44px ::after on a 24px swatch would reach
+   ~10px into each neighbour and steal its taps, and the row sits under a drag surface besides. */
+.crosshair-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: .4rem .6rem; border: 1px solid transparent; color: var(--text-dim); font-size: var(--fs-xs); }
+.crosshair-label { color: var(--magenta-hi); font-weight: 700; }
+.crosshair-swatches { display: flex; gap: var(--space-1); }
+.crosshair-swatches button { display: grid; place-items: center; width: var(--tap-min); height: var(--tap-min); padding: 0; border: 0; background: none; cursor: pointer; }
+.crosshair-swatches button::before { content: ""; width: 1.5rem; height: 1.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--swatch); }
+.crosshair-swatches button:hover:not(:disabled)::before { border-color: var(--cyan-hi); }
+.crosshair-swatches button[aria-pressed="true"]::before { outline: 2px solid var(--cyan-hi); outline-offset: 1px; }
+.crosshair-color, .crosshair-opacity { display: flex; align-items: center; gap: .35rem; min-height: var(--tap-min); }
+.crosshair-color input { width: 3rem; height: var(--tap-min); margin: 0; padding: 0 .15rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: none; }
+.crosshair-opacity input { width: 7rem; height: var(--tap-min); margin: 0; }
+.map-point-summary { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0; color: var(--text-muted); font-size: var(--fs-xs); }
+.map-point-summary strong { color: var(--text); font-family: var(--font-mono); }
+
+/* ─────────────────────────────── the rungs ─────────────────────────────── */
+/* Four, in ascending order: 560/561 is the pane's own composition, 849/850 is the rail's, and
+   1280 is where the rail stops flexing. Nothing inside the step body has a rung any more — it
+   is a COLUMN above 560 and sizes its grids from its own width (see "Fields step" above). */
+
+/* 560 — phone density, and the ONE-COLUMN pane. The upload reveal waits for a file and the
+   heading stacks. */
+@media (max-width: 560px) {
+  .map-manager-title { display: block; }
+  .map-manager-title p { margin-top: var(--space-2); text-align: left; }
+  .map-upload:not(.has-file) .map-upload-details { display: none; }
+  .map-upload label { flex-basis: 100%; }
+  .map-upload-file { flex: 1 1 100%; }
+  .point-editor fieldset { flex: 1 1 100%; }
+  .map-folder-move { flex: 1 1 100%; }
+  .map-folder-move select { width: 100%; }
+  /* Every pixel the chrome gives up here goes to the canvas, which is the point of the redesign —
+     but NOT below the canvas column's own minimum content. 8rem (128px) used to sit 36px under
+     it, and a flex column does not shrink to a floor it cannot hold: the tools row painted
+     OUTSIDE the column, over the step body, and lost 29 of its 44 tappable pixels to it. Stated
+     as the arithmetic it is, so it stays true if the preview floor or the tap floor moves. */
+  .map-canvas-col { min-height: calc(7rem + var(--space-2) + var(--tap-min)); }
+  .map-pane-title { flex: 1 1 8rem; }
+  .map-step-note { padding: .45rem .6rem; }
+}
+
+/* 561 — THE PANE ITSELF BECOMES TWO COLUMNS: canvas | step column. The canvas takes the whole
+   height of the left column and the step column owns its own scroller, so the 40% cap stands
+   down and the fields have as much room as the canvas does.
+
+   THIS USED TO START AT 1280, AND THAT WAS THE 850-1279 BUG. A pane is wide enough to afford two
+   columns long before it is wide enough to afford a tall stack of chrome, and it is SHORTNESS,
+   not narrowness, that starves the step body: the one-column pane spends 243px on
+   `pane head · steps · note · actions · gaps`, so a 355px pane at 850x640 had 112px left for a
+   canvas whose own floor is 176. Measured on the fields step, one column → two:
+     850x640   canvas 176x586 → 238x334, body 0 → 50,  action row 64px below the fold → on it
+     1024x667  canvas 176     → 265,     body 0 → 77,  19px below the fold → on it
+     667x375   canvas 176     → 214,     body 0 → 26,  70px below the fold → on it
+   and the 849→850 cliff (the head un-hiding halves the canvas) goes from 411→176 to 623→398.
+   The step column's minimum is 14rem, not the 20rem it carried at 1280: 20rem was never the
+   binding constraint there (the 1.45:1 ratio is, at every width above ~1150), and at 850 it
+   would have pushed the canvas below the width of the rail beside it. */
+@media (min-width: 561px) {
+  /* `:not(.map-pane-empty)` because the empty pane is a one-child message box with no step rows —
+     it must not inherit a five-row, two-column template it has nothing to put in. It shared this
+     selector at 1280, where the template won on source order and stretched the message into the
+     first cell; scoping it out keeps the empty pane on its base rule at every width instead of
+     spreading that to every laptop. */
+  .map-pane:not(.map-pane-empty) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(14rem, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    column-gap: var(--space-3);
+    align-items: stretch;
+  }
+  .map-pane-head { grid-area: 1 / 1 / 2 / 3; }
+  /* THE RAIL SPANS BOTH COLUMNS, and this is not decoration. `Steps` never wraps by design (a
+     seven-step builder would blob into rows at 375px) and it hides its own scrollbar, so a rail
+     wider than its box is a SILENTLY truncated one. Sat in the step column it measured 234-451px
+     against a 659px rail, and `li.nh-step--current` was fully off-view at every width from 761 to
+     1440 — including at 1280, where this composition already shipped: the current step overhung
+     by 120.1px there and 54.8px at 1440. Spanning gives the rail exactly the width it has in the
+     one-column pane (586 at 850, 956 at 1280), so the current step is on screen at every width,
+     scrollable 0 above 850. It costs the canvas 56px of height, which is the right trade for the
+     one row whose whole job is saying where you are — and for the rail-jump door C-3 restored. */
+  .map-steps { grid-area: 2 / 1 / 3 / 3; }
+  .map-canvas-col { grid-area: 3 / 1 / 6 / 2; }
+  .map-step-note { grid-area: 3 / 2 / 4 / 3; }
+  .map-step-body { grid-area: 4 / 2 / 5 / 3; max-height: none; }
+  .map-step-actions { grid-area: 5 / 2 / 6 / 3; }
+}
+
+/* 849 — the rail and the pane ARE the same column, so exactly one of them shows: tapping a map
+   swaps the region to the pane, and the pane's own "All maps" row swaps it back. This is what
+   removes the phone's scroll-to-reach, where `.map-calibration` began at y=1215 under a heading,
+   a 376px upload form and the whole list. 849, not 850: the `min-width: 850px` query in this
+   file used to double-fire against a `max-width: 850px` at exactly 850px. */
+@media (max-width: 849px) {
+  .map-body[data-view="pane"] > .map-rail { display: none; }
+  .map-body[data-view="rail"] > .map-pane { display: none; }
+  /* AND THE FRAME'S OWN ROWS STAND DOWN while the pane has the column. They belong to the
+     library — a back door to Scenes, the surface's name, "Add map…" — and none of them is part
+     of calibrating the map in front of you. Measured at 390x844: leaving them up left the pane
+     ~400px, of which 274 was chrome, and the action row was pushed off the bottom edge. "All
+     maps" brings them all back in one tap, so nothing is lost, only deferred.
+     IT STAYS INSIDE THIS QUERY, and the last clause is why. Above the rung the rail is beside the
+     pane, so `.map-pane-back` is hidden — there is no "All maps" to bring the head back with, and
+     hoisting this rule would take "Add map…" and the door to Scenes away for the rest of the
+     session the first time a map is tapped. The 212.7px it would free is bought two rules up
+     instead, by halving the pane's chrome stack rather than deleting the library's only doors. */
+  .map-manager:has(.map-body[data-view="pane"]) > .map-manager-head { display: none; }
+}
+
+/* 850 — the rail and the pane stop sharing a column. */
+@media (min-width: 850px) {
+  .map-body { grid-template-columns: minmax(12rem, var(--rail-w)) minmax(0, 1fr); }
+  .map-pane-back { display: none; }
+}
+
+/* 1280 — spend a 1080p width: the rail stops flexing and takes its full §7 cap, so every pixel
+   the window gains from here goes to the canvas. */
+@media (min-width: 1280px) {
+  .map-body { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+}
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing and the crosshair row is five adjacent 44px targets.
+   `inset: -1px` spans the border box, so the rim lands where the 1px border used to and nothing
+   reflows. All values are shared tokens, so ruling 29's daybreak translation arrives for free.
+
+   RULING 28: nothing here takes the scanline. Every one of these is a panel nested inside the
+   calibration pane or the rail — the surface's own outermost frame is the pane itself, which
+   deliberately has no fill so the canvas reads as the content (this file's header, and the same
+   reason it has no sky). A texture behind fine-tune fields sitting beside a map is the moiré case
+   the ruling names. No rest glow either: this is a workbench, not a hero surface. */
+.map-list-empty,
+.map-empty,
+.point-editor fieldset,
+.adjustment-groups fieldset,
+.verification-card,
+.crosshair-controls {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+  --material-fill: var(--material-plate);
+}
+.map-list-empty::before,
+.map-empty::before,
+.point-editor fieldset::before,
+.adjustment-groups fieldset::before,
+.verification-card::before,
+.crosshair-controls::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+/* Ruling 39's shape, applied to the two notice strips this surface owns: severity on a 2px
+   leading rule, text on a neutral ground, so neither survives on colour-over-tint in daybreak.
+   Both already had the bar; what goes is the rounded corner and the tinted fill behind the words. */
+.map-step-note { border-left-width: 2px; border-radius: 0; background: var(--surface-2); }
+.map-expired { border-left-width: 2px; border-radius: 0; background: var(--surface-2); }

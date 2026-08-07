@@ -19,10 +19,9 @@ screen→image coordinates with `getScreenCTM` via `imagePointFromClient`
 is now load-bearing rather than incidental. The viewer does its own screen→image maths against
 the SVG `viewBox`, which is a different mechanism but the same commitment.
 
-`RendererProof.tsx` has **zero import sites** (verify:
-`grep -rn "RendererProof" apps/client --include=*.tsx --include=*.ts --include=*.html`). It is
-the only importer of the PixiJS dependency declared in `apps/client/package.json`, and the only
-place in the client that configures high-DPI rendering.
+`apps/client/src/scene/RendererProof.tsx` had **zero import sites**: it was the only importer of
+the PixiJS dependency declared in `apps/client/package.json`, and the only place in the client
+that configured high-DPI rendering. Both were removed on 2026-08-05 — see Consequences.
 
 ## The decision this records
 
@@ -32,8 +31,11 @@ open.
 
 ## Consequences
 
-- PixiJS is a dependency the shipped app does not use, and `RendererProof.tsx` is dead code.
-  Removing both is a straightforward cleanup and is **not done by this record** — it is a code
-  change, and `docs/ai-ledger/current-state.md` carries it as a known gap instead.
+- **The dependency and the spike file are gone (2026-08-05).** `apps/client/src/scene/RendererProof.tsx`
+  was deleted and `pixi.js` dropped from `apps/client/package.json` and the lockfile, after
+  re-confirming the file had no import site and was named by none of the four HTML entry points.
+  This record still names the deleted path, because the removal is what it records — which is why
+  `apps/server/test/docs-paths.test.ts` carries that path in its `REMOVED_ON_PURPOSE` list rather
+  than treating it as a stale claim.
 - The image-pixel-space convention (`docs/ai-context/map-grid.md`) depends on `getScreenCTM`.
   Any renderer change must replace that convention, not just the drawing layer.

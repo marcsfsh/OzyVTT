@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, IconChevron, Input, Skeleton } from "@vtt/ui";
+import { Alert, Badge, Button, GmOnlyTag, IconChevron, Input, Skeleton } from "@vtt/ui";
 import {
   calendarApi, calendarDaysPerYear, dateToInstant, formatWorldDate, formatWorldYear,
   type CodexChronicleRecord, type CodexInWorldDate, type GmCodexCalendar
@@ -7,7 +7,6 @@ import {
 import { CHRONICLE_KIND_META, chronicleRowSummary, sameInWorldDate } from "./chronicle";
 import { CalendarEditor } from "./CalendarEditor";
 import { CodexIcon } from "./icons";
-import { GmOnlyTag } from "./SecretMarkers";
 
 /**
  * D17 — the Calendar as a real section, not a button that opens a structure editor.

@@ -1,5 +1,6 @@
-import type { GameState, Scene, SceneCombat } from "@vtt/domain";
+import { DEFAULT_RULE_EXCEPTIONS, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
+import { assertNotArchived } from "./actor-roster.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
 /**
@@ -24,7 +25,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     annotations: combat.annotations,
     turn: combat.turn,
     rulesMode: combat.rulesMode,
-    rollMode: combat.rollMode,
+    ruleExceptions: combat.ruleExceptions,
     playerDamageMode: combat.playerDamageMode,
     playerInitiativeMode: combat.playerInitiativeMode,
     healthDisplay: combat.healthDisplay,
@@ -35,14 +36,16 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     pendingSaves: combat.pendingSaves,
     pendingReactions: combat.pendingReactions,
     pendingDamage: combat.pendingDamage,
+    pendingRuleAsks: combat.pendingRuleAsks,
     pendingInitiative: combat.pendingInitiative
   };
 }
 
 /** The empty combat an inactive/active-slot scene holds (the single-source-of-truth invariant for the active scene). */
 function emptySceneCombat(): SceneCombat {
-  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", playerDamageMode: "proposal", playerInitiativeMode: "immediate", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingInitiative: [] };
+  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", ruleExceptions: { ...DEFAULT_RULE_EXCEPTIONS }, playerDamageMode: "proposal", playerInitiativeMode: "immediate", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [], pendingDamage: [], pendingRuleAsks: [], pendingInitiative: [] };
 }
+
 
 /** Builds a prepared (inactive) combat context from a combatant list: initiative at score 0, tokens at default (unplaced) positions. */
 function buildSceneCombat(state: GameState, combatantIds: readonly string[], geometry: TokenMapGeometry): SceneCombat {
@@ -53,17 +56,33 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     seen.add(actorId);
     const actor = state.actors.find((candidate) => candidate.id === actorId);
     if (!actor) throw new CommandRejectedError("One of the chosen combatants no longer exists.");
+    assertNotArchived(state, actorId);
     return { actorId, score: 0, tieBreaker: actor.initiative ?? 0 };
   });
   const tokens = createEncounterTokens(initiative.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), geometry);
   // A newly prepared scene inherits the table's current policy settings rather than resetting to defaults.
-  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, rollMode: state.combat.rollMode, playerDamageMode: state.combat.playerDamageMode, playerInitiativeMode: state.combat.playerInitiativeMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
+  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, ruleExceptions: { ...state.combat.ruleExceptions }, playerDamageMode: state.combat.playerDamageMode, playerInitiativeMode: state.combat.playerInitiativeMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
 }
 
-export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry): Scene {
+/**
+ * Recency for the scene-setup "Recent" list. `lastUsedAt` was stamped only when a creature entered a
+ * FIGHT, so a GM who preps ahead saw a Recent list that knew nothing about the evening they just
+ * spent staging. Staging counts as use. Player characters are excluded: they are the standing party,
+ * always at hand, and stamping them would push the monsters a GM is actually reaching for off the list.
+ * GM-only field - already stripped from the player projection.
+ */
+function stampStagingRecency(state: GameState, combatantIds: readonly string[], now: number) {
+  for (const actorId of combatantIds) {
+    const actor = state.actors.find((candidate) => candidate.id === actorId);
+    if (actor && actor.kind !== "player-character") actor.lastUsedAt = now;
+  }
+}
+
+export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry, now: number = Date.now()): Scene {
   if (state.combat.scenes.length >= MAX_SCENES) throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} scenes.`);
   if (state.combat.scenes.some((scene) => scene.id === input.sceneId)) throw new CommandRejectedError("That scene already exists.");
   const scene: Scene = { id: input.sceneId, name: input.name, mapAssetId: input.mapAssetId, combat: buildSceneCombat(state, input.combatantIds, geometry) };
+  stampStagingRecency(state, input.combatantIds, now);
   state.combat = { ...state.combat, scenes: [...state.combat.scenes, scene] };
   return scene;
 }
@@ -79,7 +98,7 @@ export function removeScene(state: GameState, sceneId: string) {
   state.combat = { ...state.combat, scenes: state.combat.scenes.filter((scene) => scene.id !== sceneId) };
 }
 
-export function setSceneCombatants(state: GameState, sceneId: string, combatantIds: readonly string[], geometry: TokenMapGeometry) {
+export function setSceneCombatants(state: GameState, sceneId: string, combatantIds: readonly string[], geometry: TokenMapGeometry, now: number = Date.now()) {
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live - change its combatants from the encounter instead.");
@@ -87,6 +106,7 @@ export function setSceneCombatants(state: GameState, sceneId: string, combatantI
   const placed = new Map(scene.combat.tokens.map((token) => [token.actorId, token.position]));
   const combat = buildSceneCombat(state, combatantIds, geometry);
   const combatKeepingPositions = { ...combat, tokens: combat.tokens.map((token) => ({ ...token, position: placed.get(token.actorId) ?? token.position })) };
+  stampStagingRecency(state, combatantIds, now);
   state.combat = { ...state.combat, scenes: state.combat.scenes.map((candidate) => candidate.id === sceneId ? { ...candidate, combat: combatKeepingPositions } : candidate) };
 }
 
@@ -155,6 +175,49 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   // `resumed` is a SceneCombat and carries no timeline bookkeeping - set it explicitly so the rebuilt
   // combat starts live (a bare spread would leave historyCursor/historyDirty undefined, not null/false).
   state.combat = { ...resumed, mapAssetId: target.mapAssetId, scenes, activeSceneId: sceneId, historyCursor: null, historyDirty: false };
+}
+
+/**
+ * How many scene slots a park-and-go-live needs right now: one for the new scene, plus one more when
+ * a pre-scenes encounter is running unbound and would have to be preserved as an implicit scene.
+ * Callers that MINT the scene they go live on (replay launch) pre-check with this so the refusal
+ * arrives before anything is built, rather than half-way through.
+ */
+export function sceneSlotsNeededToGoLive(state: GameState): number {
+  const parksImplicitly = state.combat.activeSceneId === null && state.combat.mapAssetId !== null && (state.combat.active || state.combat.initiative.length > 0);
+  return 1 + (parksImplicitly ? 1 : 0);
+}
+
+export function sceneHeadroom(state: GameState): number {
+  return MAX_SCENES - state.combat.scenes.length;
+}
+
+/**
+ * Park the current table and go live on a NEW scene carrying `combat`.
+ *
+ * This is `activateScene`'s motion with the target CREATED rather than resumed, and it exists so
+ * launching a replay is the same park/resume the GM already knows (D25/R3) instead of a second
+ * table concept: the current fight parks into its slot exactly as it does on a scene switch, the
+ * new scene goes live, and the parked one resumes any time through `scene.activate`.
+ */
+export function activateNewScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string | null; combat: SceneCombat }>, implicitSceneId: string): Scene {
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before switching scenes.");
+  if (state.combat.scenes.some((scene) => scene.id === input.sceneId)) throw new CommandRejectedError("That scene already exists.");
+  if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
+    throw new CommandRejectedError("Remove a prepared scene first - launching needs room to park the table and stage the replay.");
+  }
+
+  let scenes = state.combat.scenes;
+  if (state.combat.activeSceneId !== null) {
+    const parkedId = state.combat.activeSceneId;
+    scenes = scenes.map((scene) => scene.id === parkedId ? { ...scene, combat: snapshotSceneCombat(state.combat) } : scene);
+  } else if (state.combat.mapAssetId !== null && (state.combat.active || state.combat.initiative.length > 0)) {
+    scenes = [...scenes, { id: implicitSceneId, name: "Current encounter", mapAssetId: state.combat.mapAssetId, combat: snapshotSceneCombat(state.combat) }];
+  }
+  // The live scene's own slot stays EMPTY by invariant - its live copy is the top-level combat.
+  const scene: Scene = { id: input.sceneId, name: input.name, mapAssetId: input.mapAssetId ?? state.combat.mapAssetId ?? "", combat: emptySceneCombat() };
+  state.combat = { ...input.combat, mapAssetId: scene.mapAssetId, scenes: [...scenes, scene], activeSceneId: scene.id, historyCursor: null, historyDirty: false };
+  return scene;
 }
 
 /**

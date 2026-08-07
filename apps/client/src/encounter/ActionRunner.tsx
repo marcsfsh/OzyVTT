@@ -250,7 +250,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         ? <p className="action-targeting-head"><strong>{picking.action.name}</strong> - drag the {picking.action.area?.sizeFeet}-ft {picking.action.area?.shape} on the map{picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.</p>
         : <>
             <p className="action-targeting-head"><strong>{picking.action.name}</strong> - {picking.mode === "single" ? "choose one target (or click a token)" : "choose targets (or click tokens)"}</p>
-            <ul className="action-target-list">{combatants.filter((target) => target.id !== actor.id).map((target) => {
+            <ul className="action-target-list scroll-y">{combatants.filter((target) => target.id !== actor.id).map((target) => {
               const checked = picking.selected.includes(target.id);
               return <li key={target.id}>
                 <label className="action-target">

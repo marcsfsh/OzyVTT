@@ -110,12 +110,19 @@ export function WizardShell({
 
       {resume != null && <div className="nh-wizard-resume">{resume}</div>}
 
-      <div className={cx("nh-wizard-body", detail != null && "nh-wizard-body--split", detailOpen && "has-detail")}>
+      {/* The step body is the wizard's one scrolling region (design-language §7): `.scroll-y`
+          declares it, the sticky head and foot above and below it never move. */}
+      <div className={cx("nh-wizard-body", "scroll-y", detail != null && "nh-wizard-body--split", detailOpen && "has-detail")}>
         <div className="nh-wizard-main">
           {detail != null && onOpenDetail && (
             <Button variant="ghost" size="sm" className="nh-wizard-detail-open" onClick={onOpenDetail}>{detailOpenLabel}</Button>
           )}
           {children}
+          {/* The footnote (an SRD attribution, in practice) rides the step's SCROLL, at the end of
+              the column. It used to sit below the sticky footer, where the layer's own scroll kept
+              it out of the way; with the frame pinned it would instead stand permanently on screen
+              — ~110px of licence text on a 390px phone, taken from the step. */}
+          {footnote != null && <p className="nh-wizard-footnote">{footnote}</p>}
         </div>
         {detail != null && (
           <aside className="nh-wizard-detail" aria-label={typeof detailTitle === "string" ? detailTitle : "Details"}>
@@ -152,8 +159,6 @@ export function WizardShell({
           )}
         </div>
       </footer>
-
-      {footnote != null && <p className="nh-wizard-footnote">{footnote}</p>}
     </section>
   );
 }

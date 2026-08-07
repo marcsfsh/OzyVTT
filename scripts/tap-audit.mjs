@@ -1,5 +1,15 @@
 /**
- * Codex tap-target audit — the reproducible form of acceptance criterion **A-3**.
+ * Tap-target audit — the reproducible form of acceptance criterion **A-3**, grown to the
+ * play shell: the Codex in both roles (its original scope) plus the shell's phase-A
+ * surfaces (table, scenes, maps, roster, replays, settings, builder — GM and player).
+ *
+ * THE RUNNER IS PER-SURFACE ROOT/READY AWARE. A surface entry may carry `root` (the
+ * measurement root, default the pass's rootSelector) and `ready` (the selector awaited
+ * before measuring, default `<root> .codex-shell-content` — the codex gate). That is what
+ * makes design-language.md §6b step 4's "a new address is one line" true for play routes,
+ * which have no `.codex-shell-content`. Play surfaces measure the app as the server has it
+ * (a live fight if one is running) — like the codex passes, this audits a dev server's
+ * state, it does not create one.
  *
  * WHY THIS FILE EXISTS. A-3 asks that every interactive Codex control meet the 44px floor, and the
  * spec's own preamble wants that "countable, not asserted". It was first downgraded to a source-level
@@ -47,6 +57,29 @@
  * gap budget and is KNOWN TO OVER-REPORT: a 44px control legitimately walks to 43 (the interior span),
  * and anything not scrolled into view reports 0. Treat it as a pointer to investigate, never as a verdict
  * — confirm real tap theft by tapping, as `docs/ai-ledger/current-state.md` records for the M5 pass.
+ *
+ * THE LAYER SPLIT, and why a reachability number needs one. The column now printed as "unreachable in
+ * the active layer" used to read "unresolved" and stood at 184 across nine surfaces (2026-08-05, 375px,
+ * `node scripts/tap-audit.mjs 375`) with no per-row detail under it, so nobody could tell whether it
+ * named a defect. Driving each of those 184 in a browser and recording, per control, what
+ * `elementFromPoint` returned at its centre and which subtree that element belonged to, every one of
+ * them turned out to be one of two things and NEITHER is a control a user can fail to tap:
+ *
+ *   - 130 lay under an overlay the audit had deliberately opened — 56 under a modal `<dialog>`
+ *     (quick-create 28, palette 28), which the platform makes inert by spec, and 74 under an open
+ *     `Drawer` painting over the shell (nav-drawer 28, session-prep 27, player-drawer 19).
+ *   - 54 sat inside a `<details>` that was closed: `Menu`'s popover (pages 10, play-scenes 34,
+ *     play-replays 6) and the maps wizard's coordinate disclosure (play-maps 4). Chromium lays those
+ *     out — they have real rects, which is why the zero-box guard never dropped them — but skips them
+ *     for paint and hit-testing, so `elementFromPoint` correctly answers with whatever is painted there.
+ *
+ * Zero were real. Reach is therefore judged in the active layer only, and the other two layers are
+ * printed by name on a LAYER line per surface and in the run footer rather than dropped — a control
+ * that stops being reported is a control nobody re-checks. Sizes are unaffected in all three layers:
+ * see the ratchet note at the report assembly for why that boundary is where it is.
+ *
+ * IT MAKES EXACTLY ONE FIXTURE, and puts it back. See `ensureLinkedPin` below. Nothing else here
+ * writes to the server.
  */
 // Resolved at runtime, not statically imported: `playwright-core` is deliberately not a repo
 // dependency, so point PLAYWRIGHT_CORE at an out-of-tree install (or install it here with --no-save).
@@ -120,6 +153,16 @@ const MEASURE = `((rootSelector) => {
   const SEL = 'button, summary, a[href], input, select, textarea, [role="button"], [role="tab"], [role="switch"], [tabindex]:not([tabindex="-1"])';
   const root = document.querySelector(rootSelector);
   if (!root) return { error: "no " + rootSelector };
+  // WHICH LAYER a control is in — computed once per measurement, because nothing opens or closes
+  // while the walk runs. See the "THE LAYER SPLIT" note in the docblock for why \`reach\` is only a
+  // verdict in the active layer. The two overlay mechanisms are named rather than inferred, because
+  // they are \`packages/ui\` PRIMITIVES and not app-specific markup: \`Modal\` is <dialog>.showModal()
+  // (Modal.tsx:37), which puts the rest of the document in the inert layer by spec, and \`Drawer\` is
+  // a non-modal <aside> that carries \`inert\` while closed (Drawer.tsx:60) and paints over the shell
+  // while open. A THIRD mechanism arriving later lands a control in "active" and is reported as a
+  // real defect — the safe direction for a check whose job is to fail loudly.
+  const modal = document.querySelector("dialog:modal");
+  const openDrawers = [...document.querySelectorAll(".nh-drawer")].filter((d) => !d.hasAttribute("inert"));
   const out = [];
   for (const el of root.querySelectorAll(SEL)) {
     const r = el.getBoundingClientRect();
@@ -160,15 +203,56 @@ const MEASURE = `((rootSelector) => {
       if (!okUp && !okDn) break;
       reach = d * 2 + 1;
     }
+    // The layer, in the order the mechanisms stack: a closed disclosure INSIDE a modal is still closed.
+    // \`checkVisibility()\` with no options is the whole test for "closed" — Chromium lays a closed
+    // <details>'s popover out (it has a real rect, so the r.width/r.height guard above does not drop it)
+    // but skips it for paint and hit-testing, and checkVisibility() reports exactly that. Verified
+    // 2026-08-05 on six surfaces: it returns false for all 57 closed-<details> children and true for all
+    // 15 of their own <summary> elements, which are on screen and tappable. \`checkOpacity\` is
+    // deliberately NOT passed — it changed no row on this tree (0 of 320 controls across those six
+    // surfaces), so it would be an untested widening of what counts as unrendered.
+    let layer = "active";
+    if (!el.checkVisibility()) layer = "closed";
+    else if (modal && !modal.contains(el)) layer = "overlaid";
+    else if (openDrawers.some((d) => !d.contains(el) && d.contains(document.elementFromPoint(cx, cy)))) layer = "overlaid";
     out.push({
       tag: el.tagName.toLowerCase(),
       cls: (el.className && el.className.baseVal !== undefined ? el.className.baseVal : String(el.className || "")).slice(0, 60),
       label: (el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\\s+/g, " ").slice(0, 34),
-      h: Math.round(h * 10) / 10, w: Math.round(w * 10) / 10, reach
+      h: Math.round(h * 10) / 10, w: Math.round(w * 10) / 10, reach, layer
     });
   }
   return { out };
 })`;
+
+/**
+ * Open the FIRST record a rail lists, whichever record that is, and prove the editor rendered.
+ *
+ * The openers this replaces named seed titles — `hasText: "Strahd"` for the page editor and
+ * `hasText: "Missing Bones"` for the quest editor, both rows that only exist if
+ * `scripts/seed-codex.mjs` has been run against this server. Neither is in the dev database this
+ * ran against on 2026-08-05 (7 pages, none named Strahd; 2 quests, neither named Missing Bones), so
+ * both clicks waited out their 10s timeout and both surfaces reported NOT MEASURED — the audit
+ * calling a stale fixture reference an app failure. Nothing was wrong with either editor: clicking
+ * the first row of each rail opens `.codex-editor` and `.codex-quest-editor` respectively, measured
+ * in a browser the same day. The docblock's own rule is that this script audits a dev server's
+ * state rather than creating one, and a hardcoded title is the opposite of that.
+ *
+ * TWO row selectors for pages, because the GM rail has two renderings: `NotebookTree`'s
+ * `.codex-tree-page` by default and `.codex-list-item` while a type/tag filter is applied
+ * (`PagesView.tsx:214` vs `:226`). The player rail renders only the latter.
+ *
+ * `expect` is required, not optional: a click that lands on nothing would otherwise leave the empty
+ * "Select a page" state on screen and measure THAT under an editor's heading — the substitution
+ * failure the docblock's third paragraph is about.
+ */
+async function openFirstRecord(page, { rows, expect, what }) {
+  const row = page.locator(rows).first();
+  if (await row.count() === 0) throw new Error(`no ${what} row in the rail to open the editor with`);
+  await row.click({ timeout: 10_000 });
+  await page.waitForSelector(expect, { timeout: 10_000 });
+  await page.waitForTimeout(1200);
+}
 
 /**
  * Every address the sidebar lists, plus the record-level surfaces that a section address alone does not
@@ -211,15 +295,74 @@ async function openPinWithLinks(page) {
   return false;
 }
 
+/**
+ * THE ONE FIXTURE THIS SCRIPT PROVISIONS, and the only write it makes.
+ *
+ * `pin-inspector` and `player-pin` both require a pin carrying a LINKED PAGE, because
+ * `.codex-marker-link-open` is the row they exist to measure and it renders for no other pin
+ * (`MarkerInspector.tsx:175`, `PinDetails.tsx:50`). On 2026-08-05 both surfaces reported NOT
+ * MEASURED against the dev server — its three markers all carry `pageIds: []` — which cost the run
+ * every control on two surfaces, not just the one row. `scripts/seed-codex.mjs:278-285` does create
+ * four such pins, so the seed is not the gap; the gap is that this script audits WHATEVER database
+ * the dev server is holding, and most of them were not built by that seed.
+ *
+ * So it makes the fixture it needs, through the same authenticated GM endpoint the client's own
+ * `atlasApi.updateMarker` calls (`codex/api.ts:514`) — no server bypass, no state the app could not
+ * reach itself — and puts it back afterwards. It writes ONLY when no pin already has a link, and it
+ * prints what it touched either way, so a run that mutated the database says so. Set
+ * AUDIT_NO_FIXTURE=1 to forbid the write; the two surfaces then report NOT MEASURED as before,
+ * which is the honest outcome rather than a quiet one.
+ */
+async function ensureLinkedPin() {
+  const api = async (path, init = {}) => {
+    const response = await fetch(`${BASE}api/${path.replace(/^\//, "")}`, {
+      ...init,
+      headers: { "content-type": "application/json", ...(init.headers ?? {}) }
+    });
+    if (!response.ok) throw new Error(`${init.method ?? "GET"} ${path} -> ${response.status}`);
+    const body = await response.json();
+    return body && typeof body === "object" && "data" in body ? body.data : body;
+  };
+  const { token } = await api("gm/login", { method: "POST", body: JSON.stringify({ password: PASSWORD }) });
+  const auth = { authorization: `Bearer ${token}` };
+  const get = (path) => api(`v1/codex${path}`, { headers: auth });
+  const { maps } = await get("/maps");
+  // Revealed only, on both the map and the pin: the same fixture has to satisfy the GM pass and the
+  // PLAYER pass, and a player is shown neither a secret pin nor a pin on a secret map
+  // (`MarkerInspector.tsx:126` is the warning the app itself raises about that pairing).
+  const shownMaps = maps.filter((map) => map.revealedToPlayers);
+  const candidates = [];
+  for (const map of shownMaps) {
+    const { markers } = await get(`/maps/${map.id}/markers`);
+    for (const marker of markers) {
+      if (marker.pageIds.length > 0 && marker.revealedToPlayers) return { note: `pin fixture: already present (marker ${marker.id})`, undo: async () => {} };
+      if (marker.revealedToPlayers) candidates.push(marker);
+    }
+  }
+  if (process.env.AUDIT_NO_FIXTURE) return { note: "pin fixture: ABSENT and AUDIT_NO_FIXTURE set - the two pin surfaces will report NOT MEASURED", undo: async () => {} };
+  const marker = candidates[0];
+  if (!marker) return { note: "pin fixture: ABSENT and unprovisionable - no revealed pin on any revealed map", undo: async () => {} };
+  const { pages } = await get("/pages");
+  const page = pages.find((candidate) => candidate.revealedToPlayers);
+  if (!page) return { note: "pin fixture: ABSENT and unprovisionable - no page is shown to players", undo: async () => {} };
+  const before = [...marker.pageIds];
+  const patch = (pageIds) => api(`v1/codex/markers/${marker.id}`, { method: "PATCH", headers: auth, body: JSON.stringify({ pageIds }) });
+  await patch([page.id]);
+  return {
+    note: `pin fixture: LINKED page "${page.title}" to pin "${marker.label ?? marker.id}" (${marker.id}) for this run; restored at the end. Undo by hand if the run dies: PATCH /api/v1/codex/markers/${marker.id} {"pageIds":${JSON.stringify(before)}}`,
+    undo: () => patch(before)
+  };
+}
+
 const SURFACES = [
   { name: "home", path: "/codex" },
   { name: "pages", path: "/codex/pages" },
   // The page editor is the single densest surface in the Codex: a toolbar, a field grid, the tag input,
   // the connections list and its per-row controls. A section-only audit measures none of them.
-  { name: "page-editor", path: "/codex/pages", open: async (page) => {
-      await page.locator(".codex-shell-content button").filter({ hasText: "Strahd" }).first().click({ timeout: 10_000 });
-      await page.waitForTimeout(1600);
-    } },
+  { name: "page-editor", path: "/codex/pages", open: (page) => openFirstRecord(page, {
+      rows: ".codex-shell-content button.codex-tree-page, .codex-shell-content button.codex-list-item",
+      expect: ".codex-editor", what: "page"
+    }) },
   { name: "atlas", path: "/codex/atlas" },
   { name: "pin-inspector", path: "/codex/atlas", open: async (page) => {
       await page.waitForTimeout(1200);
@@ -240,17 +383,16 @@ const SURFACES = [
   { name: "sessions", path: "/codex/sessions" },
   // The session EDITOR, not just the list: it carries the shared markdown toolbar twice (prep + recap)
   // and two TagInputs, none of which a list-only measurement sees.
-  { name: "session-editor", path: "/codex/sessions", open: async (page) => {
-      const row = page.locator(".codex-shell-content button").filter({ hasText: /^Session \d/ }).first();
-      if (await row.count() === 0) throw new Error("no session row to open the editor with");
-      await row.click({ timeout: 10_000 });
-      await page.waitForTimeout(1400);
-    } },
+  // Was `hasText: /^Session \d/`, which is not a fixture reference but is the same coupling one step
+  // weaker: it passes only while `sessionTitle()` is falling back to its numbered default, and a
+  // campaign whose sessions carry real names would have reported this surface unmeasured.
+  { name: "session-editor", path: "/codex/sessions", open: (page) => openFirstRecord(page, {
+      rows: ".codex-shell-content button.codex-session-row", expect: ".codex-session-editor", what: "session"
+    }) },
   { name: "quests", path: "/codex/quests" },
-  { name: "quest-editor", path: "/codex/quests", open: async (page) => {
-      await page.locator(".codex-shell-content button").filter({ hasText: "Missing Bones" }).first().click({ timeout: 10_000 });
-      await page.waitForTimeout(1400);
-    } },
+  { name: "quest-editor", path: "/codex/quests", open: (page) => openFirstRecord(page, {
+      rows: ".codex-shell-content button.codex-quest-row", expect: ".codex-quest-editor", what: "quest"
+    }) },
   { name: "journal", path: "/codex/journal" },
   { name: "calendar", path: "/codex/calendar" },
   { name: "downtime", path: "/codex/downtime" },
@@ -296,6 +438,32 @@ const SURFACES = [
       await prep.scrollIntoViewIfNeeded();
       try { await prep.click({ timeout: 4_000 }); } catch { await prep.dispatchEvent("click"); }
       await page.waitForTimeout(700);
+    } },
+  // ---- The play shell + its phase-A surfaces. `root: "main"` measures the whole shell
+  // (tab bar included); each `ready` is the surface's own render root, since none of these
+  // has a `.codex-shell-content`. One line per address, as §6b step 4 wants. ----
+  { name: "play-table", path: "/table", root: "main", ready: ".table-layout" },
+  { name: "play-scenes", path: "/scenes", root: "main", ready: ".scene-gallery-hub" },
+  { name: "play-maps", path: "/scenes/maps", root: "main", ready: ".scenes-maps-view" },
+  { name: "play-roster", path: "/roster", root: "main", ready: ".party-heading-actions" },
+  { name: "play-replays", path: "/replays", root: "main", ready: ".replay-panel" },
+  { name: "play-settings", path: "/settings", root: "main", ready: ".settings-group" },
+  // Ruling 61 — the API reference as a real GM-only address, full window width.
+  { name: "play-api-reference", path: "/settings/api", root: "main", ready: ".api-reference-page" },
+  { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" },
+  // The sheet LAYER (`/characters/:id`) — a parameterised address, so it resolves its id from the
+  // table's own tokens the way the no-scroll audit does, then navigates. Its page actions live
+  // inside the sheet frame now, which is exactly the row this measurement should see.
+  { name: "play-sheet", path: "/table", root: "main", ready: ".table-layout", open: async (page) => {
+      const id = await page.evaluate(() => document.querySelector("[data-token-id]")?.getAttribute("data-token-id") ?? null);
+      if (!id) throw new Error("no character token on the table to open a sheet from");
+      await page.evaluate((target) => {
+        history.pushState(null, "", target);
+        dispatchEvent(new PopStateEvent("popstate", { state: null }));
+        dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      }, `/characters/${id}`);
+      await page.waitForSelector(".sheet-standalone", { timeout: 10_000 });
+      await page.waitForTimeout(700);
     } }
 ];
 
@@ -334,19 +502,40 @@ const PLAYER_SURFACES = [
       await opener.scrollIntoViewIfNeeded();
       try { await opener.click({ timeout: 4_000 }); } catch { await opener.dispatchEvent("click"); }
       await page.waitForTimeout(700);
-    } }
+    } },
+  // ---- The player's own play shell (see the GM `play-*` block above). ----
+  { name: "player-play-table", path: "/table", root: "main", ready: ".table-layout" },
+  // D9 — MY CHARACTER, the player's first tab and the only player-ONLY address in the app. It
+  // carries the release verb and the builder doors the deleted character bar used to hold, so it is
+  // exactly the kind of dense control cluster this audit exists to measure.
+  { name: "player-my-character", path: "/me", root: "main", ready: ".my-character" },
+  { name: "player-play-replays", path: "/replays", root: "main", ready: ".replay-panel" },
+  { name: "player-play-settings", path: "/settings", root: "main", ready: ".settings-group" }
 ];
 
 const report = [];
 let totalControls = 0, totalBad = 0, unmeasured = 0;
+let totalUnreachable = 0, totalOverlaid = 0, totalClosed = 0;
 
 async function walk(page, surfaces, rootSelector) {
   for (const surface of surfaces) {
     if (surface.narrowOnly && width >= 761) { report.push(`### ${surface.name}: not present at ${width}px (>=761)`); continue; }
+    // Per-surface root/ready: codex surfaces keep the pass default (`rootSelector` and its
+    // `.codex-shell-content` gate); a play surface names its own root and render gate.
+    const root = surface.root ?? rootSelector;
+    const ready = surface.ready ?? `${root} .codex-shell-content`;
     // Addresses, not tabs. A hard `goto` would drop the memory-only GM token, so this drives the router
-    // the way the address bar does inside a live SPA.
-    await page.evaluate((target) => { history.pushState(null, "", target); dispatchEvent(new PopStateEvent("popstate", { state: null })); }, surface.path);
-    try { await page.waitForSelector(`${rootSelector} .codex-shell-content`, { timeout: 15_000 }); }
+    // the way the address bar does inside a live SPA. The popstate is dispatched TWICE on purpose:
+    // router.ts's transient mechanism absorbs the first pop whenever a transient overlay (nav drawer,
+    // palette) is still registered — it closes the overlay and the route stands — so a single dispatch
+    // right after such a surface navigates nowhere. The second dispatch finds no transient and routes;
+    // with none registered, it re-routes to the same path, which the router treats as a no-op.
+    await page.evaluate((target) => {
+      history.pushState(null, "", target);
+      dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      dispatchEvent(new PopStateEvent("popstate", { state: null }));
+    }, surface.path);
+    try { await page.waitForSelector(ready, { timeout: 15_000 }); }
     catch { report.push(`### ${surface.name}: ${surface.path} DID NOT RENDER - NOT MEASURED`); unmeasured += 1; continue; }
     await page.waitForTimeout(900);
     if (surface.open) {
@@ -357,21 +546,50 @@ async function walk(page, surfaces, rootSelector) {
     }
     // A string `pageFunction` is evaluated as an EXPRESSION and never receives `arg`, so the call is
     // built into the expression instead of passed alongside it.
-    const { out, error } = await page.evaluate(`${MEASURE}(${JSON.stringify(rootSelector)})`);
+    const { out, error } = await page.evaluate(`${MEASURE}(${JSON.stringify(root)})`);
     if (error) { report.push(`### ${surface.name}: ${error} - NOT MEASURED`); unmeasured += 1; continue; }
+    // SIZE IS MEASURED IN EVERY LAYER; REACH IS JUDGED IN ONE. `bad` deliberately keeps the whole
+    // population, closed disclosures included: a menu item's box is laid out whether or not its
+    // <details> is open, so its size is a real measurement of a real tap target, and dropping those
+    // rows would have moved the A-3 number 124 -> 121 (2026-08-05, 375px: two `.action-row-static`
+    // rows at 39.9px inside play-table's "Traits & reference" disclosure, and one 19px
+    // `/api/v1/openapi.json` link inside a play-settings disclosure) by narrowing scope rather than by
+    // fixing anything. Reachability is the opposite case — it is a statement about what is under the finger
+    // RIGHT NOW, and for a control the browser is not hit-testing, or one lying under an open modal
+    // or drawer, there is no finger and no answer. Those are reported by name below, never dropped.
     const bad = out.filter((c) => c.h < 44 || c.w < 44);
-    const stolen = out.filter((c) => c.h >= 44 && c.w >= 44 && c.reach > 0 && c.reach < c.h - 2);
-    const unresolved = out.filter((c) => c.h >= 44 && c.w >= 44 && c.reach === 0);
+    const judged = out.filter((c) => c.layer === "active");
+    const stolen = judged.filter((c) => c.h >= 44 && c.w >= 44 && c.reach > 0 && c.reach < c.h - 2);
+    const unreachable = judged.filter((c) => c.h >= 44 && c.w >= 44 && c.reach === 0);
+    const overlaid = out.filter((c) => c.layer === "overlaid");
+    const closed = out.filter((c) => c.layer === "closed");
     totalControls += out.length; totalBad += bad.length;
-    report.push(`### ${surface.name} (${surface.path}) - ${out.length} controls, ${bad.length} below 44px, ${stolen.length} with taps stolen, ${unresolved.length} unresolved`);
+    totalUnreachable += unreachable.length; totalOverlaid += overlaid.length; totalClosed += closed.length;
+    report.push(`### ${surface.name} (${surface.path}) - ${out.length} controls, ${bad.length} below 44px, ${stolen.length} with taps stolen, ${unreachable.length} unreachable in the active layer`);
+    // Counted over controls of EVERY size, unlike the three metrics above, which are >=44 questions:
+    // reach goes unjudged for a 20px control in a closed menu exactly as it does for a 44px one.
+    if (overlaid.length + closed.length > 0)
+      report.push(`  LAYER reach not judged for ${overlaid.length + closed.length} of ${out.length}: ${overlaid.length} behind an open overlay, ${closed.length} inside a closed disclosure - sizes above still count them`);
     for (const c of bad) report.push(`  SIZE  ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
     for (const c of stolen) report.push(`  STEAL ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
+    // Printed per row, unlike the count this replaces: `unresolved` was a header number with no
+    // detail under it, so the 184 it reported on 2026-08-05 could not be read without re-deriving
+    // them by hand. A row here is a control in the layer the user is actually touching whose own
+    // centre resolves to something else — a real tap theft, and part of the exit gate below.
+    for (const c of unreachable) report.push(`  UNREACH ${c.h}x${c.w} reach=0  ${c.tag}.${c.cls}  "${c.label}"`);
     await page.screenshot({ path: `${OUT}/tap-${surface.name}-${width}.png`, fullPage: false });
     // Leave no overlay open behind us, or the next surface measures this one's controls too.
     await page.keyboard.press("Escape");
     await page.waitForTimeout(250);
   }
 }
+
+// Before the walk, not during it: the atlas reads its markers when the route renders, and the player
+// pass opens a second context later that has to see the same pin.
+let fixture = { note: "", undo: async () => {} };
+try { fixture = await ensureLinkedPin(); }
+catch (error) { fixture = { note: `pin fixture: FAILED - ${String(error).split("\n")[0].slice(0, 90)}`, undo: async () => {} }; }
+report.push(fixture.note, "");
 
 await walk(p, SURFACES, ".codex-root");
 
@@ -385,8 +603,20 @@ try {
   unmeasured += PLAYER_SURFACES.length;
 }
 
+// Leave the database as it was found. A failure here is reported rather than thrown: the measurement
+// is already taken, and losing the whole report to a failed cleanup would be the worse trade.
+try { await fixture.undo(); }
+catch (error) { report.push(`### PIN FIXTURE NOT RESTORED - ${String(error).split("\n")[0].slice(0, 120)}`); }
+
 console.log(`===== Codex tap-target audit @ ${width}px =====`);
 console.log(report.join("\n"));
-console.log(`\n${totalControls} interactive controls measured, ${totalBad} below the 44px floor, ${unmeasured} surfaces NOT MEASURED.`);
+console.log(`\n${totalControls} interactive controls measured, ${totalBad} below the 44px floor, ${totalUnreachable} unreachable in the active layer, ${unmeasured} surfaces NOT MEASURED.`);
+console.log(`Reach not judged for ${totalOverlaid + totalClosed}: ${totalOverlaid} behind an open overlay (a modal <dialog> or an open Drawer), ${totalClosed} inside a closed disclosure. Both are sized and counted in the total above.`);
 await b.close();
-process.exit(totalBad === 0 && unmeasured === 0 ? 0 : 1);
+// `totalUnreachable` JOINED THE GATE on 2026-08-05, at 0. It was never gated before because the number
+// it replaces (`unresolved`) stood at 184 and could not be read: every one of those 184 was a control
+// in a layer with no finger on it, so gating on it would have failed every run for a reason that was
+// not a defect. Judged in the active layer it is a defect - the control is on screen, the user's thumb
+// lands on its centre, and something else answers - so it fails the run like a sub-floor control does.
+// `stolen` stays out of the gate: the docblock's over-reporting note still holds for it.
+process.exit(totalBad === 0 && totalUnreachable === 0 && unmeasured === 0 ? 0 : 1);

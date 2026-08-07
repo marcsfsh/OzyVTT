@@ -63,6 +63,48 @@ export function Menu({ trigger, children, align = "start", label, hideCaret = fa
       if (right > viewport - gutter) shift = viewport - gutter - right;
       if (left + shift < gutter) shift = gutter - left;
       if (shift) pop.style.setProperty("--nh-menu-shift", `${Math.round(shift)}px`);
+
+      /* THE SAME PROBLEM ON THE OTHER AXIS, and it is the one that makes a menu UNREACHABLE
+         rather than merely clipped. `top: calc(100% + …)` assumed there is always room below;
+         the map's own Scenes button sits in the bottom-right CORNER of the map (ruling 12 put
+         both scene errands there), so its menu had nowhere to go — measured 70px off the bottom
+         of the window at 1280x900 and at 1280x620 with nothing to scroll, and on a 390x844 phone
+         it was worse: painted nowhere at all and hit-testing to the dock behind it.
+
+         So the box flips to whichever side has room, and ROOM MEANS ROOM WHERE IT CAN BE SEEN.
+         The window is not the bound that bites — every ancestor that clips is. The phone case
+         proves it: `innerHeight` said 579px of room below, while `.encounter-map-stage`'s
+         `overflow: hidden` (224px tall, ending 13px under the trigger) said 9px. Both edges of
+         the visible box are collected the same way, so a menu inside a scroll region flips for
+         the same reason a menu inside the map does. A `position: fixed` ancestor ends the walk:
+         nothing above it clips it.
+
+         When NEITHER side fits it takes the side with MORE room — a menu clipped by a pixel is
+         still a menu, and the case this decides is a 667x375 landscape phone where the map
+         stage leaves 9px under the trigger and 126px over it against a 127px box.
+
+         The trigger's rect is the reference and it is transform-free (`.anim-popover`'s entrance
+         keyframes belong to the POPOVER, the geometry note above), and `offsetHeight` is read
+         off the popover for the same reason `offsetLeft` is used a few lines up. */
+      const trigger = el.querySelector("summary");
+      if (!trigger) return;
+      let top = 0;
+      let bottom = document.documentElement.clientHeight;
+      for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.overflowY !== "visible" || style.overflowX !== "visible") {
+          const box = node.getBoundingClientRect();
+          top = Math.max(top, box.top);
+          bottom = Math.min(bottom, box.bottom);
+        }
+        if (style.position === "fixed") break;
+      }
+      const rect = trigger.getBoundingClientRect();
+      const height = pop.offsetHeight;
+      const gap = parseFloat(getComputedStyle(pop).getPropertyValue("--nh-menu-gap")) || 0;
+      const roomBelow = bottom - rect.bottom - gutter - gap;
+      const roomAbove = rect.top - top - gutter - gap;
+      el.classList.toggle("nh-menu--up", height > roomBelow && roomAbove > roomBelow);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);

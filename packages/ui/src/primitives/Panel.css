@@ -1,25 +1,63 @@
+/* RULING 2 — THE MATERIAL: 2px rim, scanline-over-gradient fill, inner bezel. No glow: hero
+   surfaces get the full landing door, and this primitive is not one of them.
+   No cue triangle either — the cue is a hover/focus affordance, and a Panel is a surface with
+   nothing to cue. Its interactive children carry their own.
+
+   THE HONEST SCOPE, from phase 0 (ruling 64): this primitive has SIX real app call sites, all in
+   the Codex, against ~119 hand-rolled panel-shaped rules in 20 stylesheets that inherit nothing
+   from this file. Doing it correctly here is still right — wave 5 generalises the same recipe as
+   a shared utility — but nobody should read a change to Panel.css as having re-skinned the app.
+
+   The material rides a backing layer, not the element: a panel is full of tap targets, and
+   `clip-path` clips hit-testing. `::after` is left free for the accent bar below. */
 .nh-panel {
   position: relative;
+  isolation: isolate;
   padding: var(--space-5);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
+.nh-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background-color: var(--surface-1);
+  background-image:
+    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 40%);
+  background-repeat: repeat, no-repeat;
+  background-size: 100% var(--scanline-gap), 100% 100%;
+  background-origin: border-box;
+  background-clip: border-box;
+  /* The inner bezel — the cabinet's second, quieter line, set in from the rim. The first shadow
+     re-lays the fill across the gap so the bezel reads as its own line and not as a fatter rim. */
+  box-shadow:
+    inset 0 0 0 var(--bezel-inset) var(--surface-1),
+    inset 0 0 0 calc(var(--bezel-inset) + 1px) var(--bezel-color);
+}
+/* The accent bar moves to ::after — ::before is the material now. It stops at the cut rather than
+   riding over it, which is why it is inset by the chamfer at the leading corner. */
 .nh-panel--accent-magenta,
 .nh-panel--accent-cyan,
 .nh-panel--accent-violet { padding-top: calc(var(--space-5) + 2px); }
-.nh-panel--accent-magenta::before,
-.nh-panel--accent-cyan::before,
-.nh-panel--accent-violet::before {
+.nh-panel--accent-magenta::after,
+.nh-panel--accent-cyan::after,
+.nh-panel--accent-violet::after {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
+  inset: 0 0 auto var(--chamfer);
   height: 2px;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  pointer-events: none;
 }
-.nh-panel--accent-magenta::before { background: var(--magenta); }
-.nh-panel--accent-cyan::before { background: var(--cyan); }
-.nh-panel--accent-violet::before { background: var(--violet); }
+.nh-panel--accent-magenta::after { background: var(--magenta); }
+.nh-panel--accent-cyan::after { background: var(--cyan); }
+.nh-panel--accent-violet::after { background: var(--violet); }
 
 .nh-panel-head {
   /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:

@@ -63,8 +63,9 @@ compaction making "Reveal all" a natural reset valve.
 
 ## Mobile, security, and visibility impact
 
-The five fog tools sit behind one 🌫 toggle in the map toolbar (GM only), share the annotation
-pointer plumbing so touch drags work, and were smoke-verified at 375 px. The viewer sanitizer
+The five fog tools sit behind the map toolbar's labelled **Fog** group (GM only) — on/off is a
+Switch, Reveal and Hide are the two drag tools, and Reveal all / Hide all are buttons. They share
+the annotation pointer plumbing so touch drags work, and were smoke-verified at 375 px. The viewer sanitizer
 validates fog geometry like every other viewer field; the viewer projection sends fog only with
 the public scene payload.
 

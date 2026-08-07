@@ -40,6 +40,10 @@ of record the GM is editing* is itself GM information.
   marker's page links are filtered to the revealed subset, and a quest's entity ids likewise.
   A projection that needs a neighbour's reveal state takes it as an argument — the caller
   resolves it — so the panel and the graph are gated by one predicate rather than two.
+- **Some GM fields are GM-only ALWAYS, not "until revealed."** A marker's `sceneIds` and a
+  session's `sceneIds` (D31, ruling R2) never enter a player projection even when the record is
+  revealed: revealing a session publishes its RECAP, and the fights the GM has staged for the
+  evening are spoilers either way. Scenes are not player-addressable objects anywhere in the app.
 - **A hidden record is a 404, never a 403.** Existence is itself information. The same rule
   governs conditional requests: the ETag is computed at serialization, after every
   authorization and existence gate, so a 304 can never confirm that a hidden record exists.

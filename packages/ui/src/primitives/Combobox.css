@@ -1,6 +1,10 @@
 .nh-combobox { position: relative; display: block; }
 .nh-combobox-input { width: 100%; }
 
+/* RULING 24 — the same chip family as `Chip.css`, which has read `border-radius: 0` since the
+   de-pilling. The clear ✕ below is deliberately NOT part of this change: it is the exact analogue of
+   `.nh-chip-remove`, which `Chip.css` protects by name, and squaring a 20px close control would make
+   a chip look like it holds a second chip. */
 .nh-combobox-chip {
   display: inline-flex;
   align-items: center;
@@ -8,7 +12,7 @@
   min-height: var(--tap-min);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   background: var(--surface-3);
   color: var(--text);
   font: 600 var(--fs-sm) / 1.4 var(--font-body);

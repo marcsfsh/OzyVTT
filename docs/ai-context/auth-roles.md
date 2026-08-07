@@ -27,8 +27,13 @@ join with no password.** GM login uses `bcrypt.compare`, rate-limited per IP (42
 cutoff for revoke-all.
 
 **Player identity** is accountless and per-browser-session. A claim sets exactly one
-player-character's `ownerSessionId`, enforcing: target is a `player-character`, not owned by
-another session, and the claimant owns no other character (must release first).
+player-character's `ownerSessionId`, enforcing: target is a `player-character`, not archived,
+not owned by another session, and the claimant owns no other character (must release first).
+The archived check is a **server** check, not the projection's: archived characters are hidden
+from the player view, and hiding was the only thing that used to stop a client replaying a known
+`actorId`. It refuses with the same message a missing character gets — no existence oracle.
+Archiving a claimed character releases the claim in the same mutation (`actor.set-archived`), so
+nobody is left holding an invisible claim the one-claim rule then counts against them.
 
 **Projection is the boundary.** `projectPlayerView` (`apps/server/src/projections.ts`) does
 not filter state — it destructures the sensitive fields away in one place and then re-adds a
@@ -45,6 +50,16 @@ narrow set, and the shape of that code is the rule:
 - **Filtered out entirely:** actors that are not `visibility === "public"`, and actors that
   are archived. Rolls are filtered by visibility (public/self-only) with
   `initiatorSessionId` stripped, and a hidden turn is masked (`hiddenTurn`).
+- **Re-added as a deliberately tiny list:** `archivedCharacters` — id and name only, and only
+  for archived characters the GM explicitly shared (`Actor.sheetPreview`) that are also public.
+  It is a door, not a second actor projection; everything else about them stays omitted.
+- **Table policy the player must see to obey it** is copied FIELD BY FIELD, never spread:
+  `builderPolicy` (which ability methods, the custom formula, the level cap, whether the
+  builder is open to players) and the combat's `rulesMode` + `ruleExceptions`. `pendingRuleAsks`
+  is filtered by the same ownership rule as `pendingSaves`/`pendingReactions` and drops
+  `command` entirely. The field-by-field
+  copy is the review point — a field added to `BuilderPolicySchema` reaches players only when
+  someone writes it into that copy on purpose.
 
 **Do not maintain a field list here.** Read the destructure — it is one line and it is the
 enumeration. Any new owner-only field on `Actor` must be stripped-then-re-added-when-`mine`;
@@ -71,8 +86,26 @@ the router. Full rules in `codex.md`.
 - A player may only roll/move for an actor whose `ownerSessionId` matches theirs.
 - Players **cannot**: claim a non-PC or already-claimed actor, own two characters, make
   gm-only rolls, or see other sessions' `ownerSessionId` / `notes` / private rolls / hidden
-  actors / hidden turns.
+  actors / hidden turns / other players' parked rules questions.
+- **What a player MAY now do on their own character** (D13/D18), each gated by the same
+  `canInitiateForActor` check every other player command uses, never by the UI: set its token
+  image from the library or their own upload (`actor.set-token-image`), build one when the
+  table's `builderPolicy.playerBuilder` is `open` (`character.create`, auto-claimed, with a
+  per-session daily cap and a definitions-headroom refusal), and level it up or down or respec
+  it (`character.rebuild`). The builder's ability dice are the server's
+  (`builder.roll-abilities`) and land in the table feed like any other roll.
+- **A blocked player is never a silent dead end.** A rules refusal reaches them as a
+  machine-readable `blocked`, and `rules.ask` parks it for the GM (`combat.pendingRuleAsks`).
+  A player sees only their OWN ask, and never its parked `command` payload — that can name
+  target ids they may not know. Only a GM-grade principal may `rules.answer`.
 - Role derives from the **signed token, not network position**.
+
+**The token library is curated, not policed** (D18 / ruling R1). A player browses the library and
+uploads their own image with no approval gate; the GM's control is a per-entry `hidden` flag
+(`token-catalog.ts`) that decides what the shared shelf OFFERS, applied in the store's `list()` so
+no route can forget it. Every management route (rename, delete, folder visibility) stays GM-only,
+and a player upload lands in one "Player uploads" folder under the map-asset discipline: 6 MiB,
+real image validation, content-hash dedupe, plus a per-session daily upload cap.
 
 ## Gotchas
 

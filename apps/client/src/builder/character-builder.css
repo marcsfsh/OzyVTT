@@ -4,24 +4,28 @@
    give each offer a heading rhythm. Tokens only — no hex, no new breakpoint (760 is the documented
    phone/laptop step, the same one WizardShell and Steps already swap at). */
 
-/* The wizard OWNS the viewport: it is a full page on a laptop and a full-screen sheet on a phone
-   (decision 4), never a modal floating over the table. */
+/* The wizard OWNS the pane: it fills the shell's content pane below the frame rows (the tab
+   bar and the connection strip stay visible above it now — the strip used to be painted over
+   when this layer was `position: fixed; inset: 0` covering the viewport), and it is still a
+   whole-surface page rather than a modal floating over the table (decision 4). The pane sizes
+   it (`.app-pane > *` in styles.css).
+   THE LAYER NO LONGER SCROLLS — the step body does (`.nh-wizard-body`, WizardShell.css, §7's
+   formal shape: the frame is the sticky head and foot, the region is the step). The
+   `overflow-y`, the overscroll containment and the scroll-padding that used to live here moved
+   there with the scroller; the comment that explained the padding moved with them. */
 .cb-page {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
+  position: relative;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   background: var(--bg);
-  /* This element is the scroll container, and the shell's header and footer are sticky over it.
-     Without scroll padding, anything the BROWSER scrolls to — a card reached by keyboard focus, an
-     anchor jump — lands underneath the footer and reads as unreachable. Found by driving the wizard
-     with a real browser: the focused card was visible and un-clickable. */
-  scroll-padding-top: calc(var(--space-16) + var(--space-6));
-  scroll-padding-bottom: calc(var(--space-16) + var(--space-6));
 }
+/* Inside the pane the wizard column IS the pane: WizardShell's own `min-height: 100dvh` (right
+   for a wizard that owns a whole window) would push the sticky footer below the fold, and with
+   the body scrolling there is no page left to scroll it back. `flex: 1; min-height: 0` makes the
+   column exactly the pane's height and hands the leftover to the step body. The primitive keeps
+   its own default: the app-side override is one line, and every other mount of the shell — the
+   level flow (same layer) and the styleguide's bounded demo — states its own box the same way. */
+.cb-page .nh-wizard { flex: 1; min-height: 0; }
 
 .cb-step {
   display: flex;
@@ -128,3 +132,59 @@
   .cb-asi-rows { flex-direction: column; align-items: stretch; }
   .cb-asi-row { justify-content: space-between; }
 }
+
+/* ── Level flow (D13): the rail, the two directions, and the level-down preview. ───────────── */
+.cb-level { display: flex; flex-direction: column; gap: 1.1rem; max-width: 46rem; margin: 0 auto; padding: 1.4rem var(--space-4) var(--space-12); }
+.cb-level-head h2 { margin: .2rem 0 0; font: 700 1.5rem/1.15 var(--font-display); }
+.cb-level-head p { margin: var(--space-1) 0 0; color: var(--text-dim); }
+.cb-level-rail { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; padding: 0; list-style: none; }
+.cb-level-pip { display: grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: 0 .35rem; border: 1px solid var(--line); border-radius: 0; background: var(--surface-2); color: var(--text-muted); font: 600 .8rem/1 var(--font-body); }
+.cb-level-pip.reached { color: var(--text); border-color: var(--line-strong); }
+.cb-level-pip.current { background: var(--primary); border-color: var(--primary); color: var(--text-on-neon); box-shadow: var(--glow-magenta); }
+.cb-level-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.cb-level-actions > * { flex: 1 1 12rem; }
+.cb-level-preview { padding: .9rem var(--space-4); border: 1px solid transparent; }
+.cb-level-preview h3 { margin: 0 0 .35rem; font: 700 .95rem/1 var(--font-body); }
+.cb-level-preview p { margin: 0; color: var(--text-dim); font-size: .9rem; }
+.cb-level-gate { padding: 1.4rem; border: 1px solid transparent; display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
+.cb-level-gate h2 { margin: 0; font: 700 1.2rem/1.2 var(--font-display); }
+.cb-level-gate p { margin: 0; color: var(--text-dim); }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
+   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
+   daybreak translation arrives for free.
+   THE BUILDER GATE IS ON RULING 2'S HERO LIST, so it is one of the few surfaces in this lane that
+   takes the FULL landing door — the rest glow included, via `--rim-glow` on the backing layer.
+   A filter, never a box-shadow: it follows the cut, which a shadow cannot, and it stays off the
+   element, where a filter would make a containing block for every fixed overlay inside it.
+   The level preview beside it is an ordinary panel and gets the material without the glow. */
+.cb-level-gate,
+.cb-level-preview {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.cb-level-gate::before,
+.cb-level-preview::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.cb-level-gate { --material-fill: var(--material-scanline), var(--material-plate); }
+.cb-level-gate::before { filter: var(--rim-glow); }
+.cb-level-preview { --material-fill: var(--material-plate); }

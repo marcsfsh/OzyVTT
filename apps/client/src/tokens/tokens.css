@@ -1,30 +1,71 @@
 /* Token library renders in the shared Modal (box, head, close, scroll handled there); the Done/Remove
    buttons live in the Modal footer. Below are the token-library body + grid rules only. */
-.token-upload { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: .7rem; align-items: end; margin-top: .2rem; padding: .9rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
-.token-upload label { color: var(--text-dim); font-size: .78rem; }
-.token-upload button { align-self: end; background: var(--primary); color: var(--text-on-neon); border: 0; text-align: center; padding: .8rem 1rem; }
-.token-upload button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 
-.token-library-filters { display: flex; gap: .7rem; margin-top: 1rem; }
-.token-library-filters input { flex: 1 1 auto; margin-top: 0; }
+.token-library-filters { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: var(--space-4); }
+.token-library-filters > * { flex: 1 1 10rem; margin-top: 0; }
 .token-library-filters select { width: auto; margin-top: 0; }
 
 .token-library-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: .88rem; color: var(--text-dim); }
 
 .token-library-section { margin-top: 1.2rem; }
 .token-library-section h3 { margin: 0 0 .6rem; font: 700 .8rem/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
-.token-library-empty { margin: 0; padding: 1.4rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .9rem; }
+/* Ruling 55: no dashed boxes. The empty library gets one designed frame, not a placeholder. */
+.token-library-empty { margin: .8rem 0 0; padding: 1.4rem; border: 1px solid transparent; text-align: center; color: var(--text-dim); font-size: .9rem; }
 
+/* ≤390px: two columns, tiles well over the 44px touch floor, upload tile first (D18's mobile note). */
 .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: .7rem; }
-.token-thumb { position: relative; display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: .6rem .4rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
-.token-thumb.selected { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.token-tile { display: flex; flex-direction: column; gap: .35rem; }
+.token-thumb { position: relative; display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: .6rem .4rem; border: 1px solid transparent; min-height: 44px; }
+.token-tile.selected .token-thumb, .token-thumb.selected { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
 .token-thumb-image { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 50%; overflow: hidden; background: var(--surface-3); border: 1px solid var(--line-strong); }
 .token-thumb-image img { width: 100%; height: 100%; object-fit: cover; }
-.token-thumb-placeholder { font-size: 1.6rem; }
+/* The empty-art mark and the upload mark are DRAWN, never a glyph: a dashed disc, and a plus. */
+.token-thumb-placeholder { width: 1.4rem; height: 1.4rem; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); }
+.token-thumb-upload .token-thumb-image { border-style: dashed; background: var(--surface-2); }
+.token-upload-mark { position: relative; width: 1.3rem; height: 1.3rem; }
+.token-upload-mark::before, .token-upload-mark::after { content: ""; position: absolute; background: var(--text-dim); border-radius: 1px; }
+.token-upload-mark::before { inset: 50% 0 auto; height: 2px; transform: translateY(-50%); }
+.token-upload-mark::after { inset: 0 50% auto; width: 2px; height: 100%; transform: translateX(-50%); }
+.token-thumb-upload:hover:not(:disabled) .token-upload-mark::before, .token-thumb-upload:hover:not(:disabled) .token-upload-mark::after { background: var(--cyan); }
+.token-upload-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .token-thumb-name { max-width: 100%; font-size: .78rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .token-thumb-badge { position: absolute; top: .3rem; right: .3rem; }
+.token-tile-reveal { justify-content: center; font-size: .72rem; }
 
-.token-library-remove { background: transparent; border: 1px solid var(--danger); color: var(--danger-hi); }
-.token-library-remove:hover { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
+@media (max-width: 560px) { .token-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .token-library-filters > * { flex: 1 1 100%; } }
 
-@media (max-width: 640px) { .token-upload { grid-template-columns: 1fr 1fr; } .token-upload button { grid-column: 1 / -1; } }
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
+   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
+   daybreak translation arrives for free.
+   RULING 28: a thumb is a tile in a grid, not an outermost panel, so it takes the plate without
+   the texture — twenty textured tiles in one grid is the interference case the ruling names.
+   The empty state IS the outermost panel of an empty library and takes the full fill. */
+.token-library-empty,
+.token-thumb {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.token-library-empty::before,
+.token-thumb::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.token-library-empty { --material-fill: var(--material-scanline), var(--material-plate); }
+.token-thumb { --material-fill: var(--material-plate); }

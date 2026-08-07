@@ -71,7 +71,9 @@ export function deriveActorSheet(
       check,
       checkWithProficiency: check + proficiencyBonus,
       save,
-      saveProficient: proficientSaves.has(ability),
+      // An item that GRANTS the save proficiency makes the character proficient, so the sheet's dot
+      // has to say so - the number alone ("+5 from items") would leave the row contradicting itself.
+      saveProficient: proficientSaves.has(ability) || derivation.saves.some((entry) => entry.id === ability),
       // What the equipment contributes, isolated by re-asking with the EMPTY derivation rather
       // than by re-summing the rider terms - one sum, so the two halves cannot drift.
       saveFromItems: save - saveTotalFor(definition, actor, ability, EMPTY_DERIVATION)

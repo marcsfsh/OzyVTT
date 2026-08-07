@@ -37,7 +37,7 @@
  */
 
 import { useMemo } from "react";
-import { Chip, Field, FieldGrid, Input, RowEditor, Select } from "@vtt/ui";
+import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { FieldRenderer } from "./FieldRenderer";
 import { damagePartsField, diceValidate, grouped, opt, type Draft, type FieldDef, type SchemaContext, type SelectOption } from "./schema";
@@ -220,17 +220,17 @@ const whenField = (): FieldDef => ({
     { key: "ids", label: "Which", kind: "tags", visibleWhen: hasType("while-proficient-with"), placeholder: "longsword" },
     { key: "tags", label: "Effect tags", kind: "tags", visibleWhen: hasType("while-effect-tag"), suggestions: ["raging", "blessed", "concentrating", "inspired"] },
     { key: "percent", label: "Hit points at or below", kind: "number", min: 1, max: 99, unit: "%", visibleWhen: hasType("while-hp-at-or-below") },
-    { key: "conditionIds", label: "Conditions", kind: "tags", visibleWhen: hasType("while-condition", "versus-condition"), suggestions: ["charmed", "frightened", "grappled", "poisoned", "prone", "restrained", "stunned"] },
+    { key: "conditionIds", label: "Conditions", kind: "tags", visibleWhen: hasType("while-condition", "versus-condition"), suggestions: (ctx) => ctx.conditions },
     { key: "present", label: "It has the condition", kind: "switch", visibleWhen: hasType("while-condition"), help: "Turn off for “only while you don't have it”." },
     { key: "kinds", label: "Kinds of attack", kind: "multiselect", options: [opt("melee", "Melee"), opt("ranged", "Ranged"), opt("spell", "Spell"), opt("unarmed", "Unarmed"), opt("thrown", "Thrown"), opt("reaction", "Reaction"), opt("opportunity", "Opportunity")], visibleWhen: hasType("attack-kind-is") },
-    { key: "properties", label: "Weapon properties", kind: "tags", visibleWhen: hasType("weapon-property-is"), suggestions: ["finesse", "heavy", "light", "reach", "thrown", "two-handed", "versatile"] },
-    { key: "damageTypes", label: "Damage types", kind: "tags", visibleWhen: hasType("damage-type-is"), suggestions: ["fire", "cold", "lightning", "acid", "necrotic", "radiant", "poison", "psychic", "force", "thunder"] },
+    { key: "properties", label: "Weapon properties", kind: "tags", visibleWhen: hasType("weapon-property-is"), suggestions: (ctx) => ctx.weaponProperties },
+    { key: "damageTypes", label: "Damage types", kind: "tags", visibleWhen: hasType("damage-type-is"), suggestions: (ctx) => ctx.damageTypes },
     { key: "abilities", label: "Abilities", kind: "multiselect", options: ABILITIES, visibleWhen: hasType("ability-is") },
     { key: "skills", label: "Skills", kind: "multiselect", options: (ctx) => ctx.skills, visibleWhen: hasType("skill-is") },
-    { key: "schools", label: "Schools", kind: "tags", visibleWhen: hasType("spell-school-is"), suggestions: ["abjuration", "conjuration", "divination", "enchantment", "evocation", "illusion", "necromancy", "transmutation"] },
+    { key: "schools", label: "Schools", kind: "tags", visibleWhen: hasType("spell-school-is"), suggestions: (ctx) => ctx.schools },
     { key: "levels", label: "Spell levels", kind: "multiselect", options: Array.from({ length: 10 }, (_, level) => opt(String(level), level === 0 ? "Cantrip" : `Level ${level}`)), visibleWhen: hasType("spell-level-is"), read: (row) => (Array.isArray(row.levels) ? row.levels.map(String) : []), write: (next, row) => ({ ...row, levels: (next as string[]).map(Number) }) },
     { key: "sizes", label: "Sizes", kind: "multiselect", options: SIZES, visibleWhen: hasType("versus-size") },
-    { key: "creatureTypes", label: "Kinds of creature", kind: "tags", visibleWhen: hasType("versus-creature-type"), suggestions: ["undead", "fiend", "dragon", "beast", "aberration"], note: "Not checked yet — a creature doesn't record its kind." }
+    { key: "creatureTypes", label: "Kinds of creature", kind: "tags", visibleWhen: hasType("versus-creature-type"), suggestions: (ctx) => ctx.creatureTypes, note: "Not checked yet — a creature doesn't record its kind." }
   ]
 });
 
@@ -380,7 +380,7 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
     { key: "allowShield", label: "A shield still counts", kind: "switch", visibleWhen: hasType("unarmored-defense"), note: "Not read yet." },
     { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage") },
-    { key: "damageType", label: "Damage type", placeholder: "fire", visibleWhen: hasType("extra-damage") },
+    { key: "damageType", label: "Damage type", placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
     { key: "doubleOnCritical", label: "Doubled on a critical hit", kind: "switch", visibleWhen: hasType("extra-damage"), help: "Off is the 5e rule — dice added after the attack aren't doubled." },
     { key: "roll", label: "On which roll", kind: "select", options: [opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"), opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")], visibleWhen: hasType("roll-mode") },
     { key: "mode", label: "Which way", kind: "select", options: [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")], visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a cursed item bites." },
@@ -584,6 +584,33 @@ const GRANT_KINDS: ReadonlyArray<{ key: string; label: string; help?: string }> 
 
 type GrantRow = Readonly<{ rowId: string; kind: string; values: readonly string[] }>;
 
+/**
+ * The canonical vocabulary each open-slug grant kind draws on, so "Which" is a complete list plus
+ * other rather than a blank line. Skills and saving throws are handled above as closed chip sets.
+ */
+const grantSuggestions = (kind: string, ctx: SchemaContext): readonly string[] => {
+  if (kind === "damageResistances" || kind === "damageImmunities") return ctx.damageTypes;
+  if (kind === "conditionImmunities") return ctx.conditions;
+  if (kind === "weapons") return WEAPON_GRANT_SUGGESTIONS;
+  if (kind === "armor") return ARMOR_GRANT_SUGGESTIONS;
+  return [];
+};
+
+/** The four proficiency slugs `character-build.ts` folds for armour, and the two weapon families —
+    open sets, so these are the well-known members and never a closed list. */
+const ARMOR_GRANT_SUGGESTIONS: readonly string[] = ["light-armor", "medium-armor", "heavy-armor", "shields"];
+const WEAPON_GRANT_SUGGESTIONS: readonly string[] = ["simple-weapons", "martial-weapons"];
+
+const GRANT_PLACEHOLDERS: Readonly<Record<string, string>> = {
+  armor: "light-armor",
+  weapons: "simple-weapons",
+  tools: "thieves-tools",
+  languages: "elvish",
+  damageResistances: "fire",
+  damageImmunities: "poison",
+  conditionImmunities: "charmed"
+};
+
 function GrantsEditor({
   value,
   onChange,
@@ -669,12 +696,18 @@ function GrantsEditor({
                     })}
                   </div>
                 ) : (
-                  <Input
-                    value={row.values.join(", ")}
-                    placeholder="light-armor, shields"
-                    onChange={(event) =>
-                      replace({ values: event.target.value.split(",").map((entry) => entry.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-")).filter(Boolean) })
-                    }
+                  /* Free entry, because five of these ten grant kinds are open slug sets — but no
+                     longer free entry with NOTHING to go on. A GM granting damage immunities used to
+                     face a comma box placeheld "light-armor, shields"; typing "Fire" or "flame"
+                     stored a value nothing ever matches, silently. `TagInput` gives the complete
+                     canonical list as suggestions and still takes any word (`slugify` is the same
+                     normalisation the comma box did by hand). */
+                  <TagInput
+                    ariaLabel={`Which ${meta?.label.toLowerCase() ?? "grants"}`}
+                    values={row.values}
+                    onChange={(values) => replace({ values })}
+                    suggestions={grantSuggestions(row.kind, ctx)}
+                    placeholder={GRANT_PLACEHOLDERS[row.kind] ?? "light-armor"}
                   />
                 )}
               </Field>
@@ -689,6 +722,18 @@ function GrantsEditor({
 /* ---------------------------------------------------------------- the form ----- */
 
 export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", "tags", "actions", "effects"];
+
+/**
+ * The rider field definitions, flattened, for `vocabularies.test.ts`.
+ *
+ * Exported for one reason and it is worth naming: the rider vocabulary is ONE vocabulary mounted by
+ * items, class features, species traits and feats alike, so a damage-type box that quietly went back
+ * to a hand-typed list here would regress on all four carriers at once. The census in that test
+ * needs to see these fields, and they are otherwise built inside the component.
+ */
+export const RIDER_FIELDS_FOR_TEST: readonly FieldDef[] = [
+  whenField(), modifiersField("What it does", "item"), usesField("Charges", "item"), actionsField(), effectsField()
+];
 
 /** Items get everything except `choice` — an item never asks a question at character
     creation, and there is no code path from an item to the wizard. `grants` IS here now:

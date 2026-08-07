@@ -1,5 +1,6 @@
 import type { ActionResolution, GameState } from "@vtt/domain";
 import { applyDamageDetailed, type DamageOutcome } from "./hit-points.js";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import type { ActorDefinition } from "@vtt/schemas";
 
 /**
@@ -15,6 +16,8 @@ export type PlayerDamageDeps = Readonly<{
   newId: () => string;
   /** Milliseconds since epoch (injected for deterministic tests). */
   now: () => number;
+  /** The item catalog, so a target's item-granted resistances and immunities reach the damage math. */
+  catalog?: EquipmentCatalog;
 }>;
 
 /** The applied result surfaced for table narration (direct mode / GM apply). `sourceActorId` (the attacker)
@@ -58,7 +61,7 @@ export function settlePlayerHit(state: GameState, resolution: ActionResolution, 
   const parts = resolutionDamageParts(resolution);
   const label = `${attackerName}'s ${resolution.actionName}`;
   if (mode === "direct") {
-    const outcome = applyDamageDetailed(state, attack.targetId, { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now) });
+    const outcome = applyDamageDetailed(state, attack.targetId, { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now), ...(deps.catalog ? { catalog: deps.catalog } : {}) });
     return { outcome, targetId: attack.targetId, sourceActorId, label };
   }
   state.combat = { ...state.combat, pendingDamage: [...state.combat.pendingDamage, { id: deps.newId(), sourceActorId, sourceName: attackerName, actionName: resolution.actionName, targetActorId: attack.targetId, targetName: attack.targetName, proposedDamageParts: parts, proposedTotal: resolution.damageTotal, critical: resolution.crit, createdAt: deps.now() }] };
@@ -80,7 +83,7 @@ export function resolvePendingDamage(state: GameState, proposalId: string, apply
     const input = amount !== undefined
       ? { amount, critical: proposal.critical, sourceName: label }
       : { amount: proposal.proposedTotal, parts: proposal.proposedDamageParts, critical: proposal.critical, sourceName: label };
-    const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now) });
+    const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now), ...(deps.catalog ? { catalog: deps.catalog } : {}) });
     applied = { outcome, targetId: proposal.targetActorId, sourceActorId: proposal.sourceActorId, label };
   }
   state.combat = { ...state.combat, pendingDamage: state.combat.pendingDamage.filter((entry) => entry.id !== proposalId) };

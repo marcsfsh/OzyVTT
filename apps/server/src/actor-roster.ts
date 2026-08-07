@@ -171,6 +171,7 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,
+    sheetPreview: false,
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
     size: definition.size,
@@ -211,10 +212,103 @@ export function resolvePendingImport(state: GameState, importId: string, approve
   if (approve) importActorDefinition(state, pending.definition, newActorId, "public");
 }
 
+/**
+ * Archived characters are OUT OF PLAY, and that has to be true server-side: the picker filters were
+ * the only guard, so any caller that replayed a known actorId could stage or start a fight with a
+ * character the GM had put away. Rejected rather than silently filtered - a silent filter makes the
+ * GM's own selection lie back to them.
+ */
+export function assertNotArchived(state: GameState, actorId: string) {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived - restore them first.`);
+}
+
+/**
+ * REBUILD one character in place (D13/D14): level up, level down, or respec.
+ *
+ * The definition is re-assembled by the caller through the very same `buildCharacterDefinition` a
+ * fresh create runs, so a rebuild can never be a second, laxer build path. What lands here is the
+ * live-actor half, and the rule is stated rather than implied:
+ *
+ *   KEPT  - identity on the table (id, claim, token image, size/position bookkeeping, visibility),
+ *           and everything the CAMPAIGN wrote: conditions, effects, notes, currency, inventory
+ *           (re-reconciled through the same derivation an inventory write runs).
+ *   RESET - everything the SHEET owns and the new level redefines: spell slots, pact slots, hit
+ *           dice, prepared spells, action uses, derived AC/initiative/speed/immunities.
+ *   HIT POINTS - `current += (newMaximum - oldMaximum)`, clamped to [0, newMaximum]. Levelling up
+ *           feels like growth (the new maximum arrives as usable hit points), levelling down clamps,
+ *           and the arithmetic is deterministic - which is what makes a preview round trip
+ *           (5 -> 3 -> 5) land back on the number it started from.
+ */
+export function rebuildActorDefinition(state: GameState, actorId: string, definition: ActorDefinition, catalog?: EquipmentCatalog) {
+  const actor = state.actors.find((item) => item.id === actorId);
+  if (!actor) throw new CommandRejectedError("That character no longer exists.");
+  if (actor.kind !== "player-character") throw new CommandRejectedError("Only characters can be rebuilt.");
+  const definitionId = `import-${actorId}`;
+  // The editability gate every other sheet edit uses: a bundled/example definition is not ours to rewrite.
+  if (actor.definitionId !== definitionId) throw new CommandRejectedError("That character was not built here, so it can't be rebuilt.");
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before rebuilding a character.");
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
+    throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
+  }
+  // The same extra guard `removeActor` carries: a parked scene can hold a paused, still-live fight
+  // whose action ids and per-encounter pools this rebuild would invalidate.
+  if (state.combat.scenes.some((scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId))) {
+    throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this character first.");
+  }
+
+  // THE MEMORY OF THE DICE (D14). A level-down rebuilds levels 2..N, so the new sheet's ledger has
+  // nothing to say about the levels that were dropped - and without this the way back up would roll
+  // (or average) them again, and a 5 -> 3 -> 5 round trip would land on a different character. The
+  // previous sheet's `hp-roll` rows for levels the new build does not cover are carried across, so
+  // the character remembers what it rolled even while it is temporarily smaller.
+  const previous = state.definitions.find((entry) => entry.id === definitionId)?.definition;
+  const rebuilt = rememberHitPointRolls(previous, definition);
+
+  const inventory = actor.inventory.map((item) => ({ ...item }));
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog));
+  const derivation = deriveEquipment({ ...actor, inventory } as Actor, definition, catalog);
+  const previousMaximum = actor.hp.maximum;
+  const maximum = definition.hitPoints.maximum;
+
+  actor.hp = { current: Math.max(0, Math.min(maximum, actor.hp.current + (maximum - previousMaximum))), maximum, temporary: actor.hp.temporary };
+  actor.armorClass = (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) + derivation.armorClass;
+  actor.initiative = definition.initiativeBonus + derivation.initiative;
+  actor.speedFeet = definition.speedFeet;
+  actor.conditionImmunities = definition.conditionImmunities ? [...definition.conditionImmunities] : [];
+  actor.hitDice = seedHitDice(definition);
+  actor.spellSlots = seedSpellSlots(definition, derivation.spellSlots);
+  actor.pactSlots = seedPactSlots(definition);
+  actor.preparedSpellIds = seedPreparedSpellIds(definition);
+  actor.actionUses = {};
+  actor.size = definition.size;
+  actor.sizeCells = Math.max(definition.token.footprint.width, definition.token.footprint.height);
+  state.definitions = state.definitions.map((entry) => entry.id === definitionId ? { id: definitionId, definition: rebuilt } : entry);
+  return actor;
+}
+
+/** The new sheet, plus any `hp-roll` row the old one recorded for a level this build does not cover. */
+function rememberHitPointRolls(previous: ActorDefinition | undefined, next: ActorDefinition): ActorDefinition {
+  const nextChoices = next.character?.choices;
+  if (!previous || !nextChoices) return next;
+  const carried = (previous.character?.choices ?? []).filter((row) =>
+    row.kind === "hp-roll" && !nextChoices.some((candidate) => candidate.kind === "hp-roll" && candidate.level === row.level));
+  if (carried.length === 0) return next;
+  const choices = [...nextChoices, ...carried].sort((left, right) => left.level - right.level);
+  return { ...next, character: { ...next.character!, choices } };
+}
+
 export function removeActor(state: GameState, actorId: string) {
   const actor = state.actors.find((item) => item.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (actor.kind === "player-character" && actor.ownerSessionId !== null) throw new CommandRejectedError("Release that character's claim before removing it.");
+  // An ARCHIVED character that is still claimed can be deleted, releasing the claim as part of the
+  // same mutation: archiving used to leave the claim in place while hiding the character from
+  // everyone, so an abandoned claim (a 30-day token expiry mints a new identity) turned the character
+  // into undeletable garbage. A character still in play keeps the original protection.
+  if (actor.kind === "player-character" && actor.ownerSessionId !== null) {
+    if (!actor.archived) throw new CommandRejectedError("Release that character's claim before removing it.");
+    actor.ownerSessionId = null;
+  }
   if (actor.kind === "player-character" && !actor.definitionId?.startsWith("import-")) throw new CommandRejectedError("Player characters can't be removed from the roster.");
   // A recorded turn snapshot may reference this actor; removing it while rewound would leave the
   // restore pointing at a combatant that no longer exists. Make the GM leave history review first.

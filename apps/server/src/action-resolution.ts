@@ -4,6 +4,8 @@ import { toRollModes, type ActorDefinition } from "@vtt/schemas";
 import { criticalThreshold, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
+import { recordRoll as recordRollInHistory } from "./roll-history.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
@@ -19,7 +21,7 @@ export type ResolveInput = Readonly<{
   /** Explicit GM roll-mode choice; wins over the aggregated advantage/disadvantage sources. */
   rollMode?: "advantage" | "disadvantage" | "normal" | null;
   /** GM override of a rules-mode rejection; audited in the log and journal (ADR-0020). */
-  override?: Readonly<{ reason: string }> | null;
+  override?: Readonly<{ reason?: string }> | null;
   /** The action came from the builtin catalog (not the stat block) - enables the builtin special cases. */
   builtin?: boolean;
   /** Free-text annotation (the Ready action's trigger); folded into the granted effect's name. */
@@ -108,8 +110,7 @@ function recordRoll(state: GameState, resolution: ReturnType<typeof resolveDice>
     modifiers: resolution.terms.filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier").map((term) => ({ value: term.value, sign: term.sign })),
     total: resolution.total
   };
-  state.rolls.push(record);
-  if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
+  recordRollInHistory(state, record);
 }
 
 const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
@@ -153,6 +154,8 @@ type EconomyPlan = Readonly<{
   spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
   spendLegendary: Readonly<{ cost: number }> | null;
+  /** Spell slot the action spends from the bearer's own pool (an item cast with `consumesSpellSlot`). */
+  spendSpellSlot: Readonly<{ level: number }> | null;
 }>;
 
 /**
@@ -314,6 +317,19 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     spendLegendary = { cost };
   }
 
+  // An item cast authored with `consumesSpellSlot` spends the WEARER's own slot on top of the
+  // item's charges (SRD staffs and the "expend a spell slot" wording). A creature with no pool at
+  // that level is refused here rather than mid-resolution, in the same voice as an empty charge.
+  let spendSpellSlot: EconomyPlan["spendSpellSlot"] = null;
+  if (action.spellSlot) {
+    const level = action.spellSlot.level;
+    const slot = attacker.spellSlots?.find((entry) => entry.level === level);
+    if (!slot || slot.remaining <= 0) {
+      violations.push({ rule: "feature.no-spell-slot", message: `${action.name} spends a level-${level} spell slot - ${attacker.name} has none left.` });
+    }
+    spendSpellSlot = { level };
+  }
+
   // Targeting restrictions the definition declares (Tail can't target the creature this crocodile grapples).
   if (action.targetRules?.includes("not-grappled-by-source")) {
     for (const targetId of targetIds) {
@@ -376,7 +392,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     }
   }
 
-  return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse, spendLegendary }, proseMultiattack, notes };
+  return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse, spendLegendary, spendSpellSlot }, proseMultiattack, notes };
 }
 
 /**
@@ -452,26 +468,26 @@ export function actionAvailability(state: GameState, attacker: LiveActor, action
  * violations to warnings; freeform skips validation.
  */
 function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[], distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined, siblings: ReadonlyArray<DefinitionAction>): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
-  const mode = state.combat.rulesMode;
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(state, attacker, action, input.targetIds, definition, distanceFeet, siblings);
   warnings.push(...notes);
 
   let overridden: { rule: string; reason: string } | null = null;
-  const allViolations = [...violations, ...softViolations];
-  if (mode !== "freeform" && allViolations.length > 0) {
+  // The mode is per FAMILY now, not per table: "don't police movement" must not also switch off the
+  // action economy. A violation whose family is Off is simply not a violation for this table.
+  const policed = [...violations, ...softViolations].filter((violation) => effectiveModeFor(state.combat, violation.rule) !== "freeform");
+  if (policed.length > 0) {
     if (input.override) {
-      overridden = { rule: allViolations[0].rule, reason: input.override.reason };
+      overridden = { rule: policed[0].rule, reason: overrideReason(input.override) };
     } else {
-      // A GM override earlier this turn (turn.rulesOverridden) covers the per-turn-repeatable families
-      // for the rest of the creature's turn: action/bonus/reaction economy and positional range/reach.
-      // Every other family (incapacitation, limited uses, legendary, cover, target-specific) still
-      // re-prompts, so it stays an explicit, audited call each time.
-      const covered = (rule: string) => state.combat.turn.rulesOverridden === true && (rule.startsWith("economy.") || rule.startsWith("range."));
-      const blocking = violations.filter((violation) => !covered(violation.rule));
-      if (mode === "strict" && blocking.length > 0) {
+      // A GM override earlier this turn covers that FAMILY for the rest of the creature's turn, so the
+      // next block of the same kind isn't re-prompted. Every other family still re-prompts, so it stays
+      // an explicit, audited call each time.
+      const covered = (rule: string) => overrideCovers(state.combat.turn, rule);
+      const blocking = violations.filter((violation) => !covered(violation.rule) && effectiveModeFor(state.combat, violation.rule) === "strict");
+      if (blocking.length > 0) {
         throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
       } else {
-        warnings.push(...allViolations.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
+        warnings.push(...policed.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
         if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
       }
     }
@@ -664,7 +680,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // and a self-only feature needs no target either. Without both carve-outs the counter the builder
   // now assembles could be displayed but never decremented (the same dead end 34 bundled monster
   // actions with `uses` and no roll already sit in).
-  const spendsALimitedUse = action.uses !== undefined;
+  // A spell slot is the same kind of counter, so an item cast that spends one (and nothing else)
+  // resolves for exactly the same reason a charge does.
+  const spendsALimitedUse = action.uses !== undefined || action.spellSlot !== undefined;
   const structuredWithoutTargets = (action.grants !== undefined && action.grants.target !== "target") || action.multiattack !== undefined || spendsALimitedUse || input.builtin === true;
   if (targets.length === 0 && !structuredWithoutTargets && action.grants?.target !== "target") throw new CommandRejectedError("Choose at least one target.");
   if (!action.attack && !action.save && action.damage.length === 0 && action.grants === undefined && !spendsALimitedUse && input.builtin !== true) {
@@ -685,9 +703,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // server applies the math): total cover can't be targeted directly; half/three-quarters add to AC
   // and Dexterity saves below.
   const coverBonus = input.cover === "half" ? 2 : input.cover === "three-quarters" ? 5 : 0;
-  if (input.cover === "total" && state.combat.rulesMode !== "freeform") {
-    if (state.combat.rulesMode === "strict" && !input.override) throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
-    if (input.override && overridden === null) overridden = { rule: "cover.total", reason: input.override.reason };
+  const coverMode = effectiveModeFor(state.combat, "cover.total");
+  if (input.cover === "total" && coverMode !== "freeform") {
+    if (coverMode === "strict" && !input.override && !overrideCovers(state.combat.turn, "cover.total")) throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
+    if (input.override && overridden === null) overridden = { rule: "cover.total", reason: overrideReason(input.override) };
     else warnings.push("The target has Total Cover - allowed per the rules mode.");
   }
 
@@ -997,7 +1016,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // spends the reaction and applies half, "decline" applies it in full (see reactions.ts). Freeform
   // mode stays prompt-free - reference-level play keeps the manual damage flow.
   const reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }> = [];
-  if (attack !== null && (attack.outcome === "crit" || attack.outcome === "hit") && state.combat.rulesMode !== "freeform" && deps.resolveDefinition) {
+  // The reaction WINDOW is action economy (a reaction is spent), so it follows the economy family -
+  // switching off movement policing must not also silence Uncanny Dodge.
+  if (attack !== null && (attack.outcome === "crit" || attack.outcome === "hit") && familyModeFor(state.combat, "economy") !== "freeform" && deps.resolveDefinition) {
     const target = targets[0];
     const proposedParts = [
       ...damage.map((part) => ({ amount: part.total, type: part.type })),
@@ -1095,14 +1116,18 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   if (plan.markReaction) {
     state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id] };
   }
-  // A GM override of a per-turn-repeatable rule (economy, or positional range/reach) applies for the
-  // rest of this creature's turn, so the next action/bonus/reaction/attack isn't re-blocked for the
-  // same family. Cleared on turn advance with the rest of `turn`.
-  if (overridden && (overridden.rule.startsWith("economy.") || overridden.rule.startsWith("range."))) {
-    state.combat = { ...state.combat, turn: { ...state.combat.turn, rulesOverridden: true } };
-  }
+  // A GM override applies to that rule's whole FAMILY for the rest of this creature's turn, so the
+  // next block of the same kind isn't re-prompted (D9 - one tap, no nagging). Every family is
+  // remembered now, not just economy/range. Cleared on turn advance with the rest of `turn`.
+  if (overridden) rememberOverride(state, overridden.rule);
   if (plan.spendLegendary) {
     state.combat = { ...state.combat, legendaryUsed: { ...state.combat.legendaryUsed, [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost } };
+  }
+  if (plan.spendSpellSlot) {
+    const level = plan.spendSpellSlot.level;
+    // Clamped, never negative: the economy pass above already refused an empty pool unless the GM
+    // overrode it, and an override spends what is there rather than going into debt.
+    attacker.spellSlots = (attacker.spellSlots ?? []).map((entry) => entry.level === level ? { ...entry, remaining: Math.max(0, entry.remaining - 1) } : entry);
   }
   if (plan.spendUse) {
     if (plan.spendUse.per === "turn") {

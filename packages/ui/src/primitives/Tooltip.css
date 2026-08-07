@@ -1,7 +1,13 @@
 .nh-tooltip { position: relative; display: inline-flex; }
 .nh-tooltip-trigger { display: inline-flex; }
+/* RULING 52 — panel material, brighter rim. One rule for menus, popovers and tooltips: they read
+   as panels that arrived, and the rim carries "on top" instead of a drop shadow.
+   The bubble is `pointer-events: none`, so a clip-path on it could not clip anything that
+   matters — the backing layer is used anyway, because the cut and the material are one recipe and
+   a later edit that makes a tooltip interactive should not have to rediscover ruling 14. */
 .nh-tooltip-bubble {
   position: absolute;
+  isolation: isolate;
   z-index: 50;
   left: 50%;
   bottom: calc(100% + 6px);
@@ -9,16 +15,29 @@
   width: max-content;
   max-width: 16rem;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   font: 500 var(--fs-sm) / 1.4 var(--font-body);
-  box-shadow: var(--shadow-2);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transition: opacity var(--dur-hover), transform var(--dur-hover), visibility var(--dur-hover);
+}
+.nh-tooltip-bubble::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  clip-path: polygon(0 .34rem, .34rem 0, 100% 0, 100% calc(100% - .34rem), calc(100% - .34rem) 100%, 0 100%);
+  border: var(--rim-w) solid var(--rim-color-hi);
+  background-color: var(--surface-2);
+  background-image: linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap));
+  background-size: 100% var(--scanline-gap);
+  background-origin: border-box;
+  background-clip: border-box;
 }
 .nh-tooltip--bottom .nh-tooltip-bubble { bottom: auto; top: calc(100% + 6px); transform: translateX(-50%) translateY(4px); }
 .nh-tooltip:hover .nh-tooltip-bubble,

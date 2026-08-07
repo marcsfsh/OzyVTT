@@ -26,6 +26,10 @@
  * is why the union stays at eleven members instead of thirty.
  */
 
+import {
+  CONDITION_IDS, CREATURE_TYPE_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS
+} from "@vtt/content-srd-5.2.1/schemas";
+import { setAt } from "./paths";
 import type { HomebrewType } from "./types";
 
 /** The authored record body. Deliberately open: the server owns the per-type schema,
@@ -79,6 +83,32 @@ export type SchemaContext = Readonly<{
   equipmentCategories: readonly SelectOption[];
 
   /**
+   * THE CANONICAL SRD VOCABULARIES — complete lists, never a hand-typed partial.
+   *
+   * Every one of these used to be a bare text box or a suggestion array somebody typed from memory:
+   * ten of the thirteen damage types (missing exactly the three physical ones, so a homebrew weapon
+   * could not be suggested "slashing"), seven of the fifteen conditions, five of the fourteen
+   * creature types, no schools at all. A slug typed one character wrong is not an error — it is
+   * silently inert at play time, which is the hardest homebrew failure there is to diagnose.
+   *
+   * They arrive from `@vtt/content-srd-5.2.1/schemas`, which derives them from the bundles under a
+   * drift test, so the list a GM picks from is the list the engine matches on. Each stays a
+   * SUGGESTION rather than a closed list wherever its schema is an open slug: complete dropdown,
+   * plus "other".
+   */
+  damageTypes: readonly string[];
+  conditions: readonly string[];
+  schools: readonly string[];
+  creatureTypes: readonly string[];
+  /**
+   * All 17 weapon properties AND masteries, as the bare slugs riders match on. The bundle suffixes
+   * both families (`finesse-wp`, `cleave-mastery`) because they share one id space there; every
+   * `weapon-property-is` trigger compares the bare word, so suggesting the bundle id would suggest
+   * a value that matches nothing — the silent inertness these lists exist to prevent.
+   */
+  weaponProperties: readonly string[];
+
+  /**
    * Resolves a `fromCatalog` slug through **the same function the server validates
    * with** (`resolveCatalogChoice`), so the count a GM reads while authoring is the
    * count the game will offer — the client never becomes a second rules engine.
@@ -99,6 +129,11 @@ export const EMPTY_CONTEXT: SchemaContext = {
   spells: [],
   equipment: [],
   equipmentCategories: [],
+  damageTypes: DAMAGE_TYPE_IDS,
+  conditions: CONDITION_IDS,
+  schools: MAGIC_SCHOOL_IDS,
+  creatureTypes: CREATURE_TYPE_IDS,
+  weaponProperties: [...WEAPON_PROPERTY_IDS, ...WEAPON_MASTERY_IDS],
   resolveCatalog: () => ({ error: "Catalogs haven't loaded yet." })
 };
 
@@ -139,6 +174,29 @@ export type FieldDef = Readonly<{
       never a message while drafting — a draft is allowed to be invalid. */
   required?: boolean;
   disabled?: boolean;
+
+  /**
+   * WHAT AN EMPTIED CONTROL WRITES — and the second half of the item-publish repair.
+   *
+   * A `select` returned to "Not set" used to write `null` at every field in the app
+   * (`set(event.target.value || null)`), and a cleared `NumberField` still does. That is right for
+   * `rangeFeet`, whose column is `.nullable()` and REQUIRED — the key must be there with no value —
+   * and wrong for `slot`, `rarity`, `weapon.category` and a cast's `ability`, which are `.optional()`
+   * and reject `null` outright. Four routine authoring gestures therefore produced a body the store
+   * refused, with a 409 reading "Required" that named nothing.
+   *
+   * So the two meanings are now spelled per field, in the schema, next to the label:
+   *
+   *   - `"omit"` (the DEFAULT) — the key is optional; clearing the control removes it. This is
+   *     `defaults.ts` rule 1, "omit, never null", applied to edits as well as to blank drafts.
+   *   - `"null"` — the key is REQUIRED and nullable, so it must survive with a null value.
+   *
+   * There are exactly nine `"null"` fields in the whole editor and they are precisely the nine
+   * required-but-nullable columns in the content schemas. That correspondence is the point: this
+   * flag mirrors one schema fact and is checked by the publish checklist, which runs those very
+   * schemas.
+   */
+  emptyValue?: "omit" | "null";
 
   options?: readonly SelectOption[] | ((ctx: SchemaContext, draft: Draft) => readonly SelectOption[]);
   /** `kind: "select"` over a catalog too big for a `<select>`. Renders the picker. */
@@ -255,9 +313,45 @@ export function damagePartsField(
     },
     rows: [
       { key: "formula", label: "Formula", placeholder: "1d6", validate: diceValidate },
-      { key: "type", label: "Damage type", placeholder: "fire" }
+      { key: "type", label: "Damage type", placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
     ]
   };
+}
+
+/**
+ * **Fields inside a sub-object that must arrive WHOLE — the item-publish fix, as a factory.**
+ *
+ * `EquipmentReferenceSchema.weapon` has five keys and all five are REQUIRED (two of them nullable,
+ * which is not the same as optional). The editor rendered them as five independent fields over
+ * `setAt`, which creates the container on the first touched field and never fills its siblings — so
+ * a GM who typed "1d8" into Damage produced `weapon: { damageDice: "1d8" }`, and the store answered
+ * with three separate `Required` issues, one at a time, the first of which said "Fill in range" on a
+ * melee weapon. That is the whole of "homebrew items cannot be published": seven of eleven realistic
+ * authoring paths died on it.
+ *
+ * The fix is here rather than in the schema. `EquipmentReferenceSchema` is the SAME schema the SRD
+ * bundle loads through (ADR-0016, "one shape, never a fork"), so relaxing those keys to `.optional()`
+ * would weaken the bundle's own load validation to accommodate a half-written form. Instead the FIRST
+ * touch of ANY field in the section seeds the complete container from `defaults`, and the sibling
+ * keys land at exactly the values a duplicated SRD weapon already carries (`rangeFeet: null`).
+ *
+ * `defaults` must therefore contain only values that are honest to invent: nulls, `false`, and — for
+ * a closed enum with no null — the option the control is already showing. Never a made-up number.
+ */
+export function inContainer(
+  container: string,
+  defaults: Readonly<Record<string, unknown>>,
+  fields: readonly FieldDef[]
+): readonly FieldDef[] {
+  return fields.map((field) => ({
+    ...field,
+    write: (next: unknown, scope: Draft): Draft => {
+      const current = scope[container];
+      const held = current !== null && typeof current === "object" && !Array.isArray(current) ? (current as Record<string, unknown>) : {};
+      const leaf = field.key.startsWith(`${container}.`) ? field.key.slice(container.length + 1) : field.key;
+      return { ...scope, [container]: setAt({ ...defaults, ...held }, leaf, next) };
+    }
+  }));
 }
 
 /**

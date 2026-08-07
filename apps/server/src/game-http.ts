@@ -12,6 +12,8 @@ import {
 } from "@vtt/api-contract";
 import { CommandRejectedError, RevisionConflictError, RulesBlockedError, TimelineConfirmationRequired, type EncounterArchiveSummary } from "./game-store.js";
 import { GameAccessDeniedError, GameInputError, isGmGrade, type GameCommandDescriptor, type GameOperations, type GamePrincipal } from "./game-operations.js";
+import type { EncounterArchiveDocument } from "./encounter-archive.js";
+import { projectPlayerReplay } from "./replay-projection.js";
 
 /**
  * The public HTTP adapter over the shared game operations (ADR-0016). Every write here runs the
@@ -40,6 +42,8 @@ export type GameApiRouterOptions = Readonly<{
     list: () => readonly EncounterArchiveSummary[];
     get: (id: number) => string | null;
     remove: (id: number) => void;
+    /** Share (or un-share) one archived fight with players (D26); false when no such archive exists. */
+    setVisibility: (id: number, playerVisible: boolean) => boolean;
   }>;
   sessions: Readonly<{
     /** Issues a fresh player session (the socket's open LAN-trust join, over HTTP), or null before GM setup. */
@@ -256,7 +260,6 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.effectEnd), ...command("effect.end", (req: Request) => ({ actorId: req.params.actorId, effectId: req.params.effectId })));
   router.post(expressPath(GAME_PATHS.deathSaveRoll), ...command("death-save.roll", actorIdParam));
   router.post(expressPath(GAME_PATHS.rulesMode), ...command("encounter.set-rules-mode"));
-  router.post(expressPath(GAME_PATHS.rollMode), ...command("encounter.set-roll-mode"));
   router.post(expressPath(GAME_PATHS.playerDamageMode), ...command("encounter.set-player-damage-mode"));
   router.post(expressPath(GAME_PATHS.playerInitiativeMode), ...command("encounter.set-player-initiative-mode"));
   router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
@@ -270,7 +273,16 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetProficiencies), ...command("character.set-proficiencies", actorIdParam));
   router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
+  router.post(expressPath(GAME_PATHS.characterRebuild), ...command("character.rebuild", (req) => ({ actorId: req.params.actorId })));
+  router.post(expressPath(GAME_PATHS.builderRollAbilities), ...command("builder.roll-abilities"));
   router.post(expressPath(GAME_PATHS.builderPolicy), ...command("builder.set-policy"));
+  router.post(expressPath(GAME_PATHS.rulesPolicy), ...command("rules.set-policy"));
+  router.post(expressPath(GAME_PATHS.actionUse), ...command("action.use"));
+  router.post(expressPath(GAME_PATHS.saveRoll), ...command("save.roll"));
+  router.post(expressPath(GAME_PATHS.rulesAsk), ...command("rules.ask"));
+  router.post(expressPath(GAME_PATHS.rulesAnswer), ...command("rules.answer"));
+  router.post(expressPath(GAME_PATHS.stagingDefaults), ...command("table.set-staging-defaults"));
+  router.post(expressPath(GAME_PATHS.partyVisibility), ...command("table.set-party-visibility"));
   // Literal segments (ping/clear) are registered before the {id} routes, though methods keep them unambiguous anyway.
   router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
   router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));
@@ -287,6 +299,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.actorSize), ...command("actor.set-size", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorVisibility), ...command("actor.set-visibility", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorArchived), ...command("actor.set-archived", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorSheetPreview), ...command("actor.set-sheet-preview", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorHealthDisplay), ...command("actor.set-health-display", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpeed), ...command("actor.set-speed", actorIdParam));
   router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));
@@ -339,7 +352,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Encounter archives (Time Machine v2) ----------
 
-  /** Archives hold full state + GM-only narration: GM sessions and integrations yes, player sessions never. */
+  /** Archive MANAGEMENT (visibility, delete) stays GM-grade; the two reads below are role-aware (D26). */
   function requireGmGradePrincipal(res: Response): GamePrincipal | null {
     const principal = res.locals.principal as GamePrincipal;
     if (!isGmGrade(principal)) {
@@ -359,19 +372,54 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     return id;
   }
 
+  /**
+   * ROLE-AWARE, one URL (the `ops.view` precedent): the GM gets the verbatim document, a player gets
+   * the computed player replay, and an archive the GM has not shared is a 404 for a player - never a
+   * 403. A 403 would confirm the recording exists, which is the existence oracle the Codex rule
+   * forbids; "not found" is the same answer for a missing id and an unshared one.
+   */
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.collection), authorize("combat:read"), (_req, res) => {
-    if (!requireGmGradePrincipal(res)) return;
+    const principal = res.locals.principal as GamePrincipal;
+    if (!isGmGrade(principal)) return sendData(res, { encounters: options.archives.list().filter((entry) => entry.playerVisible) });
     return sendData(res, { encounters: options.archives.list() });
   });
 
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("combat:read"), (req, res) => {
-    if (!requireGmGradePrincipal(res)) return;
+    const principal = res.locals.principal as GamePrincipal;
     const id = archiveIdParam(req, res);
     if (id === null) return;
+    if (!isGmGrade(principal)) {
+      const shared = options.archives.list().some((entry) => entry.id === id && entry.playerVisible);
+      const stored = shared ? options.archives.get(id) : null;
+      // Missing and unshared are indistinguishable on purpose.
+      if (stored === null) return sendError(res, 404, "not_found", "No such encounter archive.");
+      let document: EncounterArchiveDocument;
+      try { document = JSON.parse(stored) as EncounterArchiveDocument; }
+      catch { return sendError(res, 404, "not_found", "No such encounter archive."); }
+      return sendData(res, { id, document: projectPlayerReplay(id, document) });
+    }
     const document = options.archives.get(id);
     if (document === null) return sendError(res, 404, "not_found", "No such encounter archive.");
     // The stored JSON is spliced in verbatim - no parse/re-serialize round trip on a potentially large document.
     return res.type("application/json").send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
+  });
+
+  /** Launch-from-here (D25). The registry supplies the scope and the handler, like every typed route. */
+  router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.launch), ...command("replay.launch", (req) => ({ archiveId: Number(req.params.id) })));
+
+  /**
+   * Per-replay sharing (D26). GM-grade only, like every other archive route: this stores the GM's
+   * decision. The archive READ endpoints stay GM-grade at this version, so sharing does not yet hand
+   * a player a document - the player-facing replay projection is its own, separately reviewed change.
+   */
+  router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.visibility), authorize("combat:write"), (req, res) => {
+    if (!requireGmGradePrincipal(res)) return;
+    const id = archiveIdParam(req, res);
+    if (id === null) return;
+    const body = (req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {}) as Record<string, unknown>;
+    if (typeof body.playerVisible !== "boolean") return sendError(res, 400, "validation_failed", "playerVisible must be true or false.");
+    if (!options.archives.setVisibility(id, body.playerVisible)) return sendError(res, 404, "not_found", "No such encounter archive.");
+    return sendData(res, { id, playerVisible: body.playerVisible });
   });
 
   router.delete(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("admin"), (req, res) => {

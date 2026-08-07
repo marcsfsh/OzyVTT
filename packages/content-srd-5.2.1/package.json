@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Curated SRD 5.2.1 content bundles (CC BY 4.0) with required attribution, generated from vendored open5e srd-2024 fixtures.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

@@ -279,12 +279,17 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   );
 
   return (
-    <div className={`codex-root codex-player codex-shell${embedded ? " is-embedded" : ""}${collapsed ? " is-rail" : ""}`}>
+    /* THE FRAME (§7), the GM shell's exactly — one chassis, two audiences. The scene tier is the one
+       thing the embedded instance does NOT take: inside the GM's preview sheet there is no pane to be
+       the sky of, and the sheet's body is the frame instead (`.codex-preview-modal`). */
+    <div className={`codex-root codex-player codex-shell${embedded ? " is-embedded" : " pane-frame pane-scene scanlines anim-view"}${collapsed ? " is-rail" : ""}`}>
+      {!embedded && <div className="pane-sky" aria-hidden="true" />}
       <aside className="codex-shell-side">{nav(collapsed)}</aside>
       <Drawer open={drawerOpen} onClose={closeDrawer} side="left" title="Codex" className="codex-navdrawer">{nav(false)}</Drawer>
 
       <div className="codex-shell-main">
-        <div className="codex-topbar">
+        {/* The beam marks the frame's boundary against its region — §9's own use for it. */}
+        <div className="codex-topbar neon-beam">
           <IconButton label="Codex sections" className="codex-topbar-menu" onClick={openDrawer}><CodexIcon iconId="menu" className="codex-navitem-icon" /></IconButton>
           {/* Invariant §3.2, and the one place it leaked: a GM-only address must be INDISTINGUISHABLE from an
               address the app does not answer. `gmOnly` gated the body but not the heading, so a player who
@@ -298,7 +303,8 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
 
         {error && <Alert tone="danger" title="Couldn't load the Codex">{error}</Alert>}
 
-        <div className="codex-shell-content">
+        {/* THE REGION (§7): the one thing on this surface that scrolls, whichever section is on screen. */}
+        <div className="codex-shell-content scroll-y frame-fill">
           {(section === null || gmOnly) && <NotFoundView role="player" />}
 
           {section === "home" && !gmOnly && (
@@ -345,7 +351,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                       onChange={(tag) => setFilter({ tag })} ariaLabel="Filter by tag" placeholder="Filter by tag" />
                   </div>
                 )}
-                <nav className="codex-list" aria-label="Pages">
+                <nav className="codex-list scroll-y" aria-label="Pages">
                   {search.trim()
                     ? <SearchResultList state={searchState} selectedId={recordId} onOpen={(hit) => go(pathForHit(hit))} emptyLabel="No pages match." />
                     : <>
@@ -365,7 +371,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
                       </>}
                 </nav>
               </aside>
-              <section className="codex-main">
+              <section className="codex-main scroll-y">
                 {recordId && <Button variant="ghost" size="sm" className="codex-back" onClick={() => go(pathForSection("pages"))}><IconChevron className="codex-chevron-left" aria-hidden="true" />All pages</Button>}
                 {page
                   ? <article className="codex-reader">
@@ -544,7 +550,7 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
         <div className="codex-rail-head">
           <Input value={filter} placeholder="Filter sessions" aria-label="Filter sessions" onChange={(event) => onFilterChange({ q: event.target.value || null })} />
         </div>
-        <nav className="codex-list" aria-label="Sessions">
+        <nav className="codex-list scroll-y" aria-label="Sessions">
           {loading && sessions.length === 0 && <div className="codex-list-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</div>}
           {!loading && sessions.length === 0 && <p className="codex-list-empty">No recaps shared yet.</p>}
           {!loading && sessions.length > 0 && shown.length === 0 && <p className="codex-list-empty">No sessions match.</p>}
@@ -557,7 +563,7 @@ function PlayerSessions({ sessions, loading, openId, token, onOpen, onNavigate, 
           ))}
         </nav>
       </aside>
-      <section className="codex-main">
+      <section className="codex-main scroll-y">
         {open && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpen(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All sessions</Button>}
         {open
           ? <article className="codex-reader">
@@ -603,7 +609,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
             <option value="failed">{QUEST_STATUS_LABEL.failed}</option>
           </Select>
         </div>
-        <nav className="codex-list" aria-label="Quests">
+        <nav className="codex-list scroll-y" aria-label="Quests">
           {loading && quests.length === 0 && <div className="codex-list-loading">{[0, 1].map((row) => <Skeleton key={row} variant="text" />)}</div>}
           {!loading && quests.length === 0 && <p className="codex-list-empty">No quests shared yet.</p>}
           {!loading && quests.length > 0 && shown.length === 0 && <p className="codex-list-empty">No quests match.</p>}
@@ -617,7 +623,7 @@ function PlayerQuests({ quests, pages, loading, openId, token, onOpen, onOpenPag
           ))}
         </nav>
       </aside>
-      <section className="codex-main">
+      <section className="codex-main scroll-y">
         {open && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpen(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All quests</Button>}
         {open
           ? <article className="codex-reader">

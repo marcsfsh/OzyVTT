@@ -5,6 +5,7 @@ import type { MapSelection } from "../maps/MapManager";
 import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
+import { AskTheGmPrompt, MyPendingAsks, PendingAsksForGm } from "./RuleAsk";
 import { beginTargeting, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
 import { RollControls, type DieMode } from "./RollControls";
@@ -13,11 +14,13 @@ import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
 import { InitiativeRow } from "./InitiativeList";
 import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";
+import { ScenePrepPanel } from "../scenes/ScenePrepPanel";
+import type { PickerMap } from "../maps/MapPicker";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 import { useConfirm } from "../components/feedback";
 
-type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:use-legendary" | "turn:end" | "scene:activate";
+type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:use-legendary" | "turn:end" | "scene:activate" | "scene:create";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
 const emitMutation = socket.emit.bind(socket) as unknown as (event: CommandEvent, payload: CommandPayload, acknowledgement: (result: MutationResult) => void) => void;
 
@@ -26,6 +29,71 @@ function emitCommand(event: CommandEvent, payload: CommandPayload) {
 }
 
 const validInitiativeScore = (value: string | undefined) => value !== undefined && value.trim() !== "" && Number.isInteger(Number(value)) && Number(value) >= -1000 && Number(value) <= 1000;
+
+/* ── THE ⋯ FIGHT MENU'S GEOMETRY ────────────────────────────────────────────────────────────────
+   Breathing room from every viewport edge, the gap between the trigger and the box, and the box's
+   own width — the same three numbers the old inline `place()` used, named so the placement rule
+   below and the measurement that feeds it cannot drift apart. */
+const MENU_MARGIN = 8;
+const MENU_GAP = 6;
+const MENU_WIDTH = 24 * 16;
+/**
+ * The floor under "there is room on this side". Measured on the live menu: one `.rules-mode-control`
+ * (its label plus the select) is 68px, `.encounter-end` is 39px and the box's own padding is 22px —
+ * so 160px is one control, the End button and the top of the next. A side that cannot hold that is
+ * not a side the menu should open on, however arithmetically "more" its room is.
+ */
+const MENU_FLOOR = 160;
+
+const menuWidthFor = (viewportWidth: number) => Math.min(MENU_WIDTH, viewportWidth - MENU_MARGIN * 2);
+
+export type FightMenuPlacement = Readonly<{ top: number | "auto"; bottom: number | "auto"; left: number; width: number; maxHeight: number }>;
+
+/**
+ * WHERE THE ⋯ FIGHT MENU GOES — the rule, pulled out of the effect so it can be tested without a
+ * browser (`fight-menu-placement.test.tsx` beside this file).
+ *
+ * The version this replaces computed ONE candidate — below the trigger — clamped its `top` into the
+ * viewport and then derived the height from whatever was left:
+ * `top = min(rect.bottom + gap, innerHeight - margin)`, `maxHeight = max(0, innerHeight - top - margin)`.
+ * On a landscape phone "whatever was left" is nothing. Measured 2026-08-07 at 844x390 and 667x375,
+ * GM in combat: inline `max-height: 0px`, a **24px** box over 1028px of content, and `elementFromPoint`
+ * at "End the fight" returning `DIV.encounter-menu-backdrop` — the fight could not be ended.
+ * There was no upward branch and no floor; both are here now.
+ *
+ * NOTHING BELOW IS NEW — it is the two working counter-examples in this repo, joined:
+ *  · the FLIP is `packages/ui/src/primitives/Menu.tsx`'s exactly — `height > roomBelow &&
+ *    roomAbove > roomBelow` — so a menu that does not need to flip never does, and when neither
+ *    side fits it takes the side with more room. No ancestor walk is copied with it: that menu is
+ *    an in-flow popover whose clipping ancestors bite, and this one is `position: fixed` in a
+ *    portal on <body>, where the viewport is the only bound.
+ *  · the natural-height measurement and the LAST-RESORT COLUMN are
+ *    `apps/client/src/scene/TokenContextMenu.tsx`'s — when the box cannot fit anywhere useful it
+ *    is pinned to the margin and given the viewport's own column to scroll itself in. Its comment
+ *    names the failure this menu had ("an earlier pass capping the box"), which is why the cap here
+ *    is always real room and never `max(0, …)`.
+ *
+ * The upward branch anchors by `bottom`, not by `top`: the box then grows away from the trigger if
+ * its content changes while open (a combatant added, a select's help line) instead of creeping over
+ * the button that opened it.
+ */
+export function placeFightMenu(
+  trigger: Readonly<{ top: number; bottom: number; right: number }>,
+  naturalHeight: number,
+  viewport: Readonly<{ width: number; height: number }>
+): FightMenuPlacement {
+  const width = menuWidthFor(viewport.width);
+  const left = Math.max(MENU_MARGIN, Math.min(trigger.right - width, viewport.width - width - MENU_MARGIN));
+  const roomBelow = viewport.height - trigger.bottom - MENU_GAP - MENU_MARGIN;
+  const roomAbove = trigger.top - MENU_GAP - MENU_MARGIN;
+  const up = naturalHeight > roomBelow && roomAbove > roomBelow;
+  const room = up ? roomAbove : roomBelow;
+  if (room < MENU_FLOOR) return { top: MENU_MARGIN, bottom: "auto", left, width, maxHeight: Math.max(0, viewport.height - MENU_MARGIN * 2) };
+  return up
+    ? { top: "auto", bottom: viewport.height - trigger.top + MENU_GAP, left, width, maxHeight: room }
+    : { top: trigger.bottom + MENU_GAP, bottom: "auto", left, width, maxHeight: room };
+}
+
 
 export const DOCK_POSITIONS = ["sidebar", "left", "right"] as const;
 export type DockPosition = (typeof DOCK_POSITIONS)[number];
@@ -97,7 +165,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
         <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
       </> : undefined}
       extraActions={rolled && !rolled.success && (legendaryResistanceLeft ?? 0) > 0
-        ? <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when the creature fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>
+        ? <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when it fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>
         : undefined}
     />
   </div>;
@@ -371,6 +439,10 @@ export function PlayerActionRunner({ actorId, definition, extraActions = [], rev
   const roll = (opts?: Parameters<typeof resolveTargeting>[2]) => resolveTargeting(revision, onOutcome, opts);
 
   return <div className="action-runner player-actions">
+    {/* The blocked prompt: on Enforce the resolve suppresses its own message (the GM's runner shows a
+        dialog instead), and this runner never read that store — so a blocked player used to get a
+        button that did nothing at all. Now the refusal is stated here, with the ask beside it. */}
+    <AskTheGmPrompt onFeedback={onFeedback} />
     {!picking && !result && <>
       <p className="player-actions-label">Your actions <span>· your turn</span></p>
       <ul className="action-list">
@@ -387,7 +459,7 @@ export function PlayerActionRunner({ actorId, definition, extraActions = [], rev
     </>}
     {picking && !result?.preview && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
       <p className="action-targeting-head"><strong>{picking.action.name}</strong> - {picking.mode === "single" ? "choose one target" : "choose targets"}</p>
-      <ul className="action-target-list">{targets.filter((target) => target.actorId !== actorId).map((target) => {
+      <ul className="action-target-list scroll-y">{targets.filter((target) => target.actorId !== actorId).map((target) => {
         const checked = picking.selected.includes(target.actorId);
         return <li key={target.actorId}>
           <label className="action-target">
@@ -577,7 +649,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { if (returnToSheetAfterAttack && jumpAttackResult && !jumpAttackResult.preview) { setView("sheet"); setReturnToSheetAfterAttack(false); } }, [returnToSheetAfterAttack, jumpAttackResult]);
     const myActor = props.state.actors.find((actor) => actor.id === myId) ?? null;
-    if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
+    if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">FIGHT</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started a fight yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
     // Active creature on top: rotate the turn order so the acting combatant leads, the rest follow in
     // order (wrapping). The player's own economy rides their row - so on their turn it sits directly
@@ -589,10 +661,14 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     return <section className="encounter-panel combat-active" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
-        {myActor && <div className="player-view-toggle" role="group" aria-label="Show turn order or your sheet">
-          <button type="button" className={view === "initiative" ? "on" : ""} aria-pressed={view === "initiative"} onClick={() => setView("initiative")}>Initiative</button>
-          <button type="button" className={view === "sheet" ? "on" : ""} aria-pressed={view === "sheet"} onClick={() => setView("sheet")}>My sheet</button>
-        </div>}
+        {/* D10 — ONE "My sheet", not two. This was an Initiative / My-sheet toggle, and the other copy
+            rode the character bar over the map that ruling 20 deleted. The Initiative half went with
+            the toggle: `setView("sheet")` here is the only route into the sheet view apart from the
+            post-attack jump, and the sheet already carries its own close back to initiative
+            (`onClose` on the embedded sheet below), so the way back exists without a second control.
+            Rendered only in the initiative view for that reason — in the sheet view it would be a
+            button that does nothing. */}
+        {myActor && view === "initiative" && <Button size="sm" variant="secondary" className="player-sheet-door" onClick={() => setView("sheet")}>My sheet</Button>}
         {myTurn && <span className="your-turn-flag" role="status">Your turn - act, then end it below</span>}
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
@@ -602,6 +678,17 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           entirely behind the "My sheet" view). It clears itself the moment they roll (their id leaves
           pendingInitiative). */}
       {myId !== null && (combat.pendingInitiative ?? []).includes(myId) && <InitiativePrompt actorId={myId} />}
+      {/* Questions this player has waiting. Pinned above the region with the roll prompt, for the same
+          reason: an answer you are waiting on should not be something you have to scroll to find. */}
+      <MyPendingAsks state={props.state} />
+      {/* THE TRACKER'S REGION (B1). In combat this panel is the tallest thing in the sidebar — measured
+          at 819px inside a 676px column at 1280x720 — and it had no scroller of its own, so it pushed
+          the whole surface past the pane instead of scrolling its own turn order. The topbar above and
+          the roll prompt stay pinned as the region's header; everything that can grow lives in here.
+          `.scroll-y` is in the markup because that is the marker check (h) accepts.
+          The auto-scroll anchors below now scroll THIS region rather than the page, which is the
+          behaviour they always wanted. */}
+      <div className={`encounter-region scroll-y${view === "sheet" ? " is-sheet" : ""}`}>
       {view === "sheet" && myActor
         ? <CharacterSheet actor={myActor} role="player" state={props.state} embedded combat={{ revision: props.state.revision, active: combat.active, myTurn, playerDamageMode: combat.playerDamageMode, targets: combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name })) }} onJumpToInitiative={() => { setView("initiative"); setReturnToSheetAfterAttack(true); }} onClose={() => setView("initiative")} />
         : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
@@ -621,6 +708,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={rollMode} />}
         </li>;
       })}</ol>}
+      </div>
       <DockPicker dock={props.dock} />
     </section>;
   }
@@ -632,7 +720,6 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived).map((actor) => actor.id)));
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
-  const [combatantSearch, setCombatantSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   // The GM's own rolls (monster saves, death saves, attack previews) follow the same per-browser
@@ -646,6 +733,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
+  // The battle map chosen in this panel, when no scene is live. Held here rather than read back off
+  // `selectedMap`, which the shell also sets by itself (it defaults to the newest battlemap) - only an
+  // explicit pick should move the fight to another map.
+  const [pickedMap, setPickedMap] = useState<PickerMap | null>(null);
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   // Accordion: rows are one line by default; at most one row's tools (HP editor, condition/effect
   // editors, sheet) are open at a time.
@@ -660,26 +751,44 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
-  // Anchor the ⋯ menu just under its button, right-aligned to it, clamped into the viewport (it
-  // scrolls internally when tall). Still portaled out, so it clears the dock/enlarged stacking.
+  // Anchor the ⋯ menu to its button, right-aligned to it — under it where there is room and OVER it
+  // where there is not (`placeFightMenu` above holds the rule and the reasoning). Still portaled out,
+  // so it clears the dock/enlarged stacking.
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<FightMenuPlacement | null>(null);
   useLayoutEffect(() => {
     if (!menuOpen) { setMenuPos(null); return; }
     const place = () => {
-      const button = menuButtonRef.current;
-      if (!button) return;
-      const rect = button.getBoundingClientRect();
-      const margin = 8, gap = 6;
-      const width = Math.min(24 * 16, window.innerWidth - margin * 2);
-      const left = Math.max(margin, Math.min(rect.right - width, window.innerWidth - width - margin));
-      const top = Math.min(rect.bottom + gap, window.innerHeight - margin);
-      setMenuPos({ top, left, width, maxHeight: Math.max(0, window.innerHeight - top - margin) });
+      const button = menuButtonRef.current, menu = menuRef.current;
+      if (!button || !menu) return;
+      // Measure the box's NATURAL height with the cap off — an earlier pass may have capped it, and a
+      // menu that has since gained room should get it back rather than stay pinned at a stale cap
+      // (TokenContextMenu.tsx makes the same move for the same reason). The width is applied for the
+      // measurement too, because the height of a wrapping menu depends on it.
+      // AND THE MENU'S OWN SCROLL POSITION IS PUT BACK. Uncapping the box removes its scrollable
+      // overflow, which zeroes `scrollTop`; with `place` also bound to `scroll` below, that turned
+      // every scroll of the menu into a snap back to the top — measured, a wheel of 1200px moved it
+      // 1px and "End the fight" stayed 340px below the fold at 1280x900, unreachable by pointer on a
+      // surface whose hit test said it was there. The listener below then skips the menu's own
+      // scrolls anyway; this restore is the belt, because a resize mid-scroll would do it too.
+      const cappedHeight = menu.style.maxHeight, cappedWidth = menu.style.width, scrolled = menu.scrollTop;
+      menu.style.maxHeight = "none";
+      menu.style.width = `${menuWidthFor(window.innerWidth)}px`;
+      const natural = menu.offsetHeight;
+      menu.style.maxHeight = cappedHeight;
+      menu.style.width = cappedWidth;
+      menu.scrollTop = scrolled;
+      setMenuPos(placeFightMenu(button.getBoundingClientRect(), natural, { width: window.innerWidth, height: window.innerHeight }));
     };
+    // Capture-phase, because the scroll that moves the trigger is some ancestor scroller's, not the
+    // window's — but the menu scrolling ITSELF never moves the trigger, so it is not a reason to
+    // re-place anything.
+    const onScroll = (event: Event) => { if (event.target !== menuRef.current) place(); };
     place();
     window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+    window.addEventListener("scroll", onScroll, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", onScroll, true); };
   }, [menuOpen]);
   // A legendary creature acting off-turn (SRD Legendary Actions): the acting console temporarily
   // switches to it; cleared whenever the real turn advances.
@@ -711,9 +820,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       // adding a monster from the browser intends it to fight.
       const known = knownActorIdsRef.current;
       const valid = new Set([...current].filter((id) => actorsById.has(id)));
-      for (const actor of state.actors) if (!known.has(actor.id)) valid.add(actor.id);
+      for (const actor of state.actors) if (!known.has(actor.id) && !actor.archived) valid.add(actor.id);
       knownActorIdsRef.current = new Set(state.actors.map((actor) => actor.id));
-      return valid.size ? valid : new Set(state.actors.map((actor) => actor.id));
+      // An empty tray stays empty. This used to fall back to the WHOLE roster - so a GM who
+      // deliberately cleared the list got everyone back on the next broadcast, archived characters
+      // and GM-only monsters included (Appendix A1). "Nothing staged" is a decision, not a gap.
+      return valid;
     });
   }, [actorsById, state.actors, state.combat.active]);
 
@@ -721,25 +833,26 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     setBusy(true); setMessage("");
     try {
       const result = await operation();
-      if (!result.ok) throw new Error(result.message ?? "The encounter command was rejected.");
+      if (!result.ok) throw new Error(result.message ?? "The command was rejected.");
       setMessage(success);
     } catch (error) { setMessage((error as Error).message); }
     finally { setBusy(false); }
   };
   const start = () => void run(async () => {
     // Scene-first: once a scene is live its map IS the encounter's map (the server requires they match),
-    // so start on it directly. Only when no scene is live do we fall back to a picked battlemap.
-    const startMapId = state.combat.mapAssetId ?? (selectedMap?.kind === "battlemap" ? selectedMap.id : undefined);
+    // so start on it directly. With no scene live, the map picked in the panel wins - that is how the
+    // quick-start door runs the next fight somewhere else without a trip to Scenes.
+    const startMapId = sceneLive ? state.combat.mapAssetId ?? undefined : quickStartMapId;
     if (!startMapId) throw new Error(selectedMap && selectedMap.kind !== "battlemap"
-      ? "Select a battlemap before starting combat. Regional and world maps remain available outside encounters."
-      : "Go live on a scene from the Scenes tab, or pick a battlemap, before starting combat.");
+      ? "Pick a battle map before starting the fight. Regional and world maps stay available outside fights."
+      : "Pick a battle map first, or make a scene live from the Scenes tab.");
     const entries = state.actors.filter((actor) => selectedActors.has(actor.id)).map((actor) => {
       const value = scores[actor.id]?.trim();
       return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
     });
-    if (entries.length === 0) throw new Error("Choose at least one combatant.");
+    if (entries.length === 0) throw new Error("Stage at least one character or monster.");
     return emitCommand("encounter:start", { commandId: newId(), mapAssetId: startMapId, entries, playersRollInitiative, expectedRevision: state.revision });
-  }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
+  }, "The fight has started. Blank Initiative scores were rolled, and every token is ready in the tray above.");
   // Inline-edit an initiative score: Enter or blur commits, Escape (via cancelEditRef) discards.
   const commitEdit = (actorId: string, previous: number) => {
     if (cancelEditRef.current) { cancelEditRef.current = false; setEditingActorId(null); return; }
@@ -780,14 +893,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     () => emitCommand("initiative:previous", { commandId: newId(), confirmDiscard: true, expectedRevision: state.revision })
   );
   const end = async () => {
-    if (!(await askConfirm({ title: "End encounter?", body: "End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.", confirmLabel: "End encounter", danger: true }))) return;
-    void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Encounter ended.");
+    if (!(await askConfirm({ title: "End the fight?", body: "Turn order stays saved for reference, but the shared screen will hide it.", confirmLabel: "End the fight", danger: true }))) return;
+    void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Fight ended.");
   };
-  const remove = async (actorId: string, name: string) => {
-    if (!(await askConfirm({ title: "Remove combatant?", body: `Remove ${name} from the roster?`, confirmLabel: "Remove", danger: true }))) return;
-    void run(() => emitCommand("actor:remove", { commandId: newId(), actorId, expectedRevision: state.revision }), `Removed ${name}.`);
-  };
-  const adjustHp = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string, options?: { nonlethal?: boolean }) => {
+  const adjustHp =(event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string, options?: { nonlethal?: boolean }) => {
     const value = Number(hpAmount.trim());
     const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
     if (!Number.isInteger(value) || value < minimum || value > 1000) { setMessage(`Enter a whole number (${minimum}-1000).`); return; }
@@ -798,23 +907,45 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
-  // Archived characters (v4 #10) are hidden from the party list and the encounter builder.
-  // Setup picker, organized: pinned PCs (the party) first, then the last-used monsters/NPCs (server-
-  // tracked recency, GM-only), then a searchable list of everything else on the roster.
-  const RECENT_COUNT = 10;
-  const pcs = state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived);
-  const nonPcs = state.actors.filter((actor) => actor.kind !== "player-character");
-  const recent = nonPcs.filter((actor) => actor.lastUsedAt !== undefined).sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0)).slice(0, RECENT_COUNT);
-  const recentIds = new Set(recent.map((actor) => actor.id));
-  const search = combatantSearch.trim().toLowerCase();
-  const otherCombatants = nonPcs.filter((actor) => !recentIds.has(actor.id)).filter((actor) => !search || actor.name.toLowerCase().includes(search) || actor.kind.toLowerCase().includes(search));
-  const combatantRow = (actor: (typeof state.actors)[number]) => <li key={actor.id}>
-    <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
-    <div className="combatant-tools">
-      {actor.kind !== "player-character" && <button type="button" className="combatant-remove" disabled={busy} title={`Remove ${actor.name} from the roster`} aria-label={`Remove ${actor.name} from the roster`} onClick={() => remove(actor.id, actor.name)}>✕</button>}
-      <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
-    </div>
-  </li>;
+  // The quick-start door (D1/B2.5). Everyone active is pre-listed in the staging tray without being
+  // hand-added (D2); archived characters appear nowhere (D16); the map, the tray, the two Add buttons
+  // and Recent are the SAME parts the scene-prep workspace shows, so there is one thing to learn.
+  const stagedIds = state.actors.filter((actor) => selectedActors.has(actor.id) && !actor.archived).map((actor) => actor.id);
+  // A LIVE SCENE owns its map; nothing else does. After a fight ends `combat.mapAssetId` is still set,
+  // and treating that as ownership is what used to strand the GM on last night's map with no way to
+  // change it short of preparing a scene.
+  const sceneLive = state.combat.activeSceneId !== null;
+  // The just-picked map first: the shell's library is refetched on a tab change, so a map uploaded from
+  // inside this panel is not in it yet - and "the live scene's map" is a poor name for one you just chose.
+  const nameOf = (id: string | null) => (id ? (pickedMap?.id === id ? pickedMap.name : (mapLibrary ?? []).find((map) => map.id === id)?.name ?? null) : null);
+  const quickStartMapId = pickedMap?.id ?? state.combat.mapAssetId ?? (selectedMap?.kind === "battlemap" ? selectedMap.id : null);
+  const panelMapName = sceneLive
+    ? nameOf(state.combat.mapAssetId) ?? "the live scene’s map"
+    : pickedMap?.name ?? nameOf(quickStartMapId) ?? (selectedMap?.kind === "battlemap" ? selectedMap.name : null);
+  const readyToStart = stagedIds.length > 0 && (sceneLive ? state.combat.mapAssetId !== null : quickStartMapId !== null);
+  /**
+   * Picking a map from the quick-start door.
+   *
+   * With no scene live, that is just a choice - the fight starts on it. With a scene live the server
+   * REQUIRES the fight to run on that scene's map, so choosing another map has to move the table:
+   * one `scene.create {activate}` (the prepare-and-go command) parks the current scene and goes live
+   * on a new one named after the map. That is the same park/resume motion as switching scenes, in one
+   * tap, which is what makes this door usable for an improvised fight somewhere new - the alternative
+   * was a locked map line and a trip to Scenes. Not offered mid-fight: this panel only exists before
+   * one starts.
+   */
+  const chooseQuickStartMap = (map: PickerMap) => {
+    setPickedMap(map);
+    onSelectMap?.(map);
+    if (!sceneLive || map.id === state.combat.mapAssetId) return;
+    void run(() => emitCommand("scene:create", { commandId: newId(), name: map.name.slice(0, 120), mapAssetId: map.id, combatantIds: stagedIds, activate: true, expectedRevision: state.revision }), `${map.name} is live.`);
+  };
+  // The table's standing "new tokens" visibility (D2). Read through a guard, not because GmView makes it
+  // optional - it does not - but because the FIRST frame after a GM signs in can still be the
+  // player-projected state, which carries no GM-only fields at all. main.tsx guards `combat.scenes` the
+  // same way for the same reason; without it the panel threw on that one frame and the app fell into its
+  // error boundary. Observed in the browser pass, not deduced.
+  const stagingVisibility = state.stagingDefaults?.visibility ?? "public";
 
   // Active creature on top: rotate the turn order so the acting combatant leads the list, the rest
   // follow in order (wrapping). The acting console renders inline directly under that top row (feedback #3).
@@ -856,7 +987,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           {(legendaryActor || actor.speedFeet !== undefined) && <div className="acting-console-title">
             {legendaryActor && <strong className="acting-console-name">{actor.name}</strong>}
             {legendaryActor
-              ? <span className="economy-slot legendary-pill" title="Legendary actions remaining this round; the pool refills when this creature's own turn starts.">⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}</span>
+              ? <span className="economy-slot legendary-pill" title="Legendary actions remaining this round; the pool refills on its own turn.">⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}</span>
               : actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">{Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
           </div>}
           {legendaryActor
@@ -869,7 +1000,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             : <div className="acting-console-economy-row">
                 <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
                 <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
-                <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
+                <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh on its own turn" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
               </div>}
         </header>
         <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
@@ -879,45 +1010,34 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
 
   return <section className={`encounter-panel${state.combat.active ? " combat-active" : " setup"}`} {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
     {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
-    {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
+    {/* One title, and it names the action rather than the screen (D28: an encounter is a fight). The
+        prep panel below is deliberately heading-less here - two titles for one panel is what the old
+        "Encounter setup" + map-label stack was. */}
+    {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">FIGHT</span><h2 id="gm-encounter-title">Start a fight</h2></div></div>}
     {/* Docking the tracker to the map is available before AND during combat (report #9). */}
     <DockPicker dock={dock} />
     {!state.combat.active ? <>
-      {/* The battlemap is picked right here - starting a fight never requires a Maps-tab visit
-          (upload/calibration still live there). */}
-      <label className="encounter-map">
-        <span>Encounter map</span>
-        {state.combat.mapAssetId
-          ? <strong>{(mapLibrary ?? []).find((map) => map.id === state.combat.mapAssetId)?.name ?? "The live scene’s map"}</strong>
-          : (mapLibrary ?? []).filter((map) => map.kind === "battlemap").length > 0 && onSelectMap
-            ? <Select value={selectedMap?.kind === "battlemap" ? selectedMap.id : ""} disabled={busy} onChange={(event) => { const map = (mapLibrary ?? []).find((candidate) => candidate.id === event.target.value); if (map) onSelectMap(map); }}>
-                {selectedMap?.kind !== "battlemap" && <option value="" disabled>Choose a battlemap…</option>}
-                {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").map((map) => <option key={map.id} value={map.id}>{map.name}{map.calibration ? "" : map.scale ? " (gridless)" : " (uncalibrated)"}</option>)}
-              </Select>
-            : <strong>{selectedMap?.name ?? "Go live on a scene from the Scenes tab first"}</strong>}
-      </label>
-      {/* Undocked at desktop this region scrolls so the panel stays as tall as the map, not taller
-          (feedback #1); the map picker above and the add/start buttons below stay pinned. */}
-      <div className="combatant-scroll">
-        {pcs.length > 0 && <div className="menu-section">
-          <p className="menu-section-title">Party</p>
-          <ul className="combatant-setup">{pcs.map(combatantRow)}</ul>
-        </div>}
-        {recent.length > 0 && <div className="menu-section">
-          <p className="menu-section-title">Recent</p>
-          <ul className="combatant-setup">{recent.map(combatantRow)}</ul>
-        </div>}
-        <div className="menu-section">
-          <p className="menu-section-title">{recent.length > 0 ? "More combatants" : "Combatants"}</p>
-          <Input type="search" className="combatant-search" placeholder="Search by name or type…" value={combatantSearch} onChange={(event) => setCombatantSearch(event.target.value)} aria-label="Search combatants" />
-          {otherCombatants.length > 0
-            ? <ul className="combatant-setup">{otherCombatants.map(combatantRow)}</ul>
-            : <p className="menu-empty-note">{search ? "No combatants match your search." : "No other combatants on the roster - add monsters below."}</p>}
-        </div>
-      </div>
-      <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
-      <label className="encounter-players-roll-init"><input type="checkbox" checked={playersRollInitiative} disabled={busy} onChange={(event) => setPlayersRollInitiative(event.target.checked)} /> Let players roll their own initiative</label>
-      <button className="encounter-primary" disabled={busy || selectedActors.size === 0 || (!state.combat.mapAssetId && (!selectedMap || selectedMap.kind !== "battlemap"))} onClick={start}>Start encounter<span className="nav-arrow" aria-hidden="true">→</span></button>
+      <ScenePrepPanel
+        actors={state.actors}
+        staged={stagedIds}
+        placedIds={new Set(state.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId))}
+        onAdd={(actorId) => setSelectedActors((current) => new Set(current).add(actorId))}
+        onRemove={(actorId) => setSelectedActors((current) => { const next = new Set(current); next.delete(actorId); return next; })}
+        mapName={panelMapName}
+        mapNote={sceneLive ? "A scene is live. Choosing another map makes a new scene live on it." : undefined}
+        selectedMapId={quickStartMapId}
+        onSelectMap={chooseQuickStartMap}
+        mapFallback={mapLibrary}
+        stagingRevealed={stagingVisibility !== "gm-only"}
+        combatActive={false}
+        busy={busy}
+        emptyNote="No one staged yet. The party lands here automatically; add monsters below."
+        footer={<>
+          <Switch label="Players roll their own initiative" checked={playersRollInitiative} disabled={busy} onChange={setPlayersRollInitiative} />
+          {!readyToStart && <p className="encounter-start-blocked" role="status">{stagedIds.length === 0 ? "Stage at least one character or monster." : "Pick a battle map first."}</p>}
+          <Button variant="primary" arrow block disabled={busy || !readyToStart} onClick={start}>Start the fight</Button>
+        </>}
+      />
     </> : <>
       {(() => {
         const placed = state.combat.tokens.filter((token) => token.position !== null).length;
@@ -937,15 +1057,17 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         <div className="turn-controls"><button className="encounter-primary turn-prev" disabled={busy} onClick={previous} title="Previous turn" aria-label="Previous turn">‹</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}<span className="nav-arrow" aria-hidden="true">→</span></button></div>
         {/* Mid-fight reinforcements are a combat action, not a setting - one visible tap. */}
         <button type="button" className="encounter-menu-toggle" disabled={busy} title="Add monsters to this fight (SRD)" aria-label="Add monsters to this fight" onClick={() => setBrowsing(true)}>+</button>
-        <button type="button" ref={menuButtonRef} className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Encounter options - rules mode, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
+        {/* The name is the LABEL, not only the tooltip: `⋯` is what a screen reader reads otherwise,
+            and its `+` sibling one line up has carried an `aria-label` all along. */}
+        <button type="button" ref={menuButtonRef} className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" aria-label="Fight options" title="Fight options - rules assistant, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && createPortal(<>
           <div className="encounter-menu-backdrop" onPointerDown={() => setMenuOpen(false)} />
-          <div className="encounter-menu anim-dialog" role="menu" aria-label="Encounter options" style={menuPos ? { top: menuPos.top, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
-            <label className="rules-mode-control">Rules
-              <Select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules mode: ${mode}.` : result.message ?? "The rules mode could not be changed.")); }}>
-                <option value="strict">Strict - block invalid actions (override available)</option>
-                <option value="assisted">Assisted - allow with warnings</option>
-                <option value="freeform">Freeform - no checks</option>
+          <div ref={menuRef} className="encounter-menu anim-dialog scroll-y" role="menu" aria-label="Fight options" style={menuPos ? { top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
+            <label className="rules-mode-control">Rules assistant
+              <Select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.` : result.message ?? "The rules assistant could not be changed.")); }}>
+                <option value="strict">Enforce - blocks illegal moves; you can allow them</option>
+                <option value="assisted">Advise - allows everything, leaves notes</option>
+                <option value="freeform">Off - no checks, no prompts</option>
               </Select>
             </label>
             <label className="rules-mode-control">Players' hits
@@ -968,10 +1090,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <option value="aura">Health aura</option>
               </Select>
             </label>
-            <label className="rules-mode-control">Show health to
-              <Select value={state.combat.healthDisplay.audience} disabled={busy || state.combat.healthDisplay.style === "band"} onChange={(event) => { const audience = event.target.value as "gm" | "all"; socket.emit("encounter:set-health-display", { commandId: newId(), style: state.combat.healthDisplay.style, audience }, (result: MutationResult) => setMessage(result.ok ? `Health shown to ${audience === "all" ? "everyone" : "the GM only"}.` : result.message ?? "The health display could not be changed.")); }}>
+            <label className="rules-mode-control">Health is
+              <Select value={state.combat.healthDisplay.audience} disabled={busy || state.combat.healthDisplay.style === "band"} onChange={(event) => { const audience = event.target.value as "gm" | "all"; socket.emit("encounter:set-health-display", { commandId: newId(), style: state.combat.healthDisplay.style, audience }, (result: MutationResult) => setMessage(result.ok ? `Health is ${audience === "all" ? "shown to players" : "GM only"}.` : result.message ?? "The health display could not be changed.")); }}>
                 <option value="gm">GM only</option>
-                <option value="all">Everyone</option>
+                <option value="all">Shown to players</option>
               </Select>
             </label>
             <Switch
@@ -981,20 +1103,21 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               disabled={busy}
               onChange={(underwater) => socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed."))}
             />
-            <div className="menu-section" role="group" aria-label="Add combatants">
+            <div className="menu-section" role="group" aria-label="Add to the fight">
               <p className="menu-section-title">Add to the fight</p>
               {(() => {
-                const available = state.actors.filter((actor) => !state.combat.initiative.some((entry) => entry.actorId === actor.id));
+                // Archived characters are out of play (D16) and the server refuses them - the list agrees.
+                const available = state.actors.filter((actor) => !actor.archived && !state.combat.initiative.some((entry) => entry.actorId === actor.id));
                 return available.length > 0
                   ? <div className="menu-add-list">{available.map((actor) => <div key={actor.id} className="menu-add-row">
-                      <span>{actor.name}{actor.visibility === "gm-only" ? " · GM-only" : ""}</span>
-                      <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight.`)}>Add</button>
+                      <span>{actor.name}{actor.visibility === "gm-only" ? " · GM only" : ""}</span>
+                      <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight - their token is in the staging tray.`)}>Add</button>
                     </div>)}</div>
                   : <p className="menu-empty-note">Everyone on the roster is already in this fight.</p>;
               })()}
-              <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => { setBrowsing(true); setMenuOpen(false); }}>+ Add monsters (SRD)</button>
+              <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => { setBrowsing(true); setMenuOpen(false); }}>+ Add monsters</button>
             </div>
-            <button type="button" className="encounter-end" disabled={busy} onClick={() => { setMenuOpen(false); end(); }}>End encounter</button>
+            <button type="button" className="encounter-end" disabled={busy} onClick={() => { setMenuOpen(false); end(); }}>End the fight</button>
           </div>
         </>, document.fullscreenElement ?? document.body)}
       </div>
@@ -1005,10 +1128,19 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => { const pending = confirm; setConfirm(null); void runTurn(pending.run, pending.success); }}>Confirm</button>
         </div>
       </div>}
+      {/* Players' questions, pinned above the turn order: a blocked player is waiting on this, so it
+          does not belong somewhere the GM has to scroll to. Allow replays the parked command under GM
+          authority; an ask survives the turn advancing, so a replay can fail against current state —
+          when it does the question stays put and says so, rather than vanishing as if answered. */}
+      <PendingAsksForGm state={state} onFeedback={setMessage} />
       {(state.combat.pendingInitiative ?? []).length > 0 && <div className="initiative-gathering" role="status">
         <span>Waiting on {state.combat.pendingInitiative.length} player{state.combat.pendingInitiative.length === 1 ? "" : "s"} to roll initiative{state.combat.playerInitiativeMode === "wait" ? " - turns begin once everyone has" : ""}.</span>
         <button type="button" className="encounter-primary" disabled={busy} onClick={() => { setBusy(true); socket.emit("initiative:roll-remaining", { commandId: newId() }, (result: MutationResult) => { setBusy(false); setMessage(result.ok ? "Rolled initiative for the rest of the table." : result.message ?? "Initiative could not be rolled."); }); }}>Roll for the rest</button>
       </div>}
+      {/* The GM's tracker region — same reason as the player's: the turn order is the part that grows,
+          so it scrolls itself rather than growing the surface. The topbar, the start/stop controls and
+          the initiative-gathering notice above stay pinned as the region's header. */}
+      <div className="encounter-region scroll-y">
       <ol className="initiative-list gm">{orderedInitiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;
@@ -1019,12 +1151,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           <div className="initiative-row-main">
             {/* Foundry-style row: [avatar | name + HP bar | initiative]. The whole row opens a
                 floating tools card OVER the list - rows never shift while you work. */}
-            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} - HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>
+            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "this token"} - HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>
               <span className={`initiative-avatar ${actor?.kind ?? "npc"}${actor?.visibility === "gm-only" ? " gm-hidden" : ""}`} aria-hidden="true">{initialsOf(actor?.name ?? "?")}</span>
               <span className="initiative-main-col">
                 <span className="initiative-name-line">
                   {active && <span className="initiative-caret" aria-hidden="true">▶</span>}
-                  <strong className="initiative-name-text">{actor?.name ?? "Removed combatant"}</strong>
+                  <strong className="initiative-name-text">{actor?.name ?? "(removed)"}</strong>
                   {actor && <ConditionDots conditions={actor.conditions} />}
                   {actor && state.combat.reactionsUsed.includes(actor.id) && <span className="reaction-spent-dot" title="Reaction spent (restore in the row tools)">R</span>}
                   {actor && <span className={`initiative-hp-text hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</span>}
@@ -1034,7 +1166,13 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             </button>
             {editing
               ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
-              : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative - click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
+              /* Route 2 (design-language §4): the score is a quiet inline number beside a name and an
+                 HP readout, and growing its PAINT to 44px would put a chunky button in every row of a
+                 dense tracker. The budget is measured and it fits: the paint is 30.4x34.3, so the
+                 centred `::after` overhangs 6.8px horizontally into a 12px row gap and 4.85px
+                 vertically into 13.4px between rows (two neighbours = 9.7px). Its one horizontal
+                 neighbour, `.initiative-expand`, is 45.1px tall and carries no extension of its own. */
+              : <button type="button" className="initiative-score-value tap-target" disabled={busy} title="Initiative - click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
           </div>
           {expanded && actor && <>
             <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); }} />
@@ -1069,9 +1207,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           {actor && (state.combat.pendingDamage ?? []).filter((proposal) => proposal.targetActorId === actor.id).map((proposal) => <PendingDamagePrompt key={proposal.id} proposal={proposal} onFeedback={setMessage} />)}
         </li>;
       })}</ol>
+      </div>
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}
-    {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
+    {/* Mid-fight reinforcements: ONE command puts the monster on the roster AND in the turn order,
+        its token waiting in the staging tray, at the table's standing "new tokens" visibility. */}
+    {browsing && <MonsterBrowser visibility={stagingVisibility} joinEncounter onClose={() => setBrowsing(false)} />}
     {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" state={state} onClose={() => setSheetActorId(null)} /> : null; })()}
     {confirmDialog}
   </section>;

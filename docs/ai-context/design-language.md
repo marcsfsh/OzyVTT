@@ -104,11 +104,20 @@ absent. Therefore every semantic state carries an **icon and/or text label**, ne
 color alone; body/label text meets WCAG AA in all three themes; neon fills use
 `--text-on-neon`; never put saturated magenta text on saturated cyan or the reverse.
 
-Themes: three themes share one structure and token set; only values change. Set
-with `data-theme="dark|dusk|light"` on the root element (dark is the default). In
-light, glow becomes an accent ring, texture drops to near-nothing, and the wordmark
-drops its chrome fill for solid ink. Legibility outranks aesthetic there without
-exception.
+Themes: three themes share one structure and token set; only values change — one
+place, three hours. Set with `data-theme="dark|dusk|light"` on the root element
+(dark is the default). By name: **night** (dark) is the default drive — deepest
+surfaces, strongest texture. **The sunset hour** (dusk, reimagined 2026-08-04 —
+see `decision-log.md`) is deep ember twilight, not a washed-out dark: surfaces
+lift to `#251A4E…#443381`, the muted pair was retuned to `#C2BBE0`, and every
+text pair *gained* contrast from the deepening (re-measured numbers live beside
+the tokens in `design-tokens.css`). **Daybreak** (light) turns glow into an
+accent ring, drops texture to near-nothing, and deepens neon to ink — legibility
+outranks aesthetic there without exception, and the wordmark drops its chrome
+fill for solid ink. (The landing's sign is the one documented exception: its
+`--landing-sign` steel re-skins per theme rather than dropping to ink — night
+and the sunset hour share the blue-steel ramp, daybreak's is depth-tuned for the
+pale sky, and the reasoning lives beside the tokens.)
 
 ---
 
@@ -132,7 +141,9 @@ a hand-typed `px`. Eyebrows/small-caps and display headings each have a tracking
 a tracking value — that is the same role rendered four slightly different ways.
 
 **Breakpoints are a fixed ladder, not per-file taste: 760 / 650 / 560**, plus
-`min-width: 850/980` where a layout earns a third column. Full rationale in `mobile-ux.md`.
+`min-width: 850/980/1280` where a layout earns another column — 1280 (added 2026-08-04)
+is the laptop rung where two-column compositions spend a 1080p width: settings, the
+shared-screen controls. Full rationale in `mobile-ux.md`.
 A new number means two components change shape at widths a few dozen pixels apart for no
 reason — reuse a rung, or change the ladder deliberately for everyone. **The ladder is
 currently violated in several stylesheets**; see for yourself before adding to the pile:
@@ -143,7 +154,11 @@ currently violated in several stylesheets**; see for yourself before adding to t
 ## 4. Spacing, radius, elevation, touch targets
 
 - Spacing is a 4px-based token ladder (`--space-*`); radius is `--radius-sm/md/lg/pill`.
-  Both are in `design-tokens.css`. Avoid large soft blobs; chips and token rings may go pill.
+  Both are in `design-tokens.css`. **The square standard (2026-08-04, decision log):
+  `--radius-sm/md/lg` are 0** — surfaces sit square, and big-choice surfaces wear the
+  `.chamfer` cut (§9) instead of a large radius. `--radius-pill` survives for gauges:
+  HP/progress bars, status pills, chips and token rings stay round. Keep writing the
+  radius tokens, never a literal — reversing the ruling must stay one edit.
 - Elevation, in order of preference: a lighter surface token; a 1px border in
   `--line` or a low-alpha accent; a dark ambient shadow. Colored glow is state,
   not resting elevation.
@@ -168,14 +183,24 @@ unmeasured. Run it at 320px too: the narrower width is the worse case, not the b
 | Control | Why it is still open |
 |---|---|
 | `DicePanel`'s two `<summary>` disclosures | Unclassed `<summary>` in `apps/client/src/dice/`, which has no stylesheet of its own; needs a scoped rule there. |
-| `.encounter-map-swatches button` (color picker) | Inside a popover grid; 44px areas would overlap at the current gap. |
-| Raw `<input type="checkbox">` outside the named labels | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
+| `.api-reference-intro a` (`integrations/ApiReference.tsx`) | **Accepted, not deferred.** An inline link inside a sentence, not a control. Route 1 is *inert* on it — `display: inline`, and `min-height` does not apply to non-replaced inline boxes (CSS 2.1 §10.5) — so meeting the floor would mean making it `inline-block`, changing how it wraps mid-sentence. Route 2 measurably steals taps: with `.tap-target` the `::after` becomes 133.9×44 against a 21.6px line-height, and `elementFromPoint` at ±14px and ±18px starts returning the link instead of the prose, capturing ~58% of each adjacent line box (measured 2026-08-05). The floor-compliant route to the same artifact already exists in the same panel — `.api-export-spec`, 195.7×44, which downloads the document the sentence cites. |
+| `.encounter-token` (battle map) | **Accepted, not deferred**, and for a reason the graph row below does not have: a token's size is `sizePx` in **image-pixel space** (`apps/server/src/token-placement.ts`), scaled to the screen by the SVG `viewBox` — so growing it to 44px would draw a Large token where a Medium one stands. That changes what the *game state means*, not the chrome, which is a different and worse trade than any other row here. Mitigated the way the graph is: the map pans and zooms, so a token grows into the floor when you zoom in, and nothing steals the tap — the audit measured reach 21 against a token's own 15.8px box at 375px. |
+| `input.map-upload-input` (`maps/MapManager.tsx`) | **Not a control at all — counted, not excused. And it did not exist at the 124 baseline: C2's own MapManager rewrite introduced it**, so the phase cleared 115 sub-floor controls and added this one. It is `type="file"`, `aria-hidden="true"`, `tabIndex={-1}`, clipped, and clicked only by the visible "Add map…" button, which is itself at the floor. It was measured at **27.59px** and *did* look like a real control: `width/height: 1px` does not collapse a file input, because Chromium gives it an intrinsic size from its shadow "Choose File" button, while `clip-path` and `position` from the same rule applied normally. Fixed 2026-08-05 with `min-*: 0` and zeroed padding/border, so the box is now genuinely **1×1**. It still appears in the audit's sub-floor list, and the audit is right to count every rendered control rather than trust an attribute — the honest reading is "1 of the 9 is a 1×1 hidden input", not a narrowed scope.  Its twin `input.map-picker-file` (`maps/MapPicker.tsx`) carried the same idiom without the fix and measured the same 27.59px; it never reached the audit because no audited surface opens the embedded picker. Fixed the same way on 2026-08-05 — synthetic twin probe 27.59×27.59 → 1×1. |
+| `button.api-copy` (`integrations/ApiReference.tsx`) | **Never measured by the audit, so it is not one of the 9 — and it is sub-floor.** It sits inside `details.api-endpoint` inside the *closed* `details.api-reference` on `/settings`, and the audit measures a surface as it finds it. Measured 27.3×48.9 (2026-08-05): the height clears the floor, the width does not. A real control with a real job, so this is a **deferral, not an acceptance** — and the row exists so that "9" reads as *nine on the surfaces the route list opens, in the state it opens them*. |
 | `.codex-graph-node` (Connection graph) | **Accepted, not deferred.** Node size is data-driven and positions are force-laid, so a 44px area per node would overlap its neighbours at any realistic density — the floor and the layout are in direct conflict, and enforcing the floor destroys the thing being tapped. Mitigated three ways: the canvas pans and zooms (a node grows into the floor when you zoom in, which is what the gesture is for), every node is also reachable as a row in Pages and from the palette, and the graph is a *view onto* the connections rather than the only way to open one. The number of sub-floor nodes is data-dependent and width-dependent — it scales with the campaign, so it is a tool output, never a constant in a document. |
 
 An earlier version of this section quoted a single measured total for both widths and a
 scope that silently excluded the player shell. It was wrong in three ways and is corrected
 rather than quietly restated — which is why the numbers are gone and the command is here
 instead. A measurement belongs to the tool that produces it.
+
+The raw-`<input type="checkbox">` row left this table on 2026-08-05, and how it survived is
+the lesson: it named `.manual-nat20` as the last one open and prescribed a `min-height` on
+its wrapping `<label>` — which that label has carried since `13e3974`, *before* the baseline
+this table was narrowed against (`encounter-panel.css`, `.action-preview .manual-nat20`;
+measured 83.55×44). The population was **zero**, not one. The row was edited from two to one
+without re-measuring the one it kept, and no check could have caught it: the audit never
+opens that control. **Narrowing a row is a measurement, not an edit.**
 
 Two ways to meet the floor — pick by whether growing the paint hurts:
 
@@ -195,7 +220,9 @@ Two ways to meet the floor — pick by whether growing the paint hurts:
 the sum of their overhangs** or the later sibling silently steals the earlier one's
 taps. Worked examples live in the codebase — `.nh-card-tools`, a pressable-chip row,
 and `.encounter-map-tools`, which gets away with a small gap only because its paint is
-already close to the floor.
+already close to the floor. That last one is why the map toolbar sizes its `IconButton`s
+UP to 2.5rem (`scene/encounter-map.css`) instead of taking the primitive's 2.25rem: the
+2px-a-side overhang fits the bar's gap, a 4px-a-side one would not.
 
 New controls inherit this by composing `@vtt/ui` primitives. A hand-rolled control
 must state which of the two routes it took. **Verify by measuring, not by eye**, and
@@ -209,10 +236,13 @@ outward from the control's centre until it stops returning the control.
 ## 5. Components (see `@vtt/ui` + `/styleguide`)
 
 - **Buttons.** Primary: magenta fill, `--text-on-neon`, no glow at rest; hover
-  lifts to `--magenta-hi` + `--glow-magenta`. Secondary: transparent, 1px
+  lifts to `--magenta-hi` + `--glow-drop-magenta`. Secondary: transparent, 1px
   `--line-strong`, hover fills `--surface-3` with a low-alpha cyan border. Ghost:
-  text only. Destructive: `--danger` border/text, fills on hover, always labelled.
-  One primary action per view; labels are sentence case, body face.
+  text only. Destructive: `--danger` border/text, fills on hover (`--glow-drop-danger`),
+  always labelled. Primary and destructive wear the chamfer cut (§9) — except `sm`
+  buttons, whose `.tap-target` hit area the cut would clip — so their glow rides
+  drop-shadow filters and their focus ring is inset. One primary action per view;
+  labels are sentence case, body face.
 - **Inputs.** Well `--surface-3`, 1px `--line`, `--text-muted` placeholder. Focus
   shifts the border to `--cyan` with a soft `--glow-cyan` (the main place cyan
   appears in a resting form). Validation uses icon + text.
@@ -250,4 +280,323 @@ outward from the control's centre until it stops returning the control.
 5. For a UI-affecting change, look at it running (`npm run dev`) at a desktop
    width and a narrow/touch viewport, and cycle the themes.
 6. If you are writing words a user reads, `design-decisions.md` §Voice and copy is the
-   standard, and `apps/client/src/codex/vocabulary.test.ts` fails the build on retired words.
+   standard, and two locks fail the build on a retired word off one shared scanner
+   (`apps/client/src/copy-scan.ts`): `codex/vocabulary.test.ts` for the Codex, and
+   `apps/client/src/play-vocabulary.test.ts` for everything else.
+
+## 6b. Adding a new play surface (the seven lines that stop re-fragmentation)
+
+A new surface is where a design system quietly forks. Most of this list is already a test —
+the point of writing it down is that you meet the checks on purpose instead of discovering
+them, and that the two steps no test can demand are remembered.
+
+1. **Words from the glossary** (`design-decisions.md` §Voice and copy). `play-vocabulary.test.ts`
+   scans everything under `apps/client/src` minus a pinned exclusion list, so your new directory
+   is scanned the moment it exists — there is no list to join.
+2. **Compose from `@vtt/ui`.** A new primitive goes to `packages/ui` *and* to `/styleguide`; the
+   completeness check fails on an export with no demo. A hand-rolled lookalike fails
+   `design-conventions.test.ts` (glyphs, raw inputs, `.eyebrow`, hex, inline feedback).
+3. **Every "who sees this" decision is the Reveal family** — `RevealSwitch` / `VisibilityBadge`
+   from `@vtt/ui`, never the words re-typed. Feedback is a toast, not a per-component banner.
+   Confirms use the verb triad and mean it.
+4. **Give it an address**: the router table, the `router.test.ts` lock, **and one line in
+   `scripts/tap-audit.mjs`'s route list** — that last one is the step no test can demand, which
+   is why it is written here.
+5. **Breakpoints from the ladder** (§3). An off-ladder query fails with the nearest rung named.
+6. **A narrow-viewport and touch pass before you call it done** (§4, `mobile-ux.md`).
+7. **Docs in the same commit** — the brief whose behaviour you changed, and the ledger.
+8. **The surface fits the locked viewport and declares its scroll regions** (§7). The page
+   never scrolls; every region either fits or scrolls itself via `.scroll-y`. Run
+   `node scripts/no-scroll-audit.mjs` against your route at 1280×720-class and 390×844
+   before calling it done. *(Status: standard adopted 2026-08-04; the shell lock is in
+   force — the body is locked and `<main>` is the frame — so no surface can scroll the
+   document, and since Phase C every surface has recomposed into a real frame of its own.
+   The ratchet checks and the route audit are in repo — §10.)*
+
+---
+
+## 7. Layout — THE SCREEN IS THE PAGE
+
+> **Status: adopted 2026-08-04 (decision log); the shell is locked (refresh phase A1).**
+> `body` holds `height: 100dvh; overflow: hidden` and `<main>` is the frame
+> (`apps/client/src/styles.css`); the standalone shared-screen viewer
+> (`apps/client/src/viewer/viewer-page.css`), the standalone sheet entry and the
+> Modal/Drawer primitives were already conforming. **The document never scrolls, and since
+> Phase C every surface owns a real frame** — the temporary staged pane region A1 bought the
+> lock with (`.pane-stage` + `.scroll-y`, phase-tagged per wrapper) drained with the last of
+> them and the class is deleted. Sections marked *(refresh)* below describe that standard.
+
+**The law.** The app page never scrolls. A surface is a **frame** (chrome that never moves:
+tab bar, headers, toolbars, transport rows) plus **regions**, and every region either fits
+its box or scrolls *itself*. There is no third option; "the page grew" is a defect. The
+landing proved the feel; the shared-screen viewer has run this way since it shipped — the
+standard is a promotion of what already works, not an invention.
+
+**Targets.** One build, two postures. Laptop: 16:9, 1080p-class — compositions must spend
+the **width** (rails, docks, side columns), because locking the height while keeping one
+narrow centre column just hides the same content behind an internal scrollbar. Phone:
+390×844-class portrait — compositions spend the **height**; width collapses per the ladder
+(§3). Floors: width 320px (already declared on `body`); height **600px** *(refresh)* — below
+it the frame stays fixed and regions scroll harder, and nothing may become unreachable.
+
+**Below the height floor the last clause is the one that wins, and it is not free.** A pane
+shorter than a surface's rigid rows — a phone in landscape (a 844×390 pane is 346px tall), or
+the same phone with the soft keyboard up — cannot be composed out of by any flex arrangement:
+something must yield, and when the yielding runs out, a surface frame **scrolls as a whole**
+rather than clipping. That is a real exception to "a frame never scrolls" and it is stated
+here because the alternative was measured and is worse: the phone table clipped instead, and
+below ~430px of pane the entire dock (turn order, dice, log, *and the tab bar that reaches
+them*) became content that did not exist — `elementFromPoint` at the tab bar's own centre
+returned `null`, mid-fight. **A frame that scrolls is a composition that has run out; a frame
+that clips is a bug.** The right answer for a short, wide pane is a different composition
+(map beside sheet), which needs a height axis the ladder does not have yet.
+
+**The vocabulary.**
+
+- **Frame** — never scrolls, never shrinks below its intrinsic height. The app shell's frame
+  is `[connection strip when present][tab bar][content pane]` — a 100dvh grid in
+  `apps/client/src/styles.css`; the strip is grid row 1 and height-animates in (the old
+  `position: fixed` strip and its `:has()` padding dance retired with the lock).
+- **Region** — a box inside the frame. A region that can outgrow its box carries `.scroll-y`
+  (`packages/ui/src/styles/design-tokens.css`) — the one blessed scroll treatment: quiet thin
+  scrollbar, `scrollbar-gutter: stable`. *(refresh: `.scroll-y` becomes the mandatory marker;
+  a bare `overflow-y: auto` in app CSS is the tell of an undeclared region.)*
+- **Canvas** — the one region per surface that flex-fills leftover space (`flex: 1;
+  min-height: 0`): the map stage, the codex main pane, a wizard's step body. The map's
+  enlarged/docked modes and the viewer's stage are the proof this works.
+- **Wide content** — tables, level grids, tab strips, folder chips — always its own
+  `overflow-x` container. The locked page never scrolls sideways either.
+
+**Composition rules.**
+
+1. One primary scroller per pane. Nested same-axis scrollers only across a frame boundary
+   (a modal over a page, a drawer over a pane) — never two siblings guessing.
+2. The `NNvh`/fixed-rem internal cap idiom (19rem roll list, 16rem log, 40–94vh caps — the
+   codebase's pre-standard substitute for a frame) converts to `flex: 1; min-height: 0`
+   inside a real column *(refresh — the census enumerates every site)*. A leftover cap
+   inside a locked frame reintroduces double-scroll.
+3. Anchors and `scroll-padding` belong to regions, not the root: the
+   `html { scroll-behavior… scroll-padding-top }` recipe is retired from the shared tokens —
+   the styleguide entry keeps its own copy (`styleguide.css`), and scrolling regions declare
+   their own padding (the wizard layer and `.pane-frame > .scroll-y` do). `--header-h`
+   retired with it.
+4. Density: `comfortable` rows are ≥44px (`--tap-min`) and the default everywhere;
+   `compact` (36px paint, `.tap-target` route 2) exists only inside GM data regions
+   (initiative rows, level tables, log lines) and never on a phone *(the pair is the
+   `--row-h`/`--row-h-compact` tokens; components adopt them as they recompose)*.
+5. Keyboard: a focused input inside a locked region must stay visible above the on-screen
+   keyboard — the region scrolls to it; the frame never moves. A shell-level `focusin`
+   helper (`apps/client/src/main.tsx`) nudges the focused field into view within its own
+   region, and regions carry `scroll-padding` + safe-area bottoms (`.pane-frame > .scroll-y`,
+   the wizard/Modal practice). iOS/Android remain unverified on device (GAP-001).
+6. Gestures: `touch-action: none` on draggables stands (mobile-ux.md). New rule — once a
+   draggable's *container* scrolls, re-verify drag-vs-scroll at 390px; a drag that used to
+   rubber-band the dead page now fights a live scroller.
+7. Motion at the view level: tab swap = `anim-view` (200ms settle) — **opacity-led at the
+   pane** (`pane-in`, styles.css): an animated transform there is a containing block that
+   traps `position: fixed` overlays, the Blink lesson the old `.table-layout` fill-mode
+   patch learned one arm at a time. The landing→app entry transition (dip → cascade) is
+   one-shot state in `main.tsx`, its classes dropped when it settles. Layer push =
+   `sheet-up`/`dialog-in`; drawers = `--ease-drawer`; the ignition flicker stays the
+   landing's. Nothing moves on scroll; reduced-motion freezes (or skips) all of it — the
+   arcade feel comes from *placement snapping into a frame*, not parallax.
+
+**Layout tokens** *(in `design-tokens.css` §Layout since 2026-08-04, seeded from the live
+values they replace)*: `--app-bar-h` (the tab bar row), `--pane-gap` (frame gutter),
+`--rail-w` (nav/list rails, 220–280px), `--dock-w` (the table's side dock, 22rem),
+`--row-h`/`--row-h-compact`. Consume these; do not invent siblings ad hoc. (`--header-h`
+and its one consumer, the root scroll recipe, retired when the shell locked.)
+
+---
+
+## 8. Surface blueprints *(refresh)*
+
+> How each surface recomposes under §7. Grades from the measured census (2026-08-04, in the
+> engagement record): **trivial** = wrap the existing content in one declared region;
+> **recompose** = re-place existing pieces into a frame; **redesign** = the pieces themselves
+> change. Reference implementations (already conforming, adopt-don't-rebuild): landing ·
+> shared-screen viewer · wizard layer · Modal/Drawer · the map's docked/enlarged/fullscreen
+> modes · every capped picker list.
+
+| Surface | Grade | Frame | Regions (scroll marked ▤) |
+|---|---|---|---|
+| App shell | **done (A1)** — unlocked all below | connection row · tab bar | content pane (canvas for the active surface; every surface now stands in it as its own frame — the staged `.pane-stage` ▤ that carried the unconverted ones drained with the last of them in Phase C and the class is deleted) |
+| Table, GM — laptop | **done (B1)** — frame and dock accordion both | tab bar · scene row · party strip | **map canvas** flex-fills — the `72vh` cap and the `--setup-h` map-measuring plumbing are gone, and the stage takes the frame's leftover height (849px at 1920×1080 where the cap allowed 680) · the dock is one accordion (`apps/client/src/encounter/DockAccordion.tsx`, landed in `cb43140`): three headers always visible, exactly one body holding the flex and scrolling ▤, and the `<details>` idiom the dice and log used to hide behind is gone. Measured 1280×900: `.dock-accordion` 856px tall, three `.dock-section-head`, the open body overflowing +1518 inside its own region, document scroll 0 |
+| Table, GM — phone | **done (C1)** | tab bar · slim scene/party row | map as a fixed **band** (`flex: 0 1 14rem; min-height: 9rem` on the stage — the box that is only ever map, so a tray drop cannot shrink it under the finger), beneath it one tabbed sheet: Turn ▤ / Dice ▤ / Log ▤. `Tabs`, not `SegmentedControl`, because the primitive paints a real 44px instead of reaching the floor with a `::after` that would extend up into the band's `touch-action: none` drag surface — verified by walking `elementFromPoint` down the seam at 390×844: the **band** (`.encounter-map-stage`) ends at y=**324**, `section.table` ends at 380, and `.nh-tab` answers only from y=388, so the extension would have had 56px of clearance to the section's edge and none to the band's. (An earlier version of this row said "the band ending at 379": 379/380 is `section.table`'s bottom, not the band's. The conclusion is unchanged; the number was the wrong box.) Inactive bodies **unmount** (not `display: none`): `CombatLog` pins itself with `scrollTop = scrollHeight` and a hidden element measures 0. **AFTER, measured: `.table-layout` is 800px in every tab, both roles, in and out of combat.** The before-state was recorded three conflicting ways (this row, `current-state.md` and `f906c20` disagree), so the precise triple is dropped rather than picked: it ran to several thousand pixels inside an 800px pane, and reverting is the only way to reproduce a number for it |
+| Table, player | **done (C1)** — follows the GM pattern | tab bar · slim `YouArePlaying` row | the 349px identity card became a 44px row (avatar · name · HP · Release · My sheet); the pre-claim picker is the sheet's region with the band still live above it. The table also stopped arriving pre-scrolled in portrait and at every laptop width: `EncounterPanel`'s `activeRowRef.scrollIntoView({block:"nearest"})` walks **every** scrollable ancestor, so the initiative row scrolled the whole table (measured 202px on a genuine first paint, and the GM saw 25–202px too). What removes it is the rows FITTING, not the class: `block: "nearest"` scrolls nothing when the row is already in view, and where `scrollHeight === clientHeight` there is nothing to scroll at all — measured `scrollTop = 0` at rest in **all 120** cells of the 2026-08-05 sweep, both roles, in and out of combat. `.table-layout` **is** a scroll container again (it must be — see §7's height-floor note), so where the pane genuinely cannot hold the rows the call still pulls it: a GM's first paint in landscape lands at scrollTop 70 (844×390), 85 (667×375) or 140 (568×320), showing the fight instead of the map. That is now recoverable — scrolling back to 0 works — where the clip it replaced left the GM stuck at 13 with no way up |
+| Feed panels | trivial | — | roll list ▤ and log list ▤ go `flex:1` inside the dock |
+| Scenes gallery | **done (A2)** | heading · command bar | card grid ▤ — the region is the grid's WRAPPER, never the grid (a grid with a definite block size stops sizing its auto rows from its cards); ≤560 goes two compact columns instead of 1:1 squares; the ⋯ menu's Move earlier/later is the reorder route a scrolling grid cannot autoscroll to |
+| Scene prep / staging | **done (C1)** | head row | one declared region ▤ · feedback row **outside** it, so an error cannot be scrolled away from. Regraded from "trivial · rides the table dock": once the phone table became a frame, the staging panel was the one thing in the sheet row that was not a frame column — 681px of content in a 413px box at 390×844, held up by a conditional `.scroll-y` on that one arm. Now `frame-col frame-fill`, so the row is uniform across arms and the panel scrolls itself (306 client / 540 scroll). Below the 979 rung the head drops its "Players see none of this…" sentence: pinning the head cost 117px of a 236px row at 375×667, and that line is the third statement of GM-only-ness on the screen (the staging banner over the map and the ARRANGING · GM ONLY eyebrow both remain) |
+| Maps library + calibration | **done (C2)** | back · heading · upload row | list rail ▤ · calibration pane as a four-step layout on `Steps` (mode → canvas → fields → verify), with the canvas mounted **once** as the pane's only flex-filling child — never inside a step panel, never conditionally unmounted. Measured 1280×720: the canvas had **0px** on screen at landing, 5px with a map selected and 215px (32%) while the fine-tune fields were focused; it is **374px in every step** now, and 734px at 1920×1080 with the rail pinned to `--rail-w`. Gridless/regional get a *review* step, never a verification — the server has no verification for the scale path, only `PUT …/scale`, and a badge no server computed would be a lie. The phone upload row collapses 376px → 44px (CSS-only reveal at the 560 rung), which is what makes the pane reachable at all: `.map-calibration` used to start at y=1215 |
+| Roster | **done (A2)** | heading · actions | queue + gallery + archived ▤ (cards take a 15rem cell so a claimed character's three actions fit; the archived `<summary>` carries the 44px floor) |
+| Codex shell | recompose | its own top bar | sidebar (sticky already) · main pane ▤ — per-view `NNvh` caps convert; the body editor owns its height (`resize: vertical` retires) |
+| Homebrew | recompose | modebar | rail ▤ (already) · record detail ▤; level table keeps its own x-scroll inside |
+| Settings | **done (A2)** | heading | the group column ▤; at ≥1280 it is two columns — The table \| Mine + Players — so a 1080p width is spent instead of scrolled |
+| Shared-screen controls | recompose (light) | heading | two columns ≥1280: tools (preview pinned visible) ▤ · access ▤ |
+| Replays list | **done (A2)** | heading (the player's Back to the table is a row in it) | the rows ▤ — the list is the surface now, not a `.card`, so the rows are the cards standing on it |
+| Replay viewer | recompose | header · transport | stage canvas · side lists ▤ (phone: side lists become tabs) |
+| Builder / level flow | **done (A2)** | wizard head/foot | step body ▤ — the scroller moved from the layer to `.nh-wizard-body` (`.scroll-y` in the primitive's markup), the footnote rides the step, and the detail pane sticks to the region's top |
+| Sheet layer | **done (A2)** | sheet header · rollbar · page actions (a bottom row **inside** the sheet — they were the whole of this route's overflow) | sheet pane ▤ (`.scroll-y` in the markup, all four presentations) — `sheet.html` passes no page actions and keeps its 100dvh column |
+| Player `/replays` | **done (A1)** | — | the replay list alone — the `main.tsx` view condition excludes the table now (the census's stacking anomaly); the audit's player `/replays` row is its regression check |
+| Landing / viewer / sheet entry | done | — | — |
+
+---
+
+## 9. What the landing taught the system *(status: in force as shared utilities since 2026-08-04)*
+
+- **Glass tiers.** Two named tiers of one treatment, both in `design-tokens.css`:
+  `.surface-frost` (chrome tier, over app surfaces) and `.surface-glass` (scene tier,
+  panels standing on a canvas — a live map, a sky; the landing's `--landing-glass` is its
+  scene-local ancestor). Both go solid under reduced transparency. Do not grow a third.
+- **The sky is for content-light surfaces, and it is a LITERAL sky** *(reversal, 2026-08-04 —
+  this bullet used to read "no sun, no horizon, no stars"; the decision log carries the dated
+  entry)*. `.pane-scene` + a `.pane-sky` child + `.scanlines` (`apps/client/src/styles.css`)
+  paint the drive: a tiled starfield, a sun cresting a lit horizon, and a receding perspective
+  grid floor, all off `--sky-*` tokens with no hand-typed colour, so night, the sunset hour and
+  daybreak come free. Settings, the roster, the scenes gallery, the replays list, the builder gate
+  and the not-found page stand on it; **the table never does** (texture only — a horizon behind a
+  battle map competes with the map, and the map is the canvas). Not-found joined late: it is the
+  most content-light surface in the app — two lines and two doors on a full pane — and it was the
+  only one of them on flat ground, which is the shape of inconsistency a later reader "fixes"
+  without measuring. Three rules make it a work screen rather than a title screen, and
+  each one is load-bearing:
+  - **The horizon is a fixed inset from the pane's bottom** (`--sky-horizon-inset`, 7rem /
+    5.75rem ≤760px), never the landing's percentage — a percentage drifts up into content as the
+    pane grows. Every other layer is measured against that one number, **including `--sky-wash`'s
+    own stops**: they were fractions of the full box while the knee was `calc(100% - inset)`, and
+    those two orderings cross in any box under ~350px — CSS clamps the decreasing stop, two stops
+    share a position, and the ramp becomes a hard band. Horizon-relative, the list is monotonic at
+    any height, and the ramp on a real pane is unchanged (stops move under a pixel at 1920×1080).
+  - **The sun is a crest, not a disc** — and the crown is **exactly half the diameter**, so what
+    stands above the line is a hemisphere. Its box is only the crown and `--sky-sun-mask` cuts
+    that to the top of a circle centred on the line, so the landing's clipping sky band and its
+    slat gradient are both unnecessary — the horizon does the cutting and the hidden half is
+    exactly the slatted half. `--sky-sun-d` is **derived** (`calc(--sky-sun-crown * 2)`) rather
+    than typed: the first cut set the two independently and the mask's cap flattened into a
+    chord — a measured 394×54px slab, 8.8% taper, hard vertical sides. Two numbers that must
+    hold a ratio should not both be typed.
+  - **The bright band is RESERVED.** Row-scanned over every pixel of the bare sky for a run of
+    ≥4 consecutive failing pixels, the band failing AA for `--text-muted` is ≤157px at 1920×1080
+    and ≤130px at 390×844 in all three hours, so `.pane-scene > .scroll-y` pads
+    `--sky-horizon-inset + --sky-sun-crown` (176px / 144px) at the bottom — taller by 19px and
+    14px. Legibility is a structure, not an opacity dial: a surface that adds bare copy inherits
+    it. **The run rule is the caveat and it is load-bearing:** it sets point features aside. A
+    star is one 1–1.5px near-white dot, it can land anywhere in the pane, and no bottom reserve
+    can bound it — per-pixel, the failing band is the whole pane in night and the sunset hour
+    (0 in daybreak, where `--sky-star` is transparent). The residual is narrower than a glyph
+    stem; if it ever needs answering the answer is `--sky-star`'s alpha, not a taller reserve.
+    Read the guarantee as "no *band* of unsafe sky above the reserve", never as "every pixel".
+  Never put `transform`, `filter`, `backdrop-filter`, `perspective`, `will-change` or
+  `contain: paint` on `.pane-scene` — any one makes it the containing block for every fixed
+  overlay. The floor's perspective is on a pseudo-element inside the clipped `.pane-sky`, which
+  also stops its ~500px-per-side spill from growing `document.scrollHeight`. Under reduced
+  transparency the wash and horizon stay (they are what tells the hours apart) and the floor and
+  sun go. `.surface-glass` is worn by settings' panels alone today — the other three put plain
+  `.nh-card`s on the sky, because a gallery of cards reads as glass-on-glass when every card is
+  translucent. Whether those three should take the tier is an open look question, not a settled
+  rule. An empty state on such a surface is a scene moment, not a dashed box:
+  `.scene-empty` is one line and, where there is an action to offer, one chamfered primary
+  door (a surface that fills itself, like the replays list, offers none).
+- **Scanline tile.** A full-viewport `repeating-linear-gradient` rasterizes unevenly; the
+  landing found it and the shared `.scanlines::after` utility now paints the same one-gap
+  `background-size` tile the landing does (`apps/client/src/styles.css`, documented at
+  both rules).
+- **Noise opacity is a token.** `--landing-noise-opacity` re-skins the landing per theme;
+  the shared `.static-noise` reads `--noise-opacity` the same way.
+- **Clipped panels glow via `drop-shadow`.** `box-shadow` cannot follow a `clip-path`
+  chamfer, and neither does the outer focus ring — a chamfered control's focus is an
+  INSET outline. The door treatment is generalized as the `.chamfer` utility +
+  `--chamfer-cut` polygon + the `--glow-drop-*` filter twins of the glow set: for
+  panels, cards, feature tiles, status tags and the primary/destructive buttons
+  (`Button.css`; `sm` buttons exempt — the cut would clip their `.tap-target` hit area).
+  Never on a control that relies on `.tap-target`.
+- **Role rims** *(built 2026-08-04)*. Magenta is the player's, violet is the GM's:
+  `--rim-player` / `--rim-gm` (+ washes and drop-shadow glow twins) and the `.rim-player` /
+  `.rim-gm` utilities. Worn by the two tab bars — frame row 2 is on screen on every route in
+  both roles, and the two roles' bars were otherwise identical — and by the two GM-only settings
+  groups, which tells the GM which half of a page a player is never handed. **The rim attaches to
+  the GM-SECRET TREATMENT** (the 3px start edge + faint wash that `.scene-preview-banner`,
+  `.party-queue`, `.scene-builder` and the codex's GM blocks already wear), **never to a claim
+  that the hue means GM** — §2 assigns `--violet` to magical/concentration and ~50 rules use it
+  for NPC strokes, condition dots, legendary actions and presence. Keep rims off selection state,
+  whose axis is cyan.
+  - **A rim is never the only signal, and the four sites say so in words a screen reader
+    reaches:** the bars' `aria-label`s are "GM sections" / "Player sections", and the settings
+    `Group` appends "GM only" to its Eyebrow (the section's accessible name) from the same
+    `gmOnly` flag that paints the edge — one place, so the edge and the sentence cannot drift.
+    All four shipped without it and this bullet asserted it anyway: the player bar read "Table,
+    Codex or Settings" and the two Eyebrows read "The table" / "Players", so on the GM's
+    `/settings` the violet edge was the *only* thing separating the GM-only groups from *Mine*.
+    A new rim site inherits the obligation; if it cannot name its role, it does not get a rim.
+  - **A rim must not live on a masked element.** The edge is an **inset box-shadow**, not a
+    border: this file loads before every app stylesheet, so a shared `border-inline-start` loses
+    at equal specificity to a consumer's own `border` shorthand (measured — both rim sites
+    computed `border-left-width: 0px`), and a shadow costs no layout. But a shadow is still the
+    element's own paint, and `Tabs`' edge-fade mask (`is-scrolled-start`) makes the leading 24px
+    of the bar transparent — which erased the GM's rim outright on a phone on every route whose
+    active tab sits past the fold. So frame row 2 is now a **`.frame-tabbar` wrapper** that
+    carries the rim, the wash and the chrome scanline, with the scrolling bar as its content.
+    Mask applies after filters and shadows, so nothing an element paints survives it: when a
+    rim meets a mask, move the rim to a parent.
+- **The sign principle** *(built 2026-08-04)*. A hero title wears a metal the scene does not
+  (blue-steel on the magenta drive) and carries legibility in its chrome *structure*, not an
+  outline. `--sign-chrome` / `--sign-stroke` / `--sign-glow` + the `.sign` utility. Reserved for
+  a full-page moment that IS the screen — the landing today, and no second call site in play.
+  **Never a panel header**, never a section heading, never `.nh-panel-title`: one edit there puts
+  the metal on every panel in the app and it stops meaning anything. **In daybreak it clears
+  AA-LARGE only** — measured by image, because `background-clip: text` makes `color` transparent
+  and an element-level check skips it: every horizontal band of the wordmark reads 3.37–6.91
+  against the pale sky, so all 34 measured scanline rows sit under the 4.5 normal-text floor and
+  none under 3.0. At the demo's `clamp(2.5rem, 8vw, 4.5rem)` that is large text and it passes with
+  0.37 of margin; **`.sign` is valid at wordmark scale and nowhere smaller.** Night and the sunset
+  hour have room to spare (7.88–18.89). The values deliberately duplicate
+  `--landing-sign`/`--landing-stroke`/`--landing-title-glow`; the landing should alias them once
+  the entry-animation lane lands.
+- **Neon linework** *(built 2026-08-04)*. The sky's horizon, lent to the chrome:
+  `--rule-beam` / `--rule-beam-v` / `--rule-beam-glow` (derived from `--cyan`/`--magenta`, so
+  daybreak's deepened inks come free) and the `.neon-beam` utility, which draws a 1px lit rule on
+  an element's bottom edge. **It is scene language, not state language,** and that is the whole
+  restraint — pillar 1 keeps neon for what is interactive, focused, selected or live. A beam
+  marks a STRUCTURAL boundary only: the four scene surfaces' heading row against their region,
+  and the table dock's inner edge (`--rule-beam-v` through `border-image`, the one boundary on
+  that surface where the map stops and the panels begin). It never lands on a control, never
+  marks a state, and never replaces a resting `--line` border just because one was there — which
+  is why it runs at about half the horizon's intensity and its glow is a whisper.
+  **Check what sits ON the boundary before claiming it:** the dock's beam shipped invisible in
+  every state because `.encounter-map-dock-resize`'s 2px `--line` bar sits at the same x, one
+  z-index higher, and painted straight over it (measured: the edge column read flat `--line` in
+  all three hours; hiding only that pseudo brought the beam's magenta back). The grip is
+  transparent at rest now, so the dock owns its edge and the grip's own paint is reserved for its
+  STATE — cyan while you are dragging it, which is also why the beam stays off a control. The app's two
+  tab bars also take the **chrome-tier** scanline: `--scanline-color` is the chrome strength
+  (.22/.14/.05) and `.scanlines` halves it with `opacity: .5` for the scene tier, so the sky sits
+  at .11 and the bar at .22 — two strengths of one texture, and daybreak drops both.
+
+---
+
+## 10. Enforcement & migration *(in force since 2026-08-04 — nothing here weakens an existing check)*
+
+- **In repo:** `scripts/no-scroll-audit.mjs` — a real GM login and a real player join, then
+  the route × role table (19 rows: landing, viewer entry, every GM address including
+  resolved `/replays/:id` and `/characters/:id(/level)`, the player's four) at 1280×900,
+  1280×720 and 390×844, failing (exit non-zero) on any document scroll, either axis, or any
+  unmeasured route. Scripted-manual on the same terms as `tap-audit.mjs` (needs a browser
+  and a live dev server, honestly outside vitest) — `docs/ai-context/testing.md` has the
+  row. The A1 shell lock took the whole table green — unconverted surfaces scroll a staged
+  pane region, not the document — so any red cell is a regression; the (g)/(h) ratchets
+  below carry the remaining conversion debt.
+- **Static checks (in repo, ratchet style):** `design-conventions.test.ts` — **(g)**
+  viewport units in app CSS: `100dvh`/`100svh` and paired/`:fullscreen` `100vh` are
+  structural; every other occurrence answers to a reasoned `VIEWPORT_CONFORMING` row or a
+  phase-tagged, shrink-only `VIEWPORT_LEGACY` row (target 0); **(h)** declared scroll
+  regions: a bare `overflow(-y): auto|scroll` in app CSS must be a `SCROLL_ALLOW` legacy
+  site (shrink-only, target 0 — the end state is every region carrying `.scroll-y` in
+  markup). Both follow the `design-conventions-shape.ts` pin discipline.
+- **Phase order (the refresh):** A — the shell lock + every *trivial* surface (one
+  commit-sized region each); B — the *recompose* surfaces (table laptop, codex, homebrew,
+  replay viewer, viewer-controls); C — the two *redesigns* (table phone, map calibration).
+  The checks and audits above landed at A's foundation; docs and ledger move per commit,
+  as always.
+- The styleguide's Layout sections mirror §7–§9 for authors; the census and the refresh
+  plan live in the engagement record until implementation, then their durable facts land
+  here.

@@ -14,7 +14,16 @@
      the app's `* { box-sizing: border-box }` is not in scope there. */
   box-sizing: border-box;
   width: min(24rem, 100vw);
-  background: var(--surface-2);
+  /* RULING 52 — panel material, brighter rim. A drawer is edge-anchored, so it takes NO corner
+     cut: three of its four edges are the viewport's and there is no corner to cut. What it does
+     take is the material — scanline over a gradient (ruling 2; it is the outermost panel while
+     open, so ruling 28 permits the texture) — and the brighter rim below on the one edge it has. */
+  background-color: var(--surface-2);
+  background-image:
+    linear-gradient(to bottom, transparent 0 calc(var(--scanline-gap) - 1px), var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)),
+    linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 35%);
+  background-repeat: repeat, no-repeat;
+  background-size: 100% var(--scanline-gap), 100% 100%;
   box-shadow: var(--shadow-2);
   color: var(--text);
   visibility: hidden;
@@ -27,8 +36,8 @@
     translate var(--dur-base) var(--ease-drawer),
     visibility var(--dur-base) var(--ease-drawer);
 }
-.nh-drawer--right { right: 0; translate: 100% 0; border-left: 1px solid var(--line); }
-.nh-drawer--left { left: 0; translate: -100% 0; border-right: 1px solid var(--line); }
+.nh-drawer--right { right: 0; translate: 100% 0; border-left: var(--rim-w) solid var(--rim-color-hi); }
+.nh-drawer--left { left: 0; translate: -100% 0; border-right: var(--rim-w) solid var(--rim-color-hi); }
 .nh-drawer.is-open { translate: 0 0; visibility: visible; }
 
 .nh-drawer-head {
@@ -66,6 +75,8 @@
        every width, plus the body's own top padding (20px, 16px on the phone sheet).
    The header holds no second control, so nothing here can steal a neighbour's tap. */
 .nh-drawer-close {
+  position: relative;
+  isolation: isolate;
   flex: none;
   display: grid;
   place-items: center;
@@ -75,15 +86,30 @@
   margin: 0;
   font-size: 1rem;
   line-height: 1;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-dim);
   cursor: pointer;
+  --nh-rim: var(--rim-color);
 }
-.nh-drawer-close:hover { color: var(--text); border-color: var(--line-strong); }
+/* Ruling 49 — cut on a backing layer, never on the button: this one carries `.tap-target`. */
+.nh-drawer-close::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: polygon(0 .3rem, .3rem 0, 100% 0, 100% calc(100% - .3rem), calc(100% - .3rem) 100%, 0 100%);
+  border: 1px solid var(--nh-rim);
+  background: var(--surface-3);
+  transition: border-color var(--dur-hover);
+}
+.nh-drawer-close:hover, .nh-drawer-close:active { color: var(--text); --nh-rim: var(--rim-color-hi); }
 
-.nh-drawer-body { flex: 1; min-height: 0; padding: var(--space-5); overflow-y: auto; }
+/* overscroll-behavior: see `.nh-modal-body` — a drawer over a locked page must not chain its scroll. */
+.nh-drawer-body { flex: 1; min-height: 0; padding: var(--space-5); overflow-y: auto; overscroll-behavior: contain; }
 
 /* Full-width sheet at the repo's phone/tablet split. `width: min(24rem, 100vw)` alone
    still leaves a 384px panel with a dead strip beside it on a 700px tablet, so the sheet

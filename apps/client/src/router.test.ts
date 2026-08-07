@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import {
-  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, lastLocation, lastLocationForTab, navigate, pathForGmTab,
+  currentHref, discardTransient, gmTabForPath, isGmOnlyPath, isKnownPath, isPlayerOnlyPath, lastLocation, lastLocationForTab, layerOf, litGmTab, navigate, pathForGmTab, redirectForRetiredPath,
   popTransient, pushTransient, registerNavigationGuard, rememberLocation, replaceQuery, resumeTarget, useRoute, withQuery
 } from "./router";
 import { codexSectionOf } from "./codex/routes";
@@ -27,13 +27,55 @@ describe("The address table (D3)", () => {
   });
 
   it("round-trips every GM tab through its address", () => {
-    for (const tab of ["scenes", "table", "roster", "codex", "homebrew", "viewer", "replay", "setup"] as const) {
+    for (const tab of ["scenes", "table", "roster", "codex", "homebrew", "viewer", "replay", "settings"] as const) {
       expect(gmTabForPath(pathForGmTab(tab))).toBe(tab);
     }
   });
 
   it("reads the tab off the FIRST segment, so a deep link inside a tab still resolves to it", () => {
     expect(gmTabForPath("/codex/pages/abc")).toBe("codex");
+  });
+
+  /**
+   * D29 — the layer addresses. `/characters/<id>` and `/builder` are not tabs; they are things OPEN on
+   * top of a tab, and the tab that stays lit is the one whose kind of thing they are (the Roster, for
+   * the GM). Without this the shell fell back to "table" and painted the Table under an open sheet —
+   * the lit-tab lie one level up from where D1 killed it.
+   */
+  it("lights the Roster for the layers that belong to it, and nothing for a layer with no tab", () => {
+    expect(litGmTab("/characters/a1")).toBe("roster");
+    expect(litGmTab("/characters/a1/level")).toBe("roster");
+    expect(litGmTab("/builder")).toBe("roster");
+    expect(litGmTab("/scenes/maps")).toBe("scenes");
+    expect(litGmTab("/replays/12")).toBe("replay");
+    expect(litGmTab("/nonsense")).toBeNull();
+  });
+
+  it("reads each layer back off its address", () => {
+    expect(layerOf("/characters/a1")).toEqual({ kind: "sheet", actorId: "a1" });
+    expect(layerOf("/characters/a1/level")).toEqual({ kind: "level", actorId: "a1" });
+    expect(layerOf("/builder")).toEqual({ kind: "builder" });
+    expect(layerOf("/replays/12")).toEqual({ kind: "replay", archiveId: 12 });
+    expect(layerOf("/scenes/maps")).toEqual({ kind: "maps" });
+    expect(layerOf("/scenes/new")).toEqual({ kind: "scene-prep", sceneId: null });
+    expect(layerOf("/scenes/s1")).toEqual({ kind: "scene-prep", sceneId: "s1" });
+    // A tab's own address is not a layer, or every tab would render one.
+    expect(layerOf("/table")).toBeNull();
+    expect(layerOf("/replays")).toBeNull();
+    expect(layerOf("/settings")).toBeNull();
+  });
+
+  /**
+   * A retired address REDIRECTS rather than 404s: someone's bookmark from the previous build has to
+   * land somewhere true. The three that moved are the three that are checked.
+   */
+  it("redirects the addresses that moved, and nothing else", () => {
+    expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
+    expect(redirectForRetiredPath("/setup", new URLSearchParams())).toBe("/settings");
+    expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/scenes/maps");
+    expect(redirectForRetiredPath("/scenes", new URLSearchParams())).toBeNull();
+    expect(redirectForRetiredPath("/table", new URLSearchParams())).toBeNull();
+    expect(redirectForRetiredPath("/codex/pages", new URLSearchParams())).toBeNull();
   });
 });
 
@@ -109,13 +151,87 @@ describe("Which addresses a player may reach (viewer safety, D3)", () => {
     expect(isGmOnlyPath("/codex")).toBe(false);
   });
 
-  it("marks every non-Codex GM tab GM-only — the Codex is the one tab a player shares", () => {
-    expect(isGmOnlyPath("/encounter")).toBe(true);
+  it("keeps the GM's own tabs GM-only", () => {
     expect(isGmOnlyPath("/scenes")).toBe(true);
+    expect(isGmOnlyPath("/scenes/maps")).toBe(true);
     expect(isGmOnlyPath("/roster")).toBe(true);
+    expect(isGmOnlyPath("/homebrew")).toBe(true);
     expect(isGmOnlyPath("/viewer-controls")).toBe(true);
     expect(isGmOnlyPath("/codex")).toBe(false);
+  });
+
+  /**
+   * D29 shrinks the GM-only list. These five addresses are player-REACHABLE; whether a player may see
+   * the thing at one of them is a data guard (their claim, the GM's share, the builder policy) that
+   * renders the same not-found view on failure. The distinction matters: an address the router refuses
+   * can never be a player's, while an address whose DATA refuses can be theirs tomorrow.
+   */
+  it("lets a player reach the table, settings, replays, their sheet and the builder", () => {
     expect(isGmOnlyPath("/table")).toBe(false);
+    expect(isGmOnlyPath("/settings")).toBe(false);
+    expect(isGmOnlyPath("/replays")).toBe(false);
+    expect(isGmOnlyPath("/replays/12")).toBe(false);
+    expect(isGmOnlyPath("/characters/a1")).toBe(false);
+    expect(isGmOnlyPath("/characters/a1/level")).toBe(false);
+    expect(isGmOnlyPath("/builder")).toBe(false);
+  });
+
+  /**
+   * Ruling 61 — the API reference becomes a real address, and the head cannot decide who may have it:
+   * `/settings` is shared (a player gets the Mine group) while `/settings/api` is the GM's alone. A
+   * player asking for it gets the not-found view, indistinguishable from an unknown address.
+   */
+  it("keeps /settings shared and /settings/api GM-only", () => {
+    expect(isGmOnlyPath("/settings")).toBe(false);
+    expect(isGmOnlyPath("/settings/api")).toBe(true);
+  });
+
+  /**
+   * D9's mirror: the one address a GM may not reach. The My Character tab is about the character you
+   * claimed, and the GM claims nobody — so it is player-only rather than merely "not GM-only", which
+   * is what every shared address is.
+   */
+  it("marks the My Character tab player-only, and nothing else", () => {
+    expect(isPlayerOnlyPath("/me")).toBe(true);
+    for (const path of ["/table", "/settings", "/settings/api", "/codex", "/replays", "/characters/a1", "/builder", "/"]) {
+      expect(isPlayerOnlyPath(path), `${path} must not be player-only`).toBe(false);
+    }
+    // It is not GM-only either: the two answers are independent, and a player must not be refused it.
+    expect(isGmOnlyPath("/me")).toBe(false);
+  });
+});
+
+describe("The addresses D29 added", () => {
+  it("answers the new heads, and only in the shapes they take", () => {
+    expect(isKnownPath("/table")).toBe(true);
+    expect(isKnownPath("/settings")).toBe(true);
+    expect(isKnownPath("/builder")).toBe(true);
+    expect(isKnownPath("/characters/a1")).toBe(true);
+    expect(isKnownPath("/characters/a1/level")).toBe(true);
+    expect(isKnownPath("/scenes")).toBe(true);
+    expect(isKnownPath("/scenes/new")).toBe(true);
+    expect(isKnownPath("/scenes/maps")).toBe(true);
+    expect(isKnownPath("/scenes/s1")).toBe(true);
+    expect(isKnownPath("/replays")).toBe(true);
+    expect(isKnownPath("/replays/12")).toBe(true);
+    // D9's tab and ruling 61's reference — the two addresses round 2 added.
+    expect(isKnownPath("/me")).toBe(true);
+    expect(isKnownPath("/settings/api")).toBe(true);
+    expect(litGmTab("/settings/api")).toBe("settings");
+
+    // Shapes that are NOT addresses: a sheet with no id, a third segment that is not the level flow,
+    // a builder with a tail, and a replay id that is not an archive row id.
+    expect(isKnownPath("/characters")).toBe(false);
+    expect(isKnownPath("/characters/a1/edit")).toBe(false);
+    expect(isKnownPath("/builder/new")).toBe(false);
+    expect(isKnownPath("/replays/abc")).toBe(false);
+    expect(isKnownPath("/settings/table")).toBe(false);
+    // `/settings/api` is the ONE two-segment settings address; a length check would have opened all of them.
+    expect(isKnownPath("/settings/api/keys")).toBe(false);
+    expect(isKnownPath("/me/anything")).toBe(false);
+    // The two addresses that retired stop existing, so a stale stored location self-heals.
+    expect(isKnownPath("/encounter")).toBe(false);
+    expect(isKnownPath("/setup")).toBe(false);
   });
 });
 
@@ -335,7 +451,7 @@ describe("Resume-last-location (D2)", () => {
   });
 
   it("falls back per role when nothing was stored", () => {
-    expect(resumeTarget("gm", "/")).toBe("/encounter");
+    expect(resumeTarget("gm", "/")).toBe("/table");
     expect(resumeTarget("player", "/")).toBe("/table");
   });
 
@@ -343,7 +459,7 @@ describe("Resume-last-location (D2)", () => {
     // A stored `/codex/notebook` from before the recut must not strand the GM on the not-found view
     // every time they open the app.
     rememberLocation("gm", "/codex/notebook");
-    expect(resumeTarget("gm", "/")).toBe("/encounter");
+    expect(resumeTarget("gm", "/")).toBe("/table");
   });
 
   it("resumes an address WITH its query, and validates only the path half", () => {
@@ -353,7 +469,7 @@ describe("Resume-last-location (D2)", () => {
 
   it("never resumes to `/`, which would be a loop", () => {
     rememberLocation("gm", "/");
-    expect(resumeTarget("gm", "/")).toBe("/encounter");
+    expect(resumeTarget("gm", "/")).toBe("/table");
   });
 
   /**
@@ -368,9 +484,9 @@ describe("Resume-last-location (D2)", () => {
   describe("per tab", () => {
     it("returns to the record that was open in that tab, not to the tab's front door", () => {
       rememberLocation("gm", "/codex/pages/p1?tag=x");
-      rememberLocation("gm", "/encounter");
+      rememberLocation("gm", "/table");
       expect(lastLocationForTab("gm", "codex")).toBe("/codex/pages/p1?tag=x");
-      expect(lastLocationForTab("gm", "encounter")).toBe("/encounter");
+      expect(lastLocationForTab("gm", "table")).toBe("/table");
     });
 
     it("keeps the tabs apart — leaving one does not overwrite where you were in another", () => {

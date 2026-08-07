@@ -152,8 +152,9 @@ events (`content:spells` already reaches the client). **No class/subclass/race/b
 feat/magic-item/gear content is vendored** — that's builder-phase work.
 
 **Client.** Multi-page Vite (no router; state-driven nav in `apps/client/src/main.tsx` with
-`mode: "home"|"player"|"gm"`). Player flow: join (no password) → claim in
-`actors/ActorRoster.tsx` → during combat, `encounter/EncounterPanel.tsx` player branch (turn
+`mode: "home"|"player"|"gm"`). Player flow: join (no password) → claim in the
+shell's lobby roster (since replaced by `actors/ClaimCharacter.tsx` on the player's table) →
+during combat, `encounter/EncounterPanel.tsx` player branch (turn
 economy, **read-only** `PlayerActionList` "the GM rolls these", saves/reactions/death saves).
 Design system `packages/ui/src/index.ts`: `Modal` (full-screen on mobile), `Tabs`,
 `SegmentedControl`, `Stepper`, `Meter`, `Chip`, `Badge`, `Avatar`, `.nh-statlist`. Mobile
@@ -273,7 +274,7 @@ from equipped armor is builder work — additive later via an optional `armorCla
   with an interactive runner — tap attack → pick target → `action.resolve` → result via the
   same preview/confirm flow as the GM's `ActionRunner.tsx`. Add an "Open sheet" affordance on
   the player's own initiative row.
-- **`main.tsx` / `actors/ActorRoster.tsx`:** add a sheet entry point from the player lobby.
+- **`main.tsx` / the player's claim surface:** add a sheet entry point from the player lobby.
 - **Mobile parity** (hard rule): every tab, tap-to-roll, and control works at **375px** with
   touch.
 
@@ -361,8 +362,8 @@ magic-item/gear data + the derivation engine.
 - `apps/server/src/authorization.ts` (new) — `canInitiateForActor` seam.
 - `apps/server/src/{game-operations,game-commands}.ts` + `packages/api-contract/src/index.ts`.
 - `apps/server/src/{actor-roster,rests,projections}.ts`.
-- `apps/client/src/encounter/{CharacterSheet,EncounterPanel}.tsx` (+ `ActorRoster.tsx`,
-  `main.tsx`).
+- `apps/client/src/encounter/{CharacterSheet,EncounterPanel}.tsx` (+ the client's actor
+  surfaces, `main.tsx`).
 - `scripts/generate-app-map.ts`, `apps/server/test/app-map.test.ts`,
   `.claude/skills/vtt-orientation/SKILL.md`.
 

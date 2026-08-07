@@ -1,57 +1,78 @@
-.scene-panel { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
-.scene-panel-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+/* The two prep surfaces that wrap the shared panel: "Prepare a scene" (the create form) and the
+   staging workspace beside the private map. Everything inside them - map line, tray, adds, Recent -
+   is `scene-prep.css` and `staging-tray.css`; these rules are only the frame.
+
+   The combatant-checklist rules that used to live here are gone with the checklist itself (D2). One of
+   them, `.scene-create button { background: var(--primary) }`, was why the map picker's tiles rendered
+   as solid magenta blocks the first time this panel showed them: a descendant selector written when the
+   form held exactly one button. Buttons are styled by the primitive; the form styles the form. */
+.scene-panel { margin-top: var(--space-10); padding: var(--space-6); border: 1px solid transparent; }
+.scene-panel-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-8); }
 .scene-panel-heading h2 { font-size: var(--fs-h1); font-family: var(--font-display); }
 .scene-panel-heading p { max-width: 26rem; margin: 0; font-size: .9rem; text-align: right; }
 
-.scene-create { display: grid; gap: .8rem; margin-top: 1.3rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+/* `min-width: 0` throughout: these panels are rendered inside a Modal at 390px, where a grid item's
+   default `auto` minimum lets a long map name push the whole form wider than the dialog. */
+.scene-create { display: grid; gap: .8rem; min-width: 0; margin-top: 1.3rem; padding: var(--space-4); border: 1px solid transparent; }
+.scene-create > * { min-width: 0; }
 .scene-create label { display: block; color: var(--text-dim); font-size: .8rem; }
 .scene-create-optional { color: var(--text-muted); font-weight: 400; }
-.scene-create-map { margin: 0; font-size: .85rem; color: var(--text-dim); }
-.scene-create-map em { color: var(--text-muted); }
-label.scene-create-map { display: flex; align-items: center; gap: .5rem; }
-label.scene-create-map select { flex: 1 1 10rem; margin: 0; font-size: .85rem; color: var(--text); }
-.scene-combatants { border: 1px solid var(--line); border-radius: var(--radius-md); padding: .7rem .9rem; }
-.scene-combatants legend { padding: 0 .4rem; color: var(--text-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
-.scene-combatant-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .3rem .8rem; max-height: 12rem; overflow-y: auto; }
-.scene-combatant-list label { display: flex; align-items: center; gap: .5rem; width: auto; font-size: .88rem; color: var(--text); }
-.scene-combatant-list label.hidden { color: var(--text-muted); }
-.scene-combatant-list input { width: auto; margin: 0; accent-color: var(--magenta); }
-.scene-empty-note { margin: 0; color: var(--text-muted); font-size: .85rem; }
-.scene-create-add { margin-top: .6rem; width: 100%; padding: .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; font-size: .85rem; text-align: center; cursor: pointer; }
-.scene-create-add:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.scene-create button { justify-self: start; background: var(--primary); color: var(--text-on-neon); border: 0; text-align: center; padding: .8rem 1.3rem; }
-.scene-create button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 
 .scene-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: .88rem; color: var(--text-dim); }
-.scene-empty { margin: 1.2rem 0 0; padding: 1.4rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); }
 
-.scene-list { list-style: none; margin: 1.3rem 0 0; padding: 0; display: grid; gap: .7rem; }
-.scene-list li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .5rem 1rem; padding: .9rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.scene-list li.live { border-color: var(--magenta); box-shadow: var(--glow-magenta); }
-.scene-row-main { min-width: 0; }
-.scene-row-main strong { display: block; font: 400 1.05rem var(--font-display); }
-.scene-row-main span { color: var(--text-muted); font-size: .8rem; }
-.scene-badge { justify-self: end; padding: .2rem .6rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--magenta-hi); font: 800 .7rem/1.5 var(--font-body); }
-.scene-row-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem; }
-.scene-row-actions button { padding: .55rem .9rem; text-align: center; font-size: .85rem; }
-.scene-row-actions button:not(.secondary) { background: var(--primary); color: var(--text-on-neon); border: 0; }
+@media (max-width: 560px) {
+  .scene-panel { padding: .9rem; }
+  .scene-panel-heading { display: block; }
+  .scene-panel-heading p { text-align: left; margin-top: .6rem; }
+  .scene-create { padding: .7rem; }
+}
 
-@media (max-width: 560px) { .scene-panel-heading { display: block; } .scene-panel-heading p { text-align: left; margin-top: .6rem; } }
-
-/* Staging builder = GM-private preview (violet). */
-.scene-builder { margin-top: 0; padding: 1.3rem; border: 1px solid var(--violet); border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 25%, transparent); }
+/* Staging workspace = GM-private (violet). */
+.scene-builder { min-width: 0; margin-top: 0; padding: 1.3rem; border: 1px solid transparent; }
 .scene-builder-head h2 { font-size: var(--fs-h1); font-family: var(--font-display); margin: .15rem 0 .3rem; }
-.scene-builder-head p { margin: 0; font-size: .85rem; }
-.scene-builder-list { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: .3rem; max-height: 22rem; overflow-y: auto; }
-.scene-builder-list label { display: flex; align-items: center; gap: .6rem; cursor: pointer; padding: .35rem .4rem; border-radius: var(--radius-sm); }
-.scene-builder-list label:hover { background: var(--surface-2); }
-.scene-builder-list input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: var(--magenta); }
-.scene-builder-list span { display: block; }
-.scene-builder-list small { display: block; margin-top: .1rem; color: var(--text-muted); font-size: .72rem; }
-.scene-builder-add { width: 100%; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
-.scene-builder-add:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.scene-builder-count { margin: .7rem 0 0; color: var(--text-muted); font-size: .8rem; }
-.scene-builder-empty { margin: 1rem 0; color: var(--text-dim); font-size: .88rem; }
-.scene-builder-feedback { min-height: 1.2rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .85rem; }
-.scene-rename { margin-left: .45rem; padding: .1rem .4rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font-size: .78rem; cursor: pointer; vertical-align: middle; }
+.scene-builder-head p { margin: 0 0 .8rem; font-size: .85rem; }
+.scene-builder-feedback { min-height: 1.2rem; margin: var(--space-2) 0 0; color: var(--text-dim); font-size: .85rem; }
+.scene-rename { margin-left: .45rem; padding: .1rem .4rem; border: 1px solid transparent; border-radius: 0; background: transparent; color: var(--text-muted); font-size: .78rem; cursor: pointer; vertical-align: middle; }
 .scene-rename:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); }
+
+/* ══ THE MATERIAL (ruling 2) ═════════════════════════════════════════════════════════════════
+   Same construction as `.nh-panel::before` (packages/ui Panel.css) and the `.chamfer` / `.rim` /
+   `.bezel` utilities: the cut, the rim and the fill ride a BACKING LAYER, never the element,
+   because `clip-path` clips hit-testing. `inset: -1px` spans the border box, so the rim lands
+   where the 1px border used to and nothing reflows. Every value is a shared token, so ruling 29's
+   daybreak translation arrives for free.
+   RULING 28: `.scene-panel` and `.scene-builder` are the outermost panels of their surfaces and
+   take the scanline; `.scene-create` nests inside `.scene-panel` and takes rim + bezel over a
+   plain plate. THE STAGING WORKSPACE IS GM-PRIVATE, so `.scene-builder` keeps its violet edge —
+   moved onto the backing layer, where it follows the cut, because a negative-z-index pseudo
+   paints above its originator's own border and would otherwise bury it. Violet is this repo's
+   reservation for GM-only content and is the one hue the material must not repaint. */
+.scene-panel,
+.scene-create,
+.scene-builder {
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+  background: none;
+}
+.scene-panel::before,
+.scene-create::before,
+.scene-builder::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-fill);
+  background-origin: border-box;
+  background-clip: border-box;
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition: border-color var(--dur-hover), background var(--dur-hover);
+}
+.scene-panel, .scene-builder { --material-fill: var(--material-scanline), var(--material-plate); }
+.scene-create { --material-fill: var(--material-plate); }
+.scene-builder::before { border-color: var(--violet); outline-color: color-mix(in srgb, var(--violet) 42%, transparent); }

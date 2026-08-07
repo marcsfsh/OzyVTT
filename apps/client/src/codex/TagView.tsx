@@ -1,12 +1,11 @@
 import { useCallback, useMemo } from "react";
-import { Badge, Skeleton } from "@vtt/ui";
+import { Badge, Skeleton, VisibilityBadge } from "@vtt/ui";
 import { codexApi, playerCodexApi, type CodexJournalPayload, type CodexPlayerChroniclePayload, type CodexQuestStatus } from "./api";
 import { chronicleRowSummary, type ChroniclePayloadRef } from "./chronicle";
 import { sessionTitle, type SessionRef } from "./sessions";
 import { QUEST_STATUS_LABEL, questStatusTone } from "./quests";
 import type { EntityType } from "./entities";
 import { CodexIcon, EntityIcon } from "./icons";
-import { VisibilityBadge } from "./SecretMarkers";
 import { useCodexSearch } from "./SearchResults";
 import { atlasPath, journalEntryPath, pagePath, questPath, sessionPath } from "./routes";
 

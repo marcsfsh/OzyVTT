@@ -6,7 +6,8 @@ check you're not re-discovering a known issue or tripping a known gap.
 **Every entry under *Known gaps* is reproducible at HEAD.** Add one when you find a real
 defect, with the evidence that it is real. **When you fix one, delete the entry** — the
 regression test is the memory, not a line here (D9). Resolved entries are in
-`docs/archive/ai-ledger/known-bugs-resolved-2026-08-01.md`. If a claim here and the code
+`docs/archive/ai-ledger/known-bugs-resolved-2026-08-01.md` and
+`docs/archive/ai-ledger/known-bugs-resolved-2026-08-05.md`. If a claim here and the code
 disagree, the code wins and the entry is a defect: fix it or delete it in the same change.
 
 Format: `[area] — description — suspected cause / status`.
@@ -147,27 +148,20 @@ Format: `[area] — description — suspected cause / status`.
   which the inspector now meets; re-ordering or collapsing the icon picker is a layout redesign that was
   not part of the approved milestone. Carrying forward.
 
-- **[character-builder] No server-side builder roll command.** `DiceInputRow` covers manual-entry and
-  auto-roll client-side, but nothing server-side accepts a typed builder result the way
-  `initiative.roll-self` accepts `natural`. Without it the client owns the roll (violates server
-  authority).
-- **[ui] A bare `header { max-width: 40rem }` in `apps/client/src/styles.css` clamps every
-  `<header>` in the app.** It was written for the landing hero. Found 2026-07-27 when it silently
-  clamped the character builder's sticky header to 640px, letting the step body scroll visibly
-  through the uncovered gutter. Every `@vtt/ui` primitive that owns a `<header>` now defends itself
-  with `max-width: none` (`WizardShell`, `ReviewSummary`, `Modal`, `Panel`, `Drawer`), so the
-  primitives are safe — **the app global itself is still unscoped**, and it still clamps every
-  app-owned `<header>`: `.codex-entry-head`, `.acting-console-head` and anything added later, which
-  inherits the bug by default rather than opting out of it. The real fix is to scope the global
-  (e.g. `main > header`) — a visual change wide enough to want its own pass.
-- **[character-builder] No GM-facing editor for `builder.set-policy`.** The command and the
-  `PlayerView.builderPolicy` projection both exist and the wizard honours the policy (it offers only
-  the permitted ability methods, and "custom" only when a formula is configured), but nothing in the
-  UI lets the GM *set* it — so the table is stuck on the default (all four methods, no custom
-  formula). Small VTT-Setup panel; decision 10 is not fully delivered until it lands.
-
 ### Homebrew system — open items (2026-07-27)
 
+- **[homebrew] Editing a PUBLISHED record can still demote it mid-keystroke.** `HomebrewStore.update`
+  re-validates every PATCH to a published row and, when the new body would no longer publish, drops
+  the row to an invisible draft in the same transaction (`apps/server/src/homebrew-store.ts`
+  `stillPublishable` / the demote branch) — and the editor autosaves ~800 ms after a keystroke
+  (`apps/client/src/homebrew/useAutosave.ts`). The rule itself is right; what is wrong is that a
+  half-typed edit is a *published-state* event at all. The fix is the draft-until-update lifecycle
+  (decision D20): a published row's PATCHes land in a `draft_body_json` column, `body_json` and
+  `visible_to_players` never move, and an explicit **Update** validates and swaps. Deferred as a
+  unit, deliberately — a half-built lifecycle would be worse than the current honest one. **Much
+  narrower than it was:** the demotion used to fire on ordinary edits because a touched-but-
+  incomplete `weapon`/`armor` block was unpublishable; those bodies now publish (see below), so the
+  remaining trigger is an edit that genuinely invalidates the record.
 - **[homebrew] Validity is point-in-time.** The publish gate checks a record against the world as it
   stands at that moment. Nothing re-checks **dependents** when the world changes underneath them, so
   deleting or editing a dependency can leave a dependent record published-and-invalid (`restore`
@@ -202,8 +196,11 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   currently reproducible in the wizard's own flows, but the shape is the classic one (a second patch
   in the same tick loses the first). Fixing it properly is a state-model change, not a polish edit.
 - **[ui] The `→` glyph has no font coverage** — no loaded Manrope subset declares U+2192, so every
-  arrow falls back. The fix is an `IconArrow` primitive plus 7 call sites, and it is all-or-none
-  (mixing a drawn arrow with a fallback glyph is worse than either).
+  arrow falls back. **Half-fixed 2026-08-03:** `IconArrow` exists and is exported
+  (`packages/ui/src/primitives/icons.tsx`), and the landing doors and `Button arrow` use it; four
+  play call sites still type the character. That mixed state is the bad one this entry warned about,
+  so it stays open until the last row leaves `GLYPH_ALLOW`
+  (`apps/client/src/design-conventions.test.ts`, whose sizes are pinned and shrink-only).
 - **[character-builder] Skill/tool/language uniqueness is enforced client-side only.** `479cb80`
   makes held proficiencies arrive greyed with their provenance ("Already granted by Soldier"), which
   stops the silent double-spend in the UI — but the **server's duplicate guard is still per-offer**,
@@ -220,12 +217,6 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   step. `5c32df9` fixed the *answered* state (24,222px → 1,933px at L20) and that fix is real; the
   arrival state is untouched. Cutting it means progressive disclosure — a design change, not a
   density fix.
-- **[testing] `packages/ui` has no test script and no test files.** Its `package.json` declares
-  `check` only, so the root `npm run test` (`--if-present`) skips it silently and a green run says
-  nothing about the shared primitives every surface composes from. `apps/client` no longer shares
-  this gap — it gained a Vitest + jsdom suite in the Codex overhaul — but a jsdom suite cannot prove
-  layout or pointer geometry either way (`docs/ai-context/testing.md`).
-
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device
@@ -236,9 +227,9 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   non-null `gameId` is permanently unusable (generic 403) and `rotate` can't clear it. Predates
   the game API; harmless while everyone leaves it null (this is a single-game product). Either
   thread a real game id through verification or drop the field in a future contract pass.
-  Found by architecture review 2026-07-18. **Mitigated 2026-07-18:** the VTT Setup credential
-  form no longer offers the field, so the footgun is API-only; the contract keeps accepting it
-  for now.
+  Found by architecture review 2026-07-18. **Mitigated 2026-07-18:** the credential form (now
+  Settings → The table → Access & integrations) no longer offers the field, so the footgun is
+  API-only; the contract keeps accepting it for now.
 
 - **[codex/ux] Switching a page's entity type silently drops the old type's field values.** Since M5 the
   server prunes fields to the effective type (CD-2), and `PageEditor` filters the draft the instant the
@@ -301,6 +292,79 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   circle; these rules predate it), spotted during M7. CI-8's new `.is-focus` rule scopes itself off the
   hit circle correctly, so the pattern to copy is already in the file.
 
+- **[ui/Badge] `Badge tone="info"` fails AA on its own surfaces, worst in the sunset hour.** `--indigo`
+  (#5B6EF5 dark / dusk) as 11px/700 text measures **3.57:1 on dark `--surface-3` (#292145)** and
+  **2.45:1 on dusk `--surface-3` (#443381)**; light is fine at 5.36. Measured in Chromium 2026-08-04 by
+  sampling the composited pixel behind the live badge on `/settings` (the *Advise* rules badge is the
+  reachable instance). Pre-existing and provably unrelated to the scene sky: sampled with the sky
+  removed the numbers are byte-identical, because the badge stands on an opaque surface token.
+  `--indigo` has no readable `-hi` twin the way `--danger`/`--caution` do, which is the actual gap —
+  D21 #1 fixed exactly this shape for `--text-muted`.
+
+- **[ui/Button] `.nh-btn--destructive`'s label fails AA in daybreak, and the sky takes it 0.14 lower.**
+  The light `--danger` ink `#E24C6C` on the settings glass measures **3.48:1** at 1440×900 and
+  **3.49:1** at 390×844 (GM `/settings`, the *Revoke all GM sessions* control, region scrolled to its
+  end), against a 4.5 floor. Night reads 6.78 and the sunset hour 5.16, so daybreak alone is under —
+  the light `--danger` token is the defect, not the button. **It was under before the sky:** measured
+  in the same frame with the sky removed it reads 3.62, so the scene contributes −0.14 and the
+  remaining 0.88 is the token's. The delta is logged so the token fix is sized against the
+  COMPOSITED value rather than the flat one; this was the only row in the lane's contrast sweep
+  where the sky moved a ratio *and* the result was below AA. Same shape as the two entries around
+  it: a hue with no readable twin in one theme.
+
+- **[scenes] `.scene-live-note` ("● Live now") measures 4.07:1 in the sunset hour.** `--magenta`
+  (#FF2E9A) as 11px/700 text on dusk `--surface-1` (#2E2160); dark reads 5.32 and light 5.17, so dusk
+  alone is under. Same measurement run and the same proof of independence as the entry above (identical
+  with the sky removed — an opaque card, not the sky). The label is not colour-alone (it carries the
+  word "Live"), so this is a contrast defect rather than a semantics one.
+
+- **[codex/ui] An open `Drawer` paints over the shell behind it, the control that opened it included.**
+  Re-measured 2026-08-05 at both widths on the GM's `/codex`, by the same method
+  `scripts/tap-audit.mjs` uses for its layer split: scroll each control to the viewport centre, then
+  ask `elementFromPoint` what answers there. At **375px** the session-prep panel is
+  `min(420px, 85vw)` — 318.75px, anchored right (`apps/client/src/codex/codex.css:1174`) — and **27 of
+  the 30** hit-testable controls under `.codex-root` answer with the drawer. The three that do not are
+  its own Close and "Open Sessions" plus the top-left "Codex sections" button, which survives only
+  because it sits in the 56px strip the panel leaves. The nav drawer is the full 375px and covers **28
+  of 43**; the player's drawer covers **19 of 30**. At **1280px** the same panel is 420px on the right
+  and covers **18 of 43** — less of the shell, but still the opener: at both widths the "Session prep"
+  button reports `aria-expanded="true"` while its own centre resolves to `.nh-drawer-body`, so a second
+  press is intercepted and the open-drawer count stays at 1.
+  **This is the primitive's design, not a touch-target defect.** `packages/ui/src/primitives/Drawer.tsx:24-34`
+  states there is deliberately no scrim, no focus trap and no scroll lock — so a non-modal console can
+  sit beside a working view — and a panel that paints over the shell follows directly. Nor is it a
+  trap: Close is visible and carries `aria-label="Close"`, and Escape with focus inside leaves 0 open
+  drawers at both widths. What is open is the UX question underneath: at a width where the panel takes
+  85% of the screen and leaves one shell control reachable, should it become a `Modal` — or should the
+  opener stop presenting itself as a toggle it cannot untoggle?
+
+- **[codex/verify] `scripts/tap-audit.mjs` withholds its reach verdict for every control outside the
+  active layer — and never opens some layers at all.** At HEAD (2026-08-05) the footer at 375px reads
+  **1223 controls measured, 9 below the 44px floor, 0 unreachable in the active layer**. Reach is
+  *not judged* for the controls that sit behind an open overlay (a modal `<dialog>`, which the
+  platform makes inert by spec, or an open non-modal `Drawer` — the entry above) or inside a closed
+  `<details>`. They are still sized and still counted in the below-floor total; only the reach verdict
+  is withheld, so nothing measures whether they are reachable once their own layer becomes the active
+  one. That is the gap.
+  **The split is quoted with its provenance, because this entry once carried a stale one as if it were
+  current.** The last measured breakdown is `765e232`'s: **184 unjudged — 130 behind an open overlay,
+  54 inside a closed disclosure**. It has not been re-measured since; the phase that followed cleared
+  115 sub-floor controls and deleted a `<details>` whose contents were surfaced, so the population
+  moved and only the totals above were re-read. `node scripts/tap-audit.mjs 375` settles it. (The
+  numbers this entry used to quote — 187 unjudged of 1259 measured, 124 below the floor — were a
+  phase-opening snapshot, and 187 was `765e232`'s 184 mis-added as 130+57.)
+  **A second, larger blind spot is the state the audit opens a surface IN.** "9" means nine on the
+  surfaces its route list opens, as it finds them. Controls behind a collapsed tab or a closed
+  disclosure are never measured at all: `.dice-custom > summary` x2 at 19.5x375 (the phone sheet
+  mounts one tab's body at a time and the audit only ever measures the default tab) and
+  `button.api-copy` at 27.3x48.9 inside a closed `details.api-reference` on `/settings`. Both are
+  pre-existing and both are real sub-floor controls that would raise the 9 if the audit drove them.
+  This entry used to blame the old "unresolved" column on SVG children and on controls that could not
+  be scrolled to the viewport centre. **Both causes measure zero.** SVG controls resolve —
+  `g.encounter-token` walks out to reach 21 against its own 15.8px box, `g.codex-graph-node` to 29-31 —
+  and each control is scrolled to the centre before hit-testing (`scripts/tap-audit.mjs:185-187`). The
+  "25-59 per surface" range this entry quoted described a column that no longer exists.
+
 ## Unverified — needs a browser, a contrast check, or a runtime repro
 
 These entries could not be confirmed *or* refuted by reading the code, so they are held here
@@ -311,14 +375,6 @@ it: `node scripts/tap-audit.mjs 375` for a touch-floor claim, `scripts/browser-v
 for a layout or pointer claim, a contrast calculator against
 `packages/ui/src/styles/design-tokens.css` for a ratio. If it reproduces, move it up to
 *Known gaps* with what you saw. If it does not, delete it and say so.
-
-- **[codex/ui] The session-prep drawer covers the top-bar control that opens it.** Measured 2026-08-01
-  at 1280px: with the drawer open, a click on "Session prep" is intercepted by the drawer itself, so
-  the control that opened it cannot close it. **Not a trap** — the drawer's own Close is visible and
-  labelled, and Escape closes it with focus inside (both asserted in the browser pass) — but the
-  top-bar button carries `aria-expanded` and reads as a toggle while behaving as an opener. Found by
-  the new both-directions toggle check; left alone because moving or offsetting a shipped drawer is a
-  layout change with no user complaint behind it, at the end of a polish pass.
 
 - **[repo/tooling] A pin cannot be selected reliably by a synthesized click at 375px.** `MapSurface`
   resolves a tap from `pointerdown`/`pointerup` on the whole `<svg>` (so it can tell tap from drag from
@@ -333,38 +389,15 @@ for a layout or pointer claim, a contrast calculator against
   desktop only and says why; pin reachability on a phone is the tap audit's job, where it is measured
   rather than clicked.
 
-- **[app-shell/mobile] At 375px the GM's Codex starts roughly 1500px down the document,** below the
-  character-roster dock and the eight-tab strip. **The PLAYER half of this is fixed** (2026-07-31, Codex
-  QA client pass): D4 moved the player Codex out of a top-layer `<dialog>.showModal()` into document
-  flow under the same dock, which was a new regression rather than the shell's inherited problem, so the
-  roster and the YouArePlaying bar are now hidden while the player's Codex view is open. The GM's Codex
-  was already `GM_TABS[3]` before this engagement and that half stands as written below. Observed while capturing browser evidence: a viewport
-  screenshot at scroll 0 on any Codex address is a picture of the roster. **Not the Codex's doing** —
-  the dock is the app shell's and the stacking affects every GM tab equally — so it was left untouched
-  rather than worked around inside one tab. It is nonetheless the single worst thing about using the
-  Codex on a phone, and it is a shell-level fix (collapse the dock below the ladder's narrow step, or
-  make the tab strip sticky). Flagged for whoever owns the shell.
-
-- **[codex/verify] `tap-audit.mjs`'s "unresolved" column over-reports at narrow widths.** `reach === 0`
-  means `elementFromPoint` never resolved to the control — for an SVG child, or for anything that could
-  not be scrolled to the viewport centre. Because of the shell-stacking entry above, 25–59 controls per
-  surface report unresolved at 375px while being perfectly reachable. It is a pointer to investigate,
-  never a verdict; the `below 44px` column is the number that means something.
-
-- **[codex/ui] A closed session-console drawer inflates `document.body.scrollWidth`.** `position: fixed;
-  translate: 100%` stretches the initial containing block, so `scrollWidth` reads 1648 at a 1280 viewport and
-  `innerWidth` reads 734 on a 375px phone. **Inert for users** — `canScrollRightBy: 0`, visual viewport scale
-  1, drawer `visibility: hidden`, and the only stretched element is `.app-texture` (`z-index: -1`,
-  `pointer-events: none`). But it desynchronises `getBoundingClientRect` from synthesized input coordinates,
-  which produced two convincing false findings (a "broken" mobile pin drag, an "unreachable" drawer close)
-  before the reviewer caught it. Anyone writing automated mobile tests against this app will hit it.
-
-- **[mobile] The encounter *replay viewer* overflows horizontally at 390px (~99px).** **Pre-existing, not
-  introduced by the Codex overhaul** — proven by measuring both paths at 390px: opening a replay via the
-  existing "▶ Watch" button on the Replays list (`ReplayPanel.tsx:221`) gives the same 99px as arriving via
-  the new Codex "Open replay" link. The Replays *list* itself is clean (0px), as are all Codex surfaces.
-  `ReplayPanel`/`ReplayViewer` is a combat-pillar surface and outside the Codex overhaul's approved scope,
-  so M2 deliberately did not fix it. Worth noting that M2 makes the screen considerably easier to reach.
+- **[replay/player] A player watching a shared replay sees "Map unavailable — you don't have access to
+  this map".** Measured 2026-08-05 (B3), GM and player side by side on the same archive at
+  `/replays/3`: the GM's stage renders the battle map, the player's renders `.replay-stage-missing` at
+  every viewport. The player replay projection carries `combat.mapAssetId`, but the asset read behind
+  `useAuthorizedMapImage` refuses a player session for a map that is not the live one — so the turn
+  order and log arrive and the picture never does. **Not a viewer-safety leak** (the failure is
+  closed, not open) and not introduced by the frame recompose, which measured it in both directions
+  before and after. Server-side: the fix is in the archive's asset authorization, not in
+  `replay/ReplayPanel.tsx`.
 
 - **[a11y] `--text-muted` fails AA at small sizes** (3.61:1 dark) — affects `.nh-choice-meta`,
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;
@@ -398,6 +431,16 @@ for a layout or pointer claim, a contrast calculator against
   node.
 
 ## Gotchas that look like bugs (but aren't)
+
+- **[encounter/ask] A parked question survives the turn advancing, and a late Allow resolves the move
+  out of turn.** Driven 2026-08-05: with the question waiting, "Next turn" moved the fight to the next
+  character and left the row on both screens; the GM's Allow then rolled and applied the parked Dagger
+  for the previous character. That is the design, not a leak — nothing expires the queue on advance, the
+  replay runs under GM authority with an injected override, and "not your turn" is itself an overridable
+  economy rule. A combatant **cannot** leave a running fight (`actor:remove` refuses with "End the
+  encounter before removing a combatant who is in it"), so the parked target cannot vanish underneath the
+  question; the failure branch that remains is a question already answered, covered by
+  `apps/server/test/rules-ask.test.ts`.
 
 - **[codex, viewer safety] Auto-linking a session number to players is fixed, twice over —
   do not re-solve it.** A revealed record must not carry an unrevealed session's number, and both

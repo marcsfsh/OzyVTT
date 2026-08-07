@@ -25,7 +25,15 @@
 .nh-statlist dt { color: var(--text-muted); font: 800 var(--fs-xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
 .nh-statlist dd { margin: 2px 0 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; font-family: var(--font-mono); }
 
-/* ---- Empty state (no data yet / no results) ---- */
+/* ---- Empty state (no data yet / no results) ----
+   RULING 55 — NO DASHED BOXES. The dashed rim was this pattern's whole visual idea and it said the
+   wrong thing: a dashed outline reads as a placeholder, a drop zone or something half-built, on a
+   screen whose job is to name the one next thing to do. It goes here rather than per-surface because
+   the border is declared once and reaches every call site at the same time (measured population:
+   `ClaimCharacter.tsx`, `IntegrationsPanel.tsx`, `CharacterBuilder.tsx` x2, `HomebrewPanel.tsx`,
+   `StyleGuide.tsx`). A solid hairline keeps the box legible as a bounded region — the ruling retires
+   the DASH, not the boundary — and it is `--line` rather than `--line-strong` so an empty surface
+   reads as quiet rather than as an alert. */
 .nh-empty {
   display: grid;
   place-items: center;
@@ -33,7 +41,7 @@
   min-height: 12rem;
   padding: var(--space-6);
   text-align: center;
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   color: var(--text-dim);
 }
@@ -56,30 +64,69 @@
   padding: 0;
   list-style: none;
 }
+/* DE-PILLED TO THE CHAMFERED RECTANGLE (rulings 10/24, and the director's card ruling). The
+   radius tokens have read 0 since the square standard, so what was left to change is the
+   SILHOUETTE: the card now wears the same cut corner as the largest button and the smallest
+   count badge — one shape from top to bottom of the system.
+
+   THE CUT IS ON A BACKING LAYER, not on the card, and that is not stylistic. `clip-path` clips
+   hit-testing as well as paint, and this card is full of hit areas: `.nh-card-open` is stretched
+   across the whole box, `.nh-card-tools` carries two 44px targets in the top-right and
+   `.nh-card--new` IS a button. Clipping the card would silently eat all of them. Verified with
+   elementFromPoint: all four corners of a chamfered card still hit `.nh-card-open`.
+
+   The element keeps a 1px TRANSPARENT border so nothing reflows, and the backing layer covers
+   the border box exactly (`inset: -1px`) so there is no 1px halo where the gallery shows
+   through. `--card-edge` is the one knob the states repaint. Elevation and glow ride FILTERS on
+   that layer — box-shadow cannot follow the cut, and on a cut card a square shadow shows through
+   the notch. Wave 5 promotes `--card-edge` to the 2px `--rim-color` when it applies the
+   material; this lane changes the shape only. */
 .nh-card {
   position: relative;
+  isolation: isolate;         /* so the backing layer at z-index -1 stays inside this card */
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 9rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  --card-edge: var(--line);
+  transition: transform var(--dur-hover) var(--ease-settle);
+}
+.nh-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;                /* the element's border box, so the edge lands where it used to */
+  z-index: -1;
+  box-sizing: border-box;
+  pointer-events: none;
+  clip-path: var(--chamfer-cut);
+  border: 1px solid var(--card-edge);
   background: var(--surface-1);
-  transition: transform var(--dur-hover) var(--ease-settle), border-color var(--dur-hover), box-shadow var(--dur-base);
+  transition: border-color var(--dur-hover), filter var(--dur-base);
 }
 /* Genuine click-target cards lift on hover — the shared motion cue map/token cards already use. */
-.nh-card.is-interactive:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+.nh-card.is-interactive:hover { transform: translateY(-2px); --card-edge: var(--line-strong); }
+.nh-card.is-interactive:hover::before { filter: var(--shadow-drop-2); }
 /* Live is a state, so the live card is the one neon moment in the grid. */
-.nh-card.is-live { border-color: var(--magenta); box-shadow: var(--glow-magenta); }
+.nh-card.is-live { --card-edge: var(--magenta); }
+.nh-card.is-live::before { filter: var(--glow-drop-magenta); }
 /* Being privately staged by the GM: a quiet cyan selection edge, never a glow. */
-.nh-card.is-staging { border-color: var(--cyan); }
+.nh-card.is-staging { --card-edge: var(--cyan); }
 
+/* The thumbnail carries the card's top-left cut so the artwork follows the silhouette instead of
+   sitting square inside it. Only the top-left: the bottom-right cut belongs to the card's own
+   bottom edge, which the thumb never reaches. Safe to clip — nothing interactive lives in here
+   (`.nh-card-status` and `.nh-card-tools` are the CARD's children, not the thumb's), which is
+   exactly the distinction that makes the card itself unclippable. */
 .nh-card-thumb {
   position: relative;
   aspect-ratio: 16 / 10;
   overflow: hidden;
   background: var(--surface-3);
-  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+  border-radius: 0;
+  clip-path: polygon(0 var(--chamfer), var(--chamfer) 0, 100% 0, 100% 100%, 0 100%);
 }
 .nh-card-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .nh-card-thumb-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.7rem; opacity: .45; }
@@ -104,10 +151,22 @@
 /* Stretched, transparent button = the card's hit area + focus target; content layers below (thumb/body)
    and the interactive overlays (tools/actions) layer above it. */
 .nh-card-open { position: absolute; inset: 0; z-index: 1; border: 0; background: transparent; cursor: pointer; border-radius: inherit; }
-.nh-card-open:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -2px; }
+/* -5px, not -2px: at -2px the ring's own square corner sits outside the card's cut and pokes
+   into the notch. -5px is the offset the chamfered primitives already use for the same reason. */
+.nh-card-open:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -5px; }
 
-/* Add-new tile — a dashed call to action sharing the gallery grid. Fills its cell so it reads as one
-   more listing (same width, same min-height as the real cards) rather than a narrow odd-one-out. */
+/* Add-new tile — the call to action sharing the gallery grid. Fills its cell so it reads as one more
+   listing (same width, same min-height as the real cards) rather than a narrow odd-one-out. It is a
+   BUTTON, so its edge and its hover fill both ride the backing layer for the same hit-testing reason
+   as above; the element itself is never clipped.
+
+   RULING 55 — NO DASHED BOXES, and this tile was the last one in the app. `patterns.css`'s `.nh-empty`
+   was converted in the QA fix pass and this was missed because it is not an empty state: it is an
+   ADD tile, so nothing scanning for `.nh-empty` found it. The ruling's reasoning applies to it more
+   directly than to anything it did catch — "a dashed outline reads as a placeholder, a drop zone or
+   something half-built" is exactly how a real, working button was reading, sitting in a grid of solid
+   cards. It keeps its quieter edge (`--line-strong` against the cards' own rim) so it still reads as
+   the odd one out by INTENT rather than by looking unfinished. */
 .nh-card--new {
   display: grid;
   place-items: center;
@@ -115,19 +174,21 @@
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  border-style: dashed;
-  border-color: var(--line-strong);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
   font: 700 var(--fs-sm) / 1.3 var(--font-body);
   text-align: center;
+  --card-edge: var(--line-strong);
 }
-.nh-card--new:hover { color: var(--text); border-color: var(--magenta); background: color-mix(in srgb, var(--surface-3) 40%, transparent); }
-.nh-card--new:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -2px; }
+.nh-card--new::before { background: transparent; }
+.nh-card--new:hover { color: var(--text); --card-edge: var(--magenta); }
+.nh-card--new:hover::before { background: color-mix(in srgb, var(--surface-3) 40%, transparent); }
+.nh-card--new:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -5px; }
 .nh-card-new-icon { font-size: 1.6rem; line-height: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-  .nh-card { transition: border-color var(--dur-hover), box-shadow var(--dur-base); }
+  .nh-card { transition: none; }
+  .nh-card::before { transition: border-color var(--dur-hover); }
   .nh-card.is-interactive:hover { transform: none; }
 }

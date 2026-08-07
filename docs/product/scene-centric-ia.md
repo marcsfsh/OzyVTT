@@ -115,7 +115,7 @@ No duplication.
 
 - `sceneCombatShape` (~line 212) — the combat fields shared by live combat and every parked scene:
   `active`, `round`, `turnActorId`, `initiative`, `tokens`, `annotations`, `turn` (economy),
-  `rulesMode`, `rollMode`, `healthDisplay`, `underwater`, `reactionsUsed`, `legendaryUsed`, `fog`,
+  `rulesMode`, `healthDisplay`, `underwater`, `reactionsUsed`, `legendaryUsed`, `fog`,
   `pendingSaves`, `pendingReactions`.
 - `SceneCombatSchema` (~line 278) — `sceneCombatShape` + `refineCombatContext` validation.
 - **`SceneSchema`** (~line 282) — `{ id: uuid, name: string(1..120), mapAssetId: uuid, combat: SceneCombat }`.
@@ -200,7 +200,7 @@ The core UX problem: scene lifecycle is spread across four places that the redes
 | Prep modal | `scenes/ScenePanel.tsx` | **create only** (name + map picker + combatant checkboxes → `scene:create`) |
 | Switch strip | `scenes/SceneSwitcher.tsx` — **deleted in `c9f3132`**; replaced by the picker popup | chips; tap-to-stage, ▶ go-live (`scene:activate`), ✕ remove (`scene:remove`), "+ New scene" |
 | Staging sidebar | `scenes/SceneBuilder.tsx` | edit *that scene's* combatants (`scene:set-combatants`), rename (`scene:rename`), add SRD monsters (`MonsterBrowser`) |
-| On-map buttons | `scene/EncounterMap.tsx` | staging props `moveSceneId` / `staging={onBackToLive,onMakeLive}` / `onScenePrep` (◀ Live / Make live ⬆ / 🎬 Scenes) |
+| On-map buttons | `scene/EncounterMap.tsx` | staging props `moveSceneId` / `staging={onBackToLive,onMakeLive}` / `onScenePrep` — the bottom-corner scene cluster (Back to live / Make live, else Scenes), now real `@vtt/ui` Buttons with SVG icons |
 | Preview store | `scenes/scenePreview.ts` | `usePreviewScene` / `setPreviewScene` — **client-only**, never hits the server |
 
 ### 3.8 Map library (client)

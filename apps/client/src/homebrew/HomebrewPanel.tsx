@@ -248,7 +248,10 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   }
 
   return (
-    <div className="hb-root">
+    /* THE FRAME (§7): the modebar is chrome that never moves, the workspace below it is the fill, and
+       the library stands on the scene sky. Its two panes each scroll themselves. */
+    <div className="hb-root pane-frame pane-scene scanlines frame-col anim-view">
+      <div className="pane-sky" aria-hidden="true" />
       {/* Ops (Export / Import) land here next to the count line, Codex-style. Nothing
           is rendered for them yet: a disabled button that never becomes enabled is a
           worse answer than an honest gap. */}
@@ -267,7 +270,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
           (Draft / Published / Shown to players), and repeating it as a library-wide banner
           would state the same constraint a second time for no new information. */}
 
-      <div className={`hb-workspace${hasSelection ? " has-selection" : ""}`}>
+      <div className={`hb-workspace frame-fill${hasSelection ? " has-selection" : ""}`}>
         <HomebrewRail
           records={records}
           filters={filters}

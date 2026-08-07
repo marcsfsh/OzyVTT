@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, BuilderAbilityMethodSchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema } from "@vtt/domain";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, AskableCommandSchema, BuilderAbilityMethodSchema, EncounterTokenPositionSchema, PartyVisibilitySchema, RollPurposeSchema, RollVisibilitySchema, RuleExceptionsSchema, RuleModeSchema } from "@vtt/domain";
 import { AbilitySchema, CharacterChoiceSchema, CharacterIdentitySchema, CurrencySchema, InventoryItemSchema, ProficienciesSchema } from "@vtt/schemas";
 
 /**
@@ -13,6 +13,14 @@ import { AbilitySchema, CharacterChoiceSchema, CharacterIdentitySchema, Currency
  */
 export { GAME_COMMAND_SCOPES, type GameCommandType } from "@vtt/api-contract";
 
+/**
+ * A GM override of a rules block. The reason is OPTIONAL (D9): the override has to be one tap, so a
+ * mandatory modal was the wrong shape. Audit lines fall back to "GM override" when none is given,
+ * and old clients that always send a reason keep working unchanged - this is a loosening, not a break.
+ */
+export const RulesOverrideSchema = z.object({ reason: z.string().trim().min(1).max(300).optional() }).strict();
+/** Per-family exceptions on the wire are STRICT: a misspelled family is a rejection, never a silent no-op. */
+export const WireRuleExceptionsSchema = RuleExceptionsSchema.strict();
 export const CommandIdentitySchema = z.object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 // Turn navigation carries an optional confirmation flag: Next may rewrite history, Previous may discard an in-place change.
 export const InitiativeNextSchema = z.object({ commandId: z.string().uuid(), confirmRewrite: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -20,9 +28,12 @@ export const InitiativePreviousSchema = z.object({ commandId: z.string().uuid(),
 export const EncounterStartSchema = z.object({
   commandId: z.string().uuid(),
   mapAssetId: z.string().uuid(),
-  entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), /** 2024 surprise: the combatant rolls initiative with disadvantage (SRD Surprise). */ surprised: z.boolean().optional() }).strict()).min(1).max(200),
-  /** Rules-engine enforcement for this fight (ADR-0020); omitted keeps the table's current mode. */
-  rulesMode: z.enum(["strict", "assisted", "freeform"]).optional(),
+  /** Omitted derives the combatants from the LIVE scene's staged list, server-side - the server owns who is in the staged fight, not the client's copy of it. Supplying entries stays valid and unchanged. */
+  entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), /** 2024 surprise: the combatant rolls initiative with disadvantage (SRD Surprise). */ surprised: z.boolean().optional() }).strict()).min(1).max(200).optional(),
+  /** Rules-engine enforcement for this fight (ADR-0020); omitted seeds from the table's standing rules policy. */
+  rulesMode: RuleModeSchema.optional(),
+  /** Per-family exceptions for this fight; omitted seeds from the table's standing rules policy. */
+  ruleExceptions: WireRuleExceptionsSchema.optional(),
   /** When true, claimed player-characters roll their own initiative (a provisional auto-roll parks them until they do). */
   playersRollInitiative: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
@@ -35,7 +46,8 @@ export const InitiativeRollRemainingSchema = z.object({ commandId: z.string().uu
 /** Table-wide policy for player-rolled initiative: begin immediately (roll in) or wait for all players first (GM). */
 export const SetPlayerInitiativeModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["immediate", "wait"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const AddCombatantSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** `joinEncounter` lands the new combatant in the running fight (roster + initiative + tray token) in ONE command; ignored when no fight is running. */
+export const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), joinEncounter: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorImportDefinitionSchema = z.object({ commandId: z.string().uuid(), definition: z.unknown(), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSubmitImportSchema = z.object({ commandId: z.string().uuid(), definition: z.unknown(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterResolveImportSchema = z.object({ commandId: z.string().uuid(), importId: z.string().max(120), approve: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -44,6 +56,8 @@ export const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), acto
 export const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetActorVisibilitySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), visibility: z.enum(["public", "gm-only"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetActorArchivedSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), archived: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (D26); default hidden. */
+export const SetActorSheetPreviewSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), enabled: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /**
  * Damage keeps the legacy untyped `amount` for manual adjustments; the ADR-0020 typed path adds
@@ -65,7 +79,7 @@ export const ApplyDamageSchema = z.object({
 }).strict();
 export const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), /** Bypass a movement-rule rejection (standing from Prone costs half Speed); audited. */ override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), /** Bypass a movement-rule rejection (standing from Prone costs half Speed); audited. */ override: RulesOverrideSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActionResolveSchema = z.object({
   commandId: z.string().uuid(),
@@ -77,7 +91,7 @@ export const ActionResolveSchema = z.object({
   /** Explicit GM roll-mode choice; wins over the engine's advantage/disadvantage aggregation. */
   rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
   /** Bypass a rules-mode rejection; the reason is audited in the combat log and journal (ADR-0020). */
-  override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(),
+  override: RulesOverrideSchema.optional(),
   /** The escapable effect to break (Escape a Grapple builtin); defaults to the actor's first effect with an escape DC. */
   effectId: z.string().min(1).max(120).optional(),
   /** GM-adjudicated cover for the target (no line-of-sight engine): half +2, three-quarters +5 to AC and Dex saves; total can't be targeted (SRD Cover). */
@@ -143,8 +157,56 @@ export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId:
  * off-screen-die shortcut.
  */
 export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), commit: z.boolean().default(true), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), naturalRoll: z.number().int().min(1).max(20).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const SetRollModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["auto", "manual"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Change the LIVE fight's dial, and optionally its per-family exceptions. Omitting `exceptions` leaves the stored ones untouched, so an old mode-only payload still means exactly what it always meant. */
+export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: RuleModeSchema, exceptions: WireRuleExceptionsSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * THE TAP IS THE ATTACK (D10). One command for "use this action", whatever the situation: the SERVER
+ * decides whether it resolves in the fight, is refused because it is not this creature's turn, or rolls
+ * as loose dice. `includeDamage` is opt-in so a sheet that renders its own damage chip cannot make the
+ * same tap roll damage twice.
+ */
+export const ActionUseSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  actionId: z.string().regex(/^[a-z0-9-]+$/).max(120),
+  targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+  rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+  /** Loose route only: also roll the action's damage parts in the same tap. Ignored in the fight, where the resolver rolls damage. */
+  includeDamage: z.boolean().optional(),
+  /** GM bypass of a rules block (including the off-turn refusal); reason optional (D9). Refused for players, like `action.resolve`. */
+  override: RulesOverrideSchema.optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
+ * THE SAVE CHIP ANSWERS THE QUESTION (D10). A sheet save chip used to roll a loose d20 that ignored an
+ * open pending save entirely - the table watched a save happen and the tracker kept waiting for it.
+ * This routes: a matching pending save is ANSWERED; with none open it is a loose, attributed save roll.
+ */
+export const SaveRollSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  ability: AbilitySchema,
+  rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+  /** A hand-entered final total (the off-screen die), used verbatim instead of rolling. */
+  total: z.number().int().min(-50).max(100).optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
+ * ASK THE GM (D8). The payload is the player's ORIGINAL command, verbatim - the server revalidates it
+ * with that command's own schema before it goes anywhere, so `z.unknown()` here is a hand-off, not a
+ * hole. The ask carries its own `commandId` so the ask itself is idempotent like every other command.
+ */
+export const RulesAskSchema = z.object({ commandId: z.string().uuid(), type: AskableCommandSchema, payload: z.unknown(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM answers a parked ask (D9): Allow re-runs the parked command with an override, Deny tells the player. The reason is OPTIONAL - one tap, never a mandatory modal. */
+export const RulesAnswerSchema = z.object({ commandId: z.string().uuid(), askId: z.string().uuid(), allow: z.boolean(), reason: z.string().trim().min(1).max(300).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM sets the STANDING rules policy every new fight inherits (D7). Omitting `exceptions` keeps the stored ones (the `customFormula` tri-state precedent). */
+export const RulesSetPolicySchema = z.object({ commandId: z.string().uuid(), dial: RuleModeSchema, exceptions: WireRuleExceptionsSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM sets the table's staging defaults (D2): the visibility a newly staged combatant's token starts at. */
+export const TableSetStagingDefaultsSchema = z.object({ commandId: z.string().uuid(), visibility: z.enum(["public", "gm-only"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM sets how much a player sees of ANOTHER player's character (rulings 5/8/19). The tiers are spelled once, in `PartyVisibilitySchema`. */
+export const TableSetPartyVisibilitySchema = z.object({ commandId: z.string().uuid(), visibility: PartyVisibilitySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Table-wide policy for how a player's own confirmed hit reaches an enemy's HP (GM): a GM-confirmed proposal, or direct server-side apply. */
 export const SetPlayerDamageModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["proposal", "direct"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** GM resolves a parked player-hit damage proposal: apply it (optionally overriding the total) or dismiss it. */
@@ -198,6 +260,25 @@ export const CharacterCreateSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 /**
+ * Level a character up or down, or respec it outright (D13/D14). The shape is `CharacterCreateSchema`
+ * minus the name (kept from the live actor) plus the actor to rebuild: level change and respec are
+ * the same motion - the whole build is re-run from the ledger the client prefilled, and the server
+ * re-validates all of it exactly as it validates a fresh create.
+ */
+export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.string().uuid() }).strict();
+
+/**
+ * Roll six ability scores SERVER-SIDE (D14). The builder used to roll them in the browser, which is
+ * a rule-2 violation the ledger has carried for months; the dice now come from the same authority
+ * every other roll does, and land in the table feed like any other roll.
+ */
+export const BuilderRollAbilitiesSchema = z.object({
+  commandId: z.string().uuid(),
+  method: z.enum(["roll", "custom"]),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
  * GM sets the character-builder table policy (decision 10). `customFormula` semantics: omitted =
  * keep the stored formula, null = clear it, a string = validate through `validateAbilityFormula`
  * (the same dice grammar every other roll uses) and store it. Duplicated methods are rejected.
@@ -206,6 +287,10 @@ export const BuilderSetPolicySchema = z.object({
   commandId: z.string().uuid(),
   allowedAbilityMethods: z.array(BuilderAbilityMethodSchema).min(1).max(4),
   customFormula: z.string().trim().min(1).max(160).nullable().optional(),
+  /** Highest level this table builds to; omitted keeps the stored cap (same tri-state spirit as `customFormula`). */
+  maxLevel: z.number().int().min(1).max(20).optional(),
+  /** Whether players may run the builder themselves; omitted keeps the stored setting. */
+  playerBuilder: z.enum(["open", "gm-only"]).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().superRefine((payload, context) => {
   if (new Set(payload.allowedAbilityMethods).size !== payload.allowedAbilityMethods.length) {
@@ -216,15 +301,21 @@ export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: 
 export const TokenMoveSchema = z.object({
   commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(),
   /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
-  override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(),
+  override: RulesOverrideSchema.optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 /** GM-set walking speed; null clears to unknown (movement rules then skip for that combatant). */
 export const ActorSetSpeedSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), speedFeet: z.number().int().min(0).max(500).nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
-export const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** `activate: true` goes live on the new scene in the same command (prepare-and-go), parking whatever was live - the same swap `scene.activate` performs. */
+export const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), activate: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneRenameSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), name: SceneNameSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneIdSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * Make one recorded moment live (D25). `turnIndex` is an index into the archive document's `turns`
+ * array - the same list the replay viewer scrubs through - not a timeline revision.
+ */
+export const ReplayLaunchSchema = z.object({ commandId: z.string().uuid(), archiveId: z.number().int().positive(), turnIndex: z.number().int().min(0).max(999), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneSetCombatantsSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Reorder the prepared-scene list to a permutation of the current scene ids (GM). Bounded by the domain scenes cap (20). */
 export const SceneReorderSchema = z.object({ commandId: z.string().uuid(), order: z.array(z.string().uuid()).min(1).max(20), expectedRevision: z.number().int().nonnegative().optional() }).strict();

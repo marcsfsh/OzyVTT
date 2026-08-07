@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from "react";
-import { MarkdownEditor } from "@vtt/ui";
+import { GmOnlyTag, MarkdownEditor } from "@vtt/ui";
 import { CodexMarkdown } from "./CodexMarkdown";
-import { GmOnlyTag } from "./SecretMarkers";
 import { uploadCodexAsset, pageLinkKey } from "./api";
 
 /**
@@ -35,12 +34,18 @@ export type CodexEditorProps = Readonly<{
   gmLayer?: boolean;
   /** Titles that exist, so an unresolved link renders as a redlink rather than a working one. */
   knownTitles?: ReadonlySet<string>;
+  /**
+   * Ruling 11 — take the frame's height instead of the primitive's 14rem floor. Only for a mount whose
+   * ancestors form an unbroken flex column with a definite height; anywhere else it would collapse the
+   * field rather than grow it, which is why it is opt-in and not the default.
+   */
+  fill?: boolean;
   rows?: number;
   id?: string;
 }>;
 
 export function CodexEditor({
-  token, value, onChange, ariaLabel, placeholder, pages, excludePageId, onNavigate, gmLayer = false, knownTitles, rows, id
+  token, value, onChange, ariaLabel, placeholder, pages, excludePageId, onNavigate, gmLayer = false, knownTitles, fill = false, rows, id
 }: CodexEditorProps) {
   const suggest = useCallback((query: string) => {
     const needle = query.trim().toLowerCase();
@@ -56,7 +61,7 @@ export function CodexEditor({
   );
 
   return (
-    <div className={`codex-editor-surface${gmLayer ? " is-gm codex-gm-block" : ""}`}>
+    <div className={`codex-editor-surface${fill ? " is-fill" : ""}${gmLayer ? " is-gm codex-gm-block" : ""}`}>
       <MarkdownEditor
         id={id}
         value={value}

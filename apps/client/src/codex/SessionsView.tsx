@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, IconChevron, IconPlus, Input, Panel, SaveState, Select, Skeleton, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Field, GmOnlyTag, IconChevron, IconPlus, Input, Panel, RevealSwitch, SaveState, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
 import { sessionApi, type CodexAutosaveSettings, type CodexPageSummary, type CodexSession, type CodexSessionStatus } from "./api";
 import { pickNextSession, sessionTitle } from "./sessions";
 import { createSession } from "./creates";
 import { CodexEditor } from "./CodexEditor";
-import { GmOnlyTag, RevealSwitch, VisibilityBadge } from "./SecretMarkers";
 import { TagChip } from "./TagChip";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
@@ -91,7 +90,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
             </Select>
           </div>
           {listError && <Alert tone="danger">{listError}</Alert>}
-          <nav className="codex-list" aria-label="Sessions">
+          <nav className="codex-list scroll-y" aria-label="Sessions">
             {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
             {!loading && sessions.length === 0 && !error && <p className="codex-list-empty">No sessions yet. Create one to prep the next session.</p>}
             {!loading && sessions.length > 0 && shown.length === 0 && <p className="codex-list-empty">No sessions match.</p>}
@@ -112,7 +111,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
           </nav>
         </aside>
 
-        <section className="codex-main">
+        <section className="codex-main scroll-y">
           {selected && <Button variant="ghost" size="sm" className="codex-back" onClick={() => onOpenSession(null)}><IconChevron className="codex-chevron-left" aria-hidden="true" />All sessions</Button>}
           {/* R4: this surface's own failure. The log reads one feed; a silent one is an empty log that
               looks exactly like a campaign that has never had a session. */}

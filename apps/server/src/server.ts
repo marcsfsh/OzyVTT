@@ -5,7 +5,7 @@ import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
 import { API_VERSION, CODEX_PATHS } from "@vtt/api-contract";
-import type { ClientToServerEvents, ClientRole, CombatLogEntry, GameState, ServerToClientEvents, TableEvent } from "@vtt/domain";
+import type { ClientToServerEvents, ClientRole, CombatLogEntry, GameState, RollRecord, ServerToClientEvents, TableEvent } from "@vtt/domain";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
 import { createApiV1Router } from "./api-v1.js";
@@ -13,7 +13,7 @@ import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
 import { migrateToScene } from "./scenes.js";
-import { CombatLogStore } from "./combat-log.js";
+import { CombatLogStore, projectFeedRow } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
@@ -180,7 +180,7 @@ export function createServer(options: CreateServerOptions) {
    * GM-only AND every referenced actor is public - so a hidden combatant is never narrated to players.
    * Not stored in GameState (ephemeral presentation); the viewer channel gets nothing.
    */
-  function broadcastTableEvent(event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) {
+  function broadcastTableEvent(event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean; logged?: boolean }>) {
     const state = store.snapshot;
     const actorIds = event.actorIds ?? [];
     const publicToPlayers = !event.gmOnly && actorIds.every((id) => state.actors.find((actor) => actor.id === id)?.visibility === "public");
@@ -190,22 +190,36 @@ export function createServer(options: CreateServerOptions) {
       if (auth.verify(token)) socket.emit("table:event", payload);
       else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
     }
-    // Every transient toast is also a durable log line, gated the same way (hidden combatants stay GM-only).
-    appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
+    // Every transient toast is also a durable feed line, gated the same way (hidden combatants stay
+    // GM-only) - unless the caller is already writing a richer row for the same moment (`logged: false`).
+    //
+    // ONE feed line per moment (D11). Ten handlers used to call `appendLog` and then broadcast the
+    // IDENTICAL entry, and since a broadcast has always written its own line, every one of those
+    // moments printed twice in the log a player reads. Broadcasting is the whole write; call
+    // `appendLog` directly only for lines that have no toast.
+    if (event.logged !== false) appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
   }
   /**
    * Append one line to the persistent combat log and push it live. Visibility mirrors the toast rule:
    * GM sockets always receive it; players only when it isn't GM-only and references no hidden combatant.
    */
-  function appendLog(entry: Readonly<{ kind: CombatLogEntry["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) {
+  function appendLog(entry: Readonly<{ kind: CombatLogEntry["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean; actorId?: string | null; roll?: RollRecord | null }>) {
     const state = store.snapshot;
     const actorIds = entry.actorIds ?? [];
     const gmOnly = entry.gmOnly === true || actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility === "gm-only");
-    const record = combatLog.append({ kind: entry.kind, text: entry.text, gmOnly, revision: state.revision });
+    const row = combatLog.append({ kind: entry.kind, text: entry.text, gmOnly, revision: state.revision, actorId: entry.actorId ?? null, roll: entry.roll ?? null });
+    // Per-RECIPIENT delivery, not the old two-variant GM/player split: a `self-only` roll row is
+    // player-visible but belongs to exactly one player, and only their own session id unlocks it.
+    // `projectFeedRow` is the single place that decides - and the only thing that strips the roller's
+    // session id off the wire. The public viewer never receives `log:entry` at all (it has no game
+    // socket: `viewer-coordinator.ts` drives it), so this loop cannot reach the shared screen.
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
-      if (auth.verify(token)) socket.emit("log:entry", record);
-      else if (!gmOnly && auth.verifyPlayer(token)) socket.emit("log:entry", record);
+      if (auth.verify(token)) { socket.emit("log:entry", row.entry); continue; }
+      const player = auth.verifyPlayer(token);
+      if (!player) continue;
+      const projected = projectFeedRow(row, { gm: false, sessionId: player.sessionId });
+      if (projected) socket.emit("log:entry", projected);
     }
   }
   /** "Round 3 - Borin's turn." A hidden combatant's turn stays GM-only (its name would otherwise leak). */
@@ -268,6 +282,9 @@ export function createServer(options: CreateServerOptions) {
     playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
     random: (sides) => randomInt(1, sides + 1),
     newId: randomUUID,
+    // The archives live in the game store's own table, not in GameState; `replay.launch` reads one
+    // document through this narrow hook rather than being handed the store.
+    archiveDocument: (id) => store.getEncounterArchive(id),
     onEncounterArchived: ({ sceneId, turnCount }) => {
       // Combat-history bridge: log the fight to the codex timeline, pinned to its location marker if one links this scene.
       try {
@@ -433,6 +450,8 @@ export function createServer(options: CreateServerOptions) {
     assets: tokenAssets,
     catalog: tokenCatalog,
     authorizeGm,
+    // D18: a joined player may browse the library the GM offers and upload their own token image.
+    playerSession: (token) => auth.verifyPlayer(token),
     authorizePlayer: (token, assetId) => auth.verifyPlayer(token) !== null && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
     authorizeViewer: (token, assetId) => {
       if (!token) return false;
@@ -475,7 +494,8 @@ export function createServer(options: CreateServerOptions) {
     archives: {
       list: () => store.listEncounterArchives(),
       get: (id) => store.getEncounterArchive(id),
-      remove: (id) => store.deleteEncounterArchive(id)
+      remove: (id) => store.deleteEncounterArchive(id),
+      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible)
     },
     sessions: {
       // The HTTP mirror of the socket's open LAN-trust join: anyone who can reach the host may
@@ -593,11 +613,14 @@ export function createServer(options: CreateServerOptions) {
     socket.on("character:resolve-import", (payload, acknowledge) => respond(acknowledge, "Only the GM can approve imported sheets.", "The import could not be resolved.", (principal) => operations.characterResolveImport(principal, payload)));
     socket.on("character:create", (payload, acknowledge) => respond(acknowledge, "Only the GM can create characters directly.", "The character could not be created.", (principal) => operations.characterCreate(principal, payload)));
     socket.on("builder:set-policy", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the character-builder policy.", "The builder policy could not be changed.", (principal) => operations.builderSetPolicy(principal, payload)));
+    socket.on("character:rebuild", (payload, acknowledge) => respond(acknowledge, "You can only rebuild your own character.", "That character could not be rebuilt.", (principal) => operations.characterRebuild(principal, payload)));
+    socket.on("builder:roll-abilities", (payload, acknowledge) => respond(acknowledge, "Your GM builds the characters at this table.", "The ability scores could not be rolled.", (principal) => operations.builderRollAbilities(principal, payload)));
     socket.on("actor:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove combatants.", "The combatant could not be removed.", (principal) => operations.actorRemove(principal, payload)));
     socket.on("actor:set-token-image", (payload, acknowledge) => respond(acknowledge, "Only the GM can set token images.", "The token image could not be set.", (principal) => operations.actorSetTokenImage(principal, payload)));
     socket.on("actor:set-size", (payload, acknowledge) => respond(acknowledge, "Only the GM can resize tokens.", "The token could not be resized.", (principal) => operations.actorSetSize(principal, payload)));
     socket.on("actor:set-visibility", (payload, acknowledge) => respond(acknowledge, "Only the GM can change token visibility.", "The token visibility could not be changed.", (principal) => operations.actorSetVisibility(principal, payload)));
     socket.on("actor:set-archived", (payload, acknowledge) => respond(acknowledge, "Only the GM can archive characters.", "The character could not be archived.", (principal) => operations.actorSetArchived(principal, payload)));
+    socket.on("actor:set-sheet-preview", (payload, acknowledge) => respond(acknowledge, "Only the GM can share an archived character's sheet.", "The archived sheet could not be shared.", (principal) => operations.actorSetSheetPreview(principal, payload)));
     socket.on("actor:set-speed", (payload, acknowledge) => respond(acknowledge, "Only the GM can set movement speed.", "The speed could not be set.", (principal) => operations.actorSetSpeed(principal, payload)));
     socket.on("actor:apply-damage", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The damage could not be applied.", (principal) => operations.actorApplyDamage(principal, payload)));
     socket.on("actor:heal", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The healing could not be applied.", (principal) => operations.actorHeal(principal, payload)));
@@ -618,6 +641,8 @@ export function createServer(options: CreateServerOptions) {
     socket.on("content:monster-actions", (payload, acknowledge) => respond(acknowledge, "Only the GM can browse stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterActions(principal, payload)));
     socket.on("content:monster-sheet", (payload, acknowledge) => respond(acknowledge, "Only the GM can read stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterSheet(principal, payload)));
     socket.on("action:resolve", (payload, acknowledge) => respond(acknowledge, "Join the table before resolving actions.", "The action could not be resolved.", (principal) => operations.actionResolve(principal, payload)));
+    socket.on("action:use", (payload, acknowledge) => respond(acknowledge, "Join the table before using actions.", "The action could not be used.", (principal) => operations.actionUse(principal, payload)));
+    socket.on("save:roll", (payload, acknowledge) => respond(acknowledge, "Join the table before rolling saving throws.", "The saving throw failed.", (principal) => operations.saveRoll(principal, payload)));
     socket.on("save:answer", (payload, acknowledge) => respond(acknowledge, "Join the table before answering saving throws.", "The saving throw could not be answered.", (principal) => operations.saveAnswer(principal, payload)));
     socket.on("save:dismiss", (payload, acknowledge) => respond(acknowledge, "Join the table before managing saving throws.", "The saving throw could not be dismissed.", (principal) => operations.saveDismiss(principal, payload)));
     socket.on("reaction:answer", (payload, acknowledge) => respond(acknowledge, "Join the table before answering reactions.", "The reaction could not be answered.", (principal) => operations.reactionAnswer(principal, payload)));
@@ -628,7 +653,11 @@ export function createServer(options: CreateServerOptions) {
     socket.on("effect:end", (payload, acknowledge) => respond(acknowledge, "Join the table before managing effects.", "The effect could not be ended.", (principal) => operations.effectEnd(principal, payload)));
     socket.on("death-save:roll", (payload, acknowledge) => respond(acknowledge, "Join the table before rolling death saves.", "The death save failed.", (principal) => operations.deathSaveRoll(principal, payload)));
     socket.on("encounter:set-rules-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the rules mode.", "The rules mode could not be changed.", (principal) => operations.encounterSetRulesMode(principal, payload)));
-    socket.on("encounter:set-roll-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the roll mode.", "The roll mode could not be changed.", (principal) => operations.encounterSetRollMode(principal, payload)));
+    socket.on("rules:set-policy", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the rules policy.", "The rules policy could not be changed.", (principal) => operations.rulesSetPolicy(principal, payload)));
+    socket.on("rules:ask", (payload, acknowledge) => respond(acknowledge, "Join the table before asking the GM.", "The question could not be sent.", (principal) => operations.rulesAsk(principal, payload)));
+    socket.on("rules:answer", (payload, acknowledge) => respond(acknowledge, "Only the GM can answer a rules question.", "The answer could not be recorded.", (principal) => operations.rulesAnswer(principal, payload)));
+    socket.on("table:set-staging-defaults", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the table's staging defaults.", "The staging defaults could not be changed.", (principal) => operations.tableSetStagingDefaults(principal, payload)));
+    socket.on("table:set-party-visibility", (payload, acknowledge) => respond(acknowledge, "Only the GM can set what players see of each other.", "The party visibility could not be changed.", (principal) => operations.tableSetPartyVisibility(principal, payload)));
     socket.on("encounter:set-player-damage-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change how players' hits apply damage.", "The player damage mode could not be changed.", (principal) => operations.encounterSetPlayerDamageMode(principal, payload)));
     socket.on("encounter:set-player-initiative-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change how player initiative works.", "The player initiative mode could not be changed.", (principal) => operations.encounterSetPlayerInitiativeMode(principal, payload)));
     socket.on("encounter:set-health-display", (payload, acknowledge) => respond(acknowledge, "Only the GM can change how health is shown.", "The health display could not be changed.", (principal) => operations.encounterSetHealthDisplay(principal, payload)));
@@ -662,6 +691,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("scene:rename", (payload, acknowledge) => respond(acknowledge, "Only the GM can rename scenes.", "The scene could not be renamed.", (principal) => operations.sceneRename(principal, payload)));
     socket.on("scene:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove scenes.", "The scene could not be removed.", (principal) => operations.sceneRemove(principal, payload)));
     socket.on("scene:activate", (payload, acknowledge) => respond(acknowledge, "Only the GM can switch scenes.", "The scene could not be switched.", (principal) => operations.sceneActivate(principal, payload)));
+    socket.on("replay:launch", (payload, acknowledge) => respond(acknowledge, "Only the GM can launch a replay.", "That recorded moment could not be launched.", (principal) => operations.replayLaunch(principal, payload)));
     socket.on("scene:set-combatants", (payload, acknowledge) => respond(acknowledge, "Only the GM can change a scene's combatants.", "The scene could not be updated.", (principal) => operations.sceneSetCombatants(principal, payload)));
     socket.on("scene:duplicate", (payload, acknowledge) => respond(acknowledge, "Only the GM can duplicate scenes.", "The scene could not be duplicated.", (principal) => operations.sceneDuplicate(principal, payload)));
     socket.on("scene:reorder", (payload, acknowledge) => respond(acknowledge, "Only the GM can reorder scenes.", "The scenes could not be reordered.", (principal) => operations.sceneReorder(principal, payload)));

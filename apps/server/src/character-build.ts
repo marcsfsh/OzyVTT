@@ -423,6 +423,36 @@ function grantedClassFeatures(entry: ClassReference, level: number): { features:
  * lookup below then reads the CALLER's catalog automatically, so a player can never build against -
  * or even successfully name - a homebrew record the GM has not made player-visible.
  */
+/**
+ * The rolled hit-point entries as ledger rows: one per level from 2 up. Level N's roll is the entry
+ * at index N-2, which is the same alignment `buildCharacterDefinition` validates against
+ * ("exactly level - 1 entries, levels 2..level"). Any row the input already carries is dropped
+ * first, so a rebuild that echoes its own prefill never doubles them.
+ */
+export function hitPointRollRows(input: Pick<CharacterCreateRequestInput, "hp" | "choices">): CharacterChoice[] {
+  if (input.hp.mode !== "entries") return [];
+  return (input.hp.entries ?? []).map((roll, index) => ({ level: index + 2, kind: "hp-roll", id: "hp", payload: { roll } }));
+}
+
+/**
+ * Rolled hit points recovered FROM a stored ledger, for a rebuild at `level`.
+ *
+ * Returns `null` when any level in 2..level has no recorded roll - a character built before this
+ * was recorded, or a PDF import with no ledger at all. The caller then rebuilds on the AVERAGE,
+ * which is the honest answer: the product floor is max(roll, average), so an old rolled character
+ * can lose maximum hit points on its first rebuild, and no dice are ever invented to hide that.
+ */
+export function storedHitPointRolls(choices: readonly CharacterChoice[], level: number): number[] | null {
+  const rolls: number[] = [];
+  for (let candidate = 2; candidate <= level; candidate += 1) {
+    const row = choices.find((entry) => entry.kind === "hp-roll" && entry.level === candidate);
+    const roll = row?.payload?.roll;
+    if (typeof roll !== "number" || !Number.isInteger(roll) || roll < 1) return null;
+    rolls.push(roll);
+  }
+  return rolls;
+}
+
 export function buildCharacterDefinition(input: CharacterCreateRequestInput, library: ContentView, policy: BuilderPolicy): ActorDefinition {
   const catalogs = library.catalogChoiceCatalogs();
   const progression: ClassProgressionTable = library.classProgressionTable();
@@ -944,8 +974,12 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         ...(originFeat ? [{ id: originFeat.id, name: originFeat.name, description: originFeat.feature.description.slice(0, 4000) }] : []),
         ...chosenFeats.map((feat) => ({ id: feat.id, name: feat.name, description: feat.feature.description.slice(0, 4000) }))
       ],
-      // The provenance ledger, VERBATIM - level-up and respec prefill from exactly these rows.
-      choices: [...input.choices]
+      // The provenance ledger, VERBATIM - level-up and respec prefill from exactly these rows -
+      // plus the ROLLED HIT POINTS (D14). The rolls used to be consumed and forgotten, so a
+      // level-down/level-up round trip could not restore the character it started from: nothing
+      // anywhere remembered what the dice had said. `choices` is an open-slug array, so recording
+      // them needs no schema change and every existing reader ignores rows it does not know.
+      choices: [...input.choices.filter((row) => row.kind !== "hp-roll"), ...hitPointRollRows(input)]
     },
     proficiencies,
     ...(spellcasting ? { spellcasting } : {}),
