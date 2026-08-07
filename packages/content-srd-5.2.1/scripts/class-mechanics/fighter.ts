@@ -51,7 +51,14 @@ export const fighter: ClassMechanicsModule = {
       "improved-critical": {
         modifiers: [{ type: "critical-range", threshold: 19 }]
       },
-      /** "...can now score a Critical Hit on a roll of 18-20." The lower threshold simply wins. */
+      /**
+       * "...can now score a Critical Hit on a roll of 18-20." The lower threshold simply wins.
+       *
+       * The record carries `replacesFeatureId: "improved-critical"`, and the builder honours that
+       * only for CLASS features (`grantedClassFeatures`) - a level-15 Champion holds both subclass
+       * records. It changes nothing here, because `criticalThreshold` takes the lowest threshold any
+       * carrier names either way; it does mean the sheet lists both traits.
+       */
       "superior-critical": {
         modifiers: [{ type: "critical-range", threshold: 18 }]
       },
