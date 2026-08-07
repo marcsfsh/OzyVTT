@@ -56,11 +56,13 @@ The client reviewed the shipped builder in the running app and found three thing
 | `1` **re-opened** | `8a9c99e` | **The fold is DELETED, not gated.** The lead's `COLLAPSE_THRESHOLD` compromise did not match the client's rule, which is universal: any multi-select, at capacity, greys every unchosen option. Replaced by a **bounded scroll region** (`ChoiceGrid` `bounded` prop, `.scroll-y` in markup per ratchet (h), `max-height: 21rem`). |
 | `2f` **new** | `c50a4ae`, `2992ee2` | **`extraPicks`** — a feature may RAISE a pick budget. Thaumaturge's extra cantrip exists. |
 | `2g` **new** | `8a9c99e` | Info glyph centred; card type line re-scaled. |
+| `2g` **re-opened** | `1e83c57` | **The card and its reference control are ONE framed unit.** The client could not tell which info icon belonged to which spell — the two were separate bordered boxes 8px apart in a grid whose own gap was 10px, so an icon between two cards was ambiguous by construction. The frame moved to `.nh-choice-wrap`; the halves are borderless regions divided by a 1px rule, `align-items: stretch` makes them the same height, and `.nh-choicegrid-items:has(.nh-choice-wrap)` steps the between-pair gap to `--space-4`. The card also came down from **80.25px to 46.25px** — a tighter block rhythm, plus 8px of stray height the host app's `button span { margin-top }` was adding to *every* card. |
 
 **Measured, in a real browser, Wizard L20 answered (14 offers / 468 cards):** answered step
-**5,238px** at 1280 and **5,963px** at 375 — versus **17,089 / 44,949px** for the naive "just delete the
+**5,076px** at 1280 and **5,922px** at 375 — versus **12,766 / 32,200px** for the naive "just delete the
 fold" fix, and versus **13,434px** that the same step used to cost merely *on arrival*. Arrival itself
-improved 3.6× (13,434 → 3,705). **Nothing in the flow is taller than it already was.**
+improved 3.8× (13,434 → 3,522). **Nothing in the flow is taller than it already was.** The table in
+`known-bugs.md` carries the full before/after, including what `2g`'s re-open moved.
 
 **`2f`'s shape — `extraPicks: [{offer, amount}]`, a sibling of `choice`.** `offer` is the offer key both
 sides already share verbatim (`class-cantrips`, `feature:<id>`, …) so there is no second namespace to
@@ -768,9 +770,11 @@ all unselected options are greyed out."*
 survives as `SEARCH_THRESHOLD`, doing only the job it can honestly do — earning the search box that
 makes a capped 203-card region navigable. Separately, replace the feat *filter* at
 `build-payload.ts:335-337` with an `unavailable` entry ("already on this character").
-*Measured, Chromium 1194, Wizard L20 answered step:* **5,238px at 1280 / 5,963px at 375** with all
-468 cards mounted, against **17,089 / 44,949** for deleting the fold and adding nothing — and against
-13,434px for what the same step used to cost on ARRIVAL. Numbers and method in `known-bugs.md`.
+*Measured, Chromium 1194, Wizard L20 answered step:* **5,076px at 1280 / 5,922px at 375** with all
+468 cards mounted, against **12,766 / 32,200** for deleting the fold and adding nothing — and against
+13,434px for what the same step used to cost on ARRIVAL. (First measured at 5,238 / 5,963; the
+choice card got 34px shorter when `2g` re-opened, and both columns moved with it.) Numbers and
+method in `known-bugs.md`.
 *Tests:* Elf → Keen Senses → pick Perception → all three still in the DOM and enabled (a radiogroup
 must not lock a keyboard player into their first answer); a choose-2 offer greys the third at
 capacity and un-picking restores it; a **long** answered offer keeps all twelve cards mounted with

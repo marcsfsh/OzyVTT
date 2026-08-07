@@ -215,13 +215,21 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   | | 1280px | 375px |
   |---|---|---|
   | arrival, before | 13,434px | — |
-  | arrival, now | **3,705px** | 4,085px |
-  | answered, now | **5,238px** | 5,963px |
-  | answered, cap lifted | 17,089px | 44,949px |
+  | arrival, now | **3,522px** | 4,032px |
+  | answered, now | **5,076px** | 5,922px |
+  | answered, cap lifted | 12,766px | 32,200px |
 
   The answered step is now shorter than the same step used to be on ARRIVAL, so nothing in the flow
   is taller than it already was. What is left is genuinely a density question — 467 cards to read —
   and cutting that means progressive disclosure, a design change rather than a CSS one.
+
+  **The table moved down on 2026-08-07 and the reason is the choice card, not the cap.** Issue `2g`
+  re-opened (the card was double the reference control's height, and the pairing was ambiguous), and
+  compacting it took ~34px off every card with a description. Same script, same browser, same
+  fully-answered Wizard 20: arrival 3,705 → 3,522 at 1280 and 4,117 → 4,032 at 375; answered
+  5,238 → 5,076 and 5,971 → 5,922; cap lifted 17,089 → 12,766 and 44,957 → 32,200. The two "before"
+  figures at 375 are this run's own measurement of the previous commit, which is why they differ by
+  a few dozen pixels from the ones first recorded — quote the pair from one run, never across two.
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device

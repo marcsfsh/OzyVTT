@@ -391,6 +391,24 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     // nested button would be reparented out of the card's own hit area at parse time.
     const info = within(cantrips()).getByRole("button", { name: "Read the Light rules" });
     expect(info.closest("[role='checkbox']")).toBeNull();
+
+    /**
+     * ...and a sibling of EXACTLY ONE card, in a wrapper that holds nothing else. That is the
+     * re-opened half of `2g`: the client could not tell which icon belonged to which spell, because
+     * the two were separate boxes 8px apart in a grid whose own gap was 10px, and reading order was
+     * the only tie-break. The frame moved to `.nh-choice-wrap` (ChoiceCard.css) so the pairing is
+     * structural — this holds the structure the paint depends on. The pixels are in the report:
+     * card and control both 46.25px tall, 1px apart, 14px between pairs, measured at 320/375/1280.
+     */
+    const pair = info.parentElement as HTMLElement;
+    expect(pair).toHaveClass("nh-choice-wrap");
+    expect(pair.querySelectorAll("[role='checkbox']")).toHaveLength(1);
+    expect(pair.querySelector("[role='checkbox']")?.querySelector(".nh-choice-title")?.textContent).toBe("Light");
+    expect(pair.children).toHaveLength(2);
+    // The wrapper IS the grid item, so nothing sits between a pair and the gap that separates it
+    // from the next one.
+    expect(pair.parentElement).toHaveClass("nh-choicegrid-items");
+
     await user.click(info);
 
     const modal = await screen.findByRole("dialog", { name: "Light spell rules" });
