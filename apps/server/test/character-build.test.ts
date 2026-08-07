@@ -687,6 +687,44 @@ describe("extra picks raise the budget the server validates against", () => {
   });
 
   /**
+   * A CATALOG **PLUS** ONE BESPOKE OPTION. `from` (which `options` derives) beat `fromCatalog` in
+   * both consumers, so "a Fighting Style feat, or instead Blessed Warrior" was unsayable and the
+   * Paladin's and Ranger's printed variant was unpickable. The offer is their union now.
+   */
+  it("offers a Paladin the whole feat catalog AND Blessed Warrior, whose own pick is two Cleric cantrips", () => {
+    const paladin = (styleId: string, cantrips: readonly string[]): MutableCreateInput => ({
+      name: "Var", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
+      abilityMethod: "standard-array", baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 10, cha: 12 },
+      backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+      hp: { mode: "average" },
+      choices: [
+        { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+        { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
+        { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+        { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+        { level: 1, classId: "paladin", kind: "weapon-mastery", id: "greatsword" },
+        { level: 1, classId: "paladin", kind: "weapon-mastery", id: "flail" },
+        { level: 2, classId: "paladin", kind: "fighting-style", id: styleId, payload: { featureId: "fighting-style" } },
+        ...cantrips.map((id) => ({ level: 2, kind: "cantrip" as const, id, payload: { featureId: "blessed-warrior" } })),
+        { level: 1, kind: "spell", id: "bless", payload: undefined },
+        { level: 1, kind: "spell", id: "cure-wounds", payload: undefined },
+        { level: 1, kind: "tool", id: "gaming-set-dice" },
+        { level: 1, kind: "equipment", id: "paladin-a" },
+        { level: 1, kind: "equipment", id: "soldier-a" }
+      ]
+    });
+    // The CATALOG half still resolves - a real Fighting Style feat is accepted, with no cantrips.
+    expect(() => buildCharacterDefinition(paladin("defense", []), library, defaultPolicy)).not.toThrow();
+    // The BESPOKE half is now offerable at all, and its nested pick reaches the sheet.
+    const blessed = buildCharacterDefinition(paladin("blessed-warrior", ["sacred-flame", "guidance"]), library, defaultPolicy);
+    const cantrips = (blessed.spellcasting?.spells ?? []).filter((spell) => spell.level === 0).map((spell) => spell.id);
+    expect(cantrips.sort()).toEqual(["guidance", "sacred-flame"]);
+    // And an id in NEITHER half is still refused, so the union did not become "anything goes".
+    expect(() => buildCharacterDefinition(paladin("eldritch-mind", []), library, defaultPolicy))
+      .toThrowError(/not an offered option/);
+  });
+
+  /**
    * TWO PICKS ON ONE RECORD. Magic Initiate's text promises "two cantrips ... and one level 1 spell"
    * and its record could carry only one `choice` with one `maxSpellLevel`, so the spell was silently
    * dropped - for two of the four SRD backgrounds, on a level-1 character.

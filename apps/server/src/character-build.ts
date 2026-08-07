@@ -629,7 +629,23 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     let unresolvable: string | null = null;
     // Inline `options` carry their own mechanics; the content schema derives `from` from their ids,
     // so the id list below is identical either way and only the RIDERS need the extra reference.
-    if (choice.from && choice.from.length > 0) options = new Set(choice.from);
+    // A CATALOG **PLUS** ONE BESPOKE OPTION: `from` (which `options` derives) used to short-circuit,
+    // so "a Fighting Style feat OR Blessed Warrior" could not be said and both variants were
+    // unpickable. When both are authored the offer is their UNION, matching the wizard exactly.
+    const named = choice.from ?? [];
+    if (named.length > 0 && choice.fromCatalog) {
+      const union = new Set(named);
+      options = union;
+      try {
+        const resolved = resolveCatalogChoice(choice.fromCatalog, catalogs);
+        for (const option of resolved) union.add(option.id);
+        if (resolved.some((option) => option.level !== undefined)) optionLevels = new Map(resolved.map((option) => [option.id, option.level ?? 0]));
+      } catch (error) {
+        // The bespoke half still stands when the catalog half is a content gap.
+        if (!(error instanceof CatalogChoiceError)) throw error;
+      }
+    }
+    else if (named.length > 0) options = new Set(named);
     else if (!choice.fromCatalog) {
       // A schema-legal but unusable record: `{kind, choose, from: []}` passes the content schema's
       // "needs from OR fromCatalog" refinement (an empty array is truthy), then asks the resolver to
@@ -724,6 +740,8 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // even while the catalog's own Ability Score Improvement feat is the richer path.
   const FEAT_KINDS = new Set(["feat", "fighting-style", "asi-or-feat"]);
   const chosenFeats: FeatReference[] = [];
+  /** Inline options answered to a FEAT-kinded pick (Blessed Warrior, Druidic Warrior). */
+  const chosenInlineStyles: FeatureRecord[] = [];
   for (const row of input.choices) {
     if (!FEAT_KINDS.has(row.kind)) continue;
     if (row.kind === "asi-or-feat" && row.id === "asi") {
@@ -732,7 +750,19 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       offer.taken.push(row.id);
       continue;
     }
-    matchRow(row, offers.filter((offer) => offer.kind === row.kind));
+    const matched = matchRow(row, offers.filter((offer) => offer.kind === row.kind));
+    // A CATALOG PLUS ONE BESPOKE OPTION: the answer to a feat-kinded pick may be an INLINE option
+    // rather than a feat (Paladin's Blessed Warrior sits beside the whole Fighting Style catalog).
+    // It is interpreted exactly as pass A2 interprets any chosen option - same code path, same
+    // reshape - because "a chosen option IS a feature" does not stop being true here.
+    const inlineOption = matched.optionRecords?.find((candidate) => candidate.id === row.id);
+    if (inlineOption) {
+      const asFeature = optionAsFeature(inlineOption);
+      granted.push({ record: asFeature, count: 1, origin: matched.featureId ? { kind: "option", sourceId: matched.featureId } : null });
+      featureOffer(asFeature, 1, matched.featureId ? [matched.featureId] : []);
+      chosenInlineStyles.push(asFeature);
+      continue;
+    }
     const feat = library.featRecord(row.id) ?? reject(`No feat "${row.id}" is in the content catalog.`);
     // The SAME feat may not be taken twice across DIFFERENT offers. `repeatable:false` on a choice
     // only ever guarded within one offer, so a Human Acolyte could spend Versatile on the feat the
@@ -753,6 +783,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     featureOffer(feat.feature, 1);
   }
   for (const feat of chosenFeats) grantExtraPicks(feat.feature, 1);
+  for (const record of chosenInlineStyles) grantExtraPicks(record, 1);
 
   // Pass A2: picks whose OPTIONS carry their own mechanics - Divine Order's two sacred roles, Giant
   // Ancestry's six boons, Blessed Strikes' two forms. Settled here, before pass B, for exactly the

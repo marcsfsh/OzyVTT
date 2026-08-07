@@ -138,13 +138,22 @@ const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUp
 /** Resolve a feature's choice to concrete options, never throwing: a gap becomes `unresolvable`. */
 function resolveChoice(choice: NonNullable<ContentFeatureSummary["choice"]>, catalogs: BuilderCatalogs, nameOf: (id: string) => string):
 { options: CatalogChoiceOption[]; unresolvable: string | null } {
-  if (choice.from.length > 0) return { options: optionsOfIds(choice.from, nameOf), unresolvable: null };
-  if (!choice.fromCatalog) return { options: [], unresolvable: "this pick names no option list." };
+  const named = choice.from.length > 0 ? optionsOfIds(choice.from, nameOf) : [];
+  // A CATALOG **PLUS** ONE BESPOKE OPTION. `from` used to short-circuit, so "a Fighting Style feat
+  // OR Blessed Warrior (two Cleric cantrips)" was unsayable and Paladin's and Ranger's variants were
+  // simply unpickable. The two are UNIONED instead, inline entries first (they are the authored
+  // ones and carry their own mechanics), and an id in both keeps its inline record.
+  if (!choice.fromCatalog) {
+    return named.length > 0 ? { options: named, unresolvable: null } : { options: [], unresolvable: "this pick names no option list." };
+  }
   try {
-    return { options: resolveCatalogChoice(choice.fromCatalog, catalogs.choice), unresolvable: null };
+    const catalog = resolveCatalogChoice(choice.fromCatalog, catalogs.choice);
+    const inline = new Set(named.map((option) => option.id));
+    return { options: [...named, ...catalog.filter((option) => !inline.has(option.id))], unresolvable: null };
   } catch (error) {
-    if (error instanceof CatalogChoiceError) return { options: [], unresolvable: error.message };
-    throw error;
+    if (!(error instanceof CatalogChoiceError)) throw error;
+    // A content gap in the catalog half must not take the bespoke half down with it.
+    return named.length > 0 ? { options: named, unresolvable: null } : { options: [], unresolvable: error.message };
   }
 }
 

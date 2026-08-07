@@ -377,7 +377,9 @@ const CONFIG: Record<string, ClassConfig> = {
       "Prepared Spells": "prepared"
     },
     choices: {
-      "fighting-style": { kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" },
+      // `fighting-style` is authored in the OVERLAY for Paladin and Ranger, not here: theirs is a
+      // catalog PLUS one bespoke option (Blessed Warrior / Druidic Warrior) and `CONFIG.choices`
+      // cannot carry inline options at all. Fighter's, which is the plain catalog, stays hand-authored.
       "weapon-mastery": weaponMastery(2),
       "ability-score-improvement": asiChoice,
       "paladin-subclass": { kind: "subclass", choose: 1, fromCatalog: "paladin-subclasses" }
@@ -391,7 +393,7 @@ const CONFIG: Record<string, ClassConfig> = {
       "Prepared Spells": "prepared"
     },
     choices: {
-      "fighting-style": { kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" },
+      // See the Paladin note above - Ranger's Druidic Warrior is the same shape.
       "weapon-mastery": weaponMastery(2),
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
       "ability-score-improvement": asiChoice,

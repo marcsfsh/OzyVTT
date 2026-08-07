@@ -5661,7 +5661,20 @@
     "choice": {
      "kind": "fighting-style",
      "choose": 1,
-     "fromCatalog": "fighting-style-feats"
+     "fromCatalog": "fighting-style-feats",
+     "options": [
+      {
+       "id": "blessed-warrior",
+       "name": "Blessed Warrior",
+       "description": "You learn two Cleric cantrips of your choice. Charisma is your spellcasting ability for them. Whenever you gain a Paladin level, you can replace one of these cantrips with another Cleric cantrip.",
+       "choice": {
+        "kind": "cantrip",
+        "choose": 2,
+        "fromCatalog": "cleric-spells",
+        "maxSpellLevel": 0
+       }
+      }
+     ]
     }
    },
    {
@@ -6462,7 +6475,20 @@
     "choice": {
      "kind": "fighting-style",
      "choose": 1,
-     "fromCatalog": "fighting-style-feats"
+     "fromCatalog": "fighting-style-feats",
+     "options": [
+      {
+       "id": "druidic-warrior",
+       "name": "Druidic Warrior",
+       "description": "You learn two Druid cantrips of your choice. Wisdom is your spellcasting ability for them. Whenever you gain a Ranger level, you can replace one of these cantrips with another Druid cantrip.",
+       "choice": {
+        "kind": "cantrip",
+        "choose": 2,
+        "fromCatalog": "druid-spells",
+        "maxSpellLevel": 0
+       }
+      }
+     ]
     }
    },
    {
