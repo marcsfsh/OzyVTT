@@ -79,6 +79,21 @@ const actionOf = (built: Table, id: string) => effectiveActions(built.definition
 const resolve = (built: Table, id: string, faces: number[], targetIds: string[] = [IDS.foe]) =>
   resolveDefinitionAction(built.state, actionOf(built, id)!, { actorId: IDS.hero, targetIds, commandId: nextCommandId() }, deps(built, faces));
 
+/**
+ * A fresh turn. A long-rest pool is spent across many turns, and the ACTION ECONOMY is per turn -
+ * so draining a pool of four has to happen over four turns or the second use is blocked by the
+ * economy rather than by the pool, which would prove the wrong thing.
+ */
+function newTurn(built: Table): void {
+  built.state.combat = {
+    ...built.state.combat,
+    turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }
+  };
+}
+
+/** Spend one use of a pool on its own turn. */
+const spend = (built: Table, id: string) => { newTurn(built); return resolve(built, id, [], []); };
+
 // =================================================================================================
 // ROGUE
 // =================================================================================================
@@ -238,5 +253,207 @@ describe("Rogue - the flat grants and the pick", () => {
 
   it("makes the Thief's Fast Hands a Bonus Action", () => {
     expect(actionOf(table(rogueInput(11)), "fast-hands")?.activation).toBe("bonus-action");
+  });
+});
+
+// =================================================================================================
+// RANGER
+// =================================================================================================
+
+/** The prepared-spell picks a half-caster owes at `level`, derived from the printed table. */
+function preparedPicks(classId: string, level: number, granted: readonly string[]): string[] {
+  const record = library.classRecord(classId)!;
+  const row = record.levelTable[level - 1];
+  const maxSlotLevel = (row.spellSlots ?? []).reduce((highest, count, index) => count > 0 ? index + 1 : highest, 0);
+  const pool = library.spellSummaries()
+    .filter((spell) => spell.classes.includes(record.spellcasting!.spellListId!) && spell.level >= 1 && spell.level <= maxSlotLevel && !granted.includes(spell.id))
+    .map((spell) => spell.id);
+  const owed = row.preparedCount ?? 0;
+  if (pool.length < owed) throw new Error(`${classId} ${level} owes ${owed} prepared spells and the list offers ${pool.length}`);
+  return pool.slice(0, owed);
+}
+
+/** A Halfling Criminal Ranger. `wisFocus` sends every ASI into Wisdom, which moves the ability-scaled pools. */
+const rangerInput = (level: number, options: { wisFocus?: boolean } = {}): MutableInput => {
+  const asiLevels = [4, 8, 12, 16].filter((asi) => asi <= level);
+  const bumped = options.wisFocus ? "wis" : "dex";
+  return {
+    name: "Ash", speciesId: "halfling", backgroundId: "criminal", classId: "ranger", level,
+    ...(level >= 3 ? { subclassId: "hunter" } : {}),
+    abilityMethod: "standard-array",
+    baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
+    backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, classId: "ranger", kind: "skill", id: "survival" },
+      { level: 1, classId: "ranger", kind: "skill", id: "perception" },
+      { level: 1, classId: "ranger", kind: "skill", id: "nature" },
+      { level: 1, classId: "ranger", kind: "weapon-mastery", id: "longbow" },
+      { level: 1, classId: "ranger", kind: "weapon-mastery", id: "shortsword" },
+      ...(level >= 2 ? [
+        { level: 2, classId: "ranger", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+        { level: 2, classId: "ranger", kind: "expertise", id: "perception", payload: { featureId: "deft-explorer" } }
+      ] : []),
+      ...(level >= 3 ? [
+        { level: 3, classId: "ranger", kind: "subclass", id: "hunter" },
+        { level: 3, kind: "hunters-prey", id: "colossus-slayer", payload: { featureId: "hunters-prey" } }
+      ] : []),
+      ...(level >= 7 ? [{ level: 7, kind: "defensive-tactics", id: "escape-the-horde", payload: { featureId: "defensive-tactics" } }] : []),
+      ...(level >= 9 ? [
+        { level: 9, classId: "ranger", kind: "expertise", id: "survival", payload: { featureId: "expertise" } },
+        { level: 9, classId: "ranger", kind: "expertise", id: "nature", payload: { featureId: "expertise" } }
+      ] : []),
+      ...asiLevels.flatMap((asi) => [
+        { level: asi, classId: "ranger", kind: "asi-or-feat", id: "ability-score-improvement" },
+        { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } },
+        { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } }
+      ]),
+      ...(level >= 19 ? [
+        { level: 19, classId: "ranger", kind: "feat", id: "boon-of-dimensional-travel", payload: { featureId: "epic-boon" } },
+        { level: 19, kind: "ability-score", id: "con", payload: { featureId: "boon-of-dimensional-travel" } }
+      ] : []),
+      ...preparedPicks("ranger", level, ["hunters-mark"]).map((id) => ({ level: 1, kind: "spell" as const, id })),
+      { level: 1, kind: "equipment", id: "ranger-a" },
+      { level: 1, kind: "equipment", id: "criminal-a" }
+    ] as MutableInput["choices"]
+  };
+};
+
+describe("Ranger - Favored Enemy, audit row 32", () => {
+  it("hands over Hunter's Mark ALWAYS prepared, without charging the prepared budget", () => {
+    // The SRD's own rule: a feature-granted always-prepared spell "doesn't count against the number
+    // of spells you can prepare". A level-5 Ranger prints 6 - so the sheet holds SEVEN spells and
+    // reports the budget as 6.
+    const built = table(rangerInput(5));
+    const spells = built.definition.spellcasting?.spells ?? [];
+    expect(spells.find((spell) => spell.id === "hunters-mark")).toMatchObject({ alwaysPrepared: true, level: 1 });
+    expect(built.definition.spellcasting?.classes?.[0]).toMatchObject({ classId: "ranger", prepared: 6 });
+    expect(spells.filter((spell) => spell.level >= 1 && !spell.alwaysPrepared)).toHaveLength(6);
+  });
+
+  it("gives exactly as many free casts as the printed Favored Enemy column, at two levels", () => {
+    // The column reads 2 at level 1 and 6 at level 17, and `scaling: {type: "class-resource"}` reads
+    // it. Spending to the limit and being refused the next one is the whole promise.
+    const first = table(rangerInput(1));
+    resolve(first, "favored-enemy", [], []);
+    resolve(first, "favored-enemy", [], []);
+    expect(first.hero.actionUses["favored-enemy"]).toBe(2);
+    expect(() => resolve(first, "favored-enemy", [], []))
+      .toThrowError(/Favored Enemy: no uses remaining \(2\/long rest\)/);
+
+    const late = table(rangerInput(17));
+    for (let cast = 0; cast < 6; cast += 1) resolve(late, "favored-enemy", [], []);
+    expect(late.hero.actionUses["favored-enemy"]).toBe(6);
+    expect(() => resolve(late, "favored-enemy", [], []))
+      .toThrowError(/Favored Enemy: no uses remaining \(6\/long rest\)/);
+  });
+});
+
+describe("Ranger - the rest of the kit", () => {
+  it("REFUSES a level-2 Ranger with no Deft Explorer Expertise, and grants it when chosen", () => {
+    const missing = rangerInput(2);
+    missing.choices = missing.choices.filter((row) => row.payload?.featureId !== "deft-explorer");
+    expect(() => buildCharacterDefinition(missing, library, policy))
+      .toThrowError(/"Deft Explorer" needs 1 pick\(s\) of kind "expertise"/);
+    const skills = table(rangerInput(2)).definition.proficiencies?.skills ?? [];
+    expect(skills.find((skill) => skill.id === "perception")?.proficiency).toBe("expertise");
+  });
+
+  it("adds Roving's 10 feet at level 6 and not at level 5", () => {
+    expect(table(rangerInput(6)).definition.speedFeet).toBe(40);
+    expect(table(rangerInput(5)).definition.speedFeet).toBe(30);
+  });
+
+  it("scales Tireless off the FINAL Wisdom modifier, so an ASI moves the pool", () => {
+    // `scaling: {type: "ability-modifier"}` resolves against the built scores, not the base ones.
+    // Same record, same level, two different numbers - which is what proves the scaling is read.
+    const plain = table(rangerInput(10));                      // Wis 15 -> +2
+    for (let use = 0; use < 2; use += 1) spend(plain, "tireless");
+    expect(plain.hero.actionUses["tireless"]).toBe(2);
+    newTurn(plain);
+    expect(() => resolve(plain, "tireless", [], []))
+      .toThrowError(/Tireless: no uses remaining \(2\/long rest\)/);
+
+    const focused = table(rangerInput(10, { wisFocus: true })); // Wis 15 + 4 -> +4
+    for (let use = 0; use < 4; use += 1) spend(focused, "tireless");
+    expect(focused.hero.actionUses["tireless"]).toBe(4);
+    newTurn(focused);
+    expect(() => resolve(focused, "tireless", [], []))
+      .toThrowError(/Tireless: no uses remaining \(4\/long rest\)/);
+  });
+
+  it("makes Nature's Veil a Bonus Action with its own Wisdom-sized pool", () => {
+    const built = table(rangerInput(14));
+    expect(actionOf(built, "natures-veil")?.activation).toBe("bonus-action");
+    spend(built, "natures-veil");
+    spend(built, "natures-veil");
+    expect(built.hero.actionUses["natures-veil"]).toBe(2);
+    // A SEPARATE pool from Tireless's, which is the SRD's reading and the reason each names its own.
+    expect(built.hero.actionUses["tireless"]).toBeUndefined();
+    newTurn(built);
+    expect(() => resolve(built, "natures-veil", [], []))
+      .toThrowError(/Nature's Veil: no uses remaining \(2\/long rest\)/);
+  });
+
+  it("REFUSES a level-19 Ranger with no Epic Boon feat", () => {
+    const missing = rangerInput(19);
+    missing.choices = missing.choices.filter((row) =>
+      row.payload?.featureId !== "epic-boon" && row.payload?.featureId !== "boon-of-dimensional-travel");
+    expect(() => buildCharacterDefinition(missing, library, policy))
+      .toThrowError(/"Epic Boon" needs 1 pick\(s\) of kind "feat"/);
+  });
+
+  it("carries Feral Senses as a rider on the sheet - display-level, and knowingly so", () => {
+    // `CARRIER_RIDER_DISPOSITION` records `sense` as "display-only": it reaches the rider carriers
+    // and no consumer applies it, exactly like the `darkvision` nine shipped species traits author.
+    // Asserted at the seam it really reaches, and claimed as nothing more than that.
+    const built = table(rangerInput(18));
+    const carrier = deriveEquipment(built.hero, built.definition, built.catalog).carriers.find((entry) => entry.label === "Feral Senses");
+    expect(carrier?.modifiers).toEqual([{ type: "sense", sense: "blindsight", feet: 30, when: [], scope: undefined }]);
+  });
+
+  it("bakes Extra Attack into the definition and reaches NO weapon swing - the engine gap, pinned", () => {
+    // Extra Attack is authored because it is the correct record and the Fighter ships the identical
+    // rider. What it does today is nothing: the builder folds `extra-attack` into the `attack.count`
+    // of actions the FEATURE declares, and a Ranger declares none - their swings are derived from
+    // equipped inventory, which `BUILDER_BAKED_MODIFIER_TYPES` deliberately excludes from the
+    // roll-time collector so a feat's bonus is not applied twice.
+    //
+    // This assertion exists so the day the engine closes that gap it FAILS and says so, rather than
+    // the content quietly being right for years without anyone noticing it was wrong.
+    const built = table(rangerInput(5));
+    expect(built.definition.character?.features?.map((entry) => entry.id)).toContain("extra-attack");
+    const bow = effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === "item-longbow");
+    expect(bow?.attack?.count ?? 1).toBe(1);
+  });
+});
+
+describe("Ranger - Hunter's Prey and Defensive Tactics, audit rows 21 and 22", () => {
+  it("REFUSES a Hunter who chose neither option, and puts the chosen one on the sheet", () => {
+    // Both features shipped with no `choice` at all: a Hunter picked nothing and the sheet recorded
+    // nothing. The pick is real now - the refusal is what proves it.
+    const missing = rangerInput(3);
+    missing.choices = missing.choices.filter((row) => row.kind !== "hunters-prey");
+    expect(() => buildCharacterDefinition(missing, library, policy))
+      .toThrowError(/"Hunter's Prey" needs 1 pick\(s\) of kind "hunters-prey"/);
+
+    const traits = (table(rangerInput(3)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
+    expect(traits).toContain("Colossus Slayer");
+    expect(traits).not.toContain("Horde Breaker");
+  });
+
+  it("refuses an option that is not one of the two printed", () => {
+    const bogus = rangerInput(3);
+    bogus.choices = bogus.choices.map((row) => row.kind === "hunters-prey" ? { ...row, id: "colossal-slayer" } : row);
+    expect(() => buildCharacterDefinition(bogus, library, policy)).toThrowError(/not an offered option/);
+  });
+
+  it("offers Defensive Tactics at level 7 and refuses a build that skipped it", () => {
+    const missing = rangerInput(7);
+    missing.choices = missing.choices.filter((row) => row.kind !== "defensive-tactics");
+    expect(() => buildCharacterDefinition(missing, library, policy))
+      .toThrowError(/"Defensive Tactics" needs 1 pick\(s\) of kind "defensive-tactics"/);
+    const traits = (table(rangerInput(7)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
+    expect(traits).toContain("Escape the Horde");
   });
 });
