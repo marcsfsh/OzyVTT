@@ -34,7 +34,7 @@ import type {
 // ── fixtures ────────────────────────────────────────────────────────────────────────────────────
 
 const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSummary, "id" | "name">): ContentFeatureSummary => ({
-  level: null, description: "", tags: [], choice: null, grantedAtLevels: [], extraPicks: [], ...over
+  level: null, description: "", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [], ...over
 });
 const choice = (kind: string, chooseCount: number, from: readonly string[]) =>
   ({ kind, choose: chooseCount, from, fromCatalog: null, maxSpellLevel: null, options: [] });

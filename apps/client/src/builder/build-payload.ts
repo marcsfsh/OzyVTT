@@ -1,5 +1,5 @@
 import {
-  CatalogChoiceError, resolveCatalogChoice,
+  CatalogChoiceError, extraPickAmount, resolveCatalogChoice,
   type BuilderAbilityMethod, type BuilderPolicy, type CatalogChoiceOption, type ContentBackgroundSummary,
   type ContentClassSummary, type ContentExtraPickSummary, type ContentFeatSummary, type ContentFeatureSummary,
   type ContentSpeciesSummary, type ContentSubclassSummary
@@ -120,6 +120,15 @@ export type BuilderOffer = Readonly<{
    */
   unavailable: Readonly<Record<string, string>> | null;
 }>;
+
+/**
+ * EVERY pick a feature owes, the client's mirror of the content package's `featurePicks`.
+ *
+ * `choice` is the first and `choices` is the whole list; a record authored either way reads the same
+ * here. Reading only `choice` is what silently dropped Magic Initiate's level-1 spell.
+ */
+const featurePicksOf = (feature: ContentFeatureSummary): readonly NonNullable<ContentFeatureSummary["choice"]>[] =>
+  feature.choices.length > 0 ? feature.choices : (feature.choice ? [feature.choice] : []);
 
 const optionsOfIds = (ids: readonly string[], nameOf: (id: string) => string): CatalogChoiceOption[] =>
   ids.map((id) => ({ id, name: nameOf(id) }));
@@ -288,7 +297,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     // whose own choice draws from a `<list>-spells` catalog is Magic Initiate, whose repeat clause
     // reads "a different spell list each time" - and here a spell list IS a separate feat id, so
     // repeating the SAME id is not legal however the `repeatable` flag reads.
-    return !(feat.feature.choice?.fromCatalog?.endsWith("-spells") ?? false);
+    return !featurePicksOf(feat.feature).some((pick) => pick.fromCatalog?.endsWith("-spells") ?? false);
   };
   /**
    * EXTRA PICKS - offer key -> how many picks the granted features have ADDED to it.
@@ -305,7 +314,13 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
    */
   const extraPicks = new Map<string, number>();
   const addExtraPicks = (grants: readonly ContentExtraPickSummary[] | undefined, times: number) => {
-    for (const grant of grants ?? []) extraPicks.set(grant.offer, (extraPicks.get(grant.offer) ?? 0) + grant.amount * times);
+    // `extraPickAmount` is the SHARED resolver, so a budget that follows the printed column
+    // (Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6) is computed by ONE function on both
+    // sides. A grant with no class in the draft yet scales off an empty table and adds nothing.
+    const table = context.classRecord?.levelTable ?? [];
+    for (const grant of grants ?? []) {
+      extraPicks.set(grant.offer, (extraPicks.get(grant.offer) ?? 0) + extraPickAmount(grant, table, draft.level) * times);
+    }
   };
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
@@ -331,13 +346,26 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     recordHeld(offerKey, kind, label);
   };
 
-  const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, capacity?: number, times = 1) => {
+  const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, times = 1) => {
     // BEFORE the early return: a feature may raise a budget without asking for a pick of its own
     // ("you gain one additional skill from your class's list" has no choice card, only a bigger one
     // on the class step). Collecting inside the offer branch would drop exactly those.
     addExtraPicks(feature.extraPicks, times);
-    const choice = feature.choice;
-    if (!choice || choice.choose <= 0) return;
+    // EVERY pick the record owes, mirroring the server's `featurePicks` loop. Magic Initiate owes two
+    // cantrips AND one level-1 spell; reading only the first is what silently dropped the spell. The
+    // first pick keeps the plain key so a parked draft still resolves; later ones take "/2", "/3",
+    // which `budgetKeyOf` deliberately does NOT collapse (a "#n" repeat means the same pick again,
+    // a "/n" means a DIFFERENT pick on the same record, and only the former shares a budget).
+    const picks = featurePicksOf(feature);
+    picks.forEach((choice, index) =>
+      featurePickOffer(index === 0 ? key : `${key}/${index + 1}`, step, feature, choice, level, classId, times));
+  };
+
+  const featurePickOffer = (
+    key: string, step: OfferStep, feature: ContentFeatureSummary, choice: NonNullable<ContentFeatureSummary["choice"]>,
+    level: number, classId: string | null, times = 1
+  ) => {
+    if (choice.choose <= 0) return;
     const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind));
     // A `maxSpellLevel` ceiling is a hard filter (Evocation Savant is level 2 and under), and the
     // two spell kinds do not overlap: "cantrip" means level 0, "spell" means 1+. Offering a cantrip
@@ -367,7 +395,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     offers.push({
       key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
       help: feature.description || null,
-      capacity: capacity ?? choice.choose,
+      capacity: choice.choose * times,
       options: offerable,
       maxSpellLevel: ceiling ?? null, level, classId, unresolvable,
       unavailable: unavailableOf(choice.kind, offerable)
@@ -446,7 +474,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     for (const entry of byFeature.values()) {
       // `entry.count` multiplies the budget grants for the same reason it multiplies `choose`: a feat
       // taken twice grants twice (the server folds the same count through `grantExtraPicks`).
-      featureOffer(`feature:${entry.feat.feature.id}`, entry.step, entry.feat.feature, entry.level, entry.classId, entry.feat.feature.choice!.choose * entry.count, entry.count);
+      featureOffer(`feature:${entry.feat.feature.id}`, entry.step, entry.feat.feature, entry.level, entry.classId, entry.count);
     }
 
     // The class's own spell budgets, from its printed level row. These are the UNTAGGED rows the

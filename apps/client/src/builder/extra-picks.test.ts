@@ -23,7 +23,7 @@ import { buildCreatePayload, computeOffers, emptyDraft, prunePicks, type Builder
 // ── fixtures ────────────────────────────────────────────────────────────────────────────────────
 
 const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSummary, "id" | "name">): ContentFeatureSummary => ({
-  level: null, description: "", tags: [], choice: null, grantedAtLevels: [], extraPicks: [], ...over
+  level: null, description: "", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [], ...over
 });
 
 const levelRow = (level: number, over: Partial<ContentClassLevelRow> = {}): ContentClassLevelRow => ({
@@ -56,8 +56,8 @@ const divineOrder = feature({
   choice: {
     kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"], fromCatalog: null, maxSpellLevel: null,
     options: [
-      { id: "protector", name: "Protector", description: "Martial weapons and Heavy armor training.", choice: null, extraPicks: [] },
-      { id: "thaumaturge", name: "Thaumaturge", description: "You know one extra cantrip from the Cleric spell list.", choice: null, extraPicks: [{ offer: "class-cantrips", amount: 1 }] }
+      { id: "protector", name: "Protector", description: "Martial weapons and Heavy armor training.", choice: null, choices: [], extraPicks: [] },
+      { id: "thaumaturge", name: "Thaumaturge", description: "You know one extra cantrip from the Cleric spell list.", choice: null, choices: [], extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }] }
     ]
   }
 });
@@ -163,7 +163,7 @@ describe("extraPicks composes across carriers and budgets", () => {
     // this file and fails only here.
     const blessing = feature({
       id: "extra-cantrip-blessing", name: "Blessing of Cantrips", level: 1, grantedAtLevels: [1],
-      description: "You know one extra cantrip.", extraPicks: [{ offer: "class-cantrips", amount: 1 }]
+      description: "You know one extra cantrip.", extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }]
     });
     const offers = computeOffers(
       draftWith({ "feature:divine-order": ["thaumaturge"] }),
@@ -179,7 +179,7 @@ describe("extraPicks composes across carriers and budgets", () => {
     const scholar = feature({
       id: "temple-scholar", name: "Temple Scholar", level: 1, grantedAtLevels: [1],
       description: "You gain proficiency in one additional Cleric skill.",
-      extraPicks: [{ offer: "class-skills", amount: 1 }]
+      extraPicks: [{ offer: "class-skills", amount: 1, scaling: null }]
     });
     const offers = computeOffers(draftWith(), catalogsWith(clericWith([scholar])));
     expect(capacityOf(offers, "class-skills")).toBe(3); // the class prints 2
@@ -195,7 +195,7 @@ describe("extraPicks composes across carriers and budgets", () => {
       features: [feature({
         id: "gifted-mind", name: "Gifted Mind",
         description: "One extra cantrip and one extra class skill.",
-        extraPicks: [{ offer: "class-cantrips", amount: 1 }, { offer: "class-skills", amount: 1 }]
+        extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }, { offer: "class-skills", amount: 1, scaling: null }]
       })]
     } as unknown as ContentSpeciesSummary;
     const draft = { ...draftWith(), speciesId: "gifted" };
@@ -213,7 +213,7 @@ describe("extraPicks composes across carriers and budgets", () => {
     const devotion = feature({
       id: "deep-devotion", name: "Deep Devotion", level: 1, grantedAtLevels: [1],
       description: "You gain two more Expertise choices.",
-      extraPicks: [{ offer: "feature:expertise", amount: 2 }]
+      extraPicks: [{ offer: "feature:expertise", amount: 2, scaling: null }]
     });
     const offers = computeOffers(draftWith(), catalogsWith(clericWith([expertise, devotion])));
     expect(capacityOf(offers, "feature:expertise")).toBe(3);
@@ -225,7 +225,7 @@ describe("extraPicks composes across carriers and budgets", () => {
     const zealot = feature({
       id: "zealous-study", name: "Zealous Study", level: 1, grantedAtLevels: [1],
       description: "You can prepare one additional Cleric spell.",
-      extraPicks: [{ offer: "class-spells", amount: 1 }]
+      extraPicks: [{ offer: "class-spells", amount: 1, scaling: null }]
     });
     const offers = computeOffers(draftWith(), catalogsWith(clericWith([zealot])));
     expect(capacityOf(offers, "class-spells")).toBe(5); // the level-1 row prints 4
@@ -237,7 +237,7 @@ describe("extraPicks composes across carriers and budgets", () => {
     const confused = feature({
       id: "confused-gift", name: "Confused Gift", level: 1, grantedAtLevels: [1],
       description: "Grants a pick to a budget that does not exist here.",
-      extraPicks: [{ offer: "background-tools", amount: 1 }]
+      extraPicks: [{ offer: "background-tools", amount: 1, scaling: null }]
     });
     const offers = computeOffers(draftWith(), catalogsWith(clericWith([confused])));
     expect(offers.find((offer) => offer.key === "background-tools")).toBeUndefined();

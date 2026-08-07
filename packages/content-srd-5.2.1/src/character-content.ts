@@ -313,8 +313,40 @@ export const PickBudgetKeySchema = z.string()
  */
 export const ExtraPickSchema = z.object({
   offer: PickBudgetKeySchema,
-  amount: z.number().int().min(1).max(5).default(1)
-}).strict();
+  amount: z.number().int().min(1).max(5).optional(),
+  /**
+   * HOW MUCH, WHEN THE PRINTED TABLE ANSWERS THAT - the same fourth way `FeatureUsesSchema` scales
+   * a feature's USES, applied to a pick BUDGET.
+   *
+   * `class-resource-growth` reads the class table's own column and yields **how far it has grown
+   * above its first printed value** at this character's level. Growth, not the value, because
+   * composition here is ADDITION over the feature's own `choose`: Eldritch Invocations prints 1 at
+   * level 1 and 10 at level 20, so `choose: 1` plus a growth of 9 is exactly ten - and Weapon
+   * Mastery's 3 -> 6 (Fighter) and 2 -> 4 (Barbarian) land the same way.
+   *
+   * WHY NOT REPEAT-GRANTS. `grantedAtLevels x choose` already grows a budget, and it cannot express
+   * these: the Invocations column steps by +2 at levels 2 and 5, a level row may list a feature only
+   * once, and **the SRD prints no feature heading at L2/L5/L7/L9/L12/L15/L18 to carry a grant at
+   * all**. Inventing marker features would be inventing content the source does not have. Reading
+   * the printed column needs no carrier - the feature granted at level 1 carries it, and the number
+   * moves with the character's level.
+   *
+   * A column whose printed amount is a DICE STRING (Sneak Attack "3d6") is not a count and resolves
+   * to 0, exactly as `FeatureUsesSchema`'s `class-resource` treats it.
+   */
+  scaling: z.object({
+    type: z.literal("class-resource-growth"),
+    /** The `classResources.id` of the printed column - `eldritch-invocations`, `weapon-mastery`. */
+    id: ContentIdSchema
+  }).strict().optional()
+}).strict().superRefine((grant, context) => {
+  // Exactly one, and `amount` has no default for precisely this reason: a defaulted 1 beside a
+  // `scaling` is indistinguishable from an authored 1, and "the flat amount was silently ignored"
+  // is the class of silent failure this whole vocabulary exists to end.
+  if ((grant.amount === undefined) === (grant.scaling === undefined)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "An extra pick states either a flat `amount` or a `scaling` rule - exactly one." });
+  }
+});
 export type ExtraPick = z.infer<typeof ExtraPickSchema>;
 
 /**
@@ -381,6 +413,40 @@ export const FeatureOptionChoiceSchema = z.object(featureChoiceBase).strict().su
 export type FeatureOptionChoice = z.infer<typeof FeatureOptionChoiceSchema>;
 
 /**
+ * ONE RECORD, SEVERAL PICKS - authored as `choices`, read through `featurePicks`.
+ *
+ * `choice` was singular, and with it a single `kind` and a single `maxSpellLevel`, which is why
+ * Magic Initiate **silently dropped its level-1 spell**: all three variants author
+ * `{kind: "cantrip", choose: 2, maxSpellLevel: 0}` against text reading "two cantrips ... you also
+ * choose one level 1 spell from that list". Two of the four SRD backgrounds hand a Magic Initiate to
+ * a level-1 character (Acolyte -> Cleric, Sage -> Wizard), so half of all first-level characters met
+ * this before they reached the class step. Deft Explorer (one Expertise AND two languages) and Pact
+ * of the Tome (three cantrips AND two rituals) are the same shape.
+ *
+ * `choice` STAYS, and stays the way almost every record is authored: one pick is the overwhelming
+ * case and `choice` reads better than a one-element array. Both consumers go through `featurePicks`,
+ * so neither has to know which form a record used - and the pair is mutually exclusive rather than
+ * merged, because "which of the two is the real list" has no good silent answer.
+ */
+const oneChoiceForm = (record: { choice?: unknown; choices?: unknown }, context: z.RefinementCtx) => {
+  if (record.choice !== undefined && record.choices !== undefined) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["choices"], message: "Author `choice` (one pick) or `choices` (several) - never both." });
+  }
+};
+
+/**
+ * EVERY pick a feature or an option asks for, whichever form it was authored in.
+ *
+ * The single accessor both consumers use, so a record authored with `choices` reaches the wizard and
+ * the server's validator identically to one authored with `choice`, and adding the plural form
+ * needed no change at either call site beyond looping.
+ */
+export function featurePicks<Choice>(record: { choice?: Choice; choices?: Choice[] }): readonly Choice[] {
+  if (record.choices && record.choices.length > 0) return record.choices;
+  return record.choice ? [record.choice] : [];
+}
+
+/**
  * ONE pickable option that carries its OWN mechanics. This is the fix for options-as-bare-strings:
  * before, `from: ["protector", "thaumaturge"]` recorded WHICH role a Cleric took but could not say
  * what the role granted, so the pick was validated, written to the ledger, and then discarded.
@@ -397,10 +463,12 @@ export const FeatureOptionSchema = z.object({
   description: z.string().min(1).max(20000),
   /** A pick this OPTION asks for once chosen, from a list of its own. */
   choice: FeatureOptionChoiceSchema.optional(),
+  /** SEVERAL picks this option asks for; see `FeatureRecordSchema.choices`. Author one or the other. */
+  choices: z.array(FeatureOptionChoiceSchema).min(1).max(4).optional(),
   /** Budgets this option RAISES once chosen (Thaumaturge's extra Cleric cantrip). */
   extraPicks: extraPicksField,
   ...featureRiders
-}).strict();
+}).strict().superRefine(oneChoiceForm);
 export type FeatureOption = z.infer<typeof FeatureOptionSchema>;
 
 /**
@@ -460,12 +528,18 @@ export const FeatureRecordSchema = z.object({
   description: z.string().min(1).max(20000),
   /** A pick this feature asks the player to make; writes a `choices[]` row. */
   choice: FeatureChoiceSchema.optional(),
+  /**
+   * SEVERAL picks, when one record promises more than one - Magic Initiate's "two cantrips ... and
+   * one level 1 spell", Deft Explorer's Expertise plus two languages, Pact of the Tome's three
+   * cantrips plus two rituals. Mutually exclusive with `choice`; read both through `featurePicks`.
+   */
+  choices: z.array(FeatureChoiceSchema).min(1).max(4).optional(),
   /** Budgets this feature RAISES - one extra cantrip, one extra skill, one more prepared spell. */
   extraPicks: extraPicksField,
   ...featureRiders,
   /** This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17). */
   replacesFeatureId: ContentIdSchema.optional()
-}).strict();
+}).strict().superRefine(oneChoiceForm);
 export type FeatureRecord = z.infer<typeof FeatureRecordSchema>;
 
 // ---------------------------------------------------------------------------------------------

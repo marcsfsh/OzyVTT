@@ -121,6 +121,9 @@ const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodTypeAny; wireOnly
   { component: "HomebrewFeatureUses", schema: bundle.FeatureUsesSchema },
   { component: "HomebrewFeatureGrants", schema: bundle.FeatureGrantsSchema },
   { component: "HomebrewExtraPick", schema: bundle.ExtraPickSchema },
+  // Hoisted for the same reason `HomebrewFeatureUses.scaling`'s branches are: it is a nested object
+  // property, and the reference renderer flattens one level only.
+  { component: "HomebrewExtraPickScaling", schema: objectOf(bundle.ExtraPickSchema).shape.scaling },
   // Record support shapes.
   { component: "HomebrewChoiceList", schema: bundle.ChoiceListSchema },
   { component: "HomebrewStartingEquipmentOption", schema: bundle.StartingEquipmentOptionSchema },

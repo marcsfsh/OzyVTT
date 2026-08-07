@@ -700,7 +700,16 @@
      "kind": "weapon-mastery",
      "choose": 2,
      "fromCatalog": "weapons"
-    }
+    },
+    "extraPicks": [
+     {
+      "offer": "feature:weapon-mastery",
+      "scaling": {
+       "type": "class-resource-growth",
+       "id": "weapon-mastery"
+      }
+     }
+    ]
    },
    {
     "id": "danger-sense",
@@ -4040,7 +4049,16 @@
      "choose": 3,
      "fromCatalog": "weapons",
      "repeatable": false
-    }
+    },
+    "extraPicks": [
+     {
+      "offer": "feature:weapon-mastery",
+      "scaling": {
+       "type": "class-resource-growth",
+       "id": "weapon-mastery"
+      }
+     }
+    ]
    },
    {
     "id": "action-surge",
@@ -8535,7 +8553,16 @@
        "description": "Prerequisite: Level 15+ Warlock You have Truesight with a range of 30 feet."
       }
      ]
-    }
+    },
+    "extraPicks": [
+     {
+      "offer": "feature:eldritch-invocations",
+      "scaling": {
+       "type": "class-resource-growth",
+       "id": "eldritch-invocations"
+      }
+     }
+    ]
    },
    {
     "id": "pact-magic",

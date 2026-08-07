@@ -3,6 +3,8 @@ import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema, type Actor, ty
 
 /** The `fromCatalog` choice-slug resolver (shared by the wizard UI and server-side character.create validation). */
 export * from "./catalog-choice.js";
+export * from "./pick-budget.js";
+import type { PickBudgetScaling } from "./pick-budget.js";
 
 /**
  * The Codex entity field vocabulary. Shared for the same reason as the rider gates below: the GM UI
@@ -735,7 +737,12 @@ export type ContentSourceKind = "srd" | "homebrew";
  * wire the wizard offers Divine Order, reports the step complete, and the server refuses the build.
  * Riders (actions, grants, modifiers, uses) deliberately stay server-side - the server applies them.
  */
-export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string; choice: ContentFeatureChoiceSummary | null; extraPicks: readonly ContentExtraPickSummary[] }>;
+export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string;
+  /** The FIRST pick this option owes, or null. Kept for callers that only ever needed one; `choices` is the whole list. */
+  choice: ContentFeatureChoiceSummary | null;
+  /** EVERY pick this option owes, in authored order. Empty when it owes none. */
+  choices: readonly ContentFeatureChoiceSummary[];
+  extraPicks: readonly ContentExtraPickSummary[] }>;
 /**
  * ONE budget a feature (or a chosen option) RAISES: "you know one extra cantrip from the Cleric
  * spell list" is `{offer: "class-cantrips", amount: 1}`.
@@ -751,13 +758,28 @@ export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; d
  * `choice` and `maxSpellLevel`. A wizard that cannot see it caps the player at the printed level row
  * and the extra pick the text promised is simply unselectable.
  */
-export type ContentExtraPickSummary = Readonly<{ offer: string; amount: number }>;
+export type ContentExtraPickSummary = Readonly<{ offer: string;
+  /** A flat number of extra picks; null when `scaling` states it instead. Exactly one of the two is set. */
+  amount: number | null;
+  /**
+   * "As many as the printed column has grown" - the budget follows the class table instead of a
+   * constant. Eldritch Invocations runs 1 -> 10 and Weapon Mastery 3 -> 6 with no feature heading at
+   * the levels they step, so no repeat-grant can express them; the wizard resolves it against the
+   * same level table the server does (`extraPickAmount`). Null for a flat grant.
+   */
+  scaling: PickBudgetScaling | null }>;
 export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
   /** Ceiling on a spell pick's level (Evocation Savant is level 2 and under; Magic Initiate is cantrips only). Null = no ceiling. WITHOUT this the wizard would offer spells the server then rejects, so it crosses the wire with the rest of the choice. */
   maxSpellLevel: number | null;
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   options: readonly ContentFeatureOptionSummary[] }>;
-export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null; /**
+export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The FIRST pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null;
+/**
+ * EVERY pick this feature asks for, in authored order - one record may owe more than one, and with
+ * different kinds and ceilings. Magic Initiate owes two cantrips AND one level-1 spell; reading only
+ * `choice` is what silently dropped the spell. Empty when the feature asks for nothing.
+ */
+choices: readonly ContentFeatureChoiceSummary[]; /**
  * EVERY level at which the owning class's table grants this feature - the authoritative repeat
  * count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times, and the server's capacity
  * is `choose x grants` (`character-build.ts` grantedClassFeatures), so a client that cannot see the

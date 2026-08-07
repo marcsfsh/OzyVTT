@@ -4642,7 +4642,8 @@ ONE pick budget a feature or a chosen option raises. `offer` is the offer key th
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `offer` | string | yes | The offer key whose capacity this raises |
-| `amount` | integer (1–5) | yes | How many extra picks |
+| `amount` | integer \| null | yes | How many extra picks, as a flat number; null when `scaling` states it instead |
+| `scaling` | HomebrewExtraPickScaling \| null | yes | The budget follows a printed class-table column instead of a constant - Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6. Resolved against the same level table on both sides. Null for a flat grant. |
 
 ### `ContentFeatsData`
 
@@ -4674,7 +4675,8 @@ The browse-and-pick projection of a bundle FeatureRecord. Prose is the display s
 | `level` | integer \| null | yes | The class/subclass level the feature lands at; null when it is not level-gated (species traits, feats) |
 | `description` | string | yes |  |
 | `tags` | string (pattern)[] | yes | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
-| `choice` | ContentFeatureChoice \| null | yes | The pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking. |
+| `choice` | ContentFeatureChoice \| null | yes | The FIRST pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking. |
+| `choices` | ContentFeatureChoice[] | yes | EVERY pick this feature asks for, in authored order - one record may owe more than one, with different kinds and ceilings. Magic Initiate owes two cantrips AND one level-1 spell, and reading only `choice` is what silently dropped the spell. Empty when the feature asks for nothing. |
 | `grantedAtLevels` | integer (1–20)[] | yes | Every level at which the owning class's table grants this feature - the authoritative repeat count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times and the server's capacity is choose x grants, so a client that ignores this offers too few picks and the build is rejected at creation. Empty when no class level table grants the feature (species traits, feats, subclass features). |
 | `extraPicks` | ContentExtraPick[] | yes | Budgets this feature RAISES rather than picks it asks for. Travels although riders do not, because it is an input to picking: a wizard that ignores it caps the player at the printed level row and the extra pick the text promised is unselectable. |
 
@@ -4700,7 +4702,8 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `id` | string (pattern) | yes |  |
 | `name` | string | yes |  |
 | `description` | string | yes |  |
-| `choice` | ContentFeatureChoice \| null | yes | A nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
+| `choice` | ContentFeatureChoice \| null | yes | The FIRST nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
+| `choices` | ContentFeatureChoice[] | yes | EVERY nested pick this option owes, in authored order. |
 | `extraPicks` | ContentExtraPick[] | yes | Budgets this option RAISES once chosen - Divine Order's Thaumaturge adds one to the Cleric cantrip budget. |
 
 ### `ContentMonsterActionsData`
@@ -5262,7 +5265,17 @@ ONE budget a feature or a chosen option RAISES. `offer` is the offer key the wiz
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `offer` | string (pattern) | yes | The offer key whose capacity this raises |
-| `amount` | integer (1–5) | no | How many extra picks. Additive across every source that names the same budget Default: `1`. |
+| `amount` | integer (1–5) | no | How many extra picks, as a flat number. Additive across every source that names the same budget. Exactly one of `amount` and `scaling` is authored - a defaulted amount beside a scaling rule would be indistinguishable from an authored one, and "the flat amount was silently ignored" is the failure this vocabulary exists to end |
+| `scaling` | HomebrewExtraPickScaling | no | How many extra picks, read off the class table's own printed column instead of a constant. The budget then follows the column at every level |
+
+### `HomebrewExtraPickScaling`
+
+A pick budget that FOLLOWS A PRINTED COLUMN - the same fourth way `HomebrewFeatureUses` scales a feature's uses, applied to capacity. `class-resource-growth` yields how far the named `classResources` column has grown above its first printed value at this character's level, so the feature's own `choose` plus the growth is the printed total: Eldritch Invocations runs 1 -> 10 and Weapon Mastery 3 -> 6 (Fighter) and 2 -> 4 (Barbarian). Repeat grants cannot express these - the column steps at levels where the SRD prints no feature heading to carry a grant at all.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | `class-resource-growth` | yes |  |
+| `id` | string (pattern) | yes | The `classResources.id` of the printed column (eldritch-invocations, weapon-mastery) |
 
 ### `HomebrewFeatRecord`
 
@@ -5297,6 +5310,7 @@ THE shared feature record: a class feature, a subclass feature, a species trait,
 | `level` | integer (1–20) | no | Class/subclass level this feature is gained at. Omitted for always-on records (species traits, feats) |
 | `description` | string | yes |  |
 | `choice` | HomebrewFeatureChoice | no | A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible |
+| `choices` | HomebrewFeatureChoice[] | no | SEVERAL picks, when one record promises more than one - Magic Initiate's "two cantrips ... and one level 1 spell", Deft Explorer's Expertise plus two languages. Mutually exclusive with `choice`, which stays the way almost every record is authored |
 | `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
@@ -5431,6 +5445,7 @@ ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeat
 | `name` | string | yes |  |
 | `description` | string | yes |  |
 | `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen, from a list of its own |
+| `choices` | HomebrewFeatureOptionChoice[] | no | SEVERAL second-order picks (Pact of the Tome asks for three cantrips AND two rituals). Mutually exclusive with `choice` |
 | `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BuilderPolicySchema, GameStateSchema, resolveSpellcasting, type GameState } from "@vtt/domain";
+import { BuilderPolicySchema, GameStateSchema, extraPickAmount, resolveSpellcasting, type GameState } from "@vtt/domain";
 import { abilityModifier, meetsMulticlassPrerequisites } from "@vtt/rules-5e";
 import { buildCharacterDefinition, NAMED_PICK_BUDGETS, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
@@ -51,6 +51,7 @@ const fighterInput = (): MutableCreateInput => ({
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
+    { level: 4, classId: "fighter", kind: "weapon-mastery", id: "rapier" },
     { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
     { level: 4, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
@@ -86,6 +87,8 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "mage-hand" },
     { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
     { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
+    // The level-1 spell the feat's text always promised and its record could not carry.
+    { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
     { level: 1, kind: "spell", id: "magic-missile" },
     { level: 1, kind: "spell", id: "mage-armor" },
     { level: 1, kind: "spell", id: "detect-magic" },
@@ -122,13 +125,21 @@ const warlockInput = (): MutableCreateInput => ({
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
     { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+    // FIVE invocations at level 5, not one: the printed Invocations column runs 1 -> 3 (L2) -> 5 (L5),
+    // and `class-resource-growth` is what lets the budget follow it. Stamped at the level each is
+    // gained so a rebuild DOWN drops the ones the smaller column no longer pays for.
     { level: 1, classId: "warlock", kind: "eldritch-invocation", id: "agonizing-blast", payload: { featureId: "eldritch-invocations" } },
+    { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "devils-sight", payload: { featureId: "eldritch-invocations" } },
+    { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-mind", payload: { featureId: "eldritch-invocations" } },
+    { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-spear", payload: { featureId: "eldritch-invocations" } },
+    { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "repelling-blast", payload: { featureId: "eldritch-invocations" } },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
     { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "equipment", id: "warlock-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" }
   ]
@@ -451,6 +462,7 @@ const clericInput = (): MutableCreateInput => ({
     // The Acolyte's origin feat (Magic Initiate (Cleric)) asks for two cantrips of its own.
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "resistance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "light" },
     { level: 1, kind: "cantrip", id: "sacred-flame" },
     { level: 1, kind: "cantrip", id: "spare-the-dying" },
@@ -557,7 +569,7 @@ describe("extra picks raise the budget the server validates against", () => {
   const printedCantrips = clericRecord.levelTable[2].cantripsKnown!;
   const grantedCantrips = thaumaturge.extraPicks
     .filter((grant) => grant.offer === "class-cantrips")
-    .reduce((sum, grant) => sum + grant.amount, 0);
+    .reduce((sum, grant) => sum + extraPickAmount(grant, clericRecord.levelTable, 3), 0);
 
   /** A Thaumaturge Cleric 3 whose untagged class cantrip rows number exactly `count`. */
   const withCantrips = (count: number): MutableCreateInput => {
@@ -637,6 +649,57 @@ describe("extra picks raise the budget the server validates against", () => {
     // Without the trait, the third skill is refused - the negative control for the same input.
     expect(() => buildCharacterDefinition(threeSkills, library, defaultPolicy))
       .toThrowError(/exceeds what this build may choose/);
+  });
+
+  /**
+   * A BUDGET THAT FOLLOWS THE PRINTED COLUMN. The three records where a level-20 character was
+   * countably wrong: Eldritch Invocations (1 offered against 10 owed at level 20), and Weapon Mastery
+   * on Fighter and Barbarian. `class-resource-growth` reads the column, so `choose` plus the growth is
+   * the printed number at every level - and no marker feature has to be invented at L2/L5/L7/... where
+   * the SRD prints no heading for a repeat grant to hang on.
+   */
+  const INVOCATIONS = ["agonizing-blast", "devils-sight", "eldritch-mind", "eldritch-spear", "repelling-blast", "armor-of-shadows"];
+  const warlockWithInvocations = (count: number): MutableCreateInput => {
+    const input = warlockInput();
+    input.choices = input.choices
+      .filter((row) => row.kind !== "eldritch-invocation")
+      .concat(INVOCATIONS.slice(0, count).map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } })));
+    return input;
+  };
+
+  it("offers a level-5 Warlock FIVE invocations, and refuses both the sixth and only four", () => {
+    // The printed Invocations column reads 1 at level 1 and 5 at level 5. Before the scaling the
+    // budget was `choose: 1`, granted once, for every level of the class.
+    expect(() => buildCharacterDefinition(warlockWithInvocations(5), library, defaultPolicy)).not.toThrow();
+    expect(() => buildCharacterDefinition(warlockWithInvocations(6), library, defaultPolicy))
+      .toThrowError(/exceeds what this build may choose \(Eldritch Invocations: 5\)/);
+    // Underfilled is as loud as overfilled - which is what proves the number MOVED rather than the
+    // ceiling simply being lifted.
+    expect(() => buildCharacterDefinition(warlockWithInvocations(4), library, defaultPolicy))
+      .toThrowError(/"Eldritch Invocations" needs 5 pick\(s\)/);
+  });
+
+  it("follows the Weapon Mastery column on a HAND_AUTHORED class, which the overlay used to skip", () => {
+    // fighterInput() is level 5 and carries four masteries (the column steps to 4 at level 4).
+    const five = fighterInput();
+    five.choices.push({ level: 4, classId: "fighter", kind: "weapon-mastery", id: "shortsword" });
+    expect(() => buildCharacterDefinition(five, library, defaultPolicy)).toThrowError(/exceeds what this build may choose \(Weapon Mastery: 4\)/);
+  });
+
+  /**
+   * TWO PICKS ON ONE RECORD. Magic Initiate's text promises "two cantrips ... and one level 1 spell"
+   * and its record could carry only one `choice` with one `maxSpellLevel`, so the spell was silently
+   * dropped - for two of the four SRD backgrounds, on a level-1 character.
+   */
+  it("offers Magic Initiate's level-1 spell as a SECOND pick, and puts it on the sheet", () => {
+    const built = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
+    expect((built.spellcasting?.spells ?? []).map((spell) => spell.id)).toContain("bless");
+    const twoSpells = warlockInput();
+    twoSpells.choices.push({ level: 1, kind: "spell", id: "cure-wounds", payload: { featureId: "magic-initiate-cleric" } });
+    expect(() => buildCharacterDefinition(twoSpells, library, defaultPolicy)).toThrowError(/exceeds what this build may choose/);
+    const noSpell = warlockInput();
+    noSpell.choices = noSpell.choices.filter((row) => !(row.kind === "spell" && row.payload?.featureId === "magic-initiate-cleric"));
+    expect(() => buildCharacterDefinition(noSpell, library, defaultPolicy)).toThrowError(/"Magic Initiate \(Cleric\)" needs 1 pick\(s\) of kind "spell"/);
   });
 
   it("raises the PREPARED-SPELL budget, and the sheet reports the composed number", () => {
@@ -744,7 +807,8 @@ describe("M3 - the same feat cannot be taken twice across different offers", () 
     differentList.choices = differentList.choices.map((row) => row.kind === "feat" ? { ...row, id: "magic-initiate-wizard" } : row);
     differentList.choices.push(
       { level: 1, kind: "cantrip", id: "fire-bolt", payload: { featureId: "magic-initiate-wizard" } },
-      { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "magic-initiate-wizard" } }
+      { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
     );
     const built = buildCharacterDefinition(differentList, library, defaultPolicy);
     // The Versatile pick REPLACED Alert here, so the sheet holds the background's Cleric flavour
@@ -912,6 +976,10 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
       { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
       { level: 1, classId: "warlock", kind: "skill", id: "deception" },
       { level: 1, classId: "warlock", kind: "eldritch-invocation", id: "agonizing-blast", payload: { featureId: "eldritch-invocations" } },
+      { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "devils-sight", payload: { featureId: "eldritch-invocations" } },
+      { level: 2, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-mind", payload: { featureId: "eldritch-invocations" } },
+      { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "eldritch-spear", payload: { featureId: "eldritch-invocations" } },
+      { level: 5, classId: "warlock", kind: "eldritch-invocation", id: "repelling-blast", payload: { featureId: "eldritch-invocations" } },
       { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron", payload: { featureId: "warlock-subclass" } },
       { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement", payload: { featureId: "ability-score-improvement" } },
       { level: 4, classId: "warlock", kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },

@@ -426,6 +426,7 @@ describe("homebrew HTTP CRUD", () => {
         { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "greatsword" },
         { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "flail" },
         { level: 1, classId: heroClass.id, kind: "weapon-mastery", id: "longbow" },
+        { level: 4, classId: heroClass.id, kind: "weapon-mastery", id: "rapier" },
         { level: 3, classId: heroClass.id, kind: "subclass", id: subclass.id },
         { level: 4, classId: heroClass.id, kind: "asi-or-feat", id: "ability-score-improvement" },
         { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },

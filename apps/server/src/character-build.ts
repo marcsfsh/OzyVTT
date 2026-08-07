@@ -1,5 +1,5 @@
 import type { BuilderPolicy } from "@vtt/domain";
-import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
+import { CatalogChoiceError, extraPickAmount, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
 import {
   ActorDefinitionSchema,
   type ActorAction, type ActorDefinition, type CharacterChoice, type InventoryItem
@@ -13,6 +13,7 @@ import type {
   BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureModifier, FeatureOption,
   FeatureRecord, SpeciesReference, SubclassReference
 } from "@vtt/content-srd-5.2.1";
+import { featurePicks } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -82,7 +83,7 @@ function dedupe(values: readonly string[]): string[] { return [...new Set(values
  * place that has to change.
  */
 function repeatsOnlyWithADifferentSpellList(feat: FeatReference): boolean {
-  return feat.feature.choice?.fromCatalog?.endsWith("-spells") ?? false;
+  return featurePicks(feat.feature).some((pick) => pick.fromCatalog?.endsWith("-spells") ?? false);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -613,8 +614,16 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   listOffer("background-languages", "language", `${background.name} languages`, background.languageChoices);
   listOffer("species-languages", "language", `${species.name} languages`, species.languageChoices);
   const featureOffer = (record: FeatureRecord, count: number, featureAliases: readonly string[] = []): void => {
-    const choice = record.choice;
-    if (!choice || choice.choose * count === 0) return;
+    // EVERY pick the record owes, not just the first. A record may promise two (Magic Initiate's two
+    // cantrips AND its level-1 spell), and each becomes its own offer with its own kind, capacity and
+    // spell-level ceiling. The FIRST keeps the plain `feature:<id>` key so every existing ledger row,
+    // `extraPicks` target and alias resolves exactly as before; later picks take `/2`, `/3`, ... .
+    featurePicks(record).forEach((choice, index) => featurePickOffer(record, choice, index, count, featureAliases));
+  };
+  const featurePickOffer = (
+    record: FeatureRecord, choice: NonNullable<FeatureRecord["choice"]>, index: number, count: number, featureAliases: readonly string[]
+  ): void => {
+    if (choice.choose * count === 0) return;
     let options: ReadonlySet<string>;
     let optionLevels: ReadonlyMap<string, number> | null = null;
     let unresolvable: string | null = null;
@@ -642,7 +651,8 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       }
     }
     offers.push(offerOf({
-      key: `feature:${record.id}`, featureId: record.id, featureAliases, kind: choice.kind, capacity: choice.choose * count,
+      key: index === 0 ? `feature:${record.id}` : `feature:${record.id}/${index + 1}`,
+      featureId: record.id, featureAliases, kind: choice.kind, capacity: choice.choose * count,
       options, optionLevels, optionRecords: choice.options ?? null, unresolvable, repeatable: choice.repeatable,
       maxSpellLevel: choice.maxSpellLevel ?? null, maximum: choice.maximum ?? null, label: record.name
     }));
@@ -669,7 +679,11 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const extraPickBudgets = new Map<string, number>();
   const grantExtraPicks = (record: FeatureRecord, count: number): void => {
     for (const grant of record.extraPicks) {
-      const amount = grant.amount * count;
+      // `extraPickAmount` is the SHARED resolver - the same function the wizard calls, so a budget
+      // that follows the printed column (Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6) cannot
+      // be computed two ways. A flat grant is `grant.amount`; a scaled one reads `classRecord`'s own
+      // level table at this character's level.
+      const amount = extraPickAmount(grant, classRecord.levelTable, input.level) * count;
       extraPickBudgets.set(grant.offer, (extraPickBudgets.get(grant.offer) ?? 0) + amount);
       // The two class budgets (`class-cantrips`, `class-spells`) are not offers - they are the level
       // row's own columns, read at step 9 - so a key that matches no offer here is not yet an error.

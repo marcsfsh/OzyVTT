@@ -1,7 +1,7 @@
 import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
-import { applySpellListOverlay, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import { applySpellListOverlay, featurePicks, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
 import type { CharacterFeatureRef, FeatureRecordLike } from "./equipment-derivation.js";
 import { parseAreaProse } from "./area-targeting.js";
 
@@ -223,31 +223,48 @@ function slotCastingOptions(options: SpellReference["castingOptions"]): ContentS
  * nested choice on the wire the wizard reports the step complete and the server refuses the build.
  * Riders (actions/grants/modifiers/uses) stay server-side - only what the player must SEE travels.
  */
-const choiceSummaryOf = (choice: FeatureRecord["choice"]): ContentFeatureSummary["choice"] => choice
+type WireChoice = NonNullable<ContentFeatureSummary["choice"]>;
+/** `{offer, amount}` or `{offer, scaling}` - one of the two, filled out for a wire type that has both. */
+const extraPickSummaryOf = (grants: FeatureRecord["extraPicks"]): ContentFeatureSummary["extraPicks"] =>
+  grants.map((grant) => ({ offer: grant.offer, amount: grant.amount ?? null, scaling: grant.scaling ?? null }));
+
+const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null => choice
   ? {
       kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null,
-      options: (choice.options ?? []).map((option) => ({
-        id: option.id, name: option.name, description: option.description,
+      options: (choice.options ?? []).map((option) => {
         // One level of nesting only, matching the schema's own bound: a nested choice cannot itself carry options.
-        choice: option.choice ? { kind: option.choice.kind, choose: option.choice.choose, from: option.choice.from ?? [], fromCatalog: option.choice.fromCatalog ?? null, maxSpellLevel: option.choice.maxSpellLevel ?? null, options: [] } : null,
-        // The budget a CHOSEN option raises. Travels for the same reason its `choice` does: without
-        // it the wizard caps the player at the printed level row and the extra pick Thaumaturge
-        // promises ("one extra cantrip from the Cleric spell list") cannot be selected at all.
-        extraPicks: option.extraPicks
-      }))
+        const nested = featurePicks(option).map((pick) => ({
+          kind: pick.kind, choose: pick.choose, from: pick.from ?? [], fromCatalog: pick.fromCatalog ?? null, maxSpellLevel: pick.maxSpellLevel ?? null, options: []
+        }));
+        return {
+          id: option.id, name: option.name, description: option.description,
+          choice: nested[0] ?? null,
+          choices: nested,
+          // The budget a CHOSEN option raises. Travels for the same reason its `choice` does: without
+          // it the wizard caps the player at the printed level row and the extra pick Thaumaturge
+          // promises ("one extra cantrip from the Cleric spell list") cannot be selected at all.
+          extraPicks: extraPickSummaryOf(option.extraPicks)
+        };
+      })
     }
   : null;
 
-const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly number[] = []): ContentFeatureSummary => ({
-  id: feature.id,
-  name: feature.name,
-  level: feature.level ?? null,
-  description: feature.description,
-  tags: feature.tags,
-  choice: choiceSummaryOf(feature.choice),
-  grantedAtLevels,
-  extraPicks: feature.extraPicks
-});
+const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly number[] = []): ContentFeatureSummary => {
+  // EVERY pick, not just the first: a record may owe several (Magic Initiate's two cantrips AND its
+  // level-1 spell), and `choice` is kept as the first so callers that only ever wanted one are unchanged.
+  const picks = featurePicks(feature).map((pick) => choiceSummaryOf(pick)!);
+  return {
+    id: feature.id,
+    name: feature.name,
+    level: feature.level ?? null,
+    description: feature.description,
+    tags: feature.tags,
+    choice: picks[0] ?? null,
+    choices: picks,
+    grantedAtLevels,
+    extraPicks: extraPickSummaryOf(feature.extraPicks)
+  };
+};
 
 /** feature id -> every level row that grants it, in order. The client's repeat count. */
 const grantLevelsOf = (levelTable: ClassReference["levelTable"]): ReadonlyMap<string, number[]> => {

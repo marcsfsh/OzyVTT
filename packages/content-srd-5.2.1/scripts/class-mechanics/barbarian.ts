@@ -47,6 +47,16 @@ export const barbarian: ClassMechanicsModule = {
           ]
         }
       }]
+    },
+    /**
+     * WEAPON MASTERY, as many as the printed column says: 2 -> 3 (L4) -> 4 (L10).
+     *
+     * Same shape as the Fighter's and the Warlock's Invocations; `choose: 2` plus the growth is the
+     * printed number at every level. Paladin, Ranger and Rogue are deliberately NOT here: the SRD
+     * prints no Weapon Mastery column for them and their text says a flat "two kinds of weapons".
+     */
+    "weapon-mastery": {
+      extraPicks: [{ offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }]
     }
   },
   subclasses: { "path-of-the-berserker": {} },
