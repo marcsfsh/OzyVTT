@@ -115,6 +115,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `character.set-identity` | `actor:write` |
 | `character.set-proficiencies` | `actor:write` |
 | `character.create` | `actor:write` |
+| `character.generate` | `actor:write` |
 | `builder.set-policy` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
@@ -1250,6 +1251,24 @@ Creates a character from CHOICES rather than a finished sheet - the GM always, a
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/characters/random`
+
+Rolls a complete, playable, single-class character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the class's own stat priority, the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `level` | integer (1–20) | yes | Character level to roll up; refused above the table's builderPolicy.maxLevel |
+| `classId` | string (pattern) | no | Class to build; omit to draw one from the catalog the caller may read |
+| `name` | string | no | Name to use verbatim; omit to draw one from the rolled species' own name bundle |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/actors/{actorId}/rebuild`
 
 Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.
@@ -1373,6 +1392,7 @@ Sets the character-builder table policy (GM-grade only; task-packet decision 10)
 | `customFormula` | string \| null | no | The GM's custom roll formula (e.g. 3d6, 2d6+6), validated through the server dice grammar and 1-30 bounds; null clears it. Omitting the field keeps the stored formula |
 | `maxLevel` | integer (1–20) | no | Highest character level this table builds to (default 20). Enforced by the builder AND by the sheet's identity edit; omitting the field keeps the stored cap |
 | `playerBuilder` | `open` \| `gm-only` | no | Whether players may run the character builder themselves (default open). Stored policy: character creation is still GM-gated at this version, and the projected value is what a player's wizard reads to know whether its door is open. Omitting the field keeps the stored setting |
+| `playerRandom` | `open` \| `gm-only` | no | Whether players may roll a RANDOM character themselves. Default gm-only - the opposite of playerBuilder, because a generator is one tap that fills a roster slot rather than eight considered steps. Omitting the field keeps the stored setting |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

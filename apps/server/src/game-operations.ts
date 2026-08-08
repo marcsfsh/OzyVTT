@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AskableCommand, CombatLogEntry, EncounterStartEntry, GameState, GmView, PartyVisibility, PendingRuleAsk, PlayerView, RollRecord, RuleExceptions, TableEvent } from "@vtt/domain";
 import { ABILITY_ROLL_FORMULA, parseDiceFormula, resolveDice, rollDice, validateAbilityFormula } from "@vtt/rules-5e";
 import { ActorDefinitionSchema } from "@vtt/schemas";
+import { generateCharacterRequest } from "./character-generate.js";
 import { buildCharacterDefinition } from "./character-build.js";
 import type { IntegrationScope } from "@vtt/api-contract";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry, type AnnotationActor } from "./annotations.js";
@@ -45,7 +46,7 @@ import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "./r
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, BuilderSetPolicySchema, CharacterCreateSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRechooseSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, BuilderSetPolicySchema, CharacterCreateSchema, CharacterGenerateSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRechooseSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DamageResolveSchema, DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -847,6 +848,75 @@ export function createGameOperations(context: GameOperationsContext) {
     },
 
     /**
+     * ROLL A WHOLE CHARACTER (issue `2d`) - a complete, playable, single-class character at a named
+     * level, with every decision but the ability spread drawn at random.
+     *
+     * SERVER-SIDE IS THE WHOLE POINT. The dice are `context.random`, the same authority every other
+     * roll comes from, and they are thrown INSIDE the command against the CURRENT catalog and the
+     * CURRENT policy - so a caller cannot pre-roll a character and send it in. That is CLAUDE.md
+     * rule 2, and D14 already moved the builder's own six dice for exactly this reason.
+     *
+     * The gate is `builderPolicy.playerRandom`, which mirrors `characterCreate`'s `playerBuilder`
+     * gate line for line - the same one-character rule, the same per-session create cap, the same
+     * definitions headroom pre-check, the same auto-claim - with one deliberate difference: it is
+     * DENY BY DEFAULT. A guided builder is eight considered steps; a generator is one tap that fills
+     * a roster slot, which is a different kind of thing to hand out.
+     *
+     * The generated character lands through `character.create`'s own path: same assembler, same
+     * import, same `import-<actorId>` keying, same choice ledger. It is a hand-built character that
+     * nobody had to sit through - not a second species of sheet.
+     */
+    async characterGenerate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterGenerateSchema, raw, "The character-generate command is malformed.");
+      const isPlayer = !isGmGrade(principal);
+      if (isPlayer) {
+        const policy = store.snapshot.builderPolicy;
+        if (policy.playerRandom !== "open") throw new GameAccessDeniedError("Your GM rolls the random characters at this table.");
+        if (store.snapshot.actors.some((actor) => actor.ownerSessionId === principal.sessionId)) {
+          throw new CommandRejectedError("You already have a character - release it before rolling another.");
+        }
+        if (!withinCreateCap(principal.sessionId)) throw new CommandRejectedError("That is a lot of characters for one evening - ask your GM to add the next one.");
+      }
+      const actorId = request.commandId;
+      let summary = "";
+      let rolls: readonly number[] = [];
+      let faces = 0;
+      let rollId: string | undefined;
+      const result = await store.execute({ id: request.commandId, type: "character.generate", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        if (state.definitions.length >= MAX_STORED_DEFINITIONS) throw new CommandRejectedError("The table's sheet library is full - ask your GM to delete old characters.");
+        if (request.level > state.builderPolicy.maxLevel) throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
+        // The CALLER's catalog, exactly as `characterCreate` does: a player must not roll up a
+        // GM-only homebrew class they were never shown.
+        const generated = generateCharacterRequest(request, catalogFor(principal), state.builderPolicy, (sides) => context.random(sides));
+        ({ summary, hitPointRolls: rolls, hitDieFaces: faces } = generated);
+        const definition = buildCharacterDefinition(generated.request, catalogFor(principal), state.builderPolicy);
+        importActorDefinition(state, definition, actorId, "public", equipmentCatalog());
+        if (isPlayer) {
+          const created = state.actors.find((actor) => actor.id === actorId);
+          if (created) created.ownerSessionId = principal.sessionId;
+        }
+        // The hit-point dice land in the table feed like any other roll (D11/D14): a character
+        // rolled up at the table is a table event, not a private one. Level 1 throws none.
+        if (rolls.length > 0) {
+          rollId = context.newId();
+          recordRoll(state, {
+            id: rollId, commandId: request.commandId, initiatorSessionId: sessionIdOf(principal), initiatorRole: isGmGrade(principal) ? "gm" : "player",
+            initiatorLabel: isGmGrade(principal) ? "GM" : "A player", label: `Hit points, ${state.actors.find((actor) => actor.id === actorId)?.name ?? "a new character"}`,
+            actorId, purpose: "manual", visibility: "public",
+            formula: `${rolls.length}d${faces}`, normalizedFormula: `${rolls.length}d${faces}`,
+            dice: rolls.map((face) => ({ group: 0, sides: faces, face, kept: true, sign: 1 as const })),
+            modifiers: [], total: rolls.reduce((sum, face) => sum + face, 0), createdAt: new Date().toISOString()
+          });
+        }
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "encounter", text: `${actorName(actorId)} was rolled up — ${summary}.`, actorIds: [actorId] });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate, actorId };
+    },
+
+    /**
      * D13/D14 - LEVEL UP, LEVEL DOWN, RESPEC: one command, because they are one motion. The client
      * prefills the whole request from the stored choice ledger; the server re-runs the identical
      * build and re-validates every part of it (it never trusts a prefill), then updates the live
@@ -937,7 +1007,8 @@ export function createGameOperations(context: GameOperationsContext) {
           customFormula: request.customFormula === undefined ? state.builderPolicy.customFormula : request.customFormula,
           // Same tri-state spirit for the two additive fields: omitted keeps what is stored.
           maxLevel: request.maxLevel ?? state.builderPolicy.maxLevel,
-          playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder
+          playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder,
+          playerRandom: request.playerRandom ?? state.builderPolicy.playerRandom
         };
       });
       if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Character-builder ability methods set to ${allowedAbilityMethods.join(", ")}.`, gmOnly: true }); }
@@ -2461,6 +2532,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["character.set-identity", "Edit a character's identity (class/level/race/background/feats) on its imported sheet.", (p, raw) => operations.characterSetIdentity(p, raw)],
     ["character.set-proficiencies", "Edit a character's save and skill proficiency selections on its imported sheet.", (p, raw) => operations.characterSetProficiencies(p, raw)],
     ["character.create", "Create a character from choices (ids, scores, HP entries, the choices ledger); the server assembles and imports the sheet (GM). The actor's id equals the commandId.", (p, raw) => operations.characterCreate(p, raw)],
+    ["character.generate", "Roll a complete, playable, single-class character at a level: the standard array by the class's stat priority and every other pick drawn server-side - the GM always, a player when builderPolicy.playerRandom is open (deny by default). The actor's id equals the commandId.", (p, raw) => operations.characterGenerate(p, raw)],
     ["builder.set-policy", "Set the character-builder policy: allowed ability-score methods and the GM's custom roll formula (GM).", (p, raw) => operations.builderSetPolicy(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],

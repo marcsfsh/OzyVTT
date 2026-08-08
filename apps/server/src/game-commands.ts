@@ -276,6 +276,25 @@ export const CharacterCreateSchema = z.object({
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.string().uuid() }).strict();
 
 /**
+ * ROLL A WHOLE CHARACTER (issue `2d`). The wire carries only what the caller actually decides -
+ * which class (or none, for "surprise me") and at what level - because every other decision is the
+ * SERVER's to make: the standard array's distribution, the species, the background, the subclass,
+ * the skills, the feats, the spells and the equipment all come out of `context.random` inside the
+ * command (CLAUDE.md rule 2, D14). A client that sent its own picks would be a builder, not a
+ * generator, and `character.create` is already that door.
+ *
+ * `name` is optional and trimmed like the builder's; omitted, the server draws one from the
+ * species' own name bundle - which is the bit the wizard still does with `Math.random`.
+ */
+export const CharacterGenerateSchema = z.object({
+  commandId: z.string().uuid(),
+  level: z.number().int().min(1).max(20),
+  classId: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
+  name: z.string().trim().min(1).max(120).optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+
+/**
  * Roll six ability scores SERVER-SIDE (D14). The builder used to roll them in the browser, which is
  * a rule-2 violation the ledger has carried for months; the dice now come from the same authority
  * every other roll does, and land in the table feed like any other roll.
@@ -299,6 +318,8 @@ export const BuilderSetPolicySchema = z.object({
   maxLevel: z.number().int().min(1).max(20).optional(),
   /** Whether players may run the builder themselves; omitted keeps the stored setting. */
   playerBuilder: z.enum(["open", "gm-only"]).optional(),
+  /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
+  playerRandom: z.enum(["open", "gm-only"]).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().superRefine((payload, context) => {
   if (new Set(payload.allowedAbilityMethods).size !== payload.allowedAbilityMethods.length) {

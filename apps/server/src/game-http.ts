@@ -274,6 +274,9 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetProficiencies), ...command("character.set-proficiencies", actorIdParam));
   router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
+  // Registered BEFORE nothing in particular - `/characters/random` is a literal segment under a
+  // collection with no `{id}` route beneath it, so ordering is not load-bearing here.
+  router.post(expressPath(GAME_PATHS.charactersRandom), ...command("character.generate"));
   router.post(expressPath(GAME_PATHS.characterRebuild), ...command("character.rebuild", (req) => ({ actorId: req.params.actorId })));
   router.post(expressPath(GAME_PATHS.builderRollAbilities), ...command("builder.roll-abilities"));
   router.post(expressPath(GAME_PATHS.builderPolicy), ...command("builder.set-policy"));

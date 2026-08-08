@@ -454,7 +454,8 @@ describe("public game API over /api/v1", () => {
 
     // Players see the default policy (all four methods) before the GM touches anything.
     const before = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
-    expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null, maxLevel: 20, playerBuilder: "open" });
+    // `playerRandom` defaults CLOSED, unlike `playerBuilder` - a generator is a roster-filling vector (issue `2d`).
+    expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null, maxLevel: 20, playerBuilder: "open", playerRandom: "gm-only" });
 
     // Player write refused; the policy is the GM's (decision 10).
     const denied = await post(base, GAME_PATHS.builderPolicy, playerToken, { allowedAbilityMethods: ["standard-array"] });
@@ -472,7 +473,7 @@ describe("public game API over /api/v1", () => {
     // Player-READABLE: the stored policy reaches the player projection verbatim.
     const after = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
     // The two additive fields are omitted by this request, so they must survive it untouched.
-    expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6", maxLevel: 20, playerBuilder: "open" });
+    expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6", maxLevel: 20, playerBuilder: "open", playerRandom: "gm-only" });
   });
 
   it("creates a character from choices over HTTP (GM only); the actor id equals the commandId and the sheet is import-keyed", async () => {
@@ -847,6 +848,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.characterSetIdentity, "post", "character.set-identity"],
       [GAME_PATHS.characterSetProficiencies, "post", "character.set-proficiencies"],
       [GAME_PATHS.characters, "post", "character.create"],
+      [GAME_PATHS.charactersRandom, "post", "character.generate"],
       [GAME_PATHS.builderPolicy, "post", "builder.set-policy"],
       [GAME_PATHS.rulesPolicy, "post", "rules.set-policy"],
       [GAME_PATHS.actionUse, "post", "action.use"],

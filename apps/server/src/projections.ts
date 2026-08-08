@@ -221,7 +221,10 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
       allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods],
       customFormula: state.builderPolicy.customFormula,
       maxLevel: state.builderPolicy.maxLevel,
-      playerBuilder: state.builderPolicy.playerBuilder
+      playerBuilder: state.builderPolicy.playerBuilder,
+      //   - playerRandom: the same, for the random generator's door. Deny-by-default, so a player
+      //     surface that reads it renders the closed state until the GM opens it.
+      playerRandom: state.builderPolicy.playerRandom
     },
     // The door to an archived character's shared sheet, and nothing more: id + name, only for archived
     // characters the GM explicitly shared, and only ones that were public to begin with. Everything

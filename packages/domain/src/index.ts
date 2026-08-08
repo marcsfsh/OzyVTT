@@ -514,7 +514,16 @@ export const BuilderPolicySchema = z.object({
    * auto-claim and per-session create caps) is the separate WI5 §2 change. Nothing reads it to make an
    * authorization decision yet - it is projected so the surface work and the auth change land together
    * against one already-persisted policy rather than migrating a second time. */
-  playerBuilder: z.enum(["open", "gm-only"]).default("open")
+  playerBuilder: z.enum(["open", "gm-only"]).default("open"),
+  /**
+   * Whether players may roll a RANDOM character for themselves ("open") or only the GM can
+   * ("gm-only"). Additive, and the default is the OPPOSITE of `playerBuilder`'s: a guided builder is
+   * eight considered steps and a person only walks it when they mean it, whereas a generator is one
+   * tap that fills a roster slot - so it is deny-by-default and the GM opens it deliberately (issue
+   * `2d`). Enforced in `character.generate` (`game-operations.ts`) and projected beside
+   * `playerBuilder` so a player's surface can grey its own door.
+   */
+  playerRandom: z.enum(["open", "gm-only"]).default("gm-only")
 }).strict();
 export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;
 
@@ -1014,6 +1023,8 @@ export interface ClientToServerEvents {
   "character:submit-import": (payload: { commandId: string; definition: unknown; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:resolve-import": (payload: { commandId: string; importId: string; approve: boolean; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   /** Create a character from CHOICES (ids + scores + per-level HP entries + the choices[] ledger); the server's feature-rider interpreter assembles the ActorDefinition and lands it through the import path (`actorId` = commandId, definition keyed `import-<actorId>`). GM-only in phase 2. */
+  /** Roll a whole character server-side (issue `2d`). The caller decides the level and (optionally) the class; every other pick is the server's. */
+  "character:generate": (payload: { commandId: string; level: number; classId?: string; name?: string; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "character:create": (payload: { commandId: string; name: string; speciesId: string; backgroundId: string; classId: string; level: number; subclassId?: string; abilityMethod: BuilderAbilityMethod; baseScores: Record<AbilityId, number>; backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>; hp: { mode: "average" | "entries"; entries?: readonly number[] }; choices: ReadonlyArray<{ level: number; classId?: string; kind: string; id: string; payload?: Record<string, unknown> }>; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   /** GM sets the character-builder table policy (decision 10): allowed ability methods + the custom roll formula. */
   "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; maxLevel?: number; playerBuilder?: "open" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
