@@ -307,6 +307,13 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   unreproduced measurement. If it is taken up, the fix is `row-gap: var(--space-5)` (20px → exactly 44
   centre-to-centre; go one step further given the M5 sub-pixel lesson) plus a `/styleguide` case that
   actually wraps.
+  **Re-measured 2026-08-08 on a denser case and the verdict is unchanged.** `3d` gave every
+  damage-type `TagInput` a visible chooser, so thirteen chips are now thirteen taps rather than
+  thirteen typed words — the wrap case is much easier to reach than it was. Probed at 375px on a
+  homebrew monster carrying all 13 damage resistances plus 6 immunities: **19 ✕s across 4 wrapped
+  rows, every one 44×44 with reach 45**, and the same decisive tap 10px above a wrapped row's ✕
+  removed that chip's own tag ("poison"), not the row above's. Second independent non-reproduction;
+  still deliberately not fixed, and `TagInput.css` is untouched by that unit.
 
 - **[codex/store] Migration v15 is not idempotent, and its failure mode is "the codex will not open".**
   Re-running it (only reachable if its `codex_schema_migrations` row is lost) aborts on
