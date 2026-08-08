@@ -57,11 +57,11 @@ are out of play server-side — refused by claim, scene staging and fight start/
 **Homebrew keeps its promises** (D21). Every field the item editor offers reaches the fight
 (`equipment-derivation.ts`, one test per formerly-inert field in `homebrew-inert-fields.test.ts`).
 
-**Replays** (D25/D26). `replay.launch` parks the live table exactly as a scene switch does and makes
+**Replays** (D25/D26/D3). `replay.launch` parks the live table exactly as a scene switch does and makes
 one recorded moment live, cloning everyone under new ids so tonight's characters are never rewritten
-(`replay-launch.ts`). An archive stays hidden until the GM shares it; a player then reads a COMPUTED
+(`replay-launch.ts`). **The clone is kept and hidden** (D3, 2026-08-08): scoped to its scene (`Actor.replaySceneId`, `Scene.replayOf`), undecorated, off every roster (`rosterActors` in `@vtt/domain`), unclaimable, still in initiative and on the map, and deleted with the scene the table leaves — so a launch no longer spends a scene slot forever and 25 in a row never refuse. Both refusals now name their way out (`replay/launch-refusal.ts`, pinned by a mirror test). An archive stays hidden until the GM shares it; a player then reads a COMPUTED
 replay (`replay-projection.ts`) that hides each character until the turn it was revealed and carries no
-session ids, journal, raw states or stat blocks. Unshared reads 404, never 403. One component serves
+session ids, journal, raw states or stat blocks, and may load **that fight's map and no other archived one** (`playerReplayMapAssetIds`, gated on the shared flag). Unshared reads 404, never 403. One component serves
 both roles (`replay/ReplayPanel.tsx`): the GM list carries the per-replay reveal control (hidden by
 default), *Launch from here* whose confirm says the live scene is **parked**, and a triad Delete.
 

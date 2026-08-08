@@ -494,16 +494,6 @@ for a layout or pointer claim, a contrast calculator against
   desktop only and says why; pin reachability on a phone is the tap audit's job, where it is measured
   rather than clicked.
 
-- **[replay/player] A player watching a shared replay sees "Map unavailable — you don't have access to
-  this map".** Measured 2026-08-05 (B3), GM and player side by side on the same archive at
-  `/replays/3`: the GM's stage renders the battle map, the player's renders `.replay-stage-missing` at
-  every viewport. The player replay projection carries `combat.mapAssetId`, but the asset read behind
-  `useAuthorizedMapImage` refuses a player session for a map that is not the live one — so the turn
-  order and log arrive and the picture never does. **Not a viewer-safety leak** (the failure is
-  closed, not open) and not introduced by the frame recompose, which measured it in both directions
-  before and after. Server-side: the fix is in the archive's asset authorization, not in
-  `replay/ReplayPanel.tsx`.
-
 - **[a11y] `--text-muted` fails AA at small sizes** (3.61:1 dark) — affects `.nh-choice-meta`,
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;
   deliberately not retuned mid-flight. Needs its own pass.
