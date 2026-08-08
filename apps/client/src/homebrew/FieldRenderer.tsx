@@ -255,6 +255,16 @@ export function FieldRenderer(props: FieldRendererProps) {
           values={asStrings(raw)}
           onChange={(next) => set(next)}
           suggestions={resolveSuggestions(field, ctx)}
+          /* THE SAME FLAG THE TEXT BRANCH READS, meaning the same thing: put the list on screen.
+             Six of the client's nine `3d` sites are lists rather than single values — the monster's
+             three defence rows, a spell's damage types, the `damage-type-is` gate, the damage-type
+             grants — so a `text`-only `pick` would have left two thirds of one reported issue needing
+             a second mechanism. Still `TagInput`, still `slugify`, still free entry: `pick` changes
+             what a GM can SEE, never what the field accepts. See `FieldDef.pick`. */
+          pick={field.pick}
+          /* Derived, never a second list: `"very-rare"` reads "Very Rare" by one rule, so a
+             vocabulary that grows a member is readable the day it lands with nothing to remember. */
+          optionLabel={suggestionLabel}
           placeholder={field.placeholder}
           max={field.max}
           maxReachedReason={field.maxRowsReason}
@@ -381,6 +391,12 @@ export function FieldRenderer(props: FieldRendererProps) {
             value={asString(raw) || null}
             placeholder={field.placeholder ? suggestionLabel(field.placeholder) : undefined}
             disabled={isDisabled}
+            /* THE WHOLE LIST, not `Combobox`'s default page of 8. A `pick` field's suggestions are a
+               COMPLETE bounded vocabulary — 7 rarities, 13 damage types — and paging one to 8 would
+               reintroduce "ten of the thirteen damage types" at the renderer having just fixed it at
+               the constant. Rarity never noticed because 7 < 8. `.nh-combobox-list` scrolls at 17rem;
+               a field whose list is a 339-entry catalog is `searchable` + `CatalogPicker`, not this. */
+            limit={suggestions.length}
             allowFreeText
             /* The id handed back is either a slug from the list or the raw words typed; `pickValue`
                makes the second case the same shape as the first, so "Very Rare" typed by hand is

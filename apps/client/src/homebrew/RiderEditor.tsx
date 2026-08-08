@@ -40,7 +40,7 @@ import { useMemo } from "react";
 import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { FieldRenderer } from "./FieldRenderer";
-import { damagePartsField, diceValidate, grouped, opt, type Draft, type FieldDef, type SchemaContext, type SelectOption } from "./schema";
+import { damagePartsField, diceValidate, grouped, opt, suggestionLabel, type Draft, type FieldDef, type SchemaContext, type SelectOption } from "./schema";
 
 export type RiderKind = "modifiers" | "grants" | "uses" | "tags" | "actions" | "effects";
 
@@ -226,7 +226,9 @@ const whenField = (): FieldDef => ({
     { key: "present", label: "It has the condition", kind: "switch", visibleWhen: hasType("while-condition"), help: "Turn off for “only while you don't have it”." },
     { key: "kinds", label: "Kinds of attack", kind: "multiselect", options: [opt("melee", "Melee"), opt("ranged", "Ranged"), opt("spell", "Spell"), opt("unarmed", "Unarmed"), opt("thrown", "Thrown"), opt("reaction", "Reaction"), opt("opportunity", "Opportunity")], visibleWhen: hasType("attack-kind-is") },
     { key: "properties", label: "Weapon properties", kind: "tags", visibleWhen: hasType("weapon-property-is"), suggestions: (ctx) => ctx.weaponProperties },
-    { key: "damageTypes", label: "Damage types", kind: "tags", visibleWhen: hasType("damage-type-is"), suggestions: (ctx) => ctx.damageTypes },
+    // `3d`, site 6 of 9 — the `damage-type-is` gate. A slug typed one character wrong here does not
+    // fail: the rider simply never fires, which is the hardest homebrew failure there is to diagnose.
+    { key: "damageTypes", label: "Damage types", kind: "tags", pick: true, visibleWhen: hasType("damage-type-is"), suggestions: (ctx) => ctx.damageTypes },
     { key: "abilities", label: "Abilities", kind: "multiselect", options: ABILITIES, visibleWhen: hasType("ability-is") },
     { key: "skills", label: "Skills", kind: "multiselect", options: (ctx) => ctx.skills, visibleWhen: hasType("skill-is") },
     { key: "schools", label: "Schools", kind: "tags", visibleWhen: hasType("spell-school-is"), suggestions: (ctx) => ctx.schools },
@@ -384,7 +386,13 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
     { key: "allowShield", label: "A shield still counts", kind: "switch", visibleWhen: hasType("unarmored-defense"), note: "Not read yet." },
     { key: "formula", label: "Damage", placeholder: "1d6", validate: diceValidate, visibleWhen: hasType("extra-damage"), help: "Dice. Leave it empty to add only an ability modifier." },
     { key: "abilityModifier", label: "Plus an ability modifier", kind: "select", options: ABILITIES, emptyValue: "omit", visibleWhen: hasType("extra-damage"), help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”." },
-    { key: "damageType", label: "Damage type", placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
+    /* `3d`, site 7 of 9 — the mace's "+1d6 lightning". Left EMPTY on purpose is a real authored
+       answer here and not a blank: `action-resolution.ts` reads `damageType ?? damage[0].type`, so an
+       absent type means "the same type this weapon already deals". That is why `"untyped"` — the
+       fourteenth string the engine mints when there is nothing to inherit either — is NOT offered:
+       picking it would silently override the inheritance a GM meant to keep. U23 gives that case its
+       own words. The box stays open, so a GM who really wants the word can still type it. */
+    { key: "damageType", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
     { key: "doubleOnCritical", label: "Doubled on a critical hit", kind: "switch", visibleWhen: hasType("extra-damage"), help: "Off is the 5e rule — dice added after the attack aren't doubled." },
     { key: "roll", label: "On which roll", kind: "select", options: [opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"), opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")], visibleWhen: hasType("roll-mode") },
     { key: "mode", label: "Which way", kind: "select", options: [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")], visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a cursed item bites." },
@@ -735,6 +743,15 @@ function GrantsEditor({
                     values={row.values}
                     onChange={(values) => replace({ values })}
                     suggestions={grantSuggestions(row.kind, ctx)}
+                    /* `3d`, site 9 of 9 — `damageResistances` and `damageImmunities` are two of the
+                       kinds this one control serves. It is set for the CONTROL rather than for those
+                       two kinds, because the alternative is an affordance that appears and vanishes
+                       as the "What" select changes beside it — the same box teaching two different
+                       things about itself. `TagInput` falls back to the plain input for the kinds
+                       with no list (tools, languages), so this reads as "show the list when there is
+                       one", which is the sentence a GM can actually hold. */
+                    pick
+                    optionLabel={suggestionLabel}
                     placeholder={GRANT_PLACEHOLDERS[row.kind] ?? "light-armor"}
                   />
                 )}

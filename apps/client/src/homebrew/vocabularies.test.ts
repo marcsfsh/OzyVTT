@@ -43,16 +43,68 @@ function everyField(): ReadonlyArray<{ type: HomebrewType; field: FieldDef }> {
 
 const suggestionsOf = (field: FieldDef): readonly string[] => resolveSuggestions(field, ctx);
 
+/**
+ * Every field whose list IS the damage-type vocabulary, found by what it offers rather than by what
+ * it is called.
+ *
+ * Matching on the key was the old way and it silently missed one: `damagePartsField`'s row is keyed
+ * plainly `type` — it is already inside a container called `damage` — so `/damage.?type/i` never saw
+ * the control every action's damage goes through. Identity against the canonical array cannot miss a
+ * site and cannot pick up a look-alike, which is what a census is for.
+ */
+const damageTypeFields = () => everyField().filter(({ field }) => suggestionsOf(field) === DAMAGE_TYPE_IDS);
+
 describe("enumerated fields offer the complete SRD list", () => {
-  it("every damage-type field offers all thirteen", () => {
-    const fields = everyField().filter(({ field }) =>
-      /damage.?type/i.test(field.key) || /^damageResistances|damageImmunities|damageVulnerabilities$/.test(field.key) || field.key === "damageTypes"
-    );
-    // The census matters as much as the assertion: if a form grows a fifteenth damage input, it is
-    // covered here the day it lands rather than the day someone notices "fire" never triggered.
-    expect(fields.length).toBeGreaterThanOrEqual(6);
+  it("every damage-type field offers the canonical list, and there are nine of them", () => {
+    const fields = damageTypeFields();
+    /**
+     * **NINE, exactly** — the client's `3d` counted at HEAD, so a tenth input is covered on the day
+     * it lands rather than on the day someone notices "fire" never triggered.
+     *
+     * The nine, and the two things worth knowing about the count:
+     *
+     *  1 spell `damage.types` · 2 equipment `weapon.damageType` · 3–5 monster
+     *  `damageResistances`/`damageImmunities`/`damageVulnerabilities` · 6 the `damage-type-is` gate
+     *  (`when > damageTypes`) · 7 the `extra-damage` rider's `damageType` · 8 `damagePartsField`'s
+     *  `type`, mounted once per action.
+     *
+     *  - That is EIGHT rendered controls, and this census sees nine entries, because
+     *    `RIDER_FIELDS_FOR_TEST` exports a bare top-level `whenField()` alongside the one nested in
+     *    `modifiersField` — the same factory, counted twice. Only the nested one is ever mounted.
+     *  - The NINTH rendered control is `GrantsEditor`'s "Which" box for the `damageResistances` and
+     *    `damageImmunities` grant kinds. It has no `FieldDef` at all, so it is structurally invisible
+     *    here — the same `RIDER_EXEMPT` gap `authoring-harness.ts` names, and the reason
+     *    `pick-fields.test.tsx` drives that one through the rendered form instead.
+     */
+    expect(fields.map(({ type, field }) => `${type}.${field.key}`)).toEqual([
+      "spell.damage.types",
+      "equipment.weapon.damageType",
+      "monster.damageResistances",
+      "monster.damageImmunities",
+      "monster.damageVulnerabilities",
+      "equipment.damageTypes",
+      "equipment.damageType",
+      "equipment.damageTypes",
+      "equipment.type"
+    ]);
     for (const { type, field } of fields) {
       expect(suggestionsOf(field), `${type}.${field.key}`).toEqual(DAMAGE_TYPE_IDS);
+    }
+  });
+
+  it("every damage-type field is a VISIBLE chooser — the client's `3d`", () => {
+    /**
+     * The half no verdict in the parity audit measures. `parity` there means a control *exists*;
+     * every one of these existed, offered the complete list, and rendered it into a `<datalist>` —
+     * no arrow, no cue, and on iOS Safari no control at all. "Damage type is an unconstrained field"
+     * was a report about the affordance, not about the schema.
+     *
+     * Asserted on the FIELD rather than on the rendered DOM on purpose: this is the census, and it
+     * catches a tenth site that lands without the flag. What a GM actually sees, and that a custom
+     * type still survives, is `pick-fields.test.tsx`.
+     */
+    for (const { type, field } of damageTypeFields()) {
+      expect(field.pick, `${type}.${field.key} must be a visible chooser, not an <input list>`).toBe(true);
     }
   });
 
@@ -129,10 +181,20 @@ describe("an open slug always keeps its “other”", () => {
     // exactly the class of defect this file exists for. Counted, not just checked: the day a tenth
     // `pick` lands it is covered here rather than on the day a GM finds it.
     const picks = everyField().filter(({ field }) => field.pick === true);
-    expect(picks.length).toBeGreaterThanOrEqual(1);
+    // Rarity (`3a`) plus the nine damage-type entries this file censuses above (`3d`) — eight
+    // distinct controls, one of them counted twice because `whenField()` is exported both bare and
+    // nested. An exact number, so a `pick` that lands without a unit behind it fails here on the way
+    // in, which is the mirror-defect guard the phase is built on.
+    expect(picks.length).toBe(10);
     for (const { type, field } of picks) {
       expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
-      expect(field.kind ?? "text", `${type}.${field.key} — pick is a flag on text, not a kind`).toBe("text");
+      // A FLAG ON TWO KINDS, never a kind of its own. `text` renders `Combobox` directly; `tags`
+      // renders `TagInput`, which wears the same `Combobox` as its entry box. Both keep the column
+      // open — that is what makes `pick` legal over an open slug at all, and it is why this assertion
+      // widened for `3d` rather than being relaxed away: the day it has to admit `select`, an open
+      // slug was closed.
+      expect(["text", "tags"], `${type}.${field.key} — pick is a flag on text or tags, not a kind`)
+        .toContain(field.kind ?? "text");
     }
   });
 

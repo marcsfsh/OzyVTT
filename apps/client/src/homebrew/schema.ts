@@ -205,11 +205,11 @@ export type FieldDef = Readonly<{
   catalog?: "spells" | "equipment";
   suggestions?: readonly string[] | ((ctx: SchemaContext) => readonly string[]);
   /**
-   * **`kind: "text"` + `suggestions` — render the CHOOSER instead of a bare box with a `<datalist>`.**
+   * **`suggestions` — render the CHOOSER instead of a bare box with a `<datalist>`.**
    *
    * A renderer flag, not a twelfth `FieldKind`, per the standing rule at the top of this file: the
-   * field is still text, still writes a string, still takes a word the SRD has never heard of. What
-   * changes is that the list is visible.
+   * field is still `text` or still `tags`, still writes the same string or the same array of them,
+   * and still takes a word the SRD has never heard of. What changes is that the list is visible.
    *
    * The bug it repairs is the one an `<input list>` cannot: a `<datalist>` has **no affordance at
    * all** — no arrow, no border cue, nothing that says a list exists — and iOS Safari renders it as
@@ -217,8 +217,17 @@ export type FieldDef = Readonly<{
    * simply invisible. `Combobox` with `allowFreeText` is the same contract with the list on screen:
    * every value one tap away, `--tap-min` rows, and unmatched text still handed back as itself.
    *
+   * **It reads on both control kinds, and it had to.** The client reported it twice — item rarity
+   * (`3a`, one value) and damage types (`3d`, nine sites, six of which are lists — the monster's
+   * three defence rows, a spell's damage types, the `damage-type-is` gate and the damage-type
+   * grants). Had `pick` stayed a `text`-only flag, two thirds of `3d` would have needed a second
+   * mechanism to say the same thing, and the two would have drifted. `kind: "tags"` renders
+   * `TagInput`, which wears the same `Combobox` as its entry box under the same flag.
+   *
    * Requires `suggestions`; a `pick` field with no list is a chooser over nothing, which is why
-   * `vocabularies.test.ts` censuses it.
+   * `vocabularies.test.ts` censuses it. It is deliberately NOT automatic-on-`suggestions`: see
+   * `TagInputProps.pick` for the two different things a suggestion list means at two kinds of call
+   * site (a canonical vocabulary versus a corpus of what already exists).
    */
   pick?: boolean;
 
@@ -304,8 +313,12 @@ export const diceValidate = (value: unknown): string | null => {
 
 /**
  * Multi-term damage as a FIELD FACTORY, not a kind (see the standing rule above).
- * Four call sites: a granted action's damage, a weapon's extra damage, a spell's
- * damage, and an item-cast's damage — one helper, one shape, one set of labels.
+ *
+ * ONE call site as of this writing — `actionsField()` in `RiderEditor.tsx`, which every carrier that
+ * mounts riders shows once per action, so a monster's Bite and a magic sword's granted action are the
+ * same four controls. *(The docblock used to claim four; measured at HEAD, `grep -c damagePartsField`
+ * finds one mount. A spell's damage is `damage.roll` + `damage.types` in `schemas.ts`, a different
+ * shape, and there is no separate weapon or item-cast mount. Corrected rather than softened.)*
  */
 export function damagePartsField(
   key: string,
@@ -330,7 +343,9 @@ export function damagePartsField(
     },
     rows: [
       { key: "formula", label: "Formula", placeholder: "1d6", validate: diceValidate },
-      { key: "type", label: "Damage type", placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
+      // `3d`, site 8 of 9. The column is an open slug and stays one — a homebrew "void" damage type
+      // must remain authorable — so this is `pick` on `text`, never a closed select.
+      { key: "type", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
     ]
   };
 }

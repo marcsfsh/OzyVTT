@@ -283,6 +283,59 @@ describe("the guard itself refuses what the editor cannot author", () => {
     }
   });
 
+  it("every damage-type key is authorable, at its own scope, on every carrier that mounts riders", () => {
+    /**
+     * **`3d`'s half of the guard.** The census in `vocabularies.test.ts` asks whether each control
+     * offers the whole vocabulary and shows it; this asks the harness's own question — *can a GM
+     * reach the key at all* — at the SCOPE each one really lives at, so a false pass off the flat
+     * lookup is impossible (that is what `fieldsWithin` is for, and the effect-`modifiers` case above
+     * is the same hole this avoids).
+     *
+     * The three rider sites are asserted on **every carrier**, not just on equipment: the rider
+     * vocabulary is one vocabulary mounted by items, class features, species traits, feats and
+     * monsters alike, so a damage-type control that regressed there would regress on all of them at
+     * once and a single-carrier check would notice on none.
+     *
+     * **What this cannot see, stated rather than left implied:** the ninth site is `GrantsEditor`'s
+     * "Which" box for the `damageResistances` and `damageImmunities` grant kinds, and `grants` is the
+     * one key still on `RIDER_EXEMPT` because that component has no `FieldDef` to look up. The
+     * harness would wave it through, so `pick-fields.test.tsx` drives it through the rendered form
+     * instead. U9 is what retires the exemption.
+     */
+    const recordSites: ReadonlyArray<readonly [HomebrewType, string]> = [
+      ["spell", "damage.types"],
+      ["equipment", "weapon.damageType"],
+      ["monster", "damageResistances"],
+      ["monster", "damageImmunities"],
+      ["monster", "damageVulnerabilities"]
+    ];
+    for (const [type, key] of recordSites) {
+      expect(hasControl(type, key), `${type}.${key} — the GM has no way to say it`).toBe(true);
+    }
+
+    const riderSites: ReadonlyArray<readonly [string, readonly string[]]> = [
+      ["type", ["actions", "damage"]],       // every action's damage parts
+      ["damageType", ["modifiers"]],         // the `extra-damage` rider — the mace's +1d6 lightning
+      ["damageTypes", ["modifiers", "when"]] // the `damage-type-is` gate
+    ];
+    const carriers = (Object.keys(SCHEMAS) as HomebrewType[]).filter((type) => riderScopeOf(type) !== null);
+    for (const type of carriers) {
+      for (const [key, within] of riderSites) {
+        expect(hasControl(type, key, within), `${type}: ${within.join(" > ")} > ${key}`).toBe(true);
+      }
+    }
+
+    // ...and the value a control writes reaches the body the save path sends. Key existence is what
+    // the census can see; a round trip is the other half, and neither substitutes for the other.
+    const weapon = applyField("equipment", { name: "Mace of Storms" }, "weapon.damageType", "lightning");
+    expect((storedBody("equipment", weapon, RECORD_ID).weapon as { damageType?: string }).damageType).toBe("lightning");
+    // An open slug stays open all the way to the wire: a homebrew "void" type is the reason
+    // `DamageTypeIdSchema` is a max-40 string and not an enum, and closing it would have been the
+    // inverse of the bug the client reported.
+    const homebrewType = authoredRow("equipment", ["actions", "damage"], [["formula", "1d6"], ["type", "void"]]);
+    expect(homebrewType).toMatchObject({ formula: "1d6", type: "void" });
+  });
+
   it("the census: every key a later unit needs and the editor cannot author today", () => {
     /**
      * **This list is scope, not decoration.** Each entry is a row the phase plan already owns; the

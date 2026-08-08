@@ -489,7 +489,9 @@ const SPELL_SCHEMA: HomebrewSchema = {
           kind: "group",
           rows: [
             { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate },
-            { key: "damage.types", label: "Types", kind: "tags", suggestions: (ctx) => ctx.damageTypes }
+            // `3d`, site 1 of 9. A spell may deal two types at once (Ice Knife), so this is a list —
+            // and `pick` reads on a list exactly as it does on a single value.
+            { key: "damage.types", label: "Types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes }
           ]
         },
         {
@@ -743,7 +745,8 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
       fields: inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
         { key: "weapon.category", label: "Weapon kind", kind: "select", options: [opt("simple", "Simple"), opt("martial", "Martial")] },
         { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
-        { key: "weapon.damageType", label: "Damage type", placeholder: "slashing", suggestions: (ctx) => ctx.damageTypes },
+        // `3d`, site 2 of 9 — and the one the client's own mace goes through.
+        { key: "weapon.damageType", label: "Damage type", pick: true, placeholder: "slashing", suggestions: (ctx) => ctx.damageTypes },
         { key: "weapon.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", emptyValue: "null", help: "Leave both empty for a melee weapon." },
         { key: "weapon.longRangeFeet", label: "Long range", kind: "number", min: 1, max: 5000, unit: "ft", emptyValue: "null" }
       ])
@@ -813,9 +816,16 @@ const MONSTER_SCHEMA: HomebrewSchema = {
         { key: "hitPoints.formula", label: "Hit dice", placeholder: "19d12 + 133", validate: diceValidate, help: "Like 19d12 + 133. Without it, short rests give this monster no hit dice." },
         { key: "proficiencyBonus", label: "Proficiency bonus", kind: "number", min: 0, max: 12 },
         { key: "initiativeBonus", label: "Initiative bonus", kind: "number", min: -20, max: 30, allowNegative: true },
-        { key: "damageResistances", label: "Damage resistances", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
-        { key: "damageImmunities", label: "Damage immunities", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
-        { key: "damageVulnerabilities", label: "Damage vulnerabilities", kind: "tags", suggestions: (ctx) => ctx.damageTypes },
+        // `3d`, sites 3–5 of 9. Typing "Fire" or "flame" into any of these used to store a value the
+        // typed-defence pass never matches — silently, at play time, on the one field a monster's
+        // whole defensive identity hangs on.
+        { key: "damageResistances", label: "Damage resistances", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
+        { key: "damageImmunities", label: "Damage immunities", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
+        { key: "damageVulnerabilities", label: "Damage vulnerabilities", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes },
+        // NOT `pick` — deliberately, and it is the one visible seam this unit leaves. `3d` is the
+        // damage-type vocabulary; conditions are their own row with their own both-paths test, and
+        // turning the flag on here would ship a control this unit does not prove. One line, whenever
+        // that unit runs.
         { key: "conditionImmunities", label: "Condition immunities", kind: "tags", suggestions: (ctx) => ctx.conditions }
       ]
     },
