@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { EffectInstanceSchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-import { applyDamageDetailed, damageAdjustmentDetail } from "../src/hit-points.js";
+import { rescaleDamageParts } from "@vtt/rules-5e";
+import { applyDamageDetailed, damageAdjustmentDetail, isSrdDamageType } from "../src/hit-points.js";
 import { addEffect } from "../src/effects.js";
 import { equipmentCatalogOf, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -216,5 +217,65 @@ describe("gap 5: Fiendish Resilience is a real resistance, not a visible one", (
     } as typeof catalog;
     expect(hit(stateWith([], rechosen("fire")), [{ amount: 12, type: "cold" }], tiefling, withRacial).hpLost).toBe(6);
     expect(hit(state, [{ amount: 12, type: "fire" }], tiefling, withRacial).hpLost).toBe(6);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// Gap 4 (D7) - the GM's manual entry gains an optional type
+// -------------------------------------------------------------------------------------------------
+
+describe("gap 4 (D7): the untyped manual path can name a type", () => {
+  const resistant = () => definitionOf({ damageResistances: ["fire"] });
+  const manual = (state: GameState, input: Record<string, unknown>) => {
+    const before = state.actors[0].hp.current;
+    const outcome = applyDamageDetailed(state, IDS.hero, input as never, GM, { resolveDefinition: () => resistant() });
+    return { hpLost: before - state.actors[0].hp.current, detail: damageAdjustmentDetail(outcome.application) };
+  };
+
+  it("keeps today's fast path EXACTLY when no type is named", () => {
+    expect(manual(stateWith(), { amount: 10 }).hpLost).toBe(10);
+    expect(manual(stateWith(), { amount: 10, damageType: "untyped" }).hpLost).toBe(10);
+    expect(manual(stateWith(), { amount: 10, damageType: "  " }).hpLost).toBe(10);
+  });
+
+  it("runs the full defence pipeline once a type IS named, and says so", () => {
+    const result = manual(stateWith(), { amount: 10, damageType: "fire" });
+    expect(result.hpLost).toBe(5);
+    expect(result.detail).toContain("10 fire → 5, resistance");
+  });
+
+  it("normalises what the GM typed, so \"  Fire \" is fire", () => {
+    expect(manual(stateWith(), { amount: 10, damageType: "  Fire " }).hpLost).toBe(5);
+  });
+
+  it("still applies a homebrew type in full - the vocabulary is open, not a gate", () => {
+    expect(isSrdDamageType("fire")).toBe(true);
+    expect(isSrdDamageType("untyped")).toBe(false);
+    expect(isSrdDamageType("ooze")).toBe(false);
+    expect(manual(stateWith(), { amount: 10, damageType: "ooze" }).hpLost).toBe(10);
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// 4b - a hand-entered total that does not lose its damage type
+// -------------------------------------------------------------------------------------------------
+
+describe("4b: an amended total keeps its types", () => {
+  it("re-weights the rolled parts instead of going untyped", () => {
+    const state = stateWith();
+    const before = state.actors[0].hp.current;
+    const outcome = applyDamageDetailed(state, IDS.hero, { amount: 17, parts: [{ amount: 17, type: "fire" }], damageOverride: 12 }, GM, { resolveDefinition: () => definitionOf({ damageResistances: ["fire"] }) });
+    // 12 fire, halved to 6 - not 12 untyped landing in full, which is what dropping `parts` did.
+    expect(before - state.actors[0].hp.current).toBe(6);
+    expect(damageAdjustmentDetail(outcome.application)).toContain("12 fire → 6, resistance");
+  });
+
+  it("spreads an amended total across several types and sums to it exactly", () => {
+    expect(rescaleDamageParts([{ amount: 10, type: "fire" }, { amount: 6, type: "cold" }], 8))
+      .toEqual([{ amount: 5, type: "fire" }, { amount: 3, type: "cold" }]);
+    // The remainder lands on the largest component rather than vanishing.
+    const odd = rescaleDamageParts([{ amount: 9, type: "fire" }, { amount: 1, type: "cold" }], 7);
+    expect(odd.reduce((sum, part) => sum + part.amount, 0)).toBe(7);
+    expect(odd[0]).toEqual({ amount: 7, type: "fire" });
   });
 });

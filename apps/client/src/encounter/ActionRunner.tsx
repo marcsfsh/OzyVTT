@@ -147,15 +147,17 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
     if (!result || (overrideAmount ?? result.damageTotal) <= 0) { setApplied((current) => new Set([...current, key])); return; }
     setBusy(true);
-    // The typed parts (weapon dice + rage-style bonus lines) travel with the apply so the server can
-    // run resistances and the dying transition. A manual override is a whole different number, so it
-    // goes as a bare total on the no-defense-math path (the DamageRequest `amount` contract).
+    // The typed parts (weapon dice + rage-style bonus lines) ALWAYS travel with the apply, amended or
+    // not. An override used to drop them and send a bare total, which put the number on the
+    // defence-free path - so a GM correcting 17 to 12 handed a fire-resistant target all 12. It now
+    // rides as `damageOverride` and the SERVER re-weights the same types to it (rule 2: that maths is
+    // a game decision, not a client one).
     const parts = [
       ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
       ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
     ].filter((part) => part.amount > 0);
     const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
-    socket.emit("actor:apply-damage", { commandId: newId(), actorId: targetId, amount: overrideAmount ?? result.damageTotal, ...(useOverride ? {} : { parts }), sourceActorId: actor.id, sourceName: `${actor.name}'s ${result.actionName}`, critical: result.crit }, (response: DamageApplyResult) => {
+    socket.emit("actor:apply-damage", { commandId: newId(), actorId: targetId, amount: overrideAmount ?? result.damageTotal, parts, ...(useOverride ? { damageOverride: overrideAmount } : {}), sourceActorId: actor.id, sourceName: `${actor.name}'s ${result.actionName}`, critical: result.crit }, (response: DamageApplyResult) => {
       setBusy(false);
       if (!response.ok) { onFeedback(response.message ?? "The damage could not be applied."); return; }
       setApplied((current) => new Set([...current, key]));

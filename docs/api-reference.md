@@ -607,6 +607,8 @@ Applies damage (temporary hit points absorb first). Optional typed `parts` run t
 | `parts` | object[] | no | Typed components; the server applies the target's defenses and returns the breakdown |
 | `parts[].amount` | integer (0–1000) | yes |  |
 | `parts[].type` | string | yes |  |
+| `damageType` | string | no | OPTIONAL type for the manual `amount` path. Absent or "untyped" keeps the exact, defence-free correction; naming a type (one of the 13 SRD slugs, or a homebrew one - the vocabulary is open) runs it through resistance/immunity/vulnerability. Ignored when `parts` is present |
+| `damageOverride` | integer (0–1000) | no | A hand-entered total that REPLACES what was rolled while keeping its types: the server re-weights `parts` to this number, so an amended hit still meets the target's defences |
 | `sourceActorId` | string (uuid) | no |  |
 | `sourceActionId` | string (pattern) | no |  |
 | `sourceName` | string | no |  |
@@ -814,6 +816,7 @@ Answers a pending saving throw by server roll or manual total; on commit the out
 | `rollMode` | `advantage` \| `disadvantage` \| `normal` | no | For method=roll: the answerer's explicit advantage/disadvantage choice; wins over the engine's aggregated sources (2d20kh1 / 2d20kl1) |
 | `commit` | boolean | no | false previews the outcome without applying damage/conditions Default: `true`. |
 | `legendaryResistance` | boolean | no | GM only, commit only: spend a Legendary Resistance use to turn a failed save into a success (a natural success spends nothing) Default: `false`. |
+| `damageOverride` | integer (0–1000) | no | Hand-entered damage replacing the auto-rolled proposal, applied BEFORE the success halving and keeping the proposal's damage types. A player may amend only their own claimed character's save |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

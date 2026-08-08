@@ -1,5 +1,5 @@
 import type { AbilityId, Actor, DamageApplication, GameState, PendingSave, RollRecord } from "@vtt/domain";
-import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
+import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, rescaleDamageParts, resolveDice, sumRiders, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
@@ -224,7 +224,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
  * (ADR-0008's structured attack/save/damage carve-out). GM answers any save; a player only their own
  * claimed character's.
  */
-export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false, explicitRollMode?: "advantage" | "disadvantage" | "normal"): { outcome: SaveOutcome; events: EffectNarration[] } {
+export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false, explicitRollMode?: "advantage" | "disadvantage" | "normal", damageOverride?: number): { outcome: SaveOutcome; events: EffectNarration[] } {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
@@ -289,15 +289,33 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
       legendaryNote = `${target.name} uses Legendary Resistance to succeed (${perDay - spentSoFar - 1} of ${perDay} remaining).`;
     }
   }
+  // Issue `4b`: the damage was auto-rolled the moment the action resolved and there was no door to
+  // amend it - not as GM, and not when the table rolls physical dice. The amendment lands HERE,
+  // before the success maths, so "half on a success" halves the number the answerer actually meant.
+  // The proposal's TYPES survive it (`rescaleDamageParts`), which is the whole point: an amended 12
+  // is still 12 fire against a fire-resistant target, not 12 untyped that ignores the resistance.
+  //
+  // ROLE BOUNDARY, stated rather than inherited: a player may amend only their own claimed
+  // character's save. `adjustableActor` above already refuses any other target for a player scope,
+  // so the rule is the same one that governs answering the save at all - named here so it cannot be
+  // widened by accident.
+  if (damageOverride !== undefined) {
+    if (!Number.isInteger(damageOverride) || damageOverride < 0 || damageOverride > 1000) throw new CommandRejectedError("Enter the damage as a whole number from 0 to 1000.");
+    if (scope.role === "player" && target.ownerSessionId !== scope.sessionId) throw new CommandRejectedError("You can only amend your own character's save damage.");
+  }
+  const proposedTotal = damageOverride ?? pending.proposedDamage;
   // Typed parts (ADR-0020) halve per part on success and run the defense pipeline on application;
   // saves persisted before the field fall back to the untyped total.
-  const parts = pending.proposedDamageParts;
+  const proposed = pending.proposedDamageParts;
+  const parts = proposed && proposed.length > 0 && damageOverride !== undefined
+    ? rescaleDamageParts(proposed, damageOverride)
+    : proposed;
   const outcomeParts = parts && parts.length > 0
     ? (!success ? parts : pending.halfOnSuccess ? parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) })) : [])
     : null;
   const outcomeDamage = outcomeParts !== null
     ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-    : (!success ? pending.proposedDamage : (pending.halfOnSuccess ? Math.floor(pending.proposedDamage / 2) : 0));
+    : (!success ? proposedTotal : (pending.halfOnSuccess ? Math.floor(proposedTotal / 2) : 0));
   const outcomeCondition = !success && pending.conditionId !== null;
 
   // Preview (commit=false): the die roll is still recorded for the table so everyone sees it, but the

@@ -65,6 +65,31 @@ export function reduceDamageTotal(total: number, reduction: number): number {
   return reduction <= 0 ? total : Math.max(0, total - reduction);
 }
 
+/**
+ * A HAND-ENTERED TOTAL, re-weighted across the types that were actually rolled.
+ *
+ * The alternative - what every amend path did before this - is to send the number as an untyped
+ * total, which skips the defence pipeline entirely: the GM corrects 17 to 12 and the fire-resistant
+ * target suddenly takes all 12. Scaling keeps every type, so the amended hit is still fire, still
+ * halved, and still explains itself.
+ *
+ * Exact by construction: each part floors to its share and the whole remainder lands on the largest
+ * one, so the result always sums to `total`. An empty or zero-valued proposal has nothing to weight
+ * by, so the number goes on a single part carrying the first type it can see.
+ */
+export function rescaleDamageParts(parts: readonly DamagePart[], total: number): DamagePart[] {
+  const target = Math.max(0, Math.trunc(total));
+  const rolled = parts.reduce((sum, part) => sum + part.amount, 0);
+  if (parts.length === 0) return [];
+  if (parts.length === 1 || rolled <= 0) return [{ type: parts[0].type, amount: target }];
+  const scaled = parts.map((part) => ({ type: part.type, amount: Math.floor((part.amount * target) / rolled) }));
+  const remainder = target - scaled.reduce((sum, part) => sum + part.amount, 0);
+  let largest = 0;
+  for (let index = 1; index < parts.length; index += 1) if (parts[index].amount > parts[largest].amount) largest = index;
+  scaled[largest] = { type: scaled[largest].type, amount: scaled[largest].amount + remainder };
+  return scaled;
+}
+
 export type RollModeSource = Readonly<{ source: string; label: string }>;
 export type AggregatedRollMode = Readonly<{
   mode: "advantage" | "disadvantage" | "normal";

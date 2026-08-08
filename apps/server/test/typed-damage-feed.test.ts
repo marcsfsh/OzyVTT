@@ -237,3 +237,69 @@ describe("the opportunity-attack path narrates it too", () => {
     expect(row.text).toContain(`${rolled.amount} fire → ${rolled.adjusted}, resistance`);
   });
 });
+
+/**
+ * `4b` - THE SAVE'S DAMAGE BECOMES ENTERABLE.
+ *
+ * The damage rolled the instant the action resolved and froze into `pendingSaves[].proposedDamage`;
+ * `answerSave` applied it with no door at all - not for the GM, and not for a table rolling physical
+ * dice. These drive the real command and read the hit points and the feed row afterwards.
+ */
+describe("save.answer takes a hand-entered damage total", () => {
+  it("applies the amended number, keeps its type, and says so in the feed", async () => {
+    const { base, server, gmToken, mapAssetId } = await boot([]); // no resistance: the number is the number
+    await breatheOnBorin(base, gmToken, mapAssetId);
+    const save = server.store.snapshot.combat.pendingSaves[0];
+    // Force the plan's exact case: a proposal of 17, amended to 3.
+    await server.store.execute({ id: randomUUID(), type: "test.seed-proposal", payload: {}, principal: "gm" }, (state) => {
+      state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.map((entry) => entry.id === save.id
+        ? { ...entry, proposedDamage: 17, proposedDamageParts: [{ amount: 17, type: "fire" }], halfOnSuccess: false }
+        : entry) };
+    });
+
+    const before = hpOf(server, BORIN);
+    const answered = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), gmToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride: 3 });
+    expect(answered.status).toBe(200);
+    expect((await answered.json()).data.outcome.appliedDamage).toBe(3);
+    expect(before - hpOf(server, BORIN)).toBe(3);
+
+    const row = (await feed(base, gmToken)).find((entry) => entry.kind === "save" && entry.text.includes("Borin"))!;
+    expect(row.text).toContain("3 damage");
+    expect(row.text).not.toContain("17");
+  });
+
+  it("still meets the target's resistance - the amend does not go untyped", async () => {
+    const { base, server, gmToken, mapAssetId } = await boot(); // fire-resistant Borin
+    await breatheOnBorin(base, gmToken, mapAssetId);
+    const save = server.store.snapshot.combat.pendingSaves[0];
+    await server.store.execute({ id: randomUUID(), type: "test.seed-proposal", payload: {}, principal: "gm" }, (state) => {
+      state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.map((entry) => entry.id === save.id
+        ? { ...entry, proposedDamage: 17, proposedDamageParts: [{ amount: 17, type: "fire" }], halfOnSuccess: false }
+        : entry) };
+    });
+
+    const before = hpOf(server, BORIN);
+    await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), gmToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride: 12 });
+    expect(before - hpOf(server, BORIN)).toBe(6);
+    const row = (await feed(base, gmToken)).find((entry) => entry.kind === "save" && entry.text.includes("Borin"))!;
+    expect(row.text).toContain("12 fire → 6, resistance");
+  });
+
+  it("refuses a player amending somebody else's save", async () => {
+    const { base, server, gmToken, mapAssetId } = await boot([]);
+    await breatheOnBorin(base, gmToken, mapAssetId);
+    const save = server.store.snapshot.combat.pendingSaves[0];
+    const playerToken = server.auth.issuePlayerSession();
+
+    // A player who has claimed nothing may not answer - much less amend - Borin's save.
+    const refused = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), playerToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride: 3 });
+    expect(refused.status).toBeGreaterThanOrEqual(400);
+    expect(hpOf(server, BORIN)).toBe(40);
+
+    // Claim Borin and the same amend goes through: the boundary is ownership, not the field.
+    expect((await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: BORIN })).status).toBe(200);
+    const allowed = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), playerToken, { commandId: randomUUID(), saveId: save.id, method: "manual", total: 5, commit: true, damageOverride: 3 });
+    expect(allowed.status).toBe(200);
+    expect(hpOf(server, BORIN)).toBe(37);
+  });
+});

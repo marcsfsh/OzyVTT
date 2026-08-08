@@ -34,7 +34,7 @@ import { CommandRejectedError, RulesBlockedError, type GameStore, type JournalEn
 import { applyMovementRules } from "./movement-rules.js";
 import { applyRest, spendHitDice } from "./rests.js";
 import { paintFog, resetFog, setFogEnabled } from "./fog.js";
-import { applyDamage, applyDamageDetailed, damageAdjustmentDetail, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
+import { applyDamage, applyDamageDetailed, damageAdjustmentDetail, healActor, isSrdDamageType, setCurrentHp, setTemporaryHp, UNTYPED_DAMAGE, type ActorScope } from "./hit-points.js";
 import { settlePlayerHit, resolvePendingDamage, type AppliedDamage } from "./player-damage.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, setActorVisibility, type TokenMapGeometry } from "./token-placement.js";
@@ -1047,10 +1047,10 @@ export function createGameOperations(context: GameOperationsContext) {
     async actorApplyDamage(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ApplyDamageSchema, raw, "The damage command is malformed.");
       const scope = actorScopeOf(principal);
-      const { commandId, actorId, amount, parts, sourceName, critical, nonlethal, expectedRevision } = request;
+      const { commandId, actorId, amount, parts, damageType, damageOverride, sourceName, critical, nonlethal, expectedRevision } = request;
       let outcome: ReturnType<typeof applyDamageDetailed> | undefined;
       const result = await store.execute({ id: commandId, type: "actor.apply-damage", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        outcome = applyDamageDetailed(state, actorId, { amount, parts, critical, sourceName: sourceName ?? null, nonlethal }, scope, { resolveDefinition, newId: context.newId, now: () => new Date().toISOString(), catalog: equipmentCatalog() });
+        outcome = applyDamageDetailed(state, actorId, { amount, parts, damageType, damageOverride, critical, sourceName: sourceName ?? null, nonlethal }, scope, { resolveDefinition, newId: context.newId, now: () => new Date().toISOString(), catalog: equipmentCatalog() });
       });
       if (!result.duplicate && outcome) {
         await context.publishGameState(result.state);
@@ -1060,6 +1060,12 @@ export function createGameOperations(context: GameOperationsContext) {
         const attribution = sourceName ? `${sourceName} hit ${actorName(actorId)} for` : `${actorName(actorId)} took`;
         context.broadcastTableEvent({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
         if (detail.length > 0 || sourceName) context.appendLog({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
+        // A hand-typed type the SRD does not know is legal (homebrew is an open vocabulary) but is
+        // almost always a typo, and a typo here is silently inert - the hardest homebrew failure to
+        // diagnose. The GM hears about it once, on their own line, and the damage still lands.
+        if (damageType !== undefined && !isSrdDamageType(damageType) && damageType.trim().toLowerCase() !== UNTYPED_DAMAGE) {
+          context.appendLog({ kind: "damage", text: `"${damageType}" is not one of the SRD damage types - only a homebrew defence naming it exactly will match.`, actorIds: [actorId], gmOnly: true });
+        }
         publishNarrations(outcome.events);
       }
       return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { applied: outcome.application } : {}) };
@@ -1298,7 +1304,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(SaveAnswerSchema, raw, "The saving-throw answer is malformed.", true);
       const scope = actorScopeOf(principal);
       const sessionId = sessionIdOf(principal);
-      const { commandId, saveId, method, total, rollMode, commit, legendaryResistance, expectedRevision } = request;
+      const { commandId, saveId, method, total, rollMode, commit, legendaryResistance, damageOverride, expectedRevision } = request;
       const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
       let answered: ReturnType<typeof answerSave> | undefined;
       const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
@@ -1310,7 +1316,7 @@ export function createGameOperations(context: GameOperationsContext) {
           now: () => new Date().toISOString(),
           resolveDefinition,
           catalog: equipmentCatalog()
-        }, legendaryResistance, rollMode);
+        }, legendaryResistance, rollMode, damageOverride);
       });
       const outcome = answered?.outcome;
       if (!result.duplicate) {
