@@ -976,6 +976,12 @@ export type DamageApplication = Readonly<{
   instantDeath: boolean;
   /** A non-PC hit 0 HP: effects it sustained were ended (grapples released). */
   defeated: boolean;
+  /**
+   * Flat `damage-reduction` subtracted from the post-resistance total, once, floored at 0. Absent (or
+   * 0) when nothing reduced the hit - so an unchanged number is never explained, and a changed one
+   * always is. `parts` explains the per-type half; this is the step that comes after it.
+   */
+  flatReduction?: number;
 }>;
 export type DamageApplyResult = MutationResult & { applied?: DamageApplication };
 export type DeathSaveResult = MutationResult & { deathSave?: Readonly<{ naturalRoll: number; outcome: "success" | "failure" | "critical-success" | "critical-failure"; successes: number; failures: number; stable: boolean; dead: boolean; regainedConsciousness: boolean; /** false = previewed only (pips unchanged, awaiting confirmation); true = applied. */ committed: boolean; /** The d20 mode when adv/disadv was chosen; absent for a plain roll. */ rollMode?: "advantage" | "disadvantage" | "normal" }> };

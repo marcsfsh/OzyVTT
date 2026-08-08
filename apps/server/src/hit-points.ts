@@ -1,9 +1,9 @@
 import type { Actor, DamageApplication, GameState, HealthBand } from "@vtt/domain";
-import { adjustDamageParts, damageWhileDying, droppedToZero, type DamagePart } from "@vtt/rules-5e";
+import { adjustDamageParts, collectRiders, damageWhileDying, droppedToZero, normalizeDamageType, reduceDamageTotal, sumRiders, type DamagePart } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { applyConditionDirect, endConcentrationSustainedBy, endEffectsSustainedBy, effectDamageDefenses, removeConditionDirect, type EffectNarration } from "./effects.js";
-import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
 /** Who is asking: the GM may adjust anyone; a player only their own claimed character. */
 export type ActorScope = { role: "gm" } | { role: "player"; sessionId: string };
@@ -47,6 +47,44 @@ export type DamageDeps = Readonly<{
 }>;
 export type DamageOutcome = Readonly<{ application: DamageApplication; events: EffectNarration[] }>;
 
+/**
+ * THE damage-adjustment detail line - "17 bludgeoning → 8, resistance: Rage" - in ONE place.
+ *
+ * It was copy-pasted three times in `game-operations.ts` and missing entirely from the three call
+ * sites that discarded `application.parts` (`save.answer` and both reaction paths). That is how "fire
+ * damage isn't fire damage" could be true at the table while the engine halved correctly: the number
+ * changed and nothing said why. Returns "" when nothing adjusted the hit, so every caller can append
+ * it unconditionally and an unchanged number is never explained.
+ */
+export function damageAdjustmentDetail(application: Readonly<{ parts: DamageApplication["parts"]; flatReduction?: number }>): string {
+  const clauses = application.parts
+    .filter((part) => part.adjustment !== null)
+    .map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`);
+  // The flat step is named separately because it is not per-type: it comes after the halving, once.
+  if ((application.flatReduction ?? 0) > 0) clauses.push(`then -${application.flatReduction}, reduction`);
+  return clauses.length > 0 ? ` (${clauses.join("; ")})` : "";
+}
+
+/**
+ * FLAT REDUCTION, collected from the same rider carriers every other numeric read uses.
+ *
+ * `damage-reduction` was authored, validated, stored, carried and read by NOTHING - it was the one
+ * rider whose disposition said `"unread"` for the honest reason that no incoming-damage path
+ * collected riders at all. This is that collector, and it is the only one that runs on the RECEIVING
+ * side of a hit.
+ *
+ * Two passes, because the vocabulary allows both spellings and the SRD needs both: the STANDING set
+ * (a rider that names no moment - "you always take 3 less") and the `on-taking-damage` moment, whose
+ * `damage-type-is` filter is what makes "reduce fire damage by 3" expressible at all. The incoming
+ * types are handed to the collector so that filter can match; the total the caller then reduces is
+ * the whole hit, per `reduceDamageTotal`'s own rule.
+ */
+function damageReductionFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): number {
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  const onTakingDamage = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-taking-damage", damageTypes });
+  return sumRiders(standing, "damage-reduction") + sumRiders(onTakingDamage, "damage-reduction");
+}
+
 function definitionDefenses(definition: ActorDefinition | undefined) {
   return {
     resistances: definition?.damageResistances ?? [],
@@ -68,6 +106,7 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
 
   let totalRequested: number;
   let totalAdjusted: number;
+  let flatReduction = 0;
   let parts: DamageApplication["parts"] = [];
   if (input.parts && input.parts.length > 0) {
     const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
@@ -113,7 +152,11 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
       return { ...part, adjustmentSource: effectSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
     });
     totalRequested = input.parts.reduce((sum, part) => sum + part.amount, 0);
-    totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
+    const afterDefenses = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
+    // LAST, and per total: flat reduction subtracts from what the per-type maths produced.
+    flatReduction = Math.max(0, damageReductionFor(fromItems, adjusted.map((part) => normalizeDamageType(part.type))));
+    totalAdjusted = reduceDamageTotal(afterDefenses, flatReduction);
+    flatReduction = afterDefenses - totalAdjusted;
   } else {
     totalRequested = input.amount;
     totalAdjusted = input.amount;
@@ -207,7 +250,8 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
       droppedToZero: !wasAtZero && actor.hp.current === 0 && damageToHp > 0,
       deathSaveFailuresAdded,
       instantDeath,
-      defeated
+      defeated,
+      ...(flatReduction > 0 ? { flatReduction } : {})
     },
     events
   };

@@ -34,7 +34,7 @@ import { CommandRejectedError, RulesBlockedError, type GameStore, type JournalEn
 import { applyMovementRules } from "./movement-rules.js";
 import { applyRest, spendHitDice } from "./rests.js";
 import { paintFog, resetFog, setFogEnabled } from "./fog.js";
-import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
+import { applyDamage, applyDamageDetailed, damageAdjustmentDetail, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { settlePlayerHit, resolvePendingDamage, type AppliedDamage } from "./player-damage.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, setActorVisibility, type TokenMapGeometry } from "./token-placement.js";
@@ -1056,10 +1056,7 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         // Typed damage narrates its adjustments ("17 bludgeoning → 8, resistance: Rage") so the
         // table sees WHY the applied number differs - never a silent reduction (ADR-0020).
-        const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
-        const detail = adjustments.length > 0
-          ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})`
-          : "";
+        const detail = damageAdjustmentDetail(outcome.application);
         const attribution = sourceName ? `${sourceName} hit ${actorName(actorId)} for` : `${actorName(actorId)} took`;
         context.broadcastTableEvent({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
         if (detail.length > 0 || sourceName) context.appendLog({ kind: "damage", text: `${attribution} ${outcome.application.totalApplied} damage${detail}.`, actorIds: [actorId] });
@@ -1287,10 +1284,7 @@ export function createGameOperations(context: GameOperationsContext) {
           // breakdown). Both actors ride actorIds so gm-only-ness is re-derived correctly - the label names the
           // attacker, so a hidden attacker (unusual for a PC) must gate the line too.
           const { outcome, targetId, sourceActorId, label } = playerDamageApplied;
-          const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
-          const detail = adjustments.length > 0
-            ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})`
-            : "";
+          const detail = damageAdjustmentDetail(outcome.application);
           context.broadcastTableEvent({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId, sourceActorId] });
           context.appendLog({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId, sourceActorId] });
           publishNarrations(outcome.events);
@@ -1801,8 +1795,7 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         if (applied) {
           const { outcome, targetId, sourceActorId, label } = applied;
-          const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
-          const detail = adjustments.length > 0 ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})` : "";
+          const detail = damageAdjustmentDetail(outcome.application);
           const text = `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`;
           context.broadcastTableEvent({ kind: "damage", text, actorIds: [targetId, sourceActorId] });
           context.appendLog({ kind: "damage", text, actorIds: [targetId, sourceActorId] });

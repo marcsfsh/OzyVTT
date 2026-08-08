@@ -301,7 +301,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<Record<CarrierRiderType, "standing" | 
   "extra-damage": "at-its-moment",   // action-resolution rolls it as its own typed damage entry
   "check-bonus": "standing",         // actor-derived.ts checkRiderBonus, into every check and skill row
   "spell-attack-bonus": "unread",    // reaches derivation.spellAttackBonus; no spell-attack path reads it yet
-  "damage-reduction": "unread",      // no incoming-damage path collects riders at all yet
+  "damage-reduction": "at-its-moment", // hit-points.ts damageReductionFor, applied to the total after resistances
   "sense": "display-only"            // like `darkvision`: the trait prose carries it; no definition field models senses
 };
 

@@ -19,7 +19,17 @@ export type AdjustedDamagePart = Readonly<{
   adjustment: "resistance" | "immunity" | "vulnerability" | null;
 }>;
 
-const normalizeType = (type: string) => type.trim().toLowerCase();
+/**
+ * THE ONE damage-type normaliser, exported so both halves of the vocabulary share it.
+ *
+ * The engine matches types by this form, and the homebrew editor writes them; a second copy anywhere
+ * is a silent-inertness bug ("Fire" resisted by nothing). It lives HERE rather than beside
+ * `DAMAGE_TYPE_IDS` because `@vtt/content-srd-5.2.1` depends on this package and not the reverse -
+ * declaring it there and importing it here would be a dependency cycle. That package re-exports it.
+ */
+export const normalizeDamageType = (type: string): string => type.trim().toLowerCase();
+
+const normalizeType = normalizeDamageType;
 
 /**
  * SRD order per part: immunity zeroes, resistance halves rounding down, vulnerability doubles.
@@ -39,6 +49,20 @@ export function adjustDamageParts(parts: readonly DamagePart[], defenses: Damage
     if (vulnerable && !resistant) return { type: part.type, amount: part.amount, adjusted: part.amount * 2, adjustment: "vulnerability" as const };
     return { type: part.type, amount: part.amount, adjusted: part.amount, adjustment: null };
   });
+}
+
+/**
+ * Flat reduction ("reduce the damage by 3" - Heavy Armor Master, Armor of Gleaming) is the LAST step
+ * and the only one that is not per-type: it applies once to the total the per-type adjustments
+ * produced, and it floors at 0 rather than turning damage into healing.
+ *
+ * Per TOTAL rather than per part because the SRD phrases it against "the damage" one attack deals,
+ * not against each damage die's own type. `adjustDamageParts` has already run when this is called, so
+ * a resistance halves BEFORE the reduction subtracts - which is the order that makes a resisted hit
+ * survivable rather than the reverse.
+ */
+export function reduceDamageTotal(total: number, reduction: number): number {
+  return reduction <= 0 ? total : Math.max(0, total - reduction);
 }
 
 export type RollModeSource = Readonly<{ source: string; label: string }>;

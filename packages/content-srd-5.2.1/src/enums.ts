@@ -22,6 +22,17 @@
  * other option" rule). A closed control over an open slug is the inverse bug and is just as wrong.
  */
 
+/**
+ * THE normaliser every damage-type write and every damage-type read shares, re-exported rather than
+ * re-implemented.
+ *
+ * It is DECLARED in `@vtt/rules-5e` (`combat.ts`) and only re-exported here. This package depends on
+ * that one, so declaring it beside `DAMAGE_TYPE_IDS` and importing it there would be a dependency
+ * cycle - and two normalisers is exactly the drift this list exists to prevent: an editor that stores
+ * `"Fire "` against an engine that matches `"fire"` is silently inert at the table.
+ */
+export { normalizeDamageType } from "@vtt/rules-5e";
+
 /** The 13 SRD damage types, in bundle order. */
 export const DAMAGE_TYPE_IDS: readonly string[] = Object.freeze([
   "acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic",
