@@ -57,7 +57,7 @@ type OptionInput = z.input<typeof FeatureOptionSchema>;
  * bundle, which is the thing the overlay exists to stop.
  */
 export type OptionMechanics = Partial<Pick<OptionInput,
-  "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "choice">>;
+  "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "choice" | "choices">>;
 
 /**
  * The rider fields an overlay may add to a feature. Prose (`id`, `name`, `level`, `description`) is
@@ -75,7 +75,7 @@ export type OptionMechanics = Partial<Pick<OptionInput,
  * shared file, or not at all.
  */
 export type FeatureMechanics = Partial<Pick<FeatureInput,
-  "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "choice">> & {
+  "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "choice" | "choices">> & {
   /**
    * Riders merged into the feature's inline `choice.options`, by option id. The option must already
    * exist (the ETL parses the SRD's `#### Agonizing Blast` entries into them, or the overlay's own

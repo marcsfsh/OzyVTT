@@ -25,6 +25,31 @@ describe("the mechanics overlay", () => {
     expect(applyMechanics("barbarian", features, { barbarian: { raeg: { tags: ["typo"] } } })).toEqual(["barbarian.raeg"]);
   });
 
+  it("merges `choices` - SEVERAL picks on one record - from a class module", () => {
+    // The overlay's own docblock has always said "`choice` / `choices` and `options` are here", and
+    // for the whole of Stage 4 the type said otherwise: both `Pick<>`s listed `choice` alone, so
+    // `choices` was a hard compile error (TS2561) from every class module. Four lanes reported it
+    // independently. The multi-pick vocabulary itself shipped in `15b5337` and was reachable only
+    // from `feats.v1.json`, which is hand-authored - so Magic Initiate got its level-1 spell and
+    // Wizard's Spell Mastery ("a level 1 AND a level 2 spell") could not be said at all.
+    const features = feature();
+    const misses = applyMechanics("barbarian", features, {
+      barbarian: {
+        rage: {
+          choices: [
+            { kind: "spell", choose: 1, maxSpellLevel: 1 },
+            { kind: "spell", choose: 1, maxSpellLevel: 2 }
+          ]
+        }
+      }
+    });
+    expect(misses).toEqual([]);
+    expect(features[0].choices).toEqual([
+      { kind: "spell", choose: 1, maxSpellLevel: 1 },
+      { kind: "spell", choose: 1, maxSpellLevel: 2 }
+    ]);
+  });
+
   it("merges into an inline OPTION, and reports an option id that matches nothing", () => {
     // The one shape the overlay could not express before, and the reason Thaumaturge's extra cantrip
     // had to be hand-edited into `classes.v1.json`.

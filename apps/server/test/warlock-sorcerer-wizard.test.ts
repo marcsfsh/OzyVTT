@@ -879,17 +879,16 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
     for (const id of ["magic-missile", "acid-arrow", "fireball", "counterspell", "burning-hands", "shatter"]) {
       expect(spellOf(built.definition, id)).toMatchObject({ id });
     }
-    // INT 15 + the Acolyte's 2 = 17, then four ASIs at +2 each, clamped at 20.
+    // INT 15 + the Acolyte's 2 = 17, then four ASIs at +2 each, clamped at 20 - and then the epic
+    // boon's own +1 on top, which is the whole point of a boon and used to be silently lost.
     //
-    // AND THE EPIC BOON'S OWN POINT IS LOST, which this pins rather than hides. Boon of Dimensional
-    // Travel prints "Increase one ability score of your choice by 1, TO A MAXIMUM OF 30", and
-    // `featureChoiceBase.maximum` exists in the schema for precisely that sentence - its docstring
-    // says so by name. No epic-boon feat in `feats.v1.json` sets it: all seven print the 30 and all
-    // seven leave `maximum` unset, so the offer consumer clamps at 20 and the boon does nothing for
-    // a character already at 20 - which, at level 19+, is nearly every character who has one.
-    // `bundles/feats.v1.json` is lane B3's file, so this lane reports it and does not edit it.
-    // Fix the feats and this expectation becomes 21.
-    expect(built.definition.abilityScores.int).toBe(20);
+    // Boon of Dimensional Travel prints "Increase one ability score of your choice by 1, TO A
+    // MAXIMUM OF 30", and `featureChoiceBase.maximum` exists in the schema for precisely that
+    // sentence. All seven boons printed the 30 and none set `maximum`, so the offer consumer clamped
+    // at 20 and the boon did nothing for a character already there - which, at level 19+, is nearly
+    // every character who has one. Three lanes reported it independently; the seven feats now carry
+    // `maximum: 30` and this expectation moved from 20 to 21 exactly as this comment predicted.
+    expect(built.definition.abilityScores.int).toBe(21);
   });
 
   it("refuses the build that leaves Signature Spells unchosen", () => {
