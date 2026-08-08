@@ -542,25 +542,41 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
         if (at <= draft.level) featureOffer(`feature:${feature.id}`, "features", feature, at, context.classRecord.id);
       }
     }
-    // A chosen feat's OWN feature can ask for picks (Magic Initiate's cantrips, the ASI feat's two
-    // ability points). Those second-order offers exist only once the parent feat is chosen - exactly
-    // the server's two-pass order. Picking the same feat twice adds capacity rather than a duplicate.
+    /**
+     * A chosen feat's OWN feature can ask for picks (Magic Initiate's cantrips, the ASI feat's two
+     * ability points). Those second-order offers exist only once the parent feat is chosen - exactly
+     * the server's two-pass order.
+     *
+     * ONE OFFER PER INSTANCE, never one offer of N times the capacity. The server mints exactly one
+     * per chosen feat (`character-build.ts`: `for (const [index, feat] of chosenFeats.entries())
+     * featureOffer(feat.feature, 1, [], chosenFeatSteps[index])`), and this side used to merge them:
+     * four Ability Score Improvement feats became a single `ability-score` offer of capacity 8.
+     *
+     * That is not a shape the wizard can answer. `ChoiceGrid` is a checkbox group - a card cannot be
+     * selected twice - and `repeatable` lives on `ContentFeatSummary` but NOT on
+     * `ContentFeatureChoiceSummary`, so it never crosses the wire and this side cannot know a repeat
+     * was legal. Against the ASI feat's six ability cards the step read "6 of 8 chosen" with every
+     * card selected, `offerFilled`'s equality never held, and Next never enabled: taking the ASI feat
+     * at every improvement - the ordinary play pattern, and one of only two cards the SRD's ASI level
+     * offers - made every class uncompletable at 16 and 20 (and Fighter from 12).
+     *
+     * Splitting also fixes the arithmetic for free: `uniqueKey` gives the repeats "#2", "#3", ... and
+     * `budgetKeyOf` strips that suffix, so `extraPicks` still sum onto one budget exactly as the
+     * server's `count` multiplication did.
+     *
+     * Every taken feat is passed on, not only the ones that ask a question, because the server folds
+     * `grantExtraPicks(feat.feature, 1)` over ALL of them - a feat that raises a budget without
+     * asking for a pick of its own must raise it here too, or the wizard under-offers what the
+     * server then demands.
+     */
     const takenFeatIds = offers
       .filter((offer) => FEAT_KINDS.has(offer.kind))
       .flatMap((offer) => (draft.picks[offer.key] ?? []).map((id) => ({ id, step: offer.step, level: offer.level, classId: offer.classId })));
-    const byFeature = new Map<string, { feat: ContentFeatSummary; step: OfferStep; level: number; classId: string | null; count: number }>();
     for (const taken of takenFeatIds) {
       if (taken.id === ASI_SHORTHAND) continue;
       const feat = catalogs.choice.feats.find((entry) => entry.id === taken.id);
-      if (!feat?.feature.choice) continue;
-      const existing = byFeature.get(feat.feature.id);
-      if (existing) existing.count += 1;
-      else byFeature.set(feat.feature.id, { feat, step: taken.step, level: taken.level, classId: taken.classId, count: 1 });
-    }
-    for (const entry of byFeature.values()) {
-      // `entry.count` multiplies the budget grants for the same reason it multiplies `choose`: a feat
-      // taken twice grants twice (the server folds the same count through `grantExtraPicks`).
-      featureOffer(`feature:${entry.feat.feature.id}`, entry.step, entry.feat.feature, entry.level, entry.classId, entry.count);
+      if (!feat) continue;
+      featureOffer(`feature:${feat.feature.id}`, taken.step, feat.feature, taken.level, taken.classId);
     }
 
     // The class's own spell budgets, from its printed level row. These are the UNTAGGED rows the
