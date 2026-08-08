@@ -431,6 +431,25 @@ const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
       options: [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level")],
       // `mode` is NOT stored — it is read back out of the shape, so there is no second
       // place the answer lives and nothing to keep in sync.
+      //
+      // **This `read` is the whole of the client's `3b`(a) report.** The comment above has
+      // been true about the WRITE since the field was written and false about the read:
+      // there was no `read`, so `FieldRenderer` fell through to `getAt(value, "mode")` — a
+      // key the write path deliberately never persists — and the control rendered `""` on
+      // every pass, selecting `<option value="">Not set</option>`. The GM's choice was
+      // saving correctly the whole time; only the readback was missing. Not a controlled
+      // input, not `defaults.ts`, not `useAutosave.ts`.
+      //
+      // The three literals below are the schema's own (`FeatureUsesSchema.scaling`'s
+      // discriminator) and are byte-identical to the option values above, so there is no
+      // mapping table to drift. `class-resource` is the fourth discriminator and has no
+      // option yet — it reads back as "Not set" until U7 adds one, which is honest and is
+      // what U7's own test changes.
+      read: (scope_) => {
+        const uses = scope_.uses as { limit?: unknown; scaling?: { type?: string } } | undefined;
+        if (!uses) return undefined;
+        return uses.scaling?.type ?? "flat";
+      },
       write: (next, scope_) => {
         const uses = { ...(scope_.uses as Record<string, unknown> | undefined) };
         if (next === "flat") {
