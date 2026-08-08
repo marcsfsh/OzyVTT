@@ -50,14 +50,19 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
   const critDice = sumRiders(riders, "critical-bonus-dice") || riders.reduce((total, rider) => rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total, 0);
   const saveDc = sumRiders(riders, "spell-save-dc");
   const poolBonus = usesBonus(action, riders);
-  if (attackBonus === 0 && critDice === 0 && saveDc === 0 && poolBonus === 0) return action;
+  const extraAttacks = extraAttacksFor(action, derivation, riders);
+  if (attackBonus === 0 && critDice === 0 && saveDc === 0 && poolBonus === 0 && extraAttacks === 0) return action;
 
   return {
     ...action,
-    ...(action.attack && (attackBonus !== 0 || critDice !== 0)
+    ...(action.attack && (attackBonus !== 0 || critDice !== 0 || extraAttacks !== 0)
       ? { attack: {
           ...action.attack,
           bonus: action.attack.bonus + attackBonus,
+          // `attack.count` is what `action-resolution.ts` turns into the generic `{ attack: n-1 }`
+          // component pool, which is why raising it here is the whole of Extra Attack: the second
+          // swing may legally be a DIFFERENT weapon, and a generic pool is exactly that rule.
+          ...(extraAttacks !== 0 ? { count: Math.max(1, Math.min(10, (action.attack.count ?? 1) + extraAttacks)) } : {}),
           // `criticalBonusDice` is schema-bounded 1-4; a rider must not push it out of range.
           ...(critDice !== 0 ? { criticalBonusDice: Math.max(1, Math.min(4, (action.attack.criticalBonusDice ?? 0) + critDice)) } : {})
         } }
@@ -65,6 +70,36 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
     ...(action.save && saveDc !== 0 ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } } : {}),
     ...(action.uses && poolBonus !== 0 ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } } : {})
   };
+}
+
+/**
+ * EXTRA ATTACK, at the only place it can possibly work.
+ *
+ * The rider was baked into the definition at build time for a year and reached NOTHING: the builder
+ * raised `attack.count` on the actions a feature declares, and Fighter, Barbarian, Monk, Ranger and
+ * Paladin declare none - their swings are derived from equipped inventory. Both halves of that gap
+ * are closed here: `extra-attack` left `BUILDER_BAKED_MODIFIER_TYPES` (so a feature carrier now hands
+ * it to `collectRiders` like any other standing rider), and this is the consumer.
+ *
+ * SCOPED TO WEAPON SWINGS, and that scope is load-bearing. The SRD grants the extra attack "whenever
+ * you take the Attack action", so it must NOT multiply a wand's cast or an item action that merely
+ * rolls to hit. `derivation.weaponActionIds` is the list `deriveEquipment` built from the equipped
+ * weapons themselves, so the test is an identity check rather than a shape guess.
+ *
+ * A DEFINITION action that already declares its own `count` is left alone: a stat block that prints
+ * "Multiattack: two claws" has said its number, and a monster does not hold class features anyway.
+ *
+ * MAX, NOT SUM. The Fighter's three riders are cumulative in the SRD's prose but absolute in their
+ * counts - `extra-attack` is +1, `two-extra-attacks` is +2, `three-extra-attacks` is +3, each naming
+ * the TOTAL extra swings at that tier. Today the class grants only the newest, so a sum would agree
+ * by luck; the day a level row grants two of them (or a multiclass Fighter 11 / Ranger 5 holds both
+ * the class's +2 and the Ranger's +1) a sum would silently hand out five attacks. `Math.max` is the
+ * SRD's own rule for this: Extra Attack from two sources does not stack.
+ */
+function extraAttacksFor(action: ActorAction, derivation: EquipmentDerivation, riders: ReturnType<typeof collectRiders>): number {
+  if (!action.attack || !derivation.weaponActionIds.includes(action.id)) return 0;
+  return riders.reduce((most, rider) => rider.modifier.type === "extra-attack"
+    ? Math.max(most, rider.modifier.count ?? 0) : most, 0);
 }
 
 /**

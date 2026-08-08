@@ -180,13 +180,13 @@ export type CharacterFeatureRef = Readonly<{ id: string; kind: "class" | "subcla
  * This list and `character-build.ts`'s `CARRIER_RIDER_DISPOSITION` are the two halves of ONE
  * partition of the 21-variant vocabulary, and the partition is what rules out double-counting:
  *
- *   - THESE EIGHT describe a permanent change to the SHAPE OF THE SHEET, and baking is the correct
+ *   - THESE SEVEN describe a permanent change to the SHAPE OF THE SHEET, and baking is the correct
  *     reading for a feat specifically (`ITEM_REFUSED_MODIFIER_TYPES`' own note: "Both stay fully
  *     available on a FEATURE or FEAT carrier, where baking is correct: a feat is granted once and
  *     never un-granted"). `ability-score` is already inside `definition.abilityScores`,
  *     `hit-points-per-level` inside `hitPoints.maximum`, `speed` inside `speedFeet`, `armor-class`
  *     inside `armorClass` + the `armorClassBonus` extension, `initiative` inside `initiativeBonus`,
- *     `extra-attack` inside each action's `attack.count`, `unarmored-defense` inside `armorClass`.
+ *     `unarmored-defense` inside `armorClass`.
  *     Collecting any of them here would apply the feat's bonus a SECOND time on every read.
  *     `darkvision` is in the list because the builder's switch claims it as an explicit display-only
  *     no-op; leaving it out would split ownership of one variant across both files.
@@ -195,13 +195,22 @@ export type CharacterFeatureRef = Readonly<{ id: string; kind: "class" | "subcla
  *     fold structurally cannot express. Those become carriers, read by the SAME `collectRiders` an
  *     item's riders go through.
  *
+ * `extra-attack` USED TO BE THE EIGHTH, and moving it out is the whole of that fix. Baking it was
+ * not merely a worse reading, it was a fold onto nothing: the builder raised `attack.count` on the
+ * actions a FEATURE declares, and no martial class declares one - a Fighter's, Barbarian's, Monk's,
+ * Ranger's and Paladin's swings are all derived from equipped inventory, which this very list then
+ * excluded from the collector. Measured before the fix: at every level, for every one of those five
+ * classes, `definition.actions.filter(a => a.attack)` is EMPTY, so Extra Attack changed no number a
+ * player could ever act on. It is now a standing rider like any other, consumed by
+ * `effective-actions.ts`'s `withStandingRiders` against `weaponActionIds` below.
+ *
  * It lives HERE, next to the filter that reads it, rather than in `character-build.ts` where the
  * baking happens: this module imports no other server module, so `character-build.ts` can import it
  * without a cycle, while the reverse would drag the whole content library into a leaf.
  */
 export const BUILDER_BAKED_MODIFIER_TYPES = [
   "ability-score", "hit-points-per-level", "speed", "armor-class",
-  "initiative", "extra-attack", "unarmored-defense", "darkvision"
+  "initiative", "unarmored-defense", "darkvision"
 ] as const;
 const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES);
 
@@ -286,6 +295,17 @@ export type EquipmentDerivation = Readonly<{
   context: Omit<RiderContext, "moment">;
   /** Item-granted actions and synthesised weapon attacks, keyed `item-<itemId>`. */
   actions: readonly ActorAction[];
+  /**
+   * WHICH of `actions` are real WEAPON SWINGS - the subset `weaponAction` synthesised from an
+   * equipped weapon, as opposed to an item's declared action or a wand's synthesised spell cast.
+   *
+   * Extra Attack is the reason this exists and the reason it has to be a list rather than a guess.
+   * "You can attack twice whenever you take the ATTACK ACTION" - so the rider must raise the count on
+   * a swing and on nothing else. Inferring it from `action.attack !== undefined` would hand the same
+   * multiplier to a Wand of Magic Missiles' cast and to any item action that happens to roll to hit,
+   * which is a rules bug that would look exactly like the feature working.
+   */
+  weaponActionIds: readonly string[];
   /** Provenance for the sheet ("Stealth (Circlet of Shadows)"). */
   sources: readonly Readonly<{ itemId: string; itemName: string; summary: string }>[];
 }>;
@@ -295,7 +315,7 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   conditionImmunities: [], armorProficiencies: [], weaponProficiencies: [], featIds: [],
   armorClass: 0, initiative: 0, speed: 0, saveBonus: 0, checkBonus: 0,
   spellSaveDc: [], spellAttackBonus: [], spellSlots: [], resourceBonus: [],
-  carriers: [], context: {}, actions: [], sources: []
+  carriers: [], context: {}, actions: [], weaponActionIds: [], sources: []
 });
 
 /**
@@ -553,9 +573,10 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   // training is collected above, so a gauntlet that grants martial weapons pays the proficiency
   // bonus on the axe in the same recomputation.
   const grantedWeaponIds = weaponProficiencies.map((entry) => entry.id);
+  const weaponActionIds: string[] = [];
   for (const entry of equipped) {
     const weaponAttack = weaponAction(entry.item, definition, grantedWeaponIds);
-    if (weaponAttack) actions.push(weaponAttack);
+    if (weaponAttack) { actions.push(weaponAttack); weaponActionIds.push(weaponAttack.id); }
   }
 
   // The STANDING + CONDITIONAL pass: riders naming no moment whose static and dynamic gates pass.
@@ -579,7 +600,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       ? [{ level: rider.modifier.level, amount: rider.modifier.amount ?? 0 }] : []),
     resourceBonus: standing.flatMap((rider) => rider.modifier.type === "resource-bonus" && rider.modifier.poolId !== undefined
       ? [{ poolId: rider.modifier.poolId, amount: rider.modifier.amount ?? 0 }] : []),
-    carriers, actions, sources
+    carriers, actions, weaponActionIds, sources
   };
 }
 

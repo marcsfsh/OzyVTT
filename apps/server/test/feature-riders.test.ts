@@ -48,7 +48,7 @@ const IDS = {
 } as const;
 const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
-/** The 13 variants the build-time fold does NOT own; every one must reach the table as a carrier. */
+/** The 14 variants the build-time fold does NOT own; every one must reach the table as a carrier. */
 const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "attack-bonus", amount: 1 },
   { type: "save-bonus", amount: 1 },
@@ -57,6 +57,10 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "extra-damage", formula: "1d4", damageType: "fire" },
   { type: "critical-range", threshold: 19 },
   { type: "critical-bonus-dice", count: 1 },
+  // MOVED HERE from the baked list. Baking raised `attack.count` on the actions a FEATURE
+  // declares, and the five classes that get Extra Attack declare none - so it reached nothing at
+  // all. It is a standing rider now, folded onto the DERIVED weapon swings by `effective-actions`.
+  { type: "extra-attack", count: 1 },
   { type: "damage-reduction", amount: 1 },
   { type: "spell-save-dc", amount: 1 },
   { type: "spell-attack-bonus", amount: 1 },
@@ -64,14 +68,13 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "resource-bonus", poolId: "rift-surge", amount: 1 },
   { type: "sense", sense: "tremorsense", feet: 30 }
 ];
-/** The 8 the builder BAKES into the definition; none may appear as a carrier, or it applies twice. */
+/** The 7 the builder BAKES into the definition; none may appear as a carrier, or it applies twice. */
 const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "ability-score", ability: "wis", amount: 1 },
   { type: "hit-points-per-level", amount: 1 },
   { type: "speed", amount: 10 },
   { type: "armor-class", amount: 1 },
   { type: "initiative", amount: 2 },
-  { type: "extra-attack", count: 1 },
   { type: "unarmored-defense", ability: "con" },
   { type: "darkvision", feet: 60 }
 ];
@@ -315,7 +318,7 @@ describe("the builder records every granted feature by id and provenance", () =>
     }
   });
 
-  it("reaches all THIRTEEN roll-time variants from all SIX carriers, and none of the eight baked ones", () => {
+  it("reaches all FOURTEEN roll-time variants from all SIX carriers, and none of the seven baked ones", () => {
     // The before/after of this whole fix: 78 assertions, one per (carrier, variant) pair either way.
     for (const on of CARRIERS) {
       for (const modifier of ROLL_TIME_RIDERS) {

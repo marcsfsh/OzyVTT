@@ -85,8 +85,6 @@ const barbarianInput = (level = 20): MutableInput => ({
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
     { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
     // THE THIRD one only exists because Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
@@ -113,8 +111,6 @@ const fighterInput = (level: number): MutableInput => ({
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
@@ -146,8 +142,6 @@ const monkInput = (level: number): MutableInput => ({
   backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
-    { level: 1, kind: "language", id: "dwarvish" },
-    { level: 1, kind: "language", id: "giant" },
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
@@ -431,6 +425,95 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
   it("rolls with advantage from level 3", () => {
     const built = onTheTable(build(fighterInput(5)), { fight: false });
     expect(initiativeRollMode(built.state, IDS.hero, (id) => id === built.hero.definitionId ? built.definition : undefined, catalog)).toBe("advantage");
+  });
+});
+
+describe("Fighter: EXTRA ATTACK is a second swing that really resolves", () => {
+  /**
+   * THE GAP THIS CLOSES. `extra-attack` was a builder-baked rider: the builder raised `attack.count`
+   * on the actions a FEATURE declares, and no martial class declares one - every Fighter, Barbarian,
+   * Monk, Ranger and Paladin swing is derived from equipped inventory instead. Two lanes measured the
+   * consequence independently: the built definition was byte-identical with and without the rider,
+   * and `definition.actions.filter(a => a.attack)` is EMPTY at every level.
+   *
+   * So the assertion cannot be a count on a definition - that is exactly the number that lied for a
+   * year. It has to be a SECOND ATTACK RESOLVING, and a third being refused.
+   */
+  const foeAc = 13;
+
+  it("resolves TWO swings on one action slot at level 5, then refuses the third", () => {
+    // Str 19 (+4) + proficiency 3 = +7 to hit; the foe's AC is 13, so a natural 9 hits with room.
+    const built = onTheTable(build(fighterInput(5)));
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.armorClass).toBe(foeAc);
+
+    const first = use(built, "item-greatsword", [IDS.foe], [9, 5, 5]);
+    expect(first.attack?.outcome).toBe("hit");
+    // The second swing is OPEN, and it is a generic pool - this is the number that used to be null.
+    expect(first.componentsRemaining).toEqual({ attack: 1 });
+
+    // SRD Extra Attack lets the second swing be a DIFFERENT weapon, which is why the pool is generic.
+    const second = use(built, "item-flail", [IDS.foe], [14, 6]);
+    expect(second.attack?.outcome).toBe("hit");
+    expect(second.componentsRemaining).toBeNull();
+
+    // ...and the third is refused, so the count is a real budget rather than an unbounded one.
+    expect(() => use(built, "item-greatsword", [IDS.foe], [18, 5, 5]))
+      .toThrow(/no attacks remaining in this action/);
+  });
+
+  it("is ONE swing at level 4, the level before the feature is gained", () => {
+    // The negative control that makes the test above mean something: same sheet, same weapon, one
+    // level earlier. If this ever opens a pool, the rider is applying to someone who has not got it.
+    const built = onTheTable(build(fighterInput(4)));
+    expect(actionOf(built, "item-greatsword").attack?.count ?? 1).toBe(1);
+    const only = use(built, "item-greatsword", [IDS.foe], [9, 5, 5]);
+    expect(only.componentsRemaining).toBeNull();
+    expect(() => use(built, "item-flail", [IDS.foe], [14, 6])).toThrow(/already used an action/);
+  });
+
+  it("counts THREE swings at level 11, off the Fighter's own second tier", () => {
+    // `two-extra-attacks` is a separate feature with `count: 2`, and the Fighter is the only class
+    // that has more than one tier - so this is also the proof that the tiers are read as an absolute
+    // total rather than summed on top of the level-5 rider.
+    const built = onTheTable(build(fighterInput(11)));
+    expect(actionOf(built, "item-greatsword").attack?.count).toBe(3);
+    expect(use(built, "item-greatsword", [IDS.foe], [9, 5, 5]).componentsRemaining).toEqual({ attack: 2 });
+    expect(use(built, "item-flail", [IDS.foe], [14, 6]).componentsRemaining).toEqual({ attack: 1 });
+    // Exhausted reads as `null`, not `{ attack: 0 }` - the resolver reports remaining components only
+    // while some remain, so this is the same "nothing left" the level-5 pair's second swing gives.
+    expect(use(built, "item-spear", [IDS.foe], [16, 4]).componentsRemaining).toBeNull();
+    expect(() => use(built, "item-greatsword", [IDS.foe], [18, 5, 5]))
+      .toThrow(/no attacks remaining in this action/);
+  });
+
+  it("does NOT multiply a non-weapon action that happens to roll to hit", () => {
+    // The scope that keeps this from being a rules bug dressed as a feature: Extra Attack is
+    // "whenever you take the Attack action", so it may only raise a DERIVED WEAPON SWING. Every
+    // other action on the same level-11 sheet keeps the count it declared.
+    const built = onTheTable(build(fighterInput(11)));
+    const swings = new Set(derivationOf(built).weaponActionIds);
+    for (const action of effectiveActions(built.definition, built.hero, catalog)) {
+      if (!action.attack || swings.has(action.id)) continue;
+      expect({ id: action.id, count: action.attack.count ?? 1 }).toEqual({ id: action.id, count: 1 });
+    }
+  });
+});
+
+describe("Barbarian and Monk get the same second swing - it was never Fighter-only", () => {
+  it("opens a second attack for a level-5 Barbarian", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    expect(actionOf(built, "item-greataxe").attack?.count).toBe(2);
+    expect(use(built, "item-greataxe", [IDS.foe], [12, 7]).componentsRemaining).toEqual({ attack: 1 });
+    expect(use(built, "item-handaxe", [IDS.foe], [15, 4]).componentsRemaining).toBeNull();
+  });
+
+  it("opens a second attack for a level-5 Monk, and not for a level-4 one", () => {
+    const five = onTheTable(build(monkInput(5)));
+    expect(actionOf(five, "item-spear").attack?.count).toBe(2);
+    expect(use(five, "item-spear", [IDS.foe], [17, 5]).componentsRemaining).toEqual({ attack: 1 });
+
+    const four = onTheTable(build(monkInput(4)));
+    expect(actionOf(four, "item-spear").attack?.count ?? 1).toBe(1);
   });
 });
 
