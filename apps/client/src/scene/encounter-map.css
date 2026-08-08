@@ -386,13 +386,31 @@
    would keep re-arming the trap the other two just disarmed. */
 .encounter-map-interaction.enlarged .encounter-map-stage > svg { max-height: none; height: 100%; }
 .encounter-map-saving { margin: var(--space-2) 0 0; color: var(--text-dim); font-size: .85rem; }
-/* In enlarged mode the interaction is a flex column; a "Saving move…" line mounting in-flow on token
-   release would steal height from the flex:1 stage and bounce the map. Float it over the stage (like
-   the token tray) so it never resizes the stage. */
-/* left/bottom track the enlarged container's PADDING (--space-4), not the viewport inset above it.
-   They were literal 1rem and the padding was too; wave 3 tokenised the padding and left insets out
-   of scope, so the scale change would have desynced them. Same reason as the token tray at :11. */
-.encounter-map-interaction.enlarged .encounter-map-saving { position: absolute; z-index: 4; left: var(--space-4); bottom: var(--space-4); margin: 0; padding: .2rem .55rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 78%, transparent); }
+/* THE INTERACTION IS A FLEX COLUMN AT EVERY WIDTH ABOVE THE RUNG, so a "Saving move…" line mounting
+   in-flow on token release steals height from the flex:1 stage and bounces the map. Take it out of
+   flow (like the token tray at :7) so it never resizes the stage.
+   THIS RULE WAS SCOPED `.enlarged` AND THAT SCOPE WAS THE BUG (`4h`, the map jump, reported twice).
+   22f04ed/868ac16 floated the tray and this line in enlarged mode for exactly the reason above, when
+   the default arm was still a plain block. The table-frame lane then rewrote
+   `.encounter-map-interaction` to the `flex: 1` column at :4 and the stage to `flex: 1` at :180 —
+   "`.enlarged` has always worked this way — this is that shape, made the normal one" — which made the
+   normal arm need the float too, and left it behind. Measured at 1280x900 as GM, undocked and docked
+   both sides: the stage stood at 788.81px and became 760.42 the frame this line mounted, a 28.39px
+   jump on every token release, held until the server's ack.
+   `bottom: 0` PUTS IT IN THE ROW THE FEEDBACK LINE ALREADY RESERVES (:396, min-height 1.25rem), which
+   is where the in-flow line rendered anyway — so above the rung this changes where the height comes
+   from and nothing else. The two never collide: `submitMove` clears the message before it sets
+   `busyActorId` (EncounterMap.tsx:291), so the feedback row is empty for exactly as long as this line
+   is up. `bottom: var(--space-4)` was measured wrong for this arm — with no container padding it
+   lands 14px lower than the stage's rim, leaving the plate straddling the map's edge, half outside
+   the frame (plate bottom 866, stage bottom 852.8 at 1280x900). Enlarged keeps its own insets below.
+   scripts/map-stability-audit.mjs is what stops this coming back a third time. */
+.encounter-map-interaction .encounter-map-saving { position: absolute; z-index: 4; left: 0; bottom: 0; margin: 0; }
+/* Enlarged is the arm that floats over the MAP, and it keeps the plate that makes it readable there.
+   --space-4 tracks the enlarged container's PADDING, not the viewport inset above it. They were
+   literal 1rem and the padding was too; wave 3 tokenised the padding and left insets out of scope,
+   so the scale change would have desynced them. Same reason as the token tray at :11. */
+.encounter-map-interaction.enlarged .encounter-map-saving { left: var(--space-4); bottom: var(--space-4); padding: .2rem .55rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 78%, transparent); }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: var(--text-dim); font-size: .78rem; }
 
 /* ─────────────────────── THE ONE MAP TOOLBAR (D4) ───────────────────────
@@ -775,6 +793,15 @@
 @media (max-width: 979px) {
   .encounter-map-interaction:not(.enlarged) { flex: 0 1 auto; min-height: 0; }
   .encounter-map-interaction:not(.enlarged) .encounter-map-stage { flex: 0 1 14rem; min-height: 9rem; max-height: calc(100dvh - 12.75rem); height: auto; }
+  /* "Saving move…" FOLDS BACK IN FLOW BELOW THE RUNG, for the same reason the feedback line does
+     below. Here the stage's height is STATED and the interaction is `flex: 0 1 auto`, so an in-flow
+     line grows the interaction around the map instead of shrinking it — which is why `4h` was never
+     reproducible on a phone. Floating it is what would cost something here, and it was measured
+     costing it: at 390x844 the plate landed at 26..130 x 235..262, exactly on the compact rail's
+     Tools button at the map's bottom-left corner — the collision the feedback line's own note below
+     predicted. The map is inert while it is up (`beginGesture` returns early on `busyActorId`), so
+     nothing breaks, but covering a control to say "saving" is not a trade worth making. */
+  .encounter-map-interaction:not(.enlarged) .encounter-map-saving { position: static; margin: var(--space-2) 0 0; }
   /* The status line FOLDS instead of floating. `min-height: 1.25rem` reserves 27px against a layout
      jump that a laptop column can afford and a 224px band cannot; `:empty` is the resting state (the
      message is "" almost always), so below the rung it costs nothing until there is something to
