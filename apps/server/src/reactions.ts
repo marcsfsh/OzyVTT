@@ -1,4 +1,4 @@
-import type { ActionResolution, GameState } from "@vtt/domain";
+import type { ActionResolution, DamageApplication, GameState } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
@@ -19,9 +19,20 @@ export type ReactionAnswerDependencies = Readonly<{
   gmSessionId: string;
   now: () => string;
 }>;
+/** The two optional halves of a `ReactionOutcome`, spread at both return sites so neither can forget one. */
+const detailOf = (application: DamageApplication | null) =>
+  application === null ? {} : { parts: application.parts, ...(application.flatReduction ? { flatReduction: application.flatReduction } : {}) };
+
 export type ReactionOutcome = Readonly<{
   used: boolean;
   appliedDamage: number;
+  /**
+   * THE TYPED BREAKDOWN of what was applied. Both reaction paths - the opportunity attack's hit and
+   * the Uncanny-Dodge-class halving - used to keep only the total, so "18 becomes 9, then 4 because
+   * you resist it" reached the table as an unexplained 4. Absent when nothing landed.
+   */
+  parts?: DamageApplication["parts"];
+  flatReduction?: number;
   actorId: string;
   actorName: string;
   actionName: string;
@@ -103,6 +114,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     if (!commit) return { ...base, used: false, appliedDamage: 0, resolution, events: [] };
     clearPrompt(true);
     let appliedDamage = 0;
+    let application: DamageApplication | null = null;
     let events: readonly EffectNarration[] = [];
     // Auto-apply the hit's damage - unless the resolve itself parked it on a NEW prompt (the mover's
     // own Uncanny Dodge answers opportunity attacks too).
@@ -114,9 +126,10 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
       ].filter((part) => part.amount > 0);
       const outcome = applyDamageDetailed(state, mover.id, { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: `${reactor.name}'s ${chosen.name} (opportunity attack)` }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newRollId, now: deps.now, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
       appliedDamage = outcome.application.totalApplied;
+      application = outcome.application;
       events = outcome.events;
     }
-    return { ...base, used: true, appliedDamage, resolution, events };
+    return { ...base, used: true, appliedDamage, resolution, events, ...detailOf(application) };
   }
 
   const parts = use
@@ -125,14 +138,16 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
 
   let appliedDamage = 0;
+  let application: DamageApplication | null = null;
   let events: readonly EffectNarration[] = [];
   if (total > 0) {
     const outcome = applyDamageDetailed(state, reactor.id, { amount: total, parts, critical: pending.critical, sourceName: pending.sourceName }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newRollId, now: deps.now, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
     appliedDamage = outcome.application.totalApplied;
+    application = outcome.application;
     events = outcome.events;
   }
   clearPrompt(use);
-  return { ...base, used: use, appliedDamage, events };
+  return { ...base, used: use, appliedDamage, events, ...detailOf(application) };
 }
 
 /** Drop a reaction prompt without applying its damage (GM housekeeping - e.g. the damage was applied manually). */

@@ -1,4 +1,4 @@
-import type { AbilityId, Actor, GameState, PendingSave, RollRecord } from "@vtt/domain";
+import type { AbilityId, Actor, DamageApplication, GameState, PendingSave, RollRecord } from "@vtt/domain";
 import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
@@ -21,6 +21,15 @@ export type SaveAnswerDependencies = Readonly<{
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean;
+  /**
+   * THE TYPED BREAKDOWN of the damage this save applied - the thing `appliedDamage` alone could never
+   * explain. `answerSave` used to fold `outcome.application` into a bare number and drop the rest, so
+   * a fire-resistant target's halved save damage arrived at the table as a smaller number with no
+   * reason attached; the client could not have rendered one if it wanted to. Absent when no damage
+   * landed, and `flatReduction` rides with it because it is the step `parts` cannot show.
+   */
+  parts?: DamageApplication["parts"];
+  flatReduction?: number;
   /** The condition that forced an automatic failure (Paralyzed etc. on a Str/Dex save); null when the die was rolled. */
   autoFailed?: string | null;
   /** Advantage/disadvantage sources that shaped the rolled save (Restrained, Dodge); absent for a plain d20. */
@@ -300,10 +309,13 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
   if (autoFailed !== null) events.push({ kind: "condition", text: `${target.name} automatically fails the ${pending.ability.toUpperCase()} save (${conditionLabel(autoFailed)}).`, actorId: target.id });
   let appliedDamage = 0;
+  let application: DamageApplication | null = null;
   let conditionApplied = false;
   if (outcomeDamage > 0) {
     const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId), newId: deps.newRollId, now: deps.now, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
     appliedDamage = outcome.application.totalApplied;
+    // The whole application travels, not just its total: this is the call site that dropped it.
+    application = outcome.application;
     events.push(...outcome.events);
   }
   if (outcomeCondition && pending.conditionId) {
@@ -340,7 +352,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     events.push({ kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id });
   }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
-  return { outcome: { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true, autoFailed, ...(rollMode ? { rollMode } : {}) }, events };
+  return { outcome: { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true, autoFailed, ...(rollMode ? { rollMode } : {}), ...(application ? { parts: application.parts, ...(application.flatReduction ? { flatReduction: application.flatReduction } : {}) } : {}) }, events };
 }
 
 /** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */
