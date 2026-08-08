@@ -3317,7 +3317,7 @@ Creates a quest, and appends its first history record in the SAME transaction - 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `title` | string | yes |  |
-| `status` | `active` \| `completed` \| `failed` | no |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | no | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 | `playerBody` | string | no |  |
 | `gmBody` | string | no |  |
 | `objectives` | CodexQuestObjective[] | no |  |
@@ -3351,7 +3351,7 @@ Edits a quest; an omitted field is left alone. **A status change also appends a 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `title` | string | no |  |
-| `status` | `active` \| `completed` \| `failed` | no |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | no | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 | `playerBody` | string | no |  |
 | `gmBody` | string | no |  |
 | `objectives` | CodexQuestObjective[] | no |  |
@@ -4293,7 +4293,7 @@ One quest: a thread the party is pulling on, and whether it is still open. Two l
 | --- | --- | --- | --- |
 | `id` | string (uuid) | yes |  |
 | `title` | string | yes | The quest's name - the line that appears on the dashboard's open-quests card. |
-| `status` | `active` \| `completed` \| `failed` | yes | Player-facing (unlike a session's `status`). Queryable server-side: the dashboard counts the `active` ones. |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | Player-facing (unlike a session's `status`). Queryable server-side: the dashboard counts the OPEN ones - `not-started` and `active`. |
 | `playerBody` | string | yes | The player-facing description (markdown). Reaches a revealed quest's player projection as `body`. |
 | `gmBody` | string | yes | GM-only notes (markdown). NEVER present in a player projection, revealed or not - revealing a quest publishes its player body, never its GM body. It is also kept out of the player search index, because a HIT on a GM-only phrase leaks the phrase even when the body itself is never returned. |
 | `objectives` | CodexQuestObjective[] | yes | The ordered checklist. Player-facing in full - order is content, not incidental. |
@@ -4312,12 +4312,12 @@ One quest: a thread the party is pulling on, and whether it is still open. Two l
 
 ### `CodexQuestHistoryPayload`
 
-D11: a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest starting is an event) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.
+D11: a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest entering the log is an event, whether or not the party has begun it) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `questId` | string (uuid) | yes |  |
-| `status` | `active` \| `completed` \| `failed` | yes | The status REACHED, not a delta - the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened". |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | The status REACHED, not a delta - the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened". |
 
 ### `CodexQuestHistoryPlayerPayload`
 
@@ -4326,7 +4326,7 @@ A quest-history record as a PLAYER sees it. The whole ROW is hidden unless the q
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `questId` | string \| null | yes | Nulled unless that quest is revealed - a second line of defence behind the whole-row gate, the same arrangement a standing payload's `factionPageId` uses. |
-| `status` | `active` \| `completed` \| `failed` | yes |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 
 ### `CodexQuestListData`
 
@@ -4351,7 +4351,7 @@ A quest as a PLAYER receives it. `status` is KEPT - this is the one place a ques
 | --- | --- | --- | --- |
 | `id` | string (uuid) | yes |  |
 | `title` | string | yes |  |
-| `status` | `active` \| `completed` \| `failed` | yes |  |
+| `status` | `not-started` \| `active` \| `completed` \| `failed` \| `canceled` | yes | In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`. |
 | `body` | string | yes | The quest's `playerBody`. |
 | `objectives` | CodexQuestObjective[] | yes |  |
 | `entityIds` | string (uuid)[] | yes | Filtered to the revealed subset. |

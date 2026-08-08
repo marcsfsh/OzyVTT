@@ -571,7 +571,21 @@ export type CodexSessionUpdateInput = Readonly<{
  *  - `status` is the first enum a DASHBOARD queries rather than merely displays, which is what the
  *    `codex_quests_status` index in migration v14 is for.
  */
-export type CodexQuestStatus = "active" | "completed" | "failed";
+/**
+ * The five states, in LIFECYCLE order, and the order every picker offers them in.
+ *
+ * Two of them arrived after the first three, and the split that matters is not "old / new" but
+ * **open / finished**: `not-started` and `active` are quests the party can still do, and
+ * `completed`, `failed` and `canceled` are three different ways of being done with one. That is the
+ * line `openQuests` draws on the client, and it is the reason `canceled` is not a synonym for
+ * `failed` - a quest the party never took up did not fail, and recording it as a failure both
+ * misreports the campaign and puts a red badge on something nobody lost.
+ *
+ * `not-started` is the DEFAULT for a new quest (see `questStatus`), which is what makes the pair
+ * worth the migration: a lead the GM writes down mid-session has not started, and saying so is
+ * more honest than the old default of calling every freshly noted rumour active.
+ */
+export type CodexQuestStatus = "not-started" | "active" | "completed" | "failed" | "canceled";
 /**
  * One line on the quest's checklist. Deliberately nothing richer than `{ text, done }`: the M10 spec's
  * escalation clause makes a shape beyond this unapproved scope, so assignees / due dates / sub-quests
@@ -1591,6 +1605,58 @@ export const MIGRATIONS = [{
   // Ruling R2: `sceneIds` is GM-ONLY in projections ALWAYS - stricter than "follows the session reveal",
   // because a revealed session's player half is the RECAP and tonight's planned fights are spoilers.
   sql: `ALTER TABLE codex_sessions ADD COLUMN scene_ids_json TEXT NOT NULL DEFAULT '[]';`
+}, {
+  version: 26,
+  // Two more quest statuses - `not-started` and `canceled` - and therefore the SECOND table rebuild in
+  // this file. v15's reasoning applies verbatim and is worth restating rather than cross-referencing:
+  // `codex_quests.status` has carried `CHECK (status IN ('active', 'completed', 'failed'))` since v14,
+  // SQLite has no MODIFY/DROP CONSTRAINT, and so a `not-started` row is REJECTED BY THE FILE, not merely
+  // untyped. The rebuild is the only way to widen it.
+  //
+  // DROPPING the CHECK instead would have been one line and it is the wrong line, for exactly the reason
+  // v14 wrote it down: `questStatus()` gates this PROCESS, not the FILE. A repair script or a manual
+  // sqlite3 session would then be free to write `status = 'abandoned'`, which `coerceQuestStatus` reads
+  // back as a plausible "active" instead of failing loudly. The constraint is what makes the column
+  // honest, and it stays.
+  //
+  // **NOTHING IS REWRITTEN.** The SELECT is a column-for-column copy with no CASE, no COALESCE and no
+  // default: every existing quest keeps the exact status string it had, and `active`, `completed` and
+  // `failed` all remain legal. This migration cannot change what any existing campaign's quest log says -
+  // it only widens what a FUTURE write may say. The new default (`not-started`, in `questStatus`) applies
+  // to quests created after this point and is deliberately not back-filled onto anything.
+  //
+  // `tags_json` keeps its `DEFAULT '[]'` from v20 so the rebuilt table's shape is identical to the one it
+  // replaces, and `codex_quests_status` is recreated because a rebuild drops the index with the table -
+  // the index is not decoration, it is what makes the dashboard's open-quest filter a cheap per-render
+  // read (v14's note), and losing it here would be a silent performance regression rather than an error.
+  //
+  // The column list is written out on both sides rather than using `SELECT *`: a rebuild is exactly where
+  // a positional copy silently transposes two columns of the same type, and `player_body`/`gm_body` are
+  // adjacent TEXT columns on opposite sides of the codex's viewer boundary.
+  sql: `
+    CREATE TABLE codex_quests_new (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('not-started', 'active', 'completed', 'failed', 'canceled')),
+      player_body TEXT NOT NULL,
+      gm_body TEXT NOT NULL,
+      objectives_json TEXT NOT NULL,
+      entity_ids_json TEXT NOT NULL,
+      revealed INTEGER NOT NULL,
+      rev INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      tags_json TEXT NOT NULL DEFAULT '[]'
+    ) STRICT;
+    INSERT INTO codex_quests_new
+      (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json)
+      SELECT
+       id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json
+      FROM codex_quests;
+    DROP TABLE codex_quests;
+    ALTER TABLE codex_quests_new RENAME TO codex_quests;
+    CREATE INDEX codex_quests_status ON codex_quests (status);
+  `
 }];
 
 /**
@@ -2228,9 +2294,9 @@ function parseQuestEventPayload(raw: string | null | undefined): CodexQuestEvent
     const value = parsed as { questId?: unknown; status?: unknown };
     return {
       questId: typeof value.questId === "string" ? value.questId : "",
-      // Fails CLOSED to `active`, the `toQuest` coercion rule verbatim: an unrecognised status reads as
-      // the harmless one rather than throwing and making one bad row an unopenable codex.
-      status: value.status === "completed" || value.status === "failed" ? value.status : "active"
+      // Fails CLOSED to `active`, the `toQuest` coercion rule verbatim - and now literally the same
+      // function, so a sixth status cannot be taught to one reader and not the other.
+      status: coerceQuestStatus(value.status)
     };
   } catch { return null; }
 }
@@ -2319,12 +2385,44 @@ type EntryFields = Readonly<{ playerText: string; gmText: string | null; reveale
 export function deadlineFired(entry: Pick<CodexJournalRow, "kind" | "calendarInstant">, at: number | null): boolean {
   return entry.kind === "deadline" && entry.calendarInstant !== null && at !== null && entry.calendarInstant <= at;
 }
-const QUEST_STATUSES = new Set<CodexQuestStatus>(["active", "completed", "failed"]);
-/** The TS half of the quest status gate; migration v14's CHECK is the other half (see `sessionStatus`). */
+const QUEST_STATUSES = new Set<CodexQuestStatus>(["not-started", "active", "completed", "failed", "canceled"]);
+/**
+ * The TS half of the quest status gate; migration **v26**'s CHECK is the other half (v14 wrote the
+ * first one, over the three original statuses; see `sessionStatus`).
+ *
+ * **The default is `not-started`, and that is a deliberate reversal of the original `active`.** A quest
+ * record is created the moment a lead is NAMED - `CodexQuestCreateRequest` requires nothing but a
+ * title, precisely so a rumour can be written down mid-session and filled in later - and a rumour
+ * nobody has acted on is not an active quest. With only three statuses `active` was the least wrong of
+ * them; now that "not started" exists, defaulting to `active` would mean the honest state is the one
+ * the GM has to go and select by hand, which is the wrong way round.
+ *
+ * Nothing is lost from the dashboard by this: `openQuests` counts BOTH open states, so a quest still
+ * appears under "Open quests" the instant it is created, exactly as it did before. What changes is only
+ * the word on its badge, and the word is now true.
+ */
 function questStatus(value: string | undefined): CodexQuestStatus {
-  if (value === undefined) return "active";
-  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new CodexValidationError("A quest is active, completed, or failed.");
+  if (value === undefined) return "not-started";
+  if (!QUEST_STATUSES.has(value as CodexQuestStatus)) throw new CodexValidationError("A quest is not started, active, completed, failed, or canceled.");
   return value as CodexQuestStatus;
+}
+/**
+ * Read a status that came out of the FILE rather than off the wire, failing closed to `active`.
+ *
+ * One function for both readers (`toQuest` and `parseQuestEventPayload`) because they used to be two
+ * hand-written ternary chains over the same three literals - survivable at three, and precisely the
+ * shape that drifts at five when only one of them learns a new state. Now a status the file should not
+ * contain degrades identically wherever it is read.
+ *
+ * `active` stays the landing state even though `not-started` is now the default for a NEW quest, and
+ * the two answer different questions: the default is what a GM most likely means, while this is what an
+ * unclassifiable row should be treated as. Both open states are safe here, and `active` is the stronger
+ * "this is still live, go and look at it" - a quest silently demoted to "not started" is one the GM
+ * could reasonably scroll past. Keeping it also makes this migration inert for existing data: no stored
+ * value changes meaning.
+ */
+function coerceQuestStatus(value: unknown): CodexQuestStatus {
+  return typeof value === "string" && QUEST_STATUSES.has(value as CodexQuestStatus) ? (value as CodexQuestStatus) : "active";
 }
 const MAX_OBJECTIVES = 24;
 /** 120 = the repo's one-line-of-display bound (a marker `label`, an `inWorldLabel`), and the number `CodexQuestObjective` publishes. */
@@ -5196,7 +5294,7 @@ export class CodexStore {
       id: row.id, title: row.title,
       // Anything unrecognised reads as `active`, the same fail-safe `toSession` applies to a status and
       // `toEntry` to a journal kind. A quest that cannot be classified is one that is still open.
-      status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "active",
+      status: coerceQuestStatus(row.status),
       playerBody: row.player_body, gmBody: row.gm_body,
       objectives: parseObjectives(row.objectives_json),
       entityIds: parseIdArray(row.entity_ids_json),

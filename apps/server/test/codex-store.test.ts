@@ -1801,7 +1801,7 @@ describe("CodexStore quests (M10)", () => {
   });
 
   it("rejects an unknown status, lists oldest-first, and deletes idempotently", () => {
-    expect(() => quests.createQuest({ title: "Bad", status: "abandoned" as never })).toThrow(/active, completed, or failed/);
+    expect(() => quests.createQuest({ title: "Bad", status: "abandoned" as never })).toThrow(/not started, active, completed, failed, or canceled/);
     expect(() => quests.createQuest({ title: "" })).toThrow(/1 to 160 printable characters/);
 
     const first = quests.createQuest({ title: "First" });
@@ -1819,6 +1819,31 @@ describe("CodexStore quests (M10)", () => {
     // The index row goes with the record: an orphan would keep matching forever with no live row for
     // `PLAYER_VISIBLE_SQL` to gate it on.
     expect(quests.searchAll("gm", "First").hits).toEqual([]);
+  });
+
+  /**
+   * 5d — all FIVE statuses survive a write and a re-read as themselves, and the default is `not-started`.
+   *
+   * `coerceQuestStatus` fails closed to `active`, which is the right fail-safe and also the thing that
+   * would make a half-done widening invisible: teach the TS union and the CHECK about `canceled` but
+   * forget the read path, and a canceled quest simply reads back as active with nothing thrown anywhere.
+   * The re-read through `getQuest` is what catches that, which is why it is not asserted on the create
+   * call's return value.
+   */
+  it("stores all five statuses as THEMSELVES, and defaults a new quest to not-started", () => {
+    for (const status of ["not-started", "active", "completed", "failed", "canceled"] as const) {
+      const created = quests.createQuest({ title: `Quest ${status}`, status });
+      expect(created.status, status).toBe(status);
+      expect(quests.getQuest(created.id)!.status, `${status} re-read`).toBe(status);
+    }
+    // The default reversal: a quest created with no status is NOT started. A lead written down mid-session
+    // is not one the party has taken up, and `openQuests` counts it as open either way.
+    expect(quests.createQuest({ title: "A rumour in Vallaki" }).status).toBe("not-started");
+    // ...and a status is still changeable to and from the two new states through the ordinary update path.
+    const quest = quests.createQuest({ title: "The Bell of Vallaki" });
+    expect(quests.updateQuest(quest.id, { status: "active" }, undefined).status).toBe("active");
+    expect(quests.updateQuest(quest.id, { status: "canceled" }, undefined).status).toBe("canceled");
+    expect(quests.getQuest(quest.id)!.status).toBe("canceled");
   });
 
   /**
@@ -2203,7 +2228,7 @@ describe("CodexStore migration v14 — quests arrive with nothing to back-fill (
 
       // ...and the upgraded database really accepts a quest, so the empty list above is "nothing to
       // back-fill" and not a table that failed to arrive.
-      expect(upgraded.createQuest({ title: "The Wyrmwood Contract" }).status).toBe("active");
+      expect(upgraded.createQuest({ title: "The Wyrmwood Contract" }).status).toBe("not-started");
     } finally {
       upgraded?.close();
       await rm(legacyDirectory, { recursive: true, force: true });
@@ -2225,12 +2250,120 @@ describe("CodexStore migration v14 — quests arrive with nothing to back-fill (
       .run(`id-${status}`, status);
 
     expect(() => insert("abandoned")).toThrow();
-    // All three legal values still insert, so the throw above is the CHECK discriminating rather than the
-    // statement being broken for every input.
-    expect(() => insert("active")).not.toThrow();
-    expect(() => insert("completed")).not.toThrow();
-    expect(() => insert("failed")).not.toThrow();
+    // All FIVE legal values still insert, so the throw above is the CHECK discriminating rather than the
+    // statement being broken for every input. `not-started` and `canceled` are v26's whole point: before
+    // the rebuild they were rejected by the FILE, and this loop is what proves the rebuilt CHECK ran.
+    for (const status of ["not-started", "active", "completed", "failed", "canceled"]) expect(() => insert(status), status).not.toThrow();
+    // ...and `canceled` is not silently accepted as a near-miss spelling of itself.
+    expect(() => insert("cancelled")).toThrow();
     database.close();
+  });
+});
+
+/**
+ * Migration **v26** — two more quest statuses, and therefore the SECOND table rebuild in this file.
+ *
+ * `codex_quests.status` has carried `CHECK (status IN ('active', 'completed', 'failed'))` since v14 and
+ * SQLite cannot widen a CHECK in place, so `not-started` and `canceled` were rejected by the FILE. The
+ * table is recreated, copied, dropped, renamed and re-indexed — v15's shape, and its risk: **a rebuild
+ * that loses or mangles an existing campaign's quests is the worst outcome this change can produce, and a
+ * fresh-database test can never catch one, because every table is empty.**
+ *
+ * So this builds a genuine v1..v25 database out of the shipped migration SQL, seeds it with quests in all
+ * three statuses that could exist before today, upgrades it exactly as a GM's `vtt.sqlite` will, and
+ * compares every column of every row.
+ */
+describe("CodexStore migration v26 — two more quest statuses, no quest touched (5d)", () => {
+  /** A genuine v1..v25 database on disk, ready for a CodexStore to upgrade. `legacyDatabase`'s shape, eleven versions later. */
+  const v25Database = (path: string): DatabaseSync => {
+    const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+    database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 25)) {
+      database.exec(migration.sql);
+      database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+    }
+    return database;
+  };
+
+  it("v26 is the next version, and the file really is at 25 before it", () => {
+    // The count this migration was written against, asserted rather than remembered: a sibling landing a
+    // v26 of their own turns this into a duplicate-version collision, and it should fail here first.
+    expect(MIGRATIONS.map((migration) => migration.version)).toEqual(Array.from({ length: 26 }, (_, index) => index + 1));
+  });
+
+  it("preserves every column of every pre-existing quest — status, id and both bodies byte-identical", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v25-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      const database = v25Database(path);
+      database.prepare("INSERT INTO codex_meta (id, codex_revision, links_backfilled) VALUES (1, 7, 1)").run();
+      // One quest per status that could exist before v26, plus the shapes with something to lose: a GM
+      // body, an ordered objective list, linked page ids, tags, and a revealed row.
+      const insert = database.prepare("INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at, tags_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      const live = crypto.randomUUID(), done = crypto.randomUUID(), lost = crypto.randomUUID();
+      const linked = crypto.randomUUID();
+      insert.run(live, "The Wyrmwood Contract", "active", "Deliver the ledger to Vallaki.", "The ledger is a forgery.",
+        JSON.stringify([{ text: "Find the ledger", done: true }, { text: "Reach Vallaki", done: false }]), JSON.stringify([linked]), 1, 4, "2026-01-04T00:00:00.000Z", "2026-01-09T00:00:00.000Z", '["travel","barovia"]');
+      insert.run(done, "Free Ireena", "completed", "She is safe.", "Strahd is not finished.", JSON.stringify([{ text: "Escort her", done: true }]), "[]", 0, 2, "2026-01-05T00:00:00.000Z", "2026-01-06T00:00:00.000Z", "[]");
+      insert.run(lost, "The Missing Caravan", "failed", "", "Nobody survived the pass.", "[]", "[]", 0, 1, "2026-01-06T00:00:00.000Z", "2026-01-06T00:00:00.000Z", '["caravan"]');
+
+      // Raw SQL, not `toQuest`: a projection that drops a column reads as null on BOTH sides and the
+      // comparison would pass. `SELECT *` is right here for the same reason it is wrong in the migration —
+      // the test wants whatever columns actually exist, not the ones it remembers.
+      const before = database.prepare("SELECT * FROM codex_quests ORDER BY id").all();
+      const beforeColumns = (database.prepare("PRAGMA table_info(codex_quests)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      expect(before).toHaveLength(3);
+      // The v25 file genuinely REFUSES the new statuses, so the widening below is a real change and not a
+      // constraint that was never there.
+      expect(() => database.prepare("INSERT INTO codex_quests (id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at) VALUES (?, 'Probe', 'not-started', '', '', '[]', '[]', 0, 1, '', '')").run(crypto.randomUUID())).toThrow();
+      database.close();
+
+      upgraded = new CodexStore(path);
+      await upgraded.initialize();                                  // <- v26 runs here
+
+      const reopened = new DatabaseSync(path);
+      const after = reopened.prepare("SELECT * FROM codex_quests ORDER BY id").all() as Array<Record<string, unknown>>;
+      const afterColumns = (reopened.prepare("PRAGMA table_info(codex_quests)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      const indexes = (reopened.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_quests'").all() as Array<{ name: string }>).map((row) => row.name);
+      reopened.close();
+
+      expect(after).toHaveLength(before.length);                    // nothing dropped, nothing duplicated
+      // EVERY column of EVERY row, value for value. v26 adds no column, so this is a whole-row equality
+      // with nothing excused — including the status strings, which is the single thing the rebuild's
+      // copying SELECT could most plausibly have mangled.
+      expect(after).toEqual(before);
+      expect([...after.map((row) => row.status)].sort()).toEqual(["active", "completed", "failed"]);
+      // The rebuilt table IS the old table: same columns, order, types, NOT-NULLs and defaults — including
+      // `tags_json`'s DEFAULT '[]', which v20 added and a reconstructed-from-memory DDL would silently drop.
+      expect(afterColumns).toEqual(beforeColumns);
+      // A rebuild drops the table's indexes with it. `codex_quests_status` is what makes the dashboard's
+      // open-quest filter a cheap per-render read, so losing it here would be a silent regression.
+      expect(indexes).toContain("codex_quests_status");
+
+      // The rows are not merely present, they still READ correctly through the store's own path.
+      const carried = upgraded.getQuest(live)!;
+      expect(carried.status).toBe("active");
+      expect(carried.title).toBe("The Wyrmwood Contract");
+      expect(carried.playerBody).toBe("Deliver the ledger to Vallaki.");
+      expect(carried.gmBody).toBe("The ledger is a forgery.");
+      expect(carried.objectives).toEqual([{ text: "Find the ledger", done: true }, { text: "Reach Vallaki", done: false }]);
+      expect(carried.entityIds).toEqual([linked]);
+      expect(carried.tags).toEqual(["travel", "barovia"]);
+      expect(carried.revealedToPlayers).toBe(true);
+      expect(carried.rev).toBe(4);
+      expect(upgraded.getQuest(done)!.status).toBe("completed");
+      expect(upgraded.getQuest(lost)!.status).toBe("failed");
+      expect(upgraded.listQuests().map((quest) => quest.id)).toEqual([live, done, lost]);   // oldest-first, unchanged
+
+      // ...and the upgraded file now ACCEPTS both new statuses, through the store and back out again.
+      expect(upgraded.updateQuest(lost, { status: "canceled" }, undefined).status).toBe("canceled");
+      expect(upgraded.getQuest(lost)!.status).toBe("canceled");
+      expect(upgraded.createQuest({ title: "A rumour in Vallaki" }).status).toBe("not-started");
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -4548,9 +4681,11 @@ describe("CodexStore quest history (D11, R5)", () => {
     store.setActiveSession(session.id);
 
     const quest = store.createQuest({ title: "Find the Sunsword" });
-    expect(questRecords(), "R5: a quest STARTING is an event, and quests start at creation").toHaveLength(1);
+    expect(questRecords(), "R5: a quest ENTERING THE LOG is an event, and every quest enters at creation").toHaveLength(1);
     const start = questRecords()[0]!;
-    expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "active" });
+    // The status REACHED, which since v26 is the new default `not-started` rather than `active`: writing a
+    // lead down is not the party taking it up, and the chronicle now says so instead of overstating it.
+    expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "not-started" });
     // Hidden, with EMPTY player text - which is why the projection hides the whole row rather than a field.
     expect(start.revealedToPlayers).toBe(false);
     expect(start.playerText).toBe("");
@@ -4596,7 +4731,7 @@ describe("CodexStore quest history (D11, R5)", () => {
     database.close();
 
     expect(() => store.updateQuest(quest.id, { status: "failed" }, undefined)).toThrow();
-    expect(store.getQuest(quest.id)!.status, "the quest UPDATE rolled back with the entry INSERT").toBe("active");
+    expect(store.getQuest(quest.id)!.status, "the quest UPDATE rolled back with the entry INSERT").toBe("not-started");
     expect(questRecords(), "...and no second history record was left behind either").toHaveLength(1);
     // ...and a quest CREATE rolls back the same way: no quest row survives its own failed start record.
     const questCount = store.listQuests().length;
@@ -4614,7 +4749,7 @@ describe("CodexStore quest history (D11, R5)", () => {
     expect(projectPlayerJournalEntry(store.getEntry(record.id)!, context([]))).toBeNull();
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([]))).toBeNull();
     // The GM's own row carries it throughout, so the nulls are the gate and not a missing record.
-    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }).payload).toEqual({ questId: quest.id, status: "active" });
+    expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }).payload).toEqual({ questId: quest.id, status: "not-started" });
 
     // Absent context fails CLOSED - a caller that forgets to resolve the set hides history, never leaks it.
     expect(projectPlayerJournalEntry(store.getEntry(record.id)!, { unrevealedSessionIds: new Set<string>() })).toBeNull();
@@ -4623,7 +4758,7 @@ describe("CodexStore quest history (D11, R5)", () => {
     store.setQuestRevealed(quest.id, true);
     const shown = projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))!;
     expect(shown.kind).toBe("quest");
-    expect(shown.payload).toEqual({ questId: quest.id, status: "active" });
+    expect(shown.payload).toEqual({ questId: quest.id, status: "not-started" });
     // ...and the ENTRY's own reveal flag still gates it, so both must hold.
     store.setEntryRevealed(record.id, false);
     expect(projectPlayerChronicleRecord({ kind: "entry", entry: store.getEntry(record.id)! }, context([quest.id]))).toBeNull();

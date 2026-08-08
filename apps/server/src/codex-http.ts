@@ -272,7 +272,8 @@ const SessionUpdateSchema = z.object({
  * in its own description, so the contract is not advertising a rule nobody enforces. See
  * `questObjectives` for the full reasoning; the store is the enforcer, this is the early rejection.
  */
-const QuestStatusSchema = z.enum(["active", "completed", "failed"]);
+/** The five states of `CodexQuestStatus`, in the store's lifecycle order. `.enum` is exact, so a retired or misspelt status is a 400 here rather than a `coerceQuestStatus` fallback three layers down. */
+const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
 const ObjectiveSchema = z.object({ text: z.string().max(120), done: z.boolean() }).strict();
 const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
 const QuestEntityIdsSchema = z.array(z.string().uuid()).max(24);
