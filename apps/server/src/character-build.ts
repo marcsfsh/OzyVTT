@@ -167,6 +167,9 @@ const withinSpellWindow = (offer: Pick<ChoiceOffer, "optionLevels" | "maxSpellLe
     && (offer.minSpellLevel === null || level >= offer.minSpellLevel);
 };
 
+/** `withinSpellWindow`, for the random generator - so it draws from exactly the ids `matchRow` will accept. */
+export const withinOfferSpellWindow = withinSpellWindow;
+
 /**
  * EVERY PICK BUDGET AN `extraPicks` GRANT MAY NAME BY A FIXED KEY - the eight that are not a
  * particular feature's own pick (which is spelled `feature:<featureId>` and validated against the
@@ -1087,7 +1090,16 @@ function surveyBuild(input: CharacterCreateRequestInput, library: ContentView, p
   // pick (step 11), and the subclass mirror row. A "spell"/"cantrip" row WITH payload.featureId
   // belongs to that feature's offer (Evocation Savant, Magic Initiate); without one it fills the
   // class budgets.
-  const separateKinds = new Set(["equipment", "size"]);
+  //
+  // `hp-roll` is here for a THIRD reason and it closes a real hole: those rows are the ledger's own
+  // record of the dice (D14), written by `hitPointRollRows` from `input.hp.entries` and re-derived
+  // from them on every build. They are an OUTPUT, never a pick - and until this line, a caller who
+  // echoed a stored ledger back verbatim (which is exactly what "the provenance ledger, VERBATIM -
+  // level-up and respec prefill from exactly these rows" invites) was answered with `Nothing in this
+  // build offers a "hp-roll" choice.` The wizard never hit it because `buildChoiceRows` re-derives
+  // its rows from offers and so drops them by accident; nothing else was so lucky. Ignoring them on
+  // the way IN is what makes step 12's "filter them out and re-add" honest.
+  const separateKinds = new Set(["equipment", "size", "hp-roll"]);
   const preparedSpellRows: CharacterChoice[] = [];
   const classCantripRows: CharacterChoice[] = [];
   for (const row of input.choices) {
