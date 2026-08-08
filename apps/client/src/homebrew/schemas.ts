@@ -11,6 +11,7 @@
  * fires has no other way to find out.
  */
 
+import { RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../lib/ids";
 import { SUB_OBJECT_DEFAULTS } from "./defaults";
 import { getAt } from "./paths";
@@ -591,10 +592,6 @@ const SLOTS = [
   opt("none", "Just carried", "Everything else")
 ];
 
-/** The six printed rarities, as SLUGS: `rarity` is an open `ContentIdSchema` in the schema, so the
-    control offers these and still accepts "unique" or "table-only". */
-const RARITY_IDS: readonly string[] = ["common", "uncommon", "rare", "very-rare", "legendary", "artifact"];
-
 /** Turning magic off must take the whole magic half with it. Left behind, `isMagic: false`
     plus an orphan rider is a record `.strict()` rejects and a GM cannot see to fix. */
 const MAGIC_KEYS = ["isMagic", "rarity", "attunement", "cursed", "casts", "grantsFeatIds", "modifiers", "grants", "uses", "actions", "effects", "tags"];
@@ -646,7 +643,13 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
         // An OPEN slug in the schema, so a CLOSED select was the inverse of the usual bug: the six
         // printed rarities and no way to write "unique". Complete list plus other, like every other
         // open-slug field in the editor.
-        { key: "rarity", label: "Rarity", suggestions: RARITY_IDS, placeholder: "uncommon", emptyValue: "omit", visibleWhen: (draft) => draft.isMagic === true },
+        //
+        // `pick` is the second half of that repair and the client's own `3a`. Offering the list was
+        // never the problem — READING it was: `kind: "text"` + `suggestions` is an `<input list>`,
+        // which has no visible affordance on any browser and renders as NOTHING on iOS Safari, so a
+        // complete vocabulary shipped as a bare box. Still text, still open, still takes "unique";
+        // the list is simply on screen now. See `FieldDef.pick`.
+        { key: "rarity", label: "Rarity", pick: true, suggestions: RARITY_IDS, placeholder: "uncommon", emptyValue: "omit", visibleWhen: (draft) => draft.isMagic === true },
         {
           key: "attunement.required",
           label: "Requires attunement",

@@ -15,6 +15,7 @@
 import { useId } from "react";
 import {
   Chip,
+  Combobox,
   Field,
   FieldGrid,
   Input,
@@ -28,7 +29,10 @@ import {
 } from "@vtt/ui";
 import { CatalogPicker } from "./CatalogPicker";
 import { getAt, setAt } from "./paths";
-import { groupOptions, resolveOptions, resolveSuggestions, type Draft, type FieldDef, type SchemaContext } from "./schema";
+import {
+  groupOptions, pickValue, resolveOptions, resolveSuggestions, suggestionLabel,
+  type Draft, type FieldDef, type SchemaContext
+} from "./schema";
 
 export type CustomRenderer = (args: {
   field: FieldDef;
@@ -356,6 +360,36 @@ export function FieldRenderer(props: FieldRendererProps) {
        * whole fix; no new `FieldKind`, per the standing rule at the top of `schema.ts`.
        */
       const suggestions = resolveSuggestions(field, ctx);
+
+      /**
+       * **`pick`: the same contract, with the list on screen.** See `FieldDef.pick`.
+       *
+       * A `<datalist>` is complete and invisible — no arrow, no cue, and on iOS Safari no control at
+       * all — so "Rarity" read as a bare box a GM had to spell "very-rare" into from memory. The
+       * chooser shows the whole vocabulary, keeps `allowFreeText` so an open slug stays open, and
+       * takes the 44px floor on every row (`Combobox.css`, route 1).
+       *
+       * Empty is the ABSENT value, not `""`: clearing the chip goes through `setEmpty()`, which is
+       * what `emptyValue` already means everywhere else in this file.
+       */
+      if (field.pick && suggestions.length > 0) {
+        return wrap(
+          <Combobox
+            id={fieldId}
+            ariaLabel={field.label}
+            options={suggestions.map((suggestion) => ({ id: suggestion, label: suggestionLabel(suggestion) }))}
+            value={asString(raw) || null}
+            placeholder={field.placeholder ? suggestionLabel(field.placeholder) : undefined}
+            disabled={isDisabled}
+            allowFreeText
+            /* The id handed back is either a slug from the list or the raw words typed; `pickValue`
+               makes the second case the same shape as the first, so "Very Rare" typed by hand is
+               the rung and not an unpublishable string. */
+            onChange={(next) => (next === null ? setEmpty() : set(pickValue(next)))}
+          />
+        );
+      }
+
       const listId = suggestions.length > 0 ? `${fieldId}-list` : undefined;
       return wrap(
         <>

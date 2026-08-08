@@ -204,6 +204,23 @@ export type FieldDef = Readonly<{
   /** `kind: "select"` + `searchable` — which catalog to pick from. */
   catalog?: "spells" | "equipment";
   suggestions?: readonly string[] | ((ctx: SchemaContext) => readonly string[]);
+  /**
+   * **`kind: "text"` + `suggestions` — render the CHOOSER instead of a bare box with a `<datalist>`.**
+   *
+   * A renderer flag, not a twelfth `FieldKind`, per the standing rule at the top of this file: the
+   * field is still text, still writes a string, still takes a word the SRD has never heard of. What
+   * changes is that the list is visible.
+   *
+   * The bug it repairs is the one an `<input list>` cannot: a `<datalist>` has **no affordance at
+   * all** — no arrow, no border cue, nothing that says a list exists — and iOS Safari renders it as
+   * *nothing*, so on a phone the complete vocabulary this repo went to the trouble of shipping is
+   * simply invisible. `Combobox` with `allowFreeText` is the same contract with the list on screen:
+   * every value one tap away, `--tap-min` rows, and unmatched text still handed back as itself.
+   *
+   * Requires `suggestions`; a `pick` field with no list is a chooser over nothing, which is why
+   * `vocabularies.test.ts` censuses it.
+   */
+  pick?: boolean;
 
   min?: number;
   max?: number;
@@ -438,6 +455,36 @@ export function resolveSuggestions(field: FieldDef, ctx: SchemaContext): readonl
   const { suggestions } = field;
   if (!suggestions) return [];
   return typeof suggestions === "function" ? suggestions(ctx) : suggestions;
+}
+
+/**
+ * What a `pick` row READS as: `"very-rare"` → "Very Rare", `"fire"` → "Fire".
+ *
+ * A derived label rather than a hand-written map, because a map is a second list to keep in step
+ * with the first — the exact drift `RARITY_IDS`/`DAMAGE_TYPE_IDS` were centralised to end. Every
+ * vocabulary these controls offer is a lowercase-hyphen slug of ordinary English words, so one rule
+ * covers all of them and a new list is readable the day it lands with nothing to remember.
+ *
+ * The VALUE is untouched: the slug is what is picked, stored and matched on. This is display only.
+ * A field that needs a label the slug cannot produce is a `kind: "select"` with `options`, which is
+ * what that member is for.
+ */
+export function suggestionLabel(slug: string): string {
+  return slug.split("-").map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word)).join(" ");
+}
+
+/**
+ * Free text typed into a `pick` control, as the SLUG its column takes.
+ *
+ * Every field that carries `pick` writes an open slug — `ContentIdSchema` is `/^[a-z0-9-]+$/`, and
+ * `rarity`, `category` and the damage types are all that shape. A GM who types "Very Rare" rather
+ * than picking it means the rung, not a new one, and without this the record is silently
+ * unpublishable at a gate that names a regex. Whitespace collapses to the hyphen the slug uses and
+ * case is dropped; nothing else is removed, because deleting characters a GM typed is how a value
+ * becomes something they never wrote.
+ */
+export function pickValue(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
 /** Every visible field of a section, flattened through `group` but NOT through `rows`

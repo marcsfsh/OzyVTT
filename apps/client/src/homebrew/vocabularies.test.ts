@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { CONDITION_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS } from "@vtt/content-srd-5.2.1/schemas";
+import { CONDITION_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { RIDER_FIELDS_FOR_TEST } from "./RiderEditor";
 import { SCHEMAS } from "./schemas";
 import { EMPTY_CONTEXT, resolveSuggestions, type FieldDef, type SchemaContext } from "./schema";
@@ -97,6 +97,9 @@ describe("an open slug always keeps its “other”", () => {
       const found = everyField().find((entry) => entry.type === type && entry.field.key === key);
       expect(found, `${type}.${key}`).toBeDefined();
       const kind = found!.field.kind ?? "text";
+      // `pick` does NOT change this: it is a renderer flag on the same `text` kind, so the control
+      // becomes a visible chooser (`Combobox allowFreeText`) and the column stays open. The day this
+      // assertion has to be relaxed to accommodate a picker is the day an open slug was closed.
       expect(kind, `${type}.${key} must stay free-entry`).toBe("text");
       // DECLARES a list, rather than resolves to a non-empty one: `equipment.category` draws its
       // suggestions from the live catalog, which is empty in a bare context — and drawing them from
@@ -117,5 +120,28 @@ describe("an open slug always keeps its “other”", () => {
       expect(found?.field.kind, `${type}.${key}`).toBe("select");
       expect(found?.field.emptyValue ?? "omit", `${type}.${key}`).toBe("omit");
     }
+  });
+
+  it("every `pick` field declares a list — a chooser over nothing is worse than a text box", () => {
+    // The census, in the shape the rest of this file uses: `pick` swaps the renderer to `Combobox`
+    // ONLY when suggestions resolve non-empty, so a `pick` with no list silently falls back to the
+    // bare `<input>` it was added to replace. That failure is invisible in the browser, which is
+    // exactly the class of defect this file exists for. Counted, not just checked: the day a tenth
+    // `pick` lands it is covered here rather than on the day a GM finds it.
+    const picks = everyField().filter(({ field }) => field.pick === true);
+    expect(picks.length).toBeGreaterThanOrEqual(1);
+    for (const { type, field } of picks) {
+      expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
+      expect(field.kind ?? "text", `${type}.${field.key} — pick is a flag on text, not a kind`).toBe("text");
+    }
+  });
+
+  it("rarity offers the canonical ladder, from the package that owns the column", () => {
+    // `RARITY_IDS` used to be a client-local literal beside the field. It is not a hand-typed
+    // partial any more, and this asserts the direction that matters: the form reads the constant
+    // that lives beside `EquipmentReferenceSchema.rarity`, so the two cannot drift apart.
+    const rarity = everyField().find((entry) => entry.type === "equipment" && entry.field.key === "rarity");
+    expect(suggestionsOf(rarity!.field)).toEqual(RARITY_IDS);
+    expect(rarity!.field.pick, "rarity must be a visible chooser — the client's 3a").toBe(true);
   });
 });
