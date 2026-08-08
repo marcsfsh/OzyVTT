@@ -31,6 +31,14 @@
 .replay-meta { margin: 0.15rem 0 0; opacity: 0.75; font-size: 0.9rem; }
 .replay-error { color: var(--danger-hi); }
 
+/* A refused launch, and its way out. A CHROME ROW like the header and the transport above it — it
+   takes its own height and the region below keeps the rest, so appearing never makes the surface
+   scroll. The actions wrap for the same reason `.replay-header-actions` does: a phone cannot hold a
+   sentence and two buttons on one line. */
+.replay-refusal { margin: 0; }
+.replay-refusal p { margin: 0; }
+.replay-refusal-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+
 .replay-transport { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .replay-transport input[type="range"] { flex: 1; min-width: 8rem; }
 .replay-position { font-family: var(--font-mono); font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }

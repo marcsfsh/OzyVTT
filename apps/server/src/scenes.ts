@@ -14,6 +14,19 @@ import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.
 
 const MAX_SCENES = 20;
 
+/**
+ * THE TWO REFUSALS A GO-LIVE CAN RAISE, named once because two surfaces have to agree about them.
+ *
+ * `replay-launch.ts` pre-checks the room refusal so it can decline before cloning anything, and it
+ * used to carry its own hand-typed copy of this sentence - two strings that had to stay identical by
+ * luck. The Replays tab now reads both to decide WHICH way out to offer a GM whose launch was
+ * refused (a route to `/scenes`, or "finish the rewind first"), so a silent reword would strand the
+ * exact person this text exists for. `apps/client/src/replay/launch-refusal.mirror.test.ts` drives
+ * the real refusals through the client's classifier and fails if the wording drifts.
+ */
+export const SCENE_ROOM_REFUSAL = "Remove a prepared scene first - launching needs room to park the table and stage the replay.";
+export const HISTORY_REVIEW_REFUSAL = "Finish reviewing the combat history before switching scenes.";
+
 /** A parked scene's combat is the live top-level combat minus the map and scene bookkeeping. */
 function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
   return {
@@ -184,7 +197,7 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("That scene is already live.");
   // A scene swap replaces the live fight the timeline tracks; the handler wipes its snapshots, so
   // block a switch while the GM is mid-review rather than silently discarding an unresolved rewind.
-  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before switching scenes.");
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL);
 
   const departingId = state.combat.activeSceneId;
   let scenes = state.combat.scenes;
@@ -231,10 +244,10 @@ export function sceneHeadroom(state: GameState): number {
  * new scene goes live, and the parked one resumes any time through `scene.activate`.
  */
 export function activateNewScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string | null; combat: SceneCombat; replayOf?: Scene["replayOf"] }>, implicitSceneId: string): Scene {
-  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before switching scenes.");
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL);
   if (state.combat.scenes.some((scene) => scene.id === input.sceneId)) throw new CommandRejectedError("That scene already exists.");
   if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
-    throw new CommandRejectedError("Remove a prepared scene first - launching needs room to park the table and stage the replay.");
+    throw new CommandRejectedError(SCENE_ROOM_REFUSAL);
   }
 
   const departingId = state.combat.activeSceneId;

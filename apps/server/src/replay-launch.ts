@@ -1,7 +1,7 @@
 import type { GameState, Scene, SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
-import { activateNewScene, sceneHeadroom, sceneSlotsNeededToGoLive } from "./scenes.js";
+import { activateNewScene, sceneHeadroom, sceneSlotsNeededToGoLive, SCENE_ROOM_REFUSAL } from "./scenes.js";
 
 /**
  * ============================================================================================
@@ -109,7 +109,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
   // Scene headroom FIRST: a launch can need two slots (one to park an unbound live encounter, one
   // for the replay itself), and finding that out half-way through would leave a mangled table.
   if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
-    throw new CommandRejectedError("Remove a prepared scene first - launching needs room to park the table and stage the replay.");
+    throw new CommandRejectedError(SCENE_ROOM_REFUSAL);
   }
 
   const combatantIds = [...new Set(archived.combat.initiative.map((entry) => entry.actorId))];
