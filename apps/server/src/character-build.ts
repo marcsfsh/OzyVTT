@@ -11,7 +11,7 @@ import {
 } from "@vtt/rules-5e";
 import type {
   BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureModifier, FeatureOption,
-  FeatureRecord, SpeciesReference, SubclassReference
+  FeatureRecord, SpeciesReference, SpellReference, SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import { featurePicks } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
@@ -366,6 +366,93 @@ function interpretAction(feature: FeatureRecord, action: FeatureRecord["actions"
     }
   }
   return assembled as ActorAction;
+}
+
+/**
+ * The action id a spell resolves through - `spells[].actionId`, and the key `structuredActionFor`
+ * looks the sheet's Cast button up by. Namespaced like the derivation's `item-<id>` so a spell action
+ * and a feature action can never be mistaken for each other.
+ */
+const spellActionId = (spellId: string): string => `spell-${spellId}`;
+
+/**
+ * ONE KNOWN CANTRIP -> THE ACTION THAT RESOLVES IT, or null when it has nothing to resolve.
+ *
+ * The builder minted no spell actions at all, and the hole was not cosmetic: `spells[].actionId` was
+ * never written, so the sheet's `structuredActionFor` found nothing, `castCantrip` fell through to a
+ * bare client-side `rollFlat`, and a Warlock's Eldritch Blast rolled 1d10 on the CLIENT with no
+ * attack roll, no Charisma and - because `ActorAction.spellId` is what `spell-id-is` matches - no
+ * Agonizing Blast. That is a rule-2 violation reached through an absence, and the whole Agonizing
+ * Blast proof stood on a hand-written `ELDRITCH_BLAST` object because there was no other way to get
+ * one.
+ *
+ * CANTRIPS ONLY, and the boundary is not timidity - it is that a LEVELED spell action would have to
+ * say which slot it spends, and no field on the finished sheet can. Measured, against the real
+ * bundles: a Warlock 5's only slots are LEVEL 3 (Pact Magic replaces the column rather than filling
+ * it), so `spellSlot` taken from the spell's own level refuses a Bane the character may legally
+ * cast; and Ascendant Step's Levitate is a granted casting the SRD says costs no slot at all, yet on
+ * `spells[]` it is indistinguishable from a prepared one. Omitting `spellSlot` instead would put a
+ * slot-free cast of every leveled spell in the Actions runner. A cantrip is at will, so none of that
+ * arises. `docs/ai-ledger/known-bugs.md` carries the leveled half.
+ *
+ * WHAT COUNTS AS RESOLVABLE, and why it is not simply "it has a damage roll". `SpellReference` carries
+ * ONE `damage.roll` and the extractor fills it from whatever die the prose names - for Guidance that
+ * is the +1d4 bonus die, not damage. So a roll becomes damage only when the record also names a
+ * damage TYPE, and an action is minted only when there is typed damage or a saving throw. Sorcerous
+ * Burst (1d8 of a type the caster chooses at cast time) mints nothing and keeps today's loose roll:
+ * `attackRoll` is prose-extracted - it is true for BLESS - so a to-hit chip on its strength alone
+ * would be a wrong number on screen. A SAVE outranks an attack for the same reason (Vicious Mockery
+ * carries both flags; the SRD mechanic is the save).
+ *
+ * NOT SCALED BY CHARACTER LEVEL. `castingOptions`' `player_level_N` rows (Fire Bolt's 3d10, Eldritch
+ * Blast's beams) are read by nothing today - the sheet's own `spellEffectAt` consults them only for
+ * an UPCAST - so scaling here would make the action and the effect printed beside it disagree.
+ * Recorded in `known-bugs.md` rather than half-fixed here.
+ */
+function cantripActionFor(spell: SpellReference, numbers: Readonly<{ attackBonus: number; saveDc: number }>): ActorAction | null {
+  if (spell.level !== 0) return null;
+  const typedDamage = spell.damage.roll !== null && spell.damage.types.length > 0;
+  if (!typedDamage && spell.save === null) return null;
+  const activation: ActorAction["activation"] =
+    /bonus/i.test(spell.castingTime) ? "bonus-action"
+      : /reaction/i.test(spell.castingTime) ? "reaction"
+        : /^action$/i.test(spell.castingTime.trim()) ? "action" : "other";
+  return {
+    id: spellActionId(spell.id),
+    name: spell.name,
+    activation,
+    description: spell.description.slice(0, 12000),
+    damage: typedDamage ? [{ formula: spell.damage.roll!, type: spell.damage.types[0] }] : [],
+    ...(spell.save !== null
+      ? { save: { ability: spell.save, dc: numbers.saveDc } }
+      : spell.attackRoll ? { attack: { bonus: numbers.attackBonus } } : {}),
+    // WHICH spell this is. `spell-id-is` matches on it and on nothing else, so Agonizing Blast
+    // ("when you cast Eldritch Blast") reaches the damage only because this field is set.
+    spellId: spell.id
+  } as ActorAction;
+}
+
+/**
+ * Mint an action for every cantrip on the finished spell list that has one, and LINK it
+ * (`spells[].actionId` - the field the sheet resolves a Cast tap through, and the one it groups its
+ * "Spell actions" section by; both were written by nothing before this).
+ *
+ * Mutates the list it is handed because it is already a half-built literal at both call sites
+ * (step 9's `spells` and its non-caster twin), and the alternative is two copies of this loop. An id
+ * a feature action already took wins and the cantrip keeps today's loose roll - the `spell-`
+ * namespace makes that a theoretical collision, not one this content has.
+ */
+function linkCantripActions(
+  spells: Array<Record<string, unknown>>, into: ActorAction[],
+  numbers: Readonly<{ attackBonus: number; saveDc: number }>, library: ContentView
+): void {
+  for (const entry of spells) {
+    const record = library.spellRecord(String(entry.id));
+    const action = record ? cantripActionFor(record, numbers) : null;
+    if (!action || into.some((existing) => existing.id === action.id)) continue;
+    into.push(action);
+    entry.actionId = action.id;
+  }
 }
 
 /** Interpret ONE feature's riders into the running build. Prose (name + description) ALWAYS lands as a trait; riders only add mechanics on top. */
@@ -1356,6 +1443,9 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     }
     const saveDc = spellSaveDc(finalScores[casting.ability], proficiencyBonus);
     const attackBonus = spellAttackBonus(finalScores[casting.ability], proficiencyBonus);
+    // THE CANTRIPS BECOME ACTIONS. Every number on them is this caster's own, derived here and read
+    // verbatim by the resolver - the sheet sends an id and nothing else (rule 2).
+    linkCantripActions(spells, interpreted.actions, { attackBonus, saveDc }, library);
     // Top-level fields stay populated (the documented resolution order's step 3, and the schema's
     // superRefine demands the combined pool when per-class slots exist); the per-class entry rides along.
     spellcasting = {
@@ -1376,10 +1466,13 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       // A non-caster with granted/feat spells (High Elf cantrip, Magic Initiate): model them so the
       // sheet can cast them. The ability comes from the grant when one names it.
       const ability = interpreted.grantedSpells.find((spell) => spell.ability)?.ability ?? "int";
+      const saveDc = spellSaveDc(finalScores[ability], proficiencyBonus);
+      const attackBonus = spellAttackBonus(finalScores[ability], proficiencyBonus);
+      // A Fighter's Magic Initiate cantrip is a spell this character really casts, so it earns the
+      // same action a caster's does - the fallback ability above is its numbers.
+      linkCantripActions(extraSpells, interpreted.actions, { attackBonus, saveDc }, library);
       spellcasting = {
-        ability,
-        saveDc: spellSaveDc(finalScores[ability], proficiencyBonus),
-        attackBonus: spellAttackBonus(finalScores[ability], proficiencyBonus),
+        ability, saveDc, attackBonus,
         slots: [],
         spells: extraSpells
       };

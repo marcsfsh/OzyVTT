@@ -431,21 +431,44 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
 
 describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the blast (audit row 51)", () => {
   /**
-   * Eldritch Blast as the sheet would cast it. The builder does not mint spell ACTIONS, so the
-   * cantrip is supplied here - but the RIDER under test comes from the real bundle, off the real
-   * chosen option, through the real derivation and the real resolver.
+   * THE BLAST THIS WARLOCK REALLY OWNS. This test used to resolve a hand-written `ELDRITCH_BLAST`
+   * object because "the builder does not mint spell ACTIONS" - which meant the headline claim of
+   * this area (Agonizing Blast works, with a number) was proved against a fixture and was FALSE on
+   * every character the builder made: no `ActorAction`, no `spellId`, so `structuredActionFor` found
+   * nothing, the sheet fell through to a client-side `rollFlat`, and the rider gate never ran.
+   *
+   * So the cantrip is now a real ledger row - which also makes Agonizing Blast's OWN pick ("choose
+   * one of your known Warlock cantrips that deals damage") resolvable, where before it had no
+   * eligible option and was skipped - and the action under test is the one the builder minted.
    */
-  const ELDRITCH_BLAST = {
-    id: "eldritch-blast", name: "Eldritch Blast", activation: "action" as const,
-    description: "A beam of crackling energy streaks toward a creature.",
-    attack: { bonus: 6 }, damage: [{ formula: "1d10", type: "force" }], spellId: "eldritch-blast"
-  };
+  const KNOWS_ELDRITCH_BLAST: Row[] = [{ level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" } as Row];
+  const pointedAtTheBlast: Row[] = [{ level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } } as Row];
 
   const blast = (id: string, faces: number[]) => {
-    const built = table(withInvocation(id));
-    return resolveDefinitionAction(built.state, ELDRITCH_BLAST,
+    const built = table(withInvocation(id, [...KNOWS_ELDRITCH_BLAST, ...(id === "agonizing-blast" ? pointedAtTheBlast : [])]));
+    // `actionOf` reads the EFFECTIVE list, so this is the same object the sheet's Cast button sends
+    // an id for - not a shape this test invented.
+    return resolveDefinitionAction(built.state, actionOf(built, "spell-eldritch-blast"),
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000050" }, deps(built, faces));
   };
+
+  it("mints the cantrip as an action of its own, linked from the spell and carrying its id", () => {
+    const built = withInvocation("agonizing-blast", [...KNOWS_ELDRITCH_BLAST, ...pointedAtTheBlast]);
+    // The link the sheet resolves a Cast tap through (`structuredActionFor`), and the id `spell-id-is`
+    // matches - the two fields whose absence made every builder-made Warlock roll a bare die.
+    expect(spellOf(built, "eldritch-blast")).toMatchObject({ id: "eldritch-blast", level: 0, actionId: "spell-eldritch-blast" });
+    // CHA 17 (+3) + PB 3 = +6, derived by the builder from this character's own scores.
+    expect(built.actions.find((action) => action.id === "spell-eldritch-blast")).toMatchObject({
+      name: "Eldritch Blast", activation: "action", spellId: "eldritch-blast",
+      attack: { bonus: 6 }, damage: [{ formula: "1d10", type: "force" }]
+    });
+    // CANTRIPS ONLY. A leveled spell mints nothing, because no field on the finished sheet can say
+    // which slot it spends: a Warlock 5's only slots are level 3, so the spell's own level is the
+    // wrong number, and a granted free casting is indistinguishable from a prepared one. `bane` is
+    // on this Warlock's list through Magic Initiate and stays a Cast-control cast.
+    expect(built.actions.find((action) => action.id === "spell-bless")).toBeUndefined();
+    expect(built.spellcasting!.spells.find((spell) => spell.id === "bless")!.actionId).toBeUndefined();
+  });
 
   it("rolls 1d10 force PLUS the Warlock's +3, and 1d10 alone without the invocation", () => {
     // CHA 17 (+3) at level 5. Same two dice both times; the difference is the authored rider.
