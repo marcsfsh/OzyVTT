@@ -14,7 +14,8 @@ nothing else. It is a snapshot: **edit it in place** when something real changes
 (`token-placement.ts`); initiative, turns and rounds (`encounter.ts`); drawings, measurements and pings
 (`annotations.ts`); GM-painted manual fog (`fog.ts`, ADR-0022); staged scenes that park and resume a
 fight (`scenes.ts`). Every map tool reaches the GM through **one collapsible toolbar**
-(`apps/client/src/scene/MapToolbar.tsx`), collapsing to one `Tools` button at ≤560px.
+(`apps/client/src/scene/MapToolbar.tsx`), collapsing to one `Tools` button at ≤560px. The map
+**pinch-zooms**, and a second finger aborts the gesture under it committing nothing — measured per gesture kind by `scripts/pinch-zoom-audit.mjs` (emulation only; GAP-001 stands).
 
 **5e rules engine** (ADR-0020, server-owned). Action resolution, typed damage, persistent effects and
 conditions, saves, reactions and opportunity attacks, concentration, spell and pact slots, hit dice,

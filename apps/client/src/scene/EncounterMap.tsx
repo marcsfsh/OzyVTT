@@ -28,7 +28,15 @@ type Gesture =
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
-  | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>;
+  | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>
+  /** `4f` — two fingers. EVERY field is read at the moment the pinch begins and never updated, so the
+      zoom is ABSOLUTE (a ratio against `startDist`) rather than a product of per-move factors: a
+      dropped or coalesced move loses nothing, and a pinch returned to its starting span returns the
+      map to its starting zoom. `startFocus` is where the fingers' midpoint sat in the SVG's own box
+      (0..1 on each axis), which with `startCenter`/`startZoom` names the image point that was between
+      them — that point is what stays between them, so the map scales under the fingers rather than
+      about the screen's middle, and moving both fingers together pans it. */
+  | Readonly<{ kind: "pinch"; startDist: number; startZoom: number; startCenter: Point; startFocus: Readonly<{ x: number; y: number }> }>;
 
 type FogState = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
 
@@ -145,6 +153,19 @@ export function EncounterMap({
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const longPressRef = useRef<{ startX: number; startY: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * `4f` — THE LIVE TOUCH POINTS, keyed by `pointerId`. Every other gesture on this surface is
+   * single-pointer and `setPointerCapture` is what makes it one, so without this map a second finger
+   * is invisible: it either lands on a control or does nothing. Same shape and same job as the Codex
+   * atlas surface's (`codex/MapSurface.tsx`), which is the reference implementation for this.
+   *
+   * A MOUSE IS NEVER TRACKED. One mouse cannot pinch, so tracking it buys nothing — and an untracked
+   * pointer can never be mistaken for the second finger of a pinch that isn't happening.
+   */
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  /** Which pointer holds capture, so a pinch can release a capture it did not take (the aborted
+      gesture's, whose id is not the id of the finger that aborted it). */
+  const capturedPointerRef = useRef<number | null>(null);
   const [enlarged, setEnlarged] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
@@ -171,7 +192,20 @@ export function EncounterMap({
   const labelSize = calibration ? Math.max(16, calibration.cellSizePx * 0.42) : 16;
   const pingSize = calibration ? calibration.cellSizePx * 0.6 : 26;
 
-  useEffect(() => { setGesture(null); setSelectedId(null); }, [assetId, token]);
+  useEffect(() => { setGesture(null); setSelectedId(null); pointers.current.clear(); }, [assetId, token]);
+  /**
+   * A finger lifted OFF the map — over the browser's own chrome, past the edge of the window — raises
+   * no `pointerup` this component's handlers can hear, and a tracked pointer that never goes away
+   * would make the NEXT single touch look like the second finger of a pinch. The window hears all of
+   * them. It runs after the React handlers (they are bound at the app root, which is inside it), so
+   * `finishGesture` still sees a pointer it is about to remove itself; this only catches the strays.
+   */
+  useEffect(() => {
+    const forget = (event: PointerEvent) => { pointers.current.delete(event.pointerId); };
+    window.addEventListener("pointerup", forget);
+    window.addEventListener("pointercancel", forget);
+    return () => { window.removeEventListener("pointerup", forget); window.removeEventListener("pointercancel", forget); };
+  }, []);
   useEffect(() => { if (size) setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 }); }, [assetId, size?.width, size?.height]);
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === stageRef.current);
@@ -212,17 +246,33 @@ export function EncounterMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, camera]);
 
+  /* ZOOM-TO-A-POINT, IN THREE PIECES — the wheel and the pinch are the same three steps and must not
+     drift apart, so they are written once. `zoomAt` below is the wheel's arithmetic unchanged; the
+     pinch differs only in reading its anchor from the camera the pinch STARTED in. */
+  const clampZoom = (zoom: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+  /** Where a client point sits in the SVG's own box, as a 0..1 fraction on each axis. */
+  const boxFraction = (clientX: number, clientY: number) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    return { x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.height };
+  };
+  /** The image point under that fraction, for a given camera. */
+  const imageAtFraction = (fraction: Readonly<{ x: number; y: number }>, view: Camera): Point | null => {
+    if (!size) return null;
+    const width = size.width / view.zoom, height = size.height / view.zoom;
+    return { x: view.center.x - width / 2 + fraction.x * width, y: view.center.y - height / 2 + fraction.y * height };
+  };
+  /** The camera that holds `anchor` (image space) at that fraction of the box, at `zoom`. */
+  const anchoredCamera = (anchor: Point, fraction: Readonly<{ x: number; y: number }>, zoom: number): Camera | null => {
+    if (!size) return null;
+    const width = size.width / zoom, height = size.height / zoom;
+    return { zoom, center: { x: anchor.x + width * (0.5 - fraction.x), y: anchor.y + height * (0.5 - fraction.y) } };
+  };
   const zoomAt = (clientX: number, clientY: number, factor: number) => {
-    const svg = svgRef.current; if (!svg || !size) return;
-    const rect = svg.getBoundingClientRect();
-    const fx = (clientX - rect.left) / rect.width;
-    const fy = (clientY - rect.top) / rect.height;
-    const width = size.width / camera.zoom, height = size.height / camera.zoom;
-    const imageX = camera.center.x - width / 2 + fx * width;
-    const imageY = camera.center.y - height / 2 + fy * height;
-    const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * factor));
-    const width2 = size.width / nextZoom, height2 = size.height / nextZoom;
-    setCamera({ zoom: nextZoom, center: { x: imageX + width2 * (0.5 - fx), y: imageY + height2 * (0.5 - fy) } });
+    const fraction = boxFraction(clientX, clientY); if (!fraction) return;
+    const anchor = imageAtFraction(fraction, camera); if (!anchor) return;
+    const next = anchoredCamera(anchor, fraction, clampZoom(camera.zoom * factor));
+    if (next) setCamera(next);
   };
   const resetView = () => {
     if (!size) return;
@@ -339,6 +389,20 @@ export function EncounterMap({
     if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
     longPressRef.current = null;
   };
+  /** Take capture AND record who holds it — the pinch abort has to release a capture taken by a
+      different pointer than the one triggering it, and only this ref knows which. */
+  const capturePointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    capturedPointerRef.current = event.pointerId;
+  };
+  /** Release `pointerId` and whatever else is on record as captured; both are no-ops when untrue. */
+  const dropCapture = (element: HTMLDivElement, pointerId: number) => {
+    const held = capturedPointerRef.current;
+    capturedPointerRef.current = null;
+    for (const id of held === null || held === pointerId ? [pointerId] : [pointerId, held]) {
+      try { if (element.hasPointerCapture(id)) element.releasePointerCapture(id); } catch { /* pointer already released */ }
+    }
+  };
   const openContextMenuFor = (actorId: string, x: number, y: number) => {
     if (!actorsById.has(actorId)) return;
     if (role === "player" && !canMove(actorId)) return; // players only act on their own claimed token
@@ -361,6 +425,27 @@ export function EncounterMap({
     if (event.button !== 0) return;
     const target = event.target as Element;
     if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize, .encounter-target-bar")) return;
+    /* `4f` — PINCH ENTRY, AND THE ABORT THAT MAKES IT SAFE.
+       A second finger on the map is ALWAYS a pinch, whatever was in flight. The gesture underneath is
+       ABANDONED, never finished: capture is dropped, the long-press timer is cleared, and `gesture`
+       goes to null — which is also what discards the preview, because every preview on this surface
+       (the dragged token's snapped ghost, the fog rectangle, the ruler, the shape being drawn or
+       resized) is DERIVED from `gesture` rather than stored beside it. Nothing is submitted, so the
+       token is exactly where the server last put it and the half-drawn shape never existed.
+       This sits ABOVE every tool branch on purpose: below the ping branch a second finger would fire
+       a second ping, and below the token branch it would start a second drag. */
+    if (event.pointerType !== "mouse") pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.current.size >= 2) {
+      event.preventDefault();
+      clearLongPress();
+      dropCapture(event.currentTarget, event.pointerId);
+      const [first, second] = [...pointers.current.values()];
+      const startFocus = boxFraction((first.x + second.x) / 2, (first.y + second.y) / 2);
+      // The SELECTION is deliberately left alone: it is not a preview and it commits nothing, so a
+      // GM who selected a shape and then pinched to look closer still has it selected afterwards.
+      setGesture(startFocus ? { kind: "pinch", startDist: Math.hypot(first.x - second.x, first.y - second.y), startZoom: camera.zoom, startCenter: camera.center, startFocus } : null);
+      return;
+    }
     if (tool === "ping") {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
       event.preventDefault(); void submitPing(point);
@@ -370,7 +455,7 @@ export function EncounterMap({
     // even starting on a token - the server computes who is caught.
     if (activeTargeting?.mode === "template" && activeTargeting.template && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
-      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault(); capturePointer(event);
       setSelectedId(null); setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
       return;
     }
@@ -383,7 +468,7 @@ export function EncounterMap({
         setSelectedId(shapeId);
         if (canMoveShape(annotation) && handleId) {
           const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
-          event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+          event.preventDefault(); capturePointer(event);
           if (handleId === "resize") setGesture({ kind: "annotation-resize", id: annotation.id, anchor: annotation.geometry.origin, current: point });
           else setGesture({ kind: "annotation-move", id: annotation.id, grab: { x: point.x - annotation.geometry.origin.x, y: point.y - annotation.geometry.origin.y }, geometry: annotation.geometry });
         }
@@ -400,7 +485,7 @@ export function EncounterMap({
     }
     if (tool === "select" && tokenId && tokensById.has(tokenId)) {
       if (!canMove(tokenId)) return;
-      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault(); capturePointer(event);
       setSelectedId(null);
       const origin = tokensById.get(tokenId)?.position ?? null;
       setMessage(""); setGesture({ kind: "token", actorId: tokenId, point: origin, origin, pressClient: { x: event.clientX, y: event.clientY }, fromTray: target.closest(".encounter-token-tray") !== null });
@@ -420,13 +505,13 @@ export function EncounterMap({
     // Fog painting works on gridless maps too (the server keeps the raw rect there).
     if ((tool === "fog-reveal" || tool === "fog-hide") && role === "gm") {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
-      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault(); capturePointer(event);
       setMessage(""); setGesture({ kind: "fog", op: tool === "fog-reveal" ? "reveal" : "hide", origin: point, current: point });
       return;
     }
     if (tool !== "select" && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
-      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault(); capturePointer(event);
       setMessage(""); setGesture({ kind: tool as "measure" | AnnotationShapeKind, origin: point, current: point });
       return;
     }
@@ -434,11 +519,28 @@ export function EncounterMap({
     const svg = svgRef.current;
     if (tool !== "select" || !svg || !size || !(event.target as Element).closest("svg")) return;
     setSelectedId(null);
-    event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault(); capturePointer(event);
     const rect = svg.getBoundingClientRect();
     setGesture({ kind: "pan", startClient: { x: event.clientX, y: event.clientY }, startCenter: camera.center, scaleX: (size.width / camera.zoom) / rect.width, scaleY: (size.height / camera.zoom) / rect.height });
   };
   const continueGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    /* `4f` — the pinch branch runs BEFORE the capture guard below, and has to. A pinch holds no
+       capture at all (it released the aborted gesture's), and the second finger never had one, so the
+       guard would drop every move a pinch is made of. Reading `pointers` rather than the event means
+       either finger's move recomputes the whole gesture, which is why one finger held still and the
+       other moved still zooms. */
+    if (gesture?.kind === "pinch") {
+      event.preventDefault();
+      const [first, second] = [...pointers.current.values()];
+      if (!first || !second || gesture.startDist <= 0) return;
+      const focus = boxFraction((first.x + second.x) / 2, (first.y + second.y) / 2);
+      const anchor = imageAtFraction(gesture.startFocus, { center: gesture.startCenter, zoom: gesture.startZoom });
+      if (!focus || !anchor) return;
+      const next = anchoredCamera(anchor, focus, clampZoom(gesture.startZoom * (Math.hypot(first.x - second.x, first.y - second.y) / gesture.startDist)));
+      if (next) setCamera(next);
+      return;
+    }
     if (!gesture || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     event.preventDefault();
     if (gesture.kind === "token") {
@@ -464,9 +566,20 @@ export function EncounterMap({
     setGesture({ ...gesture, current: point });
   };
   const finishGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(event.pointerId);
     clearLongPress();
+    /* `4f` — A PINCH COMMITS NOTHING, and this is the second half of the guarantee the abort makes:
+       whatever gesture the second finger interrupted is already gone, and the pinch itself has no
+       preview to submit. Lifting one of two fingers ENDS the pinch rather than promoting the finger
+       left behind into a pan the GM never started (same rule as the Codex atlas surface). */
+    if (gesture?.kind === "pinch") {
+      event.preventDefault();
+      dropCapture(event.currentTarget, event.pointerId);
+      if (pointers.current.size < 2) setGesture(null);
+      return;
+    }
     if (!gesture || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    event.preventDefault(); event.currentTarget.releasePointerCapture(event.pointerId);
+    event.preventDefault(); dropCapture(event.currentTarget, event.pointerId);
     if (gesture.kind === "pan") { setGesture(null); return; }
     if (gesture.kind === "token") {
       const actorId = gesture.actorId;
@@ -511,8 +624,12 @@ export function EncounterMap({
     setGesture(null); void submitAnnotationAdd("shape", gesture.kind, gesture.origin, gesture.current);
   };
   const cancelGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(event.pointerId);
     clearLongPress();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    dropCapture(event.currentTarget, event.pointerId);
+    // A cancelled PINCH says nothing: "Cancelled." belongs to an edit that was abandoned, and a pinch
+    // never had one. It would otherwise fire on the ordinary case of two fingers landing a frame apart.
+    if (gesture?.kind === "pinch") { if (pointers.current.size < 2) setGesture(null); return; }
     setGesture(null); setMessage("Cancelled.");
   };
   const keyboardMove = (event: React.KeyboardEvent<SVGGElement>, encounterToken: EncounterToken) => {
