@@ -378,6 +378,52 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   and each control is scrolled to the centre before hit-testing (`scripts/tap-audit.mjs:185-187`). The
   "25-59 per surface" range this entry quoted described a column that no longer exists.
 
+- **[content/feats] All seven Epic Boon feats print "to a maximum of 30" and none of them sets
+  `maximum`, so the boon's ability point is clamped at 20 and does nothing for the character who has
+  one.** `featureChoiceBase.maximum` in `packages/content-srd-5.2.1/src/character-content.ts` exists
+  for exactly this sentence — its own docstring says all seven boons "silently did nothing for a
+  character already at 20" — but the field was added to the schema and never authored into
+  `bundles/feats.v1.json`. Every one of `boon-of-{combat-prowess,dimensional-travel,fate,
+  irresistible-offense,spell-recall,the-night-spirit,truesight}` has `feature.choice.maximum` unset,
+  and `buildCharacterDefinition` then applies `Math.min(offer.maximum ?? 20, …)`. Reproducible at
+  HEAD: the level-20 Wizard in `apps/server/test/warlock-sorcerer-wizard.test.ts` reaches INT 20 from
+  its ASIs and the boon's +1 is swallowed; that test pins the current value at 20 with a comment
+  saying the fix makes it 21. Found by Stage 4 lane B4; `bundles/feats.v1.json` is lane B3's file, so
+  it is reported rather than edited. Fix: set `maximum: 30` on all seven and flip that expectation.
+
+- **[content/vocabulary] Four rider gaps Stage 4 lane B4 hit and authored around, each blocking a
+  record that would otherwise be sayable.** All four are authoring limits, not defects in shipped
+  behaviour, and each has a record standing on it today:
+  (1) **`maxSpellLevel` has no `minSpellLevel` sibling** — the one-line follow-up
+  `docs/product/stage-4-authoring-assignments.md` §5H asks for. Warlock's four Mystic Arcanum records
+  are authored with the ceiling set to the arcanum's own level, so a level-11 Warlock may take a
+  level-3 spell as their level-6 arcanum. Needs the schema field plus the two consumers that already
+  read `maxSpellLevel` (`character-build.ts` `matchRow`, `build-payload.ts` `featurePickOffer`).
+  (2) **`overlay.ts`'s `FeatureMechanics` exposes `choice` but not `choices`**, so ruling B's
+  multi-pick is unreachable from a class module. Wizard's Spell Mastery ("choose a level 1 AND a
+  level 2 spell") is one `choice` with a single `maxSpellLevel: 2` and cannot be fixed from
+  `wizard.ts`; `overlay.ts` is frozen for Stage 4.
+  (3) **`ExtraDamageVariantSchema` requires `damageType`** and has no "same type as the triggering
+  damage" form, so Evoker's Empowered Evocation ("add your Intelligence modifier to one damage roll
+  of any Wizard Evocation spell") has no correct type to author — Fireball is Fire, Lightning Bolt is
+  Lightning.
+  (4) **Two rider filters are authorable but have no producer, so they fail closed.**
+  `RiderContext.spellSchool` is declared in `packages/rules-5e/src/riders.ts` and set by nothing, so
+  `spell-school-is` never matches; and `attackKindsOf` in `apps/server/src/action-resolution.ts`
+  derives melee/ranged/thrown/unarmed/reaction and never "spell", so `attack-kind-is: ["spell"]`
+  never matches either. Both would ship inert if authored, which is why Innate Sorcery's advantage
+  and Empowered Evocation stay prose.
+
+- **[server/riders] A damage rider gated on `damage-type-is` cannot fire on a save-only action.**
+  `apps/server/src/action-resolution.ts` populates `riderFilters.damageTypes` only inside the
+  `action.attack && targets.length === 1` branch, so a spell that forces a save and rolls no attack
+  (Fireball, Burning Hands) reaches the `extra-damage` pass with no damage types to filter on and the
+  rider is skipped. Draconic Sorcery's Elemental Affinity is the record standing on it: it adds the
+  Sorcerer's Charisma to an attack-roll spell of the chosen type and not to a save-only one. Not a
+  correctness hazard — it under-applies, which is the safe direction — and pinned by a test in
+  `apps/server/test/warlock-sorcerer-wizard.test.ts` so widening that context is noticed. Fix: build
+  the filter set once for both branches.
+
 ## Unverified — needs a browser, a contrast check, or a runtime repro
 
 These entries could not be confirmed *or* refuted by reading the code, so they are held here
