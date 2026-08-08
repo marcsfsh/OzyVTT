@@ -56,8 +56,8 @@ const divineOrder = feature({
   choice: {
     kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null,
     options: [
-      { id: "protector", name: "Protector", description: "Martial weapons and Heavy armor training.", choice: null, choices: [], extraPicks: [] },
-      { id: "thaumaturge", name: "Thaumaturge", description: "You know one extra cantrip from the Cleric spell list.", choice: null, choices: [], extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }] }
+      { id: "protector", name: "Protector", description: "Martial weapons and Heavy armor training.", requires: null, choice: null, choices: [], extraPicks: [] },
+      { id: "thaumaturge", name: "Thaumaturge", description: "You know one extra cantrip from the Cleric spell list.", requires: null, choice: null, choices: [], extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }] }
     ]
   }
 });

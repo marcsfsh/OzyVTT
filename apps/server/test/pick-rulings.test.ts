@@ -255,3 +255,129 @@ describe("ruling C - audit row 60: Skilled's `or tools` half", () => {
     ]))).toThrowError(/"longsword" is not an offered option/);
   });
 });
+
+// ── Ruling F — an option gated on an earlier answer ──────────────────────────────────────────────
+
+/** A Human Acolyte Cleric at `level`, whose Blessed Strikes answer is `blessed`. */
+const cleric = (level: number, blessed: "divine-strike" | "potent-spellcasting"): Mutable => ({
+  name: "Sera", speciesId: "human", backgroundId: "acolyte", classId: "cleric", level,
+  subclassId: "life-domain", abilityMethod: "standard-array",
+  baseScores: { str: 12, dex: 14, con: 13, int: 8, wis: 15, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "int", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    ...BASE_LANGUAGES, ...HUMAN, ...ACOLYTE_FEAT,
+    { level: 1, classId: "cleric", kind: "skill", id: "insight" },
+    { level: 1, classId: "cleric", kind: "skill", id: "religion" },
+    { level: 1, kind: "divine-order", id: "protector", payload: { featureId: "divine-order" } },
+    { level: 3, classId: "cleric", kind: "subclass", id: "life-domain" },
+    { level: 7, kind: "blessed-strikes", id: blessed, payload: { featureId: "blessed-strikes" } },
+    ...asiRows("cleric", level),
+    { level: 1, kind: "cantrip", id: "guidance" },
+    { level: 1, kind: "cantrip", id: "sacred-flame" },
+    { level: 1, kind: "cantrip", id: "thaumaturgy" },
+    { level: 1, kind: "equipment", id: "cleric-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ]
+} as Mutable);
+
+const traitsOf = (definition: ReturnType<typeof build>) =>
+  (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string; description: string }> }).traits;
+
+describe("ruling F - audit row 63: Improved Blessed Strikes reads back the level-7 answer", () => {
+  it("shows the Divine Strike half to a Divine Strike Cleric, and NOT the other one", () => {
+    const traits = traitsOf(build(cleric(14, "divine-strike")));
+    expect(traits.map((trait) => trait.name)).toContain("Improved Divine Strike");
+    expect(traits.map((trait) => trait.name)).not.toContain("Improved Potent Spellcasting");
+    expect(traits.find((trait) => trait.name === "Improved Divine Strike")!.description).toContain("increases to 2d8");
+  });
+
+  it("shows the OTHER half to a Potent Spellcasting Cleric - same level, same feature, other answer", () => {
+    const traits = traitsOf(build(cleric(14, "potent-spellcasting")));
+    expect(traits.map((trait) => trait.name)).toContain("Improved Potent Spellcasting");
+    expect(traits.map((trait) => trait.name)).not.toContain("Improved Divine Strike");
+    expect(traits.find((trait) => trait.name === "Improved Potent Spellcasting")!.description).toContain("Temporary Hit Points");
+  });
+
+  it("costs the player NO pick - a determined answer is adopted, never offered", () => {
+    // The point of the ruling: rendering a card with exactly one option on it is worse than the
+    // prose it replaces. The build is complete with no `improved-blessed-strikes` row at all, and
+    // volunteering one is refused because there is no such offer to answer.
+    const input = cleric(14, "divine-strike");
+    expect(() => build(input)).not.toThrow();
+    input.choices.push({ level: 14, kind: "improved-blessed-strikes", id: "improved-divine-strike", payload: { featureId: "improved-blessed-strikes" } });
+    expect(() => build(input)).toThrowError(/No feature "improved-blessed-strikes" offers/);
+  });
+
+  it("does not fire before level 14 - the feature is not granted yet", () => {
+    expect(traitsOf(build(cleric(13, "divine-strike"))).map((trait) => trait.name)).not.toContain("Improved Divine Strike");
+  });
+});
+
+/** A Human Acolyte Circle-of-the-Land Druid whose land choice is `land`. */
+const druid = (level: number, land: "arid" | "polar" | "temperate" | "tropical", fury: "primal-strike" | "potent-spellcasting" = "primal-strike"): Mutable => ({
+  name: "Rowan", speciesId: "human", backgroundId: "acolyte", classId: "druid", level,
+  subclassId: "circle-of-the-land", abilityMethod: "standard-array",
+  baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
+  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "int", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    ...BASE_LANGUAGES, ...HUMAN, ...ACOLYTE_FEAT,
+    { level: 1, classId: "druid", kind: "skill", id: "nature" },
+    { level: 1, classId: "druid", kind: "skill", id: "perception" },
+    { level: 1, kind: "primal-order", id: "warden", payload: { featureId: "primal-order" } },
+    { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
+    { level: 3, kind: "land", id: land, payload: { featureId: "circle-of-the-land-spells" } },
+    ...(level >= 7 ? [{ level: 7, kind: "elemental-fury", id: fury, payload: { featureId: "elemental-fury" } }] as Row[] : []),
+    ...asiRows("druid", level),
+    { level: 1, kind: "cantrip", id: "druidcraft" },
+    { level: 1, kind: "cantrip", id: "produce-flame" },
+    { level: 1, kind: "equipment", id: "druid-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ]
+} as Mutable);
+
+describe("ruling F - audit rows 29 and 65: the land choice, and the Resistance it decides", () => {
+  it("audit row 29: the four land types are a REAL pick, and an unknown land is refused", () => {
+    // The record carried no `choice` at all: "choose one type of land" existed only in the prose.
+    const missing = druid(10, "polar");
+    missing.choices = missing.choices.filter((row) => row.kind !== "land");
+    expect(() => build(missing)).toThrowError(/needs 1 pick\(s\) of kind "land"; got 0/);
+    const wrong = druid(10, "polar");
+    wrong.choices = wrong.choices.map((row) => row.kind === "land" ? { ...row, id: "swamp" } : row);
+    expect(() => build(wrong)).toThrowError(/"swamp" is not an offered option/);
+  });
+
+  it("audit row 65: Nature's Ward grants the Resistance the SRD's table prints for THAT land", () => {
+    // A number on the sheet, decided by an answer given seven levels earlier and never re-asked.
+    expect(build(druid(10, "arid")).damageResistances).toContain("fire");
+    expect(build(druid(10, "polar")).damageResistances).toContain("cold");
+    expect(build(druid(10, "temperate")).damageResistances).toContain("lightning");
+    expect(build(druid(10, "tropical")).damageResistances).toContain("poison");
+    // ...and exactly ONE of them, not all four.
+    const polar = build(druid(10, "polar")).damageResistances ?? [];
+    expect(polar.filter((type) => ["fire", "cold", "lightning", "poison"].includes(type))).toEqual(["cold"]);
+  });
+
+  it("keeps the Poisoned immunity the feature grants outright, beside the gated Resistance", () => {
+    const definition = build(druid(10, "arid"));
+    expect(definition.conditionImmunities).toContain("poisoned");
+    expect(definition.damageResistances).toContain("fire");
+  });
+
+  it("grants no Resistance at level 9 - Nature's Ward arrives at 10", () => {
+    const nine = build(druid(9, "arid")).damageResistances ?? [];
+    expect(nine).not.toContain("fire");
+  });
+});
+
+describe("ruling F - audit row 64: Improved Elemental Fury", () => {
+  it("shows the half the level-7 answer chose, and only that half", () => {
+    const strike = traitsOf(build(druid(15, "arid", "primal-strike"))).map((trait) => trait.name);
+    expect(strike).toContain("Improved Primal Strike");
+    expect(strike).not.toContain("Improved Potent Spellcasting");
+    const potent = traitsOf(build(druid(15, "arid", "potent-spellcasting"))).map((trait) => trait.name);
+    expect(potent).toContain("Improved Potent Spellcasting");
+    expect(potent).not.toContain("Improved Primal Strike");
+  });
+});

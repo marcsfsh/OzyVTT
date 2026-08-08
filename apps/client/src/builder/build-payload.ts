@@ -331,6 +331,15 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       extraPicks.set(grant.offer, (extraPicks.get(grant.offer) ?? 0) + extraPickAmount(grant, table, draft.level) * times);
     }
   };
+  /**
+   * IS THE EARLIER ANSWER A GATE NAMES ALREADY IN THE DRAFT - the client's mirror of the server's
+   * `ledgerAnswered`, which reads the submitted ledger instead.
+   *
+   * Keyed on the offer key both sides already share. The `#n` uniquifying suffix is stripped (the
+   * same normalization `budgetKeyOf` performs for budgets) so a repeated offer still answers its gate.
+   */
+  const answeredInDraft = (gate: Readonly<{ offer: string; id: string }>): boolean =>
+    Object.entries(draft.picks).some(([key, ids]) => budgetKeyOf(key).split("@")[0] === gate.offer && ids.includes(gate.id));
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
   // An OPTION is named, not abbreviated: this string is the card's title and the review's value, and
@@ -410,9 +419,27 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     });
     // Drop the feats this build already carries (see `heldFeatIds`); "asi" is the built-in
     // raise-two-scores shorthand, never a feat, so it is never filtered out.
-    const offerable = FEAT_KINDS.has(choice.kind)
+    let offerable = FEAT_KINDS.has(choice.kind)
       ? filtered.filter((option) => option.id === ASI_SHORTHAND || !heldFeatIds.has(option.id) || featRepeats(option.id))
       : filtered;
+    /**
+     * AN OPTION GATED ON AN EARLIER ANSWER (`requires`), mirroring the server exactly.
+     *
+     * Improved Blessed Strikes offers two halves and the Cleric's level-7 answer already decided
+     * which applies. An option whose gate is unmet is dropped; and when the survivors exactly fill
+     * the capacity the answer is a CONSEQUENCE, not a choice, so no card is rendered at all - a pick
+     * with one option on it is worse than the prose it replaces. The server adopts the same
+     * survivors, so the two agree without the player touching anything.
+     */
+    const gatedOptions = choice.options ?? [];
+    if (gatedOptions.some((option) => option.requires)) {
+      const legal = gatedOptions.filter((option) => !option.requires || answeredInDraft(option.requires));
+      if (legal.length === choice.choose * times) {
+        for (const option of legal) addExtraPicks(option.extraPicks, times);
+        return;
+      }
+      offerable = offerable.filter((option) => legal.some((candidate) => candidate.id === option.id));
+    }
     const offerKey = uniqueKey(key);
     // A CHOSEN inline option's own budget grants. Divine Order is one pick between two roles, and
     // Thaumaturge - not Divine Order - is what grants the extra Cleric cantrip, so the grant is read

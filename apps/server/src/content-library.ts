@@ -239,6 +239,10 @@ const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null => 
         }));
         return {
           id: option.id, name: option.name, description: option.description,
+          // The gate travels for the same reason `choice` does: the wizard has to filter the option
+          // list the way the server will, or it renders a pick the server refuses (or, worse, hides
+          // the only legal one). See `FeatureOptionSchema.requires`.
+          requires: option.requires ? { offer: option.requires.offer, id: option.requires.id } : null,
           choice: nested[0] ?? null,
           choices: nested,
           // The budget a CHOSEN option raises. Travels for the same reason its `choice` does: without

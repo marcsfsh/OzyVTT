@@ -4711,6 +4711,7 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `id` | string (pattern) | yes |  |
 | `name` | string | yes |  |
 | `description` | string | yes |  |
+| `requires` | object \| null | yes | The earlier answer that makes this option legal, or null when it is always offerable. "The option you chose for Blessed Strikes grows more powerful": the later feature's options are gated on a pick already in the ledger. When gating leaves exactly as many legal options as the capacity, the answer is a CONSEQUENCE rather than a choice and neither side renders a pick for it. |
 | `choice` | ContentFeatureChoice \| null | yes | The FIRST nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
 | `choices` | ContentFeatureChoice[] | yes | EVERY nested pick this option owes, in authored order. |
 | `extraPicks` | ContentExtraPick[] | yes | Budgets this option RAISES once chosen - Divine Order's Thaumaturge adds one to the Cleric cantrip budget. |
@@ -5466,6 +5467,9 @@ ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeat
 | `id` | string (pattern) | yes |  |
 | `name` | string | yes |  |
 | `description` | string | yes |  |
+| `requires` | object | no | This option is legal only when an EARLIER answer says so - "the option you chose for Blessed Strikes grows more powerful". `offer` is the same offer-key namespace `extraPicks` uses. When gating leaves exactly as many legal options as the capacity, the survivors are ADOPTED and no pick is rendered: the answer is a consequence, not a choice. |
+| `requires.offer` | string (pattern) | yes |  |
+| `requires.id` | string (pattern) | yes |  |
 | `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen, from a list of its own |
 | `choices` | HomebrewFeatureOptionChoice[] | no | SEVERAL second-order picks (Pact of the Tome asks for three cantrips AND two rituals). Mutually exclusive with `choice` |
 | `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |

@@ -86,7 +86,12 @@ const druid = (level: number, extra: Row[] = []): Mutable => ({
     { level: 1, kind: "spell", id: "cure-wounds" },
     ...HUMAN,
     ...SAGE_FEAT,
-    ...(level >= 3 ? [{ level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" }] as Row[] : []),
+    ...(level >= 3 ? [
+      { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
+      // Circle Spells is a REAL pick now (audit row 29's build-time half): "choose one type of land".
+      // Nature's Ward reads this answer back at level 10 for its Resistance.
+      { level: 3, kind: "land", id: "polar", payload: { featureId: "circle-of-the-land-spells" } }
+    ] as Row[] : []),
     ...asiRows("druid", level),
     { level: 1, kind: "equipment", id: "druid-a" },
     { level: 1, kind: "equipment", id: "sage-a" },

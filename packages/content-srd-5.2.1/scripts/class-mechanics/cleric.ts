@@ -64,18 +64,47 @@ export const cleric: ClassMechanicsModule = {
         description: "As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. At level 20 you can choose Wish instead, and if you do you can't use Divine Intervention again until you finish 2d4 Long Rests.",
         damage: []
       }]
+    },
+
+    /**
+     * IMPROVED BLESSED STRIKES - audit row 63, Cleric's last one, and the record ruling F was built
+     * for.
+     *
+     * "The option you chose for Blessed Strikes grows more powerful", followed by two paragraphs of
+     * which exactly one applies to any given Cleric. `requires` gates each half on the level-7
+     * answer already in the ledger; because the gate leaves ONE legal option against a capacity of
+     * one, both consumers ADOPT it and render no pick at all. The Cleric taps nothing, and the sheet
+     * carries the paragraph that is true of them instead of the one that is not - which is the whole
+     * reason the ruling insisted a one-card pick would be worse than the prose it replaces.
+     *
+     * WHAT EACH HALF DELIVERS. Divine Strike's number was already right: `damageByLevel` on the
+     * record steps 1d8 -> 2d8 at level 14 with no read-back, so this option carries the text and
+     * nothing else. Potent Spellcasting's Temporary Hit Points still have no rider vocabulary and
+     * stay prose - but prose shown only to the Cleric it applies to.
+     */
+    "improved-blessed-strikes": {
+      choice: {
+        kind: "improved-blessed-strikes",
+        choose: 1,
+        options: [
+          {
+            id: "improved-divine-strike",
+            name: "Improved Divine Strike",
+            description: "The extra damage of your Divine Strike increases to 2d8.",
+            requires: { offer: "feature:blessed-strikes", id: "divine-strike" }
+          },
+          {
+            id: "improved-potent-spellcasting",
+            name: "Improved Potent Spellcasting",
+            description: "When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier.",
+            requires: { offer: "feature:blessed-strikes", id: "potent-spellcasting" }
+          }
+        ]
+      }
     }
 
     /**
-     * NOT AUTHORED, and why. Cleric's audit rows are down to one, and it is blocked by design.
-     *
-     * `improved-blessed-strikes` (row 63, level 14) - "The option you chose for Blessed Strikes
-     * grows more powerful". A rider conditioned on an EARLIER ANSWER is assignments doc S5F:
-     * SPECIFIED, NOT BUILT (`choice.options[].requires`), and it is held back because
-     * auto-resolving a one-option choice is new client behaviour. Half of it is already delivered
-     * anyway: Divine Strike's `damageByLevel` on the record steps 1d8 -> 2d8 at level 14 without any
-     * read-back. What is missing is only the Potent Spellcasting half - Temporary Hit Points equal
-     * to twice the Wisdom modifier - and nothing in the vocabulary grants temp HP.
+     * NOT AUTHORED, and why. Cleric's audit rows are closed; these are Stage-4 prose calls.
      *
      * `sear-undead` (level 5) - "roll a number of d8s equal to your Wisdom modifier". Dice formulas
      * are literal strings (`DiceFormulaSchema`); an ability-scaled dice COUNT has no vocabulary, so

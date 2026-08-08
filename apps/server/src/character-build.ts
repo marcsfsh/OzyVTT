@@ -652,6 +652,21 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   listOffer("background-tools", "tool", `${background.name} tools`, background.toolChoices);
   listOffer("background-languages", "language", `${background.name} languages`, background.languageChoices);
   listOffer("species-languages", "language", `${species.name} languages`, species.languageChoices);
+  /**
+   * IS THIS OPTION ALREADY IN THE LEDGER - the read `options[].requires` gates on.
+   *
+   * Scoped the way `matchRow` scopes a row: a `feature:<id>` offer key matches only rows tagged with
+   * that feature, so "you chose Divine Strike for Blessed Strikes" cannot be satisfied by an
+   * unrelated row that happens to share the option id.
+   */
+  const ledgerAnswered = (offerKey: string, optionId: string): boolean => {
+    const featureId = offerKey.startsWith("feature:") ? offerKey.slice("feature:".length).replace(/\/\d+$/, "") : null;
+    return input.choices.some((row) =>
+      row.id === optionId
+      && (featureId === null || (row.payload && typeof row.payload.featureId === "string" && row.payload.featureId === featureId)));
+  };
+  /** Options a gate DETERMINED rather than offered; drained into `granted` once every offer is built. */
+  const determined: Array<{ option: FeatureOption; parentId: string }> = [];
   const featureOffer = (record: FeatureRecord, count: number, featureAliases: readonly string[] = []): void => {
     // EVERY pick the record owes, not just the first. A record may promise two (Magic Initiate's two
     // cantrips AND its level-1 spell), and each becomes its own offer with its own kind, capacity and
@@ -705,14 +720,55 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         unresolvable = error.message;
       }
     }
+    /**
+     * AN OPTION GATED ON AN EARLIER ANSWER, and the pick that therefore is not a pick.
+     *
+     * "The option you chose for Blessed Strikes grows more powerful" - the later feature's options
+     * are each legal only for one earlier answer, so the ledger already decides which applies. Two
+     * things follow, and only the second is new:
+     *
+     *   1. an option whose gate is unmet leaves the offer entirely (it was never offerable);
+     *   2. when the survivors exactly FILL the capacity, the answer is a consequence rather than a
+     *      choice - so it is ADOPTED here and no offer is pushed at all. Rendering a card with one
+     *      option on it is worse than the prose this replaces, which is precisely why the ruling was
+     *      specified and not built.
+     *
+     * The gate reads `input.choices` directly, which is the whole ledger and is available before any
+     * pass runs - so gating needs no new ordering constraint. Only choices that actually carry a gate
+     * take this path, so no existing record's behaviour changes.
+     */
+    let optionRecords = choice.options ?? null;
+    if (optionRecords?.some((option) => option.requires)) {
+      const legal = optionRecords.filter((option) => !option.requires || ledgerAnswered(option.requires.offer, option.requires.id));
+      optionRecords = legal;
+      options = new Set(legal.map((option) => option.id));
+      if (legal.length === choice.choose * count) {
+        for (const option of legal) determined.push({ option, parentId: record.id });
+        return;
+      }
+    }
     offers.push(offerOf({
       key: index === 0 ? `feature:${record.id}` : `feature:${record.id}/${index + 1}`,
       featureId: record.id, featureAliases, kind: choice.kind, capacity: choice.choose * count,
-      options, optionLevels, optionRecords: choice.options ?? null, unresolvable, repeatable: choice.repeatable,
+      options, optionLevels, optionRecords, unresolvable, repeatable: choice.repeatable,
       maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null, maximum: choice.maximum ?? null, label: record.name
     }));
   };
   for (const { record, count } of granted) featureOffer(record, count);
+
+  /**
+   * ADOPT the options an earlier answer DETERMINED - the second half of the gating rule above.
+   *
+   * Drained as a queue rather than a loop over a fixed list, because an adopted option is itself a
+   * feature and may in turn determine another. Each one joins `granted`, so its riders, its printed
+   * text and any budget it raises land exactly as a CHOSEN option's do - one code path, not two.
+   */
+  while (determined.length > 0) {
+    const { option, parentId } = determined.shift()!;
+    const asFeature = optionAsFeature(option);
+    granted.push({ record: asFeature, count: 1, origin: { kind: "option", sourceId: parentId } });
+    featureOffer(asFeature, 1, [parentId]);
+  }
 
   /**
    * EXTRA PICKS - a feature (or a chosen option) that raises a budget instead of granting an outcome.

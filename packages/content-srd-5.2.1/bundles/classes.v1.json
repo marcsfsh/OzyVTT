@@ -2642,7 +2642,31 @@
     "id": "improved-blessed-strikes",
     "name": "Improved Blessed Strikes",
     "level": 14,
-    "description": "The option you chose for Blessed Strikes grows more powerful. Divine Strike: The extra damage of your Divine Strike increases to 2d8. Potent Spellcasting: When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier."
+    "description": "The option you chose for Blessed Strikes grows more powerful. Divine Strike: The extra damage of your Divine Strike increases to 2d8. Potent Spellcasting: When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier.",
+    "choice": {
+     "kind": "improved-blessed-strikes",
+     "choose": 1,
+     "options": [
+      {
+       "id": "improved-divine-strike",
+       "name": "Improved Divine Strike",
+       "description": "The extra damage of your Divine Strike increases to 2d8.",
+       "requires": {
+        "offer": "feature:blessed-strikes",
+        "id": "divine-strike"
+       }
+      },
+      {
+       "id": "improved-potent-spellcasting",
+       "name": "Improved Potent Spellcasting",
+       "description": "When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier.",
+       "requires": {
+        "offer": "feature:blessed-strikes",
+        "id": "potent-spellcasting"
+       }
+      }
+     ]
+    }
    },
    {
     "id": "epic-boon",
@@ -3490,7 +3514,31 @@
     "id": "improved-elemental-fury",
     "name": "Improved Elemental Fury",
     "level": 15,
-    "description": "The option you chose for Elemental Fury grows more powerful, as detailed below. Potent Spellcasting. When you cast a Druid cantrip with a range of 10 feet or greater, the spell's range increases by 300 feet. Primal Strike. The extra damage of your Primal Strike increases to 2d8."
+    "description": "The option you chose for Elemental Fury grows more powerful, as detailed below. Potent Spellcasting. When you cast a Druid cantrip with a range of 10 feet or greater, the spell's range increases by 300 feet. Primal Strike. The extra damage of your Primal Strike increases to 2d8.",
+    "choice": {
+     "kind": "improved-elemental-fury",
+     "choose": 1,
+     "options": [
+      {
+       "id": "improved-potent-spellcasting",
+       "name": "Improved Potent Spellcasting",
+       "description": "A Druid cantrip you cast that has a range of 10 feet or greater has its range increased by 300 feet.",
+       "requires": {
+        "offer": "feature:elemental-fury",
+        "id": "potent-spellcasting"
+       }
+      },
+      {
+       "id": "improved-primal-strike",
+       "name": "Improved Primal Strike",
+       "description": "The extra damage of your Primal Strike increases to 2d8.",
+       "requires": {
+        "offer": "feature:elemental-fury",
+        "id": "primal-strike"
+       }
+      }
+     ]
+    }
    },
    {
     "id": "beast-spells",

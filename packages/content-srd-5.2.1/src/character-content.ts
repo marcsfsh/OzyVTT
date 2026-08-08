@@ -484,6 +484,24 @@ export const FeatureOptionSchema = z.object({
   name: z.string().min(1).max(120),
   /** Printed text for this option. Always the display source of truth; riders only add mechanics. */
   description: z.string().min(1).max(20000),
+  /**
+   * THIS OPTION IS ONLY LEGAL WHEN AN EARLIER ANSWER SAYS SO - the read-back the SRD keeps asking for.
+   *
+   * "The option you chose for Blessed Strikes grows more powerful" (Improved Blessed Strikes),
+   * "Improved Elemental Fury", Nature's Ward's resistance "associated with your current land choice".
+   * Each is one later feature whose mechanics are DETERMINED by a pick already in the ledger, and
+   * before this they were prose because a rider could not read an earlier row.
+   *
+   * `offer` is the same offer-key namespace `extraPicks` uses (`feature:<featureId>`, or a named
+   * budget), and `id` is the option that must have been taken there.
+   *
+   * AND IT IS NOT A PICK. When gating leaves exactly as many legal options as the choice's capacity,
+   * the answer is not a choice at all - it is a consequence - so both consumers ADOPT the survivors
+   * and render nothing. That is what keeps the ruling from costing the wizard a card with one option
+   * on it, which is worse than the prose it replaces. The adopted option's riders and its printed
+   * text land on the sheet exactly as a chosen option's do.
+   */
+  requires: z.object({ offer: PickBudgetKeySchema, id: ContentIdSchema }).strict().optional(),
   /** A pick this OPTION asks for once chosen, from a list of its own. */
   choice: FeatureOptionChoiceSchema.optional(),
   /** SEVERAL picks this option asks for; see `FeatureRecordSchema.choices`. Author one or the other. */

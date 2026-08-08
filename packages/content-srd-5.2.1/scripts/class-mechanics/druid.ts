@@ -120,9 +120,8 @@ export const druid: ClassMechanicsModule = {
      * rather than a sentence.
      *
      * WHAT STAYS PROSE: Potent Spellcasting (adding an ability modifier to every Druid cantrip's
-     * damage is not a rider any carrier can express), and Improved Elemental Fury's Potent
-     * Spellcasting half (+300 feet of range on a cantrip). Row 64 therefore stays open for its
-     * Potent Spellcasting half, exactly as Cleric's row 63 does - see assignments doc S5F.
+     * damage is not a rider any carrier can express). Row 64's read-back is authored below through
+     * ruling F's `requires`; only the +300 feet of cantrip range within it stays prose.
      */
     "elemental-fury": {
       choice: {
@@ -150,6 +149,39 @@ export const druid: ClassMechanicsModule = {
               ]
             }],
             uses: { limit: 1, per: "turn", pool: "primal-strike" }
+          }
+        ]
+      }
+    },
+
+    /**
+     * IMPROVED ELEMENTAL FURY - audit row 64, the Druid's twin of Cleric's row 63.
+     *
+     * "The option you chose for Elemental Fury grows more powerful", then two paragraphs of which
+     * one applies. `requires` gates each on the level-7 answer already in the ledger, and since the
+     * gate leaves one legal option against a capacity of one, it is ADOPTED rather than offered - no
+     * card, and the sheet shows the half that is true of this Druid.
+     *
+     * Primal Strike's number was already right (`damageByLevel` steps 1d8 -> 2d8 at 15 on the action
+     * itself); Potent Spellcasting's +300 feet of cantrip range has no rider vocabulary and stays
+     * prose on its own option.
+     */
+    "improved-elemental-fury": {
+      choice: {
+        kind: "improved-elemental-fury",
+        choose: 1,
+        options: [
+          {
+            id: "improved-potent-spellcasting",
+            name: "Improved Potent Spellcasting",
+            description: "A Druid cantrip you cast that has a range of 10 feet or greater has its range increased by 300 feet.",
+            requires: { offer: "feature:elemental-fury", id: "potent-spellcasting" }
+          },
+          {
+            id: "improved-primal-strike",
+            name: "Improved Primal Strike",
+            description: "The extra damage of your Primal Strike increases to 2d8.",
+            requires: { offer: "feature:elemental-fury", id: "primal-strike" }
           }
         ]
       }
@@ -218,8 +250,83 @@ export const druid: ClassMechanicsModule = {
        * rather than being authored as a second pick, because the land is re-chosen on every Long Rest
        * and a build-time pick would freeze it (S5A).
        */
+      /**
+       * CIRCLE SPELLS - audit row 29's PICK half. "Choose one type of land: arid, polar, temperate,
+       * or tropical."
+       *
+       * The land is a real choice with real consequences (Nature's Ward reads it back, below), and
+       * it had none: the record carried no `choice` at all, so the four land types existed only in
+       * the prose. It is authored as four inline options carrying nothing but their names, because
+       * that is honestly all that is expressible here.
+       *
+       * WHAT STAYS PROSE, and why it is not a miss. Each land's SPELL SET is tiered by Druid level
+       * (3/5/7/9) and `grants.spells` has no per-character-level gate, so authoring the set on one
+       * record would hand a level-3 Druid the level-9 spell. Life Domain says this shape as four
+       * separate features, one per tier - it can, because Cleric is HAND_AUTHORED and its bundle
+       * holds all four; Circle of the Land is ETL-generated from a single `#### Level 3` heading and
+       * the overlay may only merge onto features the ETL emits.
+       *
+       * The RE-CHOICE ("whenever you finish a Long Rest") is ruling A's rest-time half and rides
+       * `replaces`, which is why this pick is the build-time answer and not the last word.
+       */
+      "circle-of-the-land-spells": {
+        choice: {
+          kind: "land",
+          choose: 1,
+          options: [
+            { id: "arid", name: "Arid Land", description: "Blur, Burning Hands, Fire Bolt, Blight, Fireball, Wall of Fire." },
+            { id: "polar", name: "Polar Land", description: "Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Slow, Ice Storm." },
+            { id: "temperate", name: "Temperate Land", description: "Misty Step, Shocking Grasp, Lightning Bolt, Sleet Storm, Freedom of Movement, Ice Storm." },
+            { id: "tropical", name: "Tropical Land", description: "Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague." }
+          ]
+        }
+      },
+
+      /**
+       * NATURE'S WARD - audit row 65, and the one read-back with a real number at the end of it.
+       *
+       * "You are immune to the Poisoned condition, AND you have Resistance to a damage type
+       * associated with your current land choice." The first half was already a plain grant. The
+       * second is ruling F doing exactly what it was specified for: four options, each gated on one
+       * answer to the Circle Spells land pick above, each granting the resistance the SRD's
+       * Nature's Ward table prints - Arid/Fire, Polar/Cold, Temperate/Lightning, Tropical/Poison.
+       *
+       * Gating leaves ONE legal option against a capacity of one, so it is adopted rather than
+       * offered: a Polar Druid gains Cold Resistance without answering a second question about a
+       * decision they already made.
+       */
       "natures-ward": {
-        grants: { conditionImmunities: ["poisoned"] }
+        grants: { conditionImmunities: ["poisoned"] },
+        choice: {
+          kind: "natures-ward",
+          choose: 1,
+          options: [
+            {
+              id: "natures-ward-arid", name: "Nature's Ward (Arid)",
+              description: "Your current land choice is Arid, so you have Resistance to Fire damage.",
+              requires: { offer: "feature:circle-of-the-land-spells", id: "arid" },
+              grants: { damageResistances: ["fire"] }
+            },
+            {
+              id: "natures-ward-polar", name: "Nature's Ward (Polar)",
+              description: "Your current land choice is Polar, so you have Resistance to Cold damage.",
+              requires: { offer: "feature:circle-of-the-land-spells", id: "polar" },
+              grants: { damageResistances: ["cold"] }
+            },
+            {
+              id: "natures-ward-temperate", name: "Nature's Ward (Temperate)",
+              description: "Your current land choice is Temperate, so you have Resistance to Lightning damage.",
+              requires: { offer: "feature:circle-of-the-land-spells", id: "temperate" },
+              grants: { damageResistances: ["lightning"] }
+            },
+            {
+              id: "natures-ward-tropical", name: "Nature's Ward (Tropical)",
+              description: "Your current land choice is Tropical, so you have Resistance to Poison damage.",
+              requires: { offer: "feature:circle-of-the-land-spells", id: "tropical" },
+              grants: { damageResistances: ["poison"] }
+            }
+          ]
+        }
       },
 
       /**
@@ -242,20 +349,6 @@ export const druid: ClassMechanicsModule = {
         uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" }
       }
 
-      /**
-       * NOT AUTHORED, and why - `circle-of-the-land-spells` (audit rows 29 and 65's parent).
-       *
-       * The four land tables are four spell sets tiered by Druid level (3/5/7/9). Life Domain says
-       * that shape as FOUR features, one per tier, each with its own `grants.spells` - and it can,
-       * because Cleric is HAND_AUTHORED and its bundle record holds all four. Circle of the Land is
-       * ETL-generated from ONE `#### Level 3` heading, and the overlay may only merge onto features
-       * the ETL emits: it cannot add the three tier features, and one record's `grants.spells` has
-       * no per-character-level gate, so authoring it would hand a level-3 Druid the level-9 spell.
-       *
-       * On top of that the land is re-chosen "whenever you finish a Long Rest" (S5A). Both halves
-       * would have to land together, so row 29 stays prose and stays open. The prose is complete -
-       * this wave restored the four tables into the description (273 -> 816 characters).
-       */
     }
   },
 

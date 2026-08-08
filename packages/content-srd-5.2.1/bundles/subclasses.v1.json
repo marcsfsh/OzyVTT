@@ -84,7 +84,33 @@
     "id": "circle-of-the-land-spells",
     "name": "Circle of the Land Spells",
     "level": 3,
-    "description": "Whenever you finish a Long Rest, choose one type of land: arid, polar, temperate, or tropical. Consult the table below that corresponds to the chosen type; you have the spells listed for your Druid level and lower prepared. Arid Land Druid Level 3: Blur, Burning Hands, Fire Bolt; Druid Level 5: Fireball; Druid Level 7: Blight; Druid Level 9: Wall of Stone. Polar Land Druid Level 3: Fog Cloud, Hold Person, Ray of Frost; Druid Level 5: Sleet Storm; Druid Level 7: Ice Storm; Druid Level 9: Cone of Cold. Temperate Land Druid Level 3: Misty Step, Shocking Grasp, Sleep; Druid Level 5: Lightning Bolt; Druid Level 7: Freedom of Movement; Druid Level 9: Tree Stride. Tropical Land Druid Level 3: Acid Splash, Ray of Sickness, Web; Druid Level 5: Stinking Cloud; Druid Level 7: Polymorph; Druid Level 9: Insect Plague."
+    "description": "Whenever you finish a Long Rest, choose one type of land: arid, polar, temperate, or tropical. Consult the table below that corresponds to the chosen type; you have the spells listed for your Druid level and lower prepared. Arid Land Druid Level 3: Blur, Burning Hands, Fire Bolt; Druid Level 5: Fireball; Druid Level 7: Blight; Druid Level 9: Wall of Stone. Polar Land Druid Level 3: Fog Cloud, Hold Person, Ray of Frost; Druid Level 5: Sleet Storm; Druid Level 7: Ice Storm; Druid Level 9: Cone of Cold. Temperate Land Druid Level 3: Misty Step, Shocking Grasp, Sleep; Druid Level 5: Lightning Bolt; Druid Level 7: Freedom of Movement; Druid Level 9: Tree Stride. Tropical Land Druid Level 3: Acid Splash, Ray of Sickness, Web; Druid Level 5: Stinking Cloud; Druid Level 7: Polymorph; Druid Level 9: Insect Plague.",
+    "choice": {
+     "kind": "land",
+     "choose": 1,
+     "options": [
+      {
+       "id": "arid",
+       "name": "Arid Land",
+       "description": "Blur, Burning Hands, Fire Bolt, Blight, Fireball, Wall of Fire."
+      },
+      {
+       "id": "polar",
+       "name": "Polar Land",
+       "description": "Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Slow, Ice Storm."
+      },
+      {
+       "id": "temperate",
+       "name": "Temperate Land",
+       "description": "Misty Step, Shocking Grasp, Lightning Bolt, Sleet Storm, Freedom of Movement, Ice Storm."
+      },
+      {
+       "id": "tropical",
+       "name": "Tropical Land",
+       "description": "Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague."
+      }
+     ]
+    }
    },
    {
     "id": "lands-aid",
@@ -149,6 +175,68 @@
     "grants": {
      "conditionImmunities": [
       "poisoned"
+     ]
+    },
+    "choice": {
+     "kind": "natures-ward",
+     "choose": 1,
+     "options": [
+      {
+       "id": "natures-ward-arid",
+       "name": "Nature's Ward (Arid)",
+       "description": "Your current land choice is Arid, so you have Resistance to Fire damage.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "arid"
+       },
+       "grants": {
+        "damageResistances": [
+         "fire"
+        ]
+       }
+      },
+      {
+       "id": "natures-ward-polar",
+       "name": "Nature's Ward (Polar)",
+       "description": "Your current land choice is Polar, so you have Resistance to Cold damage.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "polar"
+       },
+       "grants": {
+        "damageResistances": [
+         "cold"
+        ]
+       }
+      },
+      {
+       "id": "natures-ward-temperate",
+       "name": "Nature's Ward (Temperate)",
+       "description": "Your current land choice is Temperate, so you have Resistance to Lightning damage.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "temperate"
+       },
+       "grants": {
+        "damageResistances": [
+         "lightning"
+        ]
+       }
+      },
+      {
+       "id": "natures-ward-tropical",
+       "name": "Nature's Ward (Tropical)",
+       "description": "Your current land choice is Tropical, so you have Resistance to Poison damage.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "tropical"
+       },
+       "grants": {
+        "damageResistances": [
+         "poison"
+        ]
+       }
+      }
      ]
     }
    },
