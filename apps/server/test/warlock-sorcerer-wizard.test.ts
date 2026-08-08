@@ -8,7 +8,8 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
-import { startEncounter } from "../src/encounter.js";
+import { endEncounter, startEncounter } from "../src/encounter.js";
+import { applyRest } from "../src/rests.js";
 
 /**
  * STAGE 4, LANE B4 - WARLOCK, SORCERER, WIZARD, held to the number a player can act on.
@@ -792,5 +793,109 @@ describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily 
     expect(actionOf(built, "dragon-companion").uses).toMatchObject({ limit: 1, per: "long-rest" });
     // ...and a level-17 Sorcerer, one level short, has neither.
     expect(spellOf(sorcerer(17), "summon-dragon")).toBeUndefined();
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// WIZARD
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * A level-20 Human Acolyte Evoker, which is the only level Signature Spells exists at.
+ *
+ * Wizard is HAND_AUTHORED: six of its features already carry a `choice` and two already carry
+ * `uses`, so this harness exists to prove the ONE rider the overlay adds - and to hold the ones
+ * already on the record, which nothing tested before now.
+ */
+const wizardInput = (): CharacterCreateRequestInput => ({
+  name: "Ansel", speciesId: "human", backgroundId: "acolyte", classId: "wizard", level: 20,
+  subclassId: "evoker", abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "int", amount: 2 }, { ability: "wis", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, classId: "wizard", kind: "skill", id: "arcana" },
+    { level: 1, classId: "wizard", kind: "skill", id: "investigation" },
+    { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 2, classId: "wizard", kind: "expertise", id: "arcana", payload: { featureId: "scholar" } },
+    { level: 3, classId: "wizard", kind: "subclass", id: "evoker" },
+    { level: 3, kind: "spell", id: "burning-hands", payload: { featureId: "evocation-savant" } },
+    { level: 3, kind: "spell", id: "shatter", payload: { featureId: "evocation-savant" } },
+    ...[4, 8, 12, 16].flatMap((level) => ([
+      { level, classId: "wizard", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level, kind: "ability-score", id: "int", payload: { featureId: "ability-score-improvement" } },
+      { level, kind: "ability-score", id: "int", payload: { featureId: "ability-score-improvement" } }
+    ])),
+    { level: 18, kind: "spell", id: "magic-missile", payload: { featureId: "spell-mastery" } },
+    { level: 18, kind: "spell", id: "acid-arrow", payload: { featureId: "spell-mastery" } },
+    { level: 19, classId: "wizard", kind: "feat", id: "boon-of-dimensional-travel", payload: { featureId: "epic-boon" } },
+    { level: 19, kind: "ability-score", id: "int", payload: { featureId: "boon-of-dimensional-travel" } },
+    { level: 20, kind: "spell", id: "fireball", payload: { featureId: "signature-spells" } },
+    { level: 20, kind: "spell", id: "counterspell", payload: { featureId: "signature-spells" } },
+    { level: 1, kind: "equipment", id: "wizard-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ] as CharacterCreateRequestInput["choices"]
+});
+
+describe("Wizard: Signature Spells becomes two free castings that a Short Rest gives back", () => {
+  it("spends both, refuses the third, and re-arms on a Short Rest", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    // "you can cast each of them once at level 3 without expending a spell slot ... until you finish
+    // a Short or Long Rest" - two uses, recovered on a Short Rest. Before this the level-20 capstone
+    // was prose with no counter anywhere on the sheet.
+    expect(actionOf(built, "signature-spells").uses).toMatchObject({ limit: 2, per: "short-rest" });
+
+    for (const commandId of ["50000000-0000-4000-8000-000000000130", "50000000-0000-4000-8000-000000000131"]) {
+      resolveDefinitionAction(built.state, actionOf(built, "signature-spells"),
+        { actorId: IDS.hero, targetIds: [], commandId }, deps(built, []));
+    }
+    expect(built.hero.actionUses["signature-spells"]).toBe(2);
+    expect(() => resolveDefinitionAction(built.state, actionOf(built, "signature-spells"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000132" }, deps(built, []))).toThrow();
+    expect(built.hero.actionUses["signature-spells"]).toBe(2); // the refusal spent nothing
+
+    // The half `per: "short-rest"` is actually for: a SHORT rest gives them back. Overchannel, on the
+    // same sheet and once per LONG rest, is the control - it must not be handed back here.
+    built.hero.actionUses = { ...built.hero.actionUses, overchannel: 1 };
+    endEncounter(built.state);
+    applyRest(built.state, IDS.hero, "short", () => built.definition, built.catalog);
+    expect(built.hero.actionUses["signature-spells"]).toBeUndefined();
+    expect(built.hero.actionUses["overchannel"]).toBe(1);
+  });
+
+  it("holds the counters and picks the hand-authored record already carried", () => {
+    // Not authored by this lane, and untested until now: Arcane Recovery and Overchannel are the two
+    // pools `class-resource-pools.test.ts` pins the Wizard to, and Spell Mastery's two spells and the
+    // Epic Boon are picks the level-20 build owes. A sheet that quietly lost one would pass every
+    // other test in this file.
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    expect(actionOf(built, "arcane-recovery").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    expect(actionOf(built, "overchannel").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    expect((built.definition.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
+    for (const id of ["magic-missile", "acid-arrow", "fireball", "counterspell", "burning-hands", "shatter"]) {
+      expect(spellOf(built.definition, id)).toMatchObject({ id });
+    }
+    // INT 15 + the Acolyte's 2 = 17, then four ASIs at +2 each, clamped at 20.
+    //
+    // AND THE EPIC BOON'S OWN POINT IS LOST, which this pins rather than hides. Boon of Dimensional
+    // Travel prints "Increase one ability score of your choice by 1, TO A MAXIMUM OF 30", and
+    // `featureChoiceBase.maximum` exists in the schema for precisely that sentence - its docstring
+    // says so by name. No epic-boon feat in `feats.v1.json` sets it: all seven print the 30 and all
+    // seven leave `maximum` unset, so the offer consumer clamps at 20 and the boon does nothing for
+    // a character already at 20 - which, at level 19+, is nearly every character who has one.
+    // `bundles/feats.v1.json` is lane B3's file, so this lane reports it and does not edit it.
+    // Fix the feats and this expectation becomes 21.
+    expect(built.definition.abilityScores.int).toBe(20);
+  });
+
+  it("refuses the build that leaves Signature Spells unchosen", () => {
+    const without = () => buildCharacterDefinition(
+      { ...wizardInput(), choices: wizardInput().choices.filter((row) => row.payload?.featureId !== "signature-spells") },
+      library, POLICY);
+    expect(thrown(without)).toMatch(/"Signature Spells" needs 2 pick\(s\) of kind "spell"/);
   });
 });

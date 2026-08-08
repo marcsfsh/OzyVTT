@@ -10319,6 +10319,10 @@
      "choose": 2,
      "fromCatalog": "wizard-spells",
      "maxSpellLevel": 3
+    },
+    "uses": {
+     "limit": 2,
+     "per": "short-rest"
     }
    }
   ]

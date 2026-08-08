@@ -82,7 +82,10 @@ describe("every printed class resource is either a real pool or marked display-o
     const keysFor = (id: string) => [...poolKeysOf(classes.find((entry) => entry.id === id)!, subclasses.filter((s) => s.classId === id))].sort();
     expect(keysFor("fighter")).toEqual(["action-surge", "indomitable", "second-wind"]);
     expect(keysFor("cleric")).toEqual(["blessed-strikes", "channel-divinity", "divine-intervention"]);
-    expect(keysFor("wizard")).toEqual(["arcane-recovery", "overchannel"]);
+    // Wizard gained a third in Stage 4 lane B4: Signature Spells' two free level-3 castings, back on
+    // a Short Rest. The pin is the ratchet this file describes - a new live pool tightens it rather
+    // than being absorbed - so a key that appears here appeared because someone authored it.
+    expect(keysFor("wizard")).toEqual(["arcane-recovery", "overchannel", "signature-spells"]);
     // And those keys are bound to printed columns rather than floating free - the convention working.
     const clericColumns = new Set(classes.find((entry) => entry.id === "cleric")!.levelTable.flatMap((row) => row.classResources.map((resource) => resource.id)));
     expect(clericColumns.has("channel-divinity")).toBe(true);
