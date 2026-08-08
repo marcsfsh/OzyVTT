@@ -3,8 +3,8 @@ import { EffectInstanceSchema, GameStateSchema, type GameState } from "@vtt/doma
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { applyDamageDetailed, damageAdjustmentDetail } from "../src/hit-points.js";
 import { addEffect } from "../src/effects.js";
-import type { EquipmentCatalog, EquipmentRecordLike } from "../src/equipment-derivation.js";
-import { startEncounter } from "../src/encounter.js";
+import { equipmentCatalogOf, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
+import { ContentLibrary } from "../src/content-library.js";
 
 /**
  * TYPED DAMAGE, END TO END (issue `4a`).
@@ -20,7 +20,6 @@ const IDS = {
   map: "20000000-0000-5000-8000-000000000001"
 } as const;
 const GM = { role: "gm" } as const;
-const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
 function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
   return {
@@ -153,5 +152,69 @@ describe("gap 2: anything can make a target vulnerable, not just a stat block", 
     const result = hit(state, [{ amount: 7, type: "cold" }], definitionOf(), catalogOf([cursedBlade]));
     expect(result.hpLost).toBe(14);
     expect(result.detail).toContain("7 cold → 14, vulnerability: Brand of the Hag");
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// Gap 5 - `choiceOverrides` had no reader at damage time
+// -------------------------------------------------------------------------------------------------
+
+describe("gap 5: Fiendish Resilience is a real resistance, not a visible one", () => {
+  // The REAL SRD catalog, so this is the shipped warlock content and not a fixture that agrees with me.
+  const catalog = equipmentCatalogOf(new ContentLibrary().forAudience("gm"));
+
+  /** A Fiend-patron Warlock who BUILT on cold: the definition carries the baked pick. */
+  const warlock = (extraResistances: string[] = []) => definitionOf({
+    name: "Sable", damageResistances: ["cold", ...extraResistances],
+    character: {
+      classes: [{ id: "warlock", name: "Warlock", level: 10, subclassId: "fiend-patron" }], feats: [], choices: [],
+      features: [
+        { id: "fiendish-resilience", kind: "subclass", sourceId: "fiend-patron" },
+        { id: "cold", kind: "option", sourceId: "fiendish-resilience" }
+      ]
+    }
+  });
+  const rechosen = (id: string) => ({ choiceOverrides: { "feature:fiendish-resilience": { id, per: "short-rest" as const } } });
+
+  it("halves the type the warlock re-chose, and names the feature on the line", () => {
+    const state = stateWith([], rechosen("fire"));
+    const result = hit(state, [{ amount: 12, type: "fire" }], warlock(), catalog);
+    expect(result.hpLost).toBe(6);
+    expect(result.detail).toContain("12 fire → 6, resistance: Fiendish Resilience");
+  });
+
+  it("stops halving the type it was re-chosen AWAY from - it is one pick, not a collection", () => {
+    const state = stateWith([], rechosen("fire"));
+    expect(hit(state, [{ amount: 12, type: "cold" }], warlock(), catalog).hpLost).toBe(12);
+  });
+
+  it("leaves the BUILT pick alone when nothing was re-chosen", () => {
+    expect(hit(stateWith(), [{ amount: 12, type: "cold" }], warlock()).hpLost).toBe(6);
+    expect(hit(stateWith(), [{ amount: 12, type: "fire" }], warlock()).hpLost).toBe(12);
+  });
+
+  it("never suppresses a type another source also grants", () => {
+    // A Tiefling warlock built on cold, re-choosing fire: the racial cold resistance is not the
+    // option's to take away, so cold stays halved and fire is halved too.
+    const state = stateWith([], rechosen("fire"));
+    const tiefling = definitionOf({
+      ...(warlock() as unknown as Record<string, unknown>),
+      character: {
+        ...((warlock() as unknown as { character: Record<string, unknown> }).character),
+        features: [
+          { id: "fiendish-resilience", kind: "subclass", sourceId: "fiend-patron" },
+          { id: "cold", kind: "option", sourceId: "fiendish-resilience" },
+          { id: "fiendish-legacy", kind: "species", sourceId: "tiefling" }
+        ]
+      }
+    });
+    // A species trait granting cold, resolved through a catalog that also knows the SRD warlock.
+    const withRacial = {
+      ...catalog,
+      featureRecord: (ref: { id: string; kind: string; sourceId: string }) =>
+        ref.id === "fiendish-legacy" ? { id: "fiendish-legacy", name: "Fiendish Legacy", grants: { damageResistances: ["cold"] } } : catalog.featureRecord!(ref as never)
+    } as typeof catalog;
+    expect(hit(stateWith([], rechosen("fire")), [{ amount: 12, type: "cold" }], tiefling, withRacial).hpLost).toBe(6);
+    expect(hit(state, [{ amount: 12, type: "fire" }], tiefling, withRacial).hpLost).toBe(6);
   });
 });

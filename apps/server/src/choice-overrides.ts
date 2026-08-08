@@ -1,5 +1,6 @@
 import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
+import { normalizeDamageType } from "@vtt/rules-5e";
+import type { Actor, ActorDefinition } from "@vtt/schemas";
 import type { ContentView } from "./content-library.js";
 
 /**
@@ -83,4 +84,110 @@ export function replaceableOffers(definition: ActorDefinition | undefined, libra
     }
   }
   return offers;
+}
+
+// -------------------------------------------------------------------------------------------------
+// THE READER. `choiceOverrides` was written, cleared, projected - and read by nobody at damage time.
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * A feature or one of its inline options as this half needs it: an id, a display name, and the
+ * defence grants a pick carries. Structural on purpose, so the content records stay the authoring
+ * surface (the same rule `equipment-derivation.ts` follows for every other read of them).
+ */
+type GrantingRecord = Readonly<{
+  id: string; name?: string;
+  grants?: Readonly<{ damageResistances?: readonly string[]; damageImmunities?: readonly string[] }>;
+}>;
+type FeatureRef = Readonly<{ id: string; kind: "class" | "subclass" | "species" | "lineage" | "background" | "option"; sourceId: string }>;
+type FeatureLookup = (ref: FeatureRef) => GrantingRecord | undefined;
+
+/**
+ * The defences a rest-time RE-CHOICE puts in force, and the build-time answer it replaces.
+ *
+ * `suppressed` is what makes this a re-choice rather than an accumulation: the build baked the
+ * original pick's grants into `definition.damageResistances`, so a Warlock who built on Cold and
+ * re-chose Fire must LOSE cold and GAIN fire, not hold both. A type another feature also grants
+ * (a Tiefling's racial fire resistance) is never suppressed - it was not the option's to give.
+ */
+export type OverrideDamageDefenses = Readonly<{
+  resistances: readonly string[];
+  immunities: readonly string[];
+  /** Normalised types to drop from the DEFINITION's own lists, because the pick that put them there was replaced. */
+  suppressed: ReadonlySet<string>;
+  /** Which feature explains each type, for the damage line ("Fiendish Resilience"). */
+  sources: ReadonlyMap<string, string>;
+}>;
+
+const EMPTY_OVERRIDE_DEFENSES: OverrideDamageDefenses = Object.freeze({
+  resistances: [], immunities: [], suppressed: new Set<string>(), sources: new Map<string, string>()
+});
+
+const defenceGrantsOf = (record: GrantingRecord | undefined) =>
+  [...(record?.grants?.damageResistances ?? []), ...(record?.grants?.damageImmunities ?? [])];
+
+/**
+ * WHAT THE CHARACTER ACTUALLY CHOSE, resolved for the damage pipeline.
+ *
+ * `actor.choiceOverrides` had a writer (`actor.rechoose`), a clearer (`rests.ts`), a projection, and
+ * a validator that answered "what MAY be re-chosen" - and no reader anywhere that answered "what WAS
+ * chosen". The Warlock's Fiendish Resilience is twelve inline options each carrying
+ * `grants: { damageResistances: [id] }`, re-chosen on a short rest: a player could pick fire, see it
+ * on the sheet, see it in the projection, and take full fire damage.
+ *
+ * Fails open in every direction a lookup can miss (no catalog, no built sheet, an offer key that
+ * names no feature, an option the content no longer has), because a damage roll must never throw.
+ */
+export function choiceOverrideDefenses(
+  definition: ActorDefinition | undefined,
+  overrides: Actor["choiceOverrides"] | undefined,
+  featureRecord: FeatureLookup | undefined
+): OverrideDamageDefenses {
+  const features = (definition?.character?.features ?? []) as readonly FeatureRef[];
+  const offers = Object.keys(overrides ?? {});
+  if (!featureRecord || features.length === 0 || offers.length === 0) return EMPTY_OVERRIDE_DEFENSES;
+
+  const resistances: string[] = [];
+  const immunities: string[] = [];
+  const sources = new Map<string, string>();
+  const supersededRefs = new Set<FeatureRef>();
+  const candidateSuppressions: string[] = [];
+
+  for (const offer of offers) {
+    // The offer key is `feature:<id>` (or `feature:<id>/N` for a feature offering several picks).
+    if (!offer.startsWith("feature:")) continue;
+    const featureId = offer.slice("feature:".length).replace(/\/\d+$/, "");
+    const chosenId = overrides![offer]!.id;
+    const label = features
+      .filter((ref) => ref.kind !== "option")
+      .map((ref) => featureRecord(ref))
+      .find((record) => record?.id === featureId)?.name ?? featureId;
+
+    // The re-choice, resolved the same way the builder resolves an inline option: kind "option"
+    // under its PARENT feature's id.
+    const chosen = featureRecord({ kind: "option", sourceId: featureId, id: chosenId });
+    for (const id of chosen?.grants?.damageResistances ?? []) resistances.push(id);
+    for (const id of chosen?.grants?.damageImmunities ?? []) immunities.push(id);
+    for (const id of defenceGrantsOf(chosen)) {
+      const type = normalizeDamageType(id);
+      if (!sources.has(type)) sources.set(type, label);
+    }
+
+    // The build-time answer this override REPLACES - already baked into the definition's lists.
+    for (const ref of features) {
+      if (ref.kind !== "option" || ref.sourceId !== featureId || ref.id === chosenId) continue;
+      supersededRefs.add(ref);
+      candidateSuppressions.push(...defenceGrantsOf(featureRecord(ref)));
+    }
+  }
+
+  // A superseded type that ANY other feature grants stays: the option's pick is what is being
+  // replaced, never the whole sheet's claim on that damage type.
+  const grantedElsewhere = new Set<string>();
+  for (const ref of features) {
+    if (supersededRefs.has(ref)) continue;
+    for (const id of defenceGrantsOf(featureRecord(ref))) grantedElsewhere.add(normalizeDamageType(id));
+  }
+  const suppressed = new Set(candidateSuppressions.map(normalizeDamageType).filter((type) => !grantedElsewhere.has(type)));
+  return { resistances, immunities, suppressed, sources };
 }

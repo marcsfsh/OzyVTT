@@ -3,6 +3,7 @@ import { adjustDamageParts, collectRiders, damageWhileDying, droppedToZero, norm
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { applyConditionDirect, endConcentrationSustainedBy, endEffectsSustainedBy, effectDamageDefenses, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { choiceOverrideDefenses } from "./choice-overrides.js";
 import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
 /** Who is asking: the GM may adjust anyone; a player only their own claimed character. */
@@ -85,11 +86,20 @@ function damageReductionFor(derivation: EquipmentDerivation, damageTypes: readon
   return sumRiders(standing, "damage-reduction") + sumRiders(onTakingDamage, "damage-reduction");
 }
 
-function definitionDefenses(definition: ActorDefinition | undefined) {
+/**
+ * The stat block's own defences, minus anything a rest-time re-choice superseded.
+ *
+ * The subtraction is the half that is easy to miss: a chosen inline option's grants are BAKED into
+ * the definition at build time, so without it a Warlock who re-chose Fiendish Resilience would keep
+ * the type they abandoned and gain the new one - two resistances from a "choose one" feature.
+ */
+function definitionDefenses(definition: ActorDefinition | undefined, superseded: ReadonlySet<string> = new Set()) {
+  const keep = (list: readonly string[] | undefined) =>
+    superseded.size === 0 ? list ?? [] : (list ?? []).filter((id) => !superseded.has(normalizeDamageType(id)));
   return {
-    resistances: definition?.damageResistances ?? [],
-    immunities: definition?.damageImmunities ?? [],
-    vulnerabilities: definition?.damageVulnerabilities ?? []
+    resistances: keep(definition?.damageResistances),
+    immunities: keep(definition?.damageImmunities),
+    vulnerabilities: keep(definition?.damageVulnerabilities)
   };
 }
 
@@ -110,7 +120,10 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
   let parts: DamageApplication["parts"] = [];
   if (input.parts && input.parts.length > 0) {
     const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
-    const innate = definitionDefenses(definition);
+    // A rest-time re-choice REPLACES the build-time pick, so this both adds and subtracts: a Warlock
+    // who built Fiendish Resilience on cold and re-chose fire must lose cold and gain fire.
+    const fromChoices = choiceOverrideDefenses(definition, actor.choiceOverrides, deps?.catalog?.featureRecord);
+    const innate = definitionDefenses(definition, fromChoices.suppressed);
     const fromEffects = effectDamageDefenses(actor);
     // Item grants: derived whole from (definition, inventory, catalog) like every other item
     // contribution, so taking the ring off removes the resistance on the very next hit.
@@ -130,8 +143,8 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
     const adjusted = adjustDamageParts(input.parts, {
-      resistances: [...innate.resistances, ...fromEffects.resistances, ...itemResistances, ...(underwater ? ["fire"] : [])],
-      immunities: [...(petrified ? [...innate.immunities, "poison"] : innate.immunities), ...itemImmunities],
+      resistances: [...innate.resistances, ...fromChoices.resistances, ...fromEffects.resistances, ...itemResistances, ...(underwater ? ["fire"] : [])],
+      immunities: [...(petrified ? [...innate.immunities, "poison"] : innate.immunities), ...fromChoices.immunities, ...itemImmunities],
       // All three channels, so a curse and a cursed item can make a target vulnerable exactly as a
       // stat block can. `adjustDamageParts` already cancels a same-type resistance against it.
       vulnerabilities: [...innate.vulnerabilities, ...fromEffects.vulnerabilities, ...itemVulnerabilities],
@@ -140,21 +153,23 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
       const effectSource = part.adjustment === "resistance" || part.adjustment === "vulnerability" ? fromEffects.sources.get(type) ?? null : null;
+      // "Fiendish Resilience" on the line, exactly as an effect or an item names itself.
+      const choiceSource = part.adjustment !== null && effectSource === null ? fromChoices.sources.get(type) ?? null : null;
       const innateHas = (list: readonly string[]) => list.map((entry) => entry.toLowerCase()).includes(type);
-      const petrifiedSource = petrified
+      const petrifiedSource = petrified && choiceSource === null
         && ((part.adjustment === "resistance" && !innateHas(innate.resistances) && effectSource === null)
           || (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
         ? "Petrified" : null;
       const underwaterSource = underwater && part.adjustment === "resistance" && type === "fire"
-        && !innateHas(innate.resistances) && effectSource === null && petrifiedSource === null
+        && !innateHas(innate.resistances) && effectSource === null && petrifiedSource === null && choiceSource === null
         ? "Underwater" : null;
       // The item's NAME on the damage line, so a halved hit explains itself ("Ring of Fire
       // Resistance") the same way an effect-sourced one does.
       const innateList = part.adjustment === "immunity" ? innate.immunities : part.adjustment === "vulnerability" ? innate.vulnerabilities : innate.resistances;
-      const itemSource = part.adjustment !== null && effectSource === null && petrifiedSource === null && underwaterSource === null
+      const itemSource = part.adjustment !== null && effectSource === null && petrifiedSource === null && underwaterSource === null && choiceSource === null
         && !innateHas(innateList)
         ? itemSourceOf(type) : null;
-      return { ...part, adjustmentSource: effectSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
+      return { ...part, adjustmentSource: effectSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
     });
     totalRequested = input.parts.reduce((sum, part) => sum + part.amount, 0);
     const afterDefenses = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
