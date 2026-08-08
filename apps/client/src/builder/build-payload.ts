@@ -313,6 +313,31 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       if (!heldProficiencies.has(id)) heldProficiencies.set(id, `already chosen for "${label}"`);
     }
   };
+  /**
+   * WHAT AN EARLIER GRANT OF THE SAME FEATURE ALREADY SPENT - budget key -> option id -> reason.
+   *
+   * The one place the wizard deliberately disagrees with the server about offer SHAPE. A class
+   * feature granted at two levels (Bard's Expertise at 3 and 9, Rogue's at 1 and 6, Sorcerer's
+   * Metamagic at 2, 10 and 17) becomes TWO offers here, one per grant level, and that split is
+   * load-bearing: `buildChoiceRows` stamps each row with its offer's level and `level-ledger.ts`
+   * reads a stored row back by matching `(level, kind, classId, featureId)`, so a ledger that put
+   * every Expertise at level 3 would be un-prefillable in the level-up flow. The server keeps ONE
+   * offer of capacity `choose x count` and says so in `grantedClassFeatures`' own comment.
+   *
+   * What was missing is the consequence of that: because the server has ONE offer, its `matchRow`
+   * refuses a repeated id (`character-build.ts` - `candidate.repeatable || !candidate.taken.includes`),
+   * while nothing here stopped the two sibling offers from taking the same card off one shared
+   * option list. `PROVENANCE_KINDS` excludes `expertise`, and `withExpertiseReach` greys only the
+   * skills you are NOT proficient in - never the one the sibling offer just spent. So a Bard 9,
+   * Rogue 6 or Sorcerer 10 could finish the wizard and be REFUSED at Create with
+   * `The "expertise" pick "acrobatics" exceeds what this build may choose (Expertise: 4)`.
+   *
+   * Keyed on `budgetKeyOf`, which strips the "#n" repeat suffix, so the siblings that share one
+   * server offer are exactly the ones that share an entry here - and `feature:<id>@<level>` (the ASI
+   * keys) never collide, which is right: the server mints one offer per CHOSEN feat, each with its
+   * own capacity, so repeating an ability there is legal and must stay offered.
+   */
+  const spentByRepeat = new Map<string, Map<string, string>>();
   const featRepeats = (id: string) => {
     const feat = catalogs.choice.feats.find((entry) => entry.id === id);
     if (!feat?.repeatable) return false;
@@ -458,16 +483,39 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       offerable = offerable.filter((option) => legal.some((candidate) => candidate.id === option.id));
     }
     const offerKey = uniqueKey(key);
+    // A feature the class table grants MORE THAN ONCE is one offer on the server and several here
+    // (see `spentByRepeat`), so its siblings share a budget key and must not share an answer.
+    const budgetKey = feature.grantedAtLevels.length > 1 ? budgetKeyOf(offerKey) : null;
+    const spent = budgetKey ? spentByRepeat.get(budgetKey) : undefined;
+    const held = unavailableOf(choice.kind, offerable);
+    let unavailable = held;
+    if (spent && spent.size > 0) {
+      const merged: Record<string, string> = { ...held };
+      for (const option of offerable) {
+        const reason = spent.get(option.id);
+        if (reason && !merged[option.id]) merged[option.id] = reason;
+      }
+      unavailable = merged;
+    }
     offers.push({
       key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
       help: feature.description || null,
       capacity: choice.choose * times,
       options: offerable,
       maxSpellLevel: ceiling ?? null, level, classId, unresolvable,
-      unavailable: unavailableOf(choice.kind, offerable)
+      unavailable
     });
     if (FEAT_KINDS.has(choice.kind)) {
       for (const id of draft.picks[offerKey] ?? []) if (id !== ASI_SHORTHAND) heldFeatIds.add(id);
+    }
+    // AFTER the push, exactly as `recordHeld` is: an offer never greys out its own answers, or a
+    // chosen card could not be tapped again to un-choose it.
+    if (budgetKey) {
+      const running = spentByRepeat.get(budgetKey) ?? new Map<string, string>();
+      for (const id of draft.picks[offerKey] ?? []) {
+        if (!running.has(id)) running.set(id, `already chosen for ${feature.name} at level ${level}`);
+      }
+      spentByRepeat.set(budgetKey, running);
     }
     recordHeld(offerKey, choice.kind, feature.name);
     /**
@@ -691,16 +739,20 @@ function withExpertiseReach(
   }
   return offers.map((offer) => {
     if (offer.kind !== "expertise") return offer;
-    const unavailable: Record<string, string> = {};
+    const notProficient: Record<string, string> = {};
     for (const option of offer.options) {
-      if (!proficient.has(option.id)) unavailable[option.id] = "not one of your proficiencies";
+      if (!proficient.has(option.id)) notProficient[option.id] = "not one of your proficiencies";
     }
     // Never grey an offer into a dead end. A build with none of these skills yet - or one whose
     // proficiency came from a feature grant the client cannot see, since riders stay server-side -
     // gets the old fully-enabled list and the server's message, which is strictly today's behaviour.
     // Greying everything would repeat the exact mistake this function exists to avoid.
-    if (Object.keys(unavailable).length === offer.options.length) return offer;
-    return { ...offer, unavailable };
+    if (Object.keys(notProficient).length === offer.options.length) return offer;
+    // MERGED, not assigned. Expertise is granted twice by three classes, and the sibling grant's
+    // "already chosen for Expertise at level 3" (see `spentByRepeat`) lives in `offer.unavailable`
+    // by the time this pass runs - overwriting it here is what let a Bard 9 spend the same skill
+    // twice and be refused at Create. The more specific reason wins where both apply.
+    return { ...offer, unavailable: { ...notProficient, ...offer.unavailable } };
   });
 }
 
