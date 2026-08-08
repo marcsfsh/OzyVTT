@@ -330,8 +330,18 @@
 /* Keep the scene cluster clear of a left/right docked panel by moving it to the opposite corner. */
 .encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
 /* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize.
-   It scrolls itself, and `.scroll-y` says so in EncounterMap's markup (check (h)). */
-.encounter-map-dock { position: absolute; z-index: 2; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
+   IT DOES NOT SCROLL ITSELF — the tracker's own region does, one level in, and `.scroll-y` says so
+   there (check (h)). It used to be the scroller, and that was `4c`: a plain block here left
+   `.encounter-region`'s `flex: 1` (encounter-panel.css:222) with nothing to flex against, so the
+   region sized to its content and became a SCROLL PORT WITH ZERO SCROLLABLE EXTENT, nested inside a
+   dock that held all the overflow. Measured as GM at 1280x900 dock-right: dock 785px client over
+   1020px of content (235px of overflow), region 892/892 — nothing to scroll and
+   `overscroll-behavior: contain` standing over it. Chromium happens to skip a zero-extent scroller
+   when it walks the chain, so the wheel still reached the dock here; an engine that honours `contain`
+   on it (the report is from a phone) gets a panel that only the scrollbar can move. The shape is
+   wrong either way, and the fix is the one the sheet's accordion already uses at
+   encounter-panel.css:33 — bound the panel so exactly ONE scroller exists. */
+.encounter-map-dock { position: absolute; z-index: 2; display: flex; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
 /* THE DOCK EDGE TAKES THE LINEWORK (§9, director ruling). The table gets no sky — a horizon
    behind a battle map competes with the map, and the map is the canvas — but its CHROME speaks
    the same language, and the dock's inner edge is the one boundary on this surface that is
@@ -343,7 +353,20 @@
    selected or live (pillar 1) and a beam per panel edge would be noise, not language. */
 .encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
 .encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid var(--line); border-image: var(--rule-beam-v) 1; }
-.encounter-map-dock .encounter-panel { margin: 0; border: 0; background: transparent; padding: 0; }
+/* The other half of `4c`: a bounded flex column, so `.encounter-region` has something to flex against
+   and becomes the one real scroller. `> ` is deliberate — the panel is the dock's direct child
+   (main.tsx:458) and a nested `.encounter-panel` (a sheet inside the tracker) must not take this. */
+.encounter-map-dock > .encounter-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: 0; background: transparent; padding: 0; }
+/* `4c.1` — THE DOCK IS THE FRAME, so the panel does not bring a second one. `.encounter-panel::before`
+   (encounter-panel.css:1500) paints `inset: -1px`, a `--rim-w` border in the role-hued `--rim-color`
+   and a bezel outline: a complete frame 1px OUTSIDE the panel's own border box, landing just inside
+   the dock's `border-image` beam edge. Measured as GM at 1280x900 dock-right, the pseudo was
+   `display: block` with a 2px rim and a 1px bezel outline standing there. The override above only
+   zeroes properties the pseudo does not use, so it never touched it.
+   The scanline plate goes with it and that is the right trade: ruling 28 gives the texture to the
+   tracker's OUTERMOST frame, and inside a dock that frame is the dock, which paints its own ground
+   at :334. Two plates stacked is what the second rim was drawing attention to. */
+.encounter-map-dock .encounter-panel::before { display: none; }
 /* Inner-edge grab strip to resize a left/right dock; spans the full height so you can grab anywhere.
    IT SITS EXACTLY ON THE DOCK'S BORDER — same x, z-index 3 against the dock's 2 — so whatever it
    paints at rest IS the dock's edge. That is how the beam above shipped invisible: this strip drew
@@ -374,9 +397,11 @@
    up. Dismissed by "Shrink map". */
 /* It scrolls NOTHING, so it no longer says it does (check (h)). Measured with the map ready and the
    tracker docked inside it: scrollHeight === clientHeight at 375, 390 and 1280, dock left and right —
-   the stage is `flex: 1; min-height: 0`, the tray and the saving line are floated over it, and the
-   docked panel is absolutely positioned inside the stage and carries its own `.scroll-y`. A declared
-   scroller that never scrolls is a claim a reader has to check by hand. */
+   the stage is `flex: 1; min-height: 0`, the tray and the saving line are out of flow over it, and the
+   docked panel is absolutely positioned inside the stage, where its own turn-order region takes the
+   scroll (`4c` moved that declaration off the dock and onto `.encounter-region`, which is where it
+   was always doing the work). A declared scroller that never scrolls is a claim a reader has to
+   check by hand. */
 .encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); }
 .encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
 /* Direct child, per the stage rule above. "Enlarge map" is a separate state from fullscreen and

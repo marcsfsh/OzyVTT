@@ -723,7 +723,11 @@ export function EncounterMap({
         })()}
 
         {dock?.node && <>
-          <div className={`encounter-map-dock scroll-y dock-${dock.position}`}>{dock.node}</div>
+          {/* NO `.scroll-y` HERE (`4c`). The dock is a frame, not a scroller: it holds the tracker as a
+              bounded flex column (encounter-map.css:359) and the tracker's own `.encounter-region`
+              takes the scroll, which is where `.scroll-y` lives. Declaring it in both places is what
+              made the docked panel two nested ports, the inner one with zero extent. */}
+          <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>
           <div className={`encounter-map-dock-resize dock-resize-${dock.position}`} role="separator" aria-label="Drag to resize the docked tracker" title="Drag to resize" onPointerDown={beginDockResize} />
         </>}
 

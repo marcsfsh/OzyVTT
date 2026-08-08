@@ -1,9 +1,15 @@
 /**
- * The map-stability audit — the reproducible form of one sentence: THE BATTLE MAP DOES NOT MOVE
- * WHEN YOU LET GO OF A TOKEN. It drives a real GM session on a real fight, drags a real token with
- * real pointer events, and records `.encounter-map-stage.getBoundingClientRect()` before
- * pointer-down, during the drag, and — the frame that matters — while `.encounter-map-saving`
- * ("Saving move…") is mounted. `top` and `height` must be identical across all three, to the pixel.
+ * The map-stability audit — two facts about the battle map that only a browser can settle, because
+ * both are facts about LAYOUT and jsdom has none.
+ *
+ * PASS 1: THE MAP DOES NOT MOVE WHEN YOU LET GO OF A TOKEN (`4h`). It drives a real GM session on a
+ * real fight, drags a real token with real pointer events, and records
+ * `.encounter-map-stage.getBoundingClientRect()` before pointer-down, during the drag, and — the
+ * frame that matters — while `.encounter-map-saving` ("Saving move…") is mounted. `top` and `height`
+ * must be identical across all three, to the pixel.
+ *
+ * PASS 2: THE PANEL DOCKED INTO THE MAP SCROLLS, AND OWNS EXACTLY ONE SCROLLER (`4c`), AND BRINGS NO
+ * SECOND FRAME (`4c.1`). See its own note further down.
  *
  * WHY THIS FILE EXISTS AT ALL. This is `4h`, and `4h` has been reported twice. It was fixed once
  * (22f04ed / 868ac16, 2026-07-22) by floating the token tray and the saving line out of flow in
@@ -184,6 +190,25 @@ const CLEAR_TOKEN = `(() => [...document.querySelectorAll(".encounter-token.mova
   return Boolean(at && at.closest(".encounter-token") === el);
 }))()`;
 
+/**
+ * ...and if none is clear, walk one out from under whatever is sitting on it. Successive runs push
+ * tokens toward the stage's centre, which on a docked cell is under the dock — so an audit that only
+ * reported "every token is parked under a control" would drift itself into being unable to measure.
+ * Arrow keys are the token's own keyboard move (`keyboardMove`), one grid step per press, so this is
+ * the product's path and not a poke at the DOM.
+ */
+async function walkATokenClear(page) {
+  if ((await page.evaluate(CLEAR_TOKEN)) >= 0) return;
+  const token = page.locator(".encounter-token.movable").first();
+  if ((await token.count()) === 0) return;
+  for (const key of ["ArrowLeft", "ArrowLeft", "ArrowUp", "ArrowLeft", "ArrowUp", "ArrowLeft"]) {
+    await token.evaluate((el) => el.focus());
+    await page.keyboard.press(key);
+    await page.waitForTimeout(700);
+    if ((await page.evaluate(CLEAR_TOKEN)) >= 0) return;
+  }
+}
+
 async function measure(testCase) {
   const page = await gmPage({ width: testCase.w, height: testCase.h }, testCase.dock);
   try {
@@ -200,6 +225,7 @@ async function measure(testCase) {
     if (testCase.dock && !(await page.evaluate(() => document.querySelector(".table-layout.docked") !== null))) {
       throw new Error("the docked composition never rendered");
     }
+    await walkATokenClear(page);
     const index = await page.evaluate(CLEAR_TOKEN);
     if (index < 0) throw new Error("every token is parked under one of the map's own controls");
 
@@ -253,7 +279,77 @@ async function measure(testCase) {
   }
 }
 
+/**
+ * PASS 2 — `4c` and `4c.1`. Three assertions about the panel docked into the map, all of which were
+ * false before this pass existed:
+ *
+ *  (1) EXACTLY ONE SCROLLER inside `.encounter-map-dock`. There were two: the dock itself
+ *      (`.scroll-y` in EncounterMap's markup) held all the overflow, and `.encounter-region` inside
+ *      it declared `overflow-y: auto` + `overscroll-behavior: contain` over ZERO scrollable extent,
+ *      because a plain-block panel left its `flex: 1` nothing to flex against. A contained scroll
+ *      port with nothing to scroll is a wheel trap on any engine that honours `contain` on it —
+ *      Chromium skips it when it walks the chain, which is why this shipped past a laptop and was
+ *      reported from a phone. Counting the ports is the assertion that does not depend on the engine.
+ *  (2) A WHEEL OVER THE TURN ORDER MOVES IT. Measured where the list is, not at the dock's midpoint:
+ *      the panel's head is pinned by design and correctly eats nothing.
+ *  (3) NO SECOND FRAME. `.encounter-panel::before` paints a full rim + bezel 1px outside the panel's
+ *      own border box; inside the dock that lands just inside the dock's `border-image` edge, so the
+ *      tracker wore two frames. The dock is the frame.
+ */
+const DOCK_CASES = [
+  { label: "dock-left 1280x900", w: 1280, h: 900, dock: "left" },
+  { label: "dock-right 1280x900", w: 1280, h: 900, dock: "right" },
+  { label: "dock-right 1024x667", w: 1024, h: 667, dock: "right" }
+];
+
+const DOCK_PORTS = `(() => {
+  const dock = document.querySelector(".encounter-map-dock");
+  if (!dock) return null;
+  const name = (el) => el.tagName.toLowerCase() + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\\s+/)[0] : "");
+  const ports = [dock, ...dock.querySelectorAll("*")].filter((el) => {
+    const overflow = getComputedStyle(el).overflowY;
+    return overflow === "auto" || overflow === "scroll";
+  }).map((el) => ({ el: name(el), over: el.scrollHeight - el.clientHeight, declared: el.classList.contains("scroll-y") }));
+  const panel = dock.querySelector(".encounter-panel");
+  return { ports, secondFrame: panel ? getComputedStyle(panel, "::before").display !== "none" : null };
+})()`;
+
+async function measureDock(testCase) {
+  const page = await gmPage({ width: testCase.w, height: testCase.h }, testCase.dock);
+  try {
+    await ensureFight(page);
+    if (!(await page.evaluate(() => document.querySelector(".table-layout.docked") !== null))) {
+      throw new Error("the docked composition never rendered");
+    }
+    const report = await page.evaluate(DOCK_PORTS);
+    if (!report) throw new Error("no .encounter-map-dock on the page");
+    const problems = [];
+    if (report.ports.length !== 1) problems.push(`${report.ports.length} scroll ports (${report.ports.map((p) => p.el).join(", ")})`);
+    // §7's marker rule: whichever element keeps the scroll says so in the markup.
+    for (const port of report.ports) if (!port.declared) problems.push(`${port.el} scrolls undeclared`);
+    if (report.secondFrame) problems.push("the panel paints a second frame (::before)");
+
+    const region = await page.locator(".encounter-map-dock .encounter-region").boundingBox();
+    if (!region) problems.push("no turn-order region in the dock");
+    else {
+      const before = await page.evaluate(() => document.querySelector(".encounter-map-dock .encounter-region").scrollTop);
+      await page.mouse.move(region.x + region.width / 2, region.y + Math.min(region.height / 2, region.height - 20));
+      await page.mouse.wheel(0, 240);
+      await page.waitForTimeout(350);
+      const after = await page.evaluate(() => document.querySelector(".encounter-map-dock .encounter-region").scrollTop);
+      const overflow = report.ports[0]?.over ?? 0;
+      if (overflow > 0 && after - before <= 0) problems.push(`a wheel over the turn order moved it 0px of ${overflow}`);
+      report.wheeled = after - before;
+      report.overflow = overflow;
+    }
+    return { problems, detail: `${report.ports.length} port(s) · overflow ${report.overflow ?? "?"} · wheel +${report.wheeled ?? "?"} · second frame ${report.secondFrame}` };
+  } finally {
+    await page.close();
+  }
+}
+
 const rows = [];
+const dockRows = [];
 let failures = 0;
 let unmeasured = 0;
 
@@ -277,12 +373,34 @@ for (const testCase of CASES) {
   }
 }
 
+for (const testCase of DOCK_CASES) {
+  try {
+    const result = await measureDock(testCase);
+    if (result.problems.length) failures += 1;
+    dockRows.push({
+      label: testCase.label,
+      verdict: result.problems.length ? "FAIL" : "PASS",
+      detail: result.problems.length ? result.problems.join(" · ") : result.detail
+    });
+  } catch (error) {
+    unmeasured += 1;
+    dockRows.push({ label: testCase.label, verdict: "NOT MEASURED", detail: String(error).split("\n")[0].slice(0, 110) });
+  }
+}
+
 await browser.close();
 
-const width = Math.max(...rows.map((r) => r.label.length));
-console.log(`\n===== map-stability audit (the map does not move when you let go of a token — 4h) =====`);
-for (const row of rows) console.log(`${row.label.padEnd(width)}  ${row.verdict.padEnd(12)}  ${row.detail}`);
+const width = Math.max(...[...rows, ...dockRows].map((r) => r.label.length));
+const table = (title, list) => {
+  console.log(`\n===== ${title} =====`);
+  for (const row of list) console.log(`${row.label.padEnd(width)}  ${row.verdict.padEnd(12)}  ${row.detail}`);
+};
+table("the map does not move when you let go of a token (4h)", rows);
 console.log(`\nA cell reads PASS when .encounter-map-stage kept its exact top and height from before`);
 console.log(`pointer-down, through the drag, while "Saving move…" was mounted, and after it cleared.`);
-console.log(`\n${rows.length} compositions; ${failures} failing; ${unmeasured} NOT MEASURED.`);
+table("the docked panel scrolls, once, inside one frame (4c / 4c.1)", dockRows);
+console.log(`\nA cell reads PASS when .encounter-map-dock holds exactly ONE scroll port, that port says`);
+console.log(`so with .scroll-y in the markup, a wheel over the turn order moves it, and the panel`);
+console.log(`inside the dock paints no second rim.`);
+console.log(`\n${rows.length + dockRows.length} checks; ${failures} failing; ${unmeasured} NOT MEASURED.`);
 process.exit(failures === 0 && unmeasured === 0 ? 0 : 1);
