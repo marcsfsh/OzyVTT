@@ -135,3 +135,27 @@ export function projectPlayerReplay(id: number, document: EncounterArchiveDocume
     // boundary as live play, where a player never receives one), and every turn's raw state.
   };
 }
+
+/**
+ * THE BATTLE-MAP IMAGES A SHARED ARCHIVE'S PLAYER REPLAY ACTUALLY RENDERS.
+ *
+ * A player could read a shared replay's turn data and never see the battlefield: the map router
+ * authorised a player for the LIVE combat map or a codex-revealed atlas map and nothing else, so a
+ * replay of last week's fight answered 403 for its own map and the stage rendered "Map unavailable"
+ * on every turn. This is the third door, and it is deliberately the narrowest one that opens it.
+ *
+ * DERIVED FROM THE PLAYER DOCUMENT, NOT FROM THE STORED ONE, and that is the whole safety argument.
+ * A stored archive holds full `GameState`s: `combat.mapAssetId` for the fight, and `scenes[].mapAssetId`
+ * for every PREPARED scene that existed at the time - next week's ambush, the map the party has not
+ * reached. Scanning the document for map ids would hand a player all of them. Running
+ * `projectPlayerReplay` and reading back what survived cannot: `projectPlayerCombat` nulls the map on
+ * any turn the fight was not active, and a parked scene's map is not in the player shape at all. So
+ * the answer is exactly "the images this player's own document points at", by construction.
+ *
+ * THE SHARED FLAG IS NOT CHECKED HERE. The caller checks it - "the mapAssetId of a SHARED archive" -
+ * and this function has no idea whether the archive it was handed is shared. Never call it on an
+ * archive the GM has not shared.
+ */
+export function playerReplayMapAssetIds(id: number, document: EncounterArchiveDocument, now = Date.now()): ReadonlySet<string> {
+  return new Set(projectPlayerReplay(id, document, now).turns.flatMap((turn) => turn.combat.mapAssetId === null ? [] : [turn.combat.mapAssetId]));
+}
