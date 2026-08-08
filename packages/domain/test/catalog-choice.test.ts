@@ -27,11 +27,12 @@ const speciesSummary = (id: string, lineages: readonly string[]): ContentSpecies
 const featSummary = (id: string, category: string): ContentFeatSummary => ({
   id, name: id, source: "srd", summary: null, description: null, category, repeatable: false,
   prerequisiteLevel: null, prerequisiteAbilities: [], prerequisiteRequires: [], prerequisiteText: null,
-  feature: { id, name: id, level: null, description: "x", tags: [], choice: null }
+  feature: { id, name: id, level: null, description: "x", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [] }
 });
 const spellSummary = (id: string, level: number, classes: readonly string[]): ContentSpellSummary => ({
   id, name: id, level, school: "evocation", castingTime: "1 action", rangeText: null, componentsText: "V", duration: "Instantaneous",
-  concentration: false, ritual: false, description: "x", higherLevel: null, classes, damageRoll: null, damageTypes: [], castingOptions: []
+  concentration: false, ritual: false, description: "x", higherLevel: null, classes, damageRoll: null, damageTypes: [],
+  attackRoll: false, rangeFeet: null, castingOptions: []
 });
 const equipmentSummary = (id: string, category: ContentEquipmentSummary["category"]): ContentEquipmentSummary => ({
   id, name: id, category, costGp: null, weightLb: null, description: null,
