@@ -388,6 +388,31 @@ describe("Combobox", () => {
     expect(screen.getByRole("button", { name: "Clear Vex the Bold" })).toBeInTheDocument();
   });
 
+  it("allowFreeText: leaving the box keeps what was typed, and an exact label commits the id", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <>
+        <Combobox options={OPTIONS} value={null} onChange={onChange} allowFreeText ariaLabel="Rarity" />
+        <button type="button">elsewhere</button>
+      </>
+    );
+
+    // The gesture people actually make: type, then move to the next field. Enter was the ONLY way to
+    // commit, so an open-slug field rendered through this control silently kept nothing — with no
+    // error, because nothing went wrong. That is worse than the bare text box it replaced.
+    await user.type(screen.getByRole("combobox", { name: "Rarity" }), "unique");
+    await user.click(screen.getByRole("button", { name: "elsewhere" }));
+    expect(onChange).toHaveBeenCalledWith("unique");
+
+    // ...and text that IS an option's label commits the OPTION, so a picker in free-text mode cannot
+    // store "Ireena" where `p1` belongs.
+    onChange.mockClear();
+    await user.type(screen.getByRole("combobox", { name: "Rarity" }), "ireena");
+    await user.click(screen.getByRole("button", { name: "elsewhere" }));
+    expect(onChange).toHaveBeenCalledWith("p1");
+  });
+
   it("without allowFreeText, unmatched text is not a value", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

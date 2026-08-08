@@ -59,6 +59,26 @@ export function Combobox({
 
   const pick = (nextId: string) => { onChange(nextId); setQuery(""); setOpen(false); setActive(0); };
 
+  /**
+   * **Leaving the box keeps what was typed — but only where typed text is a value.**
+   *
+   * `allowFreeText` says unmatched text IS the value; discarding it because focus moved contradicts
+   * that, and it is the difference between a text box and this control on the one gesture people
+   * actually make. Type "unique" into an open-slug field, tap the next field, and the old
+   * `<input>` would have kept it while this control silently kept nothing — with no error, because
+   * nothing went wrong.
+   *
+   * An exact label match commits the OPTION's id rather than the words: a page picker in free-text
+   * mode must not store "Ireena" where `p1` belongs. Without `allowFreeText` the query is discarded
+   * exactly as before — a picker over a closed set must not invent members.
+   */
+  const commitOnBlur = () => {
+    const text = query.trim();
+    if (!allowFreeText || text === "") return;
+    const exact = options.find((option) => option.label.toLowerCase() === text.toLowerCase());
+    pick(exact ? exact.id : text);
+  };
+
   if (selected || freeText) {
     return (
       <div className={cx("nh-combobox", className)}>
@@ -74,7 +94,7 @@ export function Combobox({
   }
 
   return (
-    <div className={cx("nh-combobox", className)} ref={boxRef} onBlur={(event) => { if (!boxRef.current?.contains(event.relatedTarget as Node)) setOpen(false); }}>
+    <div className={cx("nh-combobox", className)} ref={boxRef} onBlur={(event) => { if (!boxRef.current?.contains(event.relatedTarget as Node)) { setOpen(false); commitOnBlur(); } }}>
       <input
         id={id}
         className="nh-input nh-combobox-input"

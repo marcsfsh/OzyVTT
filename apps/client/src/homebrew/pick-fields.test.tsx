@@ -106,6 +106,20 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     expect(screen.getByText("unique")).toBeInTheDocument();
   });
 
+  it("typing “unique” and moving to the next field keeps it — Enter is not the only way out", async () => {
+    const user = userEvent.setup();
+    const form = mount();
+
+    // Measured in a real browser at 375px before this was fixed: typed text was discarded on blur,
+    // so a GM who typed a custom rung and tapped the next field kept nothing, with no error. That
+    // is a regression the `<input>` this replaced did not have, and it would have made "still
+    // accepts a custom value" true only for people who press Enter.
+    await user.type(form.rarity(), "unique");
+    await user.click(screen.getByLabelText("Name"));
+
+    expect(form.body().rarity).toBe("unique");
+  });
+
   it("typing a rung by its printed name lands on the rung, not beside it", async () => {
     const user = userEvent.setup();
     const form = mount();
