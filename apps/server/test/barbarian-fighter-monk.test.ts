@@ -537,6 +537,71 @@ describe("Monk: the sheet's own numbers", () => {
   });
 });
 
+/**
+ * MARTIAL ARTS, at the far end.
+ *
+ * A built Monk had no unarmed strike of its own. The only one on the table was the generic builtin,
+ * hard-coded to Strength + Proficiency Bonus to hit and a flat 1 + Strength Bludgeoning - so the
+ * printed Martial Arts column (1:1d6 ... 17:1d12) was read by NOTHING, "you can use your Dexterity
+ * modifier instead" reached nothing, and because the strike was not in `weaponActionIds` Extra
+ * Attack could not reach it either. Flurry of Blows spent a Focus Point to grant two Unarmed Strikes
+ * that existed as nothing the engine could roll.
+ */
+describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", () => {
+  it("reads the printed column at this character's own level, at Dexterity", () => {
+    // The Martial Arts column, and the Dexterity the class's own text says to use: Dex 17 (+3) at 1,
+    // 19 (+4) from the level-4 ASI, 20 (+5) at 17, 24 (+7) once Body and Mind lands.
+    const strike = (level: number) => build(monkInput(level)).actions.find((action) => action.id === "unarmed-strike");
+    for (const [level, bonus, formula] of [
+      [1, 5, "1d6 + 3"], [4, 6, "1d6 + 4"], [5, 7, "1d8 + 4"],
+      [11, 8, "1d10 + 4"], [17, 11, "1d12 + 5"], [20, 13, "1d12 + 7"]
+    ] as const) {
+      expect(strike(level), `L${level}`).toMatchObject({
+        name: "Unarmed Strike", activation: "action",
+        attack: { bonus, reachFeet: 5 }, damage: [{ formula, type: "bludgeoning" }]
+      });
+    }
+  });
+
+  it("takes STRENGTH when Strength is the better one - it is 'instead of', not 'always Dexterity'", () => {
+    // Str 15 (+2) against Dex 12 (+1): +2 and 1d6 + 2, where a hard-coded Dexterity would read +1.
+    const strong = build({ ...monkInput(1), baseScores: { str: 15, dex: 10, con: 13, int: 12, wis: 14, cha: 8 } });
+    expect(strong.abilityScores).toMatchObject({ str: 15, dex: 12 });
+    expect(strong.actions.find((action) => action.id === "unarmed-strike")).toMatchObject({
+      attack: { bonus: 4 }, damage: [{ formula: "1d6 + 2", type: "bludgeoning" }]
+    });
+  });
+
+  it("is a WEAPON swing, so Extra Attack reaches it at 5 and not at 4", () => {
+    const five = onTheTable(build(monkInput(5)));
+    expect(derivationOf(five).weaponActionIds).toContain("unarmed-strike");
+    expect(actionOf(five, "unarmed-strike").attack?.count).toBe(2);
+    // ...and the second swing is really tracked: one strike leaves one attack in the pool.
+    expect(use(five, "unarmed-strike", [IDS.foe], [17, 5]).componentsRemaining).toEqual({ attack: 1 });
+
+    const four = onTheTable(build(monkInput(4)));
+    expect(actionOf(four, "unarmed-strike").attack?.count ?? 1).toBe(1);
+  });
+
+  it("rolls the Martial Arts die, and NOT the builtin's flat 1 + Strength", () => {
+    // Dex 19 (+4), Proficiency 3: 17 + 7 = 24 against AC 13, then 1d8 + 4 on the 5.
+    const built = onTheTable(build(monkInput(5)));
+    const swung = use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(swung.attack).toMatchObject({ total: 24, outcome: "hit" });
+    expect(swung.damage).toEqual([{ formula: "1d8 + 4", type: "bludgeoning", total: 9 }]);
+    // The builtin's own damage is 1 + Str (+1) = 2 Bludgeoning, pushed through `bonusDamage`. The
+    // Monk's strike SHADOWS that id, so it must not be paid a second, Strength-flavoured time.
+    expect(swung.damageTotal).toBe(9);
+  });
+
+  it("leaves every other class on the generic builtin", () => {
+    // A class that prints no Martial Arts column mints nothing, so the SRD's shared Unarmed Strike
+    // is still what a Fighter takes - the builtin catalog covers everyone it always covered.
+    expect(build(fighterInput(5)).actions.some((action) => action.id === "unarmed-strike")).toBe(false);
+    expect(build(barbarianInput(5)).actions.some((action) => action.id === "unarmed-strike")).toBe(false);
+  });
+});
+
 describe("Monk: Focus Points are ONE pool, read off the printed column and really spent", () => {
   it("gives all three activations the same counter, sized by the class table", () => {
     const built = onTheTable(build(monkInput(20)));

@@ -51,6 +51,12 @@ export const monk: ClassMechanicsModule = {
      * WHAT STAYS PROSE: the save DC sentence (it belongs to the features that force saves, and each
      * of those carries the derived DC itself), and the Flurry/Patient/Step upgrades that Heightened
      * Focus grants at level 10 - a rider conditioned on a later feature has no vocabulary.
+     *
+     * FLURRY'S TWO STRIKES stay prose too, and now for one reason rather than two. The strikes THEMSELVES
+     * exist (see `martial-arts` below), so "two Unarmed Strikes" finally names something the engine
+     * can roll - but `multiattack`, the field that would grant them, opens its component pool only
+     * for an `activation: "action"` (`evaluateActionEconomy`). A bonus-action parent would track
+     * nothing, so declaring it would look wired and hand out no swings. `known-bugs.md` carries it.
      */
     "monks-focus": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -164,7 +170,16 @@ export const monk: ClassMechanicsModule = {
     /**
      * NOT AUTHORED, each for a stated reason:
      *
-     *   - `martial-arts`, `deflect-attacks`, `deflect-energy`, `wholeness-of-body`'s heal amount and
+     *   - `martial-arts` IS NOW WIRED, but not from here. Its Unarmed Strike needs two things this
+     *     overlay cannot say: the printed Martial Arts die at the character's own level, and
+     *     "Dexterity **or** Strength, whichever is better" - `attack.ability` names ONE ability and
+     *     `damageByLevel` is a literal dice string with no ability term. So the builder mints it
+     *     directly off the printed `classResources` column (`martialArtsStrike`, character-build.ts),
+     *     which is also why it is not a restatement of a table that already exists. What is still
+     *     prose is the OTHER half of the same feature: the die and the Dexterity also apply to MONK
+     *     WEAPONS, and those are derived from live inventory in `deriveEquipment`, which holds no
+     *     class table. `docs/ai-ledger/known-bugs.md` carries it.
+     *   - `deflect-attacks`, `deflect-energy`, `wholeness-of-body`'s heal amount and
      *     `heightened-focus`'s temporary hit points are all denominated in the MARTIAL ARTS DIE, a
      *     printed column of dice strings. `damageByLevel` can scale an action's own damage but there
      *     is no scaled healing, no scaled damage REDUCTION and no scaled temporary hit points.

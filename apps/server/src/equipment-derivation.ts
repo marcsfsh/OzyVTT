@@ -648,6 +648,14 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       masteryByActionId[weaponAttack.id] = { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition) };
     }
   }
+  // THE BEARER'S OWN UNARMED STRIKE IS A WEAPON SWING. A Monk's is minted by the builder (the
+  // printed Martial Arts die, Dexterity or Strength - see `martialArtsStrike`), so it lives on the
+  // DEFINITION rather than being derived from an inventory row here. `extraAttacksFor` tests
+  // membership of this list BY ID, so without this line a Monk 5's Extra Attack multiplied the
+  // quarterstaff and not the strike the whole class is built around.
+  if (definition?.actions.some((action) => action.id === UNARMED_STRIKE_ACTION_ID && action.attack !== undefined)) {
+    weaponActionIds.push(UNARMED_STRIKE_ACTION_ID);
+  }
 
   // The STANDING + CONDITIONAL pass: riders naming no moment whose static and dynamic gates pass.
   const context = bearerContext(actor, definition, equipped, {
@@ -779,6 +787,21 @@ const ACTION_ID_PREFIX = "item-";
 /** The derived-action id namespace, so a consumer can tell an item action from a stat-block one. */
 export const itemActionId = (itemId: string, suffix?: string) => `${ACTION_ID_PREFIX}${itemId}${suffix ? `-${suffix}` : ""}`;
 export const isItemActionId = (id: string) => id.startsWith(ACTION_ID_PREFIX);
+
+/**
+ * THE ID A CHARACTER'S OWN UNARMED STRIKE MUST CARRY, and it is deliberately the BUILTIN's id.
+ *
+ * Every combatant can take the generic SRD Unarmed Strike (`builtin-actions.ts`), whose numbers are
+ * materialised at resolve time as Strength + Proficiency Bonus for 1 + Strength - correct for
+ * everyone except the one class built around the strike. A declared id SHADOWS its builtin
+ * everywhere the two meet (`actionAvailability`'s builtin filter, `action.resolve`'s
+ * `statBlockAction ?? builtinAction`), so a Monk whose builder minted this id gets exactly one
+ * Unarmed Strike on the sheet - theirs, with the Martial Arts die - rather than two that disagree.
+ *
+ * Named here rather than in the builder because THIS module owns `weaponActionIds`, the list that
+ * decides what Extra Attack may multiply.
+ */
+export const UNARMED_STRIKE_ACTION_ID = "unarmed-strike";
 
 /** The bearer's total character level, for a `by-level` use table. Absent (a bare token) reads as 1. */
 function bearerLevel(definition: ActorDefinition | undefined): number {

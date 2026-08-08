@@ -15,7 +15,7 @@ import type {
 } from "@vtt/content-srd-5.2.1";
 import { featurePicks } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
-import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
+import { BUILDER_BAKED_MODIFIER_TYPES, UNARMED_STRIKE_ACTION_ID, type CharacterFeatureRef } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -376,6 +376,13 @@ function interpretAction(feature: FeatureRecord, action: FeatureRecord["actions"
 const spellActionId = (spellId: string): string => `spell-${spellId}`;
 
 /**
+ * `DiceFormulaSchema`'s own shape, restated here as the GUARD on a printed content column before it
+ * becomes an action's damage. The schema would reject it too - but at the end of the build, as a
+ * parse failure on a character that is otherwise legal, rather than as a fail-open skip here.
+ */
+const DICE_FORMULA = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
+
+/**
  * ONE KNOWN CANTRIP -> THE ACTION THAT RESOLVES IT, or null when it has nothing to resolve.
  *
  * The builder minted no spell actions at all, and the hole was not cosmetic: `spells[].actionId` was
@@ -453,6 +460,52 @@ function linkCantripActions(
     into.push(action);
     entry.actionId = action.id;
   }
+}
+
+/**
+ * MARTIAL ARTS: THE UNARMED STRIKE THIS CHARACTER ACTUALLY SWINGS, or null for a class that prints no
+ * Martial Arts column.
+ *
+ * A built Monk had no unarmed strike of its own. The only one anywhere was the generic builtin, whose
+ * numbers are hard-coded to Strength + Proficiency Bonus to hit and 1 + Strength Bludgeoning
+ * (`action-resolution.ts`) - so a Monk 5 with DEX 15 and STR 12 swung at +3 for 2 damage while the
+ * printed Martial Arts column said 1d8 and the class's own text says to use Dexterity. It was not in
+ * `weaponActionIds` either, so Extra Attack could not reach it, and Flurry of Blows spent a Focus
+ * Point to grant "two Unarmed Strikes" that existed as nothing the engine could roll.
+ *
+ * READ FROM THE PRINTED COLUMN, not restated beside it. `classResources` already carries
+ * `{id: "martial-arts", amount: "1d6"}` at the character's own level (1d8 at 5, 1d10 at 11, 1d12 at
+ * 17), which is exactly the table a `damageByLevel` list authored in the content overlay would be
+ * copying - and copying a printed table is how the two get to disagree. This also means the rule is
+ * CONTENT-DRIVEN rather than a hard-coded "if monk": a homebrew class that prints the column gets it.
+ *
+ * DEXTERITY OR STRENGTH, whichever is better - "Dexterous Attacks", stated as the SRD states it. The
+ * feature vocabulary's `attack.ability` names ONE ability and has no "better of" form, which is the
+ * second reason this is minted here rather than authored: the builder holds the finished scores.
+ *
+ * A NON-DICE amount is skipped rather than trusted. The column is authored text; a homebrew class
+ * printing "1d6 or 1d8" must not make every character of that class unbuildable at the schema
+ * (ADR-0008 fail-open) - it simply keeps the generic builtin.
+ *
+ * WHAT IS STILL PROSE, and it is the OTHER half of the same feature: Martial Arts also gives the die
+ * and Dexterity to MONK WEAPONS, and those are derived from live inventory in `deriveEquipment`,
+ * which holds no class table and so cannot know the die. Flurry's two strikes as a Bonus Action are
+ * prose for a different reason - `multiattack` opens its component pool only for an `activation:
+ * "action"` (`evaluateActionEconomy`), so a bonus-action parent would track nothing. Both are in
+ * `docs/ai-ledger/known-bugs.md`.
+ */
+function martialArtsStrike(context: BuildContext): ActorAction | null {
+  const die = context.classResources.find((resource) => resource.id === "martial-arts")?.amount;
+  if (typeof die !== "string" || !DICE_FORMULA.test(die)) return null;
+  const modifier = Math.max(abilityModifier(context.finalScores.str), abilityModifier(context.finalScores.dex));
+  return {
+    id: UNARMED_STRIKE_ACTION_ID,
+    name: "Unarmed Strike",
+    activation: "action",
+    description: `A strike with your body. You roll your Martial Arts die (${die}) in place of the normal damage, and use Dexterity or Strength for the attack and damage rolls - whichever is higher. (SRD 5.2.1, Martial Arts)`,
+    attack: { bonus: modifier + context.proficiencyBonus, reachFeet: 5 },
+    damage: [{ formula: modifier === 0 ? die : `${die} ${modifier > 0 ? "+" : "-"} ${Math.abs(modifier)}`, type: "bludgeoning" }]
+  } as ActorAction;
 }
 
 /** Interpret ONE feature's riders into the running build. Prose (name + description) ALWAYS lands as a trait; riders only add mechanics on top. */
@@ -1310,6 +1363,10 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     armorClassBonus: 0, armorClassBonusWhileArmored: 0, initiativeBonus: 0, unarmoredDefense: null
   };
   for (const { record } of granted) interpretFeature(record, interpreted, context);
+  // MARTIAL ARTS. Read from the class's own printed column, after the features so an id a feature
+  // already declared keeps it (the dedupe every other action here gets).
+  const strike = martialArtsStrike(context);
+  if (strike && !interpreted.actions.some((existing) => existing.id === strike.id)) interpreted.actions.push(strike);
   /**
    * WHICH FEATURE RECORDS THIS SHEET HOLDS - the payload of `definition.character.features`, and the
    * whole reason `origin` rides along on every `granted` row (issue `2e`).

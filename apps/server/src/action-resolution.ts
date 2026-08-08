@@ -2,7 +2,7 @@ import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
 import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AttackKind, type DiceExpression, type RandomSource, type RiderContext, type RiderMoment, type RollModeSource } from "@vtt/rules-5e";
 import { toRollModes, type ActorDefinition } from "@vtt/schemas";
 import { criticalThreshold, effectiveActions } from "./effective-actions.js";
-import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, UNARMED_STRIKE_ACTION_ID, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
@@ -520,7 +520,11 @@ function attackKindsOf(action: DefinitionAction, input: ResolveInput, distance: 
     else if (melee) kinds.add("melee");
     if (melee && ranged) kinds.add("thrown");
   }
-  if (input.builtin && action.id === "unarmed-strike") kinds.add("unarmed");
+  // An action whose id IS the unarmed strike is an unarmed strike whether it came from the builtin
+  // catalog or from the sheet. Gating this on `input.builtin` meant a Monk's own Martial Arts strike
+  // - which SHADOWS the builtin by carrying its id - missed every `attack-kind-is: ["unarmed"]`
+  // rider (the Paladin's Divine Smite among them) that the generic strike matched.
+  if (action.id === UNARMED_STRIKE_ACTION_ID) kinds.add("unarmed");
   if (action.activation === "reaction") kinds.add("reaction");
   return [...kinds];
 }
@@ -712,7 +716,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
 
   // Builtin Unarmed Strike: the attack math is actor-derived (SRD: Str modifier + Proficiency Bonus),
   // so the concrete attack is materialized at resolve time rather than declared in the catalog.
-  if (input.builtin && action.id === "unarmed-strike") {
+  // `input.builtin` is load-bearing, not decoration: a Monk's own strike SHADOWS this id with a
+  // declared attack of its own (Martial Arts die, Dexterity or Strength), and overwriting it here
+  // with Strength would put the class's whole point back where it was found.
+  if (input.builtin && action.id === UNARMED_STRIKE_ACTION_ID) {
     action = { ...action, attack: { bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0), reachFeet: 5 } };
   }
 
@@ -981,8 +988,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     }
   }
   // Builtin Unarmed Strike damage is flat (SRD: 1 + Str modifier Bludgeoning, no dice) - it rides
-  // the explainable bonus-damage channel since the dice grammar has no zero-die formula.
-  if (input.builtin && action.id === "unarmed-strike" && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
+  // the explainable bonus-damage channel since the dice grammar has no zero-die formula. Again the
+  // `input.builtin` gate is the thing keeping a Monk's declared Martial Arts die from being paid a
+  // second, Strength-flavoured time.
+  if (input.builtin && action.id === UNARMED_STRIKE_ACTION_ID && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
     bonusDamage.push({ amount: Math.max(0, 1 + abilityModifier(deps.definition, "str")), type: "bludgeoning", source: "Unarmed Strike" });
   }
 
