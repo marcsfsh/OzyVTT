@@ -29,80 +29,28 @@
  * `applyField` is the load-bearing helper: it looks a field up in the real schema and applies the
  * real write, so a test cannot accidentally hand-build a body shape the editor could never produce
  * — which is exactly how the original bug survived a green 123-test homebrew suite.
+ *
+ * **Those helpers now live in `authoring-harness.ts`.** They grew a second consumer — the both-paths
+ * guard in `vocabulary-parity.mirror.test.ts`, which runs in the node project so it may import the
+ * server's own modules — and one of them, `applyField`'s throw, is the guarantee that whole phase
+ * rests on. The extraction moved the code and changed exactly one thing about it: the six-key
+ * `RIDER_KEYS` escape hatch that used to sit here is down to `grants` alone, because `fieldsOf` now
+ * walks the rider fields too. See that file's header for why that mattered.
  */
 
 import { describe, expect, it } from "vitest";
+import { applyField, authored, clearField, issuesFor as harnessIssues, parsesAsStored as harnessParses } from "./authoring-harness";
 import { blankDraft, forStorage } from "./defaults";
-import { SCHEMAS } from "./schemas";
-import { EMPTY_CONTEXT, type Draft, type FieldDef, type SchemaContext } from "./schema";
-import { setAt } from "./paths";
-import { bodyForPublish, publishIssues } from "./validate";
+import { bodyForPublish } from "./validate";
+import type { Draft } from "./schema";
 import type { HomebrewType } from "./types";
 
 const RECORD_ID = "hb-test-a1b2c3";
-const ctx: SchemaContext = { ...EMPTY_CONTEXT, recordId: RECORD_ID };
 
-/** Every field of a type's form, flattened through groups AND rows, so a row-scoped key like
-    `ability` (inside `casts`) is reachable by the same lookup as a top-level one. */
-function fieldsOf(type: HomebrewType): readonly FieldDef[] {
-  const out: FieldDef[] = [];
-  const walk = (fields: readonly FieldDef[]) => {
-    for (const field of fields) {
-      out.push(field);
-      if (field.rows) walk(field.rows);
-    }
-  };
-  for (const section of SCHEMAS[type].sections) walk(section.fields);
-  return out;
-}
+const item = (...edits: ReadonlyArray<readonly [string, unknown]>): Draft => authored("equipment", "Test Item", edits);
 
-/**
- * Set one field the way the form sets it: through the field's own `write` when it declares one
- * (container seeding, magic-half clearing, the extension bag), otherwise through `setAt`.
- * `scope` is the nearest container — the record, or one row.
- */
-function applyField(type: HomebrewType, scope: Draft, key: string, value: unknown): Draft {
-  const field = fieldsOf(type).find((entry) => entry.key === key);
-  // `modifiers`, `grants`, `uses`, `actions`, `effects` and `tags` are authored by `RiderEditor`,
-  // a custom component that writes whole-body, so they are legitimately not `FieldDef`s. Everything
-  // else must be: addressing a key the form does not have would let this file assert about a body
-  // no GM could produce, which is exactly how the original defect survived a green suite.
-  if (!field) {
-    if (!RIDER_KEYS.includes(key)) throw new Error(`No field "${key}" in the ${type} form — the test is addressing a field that does not exist.`);
-    return setAt(scope, key, value);
-  }
-  return field.write ? field.write(value, scope) : setAt(scope, key, value);
-}
-
-const RIDER_KEYS: readonly string[] = ["modifiers", "grants", "uses", "actions", "effects", "tags"];
-
-/** What a control writes when it is emptied — the renderer's `setEmpty`, which reads
-    `FieldDef.emptyValue`: the flag that decides between removing an optional key and nulling a
-    required-but-nullable one. */
-function clearField(type: HomebrewType, scope: Draft, key: string): Draft {
-  const field = fieldsOf(type).find((entry) => entry.key === key);
-  if (!field) throw new Error(`No field "${key}" in the ${type} form.`);
-  return applyField(type, scope, key, field.emptyValue === "null" ? null : undefined);
-}
-
-const item = (...edits: ReadonlyArray<readonly [string, unknown]>): Draft =>
-  edits.reduce<Draft>((draft, [key, value]) => applyField("equipment", draft, key, value), {
-    ...blankDraft("equipment"),
-    name: "Test Item"
-  });
-
-const issuesFor = (type: HomebrewType, draft: Draft): readonly string[] =>
-  publishIssues(type, draft, ctx, RECORD_ID).map((reason) => reason.text);
-
-/** The gate the server applies at tier 1, run over the body the save path would send. */
-const parsesAsStored = (type: HomebrewType, draft: Draft) =>
-  SCHEMAS[type] && HOMEBREW_SCHEMA_FOR(type).safeParse(bodyForPublish(type, forStorage(draft), RECORD_ID));
-
-// Imported lazily-by-name so the assertion reads as "the server's schema" at the call site.
-import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
-function HOMEBREW_SCHEMA_FOR(type: HomebrewType) {
-  return HOMEBREW_BODY_SCHEMAS[type];
-}
+const issuesFor = (type: HomebrewType, draft: Draft): readonly string[] => harnessIssues(type, draft, RECORD_ID);
+const parsesAsStored = (type: HomebrewType, draft: Draft) => harnessParses(type, draft, RECORD_ID);
 
 /** Publishable = the checklist is empty AND the shared schema accepts the stored body. Asserting
     both is the point: they must never disagree, and a disagreement here is the defect returning. */

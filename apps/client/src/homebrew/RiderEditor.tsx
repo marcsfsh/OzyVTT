@@ -539,6 +539,11 @@ const actionsField = (): FieldDef => ({
   ]
 });
 
+/** Grouping only, and it is a `FieldDef` like everything else — built here rather than inline in the
+    component so `riderFieldsForTest` can state the rider surface COMPLETELY. A key the census cannot
+    see is a key the both-paths harness waves through. */
+const tagsField = (label: string): FieldDef => ({ key: "tags", label, kind: "tags", help: "Grouping only — no mechanical effect." });
+
 const effectsField = (): FieldDef => ({
   key: "effects",
   label: "Effects",
@@ -728,16 +733,38 @@ function GrantsEditor({
 export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", "tags", "actions", "effects"];
 
 /**
- * The rider field definitions, flattened, for `vocabularies.test.ts`.
+ * The rider field definitions, flattened, for `vocabularies.test.ts` and for
+ * `authoring-harness.ts`.
  *
  * Exported for one reason and it is worth naming: the rider vocabulary is ONE vocabulary mounted by
  * items, class features, species traits and feats alike, so a damage-type box that quietly went back
  * to a hand-typed list here would regress on all four carriers at once. The census in that test
  * needs to see these fields, and they are otherwise built inside the component.
+ *
+ * **Scoped, because the harness asks a second question of it.** `vocabularies.test.ts` asks "does
+ * this control offer the whole vocabulary", which one scope answers. `authoring-harness.ts` asks
+ * "does a control for this key exist AT ALL", and it asks it of a feature carrier as often as an
+ * item one — so the builder takes the scope the carrier is mounted at
+ * (`RecordDetail.tsx:232` is the one place that decision is made). The two scopes differ only in
+ * option lists and labels, never in keys; `vocabulary-parity.mirror.test.ts` pins that.
+ *
+ * **`grants` is deliberately absent**, and it is the one honest gap: it is authored by
+ * `GrantsEditor` above, a bespoke component that writes eleven parallel arrays whole-body and has no
+ * `FieldDef` to export. It stays on the harness's exemption list WITH that reason (U9 closes it by
+ * making the eleventh grant kind — `spells` — editable at all).
  */
-export const RIDER_FIELDS_FOR_TEST: readonly FieldDef[] = [
-  whenField(), modifiersField("What it does", "item"), usesField("Charges", "item"), actionsField(), effectsField()
-];
+export function riderFieldsForTest(scope: "feature" | "item"): readonly FieldDef[] {
+  return [
+    whenField(),
+    modifiersField("What it does", scope),
+    usesField(scope === "item" ? "Charges" : "Limited uses", scope),
+    tagsField("Tags"),
+    actionsField(),
+    effectsField()
+  ];
+}
+
+export const RIDER_FIELDS_FOR_TEST: readonly FieldDef[] = riderFieldsForTest("item");
 
 /** Items get everything except `choice` — an item never asks a question at character
     creation, and there is no code path from an item to the wizard. `grants` IS here now:
@@ -768,9 +795,7 @@ export function RiderEditor({
     const list: FieldDef[] = [];
     if (enabled.includes("modifiers")) list.push(modifiersField(label("modifiers", "Modifiers"), scope));
     if (enabled.includes("uses")) list.push(usesField(label("uses", scope === "item" ? "Charges" : "Limited uses"), scope));
-    if (enabled.includes("tags")) {
-      list.push({ key: "tags", label: label("tags", "Tags"), kind: "tags", help: "Grouping only — no mechanical effect." });
-    }
+    if (enabled.includes("tags")) list.push(tagsField(label("tags", "Tags")));
     if (enabled.includes("actions")) list.push(actionsField());
     if (enabled.includes("effects")) list.push(effectsField());
     return list;
