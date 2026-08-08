@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PlayerView } from "@vtt/domain";
+import { rosterActors, type PlayerView } from "@vtt/domain";
 import { Avatar, Badge, Button, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { PdfImportModal } from "./PdfImportModal";
@@ -25,8 +25,12 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
-  // Archived characters never reach a player projection at all, so this is every character the table has.
-  const characters = state.actors.filter((actor) => actor.kind === "player-character");
+  // Archived characters never reach a player projection at all, so this is every character the table
+  // has — minus a launched replay's clones (`rosterActors`, D3). A clone is unowned by design ("claims
+  // do not resurrect"), which is precisely what an available character looks like, so without this the
+  // picker offered a second copy of everyone in the recording. The server refuses such a claim anyway
+  // (`character-claims.ts`); this is the surface agreeing with the rule, not the rule.
+  const characters = rosterActors(state.actors).filter((actor) => actor.kind === "player-character");
 
   const claim = async (actorId: string, name: string) => {
     if (!(await confirm({ title: `Claim ${name}?`, body: "You'll play them at this table until you release them.", confirmLabel: "Claim" }))) return;

@@ -244,7 +244,7 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
       // hitDice (a healing resource that tracks with exact HP - own claimed character only), and
       // archived and sheetPreview (GM-only management flags - the shared-archived door is the
       // name-and-id-only `archivedCharacters` list above, never a flag on a live actor).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, choiceOverrides, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, sheetPreview: _sheetPreview, ...actor } = source;
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, choiceOverrides, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, sheetPreview: _sheetPreview, replaySceneId, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // ANOTHER PLAYER'S CHARACTER: the one and only thing `partyVisibility` governs. A monster, an
       // NPC and an unclaimed character are all outside it - see the field table above this function.
@@ -273,6 +273,23 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
         claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
+        // A LAUNCHED REPLAY'S CLONE (D3), copied ACROSS rather than allowed to ride the spread - it was
+        // destructured out above so that adding it here is a decision someone made on purpose.
+        //
+        // VIEWER SAFETY. It reaches players because their surfaces need it: without it the party strip
+        // shows a second copy of every character in the recording and the claim screen offers those
+        // copies for claiming (the clone is unowned, so `claimStatus` reads "available"). What it
+        // discloses is that a combatant the player is ALREADY looking at - named in `combat.initiative`,
+        // drawn on the map they are already served - belongs to the replay the GM deliberately made
+        // live on the shared table. It names no hidden actor, no prepared scene, no GM note. The VALUE
+        // is a scene id, and a player receives neither `combat.scenes` nor `activeSceneId`, so it
+        // resolves to nothing they can look up; it is an opaque grouping key for creatures they can see.
+        //
+        // The ENTRY stays even for a clone, deliberately, and for the same reason `partyVisibility`'s
+        // `off` tier keeps one: `combat.tokens` still carries the clone's token and `EncounterMap.tsx`
+        // renders nothing for a token whose actor it cannot find. Dropping the entry would replace the
+        // replay's combatants with empty squares. The lists subtract, the projection does not.
+        ...(replaySceneId !== undefined ? { replaySceneId } : {}),
         ...(classLine !== null ? { classLine } : {}),
         ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
         ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),

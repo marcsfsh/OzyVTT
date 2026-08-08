@@ -21,15 +21,16 @@ import { activateNewScene, sceneHeadroom, sceneSlotsNeededToGoLive } from "./sce
  *
  * Claims do not resurrect: a replay combatant is owned by nobody (`ownerSessionId: null`). The
  * player owns their LIVE character, and handing them a second body would let one session act twice.
+ *
+ * KEEP THE CLONE, HIDE THE CLONE (D3). The safeguard above is not negotiable, but it used to announce
+ * itself: every clone was renamed `"<name> (replay)"` and dropped into the campaign roster beside the
+ * original, so launching a fight the party was in produced a second "Borin" on the party strip and an
+ * unclaimed "Borin (replay)" on the choose-your-character screen. Both were the wrong reading of the
+ * safeguard. A clone now keeps the name it had in the recording and carries `replaySceneId` instead:
+ * it is a combatant in the fight on screen (initiative, tokens, the map) and NOT a member of the
+ * campaign (`rosterActors` in `@vtt/domain` is the one rule that says so), and `scenes.ts` deletes it
+ * with its scene the moment the table moves on.
  */
-
-/** How the launch names a cloned combatant, once - never accumulating on a replay of a replay. */
-const REPLAY_SUFFIX = " (replay)";
-const withReplaySuffix = (name: string) => {
-  if (name.endsWith(REPLAY_SUFFIX)) return name;
-  const room = 120 - REPLAY_SUFFIX.length;
-  return `${name.length > room ? name.slice(0, room) : name}${REPLAY_SUFFIX}`;
-};
 
 /** The definition cap `GameStateSchema` enforces; the launch refuses UP FRONT rather than failing mid-clone. */
 const MAX_DEFINITIONS = 100;
@@ -48,7 +49,7 @@ export type ReplayLaunchInput = Readonly<{
 
 export type ReplayLaunchOutcome = Readonly<{
   scene: Scene;
-  /** The cloned combatants, so the client can offer "remove these" when the replay scene is dropped. */
+  /** The cloned combatants. Recorded on the scene as `replayOf.actorIds`; the server deletes them with it. */
   actorIds: readonly string[];
   turnIndex: number;
   label: string;
@@ -157,19 +158,26 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
     return [{
       ...clone,
       id: actorIdMap.get(actorId)!,
-      name: withReplaySuffix(source.name),
+      // The recorded name, unchanged: a replay of a replay cannot stack suffixes because there is no
+      // suffix to stack, and the GM reads the fight they recorded rather than a decorated copy of it.
+      name: source.name,
       ownerSessionId: null,
       archived: false,
+      // Scoped to THIS launch. `replaySceneId` is what keeps the clone out of every roster surface and
+      // what `scenes.ts` deletes it by; a clone of a clone is re-scoped here, never left pointing at
+      // the scene it was recorded in.
+      replaySceneId: input.sceneId,
       ...(clone.definitionId ? { definitionId: definitionIdMap.get(clone.definitionId) ?? clone.definitionId } : {})
     }];
   });
 
   const combat = remapIds(structuredClone(sceneCombatFrom(archived.combat)), actorIdMap);
   const label = `Replay: turn ${input.turnIndex + 1} of ${input.document.endedAt.slice(0, 10)}`;
+  const actorIds = clones.map((clone) => clone.id);
 
   state.actors = [...state.actors, ...clones];
   if (definitionsToStore.length > 0) state.definitions = [...state.definitions, ...definitionsToStore];
-  const scene = activateNewScene(state, { sceneId: input.sceneId, name: label, mapAssetId: archived.combat.mapAssetId, combat }, input.implicitSceneId);
+  const scene = activateNewScene(state, { sceneId: input.sceneId, name: label, mapAssetId: archived.combat.mapAssetId, combat, replayOf: { archiveId: input.archiveId, actorIds } }, input.implicitSceneId);
 
-  return { scene, actorIds: clones.map((clone) => clone.id), turnIndex: input.turnIndex, label };
+  return { scene, actorIds, turnIndex: input.turnIndex, label };
 }

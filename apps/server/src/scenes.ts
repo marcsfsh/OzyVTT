@@ -92,9 +92,35 @@ export function renameScene(state: GameState, sceneId: string, name: string) {
   state.combat = { ...state.combat, scenes: state.combat.scenes.map((scene) => scene.id === sceneId ? { ...scene, name } : scene) };
 }
 
+/**
+ * A LAUNCHED REPLAY IS DISPOSABLE - drop the scene and the combatants it minted, together (D3).
+ *
+ * WHY THIS EXISTS AT ALL. `launchReplay` appended a scene and a clone set and NOTHING ever removed
+ * either, so every "Launch from here" permanently spent one of the twenty scene slots. At 19-20 the
+ * headroom check below started refusing with "Remove a prepared scene first" - a demand the Replays
+ * tab offered no way to satisfy. The refusal was never wrong; the leak underneath it was. Every exit
+ * from a replay scene routes through here, so there is one answer to "when do the clones go".
+ *
+ * Called AFTER the state swap in each caller, never before: `activateScene`/`activateNewScene` park
+ * the live combat into the departing scene's slot first, and dropping it earlier would lose the swap.
+ * A no-op for an ordinary prepared scene, which is what makes it safe to call unconditionally.
+ */
+function dropReplayScene(state: GameState, sceneId: string) {
+  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene?.replayOf) return;
+  // Trust the actors' own back-reference rather than the scene's list: an id in `replayOf.actorIds`
+  // that no longer names an actor is already gone, and an actor carrying this scene's id is a clone
+  // of it whether or not the list remembers. The list is the client's "remove these" hint, not the key.
+  state.actors = state.actors.filter((actor) => actor.replaySceneId !== sceneId);
+  state.combat = { ...state.combat, scenes: state.combat.scenes.filter((candidate) => candidate.id !== sceneId) };
+}
+
 export function removeScene(state: GameState, sceneId: string) {
   if (!state.combat.scenes.some((scene) => scene.id === sceneId)) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("Switch to another scene before removing the live one.");
+  // Removing a parked replay takes its clones with it - they exist only to stage that scene. A no-op
+  // for an ordinary prepared scene, whose combatants belong to the campaign and stay on the roster.
+  dropReplayScene(state, sceneId);
   state.combat = { ...state.combat, scenes: state.combat.scenes.filter((scene) => scene.id !== sceneId) };
 }
 
@@ -160,6 +186,7 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   // block a switch while the GM is mid-review rather than silently discarding an unresolved rewind.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before switching scenes.");
 
+  const departingId = state.combat.activeSceneId;
   let scenes = state.combat.scenes;
   if (state.combat.activeSceneId !== null) {
     const parkedId = state.combat.activeSceneId;
@@ -175,6 +202,9 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   // `resumed` is a SceneCombat and carries no timeline bookkeeping - set it explicitly so the rebuilt
   // combat starts live (a bare spread would leave historyCursor/historyDirty undefined, not null/false).
   state.combat = { ...resumed, mapAssetId: target.mapAssetId, scenes, activeSceneId: sceneId, historyCursor: null, historyDirty: false };
+  // Switching AWAY from a launched replay ends it: the scene the table just left, and the combatants
+  // it minted, go. Runs after the swap so the park above still had a slot to park into.
+  if (departingId !== null) dropReplayScene(state, departingId);
 }
 
 /**
@@ -200,13 +230,14 @@ export function sceneHeadroom(state: GameState): number {
  * table concept: the current fight parks into its slot exactly as it does on a scene switch, the
  * new scene goes live, and the parked one resumes any time through `scene.activate`.
  */
-export function activateNewScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string | null; combat: SceneCombat }>, implicitSceneId: string): Scene {
+export function activateNewScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string | null; combat: SceneCombat; replayOf?: Scene["replayOf"] }>, implicitSceneId: string): Scene {
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before switching scenes.");
   if (state.combat.scenes.some((scene) => scene.id === input.sceneId)) throw new CommandRejectedError("That scene already exists.");
   if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
     throw new CommandRejectedError("Remove a prepared scene first - launching needs room to park the table and stage the replay.");
   }
 
+  const departingId = state.combat.activeSceneId;
   let scenes = state.combat.scenes;
   if (state.combat.activeSceneId !== null) {
     const parkedId = state.combat.activeSceneId;
@@ -215,8 +246,12 @@ export function activateNewScene(state: GameState, input: Readonly<{ sceneId: st
     scenes = [...scenes, { id: implicitSceneId, name: "Current encounter", mapAssetId: state.combat.mapAssetId, combat: snapshotSceneCombat(state.combat) }];
   }
   // The live scene's own slot stays EMPTY by invariant - its live copy is the top-level combat.
-  const scene: Scene = { id: input.sceneId, name: input.name, mapAssetId: input.mapAssetId ?? state.combat.mapAssetId ?? "", combat: emptySceneCombat() };
+  const scene: Scene = { id: input.sceneId, name: input.name, mapAssetId: input.mapAssetId ?? state.combat.mapAssetId ?? "", combat: emptySceneCombat(), ...(input.replayOf ? { replayOf: input.replayOf } : {}) };
   state.combat = { ...input.combat, mapAssetId: scene.mapAssetId, scenes: [...scenes, scene], activeSceneId: scene.id, historyCursor: null, historyDirty: false };
+  // Launching a replay FROM a replay ends the first one. Without this the twenty-fifth launch in an
+  // evening still walks into the cap, because each one would leave its own scene and clones behind -
+  // and this path (not `activateScene`) is the one a GM who keeps pressing "Launch from here" takes.
+  if (departingId !== null) dropReplayScene(state, departingId);
   return scene;
 }
 

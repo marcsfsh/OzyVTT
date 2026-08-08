@@ -456,9 +456,41 @@ export const SceneSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(120),
   mapAssetId: z.string().uuid(),
-  combat: SceneCombatSchema.default({})
+  combat: SceneCombatSchema.default({}),
+  /**
+   * THIS SCENE IS A LAUNCHED REPLAY (D3), not a prepared encounter: which recording it came from, and
+   * the combatants `replay-launch.ts` cloned to stage it (each carries this scene's id in
+   * `Actor.replaySceneId`).
+   *
+   * Present makes the scene DISPOSABLE, and that is the point. Before it existed, every launch minted
+   * a scene and a clone set that nothing ever removed, so a GM who launched twenty replays hit
+   * `MAX_SCENES` and "Launch from here" started refusing with a demand to unpark a scene - the leak
+   * WAS the block. `scenes.ts` now drops a replay scene and its clones the moment the table leaves it:
+   * `scene.activate` away, `scene.remove`, or the next `activateNewScene`. Absent = an ordinary
+   * prepared scene, which is every scene a GM makes by hand. GM-only, like the whole `scenes` array
+   * (no player or viewer projection carries it). Additive.
+   */
+  replayOf: z.object({
+    archiveId: z.number().int().nonnegative(),
+    actorIds: z.array(z.string().uuid()).max(200)
+  }).strict().optional()
 }).strict();
 export type Scene = z.infer<typeof SceneSchema>;
+
+/**
+ * THE CAMPAIGN ROSTER: every actor a MANAGEMENT surface lists (the party, the claim screen, scene
+ * staging, add-to-the-fight, the roster tab). One rule, exported once, so the server's projections
+ * and the client's lists cannot drift into two different answers about who is on this table.
+ *
+ * The only thing it subtracts is a launched replay's clones (`Actor.replaySceneId` - D3): they are
+ * real combatants in the fight on screen and belong in `combat.initiative`, on the map and in the
+ * turn order, but they are not members of the campaign and must never be offered for claiming,
+ * staging or party display. Everything else - archived characters, gm-only monsters - is governed by
+ * its own rule in the projection that owns it, not here.
+ */
+export function rosterActors<T extends { readonly replaySceneId?: string | undefined }>(actors: readonly T[]): readonly T[] {
+  return actors.filter((actor) => actor.replaySceneId === undefined);
+}
 
 export const CombatStateSchema = z.object({
   ...sceneCombatShape,

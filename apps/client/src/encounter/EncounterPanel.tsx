@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ActionResolution, ActorDefinition, ClientToServerEvents, ContentActionSummary, DeathSaveResult, DeathSaves, GmActor, GmView, MutationResult, PendingDamage, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import { rosterActors, type ActionResolution, type ActorDefinition, type ClientToServerEvents, type ContentActionSummary, type DeathSaveResult, type DeathSaves, type GmActor, type GmView, type MutationResult, type PendingDamage, type PendingReaction, type PendingSave, type PlayerEffect, type PlayerPendingReaction, type PlayerPendingSave, type ReactionAnswerResult, type SaveAnswerResult, type PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
@@ -721,7 +721,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
 }
 
 function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; mapLibrary?: readonly MapSelection[]; onSelectMap?: (map: MapSelection | null) => void; dock?: DockControl }>) {
-  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived).map((actor) => actor.id)));
+  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(rosterActors(state.actors).filter((actor) => actor.kind === "player-character" && !actor.archived).map((actor) => actor.id)));
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -827,7 +827,9 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       // adding a monster from the browser intends it to fight.
       const known = knownActorIdsRef.current;
       const valid = new Set([...current].filter((id) => actorsById.has(id)));
-      for (const actor of state.actors) if (!known.has(actor.id) && !actor.archived) valid.add(actor.id);
+      // Roster only (D3): a replay launch appears as a burst of new actors, and auto-staging them
+      // would stage creatures the server deletes the moment the table leaves the replay.
+      for (const actor of rosterActors(state.actors)) if (!known.has(actor.id) && !actor.archived) valid.add(actor.id);
       knownActorIdsRef.current = new Set(state.actors.map((actor) => actor.id));
       // An empty tray stays empty. This used to fall back to the WHOLE roster - so a GM who
       // deliberately cleared the list got everyone back on the next broadcast, archived characters
@@ -853,7 +855,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     if (!startMapId) throw new Error(selectedMap && selectedMap.kind !== "battlemap"
       ? "Pick a battle map before starting the fight. Regional and world maps stay available outside fights."
       : "Pick a battle map first, or make a scene live from the Scenes tab.");
-    const entries = state.actors.filter((actor) => selectedActors.has(actor.id)).map((actor) => {
+    const entries = rosterActors(state.actors).filter((actor) => selectedActors.has(actor.id)).map((actor) => {
       const value = scores[actor.id]?.trim();
       return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
     });
@@ -917,7 +919,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   // The quick-start door (D1/B2.5). Everyone active is pre-listed in the staging tray without being
   // hand-added (D2); archived characters appear nowhere (D16); the map, the tray, the two Add buttons
   // and Recent are the SAME parts the scene-prep workspace shows, so there is one thing to learn.
-  const stagedIds = state.actors.filter((actor) => selectedActors.has(actor.id) && !actor.archived).map((actor) => actor.id);
+  const stagedIds = rosterActors(state.actors).filter((actor) => selectedActors.has(actor.id) && !actor.archived).map((actor) => actor.id);
   // A LIVE SCENE owns its map; nothing else does. After a fight ends `combat.mapAssetId` is still set,
   // and treating that as ownership is what used to strand the GM on last night's map with no way to
   // change it short of preparing a scene.
@@ -1122,8 +1124,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             <div className="menu-section" role="group" aria-label="Add to the fight">
               <p className="menu-section-title">Add to the fight</p>
               {(() => {
-                // Archived characters are out of play (D16) and the server refuses them - the list agrees.
-                const available = state.actors.filter((actor) => !actor.archived && !state.combat.initiative.some((entry) => entry.actorId === actor.id));
+                // Archived characters are out of play (D16) and the server refuses them - the list
+                // agrees. `rosterActors` (D3) does the same for a launched replay's clones, which are
+                // already in this fight's initiative anyway and belong to no campaign.
+                const available = rosterActors(state.actors).filter((actor) => !actor.archived && !state.combat.initiative.some((entry) => entry.actorId === actor.id));
                 /* THE SCENE-PREP SHAPE, VERBATIM (`4g`, second half; ScenePrepPanel.tsx:28,84-88,139-143).
                    This was every non-archived roster actor, flat and unsorted, in a menu that is one
                    scrollport tall — 25 rows on the throwaway server used to measure it, and a roster

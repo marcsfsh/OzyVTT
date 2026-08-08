@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { ActorDefinition, GmActor, GmView, PendingImport } from "@vtt/domain";
+import { rosterActors, type ActorDefinition, type GmActor, type GmView, type PendingImport } from "@vtt/domain";
 import { Avatar, Badge, Button, Eyebrow, Modal, RevealSwitch, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { CharacterSheet } from "../encounter/CharacterSheet";
@@ -30,7 +30,9 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
-  const pcs = state.actors.filter((actor) => actor.kind === "player-character");
+  // The campaign's characters. `rosterActors` (D3) drops a launched replay's clones - this tab manages
+  // people who belong to the table, and a clone is a prop the server deletes when the replay ends.
+  const pcs = rosterActors(state.actors).filter((actor) => actor.kind === "player-character");
   const active = pcs.filter((actor) => !actor.archived);
   const archived = pcs.filter((actor) => actor.archived);
   const sheetActor = sheetActorId ? pcs.find((actor) => actor.id === sheetActorId) ?? null : null;

@@ -537,6 +537,22 @@ export const ActorSchema = z.object({
   /** GM-archived: hidden from players and excluded from the encounter builder / party. GM management flag; never projected to players or the viewer. Additive. */
   archived: z.boolean().default(false),
   /**
+   * THIS COMBATANT BELONGS TO A LAUNCHED REPLAY (D3), and holds the id of the replay scene that minted it.
+   *
+   * `replay-launch.ts` clones an archived fight's combatants under new ids so a historical replay can
+   * never rewrite tonight's characters. That safeguard stays; what this field buys is that the clones
+   * stop being VISIBLE as campaign members. Present = "in the fight, never in the roster": every
+   * management surface (the party, the claim screen, scene staging, add-to-the-fight) skips it through
+   * the one shared rule `rosterActors` in `@vtt/domain`, while the map, the turn order and the tokens
+   * keep it - a token whose actor is missing renders as an empty square, which is why the ENTRY stays
+   * and only the roster lists subtract it (the same bargain `partyVisibility` documents).
+   *
+   * The scene is deleted when the replay ends (`scene.activate` away from it, `scene.remove`, or the
+   * next launch), and every actor carrying its id goes with it. Absent = an ordinary campaign actor,
+   * which is every actor that existed before this field. Additive.
+   */
+  replaySceneId: z.string().uuid().optional(),
+  /**
    * The GM shared this ARCHIVED character's sheet back to players as a read-only keepsake (D26).
    * Default false - hidden until shared, never the other way round. Meaningless while `archived` is
    * false (a live character's sheet reaches only its owner, unchanged). The flag itself is GM
