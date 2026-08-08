@@ -777,11 +777,21 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
     expect(unaffiliated.damage).toEqual([{ formula: "2d10", type: "fire", total: 10 }]);
   });
 
-  it("does not reach a SAVE-only spell, which is the gate's real edge and not an accident", () => {
-    // `action-resolution.ts` fills `damageTypes` on the rider context only for an action with an
-    // `attack` block against a single target, so `damage-type-is` has nothing to match on a spell
-    // that forces a save instead. Under-application, and pinned here rather than left to be
-    // discovered: widen that context and this test is the one that says to re-check the record.
+  it("reaches a SAVE-only spell too — the half of the feature that used to be missing", () => {
+    /**
+     * **This assertion is the inverse of the one it replaces, and deliberately so.**
+     *
+     * It used to pin the narrow behaviour: `action-resolution.ts` built `damageTypes` only inside
+     * the `action.attack && targets.length === 1` branch, so `damage-type-is` had nothing to match
+     * on a spell that forces a save, and the old test said "widen that context and this test is the
+     * one that says to re-check the record." This is that re-check. The record needed no change —
+     * "when you cast a spell that deals Fire damage" says nothing about attack rolls, and the SRD
+     * has no rule that would make Fire Bolt qualify and Burning Hands not.
+     *
+     * The filter is a property of the ACTION (`action.damage`), so it is now built once for both
+     * branches. Kept rather than deleted, because a save-only spell is the edge the whole gate
+     * turns on: shrink that context again and this fails.
+     */
     const built = table(sorcerer(6, "fire"));
     const burningHands = {
       id: "burning-hands", name: "Burning Hands", activation: "action" as const,
@@ -790,7 +800,21 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
     };
     const swept = resolveDefinitionAction(built.state, burningHands,
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000123" }, deps(built, [4, 4, 4]));
-    expect(swept.damage).toEqual([{ formula: "3d6", type: "fire", total: 12 }]);
+    // CHA 17 (+3) at level 6, the same Sorcerer as the Fire Bolt proof above: 3d6 fire, then the
+    // affinity's flat +3 of the type it names, as its own line on the card.
+    expect(swept.damage).toEqual([
+      { formula: "3d6", type: "fire", total: 12 },
+      { formula: "3", type: "fire", total: 3 }
+    ]);
+    expect(swept.damageTotal).toBe(15);
+
+    // ...and the gate still gates. A Sorcerer who chose Cold adds nothing to the same fire spell,
+    // which is what says the widening did not turn `damage-type-is` into "always".
+    const chilly = table(sorcerer(6, "cold"));
+    const unaffiliated = resolveDefinitionAction(chilly.state, burningHands,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000124" }, deps(chilly, [4, 4, 4]));
+    expect(unaffiliated.damage).toEqual([{ formula: "3d6", type: "fire", total: 12 }]);
+    expect(unaffiliated.damageTotal).toBe(12);
   });
 
   it("keeps Draconic Resilience's Charisma AC, which is the subclass overlay's original proof", () => {

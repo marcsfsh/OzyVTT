@@ -798,14 +798,23 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // BOTH branches: a spell that forces a save and rolls no attack ("when you cast Fireball") must
   // gate its riders exactly as an attack-roll cantrip does.
   const spellFilter = action.spellId === undefined ? {} : { spellId: action.spellId };
-  let riderFilters: Omit<Partial<RiderContext>, "moment"> = { sourceItemId: riderItemId, ...spellFilter };
+  // WHAT DAMAGE THIS ACTION DEALS belongs on both branches for the same reason `spellId` does, and
+  // it used to be built only inside the attack-roll branch below. `damage-type-is` is a property of
+  // the ACTION — `action.damage` is already known, the target is not consulted — so gating it on
+  // "has an attack block AND exactly one target" was never a rule, it was where the code happened to
+  // sit. The Sorcerer's Elemental Affinity is the record that shows the cost: "when you cast a spell
+  // that deals Fire damage you can add your Charisma modifier" reaches Fire Bolt, which rolls an
+  // attack, and never reached Burning Hands, which forces a save. Same feature, same damage type,
+  // half the spells.
+  const damageTypes = action.damage.map((part) => part.type);
+  let riderFilters: Omit<Partial<RiderContext>, "moment"> = { sourceItemId: riderItemId, damageTypes, ...spellFilter };
   if (action.attack && targets.length === 1) {
     const target = targets[0];
     const targetDerivation = deriveEquipment(target, target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, deps.catalog);
     riderFilters = {
       attackKinds: attackKindsOf(action, input, deps.distanceFeet?.(attacker.id, target.id) ?? null),
       weaponProperties: weaponPropertiesOf(riderItemId, attacker.inventory),
-      damageTypes: action.damage.map((part) => part.type),
+      damageTypes,
       targetSize: target.size ?? "medium",
       targetConditionIds: target.conditions.map((condition) => condition.id),
       sourceItemId: riderItemId,
