@@ -69,6 +69,16 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
     () => pages.filter((page) => page.entityType === "character").map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type="character" /> })),
     [pages]
   );
+  /**
+   * **The whole party is reachable, not the first eight of it.** `Combobox` pages at `limit = 8` by
+   * default and truncates SILENTLY (`Combobox.tsx:64`, `.slice(0, limit)` — no "8 of 13" line, no
+   * scroll cue), so a campaign with nine character pages simply lost the ninth: absent from the
+   * unfiltered list below, and on the edit row — which has no `allowFreeText` escape — a ninth
+   * character could not be linked at all. The same default truncated the thirteen damage types
+   * elsewhere; `TagInput` already defeats it exactly this way (`TagInput.tsx:153`), and
+   * `.nh-combobox-list` scrolls at 17rem, so a party-sized list is safe to offer whole.
+   */
+  const characterLimit = Math.max(characterOptions.length, 1);
   const pageTitle = (id: string | null) => (id ? pages.find((page) => page.id === id)?.title ?? null : null);
   /** A value that names a character page is a link; anything else is the free-text name the GM typed. */
   const whoPageId = whoValue && characterOptions.some((option) => option.id === whoValue) ? whoValue : null;
@@ -143,7 +153,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
         <div className="codex-downtime-form">
           <Field label="Who" htmlFor="codex-downtime-who" help="Pick a character page, or type a name.">
             {characterOptions.length > 0
-              ? <Combobox id="codex-downtime-who" options={characterOptions} value={whoValue} onChange={setWhoValue} allowFreeText
+              ? <Combobox id="codex-downtime-who" options={characterOptions} value={whoValue} onChange={setWhoValue} allowFreeText limit={characterLimit}
                   ariaLabel="Who spent the time" placeholder="Search characters, or type a name" />
               : <Input id="codex-downtime-who" value={who} placeholder="Vex" onChange={(event) => setWhoValue(event.target.value || null)} />}
           </Field>
@@ -213,7 +223,7 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
                       <Field label="Who" htmlFor={`codex-dt-who-${record.id}`}><Input id={`codex-dt-who-${record.id}`} value={editWho} onChange={(event) => setEditWho(event.target.value)} /></Field>
                       <Field label="Activity" htmlFor={`codex-dt-act-${record.id}`}><Input id={`codex-dt-act-${record.id}`} value={editActivity} onChange={(event) => setEditActivity(event.target.value)} /></Field>
                       <Field label="Character page" htmlFor={`codex-dt-page-${record.id}`} help="Days cannot be changed after logging. Delete the entry and log it again to correct it.">
-                        <Combobox options={characterOptions} value={editPageId} onChange={setEditPageId} ariaLabel="Link to a character page" placeholder="Search characters" />
+                        <Combobox options={characterOptions} value={editPageId} onChange={setEditPageId} limit={characterLimit} ariaLabel="Link to a character page" placeholder="Search characters" />
                       </Field>
                       <div className="codex-conn-formactions">
                         <Button variant="secondary" size="sm" disabled={busy} onClick={() => void saveEdit(record.id)}>Save</Button>

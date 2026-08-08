@@ -261,6 +261,67 @@ describe("Adopting an old row (the Edit path)", () => {
   });
 });
 
+/**
+ * **A ninth character is not a lost character.**
+ *
+ * `Combobox` pages at `limit = 8` and truncates silently — `.slice(0, limit)` with no "8 of 13" line
+ * and no scroll cue — so before these two call sites named their own limit, a party of nine lost its
+ * ninth member from the unfiltered list. The edit row was the worse half: it has no `allowFreeText`
+ * escape, so the ninth character could not be linked to an old row at all.
+ *
+ * Both tests open the list WITHOUT typing, deliberately. Filtering by name would find the ninth even
+ * at `limit = 8` — the truncation only bites the browse case, which is exactly the case a GM who does
+ * not remember a name is in.
+ */
+describe("A party bigger than the Combobox's default page", () => {
+  // Nine characters, plus a location that must still be excluded — one past the default cap.
+  const NAMES = ["Ana", "Bo", "Cass", "Dain", "Eda", "Finn", "Gale", "Hex", "Ivy"];
+  const NINE = [...NAMES.map((name, index) => page(`c${index + 1}`, name)), page("l1", "Vallaki", "location")];
+
+  it("offers every character, not the first eight", async () => {
+    const user = userEvent.setup();
+    renderDowntime({ pages: NINE });
+
+    await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
+    const options = (await screen.findAllByRole("option")).map((option) => option.textContent);
+    expect(options).toEqual(NAMES);
+    // Named rather than left to the count: "Ivy" is the row the default cap dropped.
+    expect(options).toContain("Ivy");
+  });
+
+  it("logs downtime against the ninth character, linked to its page", async () => {
+    const user = userEvent.setup();
+    renderDowntime({ pages: NINE });
+
+    await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
+    await user.click(await screen.findByRole("option", { name: "Ivy" }));
+    await user.type(screen.getByLabelText("Activity"), "Scouting");
+    await user.click(screen.getByRole("button", { name: "Log downtime" }));
+
+    await waitFor(() => expect(createDowntime).toHaveBeenCalled());
+    expect(createDowntime.mock.calls[0][1].downtime).toMatchObject({ who: "Ivy", characterPageId: "c9" });
+  });
+
+  it("lets the edit row link an old entry to the ninth character", async () => {
+    const user = userEvent.setup();
+    renderDowntime({ pages: NINE, records: [downtime("d1", { who: "ivy", activity: "Scouting", days: 4, applied: true })] });
+
+    const history = within(document.querySelector(".codex-downtime-history")!);
+    await user.click(history.getByRole("button", { name: "Edit" }));
+    await user.click(history.getByRole("combobox", { name: "Link to a character page" }));
+
+    const options = (await screen.findAllByRole("option")).map((option) => option.textContent);
+    expect(options).toEqual(NAMES);
+
+    // This row is the one with no free-text escape: if "Ivy" is not in the list, the link is unreachable.
+    await user.click(screen.getByRole("option", { name: "Ivy" }));
+    await user.click(history.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][2].downtime).toMatchObject({ who: "ivy", characterPageId: "c9" });
+  });
+});
+
 describe("The player's Downtime (D12/D14)", () => {
   const PLAYER_ROWS = [
     { id: "d1", kind: "downtime" as const, title: null, text: "", tags: [], realDate: null, inWorldLabel: "Hammer 3, 1491 DR", calendarInstant: 44732, sessionId: null, sessionNumber: null, createdAt: "2026-07-31T00:00:00.000Z", payload: { who: "Vex", activity: "Forging", days: 7, characterPageId: "c1" } }
