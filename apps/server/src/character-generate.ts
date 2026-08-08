@@ -101,7 +101,7 @@ function drawPreferring<T>(preferred: readonly T[], all: readonly T[], count: nu
  * (`packages/rules-5e/class-data.ts`) - every class already carries a `statPriority`, and an unknown
  * homebrew class falls back to sheet order there rather than throwing, so this never dead-ends.
  */
-export function standardArrayFor(classId: string, library: ContentView): Record<Ability, number> {
+function standardArrayFor(classId: string, library: ContentView): Record<Ability, number> {
   const priority = statPriorityFor(classId, library.classProgressionTable());
   const ordered = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
   const scores = {} as Record<Ability, number>;
@@ -423,12 +423,33 @@ export function generateCharacterRequest(
   };
 
   const choices: CharacterChoice[] = [];
-  // The subclass row mirrors the top-level id, exactly as the wizard writes it.
-  if (subclassId) choices.push({ level: classRecord.subclassLevel, classId, kind: "subclass", id: subclassId });
+  // ONE opening survey for the two rows written before the loop starts. Neither reads a pick, so it
+  // is the same survey the loop's first pass would compute.
+  const opening = computeServerOffers({ ...identity, choices }, library, policy);
+  /**
+   * The subclass row, written through `rowFor` LIKE EVERY OTHER PICK - which is the whole of the fix.
+   *
+   * Hand-writing it here dropped `payload.featureId`, and the wizard stamps one
+   * (`payload: {featureId: "<class>-subclass"}`). `level-ledger.ts` matches a stored row to a wizard
+   * offer on the tuple `(level, kind, classId, featureId)`, so the pick was never prefilled and the
+   * level-up wizard re-asked a generated character for the subclass it already has - against the
+   * explicit claim on `ChoiceOffer.levels`. Routing it through the offer means the row cannot drift
+   * from the offer again, and the level comes from the offer's own grant level rather than from a
+   * second reading of `classRecord.subclassLevel`.
+   */
+  if (subclassId) {
+    const offer = opening.offers.find((candidate) => candidate.kind === "subclass");
+    choices.push(offer
+      ? rowFor(offer, subclassId, 0)
+      // No subclass offer at all is a content gap (a class with no `<class>-subclass` feature). The
+      // row still has to exist - step 4 checks it against the top-level id - so it falls back to
+      // exactly what it always was rather than dropping the character.
+      : { level: classRecord.subclassLevel, classId, kind: "subclass", id: subclassId });
+  }
   // A species that prints more than one size asks which; the server has no offer for it (step 11
   // reads the row directly), so it is drawn here rather than in the loop.
   if (species.sizes.length > 1) choices.push({ level: 1, kind: "size", id: drawOne([...species.sizes], random) });
-  choices.push(...equipmentRows(computeServerOffers({ ...identity, choices }, library, policy), random));
+  choices.push(...equipmentRows(opening, random));
 
   for (let pass = 0; pass < MAX_PASSES; pass += 1) {
     const survey = computeServerOffers({ ...identity, choices }, library, policy);
@@ -457,7 +478,7 @@ function summaryOf(survey: ServerOfferSurvey): string {
 }
 
 /** A name from the species' own name bundle, or null when the content has none. Drawn like everything else. */
-export function generateName(speciesId: string, library: ContentView, random: DiceRandom): string | null {
+function generateName(speciesId: string, library: ContentView, random: DiceRandom): string | null {
   const bundle = library.nameBundles().find((entry) => entry.speciesId === speciesId);
   if (!bundle) return null;
   const family = /-(family|clan)$/;

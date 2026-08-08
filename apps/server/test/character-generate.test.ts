@@ -7,12 +7,12 @@ import { BuilderPolicySchema, GameStateSchema } from "@vtt/domain";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { STANDARD_ARRAY, statPriorityFor } from "@vtt/rules-5e";
-import { buildCharacterDefinition, storedHitPointRolls } from "../src/character-build.js";
+import { buildCharacterDefinition, computeServerOffers, levelOfPick, storedHitPointRolls } from "../src/character-build.js";
 import { generateCharacterRequest } from "../src/character-generate.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { importActorDefinition } from "../src/actor-roster.js";
-import { effectiveActions } from "../src/effective-actions.js";
-import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { actionPools, effectiveActions } from "../src/effective-actions.js";
+import { equipmentCatalogOf, isItemActionId } from "../src/equipment-derivation.js";
 import { createServer } from "../src/server.js";
 
 /**
@@ -65,9 +65,45 @@ function assemble(definition: ActorDefinition) {
   return { actor, actions: effectiveActions(definition, actor, catalog) };
 }
 
+/**
+ * ONE THING EACH CLASS OWES A CHARACTER, named by the id the engine really rolls or spends - either a
+ * non-item action or a tracked pool (`actionPools`, which is `uses.pool ?? action.id`).
+ *
+ * This replaces `actions.some((action) => action.attack || action.damage.length > 0)`, which was
+ * near-vacuous: every character carries a starting weapon and `deriveEquipment` turns it into an
+ * attack, so the assertion passed with ZERO class content. Measured, a generated Druid L1 satisfied
+ * it on a Sickle for 1d4 - 1.
+ *
+ * `atOne: null` is a FACT, not an exemption: Cleric, Druid, Paladin and Warlock are spells and prose
+ * at level 1 and the engine tracks nothing of their own. Saying so beats a bar low enough to include
+ * them. Every id here was confirmed present in all 15 seeds at that level.
+ */
+const CLASS_SIGNATURE: Readonly<Record<string, Readonly<{ atOne: string | null; later: string }>>> = {
+  barbarian: { atOne: "rage", later: "reckless-attack" },
+  bard: { atOne: "bardic-inspiration", later: "cutting-words" },
+  cleric: { atOne: null, later: "channel-divinity" },
+  druid: { atOne: null, later: "wild-shape" },
+  fighter: { atOne: "second-wind", later: "action-surge" },
+  monk: { atOne: "unarmed-strike", later: "flurry-of-blows" },
+  paladin: { atOne: null, later: "channel-divinity" },
+  ranger: { atOne: "favored-enemy", later: "favored-enemy" },
+  rogue: { atOne: "sneak-attack", later: "uncanny-dodge" },
+  sorcerer: { atOne: "innate-sorcery", later: "sorcery-points" },
+  warlock: { atOne: null, later: "magical-cunning" },
+  wizard: { atOne: "arcane-recovery", later: "arcane-recovery" }
+};
+
+/** Everything on the effective list this character owns RATHER THAN CARRIES - actions and pools, minus the item-derived ones. */
+const ownContent = (actions: readonly ActorDefinition["actions"][number][]): Set<string> => new Set([
+  ...actions.filter((action) => !isItemActionId(action.id)).map((action) => action.id),
+  ...actionPools(actions).map((pool) => pool.id)
+]);
+
 describe("random character generator - the far end", () => {
   it("rolls all twelve classes at levels 1/5/11/20, and each one round-trips through its own ledger", () => {
     expect(CLASS_IDS).toHaveLength(12);
+    // A thirteenth class must name what it owes rather than sliding through unchecked.
+    expect([...CLASS_IDS].sort()).toEqual(Object.keys(CLASS_SIGNATURE).sort());
     const failures: string[] = [];
     for (const classId of CLASS_IDS) {
       for (const level of LEVELS) {
@@ -95,12 +131,15 @@ describe("random character generator - the far end", () => {
           expect(definition.abilityScores[primary], `${classId} L${level} put ${primary.toUpperCase()} at ${definition.abilityScores[primary]}`)
             .toBeGreaterThanOrEqual(15);
 
-          // Playable: something to do on its turn, and at least one way to hurt somebody.
+          // Playable: something to do on its turn, and something its own CLASS gave it.
           const { actions } = assemble(definition);
           const onTurn = actions.filter((action) => action.activation === "action" || action.activation === "bonus-action");
           expect(onTurn.length, `${classId} L${level} has no action to take on its turn`).toBeGreaterThan(0);
-          expect(actions.some((action) => action.attack !== undefined || (action.damage?.length ?? 0) > 0),
-            `${classId} L${level} has no action that can attack or deal damage`).toBe(true);
+          const owed = level === 1 ? CLASS_SIGNATURE[classId].atOne : CLASS_SIGNATURE[classId].later;
+          const own = ownContent(actions);
+          if (owed !== null) {
+            expect(own.has(owed), `${classId} L${level} has no "${owed}" of its own - it holds ${[...own].sort().join(", ") || "nothing"}`).toBe(true);
+          }
         } catch (error) {
           failures.push(`${classId} L${level}: ${(error as Error).message}`);
         }
@@ -158,6 +197,77 @@ describe("random character generator - the far end", () => {
         expect(expertise.length, `${classId} seed ${seed}`).toBeGreaterThan(0);
       }
     }
+  });
+
+  /**
+   * A GENERATED CHARACTER MUST LEVEL UP LIKE A HAND-BUILT ONE, which is the claim `ChoiceOffer.levels`
+   * makes in its own docstring: `level-ledger.ts` matches a stored row to a wizard offer on the tuple
+   * `(level, kind, classId, featureId)`, "so it can prefill a generated character's level-up exactly
+   * as it prefills a hand-built one". It was false as shipped, twice over, and a generated cleric L11
+   * left `feature:cleric-subclass` and `feature:grappler` unfilled while a hand-built one left nothing.
+   */
+  it("stamps every row with the tuple the level-up flow matches on", () => {
+    // The FIRST bug: the subclass row was hand-written without `payload.featureId`, so no offer ever
+    // claimed it. Checked against the offer the build really has rather than against a spelled-out
+    // string, because "<class>-subclass" being the id is the wizard's convention, not a law.
+    const misses: string[] = [];
+    for (const classId of CLASS_IDS) {
+      for (const level of LEVELS) {
+        for (const seed of [1, 7, 11]) {
+          const { request } = generateCharacterRequest({ classId, level }, library, defaultPolicy, seeded(seed));
+          const ledger = buildCharacterDefinition(request, library, defaultPolicy).character!.choices!;
+          for (const offer of computeServerOffers(request, library, defaultPolicy).offers) {
+            for (const [index, id] of offer.taken.entries()) {
+              const want = { level: levelOfPick(offer, index), kind: offer.kind, classId: offer.classId, featureId: offer.featureId };
+              const found = ledger.some((row) => row.id === id
+                && row.level === want.level && row.kind === want.kind
+                && (row.classId ?? null) === want.classId
+                && ((row.payload?.featureId as string | undefined) ?? null) === want.featureId);
+              if (!found) misses.push(`${classId} L${level} s${seed}: no row answers ${JSON.stringify(want)} with "${id}"`);
+            }
+          }
+        }
+      }
+    }
+    expect(misses, misses.slice(0, 8).join("\n")).toEqual([]);
+  });
+
+  it("records a chosen feat's own picks at the ASI that took it, not at the first one", () => {
+    // The SECOND bug: a feat's own picks inherited the whole ASI offer's `levels` array, so
+    // `levelOfPick(offer, 0)` filed them at the FIRST improvement whichever one really took the feat.
+    // Measured on the task's own example - a generated cleric 11 takes Grappler at the level-8 ASI.
+    const cleric = generateCharacterRequest({ classId: "cleric", level: 11 }, library, defaultPolicy, seeded(11)).request;
+    const ledger = buildCharacterDefinition(cleric, library, defaultPolicy).character!.choices!;
+    expect(ledger.find((row) => row.kind === "asi-or-feat" && row.id === "grappler"))
+      .toMatchObject({ level: 8, classId: "cleric" });
+    expect(ledger.find((row) => row.payload?.featureId === "grappler"))
+      .toMatchObject({ level: 8, kind: "ability-score" });
+    // ...and the subclass row the same character used to write bare.
+    expect(ledger.find((row) => row.kind === "subclass"))
+      .toMatchObject({ level: 3, classId: "cleric", id: "life-domain", payload: { featureId: "cleric-subclass" } });
+
+    // The rule, across the sweep: every row a chosen feat's OWN pick wrote sits at that feat's level.
+    // (`ability-score-improvement` is excluded because the class FEATURE shares its id with the
+    // catalog feat, so `payload.featureId` cannot tell one instance's picks from another's.)
+    let checked = 0;
+    const misses: string[] = [];
+    for (const classId of CLASS_IDS) {
+      for (const level of [11, 20] as const) {
+        for (const seed of [1, 7, 11]) {
+          const { request } = generateCharacterRequest({ classId, level }, library, defaultPolicy, seeded(seed));
+          const rows = buildCharacterDefinition(request, library, defaultPolicy).character!.choices!;
+          for (const feat of rows.filter((row) => row.kind === "asi-or-feat" && row.id !== "asi" && row.id !== "ability-score-improvement")) {
+            for (const own of rows.filter((row) => row.payload?.featureId === feat.id)) {
+              checked += 1;
+              if (own.level !== feat.level) misses.push(`${classId} L${level} s${seed}: ${feat.id} taken at ${feat.level}, its ${own.kind} "${own.id}" filed at ${own.level}`);
+            }
+          }
+        }
+      }
+    }
+    // The sweep has to actually reach feats taken at a LATER improvement, or it proves nothing.
+    expect(checked, "the sweep found no chosen feat with picks of its own").toBeGreaterThan(0);
+    expect(misses, misses.slice(0, 8).join("\n")).toEqual([]);
   });
 
   it("refuses when the table has withdrawn the standard array, and says which setting to change", () => {

@@ -180,6 +180,45 @@ Format: `[area] — description — suspected cause / status`.
   rather than all of it. Flattening them to `martial` would have handed a Rogue a greatsword.
   Nothing consumes the qualifier yet, so equipment filtering by proficiency is not enforced.
 
+### Bounded out of the 2026-08-08 built-but-unwired pass (found, measured, not fixed)
+
+Three P1s were fixed there — the builder now mints an action per damaging CANTRIP with `spellId` set
+(so Agonizing Blast reaches a real Warlock), a Monk gets a Martial Arts Unarmed Strike that Extra
+Attack can multiply, and a generated character's ledger prefills a level-up like a hand-built one.
+These are the pieces those fixes deliberately stopped short of, each with the reason it stopped.
+
+- **[character-builder] Only CANTRIPS become actions; a LEVELED spell still has none, so it has no
+  `spells[].actionId`, no `spellId`, and casting it from the sheet is still a client-side damage
+  roll.** The blocker is the slot, and it is measured rather than assumed: an action would have to
+  carry `spellSlot`, and no field on the finished sheet says which slot a spell spends. A **Warlock
+  5's only slots are LEVEL 3** (`pactSlots` replaces the `spellSlots` column outright), so
+  `spellSlot` taken from the spell's own level refuses a level-1 Bane the character may legally cast;
+  and **Ascendant Step's Levitate** is a granted casting the SRD says costs no slot at all, yet on
+  `spells[]` it is indistinguishable from a prepared one (both `alwaysPrepared`). Omitting
+  `spellSlot` instead is worse: it would put a slot-free cast of every leveled spell in the Actions
+  runner. Wants a per-spell "which pool pays for this" field, not a bigger `cantripActionFor`.
+- **[character-builder] Cantrip damage does not scale with character level.** Fire Bolt rolls 1d10 at
+  level 11 where the SRD prints 3d10, and Eldritch Blast fires one beam at 5 where it prints two. The
+  content already carries the rows (`castingOptions` `player_level_5/11/17`, with `damageRoll` and
+  `targetCount`), and **nothing reads them**: the sheet's `spellEffectAt` consults `castingOptions`
+  only when the cast level exceeds the spell's own, which is never true for a cantrip. So the minted
+  action deliberately matches the base die the sheet prints beside it — fixing one without the other
+  puts two different numbers on one row. Fix both together: `spellEffectAt` and `cantripActionFor`.
+- **[character-builder] Martial Arts reaches the Unarmed Strike but not MONK WEAPONS.** "You can roll
+  1d6 in place of the normal damage of your Unarmed Strike **or Monk weapons**" and "Dexterous
+  Attacks" both apply to Simple Melee and Light Martial Melee weapons too. Measured on a real
+  generated Monk 5 (DEX 15 / STR 12): `Quarterstaff +4 (1d6+1)` — Strength, and the printed 1d8
+  nowhere. The strike could be minted by the builder because the builder holds both the printed
+  column and the finished scores; a weapon swing is derived at READ time by `deriveEquipment`, which
+  holds no class table and so cannot know the die. Wants the die on the definition (or the class row
+  reachable from the derivation), not a hard-coded "if monk" in `weaponAbilityModifier`.
+- **[rules-engine] Flurry of Blows grants no swings.** Its two Unarmed Strikes now name something the
+  engine can roll, but nothing grants them: `ActionSchema.multiattack` is the field that would, and
+  `evaluateActionEconomy` opens a component instance only for an `activation: "action"` on the
+  bearer's own turn. Declaring `multiattack` on a bonus action would look wired and hand out nothing,
+  which is worse than the prose. The GM adjudicates it today through the rules dial like any other
+  unmodelled economy call. Wants a bonus-action component pool.
+
 ### Deferred by the 2026-07-27 readiness pass (found, scoped, not fixed)
 
 The polish pass was bounded to small/medium lift; these were found by it and left, each for a stated

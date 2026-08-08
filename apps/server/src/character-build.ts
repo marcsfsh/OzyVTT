@@ -131,8 +131,14 @@ export type ChoiceOffer = {
    * `(level, kind, classId, featureId)`) can prefill a generated character's level-up exactly as it
    * prefills a hand-built one. The wizard's own convention is mirrored: species, background and the
    * two class proficiency lists are level 1; a class feature takes its grant level; a subclass
-   * feature takes `feature.level ?? subclassLevel`; a chosen feat's own picks inherit the offer that
-   * took the feat.
+   * feature takes `feature.level ?? subclassLevel`; a chosen feat's own picks take THE ONE GRANT
+   * that took the feat (`stepOfPick`).
+   *
+   * That last clause used to read "inherit the offer that took the feat", meaning the whole array -
+   * and the claim above was false because of it: `levelOfPick` resolves index 0 of an inherited
+   * `[4, 8, 12, 16]`, so a Grappler taken at the level-8 ASI wrote its ability-score row at level 4
+   * and the level-up wizard re-asked for it. The docstring is the specification; where it and the
+   * code disagreed, the code was the defect.
    */
   levels: readonly number[];
   /** The class a pick belongs to, or null for species/background/origin decisions - the wizard's `classId` on the row. */
@@ -1114,6 +1120,23 @@ function surveyBuild(input: CharacterCreateRequestInput, library: ContentView, p
     return offer;
   };
 
+  /**
+   * WHERE THE ROW `matchRow` JUST TOOK ACTUALLY SITS - ONE grant, not the offer's whole list.
+   *
+   * A feature granted at 4/8/12/16 is ONE offer here with `levels: [4, 8, 12, 16]`, and handing that
+   * whole array to a second-order offer said "this pick belongs to all four levels at once".
+   * `levelOfPick` then resolves index 0 of it, so a Grappler taken at the level-8 ASI wrote its
+   * ability-score row at level 4 - and `level-ledger.ts`, which matches on `(level, kind, classId,
+   * featureId)`, never prefilled it. The wizard has no such problem: it mints one offer PER ASI level.
+   *
+   * `matchRow` has already pushed this row, so its index in the offer is `taken.length - 1` - the
+   * same index `rowFor` stamps the row itself with. Both writers emit their rows in grant order
+   * (the generator answers the offer's outstanding picks in index order; `buildChoiceRows` walks the
+   * wizard's per-level offers in level order), so index and level agree by construction.
+   */
+  const stepOfPick = (offer: ChoiceOffer): OfferStep =>
+    ({ levels: [levelOfPick(offer, Math.max(0, offer.taken.length - 1))], classId: offer.classId });
+
   // Pass A: feat selections. "asi" is the built-in shorthand (payload.increases) that stays legal
   // even while the catalog's own Ability Score Improvement feat is the richer path.
   const FEAT_KINDS = new Set(["feat", "fighting-style", "asi-or-feat"]);
@@ -1139,7 +1162,7 @@ function surveyBuild(input: CharacterCreateRequestInput, library: ContentView, p
     if (inlineOption) {
       const asFeature = optionAsFeature(inlineOption);
       granted.push({ record: asFeature, count: 1, origin: matched.featureId ? { kind: "option", sourceId: matched.featureId } : null });
-      featureOffer(asFeature, 1, matched.featureId ? [matched.featureId] : [], { levels: matched.levels, classId: matched.classId });
+      featureOffer(asFeature, 1, matched.featureId ? [matched.featureId] : [], stepOfPick(matched));
       chosenInlineStyles.push(asFeature);
       continue;
     }
@@ -1155,7 +1178,7 @@ function surveyBuild(input: CharacterCreateRequestInput, library: ContentView, p
     }
     heldFeatIds.add(feat.id);
     chosenFeats.push(feat);
-    chosenFeatSteps.push({ levels: matched.levels, classId: matched.classId });
+    chosenFeatSteps.push(stepOfPick(matched));
   }
   // The chosen feats' features join the granted set: their own choices become offers for pass B,
   // and their riders/prose interpret exactly like any class or species feature.
@@ -1184,7 +1207,7 @@ function surveyBuild(input: CharacterCreateRequestInput, library: ContentView, p
     // keyed under the PARENT feature's id, which is where the catalog indexes it.
     granted.push({ record: asFeature, count: 1, origin: offer.featureId ? { kind: "option", sourceId: offer.featureId } : null });
     // The option's own pick is keyed on the option id, with the parent feature id as an accepted alias.
-    featureOffer(asFeature, 1, offer.featureId ? [offer.featureId] : [], { levels: offer.levels, classId: offer.classId });
+    featureOffer(asFeature, 1, offer.featureId ? [offer.featureId] : [], stepOfPick(offer));
     chosenOptionFeatures.push(asFeature);
   }
   // Folded AFTER the loop, not inside it, so one option raising another option's pick does not depend
