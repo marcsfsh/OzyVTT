@@ -116,6 +116,8 @@ type ChoiceOffer = {
   unresolvable: string | null;
   repeatable: boolean;
   maxSpellLevel: number | null;
+  /** FLOOR on an option's spell level. Mystic Arcanum is "one level 6 spell", not "6 or lower"; both bounds set to 6 make it exact. */
+  minSpellLevel: number | null;
   /** The ceiling an ability-score pick from this offer may reach; null = the SRD's 20 (epic boons say 30). */
   maximum: number | null;
   label: string;
@@ -123,8 +125,22 @@ type ChoiceOffer = {
 };
 
 function offerOf(partial: Pick<ChoiceOffer, "key" | "kind" | "capacity" | "options" | "label"> & Partial<ChoiceOffer>): ChoiceOffer {
-  return { featureId: null, featureAliases: [], optionLevels: null, optionRecords: null, unresolvable: null, maxSpellLevel: null, maximum: null, repeatable: false, taken: [], ...partial };
+  return { featureId: null, featureAliases: [], optionLevels: null, optionRecords: null, unresolvable: null, maxSpellLevel: null, minSpellLevel: null, maximum: null, repeatable: false, taken: [], ...partial };
 }
+
+/**
+ * IS THIS OPTION INSIDE THE OFFER'S SPELL-LEVEL WINDOW - a ceiling, a floor, or both.
+ *
+ * `maxSpellLevel` alone let a level-11 Warlock spend a level-6 Mystic Arcanum on a cantrip, because
+ * "choose one level 6 Warlock spell" was only ever expressible as "level 6 or lower". Both bounds set
+ * to the same number make the pick exact. An option with no known level reads as 0, exactly as the
+ * ceiling has always treated it.
+ */
+const withinSpellWindow = (offer: Pick<ChoiceOffer, "optionLevels" | "maxSpellLevel" | "minSpellLevel">, id: string): boolean => {
+  const level = offer.optionLevels?.get(id) ?? 0;
+  return (offer.maxSpellLevel === null || level <= offer.maxSpellLevel)
+    && (offer.minSpellLevel === null || level >= offer.minSpellLevel);
+};
 
 /**
  * EVERY PICK BUDGET AN `extraPicks` GRANT MAY NAME BY A FIXED KEY - the eight that are not a
@@ -194,7 +210,6 @@ type InterpretedFeatures = {
   damageImmunities: string[];
   conditionImmunities: string[];
   grantedSpells: Array<{ id: string; level: number | undefined; alwaysPrepared: boolean; ability: Ability | undefined }>;
-  abilityIncreases: Array<{ ability: Ability; amount: number; maximum: number | undefined }>;
   hitPointsPerLevel: number;
   speedBonus: number;
   armorClassBonus: number;
@@ -360,7 +375,12 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
   }
   for (const modifier of feature.modifiers) {
     switch (modifier.type) {
-      case "ability-score": into.abilityIncreases.push({ ability: modifier.ability, amount: modifier.amount, maximum: modifier.maximum }); break;
+      // ALREADY APPLIED, in step 5c, before this loop was allowed to run - and it has to be, because
+      // the `interpretAction` call above this switch has already read `context.finalScores` to derive
+      // this very feature's save DC. Collecting it here for a later fold is what made a level-20
+      // capstone invisible to the DC it raises. Left as an explicit no-op case rather than deleted:
+      // the switch is the partition's own record of who owns each of the eight baked variants.
+      case "ability-score": break;
       case "hit-points-per-level": into.hitPointsPerLevel += modifier.amount; break;
       case "speed": into.speedBonus += modifier.amount; break;
       // The Defense fighting style is "+1 AC WHILE you're wearing armor", so an `armor-class` rider
@@ -604,8 +624,24 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // Initiate's cantrips, Skilled's skills) - those second-order offers must exist before pass B
   // matches the remaining rows.
   const offers: ChoiceOffer[] = [];
-  const listOffer = (key: NamedPickBudget, kind: string, label: string, list: { choose: number; from: readonly string[] } | undefined) => {
-    if (list && list.choose > 0) offers.push(offerOf({ key, kind, capacity: list.choose, options: new Set(list.from), label }));
+  const listOffer = (key: NamedPickBudget, kind: string, label: string, list: { choose: number; from: readonly string[]; fromCatalog?: string } | undefined) => {
+    if (!list || list.choose <= 0) return;
+    // A "choose N" LIST may draw on an open catalog too, exactly as a feature's choice may - the
+    // species language budget every character is owed ("Common plus two languages from the Standard
+    // Languages table") is nineteen ids nobody should copy onto nine species records. Resolved
+    // through the SAME `resolveCatalogChoice` the wizard renders with, and a gap in the catalog half
+    // defers the pick with the resolver's own message rather than accepting anything silently.
+    const options = new Set(list.from);
+    let unresolvable: string | null = null;
+    if (list.fromCatalog) {
+      try {
+        for (const option of resolveCatalogChoice(list.fromCatalog, catalogs)) options.add(option.id);
+      } catch (error) {
+        if (!(error instanceof CatalogChoiceError)) throw error;
+        if (options.size === 0) unresolvable = error.message;
+      }
+    }
+    offers.push(offerOf({ key, kind, capacity: list.choose, options, unresolvable, label }));
   };
   listOffer("class-skills", "skill", `${classRecord.name} skills`, classRecord.skillChoices);
   listOffer("class-tools", "tool", `${classRecord.name} tools`, classRecord.toolChoices);
@@ -670,7 +706,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       key: index === 0 ? `feature:${record.id}` : `feature:${record.id}/${index + 1}`,
       featureId: record.id, featureAliases, kind: choice.kind, capacity: choice.choose * count,
       options, optionLevels, optionRecords: choice.options ?? null, unresolvable, repeatable: choice.repeatable,
-      maxSpellLevel: choice.maxSpellLevel ?? null, maximum: choice.maximum ?? null, label: record.name
+      maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null, maximum: choice.maximum ?? null, label: record.name
     }));
   };
   for (const { record, count } of granted) featureOffer(record, count);
@@ -717,13 +753,19 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     if (scoped.length === 0) reject(featureTag ? `No feature "${featureTag}" offers a "${row.kind}" choice.` : `Nothing in this build offers a "${row.kind}" choice.`);
     const gap = scoped.find((offer) => offer.unresolvable !== null);
     if (gap && !scoped.some((offer) => offer.options.has(row.id))) reject(`This build needs "${gap.label}" resolved, but ${gap.unresolvable}`);
-    const overLevel = scoped.find((offer) => offer.options.has(row.id) && offer.maxSpellLevel !== null && (offer.optionLevels?.get(row.id) ?? 0) > offer.maxSpellLevel);
-    if (overLevel && !scoped.some((offer) => offer.options.has(row.id) && (offer.maxSpellLevel === null || (offer.optionLevels?.get(row.id) ?? 0) <= offer.maxSpellLevel))) {
-      reject(`"${row.id}" is level ${overLevel.optionLevels?.get(row.id)}, above the maximum spell level (${overLevel.maxSpellLevel}) for "${overLevel.label}".`);
+    // OUT OF THE SPELL-LEVEL WINDOW, and no sibling offer would take it either: say which bound and by
+    // how much. The floor is what makes Mystic Arcanum exact ("a level 6 Warlock spell"); before it,
+    // an eleventh-level Warlock could spend the level-6 arcanum on Eldritch Blast.
+    const outOfWindow = scoped.find((offer) => offer.options.has(row.id) && !withinSpellWindow(offer, row.id));
+    if (outOfWindow && !scoped.some((offer) => offer.options.has(row.id) && withinSpellWindow(offer, row.id))) {
+      const level = outOfWindow.optionLevels?.get(row.id) ?? 0;
+      reject(outOfWindow.minSpellLevel !== null && level < outOfWindow.minSpellLevel
+        ? `"${row.id}" is level ${level}, below the minimum spell level (${outOfWindow.minSpellLevel}) for "${outOfWindow.label}".`
+        : `"${row.id}" is level ${level}, above the maximum spell level (${outOfWindow.maxSpellLevel}) for "${outOfWindow.label}".`);
     }
     const offer = scoped.find((candidate) =>
       candidate.options.has(row.id)
-      && (candidate.maxSpellLevel === null || (candidate.optionLevels?.get(row.id) ?? 0) <= candidate.maxSpellLevel)
+      && withinSpellWindow(candidate, row.id)
       && candidate.taken.length < candidate.capacity
       && (candidate.repeatable || !candidate.taken.includes(row.id)));
     if (!offer) {
@@ -902,6 +944,29 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     // `requires` slugs beyond level/ability minimums are prose-adjudicated (ADR-0008 fail-open).
   }
 
+  /**
+   * ---- 5c. Feature `ability-score` riders, BEFORE any feature is interpreted. ----
+   *
+   * ORDER IS THE WHOLE POINT, and getting it wrong was a real wrong number on a real sheet.
+   * `interpretAction` derives every attack bonus and save DC from `context.finalScores` AT THE MOMENT
+   * `interpretFeature` runs (see the `save.dc.ability` branch). This fold used to happen after that
+   * loop, so a capstone that raises the very ability one of the character's own DCs is derived from
+   * was invisible to it. Measured, at level 20, on the two features where it bites:
+   *
+   *   - Barbarian: Primal Champion (+4 STR/CON) -> Intimidating Presence read DC 19; SRD says 21.
+   *   - Monk: Body and Mind (+4 DEX/WIS)        -> Stunning Strike read DC 18; SRD says 20.
+   *
+   * Same `granted` list, same `feature.modifiers`, same `maximum` clamp (the epic boons' 30,
+   * everything else's 20) - this is the IDENTICAL fold, moved early enough to be read. Relative order
+   * against step 5's ASI and choice-driven increases is unchanged: those still land first.
+   */
+  for (const { record } of granted) {
+    for (const modifier of record.modifiers) {
+      if (modifier.type !== "ability-score") continue;
+      finalScores[modifier.ability] = Math.min(modifier.maximum ?? 20, finalScores[modifier.ability] + modifier.amount);
+    }
+  }
+
   // ---- 6. Interpret every granted feature (class, subclass, species, background, chosen feats). ----
   // This fold owns 8 of the 21 rider variants; the other 13 are roll-time and reach the table as
   // RIDER CARRIERS (see `CARRIER_RIDER_DISPOSITION`). A feat gets there because `character.feats`
@@ -913,7 +978,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const interpreted: InterpretedFeatures = {
     actions: [], traits: [], grantedSkills: [], grantedExpertise: [], grantedTools: [], grantedLanguages: [],
     grantedArmor: [], grantedWeapons: [], grantedSaves: [], damageResistances: [], damageImmunities: [],
-    conditionImmunities: [], grantedSpells: [], abilityIncreases: [], hitPointsPerLevel: 0, speedBonus: 0,
+    conditionImmunities: [], grantedSpells: [], hitPointsPerLevel: 0, speedBonus: 0,
     armorClassBonus: 0, armorClassBonusWhileArmored: 0, initiativeBonus: 0, extraAttacks: 0, unarmoredDefense: null
   };
   for (const { record } of granted) interpretFeature(record, interpreted, context);
@@ -930,9 +995,6 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
    * offers) and a carrier per duplicate would apply its riders twice.
    */
   const heldFeatures = dedupeFeatureRefs(granted);
-  for (const increase of interpreted.abilityIncreases) {
-    finalScores[increase.ability] = Math.min(increase.maximum ?? 20, finalScores[increase.ability] + increase.amount);
-  }
 
   // ---- 7. Hit points: rules-5e pool math; "entries" applies the product default max(roll, average). ----
   const conModifier = abilityModifier(finalScores.con);

@@ -83,6 +83,8 @@ const barbarianInput = (level = 20): MutableInput => ({
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
     { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
     // THE THIRD one only exists because Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
@@ -109,6 +111,8 @@ const fighterInput = (level: number): MutableInput => ({
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
@@ -138,6 +142,8 @@ const monkInput = (level: number): MutableInput => ({
   backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
     { level: 1, classId: "monk", kind: "skill", id: "insight" },
     ...(level >= 3 ? ([{ level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" }] as Row[]) : []),
@@ -363,6 +369,23 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
     const later = onTheTable(build(barbarianInput(17)), { fight: false });
     expect(actionOf(later, "intimidating-presence").save).toEqual({ ability: "wis", dc: 19 });
   });
+
+  it("counts PRIMAL CHAMPION's +4 - the capstone the DC used to be computed before", () => {
+    // THE ORDERING BUG, at the only level it can be seen. Primal Champion is a level-20 `ability-score`
+    // rider (+4 Str/Con, ceiling 25), and the builder used to fold every such rider AFTER
+    // `interpretFeature` had already derived this feature's DC from `context.finalScores`.
+    //
+    // The tell was that the sheet contradicted itself: `abilityScores.str` read 24 on the same
+    // definition whose Intimidating Presence said DC 19 - a DC that can only come from Str 20. Both
+    // halves are asserted here, so the two can never drift apart again.
+    //
+    // Str 20 at level 16, +4 from the capstone = 24 (+7); proficiency 6. 8 + 7 + 6 = 21.
+    const capstone = onTheTable(build(barbarianInput(20)));
+    expect(capstone.definition.abilityScores.str).toBe(24);
+    expect(actionOf(capstone, "intimidating-presence").save).toEqual({ ability: "wis", dc: 21 });
+    // Far end: the number the TARGET is actually held to, not just the one printed on the sheet.
+    expect(use(capstone, "intimidating-presence", [IDS.foe]).save).toMatchObject({ ability: "wis", dc: 21 });
+  });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -466,6 +489,18 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
     const resolution = use(built, "stunning-strike", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "con", dc: 15 });
     expect(built.hero.actionUses["focus-points"]).toBe(1);
+  });
+
+  it("counts BODY AND MIND's +4 - the same ordering bug, one class over", () => {
+    // The Monk's half of the level-20 capstone bug. Body and Mind is +4 Dex/Wis (ceiling 25) and
+    // Stunning Strike's DC is derived from Wisdom, so the two meet on exactly this sheet.
+    //
+    // Wis 20 by level 19 (16 at L8, 17 at L12, 19 at L16, 20 from Boon of the Night Spirit), +4 from
+    // the capstone = 24 (+7); proficiency 6. 8 + 7 + 6 = 21. It read 19 before the fold moved.
+    const capstone = onTheTable(build(monkInput(20)));
+    expect(capstone.definition.abilityScores.wis).toBe(24);
+    expect(actionOf(capstone, "stunning-strike").save).toEqual({ ability: "con", dc: 21 });
+    expect(use(capstone, "stunning-strike", [IDS.foe]).save).toMatchObject({ ability: "con", dc: 21 });
   });
 });
 
