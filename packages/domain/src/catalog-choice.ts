@@ -1,6 +1,6 @@
 import type {
-  ContentClassSummary, ContentEquipmentSummary, ContentFeatSummary, ContentSkillSummary,
-  ContentSpeciesSummary, ContentSpellSummary, ContentSubclassSummary
+  ContentClassSummary, ContentEquipmentSummary, ContentFeatSummary, ContentLanguageSummary,
+  ContentSkillSummary, ContentSpeciesSummary, ContentSpellSummary, ContentSubclassSummary
 } from "./index.js";
 
 /**
@@ -17,6 +17,12 @@ import type {
  *
  *   - `skills`               -> every skill in the skills catalog.
  *   - `weapons`              -> every weapon in the equipment catalog (Weapon Mastery-style picks).
+ *   - `tools`                -> every tool in the equipment catalog (Skilled's "skills or tools" half).
+ *   - `languages`            -> every language in the languages catalog.
+ *   - `<table>-languages`    -> languages printed in one SRD table ("standard-languages",
+ *                               "rare-languages"). The base "Common plus two languages" budget draws
+ *                               from `standard`; `druidic` and `thieves-cant` are `rare` and arrive
+ *                               as grants, never as a level-1 pick.
  *   - `<listId>-spells`      -> spells whose `classes` includes `<listId>` ("wizard-spells" -> the
  *                               Wizard list). `<listId>` is the class's `spellcasting.spellListId`
  *                               (an open slug, so a homebrew list works unchanged).
@@ -24,7 +30,17 @@ import type {
  *   - `<category>-feats`     -> feats whose `category` is `<category>` ("origin-feats",
  *                               "general-feats", "fighting-style-feats", "epic-boon-feats", ...).
  *   - `<speciesId>-lineages` -> the named species' lineages ("elf-lineages").
+ *   - `<a>-or-<b>[-or-<c>]`  -> the UNION of the named families, in order, first name winning a
+ *                               duplicate id. The one COMBINATOR in the grammar, and it exists
+ *                               because two SRD records say exactly this: Skilled's "any combination
+ *                               of three skills or tools" (`skills-or-tools`) and Magical
+ *                               Discoveries' "the Cleric, Druid, or Wizard spell list"
+ *                               (`cleric-spells-or-druid-spells-or-wizard-spells`). A part that is
+ *                               itself a content gap contributes NOTHING rather than taking the whole
+ *                               union down - the same call `from` + `fromCatalog` already makes - but
+ *                               a union that resolves to nothing overall still throws.
  *
+
  * An unresolvable slug - unknown family, unknown id, or a family that resolves to ZERO options (a
  * content gap the player would otherwise hit as a silently empty picker) - throws
  * `CatalogChoiceError`. Never return a silent empty list: a wizard step with no data path must say
@@ -43,6 +59,7 @@ export type CatalogChoiceCatalogs = Readonly<{
   spells: readonly ContentSpellSummary[];
   equipment: readonly ContentEquipmentSummary[];
   skills: readonly ContentSkillSummary[];
+  languages: readonly ContentLanguageSummary[];
 }>;
 
 /** A `fromCatalog` slug that could not be resolved to a non-empty option list. */
@@ -63,6 +80,23 @@ function nonEmpty(slug: string, options: CatalogChoiceOption[], emptyMessage: st
  * unresolvable - see the module doc for the slug grammar. Pure: same inputs, same options, no I/O.
  */
 export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalogs): CatalogChoiceOption[] {
+  // THE UNION COMBINATOR, checked first so a composite never falls through to a suffix family. Parts
+  // are resolved left to right and de-duplicated by id, so an option in two lists keeps the name the
+  // FIRST list gave it. Split on the whole "-or-" token, which no family id contains.
+  if (slug.includes("-or-")) {
+    const parts = slug.split("-or-");
+    if (parts.every((part) => part.length > 0)) {
+      const seen = new Set<string>();
+      const union: CatalogChoiceOption[] = [];
+      for (const part of parts) {
+        let resolved: CatalogChoiceOption[];
+        try { resolved = resolveCatalogChoice(part, catalogs); }
+        catch (error) { if (error instanceof CatalogChoiceError) continue; throw error; }
+        for (const option of resolved) if (!seen.has(option.id)) { seen.add(option.id); union.push(option); }
+      }
+      return nonEmpty(slug, union, `None of ${parts.map((part) => `"${part}"`).join(", ")} resolved to any option.`);
+    }
+  }
   if (slug === "skills") {
     return nonEmpty(slug, catalogs.skills.map((skill) => ({ id: skill.id, name: skill.name })), "The skills catalog is empty.");
   }
@@ -71,6 +105,32 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       slug,
       catalogs.equipment.filter((item) => item.category === "weapon").map((item) => ({ id: item.id, name: item.name })),
       "The equipment catalog has no weapons."
+    );
+  }
+  // TOOLS - the same read `weapons` makes, one column over. `equipment` already carries all 35 SRD
+  // tools (`category: "tool"`), so Skilled's "any combination of three skills or tools" needed a
+  // family, never a new bundle: the ids the wizard offers are the ids `grants.tools` already names.
+  if (slug === "tools") {
+    return nonEmpty(
+      slug,
+      catalogs.equipment.filter((item) => item.category === "tool").map((item) => ({ id: item.id, name: item.name })),
+      "The equipment catalog has no tools."
+    );
+  }
+  if (slug === "languages") {
+    return nonEmpty(slug, catalogs.languages.map((entry) => ({ id: entry.id, name: entry.name })), "The languages catalog is empty.");
+  }
+  // ONE SRD TABLE of languages. The base budget every character is owed reads "Common plus two
+  // languages ... from the Standard Languages table", so the narrowing is part of the promise and not
+  // a nicety: offering Druidic or Thieves' Cant at level 1 would hand out a secret language the SRD
+  // gives only through a class feature. Checked BEFORE `-spells` etc. because `-languages` is its own
+  // suffix; the plain `languages` slug above is matched first so it never falls in here with an empty table.
+  if (slug.endsWith("-languages")) {
+    const table = slug.slice(0, -"-languages".length);
+    return nonEmpty(
+      slug,
+      catalogs.languages.filter((entry) => entry.table === table).map((entry) => ({ id: entry.id, name: entry.name })),
+      `No languages are printed in the "${table}" table.`
     );
   }
   if (slug.endsWith("-spells")) {
@@ -108,5 +168,5 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       `"${species.name}" has no lineages authored.`
     );
   }
-  throw new CatalogChoiceError(slug, `The catalog slug "${slug}" matches no known family (skills, weapons, *-spells, *-subclasses, *-feats, *-lineages).`);
+  throw new CatalogChoiceError(slug, `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, *-languages, *-spells, *-subclasses, *-feats, *-lineages).`);
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
   CatalogChoiceCatalogs, ContentBackgroundSummary, ContentClassSummary, ContentFeatSummary,
-  ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSubclassSummary
+  ContentLanguageSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSubclassSummary
 } from "@vtt/domain";
 import { useEquipmentReference } from "../encounter/equipment";
 import { useSpellReference } from "../encounter/spells";
@@ -85,6 +85,7 @@ const backgrounds = makeCatalog<ContentBackgroundSummary>((done) => socket.emit(
 const feats = makeCatalog<ContentFeatSummary>((done) => socket.emit("content:feats", {}, (result) => done(result.feats, result.attribution)));
 const names = makeCatalog<ContentNameBundle>((done) => socket.emit("content:names", {}, (result) => done(result.names, result.attribution)));
 const skills = makeCatalog<ContentSkillSummary>((done) => socket.emit("content:skills", {}, (result) => done(result.skills, result.attribution)));
+const languages = makeCatalog<ContentLanguageSummary>((done) => socket.emit("content:languages", {}, (result) => done(result.languages, result.attribution)));
 
 export const useClassCatalog = classes.useCatalog;
 export const useSubclassCatalog = subclasses.useCatalog;
@@ -99,6 +100,13 @@ export const useNameCatalog = names.useCatalog;
  * governing ability now come from data, per architecture principle 3.
  */
 export const useSkillCatalog = skills.useCatalog;
+
+/**
+ * The language catalog, each row carrying the SRD table it is printed in. Without it the species
+ * step's "Common plus two languages" budget resolves to nothing and the wizard cannot be finished -
+ * which is exactly the state every character was built in before the catalog existed.
+ */
+export const useLanguageCatalog = languages.useCatalog;
 
 export type BuilderCatalogs = Readonly<{
   /** Exactly the shape `resolveCatalogChoice` reads - the SAME resolver the server validates with. */
@@ -124,6 +132,7 @@ export function useBuilderCatalogs(): BuilderCatalogs {
   const backgroundRead = useBackgroundCatalog();
   const featRead = useFeatCatalog();
   const skillRead = useSkillCatalog();
+  const languageRead = useLanguageCatalog();
   const nameRead = useNameCatalog();
   const spells = useSpellReference();
   const equipment = useEquipmentReference();
@@ -137,7 +146,7 @@ export function useBuilderCatalogs(): BuilderCatalogs {
    * changes and not when the render does. This is a correctness fix, not a measurable speed-up.
    */
   return useMemo(() => {
-    const reads = [classRead, subclassRead, speciesRead, backgroundRead, featRead, skillRead, nameRead];
+    const reads = [classRead, subclassRead, speciesRead, backgroundRead, featRead, skillRead, languageRead, nameRead];
     const attributions = [...new Set([...reads.map((read) => read.attribution), equipment.attribution].filter((line): line is string => typeof line === "string" && line.length > 0))];
     return {
       choice: {
@@ -147,7 +156,8 @@ export function useBuilderCatalogs(): BuilderCatalogs {
         feats: featRead.items,
         spells,
         equipment: equipment.catalog,
-        skills: skillRead.items
+        skills: skillRead.items,
+        languages: languageRead.items
       },
       backgrounds: backgroundRead.items,
       names: nameRead.items,
@@ -157,9 +167,9 @@ export function useBuilderCatalogs(): BuilderCatalogs {
     // The lists and the attribution lines ARE the value: `loaded` flips exactly when a list identity
     // does (a miss is never cached, line 40), so it needs no key of its own.
   }, [
-    classRead.items, subclassRead.items, speciesRead.items, backgroundRead.items, featRead.items, skillRead.items, nameRead.items,
+    classRead.items, subclassRead.items, speciesRead.items, backgroundRead.items, featRead.items, skillRead.items, languageRead.items, nameRead.items,
     spells, equipment.catalog,
     classRead.attribution, subclassRead.attribution, speciesRead.attribution, backgroundRead.attribution,
-    featRead.attribution, skillRead.attribution, nameRead.attribution, equipment.attribution
+    featRead.attribution, skillRead.attribution, languageRead.attribution, nameRead.attribution, equipment.attribution
   ]);
 }

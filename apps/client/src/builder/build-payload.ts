@@ -1,8 +1,8 @@
 import {
   CatalogChoiceError, extraPickAmount, resolveCatalogChoice,
   type BuilderAbilityMethod, type BuilderPolicy, type CatalogChoiceOption, type ContentBackgroundSummary,
-  type ContentClassSummary, type ContentExtraPickSummary, type ContentFeatSummary, type ContentFeatureSummary,
-  type ContentSpeciesSummary, type ContentSubclassSummary
+  type ContentChoiceList, type ContentClassSummary, type ContentExtraPickSummary, type ContentFeatSummary,
+  type ContentFeatureSummary, type ContentSpeciesSummary, type ContentSubclassSummary
 } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import {
@@ -343,13 +343,29 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
         : kind === "ability-score" ? (ABILITIES.includes(id as Ability) ? ABILITY_LABELS[id as Ability] : titleize(id))
           : titleize(id);
 
-  const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: { choose: number; from: readonly string[] } | null | undefined, classId: string | null) => {
+  const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: ContentChoiceList | { choose: number; from: readonly string[]; fromCatalog?: string | null } | null | undefined, classId: string | null) => {
     if (!list || list.choose <= 0) return;
     const offerKey = uniqueKey(key);
-    const options = optionsOfIds(list.from, nameOfKind(kind));
+    // A "choose N" LIST may name an open catalog too, exactly as a feature's choice may. The species
+    // language budget ("Common plus two languages from the Standard Languages table") is nineteen ids
+    // that would otherwise be copied onto all nine species; `fromCatalog` keeps one source of truth,
+    // resolved through the SAME function the server validates the submitted row with.
+    const named = optionsOfIds(list.from, nameOfKind(kind));
+    let options = named;
+    let unresolvable: string | null = null;
+    if (list.fromCatalog) {
+      try {
+        const catalog = resolveCatalogChoice(list.fromCatalog, catalogs.choice);
+        const inline = new Set(named.map((option) => option.id));
+        options = [...named, ...catalog.filter((option) => !inline.has(option.id))];
+      } catch (error) {
+        if (!(error instanceof CatalogChoiceError)) throw error;
+        if (named.length === 0) unresolvable = error.message;
+      }
+    }
     offers.push({
       key: offerKey, step, featureId: null, kind, label, help: null, capacity: list.choose,
-      options, maxSpellLevel: null, level: 1, classId, unresolvable: null,
+      options, maxSpellLevel: null, level: 1, classId, unresolvable,
       unavailable: unavailableOf(kind, options)
     });
     recordHeld(offerKey, kind, label);
@@ -376,13 +392,17 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   ) => {
     if (choice.choose <= 0) return;
     const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind));
-    // A `maxSpellLevel` ceiling is a hard filter (Evocation Savant is level 2 and under), and the
-    // two spell kinds do not overlap: "cantrip" means level 0, "spell" means 1+. Offering a cantrip
-    // under a "spell" pick would record it at the wrong level on the sheet.
+    // A `maxSpellLevel` ceiling is a hard filter (Evocation Savant is level 2 and under), `minSpellLevel`
+    // is its floor (Mystic Arcanum is EXACTLY a level-6 spell, not "6 or lower"), and the two spell
+    // kinds do not overlap: "cantrip" means level 0, "spell" means 1+. Offering a cantrip under a
+    // "spell" pick would record it at the wrong level on the sheet. The same window the server's
+    // `withinSpellWindow` enforces - offering outside it refuses the build at Create.
     const ceiling = choice.maxSpellLevel;
+    const floor = choice.minSpellLevel;
     const filtered = options.filter((option) => {
       const spellLevel = option.level;
       if (ceiling != null && (spellLevel ?? 0) > ceiling) return false;
+      if (floor != null && (spellLevel ?? 0) < floor) return false;
       if (spellLevel == null) return true;
       if (choice.kind === "cantrip") return spellLevel === 0;
       if (choice.kind === "spell") return spellLevel >= 1;

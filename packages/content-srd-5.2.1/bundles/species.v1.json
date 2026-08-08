@@ -15,6 +15,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "dragonborn-draconic-ancestry",
@@ -816,6 +820,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "dwarf-darkvision",
@@ -889,6 +897,10 @@
       "common",
       "elvish"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "elf-darkvision",
@@ -1013,6 +1025,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "gnome-darkvision",
@@ -1132,6 +1148,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "goliath-giant-ancestry",
@@ -1335,6 +1355,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "halfling-brave",
@@ -1376,6 +1400,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "human-resourceful",
@@ -1421,6 +1449,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "orc-adrenaline-rush",
@@ -1482,6 +1514,10 @@
     "languages": [
       "common"
     ],
+    "languageChoices": {
+      "choose": 2,
+      "fromCatalog": "standard-languages"
+    },
     "traits": [
       {
         "id": "tiefling-darkvision",

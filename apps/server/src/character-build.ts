@@ -216,7 +216,6 @@ type InterpretedFeatures = {
   /** Flat AC that only applies while body armor is worn (the Defense fighting style's "+1 while you wear armor"). */
   armorClassBonusWhileArmored: number;
   initiativeBonus: number;
-  extraAttacks: number;
   unarmoredDefense: { ability: Ability; allowShield: boolean } | null;
 };
 
@@ -239,12 +238,12 @@ type CarrierRiderType = Exclude<FeatureModifier["type"], (typeof BUILDER_BAKED_M
  * requires a key for EVERY member of `CarrierRiderType`, so adding a 22nd variant to
  * `FeatureModifierSchema` without deciding who reads it stops this file compiling.
  *
- * These thirteen are NOT folded into the definition, because a build-time number cannot express them:
+ * These fourteen are NOT folded into the definition, because a build-time number cannot express them:
  * `roll-mode` is advantage at a moment, `critical-range` is a threshold the attack path reads,
  * `extra-damage` is dice rolled on a hit, `spell-slot`/`resource-bonus` are live maxima. They reach
  * the table as RIDER CARRIERS instead - `deriveEquipment` turns the character's `character.feats`
  * into carriers with no `sourceItemId`, and the same `collectRiders` that serves a magic item serves
- * them. That is why `interpretFeature` does not grow thirteen new cases.
+ * them. That is why `interpretFeature` does not grow fourteen new cases.
  *
  * The value records where each is actually consumed, so an authored rider that reaches nothing is a
  * KNOWN gap rather than a surprise. `"unread"` means the vocabulary and the collector carry it but no
@@ -258,6 +257,11 @@ const CARRIER_RIDER_DISPOSITION: Readonly<Record<CarrierRiderType, "standing" | 
   "resource-bonus": "standing",      // effective-actions usesBonus raises uses.limit
   "critical-range": "standing",      // effective-actions criticalThreshold
   "critical-bonus-dice": "standing", // effective-actions folds it into attack.criticalBonusDice
+  // MOVED HERE FROM THE BAKED HALF, and the move is the fix. Baking raised `attack.count` on the
+  // actions a FEATURE declares; the five classes that get Extra Attack declare none, so it reached
+  // nothing at all. `withStandingRiders` now raises the count on the DERIVED weapon swings instead -
+  // the only actions the SRD's "whenever you take the Attack action" can mean.
+  "extra-attack": "standing",        // effective-actions extraAttacksFor raises attack.count on a weapon swing
   "roll-mode": "at-its-moment",      // attacks (action-resolution), saves (saving-throws), initiative (encounter)
   "extra-damage": "at-its-moment",   // action-resolution rolls it as its own typed damage entry
   "check-bonus": "standing",         // actor-derived.ts checkRiderBonus, into every check and skill row
@@ -391,7 +395,6 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
         else into.armorClassBonus += modifier.amount;
         break;
       case "initiative": into.initiativeBonus += modifier.amount; break;
-      case "extra-attack": into.extraAttacks += modifier.count; break;
       case "unarmored-defense": into.unarmoredDefense = { ability: modifier.ability, allowShield: modifier.allowShield }; break;
       case "darkvision": break; // display-only: the trait prose carries the senses; no definition field models them
       // The other THIRTEEN. Not folded here on purpose - see `CARRIER_RIDER_DISPOSITION`. A feat
@@ -979,7 +982,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     actions: [], traits: [], grantedSkills: [], grantedExpertise: [], grantedTools: [], grantedLanguages: [],
     grantedArmor: [], grantedWeapons: [], grantedSaves: [], damageResistances: [], damageImmunities: [],
     conditionImmunities: [], grantedSpells: [], hitPointsPerLevel: 0, speedBonus: 0,
-    armorClassBonus: 0, armorClassBonusWhileArmored: 0, initiativeBonus: 0, extraAttacks: 0, unarmoredDefense: null
+    armorClassBonus: 0, armorClassBonusWhileArmored: 0, initiativeBonus: 0, unarmoredDefense: null
   };
   for (const { record } of granted) interpretFeature(record, interpreted, context);
   /**
@@ -1205,13 +1208,6 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const armorClassRider = interpreted.armorClassBonus + (wearingArmor ? interpreted.armorClassBonusWhileArmored : 0);
   const armorClass = (equipmentAc ?? unarmoredAc ?? 10 + dexModifier) + armorClassRider;
   const initiativeBonus = dexModifier + interpreted.initiativeBonus;
-  if (interpreted.extraAttacks > 0) {
-    // The modeled vocabulary for Extra Attack is `attack.count`; weapon attacks themselves ride the
-    // equipped inventory (the sheet derives them), so the count lands on interpreted attack actions.
-    for (const action of interpreted.actions) {
-      if (action.attack) action.attack = { ...action.attack, count: Math.min(10, (action.attack.count ?? 1) + interpreted.extraAttacks) };
-    }
-  }
 
   // ---- 12. Assemble, validate through the canonical schema, done. ----
   const summary = [`Level ${input.level} ${species.name}${lineage ? ` (${lineage.name})` : ""} ${classRecord.name}${subclass ? ` (${subclass.name})` : ""}`, background.name].join(" · ").slice(0, 280);

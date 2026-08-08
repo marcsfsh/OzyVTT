@@ -85,6 +85,8 @@ const barbarianInput = (level = 20): MutableInput => ({
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
     { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
     // THE THIRD one only exists because Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
@@ -111,6 +113,8 @@ const fighterInput = (level: number): MutableInput => ({
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
@@ -142,6 +146,8 @@ const monkInput = (level: number): MutableInput => ({
   backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },

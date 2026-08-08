@@ -443,7 +443,7 @@ describe("public game API over /api/v1", () => {
     expect(elf).toHaveProperty("abilityBonusChoice");
     const backgrounds = await (await fetch(base + CONTENT_PATHS.backgrounds, { headers: bearer(playerToken) })).json();
     const soldier = backgrounds.data.backgrounds.find((entry: { id: string }) => entry.id === "soldier");
-    expect(soldier.toolChoices).toEqual({ choose: 1, from: ["gaming-set-dice", "gaming-set-playing-cards"] });
+    expect(soldier.toolChoices).toEqual({ choose: 1, from: ["gaming-set-dice", "gaming-set-playing-cards"], fromCatalog: null });
     expect(soldier).toHaveProperty("skillChoices");
     expect(soldier).toHaveProperty("languageChoices");
   });
@@ -488,6 +488,8 @@ describe("public game API over /api/v1", () => {
       backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
       hp: { mode: "average" },
       choices: [
+        { level: 1, kind: "language", id: "dwarvish" },
+        { level: 1, kind: "language", id: "giant" },
         { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
         { level: 1, classId: "fighter", kind: "skill", id: "perception" },
         { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
@@ -938,6 +940,7 @@ describe("public game API over /api/v1", () => {
       "content:monster-actions": [CONTENT_PATHS.monsterActions, "get"],
       "content:conditions": [CONTENT_PATHS.conditions, "get"],
       "content:skills": [CONTENT_PATHS.skills, "get"],
+      "content:languages": [CONTENT_PATHS.languages, "get"],
       "content:spells": [CONTENT_PATHS.spells, "get"],
       "content:equipment": [CONTENT_PATHS.equipment, "get"],
       "content:classes": [CONTENT_PATHS.classes, "get"],

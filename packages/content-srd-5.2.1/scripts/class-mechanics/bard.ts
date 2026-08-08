@@ -143,17 +143,25 @@ export const bard: ClassMechanicsModule = {
           damage: []
         }],
         uses: { scaling: { type: "ability-modifier", ability: "cha", minimum: 1 }, per: "long-rest", pool: "bardic-inspiration" }
-      }
+      },
 
       /**
-       * NOT AUTHORED, and why - `magical-discoveries` (audit row 56).
+       * MAGICAL DISCOVERIES - audit row 56, closed by the union COMBINATOR in `resolveCatalogChoice`.
        *
-       * "two spells ... from the Cleric, Druid, or Wizard spell list or any combination thereof."
-       * `fromCatalog` takes ONE slug, and the union that landed this wave is `from`/`options` PLUS
-       * `fromCatalog` - a catalog and a bespoke option, not three catalogs. Saying it needs a
-       * `SpellListReference` overlay (`basedOn: ["cleric", "druid", "wizard"]`), which exists but is
-       * a homebrew-merge path an SRD bundle record cannot point at. Assignments doc S5C/S5D.
+       * "Choose two spells from any combination of the Cleric, Druid, and Wizard spell lists."
+       * `fromCatalog` still takes ONE slug - what changed is that a slug may now name several
+       * families joined by `-or-`, resolved left to right and de-duplicated by id. That is a strictly
+       * smaller change than the `SpellListReference` overlay this record was previously waiting on
+       * (a homebrew-merge path an SRD bundle record cannot point at), and it says the sentence the
+       * SRD prints rather than approximating it with one list.
+       *
+       * The "always have them prepared, and they do not count against your prepared total" half is
+       * carried by the description: a pick made OUTSIDE the class budget already does not charge it
+       * (feature-tagged spell rows sit outside `class-spells` - `character-build.ts` pass B).
        */
+      "magical-discoveries": {
+        choice: { kind: "spell", choose: 2, fromCatalog: "cleric-spells-or-druid-spells-or-wizard-spells" }
+      }
     }
   }
 };

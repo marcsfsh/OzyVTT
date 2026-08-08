@@ -6904,7 +6904,13 @@
      "kind": "expertise",
      "choose": 1,
      "fromCatalog": "skills"
-    }
+    },
+    "extraPicks": [
+     {
+      "offer": "species-languages",
+      "amount": 2
+     }
+    ]
    },
    {
     "id": "fighting-style",
@@ -7593,7 +7599,13 @@
      "languages": [
       "thieves-cant"
      ]
-    }
+    },
+    "extraPicks": [
+     {
+      "offer": "species-languages",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "weapon-mastery",
@@ -9497,6 +9509,7 @@
      "kind": "spell",
      "choose": 1,
      "fromCatalog": "warlock-spells",
+     "minSpellLevel": 6,
      "maxSpellLevel": 6
     },
     "uses": {
@@ -9513,6 +9526,7 @@
      "kind": "spell",
      "choose": 1,
      "fromCatalog": "warlock-spells",
+     "minSpellLevel": 7,
      "maxSpellLevel": 7
     },
     "uses": {
@@ -9529,6 +9543,7 @@
      "kind": "spell",
      "choose": 1,
      "fromCatalog": "warlock-spells",
+     "minSpellLevel": 8,
      "maxSpellLevel": 8
     },
     "uses": {
@@ -9545,6 +9560,7 @@
      "kind": "spell",
      "choose": 1,
      "fromCatalog": "warlock-spells",
+     "minSpellLevel": 9,
      "maxSpellLevel": 9
     },
     "uses": {

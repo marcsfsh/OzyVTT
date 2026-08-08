@@ -1,7 +1,7 @@
-import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
+import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentLanguageSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
-import { applySpellListOverlay, featurePicks, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import { applySpellListOverlay, featurePicks, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadLanguages, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
 import type { CharacterFeatureRef, FeatureRecordLike } from "./equipment-derivation.js";
 import { parseAreaProse } from "./area-targeting.js";
 
@@ -65,6 +65,7 @@ export interface ContentView {
   conditionSummaries(): readonly ContentConditionSummary[];
   hasCondition(conditionId: string): boolean;
   skillSummaries(): readonly ContentSkillSummary[];
+  languageSummaries(): readonly ContentLanguageSummary[];
   spellSummaries(): readonly ContentSpellSummary[];
   equipmentSummaries(): readonly ContentEquipmentSummary[];
   classSummaries(): readonly ContentClassSummary[];
@@ -230,11 +231,11 @@ const extraPickSummaryOf = (grants: FeatureRecord["extraPicks"]): ContentFeature
 
 const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null => choice
   ? {
-      kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null,
+      kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null,
       options: (choice.options ?? []).map((option) => {
         // One level of nesting only, matching the schema's own bound: a nested choice cannot itself carry options.
         const nested = featurePicks(option).map((pick) => ({
-          kind: pick.kind, choose: pick.choose, from: pick.from ?? [], fromCatalog: pick.fromCatalog ?? null, maxSpellLevel: pick.maxSpellLevel ?? null, options: []
+          kind: pick.kind, choose: pick.choose, from: pick.from ?? [], fromCatalog: pick.fromCatalog ?? null, maxSpellLevel: pick.maxSpellLevel ?? null, minSpellLevel: pick.minSpellLevel ?? null, options: []
         }));
         return {
           id: option.id, name: option.name, description: option.description,
@@ -317,8 +318,8 @@ export function statblockFacts(definition: ActorDefinition): { challengeRating: 
 }
 
 /** A bundle "choose N from" list -> the wire shape (null = the record offers no such choice). */
-const choiceListOf = (list: Readonly<{ choose: number; from: readonly string[] }> | undefined): ContentChoiceList | null =>
-  list ? { choose: list.choose, from: list.from } : null;
+const choiceListOf = (list: Readonly<{ choose: number; from: readonly string[]; fromCatalog?: string }> | undefined): ContentChoiceList | null =>
+  list ? { choose: list.choose, from: list.from, fromCatalog: list.fromCatalog ?? null } : null;
 /** A class/subclass spellcasting header -> the wire shape. The structured riders stay server-side as ever; this is the caster step's display data plus the spell-list link. */
 const spellcastingSummaryOf = (spellcasting: ContentSpellcasting | undefined): ContentSpellcastingSummary | null =>
   spellcasting
@@ -458,6 +459,13 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     id: skill.id, name: skill.name, description: skill.description, ability: skill.ability ?? null
   }));
 
+  // The 19 SRD languages with the table each is printed in. Published as DATA (not prose in the
+  // rules text) because a `languageChoices` budget needs a list: without one, "Common plus two
+  // languages" - owed to every character by Character Creation - was never offered to anybody.
+  const languageSummaries: readonly ContentLanguageSummary[] = loadLanguages().map((language) => ({
+    id: language.id, name: language.name, description: language.description, table: language.table
+  }));
+
   const spellSummaries: readonly ContentSpellSummary[] = spells
     .map((spell) => ({
       id: spell.id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime,
@@ -501,6 +509,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     conditionSummaries,
     conditionIds: new Set(conditionSummaries.map((condition) => condition.id)),
     skillSummaries,
+    languageSummaries,
     spellSummaries,
     equipmentSummaries,
     classSummaries: classes.map(classSummaryOf).sort(byName) as readonly ContentClassSummary[],
@@ -581,6 +590,7 @@ function viewOf(audience: ContentAudience, data: CatalogData, attribution: strin
     conditionSummaries: () => data.conditionSummaries,
     hasCondition: (conditionId) => data.conditionIds.has(conditionId),
     skillSummaries: () => data.skillSummaries,
+    languageSummaries: () => data.languageSummaries,
     spellSummaries: () => data.spellSummaries,
     equipmentSummaries: () => data.equipmentSummaries,
     classSummaries: () => data.classSummaries,
@@ -592,7 +602,7 @@ function viewOf(audience: ContentAudience, data: CatalogData, attribution: strin
     monsterSummaries: () => data.monsterSummaries,
     monster: (definitionId) => data.monstersById.get(definitionId),
     monsterActionSummaries: (definitionId) => data.monstersById.get(definitionId)?.actions.map(actionSummaryOf),
-    catalogChoiceCatalogs: () => ({ classes: data.classSummaries, subclasses: data.subclassSummaries, species: data.speciesSummaries, feats: data.featSummaries, spells: data.spellSummaries, equipment: data.equipmentSummaries, skills: data.skillSummaries }),
+    catalogChoiceCatalogs: () => ({ classes: data.classSummaries, subclasses: data.subclassSummaries, species: data.speciesSummaries, feats: data.featSummaries, spells: data.spellSummaries, equipment: data.equipmentSummaries, skills: data.skillSummaries, languages: data.languageSummaries }),
     classProgressionTable: () => data.progressionTable,
     classRecord: (id) => data.classRecords.get(id),
     subclassRecord: (id) => data.subclassRecords.get(id),

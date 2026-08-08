@@ -8,7 +8,7 @@ import {
 import {
   ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema, FeatureChoiceSchema, FeatureModifierSchema,
   FeatureRecordSchema, NamePoolReferenceSchema, RiderWhenSchema, SpeciesReferenceSchema,
-  loadBackgrounds, loadClasses, loadDamageTypes, loadEquipment, loadFeats, loadNames, loadSkills,
+  loadBackgrounds, loadClasses, loadDamageTypes, loadEquipment, loadFeats, loadLanguages, loadNames, loadSkills,
   loadSpecies, loadSpells, loadSubclasses, namesForSpecies, riderLayer, subclassesForClass,
   type FeatureRecord
 } from "../src/index.js";
@@ -450,32 +450,32 @@ describe("character-builder content records", () => {
     expect(authored.length).toBeGreaterThanOrEqual(15);
     const skillCount = loadSkills().length;
     const weaponCount = loadEquipment().filter((item) => item.category === "weapon").length;
+    const toolCount = loadEquipment().filter((item) => item.category === "tool").length;
+    const languages = loadLanguages();
+    /**
+     * Mirrors the resolver's slug grammar (packages/domain/src/catalog-choice.ts): every authored
+     * slug must land in a family AND resolve to a non-empty option list, or a wizard step dead-ends.
+     * Recursive, because the grammar has one combinator - `<a>-or-<b>` is the union of its parts, and
+     * a union is legal as long as at least one part resolves.
+     */
+    const resolvesNonEmpty = (slug: string): boolean => {
+      if (slug.includes("-or-")) {
+        const parts = slug.split("-or-");
+        return parts.every((part) => part.length > 0) && parts.some(resolvesNonEmpty);
+      }
+      if (slug === "skills") return skillCount > 0;
+      if (slug === "weapons") return weaponCount > 0;
+      if (slug === "tools") return toolCount > 0;
+      if (slug === "languages") return languages.length > 0;
+      if (slug.endsWith("-languages")) return languages.some((entry) => entry.table === slug.slice(0, -"-languages".length));
+      if (slug.endsWith("-spells")) return spells.some((spell) => spell.classes.includes(slug.slice(0, -"-spells".length)));
+      if (slug.endsWith("-subclasses")) return subclassesForClass(slug.slice(0, -"-subclasses".length)).length > 0;
+      if (slug.endsWith("-feats")) return feats.some((feat) => feat.category === slug.slice(0, -"-feats".length));
+      if (slug.endsWith("-lineages")) return (species.find((entry) => entry.id === slug.slice(0, -"-lineages".length))?.lineages.length ?? 0) > 0;
+      return false;
+    };
     for (const { owner, slug } of authored) {
-      // Mirrors the resolver's slug grammar (packages/domain/src/catalog-choice.ts): every authored
-      // slug must land in a family AND resolve to a non-empty option list, or a wizard step dead-ends.
-      if (slug === "skills") { expect(skillCount, owner).toBeGreaterThan(0); continue; }
-      if (slug === "weapons") { expect(weaponCount, owner).toBeGreaterThan(0); continue; }
-      if (slug.endsWith("-spells")) {
-        const listId = slug.slice(0, -"-spells".length);
-        expect(spells.some((spell) => spell.classes.includes(listId)), `${owner} -> ${slug}`).toBe(true);
-        continue;
-      }
-      if (slug.endsWith("-subclasses")) {
-        const classId = slug.slice(0, -"-subclasses".length);
-        expect(subclassesForClass(classId).length, `${owner} -> ${slug}`).toBeGreaterThan(0);
-        continue;
-      }
-      if (slug.endsWith("-feats")) {
-        const category = slug.slice(0, -"-feats".length);
-        expect(feats.some((feat) => feat.category === category), `${owner} -> ${slug}`).toBe(true);
-        continue;
-      }
-      if (slug.endsWith("-lineages")) {
-        const speciesId = slug.slice(0, -"-lineages".length);
-        expect(species.find((entry) => entry.id === speciesId)?.lineages.length ?? 0, `${owner} -> ${slug}`).toBeGreaterThan(0);
-        continue;
-      }
-      expect.fail(`${owner}: fromCatalog "${slug}" matches no documented slug family`);
+      expect(resolvesNonEmpty(slug), `${owner}: fromCatalog "${slug}" matches no documented slug family, or resolves to nothing`).toBe(true);
     }
   });
 

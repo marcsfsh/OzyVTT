@@ -116,6 +116,11 @@ const rogueInput = (level: number): MutableInput => {
     backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
     hp: { mode: "average" },
     choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      // THIEVES' CANT raises `species-languages` by one (audit row 62): a Rogue is offered THREE
+      // languages where the printed species budget offers two.
+      { level: 1, kind: "language", id: "goblin" },
       { level: 1, classId: "rogue", kind: "skill", id: "acrobatics" },
       { level: 1, classId: "rogue", kind: "skill", id: "investigation" },
       { level: 1, classId: "rogue", kind: "skill", id: "perception" },
@@ -287,6 +292,13 @@ const rangerInput = (level: number, options: { wisFocus?: boolean } = {}): Mutab
     backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
     hp: { mode: "average" },
     choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      // DEFT EXPLORER raises `species-languages` by TWO from level 2 (audit row 61) - "you learn two
+      // languages of your choice" - so a Ranger past level 1 is offered four, not two.
+      ...(level >= 2
+        ? [{ level: 2, kind: "language", id: "goblin" }, { level: 2, kind: "language", id: "orc" }]
+        : []),
       { level: 1, classId: "ranger", kind: "skill", id: "survival" },
       { level: 1, classId: "ranger", kind: "skill", id: "perception" },
       { level: 1, classId: "ranger", kind: "skill", id: "nature" },
@@ -414,19 +426,30 @@ describe("Ranger - the rest of the kit", () => {
     expect(carrier?.modifiers).toEqual([{ type: "sense", sense: "blindsight", feet: 30, when: [], scope: undefined }]);
   });
 
-  it("bakes Extra Attack into the definition and reaches NO weapon swing - the engine gap, pinned", () => {
-    // Extra Attack is authored because it is the correct record and the Fighter ships the identical
-    // rider. What it does today is nothing: the builder folds `extra-attack` into the `attack.count`
-    // of actions the FEATURE declares, and a Ranger declares none - their swings are derived from
-    // equipped inventory, which `BUILDER_BAKED_MODIFIER_TYPES` deliberately excludes from the
-    // roll-time collector so a feat's bonus is not applied twice.
+  it("takes Extra Attack all the way to a SECOND WEAPON SWING - the engine gap, closed", () => {
+    // THIS TEST USED TO PIN THE GAP. It read: "bakes Extra Attack into the definition and reaches NO
+    // weapon swing", and asserted `count === 1` precisely so that the day the engine closed the gap
+    // it would fail loudly rather than let the content go on being quietly wrong. That day is here,
+    // so it now asserts the other side of the same seam - and one level lower, as its own control.
     //
-    // This assertion exists so the day the engine closes that gap it FAILS and says so, rather than
-    // the content quietly being right for years without anyone noticing it was wrong.
+    // What changed: `extra-attack` left `BUILDER_BAKED_MODIFIER_TYPES`. Baking it raised
+    // `attack.count` on the actions a FEATURE declares, and a Ranger (like every martial class)
+    // declares none - the swings come from equipped inventory. It is a standing rider now, and
+    // `effective-actions.ts` raises the count on the derived weapon swings themselves.
     const built = table(rangerInput(5));
     expect(built.definition.character?.features?.map((entry) => entry.id)).toContain("extra-attack");
     const bow = effectiveActions(built.definition, built.hero, built.catalog).find((entry) => entry.id === "item-longbow");
-    expect(bow?.attack?.count ?? 1).toBe(1);
+    expect(bow?.attack?.count).toBe(2);
+
+    // The far end, which a count on a definition never was: a second arrow that really resolves.
+    expect(resolve(built, "item-longbow", [17, 5]).componentsRemaining).toEqual({ attack: 1 });
+    expect(resolve(built, "item-longbow", [14, 6]).componentsRemaining).toBeNull();
+    expect(() => resolve(built, "item-longbow", [19, 4])).toThrow(/no attacks remaining in this action/);
+
+    // Level 4: the same Ranger, one level before the feature. Still exactly one arrow.
+    const before = table(rangerInput(4));
+    const single = effectiveActions(before.definition, before.hero, before.catalog).find((entry) => entry.id === "item-longbow");
+    expect(single?.attack?.count ?? 1).toBe(1);
   });
 });
 
@@ -482,6 +505,8 @@ const paladinInput = (level: number): MutableInput => {
     backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
     hp: { mode: "average" },
     choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
       { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
       { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
       { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },

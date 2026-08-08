@@ -161,7 +161,7 @@
       "choice": {
         "kind": "skill-or-tool",
         "choose": 3,
-        "fromCatalog": "skills"
+        "fromCatalog": "skills-or-tools"
       }
     }
   },

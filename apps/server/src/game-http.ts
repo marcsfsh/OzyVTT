@@ -341,6 +341,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   // Rules catalogs: public SRD reference, so these accept a player session too (the operations enforce
   // that themselves - no requireGmGrade). The bestiary above is the deliberate GM-only exception.
   router.get(expressPath(CONTENT_PATHS.skills), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSkills(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.languages), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentLanguages(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.spells), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSpells(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.equipment), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentEquipment(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.classes), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentClasses(res.locals.principal as GamePrincipal)));

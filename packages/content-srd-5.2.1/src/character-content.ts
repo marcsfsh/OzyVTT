@@ -388,6 +388,18 @@ const featureChoiceBase = {
   /** Only options at or below this level are legal (spell picks). */
   maxSpellLevel: z.number().int().min(0).max(9).optional(),
   /**
+   * Only options at or ABOVE this level are legal - the FLOOR to `maxSpellLevel`'s ceiling.
+   *
+   * Mystic Arcanum reads "choose one level 6 Warlock spell as this arcanum", not "level 6 or lower":
+   * with a ceiling alone a level-11 Warlock could spend their level-6 arcanum on Eldritch Blast. Set
+   * both to the same number and the pick is EXACTLY that level, which is what all four arcana want.
+   *
+   * Read by the same two consumers `maxSpellLevel` is (`character-build.ts` matchRow,
+   * `build-payload.ts` featurePickOffer), and it crosses the wire for the same reason: a wizard that
+   * cannot see the floor offers spells the server then rejects.
+   */
+  minSpellLevel: z.number().int().min(0).max(9).optional(),
+  /**
    * The ceiling an ability-score pick from THIS choice may raise a score to; absent = the SRD's 20.
    *
    * The sibling of `ability-score`'s own `maximum` (the modifier variant above), and it has to exist
@@ -407,8 +419,19 @@ const featureChoiceBase = {
  * your choice). Deliberately depth-limited: an option's own choice may name ids or a catalog slug
  * but cannot nest a further `options` list, so the vocabulary is bounded and non-recursive.
  */
+/** A floor above its own ceiling offers nothing at all - the silent-empty-picker failure, at author time. */
+const spellLevelWindow = (choice: { minSpellLevel?: number; maxSpellLevel?: number }, context: z.RefinementCtx) => {
+  if (choice.minSpellLevel !== undefined && choice.maxSpellLevel !== undefined && choice.minSpellLevel > choice.maxSpellLevel) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom, path: ["minSpellLevel"],
+      message: `minSpellLevel ${choice.minSpellLevel} is above maxSpellLevel ${choice.maxSpellLevel} - no spell can satisfy both.`
+    });
+  }
+};
+
 export const FeatureOptionChoiceSchema = z.object(featureChoiceBase).strict().superRefine((choice, context) => {
   if (!choice.from && !choice.fromCatalog) context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs either an explicit `from` list or a `fromCatalog` slug." });
+  spellLevelWindow(choice, context);
 });
 export type FeatureOptionChoice = z.infer<typeof FeatureOptionChoiceSchema>;
 
@@ -504,6 +527,7 @@ export const FeatureChoiceSchema = z.object({
     const duplicate = choice.options.find((option, index) => choice.options!.findIndex((other) => other.id === option.id) !== index);
     if (duplicate) context.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: `Duplicate option id "${duplicate.id}".` });
   }
+  spellLevelWindow(choice, context);
 }).transform((choice) => {
   // Early return rather than a rewritten object, so `from` stays an OPTIONAL property on the output
   // type. Spreading a `from: string[] | undefined` back in would make it required-with-undefined,
@@ -546,11 +570,26 @@ export type FeatureRecord = z.infer<typeof FeatureRecordSchema>;
 // Class
 // ---------------------------------------------------------------------------------------------
 
-/** A "choose N from this list" proficiency grant (class skills, background tools). */
+/**
+ * A "choose N from this list" proficiency grant (class skills, background tools, species languages).
+ *
+ * `fromCatalog` is the same open catalog slug a feature's `choice` takes, resolved through the same
+ * `resolveCatalogChoice` on both sides. It exists because the base language budget every character is
+ * owed reads "Common plus two languages **from the Standard Languages table**" - a list of nineteen
+ * ids that would otherwise be copied onto all nine species and drift the first time one changed.
+ * Author one or the other, or both (the offer is their union, exactly as a feature's choice is).
+ */
 export const ChoiceListSchema = z.object({
   choose: z.number().int().min(0).max(10),
-  from: z.array(ContentIdSchema).max(60).default([])
-}).strict();
+  from: z.array(ContentIdSchema).max(60).default([]),
+  fromCatalog: ContentIdSchema.optional()
+}).strict().superRefine((list, context) => {
+  // A budget with no source offers nothing, so the build can never satisfy it - the silent
+  // unfinishable-wizard failure, caught at parse time instead of at Create.
+  if (list.choose > 0 && list.from.length === 0 && !list.fromCatalog) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A \"choose N\" list needs a non-empty `from` list or a `fromCatalog` slug - otherwise the pick has no options and the build can never be completed." });
+  }
+});
 
 /** A named starting-equipment bundle ("A: chain mail and a martial weapon", "C: 155 gp"). */
 export const StartingEquipmentOptionSchema = z.object({

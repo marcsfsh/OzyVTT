@@ -54,7 +54,7 @@ const divineOrder = feature({
   id: "divine-order", name: "Divine Order", level: 1, grantedAtLevels: [1],
   description: "You have dedicated yourself to one of the following sacred roles.",
   choice: {
-    kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"], fromCatalog: null, maxSpellLevel: null,
+    kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null,
     options: [
       { id: "protector", name: "Protector", description: "Martial weapons and Heavy armor training.", choice: null, choices: [], extraPicks: [] },
       { id: "thaumaturge", name: "Thaumaturge", description: "You know one extra cantrip from the Cleric spell list.", choice: null, choices: [], extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }] }
@@ -91,7 +91,7 @@ const acolyte = {
 } as unknown as ContentBackgroundSummary;
 
 const catalogsWith = (classRecord: ContentClassSummary, species: ContentSpeciesSummary = human): BuilderCatalogs => ({
-  choice: { classes: [classRecord], subclasses: [], species: [species], feats: [], spells, equipment: [], skills },
+  choice: { classes: [classRecord], subclasses: [], species: [species], feats: [], spells, equipment: [], skills, languages: [] },
   backgrounds: [acolyte], names: [], loaded: true, attributions: []
 });
 
@@ -208,7 +208,7 @@ describe("extraPicks composes across carriers and budgets", () => {
     const expertise = feature({
       id: "expertise", name: "Expertise", level: 1, grantedAtLevels: [1],
       description: "Choose skills you are proficient in.",
-      choice: { kind: "expertise", choose: 1, from: ["history", "medicine", "religion"], fromCatalog: null, maxSpellLevel: null, options: [] }
+      choice: { kind: "expertise", choose: 1, from: ["history", "medicine", "religion"], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, options: [] }
     });
     const devotion = feature({
       id: "deep-devotion", name: "Deep Devotion", level: 1, grantedAtLevels: [1],

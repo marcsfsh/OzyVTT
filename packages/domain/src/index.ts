@@ -771,6 +771,8 @@ export type ContentExtraPickSummary = Readonly<{ offer: string;
 export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
   /** Ceiling on a spell pick's level (Evocation Savant is level 2 and under; Magic Initiate is cantrips only). Null = no ceiling. WITHOUT this the wizard would offer spells the server then rejects, so it crosses the wire with the rest of the choice. */
   maxSpellLevel: number | null;
+  /** FLOOR on a spell pick's level, the sibling of `maxSpellLevel`. Mystic Arcanum reads "one level 6 Warlock spell", not "level 6 or lower"; both set to 6 makes the pick exactly that level. Null = no floor. */
+  minSpellLevel: number | null;
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   options: readonly ContentFeatureOptionSummary[] }>;
 export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The FIRST pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null;
@@ -808,7 +810,15 @@ export type ContentClassLevelRow = Readonly<{ level: number; proficiencyBonus: n
 /** A named starting-equipment bundle with its RESOLVABLE contents - a label alone can be shown but never turned into inventory. `goldPieces` is the "or take N gp" alternative. */
 export type ContentStartingEquipmentOption = Readonly<{ id: string; label: string; items: ReadonlyArray<{ id: string; name: string; quantity: number }>; goldPieces: number }>;
 /** A "choose N from this list" proficiency grant, exactly as authored (class tool choices, background skill/tool/language choices). */
-export type ContentChoiceList = Readonly<{ choose: number; from: readonly string[] }>;
+export type ContentChoiceList = Readonly<{ choose: number; from: readonly string[];
+  /**
+   * An open catalog slug supplying the options instead of (or beside) `from` - the same slug grammar
+   * `fromCatalog` uses on a feature's choice, resolved through the same `resolveCatalogChoice`.
+   *
+   * Exists because "Common plus two languages from the Standard Languages table" cannot be spelled as
+   * a `from` list without copying nineteen ids onto all nine species. Null for the lists that name
+   * their options outright (a class's skill list, a background's tools). */
+  fromCatalog: string | null }>;
 /**
  * A class's (or third-caster subclass's) spellcasting header - what the wizard's caster step renders
  * and filters by. `spellListId` pairs with `ContentSpellSummary.classes` to restore the class->spell
@@ -858,6 +868,16 @@ export type ContentBackgroundsResult = { ok: boolean; message?: string; backgrou
 /** One skill: reference text plus the ability its check uses. `ability` is null only while the bundle row predates the ability column (the server fills the SRD mapping for the 18 known skills). */
 export type ContentSkillSummary = Readonly<{ id: string; name: string; description: string; ability: string | null }>;
 export type ContentSkillsResult = { ok: boolean; message?: string; skills?: readonly ContentSkillSummary[]; attribution?: string };
+/**
+ * ONE LANGUAGE, plus which SRD table it is printed in ("standard" / "rare" - an open slug).
+ *
+ * The languages lived only as prose in the rules text, and the cost of that was concrete: with no
+ * list to draw from, `languageChoices` could not be authored, so the "Common plus two languages"
+ * every character is owed by Character Creation was **never offered to anyone**. `table` is what the
+ * base budget narrows on - Druidic and Thieves' Cant are `rare` and come from a class feature.
+ */
+export type ContentLanguageSummary = Readonly<{ id: string; name: string; description: string; table: string }>;
+export type ContentLanguagesResult = { ok: boolean; message?: string; languages?: readonly ContentLanguageSummary[]; attribution?: string };
 /** One feat. Prerequisites are reported as data + prose for display; the SERVER decides whether one is met, never the wizard. A feat IS a feature plus catalog metadata - hence the single `feature`. */
 export type ContentFeatSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; category: string; repeatable: boolean; prerequisiteLevel: number | null; prerequisiteAbilities: ReadonlyArray<{ ability: string; minimum: number }>; prerequisiteRequires: readonly string[]; prerequisiteText: string | null; feature: ContentFeatureSummary }>;
 export type ContentFeatsResult = { ok: boolean; message?: string; feats?: readonly ContentFeatSummary[]; attribution?: string };
@@ -1022,6 +1042,7 @@ export interface ClientToServerEvents {
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; override?: { reason?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
+  "content:languages": (payload: Record<string, never>, acknowledgement: (result: ContentLanguagesResult) => void) => void;
   "content:spells": (payload: Record<string, never>, acknowledgement: (result: ContentSpellsResult) => void) => void;
   "content:equipment": (payload: Record<string, never>, acknowledgement: (result: ContentEquipmentResult) => void) => void;
   "content:classes": (payload: Record<string, never>, acknowledgement: (result: ContentClassesResult) => void) => void;

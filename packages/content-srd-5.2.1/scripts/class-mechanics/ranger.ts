@@ -50,8 +50,18 @@ export const ranger: ClassMechanicsModule = {
      * reachable - and it is NOT reachable from here either: `FeatureMechanics` in `./overlay.ts`
      * exposes `choice` and not `choices`. Recorded so the next author does not rediscover it.
      */
+    /**
+     * DEFT EXPLORER - audit row 61, both halves.
+     *
+     * "You gain Expertise in one of your skill proficiencies, and you learn two languages of your
+     * choice." The Expertise half was always one line. The languages half was blocked on ruling C
+     * twice over - no `languages` catalog family, and no species declaring `languageChoices` for
+     * `species-languages` to raise. Both are fixed, so the second half is now the one `extraPicks`
+     * line the audit said it would be, and a level-2 Ranger is offered four languages, not two.
+     */
     "deft-explorer": {
-      choice: { kind: "expertise", choose: 1, fromCatalog: "skills" }
+      choice: { kind: "expertise", choose: 1, fromCatalog: "skills" },
+      extraPicks: [{ offer: "species-languages", amount: 2 }]
     },
 
     /**

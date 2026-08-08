@@ -203,20 +203,27 @@ export const warlock: ClassMechanicsModule = {
      * keeps a level-9 spell legal at all: the class budget refuses anything above the Pact Magic
      * slot level, and Pact Magic tops out at 5.
      */
+    /**
+     * MYSTIC ARCANUM x4 - audit rows 15-18, and the reason `minSpellLevel` exists (assignments SS5H).
+     *
+     * "Choose one level 6 Warlock spell as this arcanum" is an EXACT level, not a ceiling. With
+     * `maxSpellLevel` alone a level-11 Warlock could spend their level-6 arcanum on Eldritch Blast;
+     * the floor beside it makes the window one level wide, which is what all four arcana print.
+     */
     "mystic-arcanum-level-6-spell": {
-      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", maxSpellLevel: 6 },
+      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 6, maxSpellLevel: 6 },
       uses: { limit: 1, per: "long-rest" }
     },
     "mystic-arcanum-level-7-spell": {
-      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", maxSpellLevel: 7 },
+      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 7, maxSpellLevel: 7 },
       uses: { limit: 1, per: "long-rest" }
     },
     "mystic-arcanum-level-8-spell": {
-      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", maxSpellLevel: 8 },
+      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 8, maxSpellLevel: 8 },
       uses: { limit: 1, per: "long-rest" }
     },
     "mystic-arcanum-level-9-spell": {
-      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", maxSpellLevel: 9 },
+      choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 9, maxSpellLevel: 9 },
       uses: { limit: 1, per: "long-rest" }
     },
     /**

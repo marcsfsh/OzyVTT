@@ -76,6 +76,8 @@ const druid = (level: number, extra: Row[] = []): Mutable => ({
   backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "druid", kind: "skill", id: "nature" },
     { level: 1, classId: "druid", kind: "skill", id: "perception" },
     { level: 1, kind: "cantrip", id: "druidcraft" },
@@ -122,6 +124,8 @@ const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable => ({
     : [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "bard", kind: "skill", id: "performance" },
     { level: 1, classId: "bard", kind: "skill", id: "persuasion" },
     { level: 1, classId: "bard", kind: "skill", id: "deception" },
@@ -143,6 +147,13 @@ const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable => ({
     ...(level >= 10 ? [
       { level: 10, classId: "bard", kind: "spell", id: "hypnotic-pattern", payload: { featureId: "magical-secrets" } },
       { level: 10, classId: "bard", kind: "spell", id: "fear", payload: { featureId: "magical-secrets" } }
+    ] as Row[] : []),
+    // MAGICAL DISCOVERIES (audit row 56) - two spells drawn from the Cleric, Druid OR Wizard list,
+    // which is the union slug `cleric-spells-or-druid-spells-or-wizard-spells`. Neither is on the
+    // Bard list, which is the whole point of the feature.
+    ...(level >= 6 ? [
+      { level: 6, kind: "spell", id: "spiritual-weapon", payload: { featureId: "magical-discoveries" } },
+      { level: 6, kind: "spell", id: "fireball", payload: { featureId: "magical-discoveries" } }
     ] as Row[] : []),
     ...asiRows("bard", level),
     { level: 1, kind: "equipment", id: "bard-a" },
@@ -440,6 +451,8 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
     backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "con", amount: 1 }],
     hp: { mode: "average" },
     choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
       { level: 1, classId: "cleric", kind: "skill", id: "religion" },
       { level: 1, classId: "cleric", kind: "skill", id: "insight" },
       { level: 1, classId: "cleric", kind: "divine-order", id: "thaumaturge", payload: { featureId: "divine-order" } },

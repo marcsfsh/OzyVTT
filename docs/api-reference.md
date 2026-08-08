@@ -1998,6 +1998,14 @@ The skill catalog: reference text plus the ability each check uses, as data - th
 
 **Responses:** `200` Catalog entries - envelope of `ContentSkillsData` · errors `401` `403`
 
+### `GET /api/v1/content/languages`
+
+The language catalog: the SRD's Standard and Rare language tables as data, each row tagged with the table it is printed in. The builder's "Common plus two languages" budget resolves against this - as prose it could not be offered at all. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentLanguagesData` · errors `401` `403`
+
 ### `GET /api/v1/content/spells`
 
 The bundled SRD spell list with the fields a sheet needs to cast from: level, school, casting time, range, components, duration, concentration/ritual flags, description, the spell-list tags (`classes`) the builder filters on, and the upcast (`castingOptions`) rows keyed by slot level. Includes the CC BY 4.0 attribution line.
@@ -4691,6 +4699,7 @@ One pick a feature asks for. Options arrive either as plain ids in `from`, as an
 | `from` | string (pattern)[] | yes | Explicit option ids; empty when fromCatalog names an open list instead |
 | `fromCatalog` | string \| null | yes | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer \| null | yes | Ceiling on a spell pick's level (Evocation Savant: 2; Magic Initiate: 0, i.e. cantrips only). null when the pick has no ceiling — a picker that ignores it offers spells the server then rejects |
+| `minSpellLevel` | integer \| null | yes | Floor on a spell pick's level (Mystic Arcanum: 6, so the level-6 arcanum is EXACTLY a level-6 spell rather than "6 or lower"). null when the pick has no floor |
 | `options` | ContentFeatureOption[] | yes | Inline options with their authored names and any nested pick; empty when the options are plain ids or come from a catalog |
 
 ### `ContentFeatureOption`
@@ -4705,6 +4714,17 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `choice` | ContentFeatureChoice \| null | yes | The FIRST nested pick this option owes. Bounded at one level: a nested choice never carries its own options. |
 | `choices` | ContentFeatureChoice[] | yes | EVERY nested pick this option owes, in authored order. |
 | `extraPicks` | ContentExtraPick[] | yes | Budgets this option RAISES once chosen - Divine Order's Thaumaturge adds one to the Cleric cantrip budget. |
+
+### `ContentLanguagesData`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `languages` | object[] | yes |  |
+| `languages[].id` | string | yes |  |
+| `languages[].name` | string | yes |  |
+| `languages[].description` | string | yes |  |
+| `languages[].table` | string | yes | Which SRD table the language is printed in - "standard" (widespread) or "rare" (secret or planar). An open slug: a homebrew table needs no schema change. The base "Common plus two languages" budget draws from `standard`; Druidic and Thieves' Cant are `rare` and arrive from a class feature |
+| `attribution` | string | yes | The bundle's canonical CC BY 4.0 statement - ADR-0015 requires it on any surface that displays this content |
 
 ### `ContentMonsterActionsData`
 
@@ -4972,12 +4992,13 @@ A background. In SRD 5.2.1 this is where ability increases and the origin feat l
 
 ### `HomebrewChoiceList`
 
-A "choose N from this list" proficiency grant (class skills, background tools).
+A "choose N from this list" proficiency grant (class skills, background tools, species languages). Needs a non-empty `from` or a `fromCatalog` whenever `choose` is above zero - a budget with no source can never be satisfied and the wizard could not be finished.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `choose` | integer (0–10) | yes |  |
 | `from` | string (pattern)[] | no |  |
+| `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time ("standard-languages", "tools", "skills") |
 
 ### `HomebrewClassLevelRow`
 
@@ -5381,6 +5402,7 @@ A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an ope
 | `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `minSpellLevel` | integer (0–9) | no | Floor on a spell pick's level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact |
 | `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 | `options` | HomebrewFeatureOption[] | no | Options carrying their own mechanics. Mutually exclusive with `from` |
@@ -5465,6 +5487,7 @@ THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureCho
 | `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `minSpellLevel` | integer (0–9) | no | Floor on a spell pick's level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact |
 | `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 

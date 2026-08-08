@@ -63,18 +63,18 @@ export const rogue: ClassMechanicsModule = {
     },
 
     /**
-     * THIEVES' CANT - the grant half of audit row 62. The PICK half is not authorable.
+     * THIEVES' CANT - audit row 62, BOTH halves, now that ruling C has landed.
      *
      * "You know Thieves' Cant AND one other language of your choice, which you choose from the
-     * language tables in Character Creation." The first half is a plain grant. The second is blocked
-     * twice over by ruling C: there is no `languages` family in `resolveCatalogChoice`, and no SRD
-     * species or background declares `languageChoices`, so `extraPicks: [{offer: "species-languages",
-     * amount: 1}]` - the right SHAPE - names a budget no real build has and is correctly refused by
-     * `character-build.ts`. Row 62 stays open until the base "Common plus two languages" case is
-     * fixed; the description carries the promise meanwhile.
+     * language tables in Character Creation." The first half is a plain grant. The second is one
+     * `extraPicks` line raising the SAME budget Character Creation opens (`species-languages`) - the
+     * shape the audit prescribed, which used to name a budget no real build had because no SRD
+     * species declared `languageChoices` at all. Every species now does, so a level-1 Rogue is
+     * offered three languages where the printed table offers two.
      */
     "thieves-cant": {
-      grants: { languages: ["thieves-cant"] }
+      grants: { languages: ["thieves-cant"] },
+      extraPicks: [{ offer: "species-languages", amount: 1 }]
     },
 
     /**

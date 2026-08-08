@@ -418,6 +418,8 @@ describe("homebrew HTTP CRUD", () => {
       backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
       hp: { mode: "entries", entries: [1, 10, 4, 6] },
       choices: [
+        { level: 1, kind: "language", id: "dwarvish" },
+        { level: 1, kind: "language", id: "giant" },
         { level: 1, classId: heroClass.id, kind: "skill", id: "athletics" },
         { level: 1, classId: heroClass.id, kind: "skill", id: "perception" },
         { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },

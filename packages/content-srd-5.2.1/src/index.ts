@@ -21,9 +21,9 @@ import {
 } from "./character-content.js";
 import {
   ArmorReferenceSchema, ConditionReferenceSchema, ContentAttributionSchema, EquipmentReferenceSchema,
-  RuleReferenceSchema, SkillReferenceSchema, SpellReferenceSchema, SRD_SKILL_ABILITY,
+  LanguageReferenceSchema, RuleReferenceSchema, SkillReferenceSchema, SpellReferenceSchema, SRD_SKILL_ABILITY,
   WeaponPropertyReferenceSchema, WeaponReferenceSchema,
-  type ArmorReference, type ConditionReference, type ContentAttribution, type EquipmentReference, type RuleReference,
+  type ArmorReference, type ConditionReference, type ContentAttribution, type EquipmentReference, type LanguageReference, type RuleReference,
   type SkillReference, type SpellReference, type WeaponPropertyReference, type WeaponReference
 } from "./schemas.js";
 
@@ -77,6 +77,17 @@ export function loadSkills(): readonly SkillReference[] {
   return loadBundle("skills.v1.json", z.array(SkillReferenceSchema)).map((skill) => (
     skill.ability ? skill : { ...skill, ability: SRD_SKILL_ABILITY[skill.id] }
   ));
+}
+
+/**
+ * The 19 SRD 5.2.1 languages (10 Standard, 9 Rare), each tagged with the table it is printed in.
+ *
+ * Published as a bundle rather than left as prose because a choice needs a LIST: without this the
+ * `species-languages` budget every character is owed ("Common plus two languages") had no options and
+ * was therefore never offered at all. See `LanguageReferenceSchema`.
+ */
+export function loadLanguages(): readonly LanguageReference[] {
+  return loadBundle("languages.v1.json", z.array(LanguageReferenceSchema));
 }
 
 /**

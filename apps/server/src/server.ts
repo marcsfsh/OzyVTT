@@ -627,6 +627,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("actor:set-temp-hp", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The temporary hit points could not be set.", (principal) => operations.actorSetTempHp(principal, payload)));
     socket.on("content:conditions", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentConditions(principal)));
     socket.on("content:skills", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSkills(principal)));
+    socket.on("content:languages", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentLanguages(principal)));
     socket.on("content:spells", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSpells(principal)));
     socket.on("content:equipment", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentEquipment(principal)));
     // The character-builder catalogs: readable by any joined session (a player builds their own character),

@@ -56,6 +56,8 @@ const warlockInput = (level: number, extra: readonly Row[] = []): CharacterCreat
   backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
     { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
@@ -536,6 +538,8 @@ const sorcererInput = (level: number, extra: readonly Row[] = []): CharacterCrea
   backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "sorcerer", kind: "skill", id: "arcana" },
     { level: 1, classId: "sorcerer", kind: "skill", id: "deception" },
     { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
@@ -814,6 +818,8 @@ const wizardInput = (): CharacterCreateRequestInput => ({
   backgroundBonusAllocation: [{ ability: "int", amount: 2 }, { ability: "wis", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "wizard", kind: "skill", id: "arcana" },
     { level: 1, classId: "wizard", kind: "skill", id: "investigation" },
     { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },

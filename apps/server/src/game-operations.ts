@@ -345,6 +345,13 @@ export function createGameOperations(context: GameOperationsContext) {
       return { skills: catalog.skillSummaries(), attribution: catalog.attribution };
     },
 
+    contentLanguages(principal: GamePrincipal) {
+      // The language catalog is public reference exactly like skills: the builder's species step
+      // offers "Common plus two languages" from it, and the sheet renders what a character knows.
+      const catalog = catalogFor(principal);
+      return { languages: catalog.languageSummaries(), attribution: catalog.attribution };
+    },
+
     contentSpells(principal: GamePrincipal) {
       // Spell rules are public reference text (the CC-BY SRD), like conditions - any joined session may read them.
       const catalog = catalogFor(principal);

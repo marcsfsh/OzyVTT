@@ -37,7 +37,7 @@ const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSumma
   level: null, description: "", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [], ...over
 });
 const choice = (kind: string, chooseCount: number, from: readonly string[]) =>
-  ({ kind, choose: chooseCount, from, fromCatalog: null, maxSpellLevel: null, options: [] });
+  ({ kind, choose: chooseCount, from, fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, options: [] });
 
 const SKILL_IDS = ["insight", "perception", "survival", "history", "medicine", "religion"] as const;
 const skills: readonly ContentSkillSummary[] = SKILL_IDS.map((id) => ({
@@ -86,7 +86,7 @@ const cleric = {
     feature({
       id: "cleric-subclass", name: "Cleric Subclass", level: 3, grantedAtLevels: [3],
       description: "You gain a Cleric subclass of your choice.",
-      choice: { kind: "subclass", choose: 1, from: [], fromCatalog: "cleric-subclasses", maxSpellLevel: null, options: [] }
+      choice: { kind: "subclass", choose: 1, from: [], fromCatalog: "cleric-subclasses", maxSpellLevel: null, minSpellLevel: null, options: [] }
     })
   ]
 } as unknown as ContentClassSummary;
@@ -140,6 +140,9 @@ const CATALOG_ANSWERS: Readonly<Record<string, unknown>> = {
   "content:feats": { ok: true, feats: [{ id: "alert", name: "Alert", source: "srd", summary: "You are hard to surprise.", description: "", category: "origin", repeatable: false, prerequisiteLevel: null, prerequisiteAbilities: [], prerequisiteRequires: [], prerequisiteText: null, feature: feature({ id: "alert-feature", name: "Alert" }) }], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:names": { ok: true, names: [{ speciesId: "elf", source: "srd", pools: [{ id: "given", label: "Given", names: ["Aerin"] }] }], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:skills": { ok: true, skills, attribution: "SRD 5.2.1, CC BY 4.0." },
+  // `useBuilderCatalogs` waits on EVERY catalog; a miss is never cached, so leaving this out kept the
+  // wizard on its loading state forever rather than failing anywhere near the cause.
+  "content:languages": { ok: true, languages: [{ id: "dwarvish", name: "Dwarvish", description: "A standard language.", table: "standard" }], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:spells": { ok: true, spells, attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:equipment": { ok: true, equipment: [{ id: "club", name: "Club", category: "weapon", costGp: 1, weightLb: 2, description: null, weapon: null, armor: null }], attribution: "SRD 5.2.1, CC BY 4.0." }
 };

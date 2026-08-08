@@ -313,6 +313,24 @@ export type ContentAttribution = z.infer<typeof ContentAttributionSchema>;
 export const SkillReferenceSchema = ConditionReferenceSchema.extend({ ability: AbilityShortSchema.optional() });
 export type SkillReference = z.infer<typeof SkillReferenceSchema>;
 
+/**
+ * A LANGUAGE, as data rather than prose.
+ *
+ * The SRD's Standard and Rare language tables lived only inside a paragraph of `rules.v1.json`, and
+ * the consequence was not cosmetic: `languageChoices` on a species or background had no list to draw
+ * from, so **"Common plus two languages" - which Character Creation owes every character - was never
+ * offered to anybody**, and Deft Explorer's and Thieves' Cant's language picks had nothing to raise.
+ *
+ * `table` is the SRD's own split and it is what a choice narrows on: the base budget draws from
+ * `standard`, while `druidic` and `thieves-cant` are `rare` and arrive as grants from a class
+ * feature. It is an OPEN slug, not an enum, so a homebrew "planar" table needs no schema edit.
+ */
+export const LanguageReferenceSchema = ConditionReferenceSchema.extend({
+  /** Which SRD table the language is printed in - "standard" (widespread) or "rare" (secret/planar). */
+  table: z.string().regex(/^[a-z0-9-]+$/).max(40).default("standard")
+});
+export type LanguageReference = z.infer<typeof LanguageReferenceSchema>;
+
 /** The printed SRD 5.2.1 skill->ability table, used ONLY when a bundle row omits its own `ability`. */
 export const SRD_SKILL_ABILITY: Readonly<Record<string, z.infer<typeof AbilityShortSchema>>> = Object.freeze({
   athletics: "str",

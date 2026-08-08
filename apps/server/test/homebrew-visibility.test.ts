@@ -150,7 +150,7 @@ function operationsWith(contentLibrary: ContentLibrary): GameOperations {
  * the operations object itself, so a new content read cannot be added without a decision here.
  */
 const PLAYER_READABLE_CONTENT_OPS = [
-  "contentConditions", "contentSkills", "contentSpells", "contentEquipment",
+  "contentConditions", "contentSkills", "contentLanguages", "contentSpells", "contentEquipment",
   "contentClasses", "contentSubclasses", "contentSpecies", "contentBackgrounds", "contentFeats", "contentNames"
 ] as const;
 /** The bestiary and stat blocks: GM-grade only, and that gate is asserted below rather than assumed. */

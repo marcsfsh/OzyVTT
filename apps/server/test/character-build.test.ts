@@ -43,6 +43,8 @@ const fighterInput = (): MutableCreateInput => ({
   backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "entries", entries: [1, 10, 4, 6] },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
@@ -74,6 +76,8 @@ const wizardInput = (): MutableCreateInput => ({
   backgroundBonusAllocation: [{ ability: "int", amount: 2 }, { ability: "con", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "wizard", kind: "skill", id: "investigation" },
     { level: 1, classId: "wizard", kind: "skill", id: "insight" },
     { level: 1, kind: "skill", id: "perception", payload: { featureId: "elf-keen-senses" } },
@@ -121,6 +125,8 @@ const warlockInput = (): MutableCreateInput => ({
   backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
     { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
@@ -213,7 +219,10 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.proficiencies?.armor).toEqual(["light", "medium", "heavy", "shields"]);
     expect(definition.proficiencies?.weapons).toEqual(["simple", "martial"]);
     expect(definition.proficiencies?.tools).toEqual(["gaming-set-dice"]);
-    expect(definition.proficiencies?.languages).toEqual(["common"]);
+    // Common is the species grant; Dwarvish and Giant are the base "Common plus two languages"
+    // budget every character is owed - `species-languages`, which no SRD species declared until the
+    // language catalog existed, so it was never offered to anybody.
+    expect(definition.proficiencies?.languages).toEqual(["common", "dwarvish", "giant"]);
   });
 
   it("interprets the Second Wind rider into a sheet action with by-level uses resolved (3 at level 5)", () => {
@@ -324,7 +333,7 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(skills.get("arcana")).toBe("expertise");
     expect(definition.proficiencies?.saves).toEqual(["int", "wis"]);
     expect(definition.proficiencies?.tools).toEqual(["calligraphers-supplies"]);
-    expect(definition.proficiencies?.languages).toEqual(["common", "elvish"]);
+    expect(definition.proficiencies?.languages).toEqual(["common", "elvish", "dwarvish", "giant"]);
     expect(definition.character?.race).toEqual({ id: "elf", name: "Elf", subrace: { id: "high-elf", name: "High Elf" } });
   });
 
@@ -454,6 +463,8 @@ const clericInput = (): MutableCreateInput => ({
   backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "cha", amount: 1 }],
   hp: { mode: "average" },
   choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "cleric", kind: "skill", id: "history" },
     { level: 1, classId: "cleric", kind: "skill", id: "medicine" },
     { level: 1, kind: "skill", id: "perception", payload: { featureId: "human-skillful" } },
@@ -698,6 +709,8 @@ describe("extra picks raise the budget the server validates against", () => {
       backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
       hp: { mode: "average" },
       choices: [
+        { level: 1, kind: "language", id: "dwarvish" },
+        { level: 1, kind: "language", id: "giant" },
         { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
         { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
         { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
@@ -1007,6 +1020,8 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
     backgroundBonusAllocation: [{ ability: "con", amount: 2 }, { ability: "dex", amount: 1 }],
     hp: { mode: "average" },
     choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
       { level: 1, kind: "skill", id: "acrobatics", payload: { featureId: "human-skillful" } },
       { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
       { level: 1, kind: "size", id: "small" },
