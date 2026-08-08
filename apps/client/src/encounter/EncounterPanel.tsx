@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ActionResolution, ActorDefinition, ClientToServerEvents, ContentActionSummary, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingDamage, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import type { ActionResolution, ActorDefinition, ClientToServerEvents, ContentActionSummary, DeathSaveResult, DeathSaves, GmActor, GmView, MutationResult, PendingDamage, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
@@ -29,6 +29,10 @@ function emitCommand(event: CommandEvent, payload: CommandPayload) {
 }
 
 const validInitiativeScore = (value: string | undefined) => value !== undefined && value.trim() !== "" && Number.isInteger(Number(value)) && Number(value) >= -1000 && Number(value) <= 1000;
+
+/** How many monsters the ⋯ menu's `Recent` disclosure offers. The same ten scene prep offers, and
+    for the same reason (D3) — `ScenePrepPanel.tsx:28`, whose list this one is deliberately a copy of. */
+const RECENT_COUNT = 10;
 
 /* ── THE ⋯ FIGHT MENU'S GEOMETRY ────────────────────────────────────────────────────────────────
    Breathing room from every viewport edge, the gap between the trigger and the box, and the box's
@@ -756,6 +760,9 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   // so it clears the dock/enlarged stacking.
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  /* The scroller is the BODY, not the menu (`4g`) — every read and write of a scroll offset below
+     goes here, or the snap-back this effect documents comes straight back one element in. */
+  const menuBodyRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<FightMenuPlacement | null>(null);
   useLayoutEffect(() => {
     if (!menuOpen) { setMenuPos(null); return; }
@@ -772,19 +779,19 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       // 1px and "End the fight" stayed 340px below the fold at 1280x900, unreachable by pointer on a
       // surface whose hit test said it was there. The listener below then skips the menu's own
       // scrolls anyway; this restore is the belt, because a resize mid-scroll would do it too.
-      const cappedHeight = menu.style.maxHeight, cappedWidth = menu.style.width, scrolled = menu.scrollTop;
+      const cappedHeight = menu.style.maxHeight, cappedWidth = menu.style.width, scrolled = menuBodyRef.current?.scrollTop ?? 0;
       menu.style.maxHeight = "none";
       menu.style.width = `${menuWidthFor(window.innerWidth)}px`;
       const natural = menu.offsetHeight;
       menu.style.maxHeight = cappedHeight;
       menu.style.width = cappedWidth;
-      menu.scrollTop = scrolled;
+      if (menuBodyRef.current) menuBodyRef.current.scrollTop = scrolled;
       setMenuPos(placeFightMenu(button.getBoundingClientRect(), natural, { width: window.innerWidth, height: window.innerHeight }));
     };
     // Capture-phase, because the scroll that moves the trigger is some ancestor scroller's, not the
     // window's — but the menu scrolling ITSELF never moves the trigger, so it is not a reason to
-    // re-place anything.
-    const onScroll = (event: Event) => { if (event.target !== menuRef.current) place(); };
+    // re-place anything. `contains`, not identity: the scroller is the body inside the menu now.
+    const onScroll = (event: Event) => { if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)) place(); };
     place();
     window.addEventListener("resize", place);
     window.addEventListener("scroll", onScroll, true);
@@ -1062,7 +1069,16 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         <button type="button" ref={menuButtonRef} className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" aria-label="Fight options" title="Fight options - rules assistant, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && createPortal(<>
           <div className="encounter-menu-backdrop" onPointerDown={() => setMenuOpen(false)} />
-          <div ref={menuRef} className="encounter-menu anim-dialog scroll-y" role="menu" aria-label="Fight options" style={menuPos ? { top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
+          <div ref={menuRef} className="encounter-menu anim-dialog" role="menu" aria-label="Fight options" style={menuPos ? { top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, width: menuPos.width, maxHeight: menuPos.maxHeight } : { visibility: "hidden" }}>
+          {/* THE FRAME DOES NOT SCROLL; THIS DOES (`4g`). `.encounter-menu::before` is the plate, the
+              rim and the chamfer, and it is `position: absolute; inset: -1px` — so while the menu was
+              itself the scroll container the plate was sized to the SCROLLPORT and scrolled away with
+              the content. Measured as GM at 1280x900 with 25 roster actors: 674px of menu, 787px of
+              overflow, and at full scroll the plate sat at -569..105 against a menu at 218..892 —
+              every visible row rendering with no plate, no rim and no chamfer, straight over the
+              turn order's action cards. That is the reported screenshot. `role="none"` keeps the
+              wrapper out of the menu's own accessibility tree. */}
+          <div ref={menuBodyRef} className="encounter-menu-body scroll-y" role="none">
             <label className="rules-mode-control">Rules assistant
               <Select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.` : result.message ?? "The rules assistant could not be changed.")); }}>
                 <option value="strict">Enforce - blocks illegal moves; you can allow them</option>
@@ -1108,16 +1124,46 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               {(() => {
                 // Archived characters are out of play (D16) and the server refuses them - the list agrees.
                 const available = state.actors.filter((actor) => !actor.archived && !state.combat.initiative.some((entry) => entry.actorId === actor.id));
-                return available.length > 0
-                  ? <div className="menu-add-list">{available.map((actor) => <div key={actor.id} className="menu-add-row">
-                      <span>{actor.name}{actor.visibility === "gm-only" ? " · GM only" : ""}</span>
-                      <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight - their token is in the staging tray.`)}>Add</button>
-                    </div>)}</div>
-                  : <p className="menu-empty-note">Everyone on the roster is already in this fight.</p>;
+                /* THE SCENE-PREP SHAPE, VERBATIM (`4g`, second half; ScenePrepPanel.tsx:28,84-88,139-143).
+                   This was every non-archived roster actor, flat and unsorted, in a menu that is one
+                   scrollport tall — 25 rows on the throwaway server used to measure it, and a roster
+                   grows monotonically. Characters and NPCs stay listed in full because there are few
+                   of them and each is a person at this table; monsters go behind `Recent`, ten deep,
+                   pre-collapsed, sorted by the SERVER-STAMPED `lastUsedAt` (encounter.ts:115) — the
+                   same three rules D3 settled for scene prep, so the two doors agree. A monster the
+                   table has never fought is reached the way a new one always is: `+ Add monsters`. */
+                const addable = available.filter((actor) => actor.kind !== "monster");
+                const recent = available
+                  .filter((actor) => actor.kind !== "player-character" && actor.lastUsedAt !== undefined)
+                  .sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0))
+                  .slice(0, RECENT_COUNT);
+                const row = (actor: GmActor) => <div key={actor.id} className="menu-add-row">
+                  <span>{actor.name}{actor.visibility === "gm-only" ? " · GM only" : ""}</span>
+                  <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight - their token is in the staging tray.`)}>Add</button>
+                </div>;
+                return <>
+                  {addable.length > 0 && <div className="menu-add-list">{addable.map(row)}</div>}
+                  {/* The note is about the ROSTER, so it may only be said when the roster really is
+                      exhausted — `addable` being empty while `Recent` has ten monsters to offer is
+                      not that, and saying it there would be a lie the disclosure immediately
+                      contradicts. */}
+                  {available.length === 0 && <p className="menu-empty-note">Everyone on the roster is already in this fight.</p>}
+                  {/* NO `.scroll-y` on the recent list, unlike scene prep's picklist: `RECENT_COUNT`
+                      is what bounds it, and encounter-panel.css:450 already records why a scroller
+                      here is wrong ("a second scrollbar-in-a-scrollbar the GM had to fight"). Ten
+                      rows flow inside the body's one scroll region. */}
+                  <details className="menu-add-recent">
+                    <summary>Recent{recent.length > 0 ? ` (${recent.length})` : ""}</summary>
+                    {recent.length === 0
+                      ? <p className="menu-empty-note">Monsters you have used before show up here.</p>
+                      : <div className="menu-add-list">{recent.map(row)}</div>}
+                  </details>
+                </>;
               })()}
               <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => { setBrowsing(true); setMenuOpen(false); }}>+ Add monsters</button>
             </div>
             <button type="button" className="encounter-end" disabled={busy} onClick={() => { setMenuOpen(false); end(); }}>End the fight</button>
+          </div>
           </div>
         </>, document.fullscreenElement ?? document.body)}
       </div>

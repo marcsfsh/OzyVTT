@@ -358,7 +358,7 @@
    (main.tsx:458) and a nested `.encounter-panel` (a sheet inside the tracker) must not take this. */
 .encounter-map-dock > .encounter-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: 0; background: transparent; padding: 0; }
 /* `4c.1` — THE DOCK IS THE FRAME, so the panel does not bring a second one. `.encounter-panel::before`
-   (encounter-panel.css:1500) paints `inset: -1px`, a `--rim-w` border in the role-hued `--rim-color`
+   (encounter-panel.css:1526) paints `inset: -1px`, a `--rim-w` border in the role-hued `--rim-color`
    and a bezel outline: a complete frame 1px OUTSIDE the panel's own border box, landing just inside
    the dock's `border-image` beam edge. Measured as GM at 1280x900 dock-right, the pseudo was
    `display: block` with a 2px rim and a 1px bezel outline standing there. The override above only

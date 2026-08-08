@@ -1,6 +1,6 @@
 /**
- * The map-stability audit — two facts about the battle map that only a browser can settle, because
- * both are facts about LAYOUT and jsdom has none.
+ * The map-stability audit — three facts about the battle map and the surfaces over it that only a
+ * browser can settle, because all three are facts about LAYOUT and jsdom has none.
  *
  * PASS 1: THE MAP DOES NOT MOVE WHEN YOU LET GO OF A TOKEN (`4h`). It drives a real GM session on a
  * real fight, drags a real token with real pointer events, and records
@@ -10,6 +10,9 @@
  *
  * PASS 2: THE PANEL DOCKED INTO THE MAP SCROLLS, AND OWNS EXACTLY ONE SCROLLER (`4c`), AND BRINGS NO
  * SECOND FRAME (`4c.1`). See its own note further down.
+ *
+ * PASS 3: THE ⋯ FIGHT MENU'S FRAME STAYS BEHIND ITS OWN CONTENT WHEN IT SCROLLS, AND ITS ADD LIST IS
+ * BOUNDED (`4g`). See its own note further down.
  *
  * WHY THIS FILE EXISTS AT ALL. This is `4h`, and `4h` has been reported twice. It was fixed once
  * (22f04ed / 868ac16, 2026-07-22) by floating the token tray and the saving line out of flow in
@@ -47,16 +50,17 @@
  * agree: a MutationObserver that measures synchronously the instant the node is added — that is the
  * capture that would still work with no delay at all — and rAF samples across the held window.
  *
- * WHAT IT COVERS. The three compositions the CSS actually distinguishes, at the two rungs the
+ * WHAT PASS 1 COVERS. The three compositions the CSS actually distinguishes, at the two rungs the
  * layout distinguishes: undocked, docked left and docked right at 1280x900 and 1024x667 (the stage
  * is `flex: 1` and the saving line is out of flow), 390x844 and 320x568 (the stage's height is
  * STATED and the line folds back in flow), and enlarged (`position: fixed` over the page). Every
  * cell asserts the same thing, because the requirement does not vary: the map holds still.
  *
  * WHAT A GREEN RUN IS NOT WORTH. It measures the GM. A player sees the same CSS and the same
- * markup — the arm is chosen by viewport and dock preference, not by role — but a player can only
- * move a character they have claimed, and this audit does not claim one. It also measures one drag
- * per cell, not every gesture kind.
+ * markup — every arm here is chosen by viewport and dock preference, not by role — but a player can
+ * only move a character they have claimed, and the ⋯ menu is the GM's alone; this audit claims no
+ * character. It also measures one drag per cell, not every gesture kind, and it reads whatever
+ * roster the dev server happens to hold: pass 3's row cap is only tested where there are rows.
  */
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_CORE ?? "playwright-core");
@@ -199,13 +203,15 @@ const CLEAR_TOKEN = `(() => [...document.querySelectorAll(".encounter-token.mova
  */
 async function walkATokenClear(page) {
   if ((await page.evaluate(CLEAR_TOKEN)) >= 0) return;
-  const token = page.locator(".encounter-token.movable").first();
-  if ((await token.count()) === 0) return;
-  for (const key of ["ArrowLeft", "ArrowLeft", "ArrowUp", "ArrowLeft", "ArrowUp", "ArrowLeft"]) {
-    await token.evaluate((el) => el.focus());
-    await page.keyboard.press(key);
-    await page.waitForTimeout(700);
-    if ((await page.evaluate(CLEAR_TOKEN)) >= 0) return;
+  const count = await page.locator(".encounter-token.movable").count();
+  for (let index = 0; index < Math.min(count, 3); index += 1) {
+    const token = page.locator(".encounter-token.movable").nth(index);
+    for (let step = 0; step < 8; step += 1) {
+      await token.evaluate((el) => el.focus());
+      await page.keyboard.press(step % 2 === 0 ? "ArrowLeft" : "ArrowUp");
+      await page.waitForTimeout(550);
+      if ((await page.evaluate(CLEAR_TOKEN)) >= 0) return;
+    }
   }
 }
 
@@ -225,45 +231,55 @@ async function measure(testCase) {
     if (testCase.dock && !(await page.evaluate(() => document.querySelector(".table-layout.docked") !== null))) {
       throw new Error("the docked composition never rendered");
     }
-    await walkATokenClear(page);
-    const index = await page.evaluate(CLEAR_TOKEN);
-    if (index < 0) throw new Error("every token is parked under one of the map's own controls");
+    /* Up to three attempts, on three different tokens. A drag that lands on another token, or that
+       the server reads as "stayed in the same space", submits no move and mounts no line — and a
+       cell that reports NOT MEASURED for a fixture accident reads exactly like a cell that could
+       not reach the state, which is the one thing this script must not blur. Each attempt is a
+       complete measurement; the first that produces a mount is the one reported. */
+    let log = null;
+    for (let attempt = 0; attempt < 3 && !log; attempt += 1) {
+      await walkATokenClear(page);
+      const clear = await page.evaluate(CLEAR_TOKEN);
+      if (clear < 0) throw new Error("every token is parked under one of the map's own controls");
+      const index = Math.min(clear + attempt, (await page.locator(".encounter-token.movable").count()) - 1);
+      const box = await page.locator(".encounter-token.movable").nth(index).boundingBox();
+      const stage = await page.locator(".encounter-map-stage").boundingBox();
+      if (!box || !stage) throw new Error("the token or the stage has no box");
+      await page.evaluate(INSTRUMENT);
+      await page.evaluate(() => window.__mapStability.push("before-pointerdown"));
 
-    const box = await page.locator(".encounter-token.movable").nth(index).boundingBox();
-    const stage = await page.locator(".encounter-map-stage").boundingBox();
-    if (!box || !stage) throw new Error("the token or the stage has no box");
-    await page.evaluate(INSTRUMENT);
-    await page.evaluate(() => window.__mapStability.push("before-pointerdown"));
+      // Aim at the stage's centre from an edge, or a comfortable step away from the middle: far
+      // enough that the move is not read as "stayed in the same space", inside the stage either way.
+      const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const centre = { x: stage.x + stage.width / 2, y: stage.y + stage.height / 2 };
+      const away = 1 + attempt;
+      const to = {
+        x: Math.abs(from.x - centre.x) > stage.width / 4 ? centre.x : from.x + Math.min(70 * away, stage.width / 3),
+        y: Math.abs(from.y - centre.y) > stage.height / 4 ? centre.y : from.y + Math.min(50 * away, stage.height / 3)
+      };
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      for (let step = 1; step <= 8; step += 1) {
+        await page.mouse.move(from.x + (to.x - from.x) * step / 8, from.y + (to.y - from.y) * step / 8);
+        await page.evaluate(() => window.__mapStability.push("drag"));
+        await page.waitForTimeout(20);
+      }
+      await page.evaluate(() => { window.__holdSocket = 2500; });
+      await page.mouse.up();
 
-    // Aim at the stage's centre from an edge, or a comfortable step away from the middle: far enough
-    // that the move is not read as "stayed in the same space", inside the stage either way.
-    const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-    const centre = { x: stage.x + stage.width / 2, y: stage.y + stage.height / 2 };
-    const to = {
-      x: Math.abs(from.x - centre.x) > stage.width / 4 ? centre.x : from.x + Math.min(80, stage.width / 5),
-      y: Math.abs(from.y - centre.y) > stage.height / 4 ? centre.y : from.y + Math.min(60, stage.height / 5)
-    };
-    await page.mouse.move(from.x, from.y);
-    await page.mouse.down();
-    for (let step = 1; step <= 8; step += 1) {
-      await page.mouse.move(from.x + (to.x - from.x) * step / 8, from.y + (to.y - from.y) * step / 8);
-      await page.evaluate(() => window.__mapStability.push("drag"));
-      await page.waitForTimeout(20);
+      const mounted = await page.waitForSelector(".encounter-map-saving", { state: "attached", timeout: 6_000 }).then(() => true, () => false);
+      if (!mounted) { await page.evaluate(() => { window.__holdSocket = 0; window.__mapStability.stop(); }); await page.waitForTimeout(500); continue; }
+      for (let sample = 0; sample < 12; sample += 1) {
+        await page.evaluate(() => window.__mapStability.push("saving-held"));
+        await page.waitForTimeout(60);
+      }
+      await page.evaluate(() => { window.__holdSocket = 0; });
+      await page.waitForSelector(".encounter-map-saving", { state: "detached", timeout: 10_000 });
+      await page.evaluate(() => { window.__mapStability.push("settled"); window.__mapStability.stop(); });
+      const candidate = await page.evaluate(() => window.__mapStability);
+      if (candidate.mounts > 0) log = candidate;
     }
-    await page.evaluate(() => { window.__holdSocket = 2500; });
-    await page.mouse.up();
-
-    await page.waitForSelector(".encounter-map-saving", { state: "attached", timeout: 8_000 });
-    for (let sample = 0; sample < 12; sample += 1) {
-      await page.evaluate(() => window.__mapStability.push("saving-held"));
-      await page.waitForTimeout(60);
-    }
-    await page.evaluate(() => { window.__holdSocket = 0; });
-    await page.waitForSelector(".encounter-map-saving", { state: "detached", timeout: 10_000 });
-    await page.evaluate(() => { window.__mapStability.push("settled"); window.__mapStability.stop(); });
-
-    const log = await page.evaluate(() => window.__mapStability);
-    if (log.mounts === 0) throw new Error("the saving line never mounted — the move did not submit");
+    if (!log) throw new Error("three drags submitted no move — the saving line never mounted");
     const held = log.samples.filter((s) => s.saving);
     if (held.length === 0) throw new Error("never sampled the stage while the saving line was up");
     const base = log.samples[0];
@@ -348,8 +364,113 @@ async function measureDock(testCase) {
   }
 }
 
+/**
+ * PASS 3 — `4g`. The ⋯ fight menu, at the two rungs and on a phone, with whatever roster this server
+ * holds. Three assertions:
+ *
+ *  (1) THE FRAME DOES NOT MOVE WHEN THE MENU SCROLLS. `.encounter-menu::before` is the plate, the rim
+ *      and the chamfer, at `position: absolute; inset: -1px` — and an absolutely-positioned child of
+ *      a SCROLL CONTAINER is sized to the scrollport and rides the scroll. While `.encounter-menu`
+ *      was itself the scroller, the frame scrolled off its own contents: measured with 25 roster
+ *      actors at 1280x900, the plate ended at -569..105 against a menu box at 218..892, so every
+ *      visible row painted with no plate, no rim and no chamfer, straight over the turn order.
+ *      A pseudo-element has no measurable box, so the probe is a real element given the SAME
+ *      containing block and the SAME insets — its rect IS the pseudo's geometry.
+ *  (2) EXACTLY ONE SCROLLER, and it says so with `.scroll-y` in the markup (check (h)).
+ *  (3) THE ADD LIST IS BOUNDED. Visible rows must not exceed `RECENT_COUNT`; it was every
+ *      non-archived roster actor not already fighting, flat and unsorted, in a box one scrollport
+ *      tall. VISIBILITY IS `checkVisibility()`, NOT A RECT: Chromium lays out a closed `<details>`
+ *      (`content-visibility: hidden` keeps layout and skips paint), so all ten Recent rows report a
+ *      31px box while being genuinely unrendered — the same trap `tap-audit.mjs`'s docblock records.
+ *  (4) `.row-tools-popover` SHARES THE PSEUDO AND MUST NOT SHARE THE TRAP. It is in the same selector
+ *      list at `encounter-panel.css:1539`; it is safe only because it is not a scroll container, and
+ *      that is a fact worth asserting rather than assuming, since giving it a `max-height` some day
+ *      would silently re-open this.
+ */
+const MENU_CASES = [
+  { label: "⋯ menu 1280x900", w: 1280, h: 900 },
+  { label: "⋯ menu 1024x667", w: 1024, h: 667 },
+  { label: "⋯ menu 390x844", w: 390, h: 844 },
+  { label: "⋯ menu 320x568", w: 320, h: 568 }
+];
+
+/** Mirrors `RECENT_COUNT` in EncounterPanel.tsx — the cap the add list is supposed to keep. */
+const RECENT_COUNT = 10;
+
+const MENU_REPORT = `(() => {
+  const menu = document.querySelector(".encounter-menu");
+  if (!menu) return null;
+  const name = (el) => el.tagName.toLowerCase() + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\\s+/)[0] : "");
+  const ports = [menu, ...menu.querySelectorAll("*")].filter((el) => {
+    const overflow = getComputedStyle(el).overflowY;
+    return overflow === "auto" || overflow === "scroll";
+  }).map((el) => ({ el: name(el), over: el.scrollHeight - el.clientHeight, declared: el.classList.contains("scroll-y") }));
+  // The plate's geometry, read off a stand-in with the same containing block and the same insets.
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:absolute;inset:-1px;pointer-events:none;visibility:hidden";
+  menu.appendChild(probe);
+  const scroller = ports.find((p) => p.over > 0) ? menu.querySelector(".scroll-y") ?? menu : menu;
+  const read = (top) => { scroller.scrollTop = top; const r = probe.getBoundingClientRect(); return { at: scroller.scrollTop, top: Math.round(r.top * 100) / 100, bottom: Math.round(r.bottom * 100) / 100 }; };
+  const atTop = read(0);
+  const atBottom = read(1e6);
+  scroller.scrollTop = 0;
+  probe.remove();
+  const rows = [...menu.querySelectorAll(".menu-add-row")];
+  const tools = document.querySelector(".row-tools-popover");
+  return {
+    ports, atTop, atBottom,
+    scrolledBy: atBottom.at,
+    visibleRows: rows.filter((el) => el.checkVisibility()).length,
+    rowsInDom: rows.length,
+    toolsScrolls: tools ? ["auto", "scroll"].includes(getComputedStyle(tools).overflowY) : null
+  };
+})()`;
+
+async function measureMenu(testCase) {
+  const page = await gmPage({ width: testCase.w, height: testCase.h }, null);
+  try {
+    await ensureFight(page);
+    await page.getByRole("button", { name: "Fight options" }).click({ timeout: 12_000 });
+    await page.waitForSelector(".encounter-menu", { timeout: 10_000 });
+    await page.waitForTimeout(600);
+    const report = await page.evaluate(MENU_REPORT);
+    if (!report) throw new Error("the ⋯ menu never opened");
+    // The row tools card shares the plate's rule — open one so (4) is measured, not assumed. It goes
+    // AFTER the menu, and the menu's own backdrop is dismissed first, because that backdrop is
+    // `position: fixed; inset: 0` and swallows every click behind it.
+    await page.keyboard.press("Escape");
+    await page.locator(".encounter-menu-backdrop").click({ position: { x: 5, y: 5 }, timeout: 5_000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const rowButton = page.locator(".initiative-expand").first();
+    if (await rowButton.count()) {
+      await rowButton.click({ timeout: 8_000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      report.toolsScrolls = await page.evaluate(() => {
+        const tools = document.querySelector(".row-tools-popover");
+        return tools ? ["auto", "scroll"].includes(getComputedStyle(tools).overflowY) : null;
+      });
+    }
+    const problems = [];
+    if (report.ports.length !== 1) problems.push(`${report.ports.length} scroll ports (${report.ports.map((p) => p.el).join(", ") || "none"})`);
+    for (const port of report.ports) if (!port.declared) problems.push(`${port.el} scrolls undeclared`);
+    if (report.atTop.top !== report.atBottom.top || report.atTop.bottom !== report.atBottom.bottom) {
+      problems.push(`the frame scrolls with the content: ${report.atTop.top}..${report.atTop.bottom} -> ${report.atBottom.top}..${report.atBottom.bottom} after ${report.scrolledBy}px`);
+    }
+    if (report.visibleRows > RECENT_COUNT) problems.push(`${report.visibleRows} add rows visible, cap ${RECENT_COUNT}`);
+    if (report.toolsScrolls === true) problems.push(".row-tools-popover is a scroll container and shares the pseudo — same trap");
+    return {
+      problems,
+      detail: `${report.ports.length} port(s) · scrolled ${report.scrolledBy}px · frame ${report.atTop.top}..${report.atTop.bottom} unmoved`
+        + ` · ${report.visibleRows}/${report.rowsInDom} add rows visible · row-tools scrolls ${report.toolsScrolls}`
+    };
+  } finally {
+    await page.close();
+  }
+}
+
 const rows = [];
 const dockRows = [];
+const menuRows = [];
 let failures = 0;
 let unmeasured = 0;
 
@@ -388,9 +509,24 @@ for (const testCase of DOCK_CASES) {
   }
 }
 
+for (const testCase of MENU_CASES) {
+  try {
+    const result = await measureMenu(testCase);
+    if (result.problems.length) failures += 1;
+    menuRows.push({
+      label: testCase.label,
+      verdict: result.problems.length ? "FAIL" : "PASS",
+      detail: result.problems.length ? result.problems.join(" · ") : result.detail
+    });
+  } catch (error) {
+    unmeasured += 1;
+    menuRows.push({ label: testCase.label, verdict: "NOT MEASURED", detail: String(error).split("\n")[0].slice(0, 110) });
+  }
+}
+
 await browser.close();
 
-const width = Math.max(...[...rows, ...dockRows].map((r) => r.label.length));
+const width = Math.max(...[...rows, ...dockRows, ...menuRows].map((r) => r.label.length));
 const table = (title, list) => {
   console.log(`\n===== ${title} =====`);
   for (const row of list) console.log(`${row.label.padEnd(width)}  ${row.verdict.padEnd(12)}  ${row.detail}`);
@@ -402,5 +538,9 @@ table("the docked panel scrolls, once, inside one frame (4c / 4c.1)", dockRows);
 console.log(`\nA cell reads PASS when .encounter-map-dock holds exactly ONE scroll port, that port says`);
 console.log(`so with .scroll-y in the markup, a wheel over the turn order moves it, and the panel`);
 console.log(`inside the dock paints no second rim.`);
-console.log(`\n${rows.length + dockRows.length} checks; ${failures} failing; ${unmeasured} NOT MEASURED.`);
+table("the fight menu's frame stays behind its rows, and its add list is capped (4g)", menuRows);
+console.log(`\nA cell reads PASS when the ⋯ menu holds exactly ONE declared scroll port, its plate keeps`);
+console.log(`the same box at every scroll offset, no more than ${RECENT_COUNT} add rows are actually rendered, and`);
+console.log(`.row-tools-popover — which shares the plate's rule — is still not a scroll container.`);
+console.log(`\n${rows.length + dockRows.length + menuRows.length} checks; ${failures} failing; ${unmeasured} NOT MEASURED.`);
 process.exit(failures === 0 && unmeasured === 0 ? 0 : 1);
