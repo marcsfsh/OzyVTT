@@ -5282,6 +5282,7 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item
 | `damageType` | string | yes |  |
 | `rangeFeet` | integer \| null | yes |  |
 | `longRangeFeet` | integer \| null | yes | Attacks past `rangeFeet` up to this roll at disadvantage |
+| `mastery` | `cleave` \| `graze` \| `nick` \| `push` \| `sap` \| `slow` \| `topple` \| `vex` | no | The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery. |
 
 ### `HomebrewExtraPick`
 
