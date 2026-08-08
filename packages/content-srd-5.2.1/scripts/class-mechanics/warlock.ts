@@ -283,14 +283,17 @@ export const warlock: ClassMechanicsModule = {
         uses: { scaling: { type: "ability-modifier", ability: "cha", minimum: 1 }, per: "long-rest" }
       },
       /**
-       * FIENDISH RESILIENCE - audit row 66, its base pick only.
+       * FIENDISH RESILIENCE - audit row 66, both halves.
        *
        * "Choose one damage type, other than Force" is Divine-Order-shaped: twelve inline options,
        * each carrying its own `grants.damageResistances`. "Whenever you finish a Short or Long Rest"
-       * is ruling A's rest-time re-choice and stays prose - it is runtime state (a per-actor
-       * `choiceOverrides` map cleared on a rest), not a build-time ledger row.
+       * is ruling A's rest-time re-choice, and it is RUNTIME state rather than a ledger row - the
+       * build's answer is where the character starts, `actor.rechoose` writes the override, and the
+       * next rest of either kind clears it. Declared as `short-rest` because a long rest satisfies a
+       * short-rest clause too, exactly as it re-arms a short-rest use pool.
        */
       "fiendish-resilience": {
+        replaces: [{ offer: "feature:fiendish-resilience", when: "short-rest", amount: 1 }],
         choice: {
           kind: "damage-type",
           choose: 1,

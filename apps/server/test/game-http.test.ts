@@ -838,6 +838,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.healthDisplay, "post", "encounter.set-health-display"],
       [GAME_PATHS.environment, "post", "encounter.set-environment"],
       [GAME_PATHS.actorRest, "post", "actor.rest"],
+      [GAME_PATHS.actorRechoose, "post", "actor.rechoose"],
       [GAME_PATHS.actorSpendHitDice, "post", "actor.spend-hit-dice"],
       [GAME_PATHS.characterSetSlot, "post", "character.set-slot"],
       [GAME_PATHS.characterSetPrepared, "post", "character.set-prepared"],

@@ -241,7 +241,7 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
       // hitDice (a healing resource that tracks with exact HP - own claimed character only), and
       // archived and sheetPreview (GM-only management flags - the shared-archived door is the
       // name-and-id-only `archivedCharacters` list above, never a flag on a live actor).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, sheetPreview: _sheetPreview, ...actor } = source;
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, choiceOverrides, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, archived: _archived, sheetPreview: _sheetPreview, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // ANOTHER PLAYER'S CHARACTER: the one and only thing `partyVisibility` governs. A monster, an
       // NPC and an unclaimed character are all outside it - see the field table above this function.
@@ -273,6 +273,11 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         ...(classLine !== null ? { classLine } : {}),
         ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
         ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),
+        // PICKS RE-MADE ON A REST (ruling A's runtime half), under the SAME gate as `actionUses` and
+        // for the same reason: it is a sheet resource, it names the character's own offer keys, and
+        // it is exactly as private as the spent-use map beside it. Copied rather than referenced -
+        // a player projection never hands out a live reference into GameState.
+        ...(resourcesVisible ? { choiceOverrides: Object.fromEntries(Object.entries(choiceOverrides).map(([key, value]) => [key, { ...value }])) } : {}),
         // WHAT THOSE SPENT COUNTS ARE OUT OF. `actionUses` has always been a bare map of spent
         // numbers with nothing on the wire naming the pools or their ceilings, so "3" could not be
         // rendered as "3 of 5". `pools` is derived from the sheet that is ALREADY being sent (see

@@ -620,7 +620,7 @@ describe("extra picks raise the budget the server validates against", () => {
         if (!real || id !== "human") return real;
         return { ...real, traits: [...real.traits, {
           id: "arcane-echo", name: "Arcane Echo", description: "You know one extra cantrip.",
-          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-cantrips", amount: 1 }]
+          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-cantrips", amount: 1 }]
         }] };
       }
     });
@@ -644,7 +644,7 @@ describe("extra picks raise the budget the server validates against", () => {
         if (!real || id !== "human") return real;
         return { ...real, traits: [...real.traits, {
           id: "temple-scholar", name: "Temple Scholar", description: "One additional Cleric skill.",
-          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-skills", amount: 1 }]
+          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-skills", amount: 1 }]
         }] };
       }
     });
@@ -760,7 +760,7 @@ describe("extra picks raise the budget the server validates against", () => {
         if (!real || id !== "human") return real;
         return { ...real, traits: [...real.traits, {
           id: "zealous-study", name: "Zealous Study", description: "One additional prepared Cleric spell.",
-          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-spells", amount: 1 }]
+          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-spells", amount: 1 }]
         }] };
       }
     });
@@ -818,7 +818,7 @@ describe("extra picks raise the budget the server validates against", () => {
         if (!real || id !== "human") return real;
         return { ...real, traits: [...real.traits, {
           id: "typo-gift", name: "Typo Gift", description: "Grants a pick to a budget that does not exist.",
-          tags: [], actions: [], effects: [], modifiers: [], extraPicks: [{ offer: "class-cantrip", amount: 1 }]
+          tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [{ offer: "class-cantrip", amount: 1 }]
         }] };
       }
     });
@@ -960,7 +960,7 @@ describe("D3 - a malformed content record rejects instead of throwing a raw Type
       if (!real || id !== "human") return real;
       return { ...real, traits: [...real.traits, {
         id: "broken-boon", name: "Broken Boon", description: "A boon whose option list was never authored.",
-        tags: [], actions: [], effects: [], modifiers: [], extraPicks: [],
+        tags: [], actions: [], effects: [], modifiers: [], replaces: [], extraPicks: [],
         // `{kind, choose, from: []}` used to PARSE (an empty array is truthy, so the schema's
         // "needs from OR fromCatalog" refinement never fired) and then hand `undefined` to
         // resolveCatalogChoice - a TypeError, which is neither a CatalogChoiceError nor a

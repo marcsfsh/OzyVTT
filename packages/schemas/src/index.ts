@@ -487,6 +487,23 @@ export const ActorSchema = z.object({
   deathSaves: DeathSavesSchema.nullable().default(null),
   /** Spent limited-use counts by action id (per-encounter and per-long-rest pools). Additive. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  /**
+   * PICKS RE-MADE ON A REST, keyed by the offer key the build already uses.
+   *
+   * "Whenever you finish a Long Rest, choose one type of land"; "whenever you finish a Short or Long
+   * Rest, choose one damage type". These are the RUNTIME half of a feature's `replaces` clause and
+   * they belong here rather than in `character.choices[]`: a Barbarian re-choosing weapon masteries
+   * on a rest must not require a rebuild, and a GM has to be able to see it happen mid-session.
+   *
+   * `per` is the rest that CLEARS it - so an override lasts exactly until the next rest of that kind,
+   * and the character falls back to the answer their build recorded until they choose again. A long
+   * rest clears short-rest overrides too, the same nesting a short-rest use pool has. Additive:
+   * absent means "nobody has re-chosen anything", which is every existing actor.
+   */
+  choiceOverrides: z.record(z.string(), z.object({
+    id: z.string().regex(/^[a-z0-9-]+$/).max(80),
+    per: z.enum(["short-rest", "long-rest"])
+  }).strict()).default({}),
   /** Conditions this actor is immune to (seeded from its definition; enforced skip-with-narration). GM knowledge - stripped from player projections. Additive. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown → movement rules skip, the unmeasurable pattern. Additive. */

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BuilderPolicySchema } from "@vtt/domain";
+import { BuilderPolicySchema, GameStateSchema } from "@vtt/domain";
+import { importActorDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
-import { ContentLibrary } from "../src/content-library.js";
+import { replaceableOffers } from "../src/choice-overrides.js";
+import { ContentLibrary, type ContentView } from "../src/content-library.js";
+import { applyRest } from "../src/rests.js";
 
 /**
  * THE FOUR PICK RULINGS Stage 4 specified and declined to build - held at the far end.
@@ -456,5 +459,83 @@ describe("ruling E - audit rows 51-53: `fromPicks` over the character's own know
     );
     // Thunderclap satisfies "deals damage" but NOT "requires an attack roll".
     expect(() => build(input)).toThrowError(/"thunderclap" is not an offered option/);
+  });
+});
+
+// ── Ruling A — replacement ───────────────────────────────────────────────────────────────────────
+
+describe("ruling A - `replaces` names a pick this build really has, or the build is refused", () => {
+  it("REFUSES a clause naming no budget, the same way an extraPicks key that names nothing is refused", () => {
+    // One offer-key namespace, one check. "You can replace one of these" is worth nothing if the
+    // thing it replaces is not a pick this build has - the clause would parse, ship, and let the
+    // player re-choose a budget that does not exist.
+    const bogus: ContentView = {
+      ...library,
+      classRecord: (id: string) => {
+        const real = library.classRecord(id);
+        if (!real || id !== "druid") return real;
+        return {
+          ...real,
+          features: real.features.map((feature) => feature.id === "druidic"
+            ? { ...feature, replaces: [{ offer: "feature:not-a-real-pick", when: "long-rest" as const, amount: 1 }] }
+            : feature)
+        };
+      }
+    };
+    expect(() => buildCharacterDefinition(druid(10, "polar"), bogus, policy))
+      .toThrowError(/says a pick to "feature:not-a-real-pick" may be replaced, which is not a pick this build has/);
+  });
+
+  it("accepts the clauses the SRD really prints - the land on a Long Rest, the damage type on either", () => {
+    // Circle Spells and Fiendish Resilience both declare `replaces` against their OWN pick, and both
+    // builds stand. A clause naming a real budget adds nothing to the build; it licenses a re-choice.
+    expect(() => build(druid(10, "polar"))).not.toThrow();
+    expect(() => build(warlock11("true-seeing"))).not.toThrow();
+  });
+});
+
+describe("ruling A - the rest-time half: re-choose, then let the rest take it back", () => {
+  const HERO = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
+  const onTheTable = (definition: ReturnType<typeof build>) => {
+    const state = GameStateSchema.parse({ schemaVersion: 1 });
+    importActorDefinition(state, definition, HERO, "public");
+    return state;
+  };
+  const view = library;
+
+  it("offers exactly the re-choices the CONTENT declares, with the option list the pick itself had", () => {
+    const state = onTheTable(build(druid(10, "polar")));
+    const offers = replaceableOffers(state.definitions[0].definition, view);
+    expect(offers.map((offer) => offer.offer)).toEqual(["feature:circle-of-the-land-spells"]);
+    expect(offers[0].per).toBe("long-rest");
+    expect(offers[0].options).toEqual(["arid", "polar", "temperate", "tropical"]);
+    // A Cleric declares none - nothing on that sheet is re-chosen on a rest.
+    const cleric14 = onTheTable(build(cleric(14, "divine-strike")));
+    expect(replaceableOffers(cleric14.definitions[0].definition, view)).toEqual([]);
+  });
+
+  it("a Warlock's Fiendish Resilience is re-choosable on the SHORTER rest, over all twelve types", () => {
+    const state = onTheTable(build(warlock11("true-seeing")));
+    const offers = replaceableOffers(state.definitions[0].definition, view);
+    const resilience = offers.find((offer) => offer.offer === "feature:fiendish-resilience");
+    expect(resilience, "Fiendish Resilience re-chooses on a Short or Long Rest").toBeTruthy();
+    expect(resilience!.per).toBe("short-rest");
+    expect(resilience!.options).toContain("cold");
+    expect(resilience!.options).not.toContain("force"); // "other than Force", as the SRD prints it
+  });
+
+  it("a LONG rest clears both kinds; a SHORT rest clears only the short-rest one", () => {
+    // The counter half of the ruling: the override lasts exactly until the next rest of its kind, so
+    // the choice is made afresh instead of standing forever.
+    const state = onTheTable(build(warlock11("true-seeing")));
+    const actor = state.actors[0];
+    actor.choiceOverrides = {
+      "feature:fiendish-resilience": { id: "cold", per: "short-rest" },
+      "feature:some-long-rest-pick": { id: "arid", per: "long-rest" }
+    };
+    applyRest(state, HERO, "short", () => state.definitions[0].definition);
+    expect(Object.keys(actor.choiceOverrides)).toEqual(["feature:some-long-rest-pick"]);
+    applyRest(state, HERO, "long", () => state.definitions[0].definition);
+    expect(actor.choiceOverrides).toEqual({});
   });
 });

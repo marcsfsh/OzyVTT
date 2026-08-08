@@ -175,6 +175,7 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
     // Listed explicitly rather than spread, so a field added to one carrier and forgotten on the
     // other is a TYPE error here instead of a rider that silently stops arriving.
     extraPicks: option.extraPicks,
+    replaces: option.replaces,
     ...(option.uses ? { uses: option.uses } : {}),
     ...(option.grants ? { grants: option.grants } : {}),
     // An option's own choice cannot nest further options (the vocabulary is depth-limited), but the
@@ -963,11 +964,27 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
   const printedCantrips = levelRow.cantripsKnown ?? 0;
   const printedPrepared = levelRow.preparedCount ?? levelRow.spellsKnown ?? 0;
+  const namesARealBudget = (key: string): boolean =>
+    offers.some((candidate) => candidate.key === key)
+    || (key === CLASS_CANTRIP_BUDGET && printedCantrips > 0)
+    || (key === CLASS_SPELL_BUDGET && printedPrepared > 0);
   for (const key of extraPickBudgets.keys()) {
-    if (offers.some((candidate) => candidate.key === key)) continue;
-    if (key === CLASS_CANTRIP_BUDGET && printedCantrips > 0) continue;
-    if (key === CLASS_SPELL_BUDGET && printedPrepared > 0) continue;
+    if (namesARealBudget(key)) continue;
     reject(`A feature grants an extra pick to "${key}", which is not a pick this build has. Name one of ${NAMED_PICK_BUDGETS.map((budget) => `"${budget}"`).join(", ")}, or a feature's own pick ("feature:<featureId>").`);
+  }
+  /**
+   * A `replaces` CLAUSE NAMING NOTHING IS THE SAME AUTHORING ERROR, and fails the same way.
+   *
+   * "You can replace one of these" is worth nothing if the thing it replaces is not a pick this
+   * build has - the clause would parse, ship, and let a player re-choose a budget that does not
+   * exist. One offer-key namespace means one check, so this reuses the test `extraPicks` uses rather
+   * than growing a second list of legal keys beside it.
+   */
+  for (const { record } of granted) {
+    for (const clause of record.replaces) {
+      if (namesARealBudget(clause.offer)) continue;
+      reject(`"${record.name}" says a pick to "${clause.offer}" may be replaced, which is not a pick this build has. Name one of ${NAMED_PICK_BUDGETS.map((budget) => `"${budget}"`).join(", ")}, or a feature's own pick ("feature:<featureId>").`);
+    }
   }
 
   // Pass B: everything else. Rows the offer machinery does not own: the class's own prepared

@@ -106,6 +106,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
+| `actor.rechoose` | `actor:write` |
 | `actor.spend-hit-dice` | `actor:write` |
 | `character.set-slot` | `actor:write` |
 | `character.set-prepared` | `actor:write` |
@@ -1039,6 +1040,25 @@ Toggles the underwater environment on the live encounter (GM-grade only; SRD Und
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `underwater` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/rechoose`
+
+Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). The answer is NOT written to the character's choices ledger - it is runtime state on the actor, cleared by the matching rest - so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `offer` | string (pattern) | yes | The offer key whose answer is being re-made - the same key the build already uses ("feature:circle-of-the-land-spells") |
+| `id` | string (pattern) | yes | The new answer. Must be one the original pick could itself have chosen; the server resolves that list from the content and a client cannot widen it |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -5338,6 +5358,7 @@ THE shared feature record: a class feature, a subclass feature, a species trait,
 | `choice` | HomebrewFeatureChoice | no | A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible |
 | `choices` | HomebrewFeatureChoice[] | no | SEVERAL picks, when one record promises more than one - Magic Initiate's "two cantrips ... and one level 1 spell", Deft Explorer's Expertise plus two languages. Mutually exclusive with `choice`, which stays the way almost every record is authored |
 | `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
+| `replaces` | HomebrewReplaceableChoice[] | no | Picks this lets the character RE-MAKE later - "whenever you finish a Long Rest, choose one type of land". Not a budget increase: it edits an answer. A level-up clause rewrites the choices ledger; a rest clause is runtime state on the actor, cleared by the matching rest |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
 | `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
@@ -5480,6 +5501,7 @@ ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeat
 | `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen, from a list of its own |
 | `choices` | HomebrewFeatureOptionChoice[] | no | SEVERAL second-order picks (Pact of the Tome asks for three cantrips AND two rituals). Mutually exclusive with `choice` |
 | `extraPicks` | HomebrewExtraPick[] | no | Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class's list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2 |
+| `replaces` | HomebrewReplaceableChoice[] | no | Picks this lets the character RE-MAKE later - "whenever you finish a Long Rest, choose one type of land". Not a budget increase: it edits an answer. A level-up clause rewrites the choices ledger; a rest clause is runtime state on the actor, cleared by the matching rest |
 | `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
 | `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
 | `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
@@ -5917,6 +5939,16 @@ The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `va
 | `updatedAt` | string (date-time) | yes |  |
 | `valid` | boolean | yes |  |
 | `usageCount` | integer (≥ 0) | yes | How many characters took this record; 0 is the common case |
+
+### `HomebrewReplaceableChoice`
+
+ONE "you can replace…" clause. `offer` is the same offer-key namespace `extraPicks` uses, and a key naming no pick this build has is a loud build rejection. `when: "level-up"` is a build-time permission over the choices ledger (the replaced row is deleted, never tombstoned); `"short-rest"` / `"long-rest"` are runtime state on the actor, set by actor.rechoose and cleared by the matching rest - a short-rest clause is satisfied by a long rest too.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `offer` | string (pattern) | yes |  |
+| `when` | `level-up` \| `short-rest` \| `long-rest` | yes |  |
+| `amount` | integer (1–5) | no | How many of that offer's answers may be swapped at once Default: `1`. |
 
 ### `HomebrewRiderAttackBonus`
 

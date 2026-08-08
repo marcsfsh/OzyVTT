@@ -373,6 +373,40 @@ export type ExtraPick = z.infer<typeof ExtraPickSchema>;
  */
 const extraPicksField = z.array(ExtraPickSchema).max(4).default([]);
 
+/**
+ * ONE "you can replace…" clause - the largest unmodelled family in the content (33 of them).
+ *
+ * "Whenever you gain a Cleric level you can replace one cantrip"; "whenever you finish a Long Rest,
+ * change your Weapon Mastery choices"; "choose one type of land … whenever you finish a Long Rest".
+ *
+ * IT IS NOT A BUDGET INCREASE, which is why `extraPicks` cannot say it: nothing is added. It EDITS a
+ * row of `character.choices[]`, the provenance ledger level-up and respec are both built on - so
+ * `offer` is the same offer-key namespace `extraPicks` uses (one vocabulary, and the same loud
+ * "names no budget this build has" rejection), and `amount` is how many of that offer's rows may be
+ * swapped at once.
+ *
+ * `when` is the thing that splits it in two, and the halves live in different places:
+ *
+ *   - `"level-up"` is a BUILD-TIME permission. The ledger is rewritten and the character rebuilt, so
+ *     the two rules that make it safe are the ones the builder already enforces: a row may never be
+ *     stamped above the character's own level, and an offer may never hold more rows than its
+ *     capacity (`matchRow`). What was missing was the DECLARATION - nothing told a level-up surface
+ *     that the swap was permitted at all. The replaced row is DELETED, never tombstoned, because the
+ *     ledger's job is to describe the character that exists.
+ *   - `"short-rest"` / `"long-rest"` are RUNTIME state. A Barbarian re-choosing weapon masteries on a
+ *     rest must not need a rebuild, and a GM must be able to watch it happen mid-session, so the
+ *     answer lives with `actor.actionUses` as `actor.choiceOverrides` - set by a command, cleared by
+ *     the matching rest. A short-rest clause is satisfied by a long rest too, exactly as a
+ *     short-rest use pool is.
+ */
+export const ReplaceableChoiceSchema = z.object({
+  offer: PickBudgetKeySchema,
+  when: z.enum(["level-up", "short-rest", "long-rest"]),
+  amount: z.number().int().min(1).max(5).default(1)
+}).strict();
+export type ReplaceableChoice = z.infer<typeof ReplaceableChoiceSchema>;
+const replacesField = z.array(ReplaceableChoiceSchema).max(4).default([]);
+
 /** The fields that describe WHAT is being picked, shared by a feature's choice and an option's own. */
 const featureChoiceBase = {
   kind: ContentIdSchema,
@@ -530,6 +564,8 @@ export const FeatureOptionSchema = z.object({
   choices: z.array(FeatureOptionChoiceSchema).min(1).max(4).optional(),
   /** Budgets this option RAISES once chosen (Thaumaturge's extra Cleric cantrip). */
   extraPicks: extraPicksField,
+  /** Picks this option lets the character RE-MAKE later (see `ReplaceableChoiceSchema`). */
+  replaces: replacesField,
   ...featureRiders
 }).strict().superRefine(oneChoiceForm);
 export type FeatureOption = z.infer<typeof FeatureOptionSchema>;
@@ -600,6 +636,8 @@ export const FeatureRecordSchema = z.object({
   choices: z.array(FeatureChoiceSchema).min(1).max(4).optional(),
   /** Budgets this feature RAISES - one extra cantrip, one extra skill, one more prepared spell. */
   extraPicks: extraPicksField,
+  /** Picks this feature lets the character RE-MAKE later - on a level-up, or on a rest (see `ReplaceableChoiceSchema`). */
+  replaces: replacesField,
   ...featureRiders,
   /** This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17). */
   replacesFeatureId: ContentIdSchema.optional()

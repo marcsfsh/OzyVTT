@@ -14,6 +14,7 @@ import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-act
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, rebuildActorDefinition, removeActor, resolvePendingImport, storedDefinition, submitPendingImport } from "./actor-roster.js";
 import { canInitiateForActor, canPlayerTarget } from "./authorization.js";
+import { replaceableOffers } from "./choice-overrides.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
 import { setCurrency, setInventoryItem } from "./inventory.js";
 import { setCharacterIdentity, setCharacterProficiencies } from "./character-edit.js";
@@ -44,7 +45,7 @@ import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "./r
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, BuilderSetPolicySchema, CharacterCreateSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, BuilderSetPolicySchema, CharacterCreateSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRechooseSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DamageResolveSchema, DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -1778,6 +1779,52 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    /**
+     * RE-MAKE A PICK the content says may be re-made on a rest - ruling A's runtime half.
+     *
+     * "Whenever you finish a Long Rest, choose one type of land." The answer is NOT written to
+     * `character.choices[]`: that ledger is the provenance level-up and respec are built on, and a
+     * re-choice between fights must not require a rebuild. It goes on the actor as `choiceOverrides`,
+     * beside `actionUses`, and the matching rest clears it (`rests.ts`).
+     *
+     * The server decides both halves of legality from the CONTENT, never from the request: which
+     * offers this character may re-choose at all (a feature declaring `replaces`), and what each may
+     * be re-chosen to (that offer's own option list). A client cannot widen either.
+     */
+    async actorRechoose(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(ActorRechooseSchema, raw, "The re-choose command is malformed.");
+      const { commandId, actorId, offer, id, expectedRevision } = request;
+      let label = "";
+      const result = await store.execute({ id: commandId, type: "actor.rechoose", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        // The same owner-or-GM seam a rest uses: this is a resource decision on a character sheet.
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+        // The GM audience deliberately: legality is a CONTENT question (which feature declares the
+        // clause, what its option list is), and a player re-choosing on their own sheet must get the
+        // same answer the GM would. Nothing GM-only is projected - only the offer they may already see.
+        const choices = replaceableOffers(definition, contentLibrary.forAudience("gm"));
+        const match = choices.find((candidate) => candidate.offer === offer);
+        if (!match) {
+          throw new CommandRejectedError(choices.length === 0
+            ? `Nothing on ${actor.name}'s sheet can be re-chosen on a rest.`
+            : `${actor.name} cannot re-choose "${offer}" - only ${choices.map((candidate) => `"${candidate.offer}"`).join(", ")}.`);
+        }
+        if (!match.options.includes(id)) {
+          throw new CommandRejectedError(`"${id}" is not one of the options ${match.label} offers (${match.options.join(", ")}).`);
+        }
+        label = match.label;
+        actor.choiceOverrides = { ...actor.choiceOverrides, [offer]: { id, per: match.per } };
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "encounter", text: `${actorName(actorId)} re-chose ${label}: ${id}.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     async actorRest(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ActorRestSchema, raw, "The rest command is malformed.");
       const { commandId, actorId, kind, expectedRevision } = request;
@@ -2404,6 +2451,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],
     ["actor.set-health-display", "Override one combatant's token health display, or clear it to follow the table default (GM).", (p, raw) => operations.actorSetHealthDisplay(p, raw)],
     ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],
+    ["actor.rechoose", "Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either). Your own character; the GM anyone.", (p, raw) => operations.actorRechoose(p, raw)],
     ["actor.rest", "Take a rest on your own character (GM: anyone): short re-arms short-rest uses; long restores HP, hit dice, spell slots, prepared spells, limited uses, clears dying, and drops one Exhaustion level.", (p, raw) => operations.actorRest(p, raw)],
     ["actor.spend-hit-dice", "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).", (p, raw) => operations.actorSpendHitDice(p, raw)],
     ["character.set-slot", "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).", (p, raw) => operations.characterSetSlot(p, raw)],

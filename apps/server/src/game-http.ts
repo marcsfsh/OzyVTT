@@ -265,6 +265,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
   router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
   router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorRechoose), ...command("actor.rechoose", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpendHitDice), ...command("actor.spend-hit-dice", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetSlot), ...command("character.set-slot", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetPrepared), ...command("character.set-prepared", actorIdParam));

@@ -227,6 +227,14 @@ export const FogPaintSchema = z.object({
 }).strict();
 export const FogResetSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.enum(["long", "short"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * RE-MAKE A PICK a feature says may be re-made on a rest (`replaces`, ruling A's runtime half):
+ * Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either.
+ *
+ * `offer` is the offer key the build already uses; `id` is the new answer, which must be one the
+ * original pick could itself have chosen. GM any actor; a player only their claimed character.
+ */
+export const ActorRechooseSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), offer: z.string().regex(/^[a-z0-9-]+(:[a-z0-9-]+)?$/).max(80), id: z.string().regex(/^[a-z0-9-]+$/).max(80), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), count: z.number().int().min(1).max(40), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetSlotSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), level: z.number().int().min(1).max(9), remaining: z.number().int().min(0).max(9), expectedRevision: z.number().int().nonnegative().optional() }).strict();

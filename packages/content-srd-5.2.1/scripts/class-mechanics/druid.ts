@@ -270,6 +270,11 @@ export const druid: ClassMechanicsModule = {
        * `replaces`, which is why this pick is the build-time answer and not the last word.
        */
       "circle-of-the-land-spells": {
+        // "Whenever you finish a Long Rest, choose one type of land" - ruling A's runtime half, and
+        // the completion of audit row 29. The build-time pick below is the answer the character
+        // starts with; `actor.rechoose` writes a Long-Rest override beside it, and the next Long Rest
+        // clears it so the choice is made afresh rather than standing forever.
+        replaces: [{ offer: "feature:circle-of-the-land-spells", when: "long-rest", amount: 1 }],
         choice: {
           kind: "land",
           choose: 1,
