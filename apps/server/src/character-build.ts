@@ -1,5 +1,5 @@
 import type { BuilderPolicy } from "@vtt/domain";
-import { CatalogChoiceError, extraPickAmount, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
+import { CatalogChoiceError, extraPickAmount, resolveCatalogChoice, resolvePickChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
 import {
   ActorDefinitionSchema,
   type ActorAction, type ActorDefinition, type CharacterChoice, type InventoryItem
@@ -667,6 +667,28 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   };
   /** Options a gate DETERMINED rather than offered; drained into `granted` once every offer is built. */
   const determined: Array<{ option: FeatureOption; parentId: string }> = [];
+  /**
+   * WHAT A BUDGET ALREADY HOLDS, straight off the ledger - the source `fromPicks` narrows.
+   *
+   * A `feature:<id>` key means the rows tagged with that feature. A NAMED budget is spelled in the
+   * ledger only as an untagged row of its kind, which is exactly how pass B fills the class cantrip
+   * and prepared-spell budgets; the two skill budgets are indistinguishable there and always have
+   * been (both land in one proficiency list), so a `fromPicks` over `class-skills` reads the
+   * background's too. Every SRD use is `class-cantrips`, where there is no such ambiguity.
+   */
+  const NAMED_BUDGET_KIND: Readonly<Record<string, string>> = {
+    "class-cantrips": "cantrip", "class-spells": "spell", "class-skills": "skill", "class-tools": "tool",
+    "background-skills": "skill", "background-tools": "tool", "background-languages": "language", "species-languages": "language"
+  };
+  const answersFor = (offerKey: string): string[] => {
+    if (offerKey.startsWith("feature:")) {
+      const featureId = offerKey.slice("feature:".length).replace(/\/\d+$/, "");
+      return input.choices.filter((row) => row.payload && row.payload.featureId === featureId).map((row) => row.id);
+    }
+    const kind = NAMED_BUDGET_KIND[offerKey];
+    if (!kind) return [];
+    return input.choices.filter((row) => row.kind === kind && !(row.payload && typeof row.payload.featureId === "string")).map((row) => row.id);
+  };
   const featureOffer = (record: FeatureRecord, count: number, featureAliases: readonly string[] = []): void => {
     // EVERY pick the record owes, not just the first. A record may promise two (Magic Initiate's two
     // cantrips AND its level-1 spell), and each becomes its own offer with its own kind, capacity and
@@ -687,7 +709,24 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     // so "a Fighting Style feat OR Blessed Warrior" could not be said and both variants were
     // unpickable. When both are authored the offer is their UNION, matching the wizard exactly.
     const named = choice.from ?? [];
-    if (named.length > 0 && choice.fromCatalog) {
+    // THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS. "Choose one of your known Warlock
+    // cantrips that deals damage" - a list no catalog holds, read straight off the ledger and
+    // narrowed by a closed predicate. Resolved from `input.choices`, which is the whole ledger and
+    // is available before any pass runs, so this needs no fourth pass and no ordering rule.
+    if (choice.fromPicks) {
+      try {
+        const resolved = resolvePickChoice(choice.fromPicks, answersFor(choice.fromPicks.offer), catalogs);
+        options = new Set(resolved.map((option) => option.id));
+        if (resolved.some((option) => option.level !== undefined)) optionLevels = new Map(resolved.map((option) => [option.id, option.level ?? 0]));
+      } catch (error) {
+        if (!(error instanceof CatalogChoiceError)) throw error;
+        // Nothing eligible chosen yet: DEFER, exactly as an unresolvable catalog does. A row that
+        // targets it is still refused, with this reason - never a silent accept.
+        options = new Set();
+        unresolvable = error.message;
+      }
+    }
+    else if (named.length > 0 && choice.fromCatalog) {
       const union = new Set(named);
       options = union;
       try {

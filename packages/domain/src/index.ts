@@ -692,6 +692,10 @@ export type ContentConditionSummary = Readonly<{ id: string; name: string; descr
 export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[]; /** The bundle's canonical CC BY 4.0 line (ADR-0015). The server always sends it; a surface that has to hand-write a substitute always writes a weaker one. */ attribution?: string };
 /** SRD spell reference (rules text + the header fields a card shows) for the in-app spell rules window; public information for any joined session. */
 export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null;
+  /** Whether casting it rolls an attack. One of the three closed `fromPicks` predicates ("a cantrip that requires an attack roll" - Repelling Blast). */
+  attackRoll: boolean;
+  /** Range in FEET when the printed range IS a distance, else null (Self and Touch are not ranges of zero). The `ranged` predicate reads it - "a cantrip with a range of 10+ feet" (Eldritch Spear). */
+  rangeFeet: number | null;
   /** Spell-list ids this spell belongs to ("wizard", "cleric", a homebrew list slug) - THE class->spell-list link the wizard's spell step filters on (paired with `ContentClassSummary.spellcasting.spellListId`). */
   classes: readonly string[];
   /** Base damage/healing roll ("8d6"), or null for a spell that rolls nothing. Drives the sheet's "cast at" auto-roll. */
@@ -738,6 +742,15 @@ export type ContentSourceKind = "srd" | "homebrew";
  * Riders (actions, grants, modifiers, uses) deliberately stay server-side - the server applies them.
  */
 export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string;
+  /**
+   * The earlier answer that makes this option legal, or null when it is always offerable.
+   *
+   * "The option you chose for Blessed Strikes grows more powerful" - the later feature's options are
+   * gated on a pick already in the ledger. It crosses the wire because the wizard must filter the
+   * same way the server does: when gating leaves exactly as many legal options as the capacity, the
+   * answer is a CONSEQUENCE rather than a choice and neither side renders a pick for it.
+   */
+  requires: Readonly<{ offer: string; id: string }> | null;
   /** The FIRST pick this option owes, or null. Kept for callers that only ever needed one; `choices` is the whole list. */
   choice: ContentFeatureChoiceSummary | null;
   /** EVERY pick this option owes, in authored order. Empty when it owes none. */
@@ -773,6 +786,13 @@ export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: numbe
   maxSpellLevel: number | null;
   /** FLOOR on a spell pick's level, the sibling of `maxSpellLevel`. Mystic Arcanum reads "one level 6 Warlock spell", not "level 6 or lower"; both set to 6 makes the pick exactly that level. Null = no floor. */
   minSpellLevel: number | null;
+  /**
+   * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS, not a catalog - "choose one of your known
+   * Warlock cantrips that deals damage". `offer` names the budget holding them and `where` is a
+   * closed predicate slug. Null for every ordinary pick. It crosses the wire for the same reason
+   * `fromCatalog` does: the wizard must offer exactly what the server will accept.
+   */
+  fromPicks: Readonly<{ offer: string; where: string | null }> | null;
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   options: readonly ContentFeatureOptionSummary[] }>;
 export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The FIRST pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null;

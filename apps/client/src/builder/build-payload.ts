@@ -1,5 +1,5 @@
 import {
-  CatalogChoiceError, extraPickAmount, resolveCatalogChoice,
+  CatalogChoiceError, extraPickAmount, resolveCatalogChoice, resolvePickChoice,
   type BuilderAbilityMethod, type BuilderPolicy, type CatalogChoiceOption, type ContentBackgroundSummary,
   type ContentChoiceList, type ContentClassSummary, type ContentExtraPickSummary, type ContentFeatSummary,
   type ContentFeatureSummary, type ContentSpeciesSummary, type ContentSubclassSummary
@@ -136,8 +136,22 @@ const optionsOfIds = (ids: readonly string[], nameOf: (id: string) => string): C
 const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 
 /** Resolve a feature's choice to concrete options, never throwing: a gap becomes `unresolvable`. */
-function resolveChoice(choice: NonNullable<ContentFeatureSummary["choice"]>, catalogs: BuilderCatalogs, nameOf: (id: string) => string):
-{ options: CatalogChoiceOption[]; unresolvable: string | null } {
+function resolveChoice(
+  choice: NonNullable<ContentFeatureSummary["choice"]>, catalogs: BuilderCatalogs, nameOf: (id: string) => string,
+  answersFor: (offer: string) => readonly string[]
+): { options: CatalogChoiceOption[]; unresolvable: string | null } {
+  // THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS ("one of your known Warlock cantrips that
+  // deals damage"). Resolved by the same function the server re-validates with, over the draft's own
+  // answers - so the wizard offers exactly the eligible cantrips and no others. A pick made too
+  // early (no cantrips chosen yet) DEFERS with the resolver's message rather than showing an empty list.
+  if (choice.fromPicks) {
+    try {
+      return { options: resolvePickChoice(choice.fromPicks, answersFor(choice.fromPicks.offer), catalogs.choice), unresolvable: null };
+    } catch (error) {
+      if (!(error instanceof CatalogChoiceError)) throw error;
+      return { options: [], unresolvable: error.message };
+    }
+  }
   const named = choice.from.length > 0 ? optionsOfIds(choice.from, nameOf) : [];
   // A CATALOG **PLUS** ONE BESPOKE OPTION. `from` used to short-circuit, so "a Fighting Style feat
   // OR Blessed Warrior (two Cleric cantrips)" was unsayable and Paladin's and Ranger's variants were
@@ -339,7 +353,10 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
    * same normalization `budgetKeyOf` performs for budgets) so a repeated offer still answers its gate.
    */
   const answeredInDraft = (gate: Readonly<{ offer: string; id: string }>): boolean =>
-    Object.entries(draft.picks).some(([key, ids]) => budgetKeyOf(key).split("@")[0] === gate.offer && ids.includes(gate.id));
+    answersInDraft(gate.offer).includes(gate.id);
+  /** Every answer this budget already holds - the draft-side mirror of the server's `answersFor`. */
+  const answersInDraft = (offer: string): readonly string[] =>
+    Object.entries(draft.picks).flatMap(([key, ids]) => budgetKeyOf(key).split("@")[0] === offer ? ids : []);
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
   // An OPTION is named, not abbreviated: this string is the card's title and the review's value, and
@@ -400,7 +417,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     level: number, classId: string | null, times = 1
   ) => {
     if (choice.choose <= 0) return;
-    const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind));
+    const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind), answersInDraft);
     // A `maxSpellLevel` ceiling is a hard filter (Evocation Savant is level 2 and under), `minSpellLevel`
     // is its floor (Mystic Arcanum is EXACTLY a level-6 spell, not "6 or lower"), and the two spell
     // kinds do not overlap: "cantrip" means level 0, "spell" means 1+. Offering a cantrip under a
@@ -441,13 +458,6 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       offerable = offerable.filter((option) => legal.some((candidate) => candidate.id === option.id));
     }
     const offerKey = uniqueKey(key);
-    // A CHOSEN inline option's own budget grants. Divine Order is one pick between two roles, and
-    // Thaumaturge - not Divine Order - is what grants the extra Cleric cantrip, so the grant is read
-    // off the option the player actually took. This is the client's mirror of the server's pass A2.
-    if ((choice.options ?? []).length > 0) {
-      const picked = new Set(draft.picks[offerKey] ?? []);
-      for (const option of choice.options) if (picked.has(option.id)) addExtraPicks(option.extraPicks, times);
-    }
     offers.push({
       key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
       help: feature.description || null,
@@ -460,6 +470,26 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       for (const id of draft.picks[offerKey] ?? []) if (id !== ASI_SHORTHAND) heldFeatIds.add(id);
     }
     recordHeld(offerKey, choice.kind, feature.name);
+    /**
+     * A CHOSEN INLINE OPTION IS A FEATURE, so its own picks and budget grants are the client's
+     * mirror of the server's pass A2 - and until now only half of that mirror existed.
+     *
+     * `extraPicks` was read (Divine Order's Thaumaturge grants the extra Cleric cantrip). The
+     * option's own `choice` was NOT: Blessed Warrior's two Cleric cantrips, Druidic Warrior's two
+     * Druid cantrips, Pact of the Blade's weapon and Pact of the Tome's cantrips were all offered by
+     * the server and rendered by nobody, so taking one produced a build the server refused with
+     * "needs N pick(s)" and no card anywhere to answer it. Keyed on the OPTION's id, which is
+     * exactly the key the server's pass A2 gives it.
+     */
+    const picked = new Set(draft.picks[offerKey] ?? []);
+    for (const option of choice.options ?? []) {
+      if (!picked.has(option.id)) continue;
+      addExtraPicks(option.extraPicks, times);
+      const nested = option.choices.length > 0 ? option.choices : (option.choice ? [option.choice] : []);
+      const asFeature = { ...feature, id: option.id, name: option.name, description: option.description };
+      nested.forEach((pick, index) =>
+        featurePickOffer(index === 0 ? `feature:${option.id}` : `feature:${option.id}/${index + 1}`, step, asFeature, pick, level, classId, times));
+    }
   };
 
   // ---- Step 1: species. Its traits' picks, its language choices, and (when the species prints

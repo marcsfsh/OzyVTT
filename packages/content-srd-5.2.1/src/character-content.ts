@@ -385,6 +385,26 @@ const featureChoiceBase = {
   from: z.array(ContentIdSchema).min(1, "An explicit `from` list must name at least one option (omit it entirely to use `fromCatalog` or `options`).").max(80).optional(),
   /** An open catalog slug the wizard resolves at pick time ("skills", "feats", "wizard-spells"). */
   fromCatalog: ContentIdSchema.optional(),
+  /**
+   * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - the third source, beside `from` and
+   * `fromCatalog`.
+   *
+   * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast, Eldritch Spear,
+   * Repelling Blast). No catalog can say that: the list is the ledger, narrowed by a predicate over
+   * what was chosen. `offer` names the budget holding those answers (`class-cantrips`,
+   * `feature:<id>`) in the same key namespace `extraPicks` uses.
+   *
+   * `where` is a CLOSED slug list and never an expression (ADR-0008). Three, because three is what
+   * the SRD asks for and each is a field the spell catalog already carries.
+   *
+   * It resolves to a non-empty list or DEFERS, exactly as an unresolvable `fromCatalog` does - a
+   * Warlock who has not chosen their cantrips yet is not shown an empty picker, and a row that
+   * targets the deferred pick is still refused with the reason.
+   */
+  fromPicks: z.object({
+    offer: PickBudgetKeySchema,
+    where: z.enum(["deals-damage", "attack-roll", "ranged"]).optional()
+  }).strict().optional(),
   /** Only options at or below this level are legal (spell picks). */
   maxSpellLevel: z.number().int().min(0).max(9).optional(),
   /**
@@ -430,7 +450,9 @@ const spellLevelWindow = (choice: { minSpellLevel?: number; maxSpellLevel?: numb
 };
 
 export const FeatureOptionChoiceSchema = z.object(featureChoiceBase).strict().superRefine((choice, context) => {
-  if (!choice.from && !choice.fromCatalog) context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs either an explicit `from` list or a `fromCatalog` slug." });
+  if (!choice.from && !choice.fromCatalog && !choice.fromPicks) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs an explicit `from` list, a `fromCatalog` slug, or a `fromPicks` source." });
+  }
   spellLevelWindow(choice, context);
 });
 export type FeatureOptionChoice = z.infer<typeof FeatureOptionChoiceSchema>;
@@ -535,8 +557,8 @@ export const FeatureChoiceSchema = z.object({
   /** Options carrying their own mechanics. Mutually exclusive with `from`, which is derived from these. */
   options: z.array(FeatureOptionSchema).min(1).max(40).optional()
 }).strict().superRefine((choice, context) => {
-  if (!choice.from && !choice.fromCatalog && !choice.options) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs an explicit `from` list, inline `options`, or a `fromCatalog` slug." });
+  if (!choice.from && !choice.fromCatalog && !choice.options && !choice.fromPicks) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs an explicit `from` list, inline `options`, a `fromCatalog` slug, or a `fromPicks` source." });
   }
   if (choice.from && choice.options) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["from"], message: "Author `options` alone - `from` is derived from the option ids." });

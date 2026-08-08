@@ -80,11 +80,33 @@ export const warlock: ClassMechanicsModule = {
          * they do today; naming all four damaging Warlock cantrips would be worse, because it would
          * apply to every one of them at once instead of to the one chosen.
          */
+        /**
+         * THE THREE THAT PICK FROM THE CHARACTER'S OWN ANSWERS - audit rows 51-53, ruling E.
+         *
+         * "Choose one of your known Warlock cantrips that deals damage." The option list is the
+         * ledger, narrowed by a predicate, which is why no `fromCatalog` slug could ever say it and
+         * why all three were prose. `fromPicks` is that third source, and its `where` is a closed
+         * slug: `deals-damage`, `ranged` (a range of 10+ feet), `attack-roll`.
+         *
+         * WHAT IS STILL PROSE, and it is only the effect. Agonizing Blast's rider is authored and
+         * shipped - but scoped to Eldritch Blast by id, because `extra-damage` fires on a `when` gate
+         * and the gate cannot name "the cantrip this invocation was pointed at". Eldritch Spear's
+         * +30-feet-per-level range and Repelling Blast's 10-foot push have no rider vocabulary at
+         * all. The PICK is what these rows were about: which cantrip, recorded on the ledger, refused
+         * when it is not eligible.
+         */
         "agonizing-blast": {
+          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } },
           modifiers: [{
             type: "extra-damage", abilityModifier: "cha", damageType: "force",
             when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
           }]
+        },
+        "eldritch-spear": {
+          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "ranged" } }
+        },
+        "repelling-blast": {
+          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } }
         },
         // ---- the eleven at-will / once-a-day castings (audit rows 37-47) -------------------------
         "armor-of-shadows": { grants: { spells: [{ id: "mage-armor", level: 1 }] } },
@@ -152,9 +174,6 @@ export const warlock: ClassMechanicsModule = {
          *   eldritch-mind                   - `roll-mode` has a `concentration` roll and NO consumer
          *                                     reads it; `roll: "save"` + `ability-is: con` would be
          *                                     advantage on every Constitution save, which is wrong.
-         *   eldritch-spear (row 52),
-         *   repelling-blast (row 53)        - ruling E (a pick over the character's own answers), and
-         *                                     neither a spell's range nor forced movement is sayable.
          *   thirsting-blade, devouring-blade,
          *   eldritch-smite, lifedrinker     - all four scope to "your pact weapon" and the trigger
          *                                     vocabulary cannot name one conjured weapon. Unscoped,

@@ -35,7 +35,7 @@ const CANTRIPS = ["Guidance", "Light", "Mending", "Resistance", "Sacred Flame", 
 const spell = (name: string, level: number): ContentSpellSummary => ({
   id: name.toLowerCase().replace(/ /g, "-"), name, level, school: "evocation",
   castingTime: "action", rangeText: "Touch", componentsText: "V, S", duration: "Instantaneous",
-  concentration: false, ritual: false, description: `${name}.`, higherLevel: null,
+  concentration: false, ritual: false, attackRoll: false, rangeFeet: 120, description: `${name}.`, higherLevel: null,
   classes: ["cleric"], damageRoll: null, damageTypes: [], castingOptions: []
 });
 const spells: readonly ContentSpellSummary[] = [...CANTRIPS.map((name) => spell(name, 0)), spell("Bless", 1), spell("Cure Wounds", 1)];
@@ -54,7 +54,7 @@ const divineOrder = feature({
   id: "divine-order", name: "Divine Order", level: 1, grantedAtLevels: [1],
   description: "You have dedicated yourself to one of the following sacred roles.",
   choice: {
-    kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null,
+    kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, fromPicks: null,
     options: [
       { id: "protector", name: "Protector", description: "Martial weapons and Heavy armor training.", requires: null, choice: null, choices: [], extraPicks: [] },
       { id: "thaumaturge", name: "Thaumaturge", description: "You know one extra cantrip from the Cleric spell list.", requires: null, choice: null, choices: [], extraPicks: [{ offer: "class-cantrips", amount: 1, scaling: null }] }
@@ -208,7 +208,7 @@ describe("extraPicks composes across carriers and budgets", () => {
     const expertise = feature({
       id: "expertise", name: "Expertise", level: 1, grantedAtLevels: [1],
       description: "Choose skills you are proficient in.",
-      choice: { kind: "expertise", choose: 1, from: ["history", "medicine", "religion"], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, options: [] }
+      choice: { kind: "expertise", choose: 1, from: ["history", "medicine", "religion"], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: [] }
     });
     const devotion = feature({
       id: "deep-devotion", name: "Deep Devotion", level: 1, grantedAtLevels: [1],
@@ -243,5 +243,85 @@ describe("extraPicks composes across carriers and budgets", () => {
     expect(offers.find((offer) => offer.key === "background-tools")).toBeUndefined();
     expect(capacityOf(offers, "class-cantrips")).toBe(3);
     expect(capacityOf(offers, "class-skills")).toBe(2);
+  });
+});
+
+// ── a chosen option's OWN pick, and a pick over the character's own answers ──────────────────────
+
+/**
+ * Two things the wizard could not render, held at the far end of `computeOffers`: THE OFFER LIST.
+ *
+ * The first is an old gap and a bad one - the server has always turned a chosen inline option's own
+ * `choice` into an offer (pass A2) and the wizard never did, so taking Blessed Warrior or Pact of
+ * the Blade produced a build the server refused with "needs N pick(s)" and no card anywhere to
+ * answer it. The second is ruling E: a pick whose options are the character's own prior answers.
+ */
+const optionChoice = (over: Partial<NonNullable<ContentFeatureSummary["choice"]>>): NonNullable<ContentFeatureSummary["choice"]> =>
+  ({ kind: "cantrip", choose: 1, from: [], fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: [], ...over });
+
+describe("a chosen inline option's OWN pick becomes an offer (the server's pass A2, mirrored)", () => {
+  const fightingStyle = feature({
+    id: "fighting-style", name: "Fighting Style", level: 1, grantedAtLevels: [1],
+    description: "Choose a style.",
+    choice: optionChoice({
+      kind: "fighting-style", from: ["blessed-warrior"],
+      options: [{
+        id: "blessed-warrior", name: "Blessed Warrior", description: "You learn two Cleric cantrips.",
+        requires: null, choice: optionChoice({ kind: "cantrip", choose: 2, fromCatalog: "cleric-spells", maxSpellLevel: 0 }),
+        choices: [], extraPicks: []
+      }]
+    })
+  });
+  const catalogs = catalogsWith(clericWith([fightingStyle]));
+
+  it("offers nothing extra while the option is unpicked", () => {
+    expect(computeOffers(draftWith(), catalogs).find((offer) => offer.key === "feature:blessed-warrior")).toBeUndefined();
+  });
+
+  it("offers the option's two cantrips the moment it IS picked - keyed the way the server keys it", () => {
+    const offers = computeOffers(draftWith({ "feature:fighting-style": ["blessed-warrior"] }), catalogs);
+    const nested = offers.find((offer) => offer.key === "feature:blessed-warrior");
+    expect(nested, "Blessed Warrior's own cantrip pick must be rendered, or the build is unfinishable").toBeTruthy();
+    expect(nested!.capacity).toBe(2);
+    expect(nested!.featureId).toBe("blessed-warrior");
+    expect(nested!.options.map((option) => option.id)).toContain("guidance");
+    // A cantrip pick offers cantrips only, never the level-1 spells on the same list.
+    expect(nested!.options.every((option) => option.level === 0)).toBe(true);
+  });
+});
+
+describe("ruling E - `fromPicks` offers the character's own answers, narrowed by a closed predicate", () => {
+  const agonizing = feature({
+    id: "agonizing-blast", name: "Agonizing Blast", level: 1, grantedAtLevels: [1],
+    description: "Choose one of your known cantrips that deals damage.",
+    choice: optionChoice({ kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } })
+  });
+  // Two of the fixture's cantrips deal damage; the rest do not.
+  const damaging = new Set(["sacred-flame", "spare-the-dying"]);
+  const catalogs = {
+    ...catalogsWith(clericWith([agonizing])),
+    choice: {
+      ...catalogsWith(clericWith([agonizing])).choice,
+      spells: spells.map((entry) => damaging.has(entry.id) ? { ...entry, damageRoll: "1d8", damageTypes: ["radiant"] } : entry)
+    }
+  } as BuilderCatalogs;
+
+  it("DEFERS while no cantrip has been chosen - an empty picker is never rendered", () => {
+    const offer = computeOffers(draftWith(), catalogs).find((entry) => entry.key === "feature:agonizing-blast");
+    expect(offer!.options).toHaveLength(0);
+    expect(offer!.unresolvable).toMatch(/Nothing chosen for "class-cantrips" is deals damage yet/);
+  });
+
+  it("offers exactly the chosen cantrips that pass the predicate, and no others", () => {
+    const draft = draftWith({ "class-cantrips": ["sacred-flame", "guidance", "light"] });
+    const offer = computeOffers(draft, catalogs).find((entry) => entry.key === "feature:agonizing-blast");
+    expect(offer!.unresolvable).toBeNull();
+    expect(offer!.options.map((option) => option.id)).toEqual(["sacred-flame"]);
+  });
+
+  it("follows the answer as it changes - the list IS the ledger, not a catalog", () => {
+    const draft = draftWith({ "class-cantrips": ["spare-the-dying", "sacred-flame", "light"] });
+    const offer = computeOffers(draft, catalogs).find((entry) => entry.key === "feature:agonizing-blast");
+    expect(offer!.options.map((option) => option.id)).toEqual(["spare-the-dying", "sacred-flame"]);
   });
 });

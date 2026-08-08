@@ -232,10 +232,12 @@ const extraPickSummaryOf = (grants: FeatureRecord["extraPicks"]): ContentFeature
 const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null => choice
   ? {
       kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null,
+      fromPicks: choice.fromPicks ? { offer: choice.fromPicks.offer, where: choice.fromPicks.where ?? null } : null,
       options: (choice.options ?? []).map((option) => {
         // One level of nesting only, matching the schema's own bound: a nested choice cannot itself carry options.
         const nested = featurePicks(option).map((pick) => ({
-          kind: pick.kind, choose: pick.choose, from: pick.from ?? [], fromCatalog: pick.fromCatalog ?? null, maxSpellLevel: pick.maxSpellLevel ?? null, minSpellLevel: pick.minSpellLevel ?? null, options: []
+          kind: pick.kind, choose: pick.choose, from: pick.from ?? [], fromCatalog: pick.fromCatalog ?? null, maxSpellLevel: pick.maxSpellLevel ?? null, minSpellLevel: pick.minSpellLevel ?? null,
+          fromPicks: pick.fromPicks ? { offer: pick.fromPicks.offer, where: pick.fromPicks.where ?? null } : null, options: []
         }));
         return {
           id: option.id, name: option.name, description: option.description,
@@ -474,6 +476,11 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     .map((spell) => ({
       id: spell.id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime,
       rangeText: spell.range.text, componentsText: spellComponentsText(spell.components), duration: spell.duration,
+      // Two facts the `fromPicks` predicates read (Repelling Blast wants an attack roll, Eldritch
+      // Spear a range of 10+ feet). Feet only when the printed range IS a distance - Self and Touch
+      // are not ranges of zero, they are not ranges.
+      attackRoll: spell.attackRoll,
+      rangeFeet: spell.range.unit === "feet" || spell.range.unit === "foot" ? spell.range.distance : null,
       concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel,
       // The spell-list link (which class lists this spell is on) - what the builder's spell step
       // filters by, paired with the class record's spellcasting.spellListId. Dropping this severed

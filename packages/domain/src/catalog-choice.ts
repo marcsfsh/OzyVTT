@@ -170,3 +170,51 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
   }
   throw new CatalogChoiceError(slug, `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, *-languages, *-spells, *-subclasses, *-feats, *-lineages).`);
 }
+
+/** One `fromPicks` source: which budget's answers, narrowed by which closed predicate. */
+export type PickSourceReference = Readonly<{ offer: string; where?: string | null }>;
+
+/**
+ * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - the resolver for `fromPicks`.
+ *
+ * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast), "...that has a
+ * range of 10+ feet" (Eldritch Spear), "...that requires an attack roll" (Repelling Blast). The list
+ * is the ledger, not a catalog, so no `fromCatalog` slug can express it - and the predicate is a
+ * CLOSED slug list rather than an expression (ADR-0008), each one a field the spell catalog already
+ * carries.
+ *
+ * `answered` is what that budget already holds - the ledger's rows on the server, the draft's picks
+ * in the wizard - and the same function narrows both, so the two cannot disagree about what was
+ * offerable. An id the spell catalog does not know is dropped rather than guessed at: the predicates
+ * are all spell facts, so a non-spell answer can never satisfy one.
+ *
+ * Throws `CatalogChoiceError` when nothing survives, which both consumers already treat as DEFER
+ * rather than reject - a Warlock who has not chosen their cantrips yet is not shown an empty picker.
+ */
+export function resolvePickChoice(source: PickSourceReference, answered: readonly string[], catalogs: CatalogChoiceCatalogs): CatalogChoiceOption[] {
+  const spellsById = new Map(catalogs.spells.map((spell) => [spell.id, spell]));
+  const matches = (id: string): boolean => {
+    if (!source.where) return true;
+    const spell = spellsById.get(id);
+    if (!spell) return false;
+    if (source.where === "deals-damage") return spell.damageRoll !== null || spell.damageTypes.length > 0;
+    if (source.where === "attack-roll") return spell.attackRoll;
+    if (source.where === "ranged") return (spell.rangeFeet ?? 0) >= 10;
+    return false;
+  };
+  const seen = new Set<string>();
+  const options: CatalogChoiceOption[] = [];
+  for (const id of answered) {
+    if (seen.has(id) || !matches(id)) continue;
+    seen.add(id);
+    const spell = spellsById.get(id);
+    options.push({ id, name: spell?.name ?? id, ...(spell ? { level: spell.level } : {}) });
+  }
+  return nonEmpty(
+    `fromPicks:${source.offer}`,
+    options,
+    source.where
+      ? `Nothing chosen for "${source.offer}" is ${source.where.replace(/-/g, " ")} yet - make that pick first.`
+      : `Nothing has been chosen for "${source.offer}" yet - make that pick first.`
+  );
+}

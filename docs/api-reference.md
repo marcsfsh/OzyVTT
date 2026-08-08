@@ -4700,6 +4700,7 @@ One pick a feature asks for. Options arrive either as plain ids in `from`, as an
 | `fromCatalog` | string \| null | yes | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer \| null | yes | Ceiling on a spell pick's level (Evocation Savant: 2; Magic Initiate: 0, i.e. cantrips only). null when the pick has no ceiling — a picker that ignores it offers spells the server then rejects |
 | `minSpellLevel` | integer \| null | yes | Floor on a spell pick's level (Mystic Arcanum: 6, so the level-6 arcanum is EXACTLY a level-6 spell rather than "6 or lower"). null when the pick has no floor |
+| `fromPicks` | object \| null | yes | The options are the character's OWN earlier answers rather than a catalog - "choose one of your known Warlock cantrips that deals damage". null for every ordinary pick. |
 | `options` | ContentFeatureOption[] | yes | Inline options with their authored names and any nested pick; empty when the options are plain ids or come from a catalog |
 
 ### `ContentFeatureOption`
@@ -4807,6 +4808,8 @@ One inline option of a feature's pick. Carries its authored name (an id alone wo
 | `spells[].school` | string | yes |  |
 | `spells[].castingTime` | string | yes |  |
 | `spells[].rangeText` | string \| null | yes |  |
+| `spells[].attackRoll` | boolean | yes | Whether casting it rolls an attack. One of the three closed `fromPicks` predicates - "a cantrip that requires an attack roll" (Repelling Blast) |
+| `spells[].rangeFeet` | integer \| null | yes | Range in FEET when the printed range IS a distance, else null (Self and Touch are not ranges of zero). Read by the `ranged` predicate - "a cantrip with a range of 10+ feet" (Eldritch Spear) |
 | `spells[].componentsText` | string | yes | "V, S, M (a pinch of soot)", or "None" |
 | `spells[].duration` | string | yes |  |
 | `spells[].concentration` | boolean | yes |  |
@@ -5404,6 +5407,9 @@ A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an ope
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
 | `minSpellLevel` | integer (0–9) | no | Floor on a spell pick's level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact |
+| `fromPicks` | object | no | THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - "choose one of your known Warlock cantrips that deals damage". `offer` names the budget holding them, in the same key namespace extraPicks uses; `where` is a CLOSED predicate slug, never an expression. Resolves to a non-empty list or DEFERS, exactly as an unresolvable fromCatalog does. |
+| `fromPicks.offer` | string (pattern) | yes |  |
+| `fromPicks.where` | `deals-damage` \| `attack-roll` \| `ranged` | no |  |
 | `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 | `options` | HomebrewFeatureOption[] | no | Options carrying their own mechanics. Mutually exclusive with `from` |
@@ -5492,6 +5498,9 @@ THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureCho
 | `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
 | `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
 | `minSpellLevel` | integer (0–9) | no | Floor on a spell pick's level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact |
+| `fromPicks` | object | no | THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS - "choose one of your known Warlock cantrips that deals damage". `offer` names the budget holding them, in the same key namespace extraPicks uses; `where` is a CLOSED predicate slug, never an expression. Resolves to a non-empty list or DEFERS, exactly as an unresolvable fromCatalog does. |
+| `fromPicks.offer` | string (pattern) | yes |  |
+| `fromPicks.where` | `deals-damage` \| `attack-roll` \| `ranged` | no |  |
 | `maximum` | integer (1–30) | no | Ceiling an ability-score pick from THIS choice may raise a score to; omitted = the SRD's 20. The sibling of the `ability-score` rider's own `maximum`, and separate because the mechanisms differ: a rider raises a NAMED ability, a choice lets the player pick which - and the epic boons ("increase one ability score by 1, to a maximum of 30") do the second |
 | `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
 

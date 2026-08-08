@@ -37,7 +37,7 @@ const feature = (over: Partial<ContentFeatureSummary> & Pick<ContentFeatureSumma
   level: null, description: "", tags: [], choice: null, choices: [], grantedAtLevels: [], extraPicks: [], ...over
 });
 const choice = (kind: string, chooseCount: number, from: readonly string[]) =>
-  ({ kind, choose: chooseCount, from, fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, options: [] });
+  ({ kind, choose: chooseCount, from, fromCatalog: null, maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: [] });
 
 const SKILL_IDS = ["insight", "perception", "survival", "history", "medicine", "religion"] as const;
 const skills: readonly ContentSkillSummary[] = SKILL_IDS.map((id) => ({
@@ -51,7 +51,7 @@ const CANTRIPS = ["Guidance", "Light", "Mending", "Resistance", "Sacred Flame", 
 const spell = (name: string, level: number): ContentSpellSummary => ({
   id: name.toLowerCase().replace(/ /g, "-"), name, level, school: "evocation",
   castingTime: "action", rangeText: level === 0 ? "Touch" : "60 feet", componentsText: "V, S",
-  duration: "Instantaneous", concentration: false, ritual: false,
+  duration: "Instantaneous", concentration: false, ritual: false, attackRoll: false, rangeFeet: 120,
   description: `${name} does exactly what ${name} says on the tin, and this sentence is its rules text.`,
   higherLevel: null, classes: ["cleric"], damageRoll: null, damageTypes: [], castingOptions: []
 });
@@ -86,7 +86,7 @@ const cleric = {
     feature({
       id: "cleric-subclass", name: "Cleric Subclass", level: 3, grantedAtLevels: [3],
       description: "You gain a Cleric subclass of your choice.",
-      choice: { kind: "subclass", choose: 1, from: [], fromCatalog: "cleric-subclasses", maxSpellLevel: null, minSpellLevel: null, options: [] }
+      choice: { kind: "subclass", choose: 1, from: [], fromCatalog: "cleric-subclasses", maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: [] }
     })
   ]
 } as unknown as ContentClassSummary;

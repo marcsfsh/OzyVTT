@@ -73,6 +73,9 @@ const warlock11 = (arcanum: string): Mutable => ({
     { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
     ...INVOCATIONS.map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } }) as Row),
+    // Ruling E: Agonizing Blast and Repelling Blast each point at one of the character's OWN cantrips.
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 10, kind: "damage-type", id: "fire", payload: { featureId: "fiendish-resilience" } },
     ...asiRows("warlock", 11),
@@ -379,5 +382,79 @@ describe("ruling F - audit row 64: Improved Elemental Fury", () => {
     const potent = traitsOf(build(druid(15, "arid", "potent-spellcasting"))).map((trait) => trait.name);
     expect(potent).toContain("Improved Potent Spellcasting");
     expect(potent).not.toContain("Improved Primal Strike");
+  });
+});
+
+// ── Ruling E — a pick whose options are the character's own prior answers ────────────────────────
+
+describe("ruling E - audit rows 51-53: `fromPicks` over the character's own known cantrips", () => {
+  /** The warlock11 fixture, with the invocation cantrip rows replaced by `rows`. */
+  const withInvocationPicks = (rows: readonly Row[]): Mutable => {
+    const input = warlock11("true-seeing");
+    input.choices = input.choices.filter((row) => !(row.kind === "cantrip" && typeof row.payload?.featureId === "string"
+      && ["agonizing-blast", "repelling-blast"].includes(row.payload.featureId as string)));
+    input.choices.push(...rows);
+    return input;
+  };
+
+  it("records WHICH cantrip the invocation was pointed at - the half these rows were about", () => {
+    const definition = build(warlock11("true-seeing"));
+    const pointed = (definition.character?.choices ?? []).filter((row) => row.payload?.featureId === "agonizing-blast");
+    expect(pointed.map((row) => row.id)).toEqual(["eldritch-blast"]);
+  });
+
+  it("REFUSES a cantrip the character does not know - the list is the ledger, not the catalog", () => {
+    // Sacred Flame deals damage and this Warlock even has it (from Magic Initiate), but it is not one
+    // of their KNOWN WARLOCK CANTRIPS, which is what the invocation says. No catalog slug can draw
+    // that line, which is exactly why all three of these rows were prose.
+    expect(() => build(withInvocationPicks([
+      { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "agonizing-blast" } },
+      { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } }
+    ]))).toThrowError(/"sacred-flame" is not an offered option for the "cantrip" choice/);
+  });
+
+  it("REFUSES a known cantrip that fails the predicate - `deals damage` is enforced, not decoration", () => {
+    // Prestidigitation is a cantrip this Warlock really knows and really cannot point Agonizing
+    // Blast at: it deals no damage.
+    expect(() => build(withInvocationPicks([
+      { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "agonizing-blast" } },
+      { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } }
+    ]))).toThrowError(/"prestidigitation" is not an offered option/);
+  });
+
+  it("DEFERS rather than dead-ends when no eligible cantrip has been chosen yet", () => {
+    // The ordering problem the ruling names, answered the way an unresolvable catalog already is:
+    // the pick is not required, and a row that targets it still fails with the reason.
+    const early = warlock11("true-seeing");
+    early.choices = early.choices.filter((row) => !(row.kind === "cantrip" && !row.payload));
+    early.choices.push(
+      { level: 1, kind: "cantrip", id: "prestidigitation" },
+      { level: 1, kind: "cantrip", id: "minor-illusion" },
+      { level: 1, kind: "cantrip", id: "mage-hand" }
+    );
+    early.choices = early.choices.filter((row) => !(row.kind === "cantrip" && typeof row.payload?.featureId === "string"
+      && ["agonizing-blast", "repelling-blast"].includes(row.payload.featureId as string)));
+    expect(() => build(early)).not.toThrow();
+    early.choices.push({ level: 1, kind: "cantrip", id: "mage-hand", payload: { featureId: "agonizing-blast" } });
+    expect(() => build(early)).toThrowError(/needs "Agonizing Blast" resolved, but Nothing chosen for "class-cantrips" is deals damage yet/);
+  });
+
+  it("narrows on the OTHER two predicates too - each invocation asks a different question", () => {
+    // Repelling Blast wants an attack roll; Eldritch Spear wants a range of 10+ feet. Chill Touch
+    // deals damage AND rolls an attack; Thunderclap deals damage and is a Self emanation, so it
+    // answers Agonizing Blast and neither of the others.
+    const input = warlock11("true-seeing");
+    input.choices = input.choices.filter((row) => row.kind !== "cantrip");
+    input.choices.push(
+      { level: 1, kind: "cantrip", id: "eldritch-blast" },
+      { level: 1, kind: "cantrip", id: "thunderclap" },
+      { level: 1, kind: "cantrip", id: "prestidigitation" },
+      { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "cantrip", id: "thunderclap", payload: { featureId: "agonizing-blast" } },
+      { level: 1, kind: "cantrip", id: "thunderclap", payload: { featureId: "repelling-blast" } }
+    );
+    // Thunderclap satisfies "deals damage" but NOT "requires an attack roll".
+    expect(() => build(input)).toThrowError(/"thunderclap" is not an offered option/);
   });
 });
