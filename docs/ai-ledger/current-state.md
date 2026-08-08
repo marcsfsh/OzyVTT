@@ -26,6 +26,8 @@ action economy. A GM override is one tap, remembered per family for the turn. `r
 exact command in `combat.pendingRuleAsks` (`rule-asks.ts`) and `rules.answer` replays or declines it;
 a player sees only their own ask, without its payload. B1's client half (Ask row, waiting rows, GM
 Allow/Deny) is driven both ways; the parked command commits (`apps/client/src/encounter/rule-ask.test.tsx`).
+**Typed damage is typed everywhere** (`4a`/`4b`/D7, 2026-08-08). `applyDamageDetailed` (`hit-points.ts`) stays the one entry point and all six call sites now narrate the adjustment. Six defence sources: definition RVI, effects, items, Petrified/Underwater, flat `damage-reduction` riders (last, per total, floored at 0) and rest-time re-choices (`choice-overrides.ts` — Fiendish Resilience really works). Vulnerability has three channels, not one (`damage-vulnerability` on `EffectModifierSchema`).
+Entering a number no longer discards its type: `actor.apply-damage` takes an optional `damageType` (absent/`"untyped"` = the old exact fast path) and a `damageOverride` that re-weights the rolled types to it; `save.answer` takes the same override before the success halving, and a player may amend only their own character's save.
 
 **One table feed** (D11). The combat-log store IS the feed (`apps/server/src/combat-log.ts`): every
 roll lands there as a `kind: "roll"` row carrying the whole `RollRecord`, attributed to its character,
