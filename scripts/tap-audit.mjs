@@ -163,6 +163,15 @@ const MEASURE = `((rootSelector) => {
   // real defect — the safe direction for a check whose job is to fail loudly.
   const modal = document.querySelector("dialog:modal");
   const openDrawers = [...document.querySelectorAll(".nh-drawer")].filter((d) => !d.hasAttribute("inert"));
+  // THE THIRD MECHANISM, arriving exactly as the docblock said it would. \`Combobox\`'s listbox is an
+  // absolutely-positioned popover at z-index 40 (\`Combobox.css\`) that paints over whatever the field
+  // sits above - so a run that deliberately opens one (see \`play-homebrew-picker\`) reported the four
+  // fields beneath it as unreachable, which is in the EXIT GATE and would have failed the run for
+  // four controls nobody's finger is anywhere near. Same predicate as the drawer case above, and it
+  // is a statement about the same thing: reach is judged where there is a finger. Its OWN option rows
+  // are excluded by \`!list.contains(el)\`, which is the measurement that matters here - they are the
+  // 44px route-1 rows the picker surface exists to check.
+  const openPopovers = [...document.querySelectorAll(".nh-combobox-list")];
   const out = [];
   for (const el of root.querySelectorAll(SEL)) {
     const r = el.getBoundingClientRect();
@@ -215,6 +224,7 @@ const MEASURE = `((rootSelector) => {
     if (!el.checkVisibility()) layer = "closed";
     else if (modal && !modal.contains(el)) layer = "overlaid";
     else if (openDrawers.some((d) => !d.contains(el) && d.contains(document.elementFromPoint(cx, cy)))) layer = "overlaid";
+    else if (openPopovers.some((l) => !l.contains(el) && l.contains(document.elementFromPoint(cx, cy)))) layer = "overlaid";
     out.push({
       tag: el.tagName.toLowerCase(),
       cls: (el.className && el.className.baseVal !== undefined ? el.className.baseVal : String(el.className || "")).slice(0, 60),
@@ -451,6 +461,48 @@ const SURFACES = [
   // Ruling 61 — the API reference as a real GM-only address, full window width.
   { name: "play-api-reference", path: "/settings/api", root: "main", ready: ".api-reference-page" },
   { name: "play-builder", path: "/builder", root: "main", ready: ".cb-page, .builder-gate" },
+  /**
+   * `/homebrew` — a GM-only address this audit has never loaded, on a tab whose whole job is dense
+   * forms. Two entries because the library and the editor share almost no controls: the rail is rows
+   * and filters, and every field a GM actually authors is inside `RecordDetail`. Measuring only the
+   * first would report "the homebrew tab is clean" about a screen containing no fields.
+   *
+   * The editor entry opens whatever record the rail lists first, the same way the page and quest
+   * editors do here — never a named fixture, which is what made two Codex surfaces report NOT
+   * MEASURED against a database the seed had not built. A homebrew library with nothing in it
+   * therefore reports NOT MEASURED rather than measuring the empty state twice.
+   */
+  { name: "play-homebrew", path: "/homebrew", root: "main", ready: ".hb-root" },
+  { name: "play-homebrew-record", path: "/homebrew", root: "main", ready: ".hb-root", open: (page) => openFirstRecord(page, {
+      rows: ".hb-rail button.hb-row", expect: ".hb-detail", what: "homebrew"
+    }) },
+  /**
+   * ...and one with a CHOOSER OPEN, on the same reasoning as the pin inspector's Appearance
+   * disclosure above: `Combobox`'s option rows take the 44px floor as real paint (route 1,
+   * `min-height: var(--tap-min)` on `.nh-combobox-option`), and a closed picker has no rows at all.
+   * The editor measured with every picker shut says nothing about the densest cluster on it — which
+   * is precisely the thirteen damage types and seven rarities this audit exists to check.
+   *
+   * Separate from the entry above rather than folded into it so a library whose first record has no
+   * open-slug picker (a spell list, say) reports THIS surface unmeasured and still measures the
+   * editor. Substituting one for the other is the failure this file's docblock is about.
+   */
+  { name: "play-homebrew-picker", path: "/homebrew", root: "main", ready: ".hb-root", open: async (page) => {
+      // Only if a record is not ALREADY open. `walk` navigates by pushing the same address the
+      // previous surface used, which the router correctly treats as a no-op — so the editor the
+      // entry above opened is still on screen, and at 375px the rail it would be re-opened from is
+      // the half of the master-detail that is currently hidden. This is not the "measure the previous
+      // surface" substitution the docblock forbids: the surface still ends at a homebrew editor with
+      // a chooser open, and still fails loudly below if there is no chooser to open.
+      if (await page.locator(".hb-detail").count() === 0) {
+        await openFirstRecord(page, { rows: ".hb-rail button.hb-row", expect: ".hb-detail", what: "homebrew" });
+      }
+      const chooser = page.locator(".hb-detail .nh-combobox input[role=combobox]").first();
+      if (await chooser.count() === 0) throw new Error("the first homebrew record has no open-slug chooser to open");
+      await chooser.click({ timeout: 8_000 });
+      await page.waitForSelector(".nh-combobox-list", { timeout: 8_000 });
+      await page.waitForTimeout(600);
+    } },
   // The sheet LAYER (`/characters/:id`) — a parameterised address, so it resolves its id from the
   // table's own tokens the way the no-scroll audit does, then navigates. Its page actions live
   // inside the sheet frame now, which is exactly the row this measurement should see.
@@ -569,7 +621,7 @@ async function walk(page, surfaces, rootSelector) {
     // Counted over controls of EVERY size, unlike the three metrics above, which are >=44 questions:
     // reach goes unjudged for a 20px control in a closed menu exactly as it does for a 44px one.
     if (overlaid.length + closed.length > 0)
-      report.push(`  LAYER reach not judged for ${overlaid.length + closed.length} of ${out.length}: ${overlaid.length} behind an open overlay, ${closed.length} inside a closed disclosure - sizes above still count them`);
+      report.push(`  LAYER reach not judged for ${overlaid.length + closed.length} of ${out.length}: ${overlaid.length} behind an open overlay (a modal, a Drawer, or a Combobox listbox), ${closed.length} inside a closed disclosure - sizes above still count them`);
     for (const c of bad) report.push(`  SIZE  ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
     for (const c of stolen) report.push(`  STEAL ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
     // Printed per row, unlike the count this replaces: `unresolved` was a header number with no
