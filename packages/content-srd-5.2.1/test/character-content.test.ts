@@ -797,7 +797,10 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
 describe("the subclass authoring surface, and the tables the parser used to throw away", () => {
   const classes = loadClasses();
   const subclasses = loadSubclasses();
-  const featureOf = (records: Array<{ id: string; features: FeatureRecord[] }>, recordId: string, featureId: string) =>
+  // Readonly in BOTH dimensions: `loadClasses`/`loadSubclasses` return `readonly ClassReference[]`,
+  // and a mutable parameter type made this helper uncallable with them - invisible while the package
+  // did not typecheck `test/`.
+  const featureOf = (records: readonly { id: string; features: readonly FeatureRecord[] }[], recordId: string, featureId: string) =>
     records.find((record) => record.id === recordId)!.features.find((feature) => feature.id === featureId)!;
 
   it("merges SUBCLASS_MECHANICS into an ETL-GENERATED subclass", () => {

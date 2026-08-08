@@ -346,7 +346,7 @@ describe("spell-list overlay", () => {
     const blank = list("hb-empty");
     const phantom = list("hb-phantom", { add: ["no-such-spell"], basedOn: ["no-such-list"] });
     const resolution = resolveSpellLists([blank, phantom, list("hb-real", { basedOn: ["cleric"] })], spells);
-    expect(resolution.emptyListIds.sort()).toEqual(["hb-empty", "hb-phantom"]);
+    expect([...resolution.emptyListIds].sort()).toEqual(["hb-empty", "hb-phantom"]);
     expect(resolution.unknownBasedOn).toEqual(["no-such-list"]);
     expect(spellListMemberIds("hb-empty", [blank], spells).size).toBe(0);
     // The same probe answers for a bare SRD tag, so a publish gate needs no special case.
@@ -365,7 +365,7 @@ describe("spell-list overlay", () => {
     const b = list("hb-b", { basedOn: ["hb-a"] });
     const downstream = list("hb-c", { basedOn: ["hb-a"] });          // points AT the loop, is not in it
     const resolution = resolveSpellLists([a, b, downstream], spells);
-    expect(resolution.cyclicListIds.sort()).toEqual(["hb-a", "hb-b"]);
+    expect([...resolution.cyclicListIds].sort()).toEqual(["hb-a", "hb-b"]);
     expect(resolution.cyclicListIds).not.toContain("hb-c");
     expect([...resolution.memberIds.get("hb-a")!]).toEqual(["fireball"]);   // basedOn dropped, `add` kept
   });
