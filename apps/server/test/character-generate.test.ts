@@ -99,8 +99,8 @@ describe("random character generator - the far end", () => {
           const { actions } = assemble(definition);
           const onTurn = actions.filter((action) => action.activation === "action" || action.activation === "bonus-action");
           expect(onTurn.length, `${classId} L${level} has no action to take on its turn`).toBeGreaterThan(0);
-          expect(actions.some((action) => action.attackRoll || (action.damage?.length ?? 0) > 0),
-            `${classId} L${level} has no action that can deal damage`).toBe(true);
+          expect(actions.some((action) => action.attack !== undefined || (action.damage?.length ?? 0) > 0),
+            `${classId} L${level} has no action that can attack or deal damage`).toBe(true);
         } catch (error) {
           failures.push(`${classId} L${level}: ${(error as Error).message}`);
         }

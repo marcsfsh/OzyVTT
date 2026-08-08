@@ -4,6 +4,7 @@ import { Avatar, Badge, Button, Eyebrow, Modal, RevealSwitch, useToast } from "@
 import { useConfirm } from "../components/feedback";
 import { CharacterSheet } from "../encounter/CharacterSheet";
 import { PdfImportModal } from "./PdfImportModal";
+import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, claimStateOf, classLine, presenceDot } from "./actor-display";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -24,6 +25,7 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [previewImportId, setPreviewImportId] = useState<string | null>(null);
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
+  const [randomOpen, setRandomOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const { confirm, dialog } = useConfirm();
@@ -139,6 +141,9 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
       <h2>Roster</h2>
       <div className="party-heading-actions">
         {onCreateCharacter && <Button variant="primary" onClick={onCreateCharacter}>Create a character</Button>}
+        {/* Beside Create, not inside it: rolling one up is a different intention from building one,
+            and a GM filling a table with NPCs-as-characters reaches for it far more often. */}
+        <Button onClick={() => setRandomOpen(true)}>Roll a random character</Button>
         <Button onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
         <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
         <Button variant="secondary" onClick={() => importFileRef.current?.click()}>Import JSON</Button>
@@ -166,6 +171,7 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
       ? <div className="scene-empty">
           <p>Nobody is on the table yet.</p>
           {onCreateCharacter && <Button variant="primary" arrow onClick={onCreateCharacter}>Create a character</Button>}
+          <Button variant="secondary" onClick={() => setRandomOpen(true)}>Roll a random character</Button>
         </div>
       : <>
         <ul className="nh-gallery party-gallery">{active.map((actor) => card(actor, false))}</ul>
@@ -177,6 +183,12 @@ export function PartyRosterTab({ state, onCreateCharacter }: Readonly<{ state: G
       </>}
     </div>
 
+    <RandomCharacterModal
+      open={randomOpen}
+      maxLevel={state.builderPolicy?.maxLevel ?? 20}
+      onClose={() => setRandomOpen(false)}
+      onRolled={(actorId) => toast(`${state.actors.find((actor) => actor.id === actorId)?.name ?? "A new character"} joined the roster.`, { tone: "success" })}
+    />
     {sheetActor && <CharacterSheet actor={sheetActor} role="gm" state={state} onClose={() => setSheetActorId(null)} />}
     {previewImport && <Modal open onClose={() => setPreviewImportId(null)} size="md" title={previewImport.name} ariaLabel={`Preview ${previewImport.name}`}
       footer={<>
