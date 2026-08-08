@@ -232,6 +232,14 @@ export const RollModeVariantSchema = z.object({
 export const EffectModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
   z.object({ type: z.literal("damage-resistance"), damageTypes: z.array(DamageTypeIdSchema).min(1).max(20) }).strict(),
+  /**
+   * THE OTHER HALF OF THE DEFENCE VOCABULARY, and until it existed a player character could not be
+   * vulnerable to anything. `damageVulnerabilities` was declared on `ActorDefinition` and written
+   * only by a monster stat block; no effect, no item and no feature could grant it - so a curse that
+   * doubled fire damage was prose. It mirrors `damage-resistance` exactly, and `adjustDamageParts`
+   * already implements the SRD's cancellation rule (resistance + vulnerability = normal damage).
+   */
+  z.object({ type: z.literal("damage-vulnerability"), damageTypes: z.array(DamageTypeIdSchema).min(1).max(20) }).strict(),
   z.object({ type: z.literal("attack-advantage") }).strict(),
   z.object({ type: z.literal("incoming-attack-advantage") }).strict(),
   /** The bearer's own attack rolls have disadvantage (always-on, unlike turn-scoped attack-advantage). */

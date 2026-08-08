@@ -310,6 +310,8 @@ export type EquipmentDerivation = Readonly<{
   tools: readonly Sourced[];
   languages: readonly Sourced[];
   damageResistances: readonly Sourced[];
+  /** Damage the bearer takes DOUBLE of while the item's effect is active - the mirror of the line above, and the item half of the vulnerability channel a PC never had. */
+  damageVulnerabilities: readonly Sourced[];
   /** Damage the bearer ignores entirely while the item is active; read by the damage pipeline beside the definition's own. */
   damageImmunities: readonly Sourced[];
   /** Conditions the item refuses; `setCondition` narrates the skip exactly as it does for an innate immunity. */
@@ -367,7 +369,7 @@ export type EquipmentDerivation = Readonly<{
 }>;
 
 export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
-  skills: [], saves: [], tools: [], languages: [], damageResistances: [], damageImmunities: [],
+  skills: [], saves: [], tools: [], languages: [], damageResistances: [], damageVulnerabilities: [], damageImmunities: [],
   conditionImmunities: [], armorProficiencies: [], weaponProficiencies: [], featIds: [],
   armorClass: 0, initiative: 0, speed: 0, saveBonus: 0, checkBonus: 0,
   spellSaveDc: [], spellAttackBonus: [], spellSlots: [], resourceBonus: [],
@@ -557,6 +559,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   const tools: Sourced[] = [];
   const languages: Sourced[] = [];
   const damageResistances: Sourced[] = [];
+  const damageVulnerabilities: Sourced[] = [];
   const damageImmunities: Sourced[] = [];
   const conditionImmunities: Sourced[] = [];
   const armorProficiencies: Sourced[] = [];
@@ -586,10 +589,13 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       for (const tag of effect.tags ?? []) itemEffectTags.push(tag);
       const modifiers: RiderModifier[] = [];
       for (const modifier of effect.modifiers ?? []) {
-        // `damage-resistance` is the effect vocabulary's own shape (a LIST of types, no amount); it
-        // is a defense, not a rider, so it joins the resistance grants rather than the collector.
-        if (modifier.type === "damage-resistance") {
-          for (const id of modifier.damageTypes ?? []) damageResistances.push({ id, sourceItemId: itemId });
+        // `damage-resistance`/`damage-vulnerability` are the effect vocabulary's own shape (a LIST of
+        // types, no amount); they are defenses, not riders, so they join the grants rather than the
+        // collector. Without the second branch a `damage-vulnerability` on an item's effect would
+        // fall through to `asRiderModifiers` and become a rider that nothing reads.
+        if (modifier.type === "damage-resistance" || modifier.type === "damage-vulnerability") {
+          const into = modifier.type === "damage-resistance" ? damageResistances : damageVulnerabilities;
+          for (const id of modifier.damageTypes ?? []) into.push({ id, sourceItemId: itemId });
           continue;
         }
         modifiers.push(...asRiderModifiers(modifier));
@@ -665,7 +671,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   const standing = collectRiders(carriers, { ...context, moment: null });
   return {
     context,
-    skills, saves, tools, languages, damageResistances, damageImmunities, conditionImmunities,
+    skills, saves, tools, languages, damageResistances, damageVulnerabilities, damageImmunities, conditionImmunities,
     armorProficiencies, weaponProficiencies, featIds,
     armorClass: sumRiders(standing, "armor-class"),
     initiative: sumRiders(standing, "initiative"),

@@ -117,9 +117,11 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const fromItems = deps?.catalog ? deriveEquipment(actor, definition, deps.catalog) : EMPTY_DERIVATION;
     const itemResistances = fromItems.damageResistances.map((entry) => entry.id);
     const itemImmunities = fromItems.damageImmunities.map((entry) => entry.id);
+    const itemVulnerabilities = fromItems.damageVulnerabilities.map((entry) => entry.id);
     const itemSourceOf = (type: string): string | null => {
       const source = fromItems.damageImmunities.find((entry) => entry.id.toLowerCase() === type)
-        ?? fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type);
+        ?? fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type)
+        ?? fromItems.damageVulnerabilities.find((entry) => entry.id.toLowerCase() === type);
       if (!source) return null;
       return fromItems.sources.find((row) => row.itemId === source.sourceItemId)?.itemName ?? source.sourceItemId;
     };
@@ -130,12 +132,14 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const adjusted = adjustDamageParts(input.parts, {
       resistances: [...innate.resistances, ...fromEffects.resistances, ...itemResistances, ...(underwater ? ["fire"] : [])],
       immunities: [...(petrified ? [...innate.immunities, "poison"] : innate.immunities), ...itemImmunities],
-      vulnerabilities: innate.vulnerabilities,
+      // All three channels, so a curse and a cursed item can make a target vulnerable exactly as a
+      // stat block can. `adjustDamageParts` already cancels a same-type resistance against it.
+      vulnerabilities: [...innate.vulnerabilities, ...fromEffects.vulnerabilities, ...itemVulnerabilities],
       resistAll: petrified
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
-      const effectSource = part.adjustment === "resistance" ? fromEffects.sources.get(type) ?? null : null;
+      const effectSource = part.adjustment === "resistance" || part.adjustment === "vulnerability" ? fromEffects.sources.get(type) ?? null : null;
       const innateHas = (list: readonly string[]) => list.map((entry) => entry.toLowerCase()).includes(type);
       const petrifiedSource = petrified
         && ((part.adjustment === "resistance" && !innateHas(innate.resistances) && effectSource === null)
@@ -146,8 +150,9 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
         ? "Underwater" : null;
       // The item's NAME on the damage line, so a halved hit explains itself ("Ring of Fire
       // Resistance") the same way an effect-sourced one does.
+      const innateList = part.adjustment === "immunity" ? innate.immunities : part.adjustment === "vulnerability" ? innate.vulnerabilities : innate.resistances;
       const itemSource = part.adjustment !== null && effectSource === null && petrifiedSource === null && underwaterSource === null
-        && !innateHas(part.adjustment === "immunity" ? innate.immunities : innate.resistances)
+        && !innateHas(innateList)
         ? itemSourceOf(type) : null;
       return { ...part, adjustmentSource: effectSource ?? petrifiedSource ?? underwaterSource ?? itemSource };
     });

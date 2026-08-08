@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import { EffectInstanceSchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { applyDamageDetailed, damageAdjustmentDetail } from "../src/hit-points.js";
 import { addEffect } from "../src/effects.js";
@@ -102,5 +102,56 @@ describe("gap 1: flat damage-reduction reaches the hit", () => {
     const plain = hit(stateWith(), [{ amount: 5, type: "fire" }], definitionOf());
     expect(plain.application.flatReduction).toBeUndefined();
     expect(plain.detail).toBe("");
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// Gap 2 - vulnerability had exactly one channel
+// -------------------------------------------------------------------------------------------------
+
+describe("gap 2: anything can make a target vulnerable, not just a stat block", () => {
+  const curse = (state: GameState, damageTypes: string[]) => addEffect(state, IDS.hero, EffectInstanceSchema.parse({
+    id: "curse-of-embers", name: "Curse of Embers", tags: ["curse"], sourceActorId: null, sourceName: "Hag",
+    sourceActionId: null, startedRound: 1, duration: { type: "manual" },
+    modifiers: [{ type: "damage-vulnerability", damageTypes }]
+  }));
+
+  it("doubles the damage an ACTIVE EFFECT declares vulnerable, and names the effect on the line", () => {
+    const state = stateWith();
+    curse(state, ["fire"]);
+    const result = hit(state, [{ amount: 6, type: "fire" }], definitionOf());
+    expect(result.hpLost).toBe(12);
+    expect(result.detail).toContain("6 fire → 12, vulnerability: Curse of Embers");
+  });
+
+  it("leaves other types alone", () => {
+    const state = stateWith();
+    curse(state, ["fire"]);
+    expect(hit(state, [{ amount: 6, type: "cold" }], definitionOf()).hpLost).toBe(6);
+  });
+
+  it("cancels against a same-type resistance instead of compounding (SRD 5.2.1)", () => {
+    const state = stateWith();
+    curse(state, ["fire"]);
+    const result = hit(state, [{ amount: 6, type: "fire" }], definitionOf({ damageResistances: ["fire"] }));
+    expect(result.hpLost).toBe(6);
+    expect(result.detail).toBe("");
+  });
+
+  it("loses to immunity outright", () => {
+    const state = stateWith();
+    curse(state, ["fire"]);
+    expect(hit(state, [{ amount: 6, type: "fire" }], definitionOf({ damageImmunities: ["fire"] })).hpLost).toBe(0);
+  });
+
+  it("reaches the maths from an ITEM's effect too, named by the item", () => {
+    const cursedBlade = {
+      id: "brand-of-the-hag", name: "Brand of the Hag", category: "weapon", slot: "weapon", isMagic: true,
+      effects: [{ name: "Hag's Brand", modifiers: [{ type: "damage-vulnerability", damageTypes: ["cold"] }] }]
+    } as unknown as EquipmentRecordLike;
+    const state = stateWith([item({ id: "brand-of-the-hag", name: "Brand of the Hag", category: "weapon" })]);
+    const result = hit(state, [{ amount: 7, type: "cold" }], definitionOf(), catalogOf([cursedBlade]));
+    expect(result.hpLost).toBe(14);
+    expect(result.detail).toContain("7 cold → 14, vulnerability: Brand of the Hag");
   });
 });

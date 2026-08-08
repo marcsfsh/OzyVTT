@@ -75,6 +75,7 @@
       "oneOf": [
         { "type": "object", "required": ["type", "amount"], "properties": { "type": { "const": "damage-bonus" }, "amount": { "type": "integer", "minimum": -20, "maximum": 20 }, "appliesTo": { "enum": ["melee", "all"] } }, "additionalProperties": false },
         { "type": "object", "required": ["type", "damageTypes"], "properties": { "type": { "const": "damage-resistance" }, "damageTypes": { "$ref": "#/$defs/damageTypeList" } }, "additionalProperties": false },
+        { "type": "object", "required": ["type", "damageTypes"], "properties": { "type": { "const": "damage-vulnerability" }, "damageTypes": { "$ref": "#/$defs/damageTypeList" } }, "additionalProperties": false },
         { "type": "object", "required": ["type"], "properties": { "type": { "const": "attack-advantage" } }, "additionalProperties": false },
         { "type": "object", "required": ["type"], "properties": { "type": { "const": "incoming-attack-advantage" } }, "additionalProperties": false },
         { "type": "object", "required": ["type"], "properties": { "type": { "const": "attack-disadvantage" } }, "additionalProperties": false },

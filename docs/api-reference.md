@@ -5160,6 +5160,15 @@ Resistance to the listed damage types.
 | `type` | const `"damage-resistance"` | yes |  |
 | `damageTypes` | string[] | yes |  |
 
+### `HomebrewEffectDamageVulnerability`
+
+Vulnerability to the listed damage types - double damage, and the mirror of `damage-resistance`. Resistance and vulnerability to the SAME type cancel to normal damage rather than compounding (SRD 5.2.1).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-vulnerability"` | yes |  |
+| `damageTypes` | string[] | yes |  |
+
 ### `HomebrewEffectDurationEncounter`
 
 Until the encounter ends.
@@ -5233,6 +5242,7 @@ One of the following, discriminated by `type`:
 
 - `HomebrewEffectDamageBonus`
 - `HomebrewEffectDamageResistance`
+- `HomebrewEffectDamageVulnerability`
 - `HomebrewEffectAttackAdvantage`
 - `HomebrewEffectIncomingAttackAdvantage`
 - `HomebrewEffectAttackDisadvantage`

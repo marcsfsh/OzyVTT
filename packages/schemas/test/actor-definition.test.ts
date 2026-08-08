@@ -284,10 +284,12 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(withRiders);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(withRiders), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // Eleven variants: the eight that existed plus the three shared with FeatureModifierSchema.
-    expect(EffectModifierSchema.options).toHaveLength(11);
+    // Twelve variants: the eight that existed, the three shared with FeatureModifierSchema, and
+    // `damage-vulnerability` - the mirror of `damage-resistance`, without which nothing in the game
+    // could make a player character vulnerable to a damage type.
+    expect(EffectModifierSchema.options).toHaveLength(12);
     // ...and the JSON twin declares exactly as many branches, which is the lockstep this test buys.
-    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(11);
+    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(12);
   });
 
   it("normalises every advantage shape through ONE function, so no consumer branches on eleven", () => {

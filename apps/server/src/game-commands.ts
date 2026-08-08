@@ -136,6 +136,8 @@ export const EffectAddSchema = z.object({
   modifiers: z.array(z.discriminatedUnion("type", [
     z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
     z.object({ type: z.literal("damage-resistance"), damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20) }).strict(),
+    /** The mirror of the line above, and the only channel by which anything can make a target vulnerable. */
+    z.object({ type: z.literal("damage-vulnerability"), damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20) }).strict(),
     z.object({ type: z.literal("attack-advantage") }).strict(),
     z.object({ type: z.literal("incoming-attack-advantage") }).strict(),
     z.object({ type: z.literal("attack-disadvantage") }).strict(),

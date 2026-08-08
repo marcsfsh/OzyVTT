@@ -231,19 +231,27 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
   return events;
 }
 
-/** Typed damage defenses an actor's active effects contribute (Rage resistance), merged with definition defenses by the caller. */
-export function effectDamageDefenses(actor: Actor): { resistances: string[]; sources: Map<string, string> } {
+/**
+ * Typed damage defenses an actor's active effects contribute (Rage resistance, a curse's
+ * vulnerability), merged with definition defenses by the caller.
+ *
+ * `vulnerabilities` is the half that did not exist. Effects returned resistances only, so the
+ * `damageVulnerabilities` the damage maths reads had exactly ONE writer - a monster stat block - and
+ * a player character could not be made vulnerable by anything at all. Both lists share one `sources`
+ * map because a type is never both (the SRD cancels them), so one name always explains one line.
+ */
+export function effectDamageDefenses(actor: Actor): { resistances: string[]; vulnerabilities: string[]; sources: Map<string, string> } {
   const resistances: string[] = [];
+  const vulnerabilities: string[] = [];
   const sources = new Map<string, string>();
   for (const effect of actor.effects) {
     for (const modifier of effect.modifiers) {
-      if (modifier.type === "damage-resistance") {
-        for (const damageType of modifier.damageTypes) {
-          resistances.push(damageType);
-          if (!sources.has(damageType.toLowerCase())) sources.set(damageType.toLowerCase(), effect.name);
-        }
+      if (modifier.type !== "damage-resistance" && modifier.type !== "damage-vulnerability") continue;
+      for (const damageType of modifier.damageTypes) {
+        (modifier.type === "damage-resistance" ? resistances : vulnerabilities).push(damageType);
+        if (!sources.has(damageType.toLowerCase())) sources.set(damageType.toLowerCase(), effect.name);
       }
     }
   }
-  return { resistances, sources };
+  return { resistances, vulnerabilities, sources };
 }
