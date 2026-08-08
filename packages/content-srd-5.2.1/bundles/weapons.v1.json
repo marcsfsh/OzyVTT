@@ -4,6 +4,7 @@
   "name": "Battleaxe",
   "category": "martial",
   "improvised": false,
+  "mastery": "topple",
   "damage": {
    "dice": "1d8",
    "type": "slashing"
@@ -16,6 +17,7 @@
   "name": "Blowgun",
   "category": "martial",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1",
    "type": "piercing"
@@ -28,6 +30,7 @@
   "name": "Club",
   "category": "simple",
   "improvised": false,
+  "mastery": "slow",
   "damage": {
    "dice": "1d4",
    "type": "bludgeoning"
@@ -40,6 +43,7 @@
   "name": "Dagger",
   "category": "simple",
   "improvised": false,
+  "mastery": "nick",
   "damage": {
    "dice": "1d4",
    "type": "piercing"
@@ -52,6 +56,7 @@
   "name": "Dart",
   "category": "simple",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1d4",
    "type": "piercing"
@@ -64,6 +69,7 @@
   "name": "Flail",
   "category": "martial",
   "improvised": false,
+  "mastery": "sap",
   "damage": {
    "dice": "1d8",
    "type": "bludgeoning"
@@ -76,6 +82,7 @@
   "name": "Glaive",
   "category": "martial",
   "improvised": false,
+  "mastery": "graze",
   "damage": {
    "dice": "1d10",
    "type": "slashing"
@@ -88,6 +95,7 @@
   "name": "Greataxe",
   "category": "martial",
   "improvised": false,
+  "mastery": "cleave",
   "damage": {
    "dice": "1d12",
    "type": "slashing"
@@ -100,6 +108,7 @@
   "name": "Greatclub",
   "category": "simple",
   "improvised": false,
+  "mastery": "push",
   "damage": {
    "dice": "1d8",
    "type": "bludgeoning"
@@ -112,6 +121,7 @@
   "name": "Greatsword",
   "category": "martial",
   "improvised": false,
+  "mastery": "graze",
   "damage": {
    "dice": "2d6",
    "type": "slashing"
@@ -124,6 +134,7 @@
   "name": "Halberd",
   "category": "martial",
   "improvised": false,
+  "mastery": "cleave",
   "damage": {
    "dice": "1d10",
    "type": "slashing"
@@ -136,6 +147,7 @@
   "name": "Hand Crossbow",
   "category": "martial",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -148,6 +160,7 @@
   "name": "Handaxe",
   "category": "simple",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1d6",
    "type": "slashing"
@@ -160,6 +173,7 @@
   "name": "Heavy Crossbow",
   "category": "martial",
   "improvised": false,
+  "mastery": "push",
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -172,6 +186,7 @@
   "name": "Javelin",
   "category": "simple",
   "improvised": false,
+  "mastery": "slow",
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -184,6 +199,7 @@
   "name": "Lance",
   "category": "martial",
   "improvised": false,
+  "mastery": "topple",
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -196,6 +212,7 @@
   "name": "Light Crossbow",
   "category": "simple",
   "improvised": false,
+  "mastery": "slow",
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -208,6 +225,7 @@
   "name": "Light Hammer",
   "category": "simple",
   "improvised": false,
+  "mastery": "nick",
   "damage": {
    "dice": "1d4",
    "type": "bludgeoning"
@@ -220,6 +238,7 @@
   "name": "Longbow",
   "category": "martial",
   "improvised": false,
+  "mastery": "slow",
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -232,6 +251,7 @@
   "name": "Longsword",
   "category": "martial",
   "improvised": false,
+  "mastery": "sap",
   "damage": {
    "dice": "1d8",
    "type": "slashing"
@@ -244,6 +264,7 @@
   "name": "Mace",
   "category": "simple",
   "improvised": false,
+  "mastery": "sap",
   "damage": {
    "dice": "1d6",
    "type": "bludgeoning"
@@ -256,6 +277,7 @@
   "name": "Maul",
   "category": "martial",
   "improvised": false,
+  "mastery": "topple",
   "damage": {
    "dice": "2d6",
    "type": "bludgeoning"
@@ -268,6 +290,7 @@
   "name": "Morningstar",
   "category": "martial",
   "improvised": false,
+  "mastery": "sap",
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -280,6 +303,7 @@
   "name": "Musket",
   "category": "martial",
   "improvised": false,
+  "mastery": "slow",
   "damage": {
    "dice": "1d12",
    "type": "piercing"
@@ -292,6 +316,7 @@
   "name": "Pike",
   "category": "martial",
   "improvised": false,
+  "mastery": "push",
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -304,6 +329,7 @@
   "name": "Pistol",
   "category": "martial",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1d10",
    "type": "piercing"
@@ -316,6 +342,7 @@
   "name": "Quarterstaff",
   "category": "simple",
   "improvised": false,
+  "mastery": "topple",
   "damage": {
    "dice": "1d6",
    "type": "bludgeoning"
@@ -328,6 +355,7 @@
   "name": "Rapier",
   "category": "martial",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -340,6 +368,7 @@
   "name": "Scimitar",
   "category": "martial",
   "improvised": false,
+  "mastery": "nick",
   "damage": {
    "dice": "1d6",
    "type": "slashing"
@@ -352,6 +381,7 @@
   "name": "Shortbow",
   "category": "simple",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -364,6 +394,7 @@
   "name": "Shortsword",
   "category": "martial",
   "improvised": false,
+  "mastery": "vex",
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -376,6 +407,7 @@
   "name": "Sickle",
   "category": "simple",
   "improvised": false,
+  "mastery": "nick",
   "damage": {
    "dice": "1d4",
    "type": "slashing"
@@ -388,6 +420,7 @@
   "name": "Sling",
   "category": "simple",
   "improvised": false,
+  "mastery": "slow",
   "damage": {
    "dice": "1d4",
    "type": "bludgeoning"
@@ -400,6 +433,7 @@
   "name": "Spear",
   "category": "simple",
   "improvised": false,
+  "mastery": "sap",
   "damage": {
    "dice": "1d6",
    "type": "piercing"
@@ -412,6 +446,7 @@
   "name": "Trident",
   "category": "martial",
   "improvised": false,
+  "mastery": "topple",
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -424,6 +459,7 @@
   "name": "War Pick",
   "category": "martial",
   "improvised": false,
+  "mastery": "sap",
   "damage": {
    "dice": "1d8",
    "type": "piercing"
@@ -436,6 +472,7 @@
   "name": "Warhammer",
   "category": "martial",
   "improvised": false,
+  "mastery": "push",
   "damage": {
    "dice": "1d8",
    "type": "bludgeoning"
@@ -448,6 +485,7 @@
   "name": "Whip",
   "category": "martial",
   "improvised": false,
+  "mastery": "slow",
   "damage": {
    "dice": "1d4",
    "type": "slashing"

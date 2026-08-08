@@ -913,6 +913,27 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       }
     }
   }
+  /**
+   * WEAPON MASTERY: GRAZE. "If your attack roll with this weapon misses a creature, you can deal
+   * damage to that creature equal to the ability modifier you used to make the attack roll. This
+   * damage is the same type dealt by the weapon."
+   *
+   * The one mastery that fires on a MISS, which is why it sits outside the damage block above - that
+   * block is gated on hit/crit/unknown by design, and Graze is the exception the SRD writes.
+   *
+   * A FUMBLE is still a miss and still grazes: the SRD gives no carve-out for a natural 1, and the
+   * feature is a floor on the swing rather than a reward for rolling well.
+   *
+   * `bonusDamage` is the right channel and not a compromise - it is flat integers with a source
+   * label, which is exactly what "damage equal to your ability modifier" is, and the roll card
+   * already renders it as its own explainable line. A non-positive modifier deals nothing rather than
+   * healing the target.
+   */
+  const mastery = derivation.masteryByActionId[action.id];
+  if (mastery?.id === "graze" && attack !== null && (attack.outcome === "miss" || attack.outcome === "fumble") && mastery.abilityModifier > 0) {
+    bonusDamage.push({ amount: mastery.abilityModifier, type: action.damage[0]?.type ?? "untyped", source: "Graze" });
+  }
+
   // TYPED RIDER DAMAGE: criterion 1's "extra 1d4 lightning" and criterion 9's "extra 1d6 fire on a
   // critical hit". Neither existing channel can carry it - `bonusDamage` is flat integers only, and
   // `attack.criticalBonusDice` is a bare COUNT applied to the first damage part, so it cannot carry a
@@ -996,6 +1017,47 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       });
       effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds });
     });
+  }
+
+  /**
+   * WEAPON MASTERY: SAP. "If you hit a creature with this weapon, that creature has Disadvantage on
+   * its next attack roll before the start of your next turn."
+   *
+   * A real effect on the TARGET, carrying `attack-disadvantage` - the variant whose own comment reads
+   * "the bearer's own attack rolls have disadvantage" - and ending at the start of the attacker's next
+   * turn, which is what `until-source-next-turn` already means for Reckless Attack and Dodge.
+   *
+   * KNOWN APPROXIMATION, stated rather than hidden: the SRD ends Sap on the target's NEXT attack roll
+   * or the attacker's next turn, whichever comes first, and nothing in the effect vocabulary expires
+   * on use. So a target that attacks twice in that window rolls both at Disadvantage instead of one.
+   * This is the same shape the shipped Help builtin already has (`attack-advantage`, same duration,
+   * also "the next attack roll" in the SRD), so it follows the engine's existing convention rather
+   * than inventing a second one. A one-shot duration is the fix, and it fixes both together.
+   *
+   * NO condition is linked: Sap is not a named condition, and putting one on the row would make the
+   * token render a status it does not have.
+   */
+  if (mastery?.id === "sap" && attack !== null && (attack.outcome === "hit" || attack.outcome === "crit")) {
+    const sapped = targets[0];
+    const effect = addEffect(state, sapped.id, {
+      id: `${input.commandId}:mastery:sap:${sapped.id}`,
+      name: `Sapped by ${attacker.name}`,
+      tags: ["sap"],
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      sourceActionId: `${action.id}:sap`,
+      startedRound: state.combat.round,
+      duration: { type: "until-source-next-turn" },
+      endsWhenSourceDefeated: true,
+      voidWhileIncapacitated: false,
+      concentration: false,
+      modifiers: [{ type: "attack-disadvantage" }],
+      linkedConditionIds: [],
+      escapeDc: null,
+      onEnd: [],
+      endsWithTag: null
+    });
+    effectsApplied.push({ targetId: sapped.id, targetName: sapped.name, name: effect.name, conditionIds: [] });
   }
 
   // Granted effects (Rage, Reckless Attack - self; Help - the chosen ally): replace-on-refresh,

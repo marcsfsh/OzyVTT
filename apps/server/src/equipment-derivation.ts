@@ -129,6 +129,14 @@ export type ItemEffectModifierLike = RiderModifier & Readonly<{ damageTypes?: re
 export type EquipmentRecordLike = RiderBlockLike & Readonly<{
   id: string; name: string; category?: string;
   slot?: string;
+  /**
+   * The weapon block, read for its MASTERY only - the damage/range half already reaches the engine
+   * through the inventory row. Resolved from the catalog by item id rather than stored on the row,
+   * which is the same rule an item's riders follow ("Mechanics resolve by `item.id` against the
+   * content catalog, which never leaves the server"). No schema change on the wire, no migration, and
+   * a GM who re-authors a homebrew weapon's mastery sees it on the next read.
+   */
+  weapon?: Readonly<{ mastery?: string }> | null;
   isMagic?: boolean;
   attunement?: Readonly<{ required?: boolean; restrictedTo?: readonly string[] }> | null;
   cursed?: boolean;
@@ -213,6 +221,40 @@ export const BUILDER_BAKED_MODIFIER_TYPES = [
   "initiative", "unarmored-defense", "darkvision"
 ] as const;
 const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES);
+
+/**
+ * WHICH OF THE EIGHT MASTERIES THE ENGINE ACTUALLY IMPLEMENTS - the one place that answers it.
+ *
+ * The SRD defines exactly eight mastery properties, and all 38 weapons now name one. That data is
+ * worth nothing on its own: a slug on 38 records that no engine path reads is the "built but unwired"
+ * failure this repo has already shipped three times, and it looks identical to a feature that works.
+ * So the derivation refuses to advertise a mastery it cannot honour, and this set is the gate.
+ *
+ * Implemented, and proved at the far end (a rolled number, a die that changes):
+ *   graze - `action-resolution.ts` rolls the ability modifier as damage on a MISS.
+ *   sap   - `action-resolution.ts` puts a real effect on the target; its next attack rolls 2d20kl1.
+ *
+ * NOT implemented, and therefore deliberately inert rather than half-wired. Each needs engine surface
+ * that does not exist yet, sized in the Stage 5 report:
+ *   push   - moves a token 10 feet directly away; needs the attack path to write a position.
+ *   slow   - -10 Speed until the attacker's next turn; the effect vocabulary has no speed modifier.
+ *   topple - a Constitution save the WEAPON triggers, then Prone; the save path is action-declared.
+ *   cleave - a second attack roll against a different creature inside one resolution.
+ *   nick   - moves the Light property's extra attack out of the bonus action; a turn-economy change.
+ *   vex    - Advantage on the attacker's next attack AGAINST THAT CREATURE; effects have no target
+ *            scoping, so there is nowhere to hang "against this one foe" today.
+ */
+const IMPLEMENTED_MASTERIES: ReadonlySet<string> = new Set(["graze", "sap"]);
+/**
+ * One weapon swing's mastery, as the resolver needs it. The ability modifier travels with the slug
+ * because Graze deals "damage equal to the ability modifier you used to make the attack roll", and
+ * that choice (finesse takes the better of Str/Dex, a ranged weapon takes Dex) is `weaponAction`'s
+ * to make - recomputing it at the resolver would be a second copy of the rule, free to drift.
+ */
+export type MasteryInForce = Readonly<{ id: string; abilityModifier: number }>;
+
+/** Does this mastery slug reach a real behaviour today? The derivation omits it entirely when not. */
+export const masteryReaches = (mastery: string): boolean => IMPLEMENTED_MASTERIES.has(mastery);
 
 export type EquipmentCatalog = Readonly<{
   equipmentRecord: (id: string) => EquipmentRecordLike | undefined;
@@ -306,6 +348,20 @@ export type EquipmentDerivation = Readonly<{
    * which is a rules bug that would look exactly like the feature working.
    */
   weaponActionIds: readonly string[];
+  /**
+   * THE MASTERY IN FORCE for each weapon swing, keyed by action id - and ONLY where the bearer has
+   * actually unlocked it.
+   *
+   * Two things have to be true for a mastery to do anything, and this map is where they meet:
+   * the weapon has one (the SRD table's Mastery column, all 38 rows), and the character has spent one
+   * of their Weapon Mastery picks ON THAT WEAPON. A Fighter 1 knows three weapons' masteries, not
+   * every weapon's - so a greatsword in the hands of someone who picked longbow, flail and rapier
+   * grazes for nothing, and that is the SRD's own rule, not a limitation.
+   *
+   * A weapon whose mastery is unlocked but not yet IMPLEMENTED is simply absent from this map, so
+   * `masteryReaches` below is the single honest answer to "does this slug do anything today".
+   */
+  masteryByActionId: Readonly<Record<string, MasteryInForce>>;
   /** Provenance for the sheet ("Stealth (Circlet of Shadows)"). */
   sources: readonly Readonly<{ itemId: string; itemName: string; summary: string }>[];
 }>;
@@ -315,7 +371,7 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   conditionImmunities: [], armorProficiencies: [], weaponProficiencies: [], featIds: [],
   armorClass: 0, initiative: 0, speed: 0, saveBonus: 0, checkBonus: 0,
   spellSaveDc: [], spellAttackBonus: [], spellSlots: [], resourceBonus: [],
-  carriers: [], context: {}, actions: [], weaponActionIds: [], sources: []
+  carriers: [], context: {}, actions: [], weaponActionIds: [], masteryByActionId: {}, sources: []
 });
 
 /**
@@ -574,9 +630,23 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
   // bonus on the axe in the same recomputation.
   const grantedWeaponIds = weaponProficiencies.map((entry) => entry.id);
   const weaponActionIds: string[] = [];
+  // Which weapons this character has spent a Weapon Mastery pick on. The builder already stores the
+  // ledger verbatim on the definition, so no new state is needed - the picks are read back from the
+  // same rows level-up and respec prefill from. `id` is the WEAPON id; the mastery is the weapon's.
+  const unlocked = new Set((definition?.character?.choices ?? [])
+    .filter((row) => row.kind === "weapon-mastery").map((row) => row.id));
+  const masteryByActionId: Record<string, MasteryInForce> = {};
   for (const entry of equipped) {
     const weaponAttack = weaponAction(entry.item, definition, grantedWeaponIds);
-    if (weaponAttack) { actions.push(weaponAttack); weaponActionIds.push(weaponAttack.id); }
+    if (!weaponAttack) continue;
+    actions.push(weaponAttack);
+    weaponActionIds.push(weaponAttack.id);
+    const mastery = catalog.equipmentRecord(entry.item.id)?.weapon?.mastery;
+    // BOTH gates: the weapon has a mastery AND the bearer unlocked THIS weapon - plus the third,
+    // that the engine can actually honour it (see `masteryReaches`).
+    if (mastery && unlocked.has(entry.item.id) && masteryReaches(mastery)) {
+      masteryByActionId[weaponAttack.id] = { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition) };
+    }
   }
 
   // The STANDING + CONDITIONAL pass: riders naming no moment whose static and dynamic gates pass.
@@ -600,7 +670,7 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       ? [{ level: rider.modifier.level, amount: rider.modifier.amount ?? 0 }] : []),
     resourceBonus: standing.flatMap((rider) => rider.modifier.type === "resource-bonus" && rider.modifier.poolId !== undefined
       ? [{ poolId: rider.modifier.poolId, amount: rider.modifier.amount ?? 0 }] : []),
-    carriers, actions, weaponActionIds, sources
+    carriers, actions, weaponActionIds, masteryByActionId, sources
   };
 }
 
@@ -873,14 +943,30 @@ function castAction(itemId: string, cast: ItemSpellCastLike, itemName: string, d
  * Absent `proficiencies.weapons` means "not recorded", NOT "untrained", so proficiency is assumed -
  * which keeps every existing sheet's number exactly where it is.
  */
-export function weaponAction(item: InventoryItem, definition: ActorDefinition | undefined, grantedWeapons: readonly string[] = []): ActorAction | null {
+/**
+ * WHICH ABILITY MODIFIER THIS WEAPON SWINGS WITH - Finesse takes the better of Strength and Dexterity,
+ * a genuinely ranged weapon takes Dexterity, everything else takes Strength.
+ *
+ * Extracted from `weaponAction` rather than copied because Graze needs the SAME number ("damage equal
+ * to the ability modifier you used to make the attack roll"). Two copies of a rule with a Finesse
+ * branch in it is two copies that can disagree, and the disagreement would be a wrong damage number
+ * on a miss - visible to a player and hard to trace back here.
+ */
+export function weaponAbilityModifier(item: InventoryItem, definition: ActorDefinition | undefined): number {
   const weapon = item.weapon;
-  if (!weapon || !definition) return null;
+  if (!weapon || !definition) return 0;
   const properties = weapon.properties ?? [];
   const str = abilityModifier(definition.abilityScores.str);
   const dex = abilityModifier(definition.abilityScores.dex);
   const ranged = weapon.rangeFeet !== null && !properties.includes("thrown");
-  const modifier = properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
+  return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
+}
+
+export function weaponAction(item: InventoryItem, definition: ActorDefinition | undefined, grantedWeapons: readonly string[] = []): ActorAction | null {
+  const weapon = item.weapon;
+  if (!weapon || !definition) return null;
+  const properties = weapon.properties ?? [];
+  const modifier = weaponAbilityModifier(item, definition);
   const trained = definition.proficiencies?.weapons;
   const granted = grantedWeapons.includes(weapon.category) || grantedWeapons.includes(item.id);
   const proficient = granted || trained === undefined || trained.includes(weapon.category) || trained.includes(item.id);

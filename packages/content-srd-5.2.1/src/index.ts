@@ -112,7 +112,7 @@ export function loadEquipment(): readonly EquipmentReference[] {
   // consumer still falls back to `category`) and what makes an open homebrew category derive AC.
   const weapons: EquipmentReference[] = loadWeapons().filter((weapon) => !weapon.improvised).map((weapon) => ({
     id: weapon.id, name: weapon.name, source: weapon.source, category: "weapon", slot: "weapon", costGp: null, weightLb: null, description: null,
-    weapon: { category: weapon.category, damageDice: weapon.damage.dice, damageType: weapon.damage.type, rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet }, armor: null,
+    weapon: { category: weapon.category, damageDice: weapon.damage.dice, damageType: weapon.damage.type, rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet, mastery: weapon.mastery }, armor: null,
     ...mundane()
   }));
   const armor: EquipmentReference[] = loadArmor().map((piece) => ({
