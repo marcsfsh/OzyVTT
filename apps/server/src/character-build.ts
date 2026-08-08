@@ -96,7 +96,7 @@ function repeatsOnlyWithADifferentSpellList(feat: FeatReference): boolean {
  * a partial-content gap (no fighting-style feats authored yet): the pick is NOT required, but any
  * ledger row that targets it still fails with the resolver's own loud error, never a silent accept.
  */
-type ChoiceOffer = {
+export type ChoiceOffer = {
   key: string;
   featureId: string | null;
   /**
@@ -121,11 +121,36 @@ type ChoiceOffer = {
   /** The ceiling an ability-score pick from this offer may reach; null = the SRD's 20 (epic boons say 30). */
   maximum: number | null;
   label: string;
+  /**
+   * The character LEVEL(S) this offer's picks belong to - one entry per grant, so a feature granted
+   * at 4/8/12/16 reads `[4, 8, 12, 16]` while everything else reads `[1]` or `[<its grant level>]`.
+   *
+   * Nothing in the validation path reads this: a row's own `level` is only bound-checked against the
+   * character's. It exists for the WRITERS - the random generator records the level each pick was
+   * really made at, so `level-ledger.ts` (which matches a stored row to a wizard offer on the tuple
+   * `(level, kind, classId, featureId)`) can prefill a generated character's level-up exactly as it
+   * prefills a hand-built one. The wizard's own convention is mirrored: species, background and the
+   * two class proficiency lists are level 1; a class feature takes its grant level; a subclass
+   * feature takes `feature.level ?? subclassLevel`; a chosen feat's own picks inherit the offer that
+   * took the feat.
+   */
+  levels: readonly number[];
+  /** The class a pick belongs to, or null for species/background/origin decisions - the wizard's `classId` on the row. */
+  classId: string | null;
   taken: string[];
 };
 
 function offerOf(partial: Pick<ChoiceOffer, "key" | "kind" | "capacity" | "options" | "label"> & Partial<ChoiceOffer>): ChoiceOffer {
-  return { featureId: null, featureAliases: [], optionLevels: null, optionRecords: null, unresolvable: null, maxSpellLevel: null, minSpellLevel: null, maximum: null, repeatable: false, taken: [], ...partial };
+  return {
+    featureId: null, featureAliases: [], optionLevels: null, optionRecords: null, unresolvable: null,
+    maxSpellLevel: null, minSpellLevel: null, maximum: null, repeatable: false, levels: [1], classId: null, taken: [], ...partial
+  };
+}
+
+/** The level a pick at index `index` of this offer belongs to - see `ChoiceOffer.levels`. */
+export function levelOfPick(offer: Pick<ChoiceOffer, "levels" | "capacity">, index: number): number {
+  const perGrant = Math.max(1, Math.ceil(offer.capacity / Math.max(1, offer.levels.length)));
+  return offer.levels[Math.min(offer.levels.length - 1, Math.floor(index / perGrant))] ?? 1;
 }
 
 /**
@@ -489,14 +514,23 @@ function dedupeFeatureRefs(
   return refs.slice(0, 80);
 }
 
-/** The feature records the class's level rows 1..level grant (with grant counts), plus the row for `level` itself. */
-function grantedClassFeatures(entry: ClassReference, level: number): { features: Map<string, { record: FeatureRecord; count: number }>; row: ClassLevelRow } {
+/**
+ * The feature records the class's level rows 1..level grant (with grant counts AND the levels those
+ * grants landed at), plus the row for `level` itself.
+ *
+ * `levels` exists so a recorded choice row can name the level it was really made at. The wizard
+ * splits a feature granted four times into four offers, one per grant level (`feature:<id>@<level>`
+ * for an ASI), and `level-ledger.ts` reads a stored row back by matching `(level, kind, classId,
+ * featureId)` - so a ledger that put every ASI at level 1 would be un-prefillable in the level-up
+ * flow. This side keeps ONE offer of capacity choose x count and hands the levels along with it.
+ */
+function grantedClassFeatures(entry: ClassReference, level: number): { features: Map<string, { record: FeatureRecord; count: number; levels: number[] }>; row: ClassLevelRow } {
   const byId = new Map(entry.features.map((feature) => [feature.id, feature]));
-  const granted = new Map<string, { record: FeatureRecord; count: number }>();
+  const granted = new Map<string, { record: FeatureRecord; count: number; levels: number[] }>();
   for (const row of entry.levelTable.filter((candidate) => candidate.level <= level)) {
     for (const featureId of row.features) {
       const existing = granted.get(featureId);
-      granted.set(featureId, { record: byId.get(featureId)!, count: (existing?.count ?? 0) + 1 });
+      granted.set(featureId, { record: byId.get(featureId)!, count: (existing?.count ?? 0) + 1, levels: [...(existing?.levels ?? []), row.level] });
     }
   }
   // A replacing feature (Indomitable 9/13/17) supersedes its predecessor once granted.
@@ -545,7 +579,60 @@ export function storedHitPointRolls(choices: readonly CharacterChoice[], level: 
   return rolls;
 }
 
-export function buildCharacterDefinition(input: CharacterCreateRequestInput, library: ContentView, policy: BuilderPolicy): ActorDefinition {
+/**
+ * EVERYTHING STEPS 1-4 SETTLED - the offers this build really has, with the ledger rows already
+ * matched against them, plus the records and budgets steps 5-12 read.
+ *
+ * This is the surface the RANDOM GENERATOR answers (issue `2d`). It exists so the generator picks
+ * from the same offers `buildCharacterDefinition` will validate its picks against: a divergence
+ * between what the generator may choose and what the validator will accept is the same bug class as
+ * `computeOffers` vs this module, and the plan's rule is that such a divergence is always the bug.
+ * Reuse, never fork - there is exactly one function that knows what a build is asking for.
+ */
+export type ServerOfferSurvey = Readonly<{
+  offers: readonly ChoiceOffer[];
+  classRecord: ClassReference;
+  species: SpeciesReference;
+  background: BackgroundReference;
+  subclass: SubclassReference | null;
+  lineage: SpeciesReference["lineages"][number] | null;
+  originFeat: FeatReference | null;
+  levelRow: ClassLevelRow;
+  /** Every feature this build holds so far, with its provenance (the origin feat and chosen feats carry `origin: null`). */
+  granted: ReadonlyArray<{ record: FeatureRecord; count: number; origin: CharacterFeatureOrigin | null }>;
+  chosenFeats: readonly FeatReference[];
+  /** Every feat id already held - the cross-offer duplicate guard a generator must respect too. */
+  heldFeatIds: ReadonlySet<string>;
+  extraPickBudgets: ReadonlyMap<string, number>;
+  preparedSpellRows: readonly CharacterChoice[];
+  classCantripRows: readonly CharacterChoice[];
+  /** The printed level-row columns, BEFORE `extraPickBudgets` composes on top (step 9 does that sum). */
+  printedCantrips: number;
+  printedPrepared: number;
+  catalogs: CatalogChoiceCatalogs;
+  progression: ClassProgressionTable;
+  /** Ability scores after the background spread and species bonuses, BEFORE any ASI or feature rider. */
+  scoresBeforeIncreases: Record<Ability, number>;
+  proficiencyBonus: number;
+}>;
+
+const CLASS_CANTRIP_BUDGET: NamedPickBudget = "class-cantrips";
+const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
+
+/**
+ * The offers a build has, WITHOUT requiring the ledger to have answered them yet.
+ *
+ * Identical code to the first four steps of `buildCharacterDefinition` because it IS those steps:
+ * `surveyBuild(..., "offers")` runs them and stops, and `buildCharacterDefinition` runs them and
+ * carries on. The two rejections a partial ledger would otherwise trip - "your species asks for a
+ * lineage" and "this offer needs N picks" - are completeness checks the caller owns rather than
+ * conditions the offers depend on, so they are the caller's to make.
+ */
+export function computeServerOffers(input: CharacterCreateRequestInput, library: ContentView, policy: BuilderPolicy): ServerOfferSurvey {
+  return surveyBuild(input, library, policy, "offers");
+}
+
+function surveyBuild(input: CharacterCreateRequestInput, library: ContentView, policy: BuilderPolicy, mode: "build" | "offers"): ServerOfferSurvey {
   const catalogs = library.catalogChoiceCatalogs();
   const progression: ClassProgressionTable = library.classProgressionTable();
 
@@ -593,7 +680,9 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const lineage = chosenLineageId
     ? species.lineages.find((candidate) => candidate.id === chosenLineageId) ?? reject(`"${species.name}" has no lineage "${chosenLineageId}".`)
     : null;
-  if (!chosenLineageId && species.traits.some((trait) => trait.choice?.kind === "lineage")) reject(`${species.name} asks for a lineage choice.`);
+  // In "offers" mode the lineage is simply not chosen YET - the species trait's own `lineage` offer
+  // is in the list below, unanswered, and answering it is what the caller is here to do.
+  if (mode === "build" && !chosenLineageId && species.traits.some((trait) => trait.choice?.kind === "lineage")) reject(`${species.name} asks for a lineage choice.`);
   const subclassFeatures = (subclass?.features ?? []).filter((feature) => (feature.level ?? subclass?.subclassLevel ?? classRecord.subclassLevel) <= input.level);
   const originFeat: FeatReference | null = background.originFeatId
     ? library.featRecord(background.originFeatId) ?? reject(`${background.name} grants unknown feat "${background.originFeatId}".`)
@@ -613,13 +702,16 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
    * `origin: null` means "recorded elsewhere": the origin feat and every chosen feat are already on
    * `character.feats`, and recording them a second time here would double every rider they carry.
    */
-  const granted: Array<{ record: FeatureRecord; count: number; origin: CharacterFeatureOrigin | null }> = [
-    ...[...classFeatures.values()].map((entry) => ({ ...entry, origin: { kind: "class", sourceId: classRecord.id } as const })),
-    ...subclassFeatures.map((record) => ({ record, count: 1, origin: { kind: "subclass", sourceId: subclass!.id } as const })),
-    ...species.traits.map((record) => ({ record, count: 1, origin: { kind: "species", sourceId: species.id } as const })),
-    ...(lineage?.traits ?? []).map((record) => ({ record, count: 1, origin: { kind: "lineage", sourceId: lineage!.id } as const })),
-    ...background.features.map((record) => ({ record, count: 1, origin: { kind: "background", sourceId: background.id } as const })),
-    ...(originFeat ? [{ record: originFeat.feature, count: 1, origin: null }] : [])
+  /** Where a granted feature's own picks sit in the wizard's `(level, classId)` grid - see `ChoiceOffer.levels`. */
+  const ORIGIN_STEP = { levels: [1], classId: null } as const;
+  const subclassStep = (record: FeatureRecord) => ({ levels: [record.level ?? subclass?.subclassLevel ?? classRecord.subclassLevel], classId: classRecord.id });
+  const granted: Array<{ record: FeatureRecord; count: number; origin: CharacterFeatureOrigin | null; where?: { levels: readonly number[]; classId: string | null } }> = [
+    ...[...classFeatures.values()].map((entry) => ({ ...entry, origin: { kind: "class", sourceId: classRecord.id } as const, where: { levels: entry.levels, classId: classRecord.id } })),
+    ...subclassFeatures.map((record) => ({ record, count: 1, origin: { kind: "subclass", sourceId: subclass!.id } as const, where: subclassStep(record) })),
+    ...species.traits.map((record) => ({ record, count: 1, origin: { kind: "species", sourceId: species.id } as const, where: ORIGIN_STEP })),
+    ...(lineage?.traits ?? []).map((record) => ({ record, count: 1, origin: { kind: "lineage", sourceId: lineage!.id } as const, where: ORIGIN_STEP })),
+    ...background.features.map((record) => ({ record, count: 1, origin: { kind: "background", sourceId: background.id } as const, where: ORIGIN_STEP })),
+    ...(originFeat ? [{ record: originFeat.feature, count: 1, origin: null, where: ORIGIN_STEP }] : [])
   ];
 
   // ---- 4. Build the choice offers and match every ledger row against them (two passes). ----
@@ -628,7 +720,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // Initiate's cantrips, Skilled's skills) - those second-order offers must exist before pass B
   // matches the remaining rows.
   const offers: ChoiceOffer[] = [];
-  const listOffer = (key: NamedPickBudget, kind: string, label: string, list: { choose: number; from: readonly string[]; fromCatalog?: string } | undefined) => {
+  const listOffer = (key: NamedPickBudget, kind: string, label: string, list: { choose: number; from: readonly string[]; fromCatalog?: string } | undefined, classId: string | null) => {
     if (!list || list.choose <= 0) return;
     // A "choose N" LIST may draw on an open catalog too, exactly as a feature's choice may - the
     // species language budget every character is owed ("Common plus two languages from the Standard
@@ -645,14 +737,14 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         if (options.size === 0) unresolvable = error.message;
       }
     }
-    offers.push(offerOf({ key, kind, capacity: list.choose, options, unresolvable, label }));
+    offers.push(offerOf({ key, kind, capacity: list.choose, options, unresolvable, label, classId }));
   };
-  listOffer("class-skills", "skill", `${classRecord.name} skills`, classRecord.skillChoices);
-  listOffer("class-tools", "tool", `${classRecord.name} tools`, classRecord.toolChoices);
-  listOffer("background-skills", "skill", `${background.name} skills`, background.skillChoices);
-  listOffer("background-tools", "tool", `${background.name} tools`, background.toolChoices);
-  listOffer("background-languages", "language", `${background.name} languages`, background.languageChoices);
-  listOffer("species-languages", "language", `${species.name} languages`, species.languageChoices);
+  listOffer("class-skills", "skill", `${classRecord.name} skills`, classRecord.skillChoices, classRecord.id);
+  listOffer("class-tools", "tool", `${classRecord.name} tools`, classRecord.toolChoices, classRecord.id);
+  listOffer("background-skills", "skill", `${background.name} skills`, background.skillChoices, null);
+  listOffer("background-tools", "tool", `${background.name} tools`, background.toolChoices, null);
+  listOffer("background-languages", "language", `${background.name} languages`, background.languageChoices, null);
+  listOffer("species-languages", "language", `${species.name} languages`, species.languageChoices, null);
   /**
    * IS THIS OPTION ALREADY IN THE LEDGER - the read `options[].requires` gates on.
    *
@@ -667,7 +759,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       && (featureId === null || (row.payload && typeof row.payload.featureId === "string" && row.payload.featureId === featureId)));
   };
   /** Options a gate DETERMINED rather than offered; drained into `granted` once every offer is built. */
-  const determined: Array<{ option: FeatureOption; parentId: string }> = [];
+  const determined: Array<{ option: FeatureOption; parentId: string; where: { levels: readonly number[]; classId: string | null } }> = [];
   /**
    * WHAT A BUDGET ALREADY HOLDS, straight off the ledger - the source `fromPicks` narrows.
    *
@@ -690,15 +782,16 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     if (!kind) return [];
     return input.choices.filter((row) => row.kind === kind && !(row.payload && typeof row.payload.featureId === "string")).map((row) => row.id);
   };
-  const featureOffer = (record: FeatureRecord, count: number, featureAliases: readonly string[] = []): void => {
+  type OfferStep = Readonly<{ levels: readonly number[]; classId: string | null }>;
+  const featureOffer = (record: FeatureRecord, count: number, featureAliases: readonly string[] = [], where: OfferStep = ORIGIN_STEP): void => {
     // EVERY pick the record owes, not just the first. A record may promise two (Magic Initiate's two
     // cantrips AND its level-1 spell), and each becomes its own offer with its own kind, capacity and
     // spell-level ceiling. The FIRST keeps the plain `feature:<id>` key so every existing ledger row,
     // `extraPicks` target and alias resolves exactly as before; later picks take `/2`, `/3`, ... .
-    featurePicks(record).forEach((choice, index) => featurePickOffer(record, choice, index, count, featureAliases));
+    featurePicks(record).forEach((choice, index) => featurePickOffer(record, choice, index, count, featureAliases, where));
   };
   const featurePickOffer = (
-    record: FeatureRecord, choice: NonNullable<FeatureRecord["choice"]>, index: number, count: number, featureAliases: readonly string[]
+    record: FeatureRecord, choice: NonNullable<FeatureRecord["choice"]>, index: number, count: number, featureAliases: readonly string[], where: OfferStep
   ): void => {
     if (choice.choose * count === 0) return;
     let options: ReadonlySet<string>;
@@ -783,7 +876,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       optionRecords = legal;
       options = new Set(legal.map((option) => option.id));
       if (legal.length === choice.choose * count) {
-        for (const option of legal) determined.push({ option, parentId: record.id });
+        for (const option of legal) determined.push({ option, parentId: record.id, where });
         return;
       }
     }
@@ -791,10 +884,11 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       key: index === 0 ? `feature:${record.id}` : `feature:${record.id}/${index + 1}`,
       featureId: record.id, featureAliases, kind: choice.kind, capacity: choice.choose * count,
       options, optionLevels, optionRecords, unresolvable, repeatable: choice.repeatable,
-      maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null, maximum: choice.maximum ?? null, label: record.name
+      maxSpellLevel: choice.maxSpellLevel ?? null, minSpellLevel: choice.minSpellLevel ?? null, maximum: choice.maximum ?? null, label: record.name,
+      levels: where.levels, classId: where.classId
     }));
   };
-  for (const { record, count } of granted) featureOffer(record, count);
+  for (const { record, count, where } of granted) featureOffer(record, count, [], where);
 
   /**
    * ADOPT the options an earlier answer DETERMINED - the second half of the gating rule above.
@@ -804,10 +898,10 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
    * text and any budget it raises land exactly as a CHOSEN option's do - one code path, not two.
    */
   while (determined.length > 0) {
-    const { option, parentId } = determined.shift()!;
+    const { option, parentId, where } = determined.shift()!;
     const asFeature = optionAsFeature(option);
     granted.push({ record: asFeature, count: 1, origin: { kind: "option", sourceId: parentId } });
-    featureOffer(asFeature, 1, [parentId]);
+    featureOffer(asFeature, 1, [parentId], where);
   }
 
   /**
@@ -881,6 +975,8 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // even while the catalog's own Ability Score Improvement feat is the richer path.
   const FEAT_KINDS = new Set(["feat", "fighting-style", "asi-or-feat"]);
   const chosenFeats: FeatReference[] = [];
+  /** Where each chosen feat was taken - a feat's OWN picks belong to the level/class of the offer that took it. */
+  const chosenFeatSteps: OfferStep[] = [];
   /** Inline options answered to a FEAT-kinded pick (Blessed Warrior, Druidic Warrior). */
   const chosenInlineStyles: FeatureRecord[] = [];
   for (const row of input.choices) {
@@ -900,7 +996,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     if (inlineOption) {
       const asFeature = optionAsFeature(inlineOption);
       granted.push({ record: asFeature, count: 1, origin: matched.featureId ? { kind: "option", sourceId: matched.featureId } : null });
-      featureOffer(asFeature, 1, matched.featureId ? [matched.featureId] : []);
+      featureOffer(asFeature, 1, matched.featureId ? [matched.featureId] : [], { levels: matched.levels, classId: matched.classId });
       chosenInlineStyles.push(asFeature);
       continue;
     }
@@ -916,12 +1012,13 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     }
     heldFeatIds.add(feat.id);
     chosenFeats.push(feat);
+    chosenFeatSteps.push({ levels: matched.levels, classId: matched.classId });
   }
   // The chosen feats' features join the granted set: their own choices become offers for pass B,
   // and their riders/prose interpret exactly like any class or species feature.
-  for (const feat of chosenFeats) {
+  for (const [index, feat] of chosenFeats.entries()) {
     granted.push({ record: feat.feature, count: 1, origin: null }); // recorded on `character.feats`
-    featureOffer(feat.feature, 1);
+    featureOffer(feat.feature, 1, [], chosenFeatSteps[index]);
   }
   for (const feat of chosenFeats) grantExtraPicks(feat.feature, 1);
   for (const record of chosenInlineStyles) grantExtraPicks(record, 1);
@@ -944,7 +1041,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     // keyed under the PARENT feature's id, which is where the catalog indexes it.
     granted.push({ record: asFeature, count: 1, origin: offer.featureId ? { kind: "option", sourceId: offer.featureId } : null });
     // The option's own pick is keyed on the option id, with the parent feature id as an accepted alias.
-    featureOffer(asFeature, 1, offer.featureId ? [offer.featureId] : []);
+    featureOffer(asFeature, 1, offer.featureId ? [offer.featureId] : [], { levels: offer.levels, classId: offer.classId });
     chosenOptionFeatures.push(asFeature);
   }
   // Folded AFTER the loop, not inside it, so one option raising another option's pick does not depend
@@ -960,8 +1057,6 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
    * has plus the two printed class columns - reality, not a second hand-maintained list of legal keys
    * that would drift away from the offers it claims to describe.
    */
-  const CLASS_CANTRIP_BUDGET: NamedPickBudget = "class-cantrips";
-  const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
   const printedCantrips = levelRow.cantripsKnown ?? 0;
   const printedPrepared = levelRow.preparedCount ?? levelRow.spellsKnown ?? 0;
   const namesARealBudget = (key: string): boolean =>
@@ -1014,6 +1109,25 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     }
     matchRow(row, offers.filter((offer) => offer.kind === row.kind));
   }
+  return {
+    offers, classRecord, species, background, subclass, lineage, originFeat, levelRow, granted,
+    chosenFeats, heldFeatIds, extraPickBudgets, preparedSpellRows, classCantripRows,
+    printedCantrips, printedPrepared, catalogs, progression, scoresBeforeIncreases: finalScores, proficiencyBonus
+  };
+}
+
+export function buildCharacterDefinition(input: CharacterCreateRequestInput, library: ContentView, policy: BuilderPolicy): ActorDefinition {
+  const survey = surveyBuild(input, library, policy, "build");
+  const {
+    offers, classRecord, species, background, subclass, lineage, originFeat, levelRow, granted,
+    chosenFeats, extraPickBudgets, preparedSpellRows, classCantripRows,
+    printedCantrips, printedPrepared, catalogs, progression, proficiencyBonus
+  } = survey;
+  const finalScores = survey.scoresBeforeIncreases;
+
+  // EVERY OFFER ANSWERED - the completeness check. It closes step 4 rather than opening step 5, and
+  // it lives here rather than in the survey because a survey of a HALF-ANSWERED build is exactly
+  // what the generator asks for: "what is still unpicked" is its loop condition, not an error.
   for (const offer of offers) {
     if (offer.kind === "subclass" || offer.unresolvable !== null) continue; // payload-mirrored / content-gap-deferred
     if (offer.taken.length !== offer.capacity) {
