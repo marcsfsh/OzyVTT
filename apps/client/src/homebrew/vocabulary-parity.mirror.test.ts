@@ -1466,6 +1466,50 @@ describe("the guard itself refuses what the editor cannot author", () => {
     );
   });
 
+  /**
+   * The other half of R1's reach: an inline option — the third way a choice states its list, and
+   * the depth `FeatureOption` lives at. It matters for U16, whose control half is "the option row
+   * already mounts `RiderEditor`; these need the choice panel too": the option row is now a real
+   * row scope, so `FeatureOption.requires` lands as one `FieldDef` beside `name` and `description`
+   * rather than as more hand-written JSX invisible to this file.
+   */
+  it("R1: an inline option is a real row scope inside a bespoke component", () => {
+    const option = authoredRow("feat", ["feature", "choice.options"], [
+      ["name", "Thaumaturge"],
+      ["description", "You know one extra cantrip from the Cleric spell list."]
+    ]);
+    const feature = [
+      ["name", "Divine Order"],
+      ["description", "You gain one of the following options of your choice."],
+      ["choice.kind", "divine-order"],
+      ["choice.options", [option]]
+    ].reduce<Draft>((row, [key, value]) => applyField("feat", row, key as string, value, ["feature"]), authoredRow("feat", ["feature"], []));
+
+    const draft: Draft = {
+      ...authored("feat", "Divine Order", [
+        ["category", "general"],
+        ["summary", "Pick an order."],
+        ["description", "Pick your order."]
+      ]),
+      feature
+    };
+    expect(publishVerdict("feat", draft, RECORD_ID).why).toBe("");
+
+    const body = storedBody("feat", draft, RECORD_ID) as { feature: { choice?: { options?: Array<Record<string, unknown>> } } };
+    expect(body.feature.choice?.options).toHaveLength(1);
+    expect(body.feature.choice?.options?.[0]).toMatchObject({
+      name: "Thaumaturge",
+      description: "You know one extra cantrip from the Cleric spell list."
+    });
+
+    // The row is looked up in the OPTION's own fields, never the feature's — the same guard the
+    // effect-`modifiers` row above relies on. An option carries no level and no `choice.kind`.
+    expect(hasControl("feat", "name", ["feature", "choice.options"])).toBe(true);
+    expect(hasControl("feat", "choice.kind", ["feature", "choice.options"])).toBe(false);
+    // U16's own row, still owed: an option cannot yet say which earlier answer legalises it.
+    expect(hasControl("feat", "requires", ["feature", "choice.options"])).toBe(false);
+  });
+
   it("`choices` throws, naming the form — the canonical SRD-only row", () => {
     // The worked example the plan names: `choices` (plural) is read by `character-build.ts` and
     // authored by three feat records, and `FeatureEditor`'s choice panel is 651 lines of hand-written

@@ -73,7 +73,7 @@
  */
 
 import { useId, useMemo, useState } from "react";
-import { Chip, Field, FieldGrid, Input, RowEditor, SegmentedControl, Select, Textarea } from "@vtt/ui";
+import { Chip, Field, FieldGrid, RowEditor, SegmentedControl, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { FieldRenderer } from "./FieldRenderer";
 import { RiderEditor, riderSummary, type RiderKind } from "./RiderEditor";
@@ -263,6 +263,34 @@ export function featureFields(): readonly FieldDef[] {
         })
     },
     {
+      /**
+       * Inline options — the third source, and the one `RowEditor` around it is written by
+       * hand while the FIELD is the source of the row's shape.
+       *
+       * The reason is worth writing down, because U16 mounts the choice panel on an option
+       * row and meets it again: an option carries `RiderEditor`, and `FieldRenderer`'s
+       * `rows` branch hands a row-scoped `custom` field the whole RECORD and the record's
+       * setter — never its row — so it structurally cannot mount one. Everything the row
+       * IS still lives here (`newRow`, `rowKey`, `rowLabel`, both controls); the component
+       * reads them rather than restating them, so the field and the form cannot drift.
+       */
+      key: "choice.options",
+      label: "Options",
+      kind: "rows",
+      wide: true,
+      addLabel: "Add an option",
+      emptyText: "No options yet.",
+      visibleWhen: asksAChoice,
+      rowKey: (row) => String((row as { id?: unknown }).id ?? ""),
+      newRow: () => ({ id: newId(), name: "", description: "" }),
+      rowLabel: (row) => String((row as { name?: unknown }).name || "Unnamed option"),
+      write: (next, feature) => writeChoice(feature, { options: next }),
+      rows: [
+        { key: "name", label: "Name" },
+        { key: "description", label: "Description", kind: "textarea", wide: true }
+      ]
+    },
+    {
       key: "choice.repeatable",
       label: "The same option can be chosen more than once",
       kind: "switch",
@@ -275,6 +303,12 @@ export function featureFields(): readonly FieldDef[] {
 /** Built once: the list is a constant of this module, and `featuresField` mounts the same
     call, so the fields a test finds are literally the objects the component renders. */
 const FIELDS = featureFields();
+
+const fieldFor = (key: string): FieldDef => {
+  const field = FIELDS.find((entry) => entry.key === key);
+  if (!field) throw new Error(`FeatureEditor has no field "${key}".`);
+  return field;
+};
 
 export function FeatureEditor({
   draft,
@@ -452,6 +486,8 @@ export function FeatureEditor({
         ? "catalog"
         : "list";
     const source = sourceMode[feature.id] ?? derivedSource;
+    const optionsField = fieldFor("choice.options");
+    const optionRows = Array.isArray(choice?.options) ? (choice.options as Array<Record<string, unknown>>) : [];
 
     const setChoice = (changes: Readonly<Record<string, unknown>> | undefined) => {
       if (changes === undefined) {
@@ -473,21 +509,17 @@ export function FeatureEditor({
 
     /** One declared control, rendered against THIS feature as its container. The write is
         the field's own, so what a test drives and what a finger drives are one function. */
-    const control = (key: string) => {
-      const field = FIELDS.find((entry) => entry.key === key);
-      if (!field) throw new Error(`FeatureEditor has no field "${key}".`);
-      return (
-        <FieldRenderer
-          field={field}
-          value={feature}
-          onValue={(next) => writeFeatures(features.map((entry, i) => (i === index ? (next as Feature) : entry)))}
-          draft={draft}
-          onDraft={onDraft}
-          ctx={ctx}
-          idPrefix={`${idPrefix}-feature-${index}`}
-        />
-      );
-    };
+    const control = (key: string) => (
+      <FieldRenderer
+        field={fieldFor(key)}
+        value={feature}
+        onValue={(next) => writeFeatures(features.map((entry, i) => (i === index ? (next as Feature) : entry)))}
+        draft={draft}
+        onDraft={onDraft}
+        ctx={ctx}
+        idPrefix={`${idPrefix}-feature-${index}`}
+      />
+    );
 
     return (
       <div className="hb-feature">
@@ -645,33 +677,38 @@ export function FeatureEditor({
 
             {source === "list" && control("choice.from")}
 
+            {/* The FIELD says what an option row is; this says how it is drawn, because a
+                row that mounts `RiderEditor` cannot go through `FieldRenderer`'s rows
+                branch — see the field's own note. Every value below comes from the field. */}
             {source === "options" && (
               <RowEditor
-                rows={Array.isArray(choice.options) ? (choice.options as Array<Record<string, unknown>>) : []}
+                rows={optionRows}
                 onChange={(next) => setChoice({ options: next })}
-                rowKey={(option) => String(option.id)}
-                onAdd={() => ({ id: newId(), name: "", description: "" })}
-                addLabel="Add an option"
-                emptyText="No options yet."
+                rowKey={(option) => optionsField.rowKey!(option, 0)}
+                onAdd={() => optionsField.newRow!() as Record<string, unknown>}
+                addLabel={optionsField.addLabel!}
+                emptyText={optionsField.emptyText}
                 collapsible
-                ariaLabel="Options"
-                rowLabel={(option) => String(option.name || "Unnamed option")}
+                ariaLabel={optionsField.label}
+                rowLabel={(option, optionIndex) => optionsField.rowLabel!(option, optionIndex)}
                 renderRow={(option, optionIndex) => {
                   const setOption = (changes: Readonly<Record<string, unknown>>) =>
-                    setChoice({
-                      options: (choice.options as Array<Record<string, unknown>>).map((entry, i) =>
-                        i === optionIndex ? { ...entry, ...changes } : entry
-                      )
-                    });
+                    setChoice({ options: optionRows.map((entry, i) => (i === optionIndex ? { ...entry, ...changes } : entry)) });
                   return (
                     <>
                       <FieldGrid>
-                        <Field label="Name">
-                          <Input value={String(option.name ?? "")} onChange={(event) => setOption({ name: event.target.value })} />
-                        </Field>
-                        <Field label="Description" className="nh-fieldgrid-wide">
-                          <Textarea rows={3} value={String(option.description ?? "")} onChange={(event) => setOption({ description: event.target.value })} />
-                        </Field>
+                        {(optionsField.rows ?? []).map((rowField, rowFieldIndex) => (
+                          <FieldRenderer
+                            key={`${rowField.key}-${rowFieldIndex}`}
+                            field={rowField}
+                            value={option}
+                            onValue={(next) => setOption(next as Record<string, unknown>)}
+                            draft={draft}
+                            onDraft={onDraft}
+                            ctx={ctx}
+                            idPrefix={`${idPrefix}-feature-${index}-option-${optionIndex}`}
+                          />
+                        ))}
                       </FieldGrid>
                       {/* Depth capped at 1: an option carries riders but never its
                           own "Options I write", which is what the schema allows. */}
