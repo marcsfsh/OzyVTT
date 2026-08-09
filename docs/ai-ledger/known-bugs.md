@@ -445,10 +445,11 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   are authored with the ceiling set to the arcanum's own level, so a level-11 Warlock may take a
   level-3 spell as their level-6 arcanum. Needs the schema field plus the two consumers that already
   read `maxSpellLevel` (`character-build.ts` `matchRow`, `build-payload.ts` `featurePickOffer`).
-  (2) **`overlay.ts`'s `FeatureMechanics` exposes `choice` but not `choices`**, so ruling B's
-  multi-pick is unreachable from a class module. Wizard's Spell Mastery ("choose a level 1 AND a
-  level 2 spell") is one `choice` with a single `maxSpellLevel: 2` and cannot be fixed from
-  `wizard.ts`; `overlay.ts` is frozen for Stage 4.
+  (2) **Wizard's Spell Mastery is still authored as ONE `choice`** — "choose a level 1 AND a level
+  2 spell" ships as a single pick with `maxSpellLevel: 2`, so a Wizard may take two level-1 spells.
+  The limit that forced it is gone: `overlay.ts`'s `FeatureMechanics` carries `choices` in both of
+  its unions and the homebrew editor authors the plural form (U12, 2026-08-09), so the record can
+  now be re-authored from `wizard.ts`; it has not been.
   (3) **`ExtraDamageVariantSchema` requires `damageType`** and has no "same type as the triggering
   damage" form, so Evoker's Empowered Evocation ("add your Intelligence modifier to one damage roll
   of any Wizard Evocation spell") has no correct type to author — Fireball is Fire, Lightning Bolt is
