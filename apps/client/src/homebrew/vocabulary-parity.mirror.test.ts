@@ -845,13 +845,14 @@ function authoredFeat(withGrant = true): Draft {
     ["description", "You always have the Bless spell prepared."]
   ]);
   const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }]) : undefined;
-  // The feature's own name and description are plain text boxes on `FeatureEditor`, which is 651
-  // lines of hand-written JSX with no `FieldDef` — invisible to the harness for the same reason
-  // `grants` is, and R1's whole subject. Set here rather than pretended about.
-  return {
-    ...shell,
-    feature: { ...(shell.feature as Record<string, unknown>), name: GRANTED.featName, description: "You always have the Bless spell prepared.", grants }
-  };
+  // The feature's own name and description used to be hand-set here, because `FeatureEditor` had no
+  // `FieldDef` anywhere and was invisible to the harness. R1 mounted its fields as the row shape of
+  // the `custom: "features"` field, so they go through the real control at the feature's OWN scope —
+  // `["feature"]`, singular, because a feat IS one `FeatureRecord` and not a list.
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "name", GRANTED.featName, ["feature"]);
+  feature = applyField("feat", feature, "description", "You always have the Bless spell prepared.", ["feature"]);
+  return { ...shell, feature: { ...feature, grants } };
 }
 
 /**
@@ -1029,9 +1030,11 @@ function authoredFuryFeat(resourceId: string): Draft {
   feature = applyField("feat", feature, "mode", "class-resource", ["uses"]);
   feature = applyField("feat", feature, "uses.scaling.id", resourceId, ["uses"]);
   feature = applyField("feat", feature, "uses.per", "long-rest", ["uses"]);
-  // Name and description are plain boxes on `FeatureEditor`, which has zero `FieldDef`s and is
-  // invisible to the harness — R1's whole subject. Set here rather than pretended about.
-  return { ...shell, feature: { ...feature, name: RAGES.featName, description: "You can bottle your fury as often as you can Rage." } };
+  // Name and description go through the feature's OWN controls since R1 — `["feature"]` is the
+  // feat's singular container, the same scope the `uses` block above is addressed at.
+  feature = applyField("feat", feature, "name", RAGES.featName, ["feature"]);
+  feature = applyField("feat", feature, "description", "You can bottle your fury as often as you can Rage.", ["feature"]);
+  return { ...shell, feature };
 }
 
 const furyFeatureId = (draft: Draft) => String((draft.feature as { id?: unknown }).id ?? "");

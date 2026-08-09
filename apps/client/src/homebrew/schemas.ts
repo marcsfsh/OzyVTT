@@ -13,7 +13,8 @@
 
 import { RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../lib/ids";
-import { SUB_OBJECT_DEFAULTS } from "./defaults";
+import { SUB_OBJECT_DEFAULTS, blankFeature } from "./defaults";
+import { featureFields } from "./FeatureEditor";
 import { getAt } from "./paths";
 import { basicsSection, damagePartsField, diceValidate, humanise, inContainer, opt, type Draft, type FieldDef, type HomebrewSchema, type SchemaContext, type SectionDef } from "./schema";
 import type { HomebrewType } from "./types";
@@ -160,16 +161,33 @@ const proficiencyFields = (): readonly FieldDef[] => [
   { key: "toolProficiencies", label: "Tool proficiencies", kind: "tags", suggestions: (ctx) => ctx.equipment.filter((entry) => entry.keywords === "tool").map((entry) => entry.id) }
 ];
 
-/** `key` is the record's own: every type stores a LIST under `features` (or `traits`)
-    except a feat, which is one `FeatureRecord` under a singular `feature`. The renderer
-    is the same either way — `FeatureEditor`'s `single` mode reads the object. */
+/**
+ * `key` is the record's own: every type stores a LIST under `features` (or `traits`)
+ * except a feat, which is one `FeatureRecord` under a singular `feature`. The renderer
+ * is the same either way — `FeatureEditor`'s `single` mode reads the object.
+ *
+ * **`rows` on a `custom` field, and why it is not a lie (R1).** `FieldRenderer`'s custom
+ * branch never reads `rows`, so this changes nothing about what renders. What it changes
+ * is that `fieldsOf` and `fieldsWithin` can see INSIDE a bespoke component: before it,
+ * every control `FeatureEditor` draws was invisible to `applyField` in both directions,
+ * and the whole pick family therefore had no way to be tested through both paths. The
+ * list is `FeatureEditor`'s own — the same objects it renders — so declaring it here
+ * cannot drift from what a GM sees. It is the same call `riderFieldsForTest` makes from
+ * the other side of the same problem.
+ */
 const featuresField = (label: string, key = "features", blurbless = false): FieldDef => ({
   key,
   label,
   kind: "custom",
   custom: "features",
   wide: true,
-  help: blurbless ? undefined : "What the record actually does."
+  help: blurbless ? undefined : "What the record actually does.",
+  rows: featureFields(),
+  /* What `FeatureEditor`'s Add button mints, minus the one thing only the component can
+     know: a CLASS feature also arrives at `DEFAULT_GRANT_LEVEL`, because a class's grant
+     lives in `levelTable[].features[]` and the level chips write both halves in one edit.
+     A feature minted here is granted nowhere until that control says otherwise. */
+  newRow: () => blankFeature()
 });
 
 /* -------------------------------------------------------------------- class ----- */

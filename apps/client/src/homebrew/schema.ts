@@ -238,7 +238,15 @@ export type FieldDef = Readonly<{
   allowDecimal?: boolean;
   allowNegative?: boolean;
 
-  /** `kind: "rows" | "group"` — the nested fields. For `rows`, keys are relative to the row. */
+  /**
+   * `kind: "rows" | "group"` — the nested fields. For `rows`, keys are relative to the row.
+   *
+   * A `kind: "custom"` field may declare them too, and one does: `featuresField` mounts
+   * `FeatureEditor`'s own list. The renderer ignores it there — a custom field draws
+   * itself — but `fieldsOf`/`fieldsWithin` walk it, which is the only way the authoring
+   * harness can see inside a bespoke component. A control it cannot see is a control no
+   * both-paths test can drive, in either direction.
+   */
   rows?: readonly FieldDef[];
   /** `kind: "rows"` — a STABLE id, never the index. */
   rowKey?: (row: unknown, index: number) => string;

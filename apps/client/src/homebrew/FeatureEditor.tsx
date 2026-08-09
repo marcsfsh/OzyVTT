@@ -52,16 +52,33 @@
  * `feature.level ?? subclassLevel`), and `setGrantedLevels` can only express one of
  * those — two selected levels omit `level` and write no rows, so tapping a second chip
  * used to silently deselect BOTH. Where there is no table, the chips are single-select.
+ *
+ * ## Why a feature's controls are `FieldDef`s and not JSX (R1)
+ *
+ * This file used to be 651 lines of hand-written JSX with **zero** `FieldDef`s, and that
+ * was not a style problem. `fieldsOf` in `authoring-harness.ts` walks the form schema;
+ * `FeatureEditor` is mounted as a `custom` field, so it had no fields to walk and every
+ * control in here was **invisible to `applyField` in both directions**. A both-paths test
+ * could not drive a feature's name, let alone its choice panel — the fourth part of the
+ * phase's own rule ("a test through BOTH paths") was structurally unavailable for the
+ * whole pick family. `featureFields()` below is what puts it on the surface: the fields
+ * are declared once, rendered through the ONE renderer, and mounted as the row shape of
+ * the `custom: "features"` field so the harness can address them.
+ *
+ * **The level chips stay bespoke**, deliberately: one control writing `feature.level` AND
+ * `levelTable[].features[]` in one edit is what `CustomField` exists for, and forcing it
+ * into a `FieldDef` would break the invariant this file opens with.
  */
 
 import { useId, useMemo, useState } from "react";
 import { Chip, Field, FieldGrid, Input, RowEditor, SegmentedControl, Select, Stepper, Switch, Textarea } from "@vtt/ui";
 import { newId } from "../lib/ids";
+import { FieldRenderer } from "./FieldRenderer";
 import { RiderEditor, riderSummary, type RiderKind } from "./RiderEditor";
 import { LEVELS, blankFeature } from "./defaults";
 import { setAt } from "./paths";
 import { namesOwnRecord } from "./schema";
-import type { Draft, SchemaContext } from "./schema";
+import type { Draft, FieldDef, SchemaContext } from "./schema";
 
 type Feature = Readonly<{
   id: string;
@@ -117,6 +134,33 @@ const composeCatalog = (family: CatalogFamily, which: string): string | undefine
  * undo; a predictable one is a single tap from anywhere else.
  */
 const DEFAULT_GRANT_LEVEL = 1;
+
+/* -------------------------------------------------------- the field schema ------ */
+
+/**
+ * **One feature's controls, as data — the declarative surface this file used to be off.**
+ *
+ * Keys are relative to ONE feature, which is what a row's keys always are, and that is
+ * exactly how they are mounted: `featuresField` in `schemas.ts` declares this list as the
+ * `rows` of its `custom: "features"` field, so `fieldsOf` walks it flat and
+ * `fieldsWithin(type, ["features"])` — or `["feature"]` on a feat — addresses one feature
+ * at its own scope. Nothing about the render changes; `FieldRenderer`'s `custom` branch
+ * never reads `rows`.
+ *
+ * Every write here is the write the panel already made, lifted out of an event handler
+ * and into the field. That is what makes the harness's guarantee true rather than
+ * decorative: a test drives the same function the GM's finger does.
+ */
+export function featureFields(): readonly FieldDef[] {
+  return [
+    { key: "name", label: "Name" },
+    { key: "description", label: "Description", kind: "textarea", wide: true }
+  ];
+}
+
+/** Built once: the list is a constant of this module, and `featuresField` mounts the same
+    call, so the fields a test finds are literally the objects the component renders. */
+const FIELDS = featureFields();
 
 export function FeatureEditor({
   draft,
@@ -313,24 +357,29 @@ export function FeatureEditor({
     const selfCatalog = !!catalogSlug && namesOwnRecord(catalogSlug, ctx.recordId);
     const catalogResult = catalogSlug && !selfCatalog ? ctx.resolveCatalog(catalogSlug) : null;
 
+    /** One declared control, rendered against THIS feature as its container. The write is
+        the field's own, so what a test drives and what a finger drives are one function. */
+    const control = (key: string) => {
+      const field = FIELDS.find((entry) => entry.key === key);
+      if (!field) throw new Error(`FeatureEditor has no field "${key}".`);
+      return (
+        <FieldRenderer
+          field={field}
+          value={feature}
+          onValue={(next) => writeFeatures(features.map((entry, i) => (i === index ? (next as Feature) : entry)))}
+          draft={draft}
+          onDraft={onDraft}
+          ctx={ctx}
+          idPrefix={`${idPrefix}-feature-${index}`}
+        />
+      );
+    };
+
     return (
       <div className="hb-feature">
         <FieldGrid>
-          <Field label="Name" htmlFor={`${autoId}-name-${feature.id}`}>
-            <Input
-              id={`${autoId}-name-${feature.id}`}
-              value={feature.name ?? ""}
-              onChange={(event) => patch(index, { name: event.target.value })}
-            />
-          </Field>
-          <Field label="Description" htmlFor={`${autoId}-desc-${feature.id}`} className="nh-fieldgrid-wide">
-            <Textarea
-              id={`${autoId}-desc-${feature.id}`}
-              rows={4}
-              value={feature.description ?? ""}
-              onChange={(event) => patch(index, { description: event.target.value })}
-            />
-          </Field>
+          {control("name")}
+          {control("description")}
         </FieldGrid>
 
         {levelAware && (
