@@ -51,8 +51,20 @@ import { bodyForPublish, publishIssues } from "./validate";
  * `grants` is written by `GrantsEditor`, a bespoke component that turns eleven parallel arrays into
  * one `[What ▾][Which…]` list and calls `onChange` with a whole body. There is no `FieldDef` to look
  * up because there is no field. Note what this exemption does NOT cover: it is the key `grants`
- * alone, not "anything rider-shaped" — `grants.spells` is a real gap (41 SRD records author it, the
- * editor preserves it on write rather than editing it) and this list must never grow to hide one.
+ * alone, not "anything rider-shaped", and this list must never grow to hide a gap.
+ *
+ * **U9 checked whether it could go, and it cannot yet — for a reason that is not the one the plan
+ * assumed.** The plan's condition was "if `grants.spells` becoming a real control means `grants` no
+ * longer needs to be waved through". It became one: all eleven kinds are now editable rather than
+ * ten editable and one silently preserved. But the exemption is about the LOOKUP, not about
+ * coverage — every one of the eleven is bespoke JSX with no `FieldDef`, so `fieldsOf` still has
+ * nothing to find for any of them. Retiring it means converting `GrantsEditor` to the declarative
+ * surface, which adds no vocabulary and is therefore a refactor rather than a unit.
+ *
+ * Until then a test drives the component's own boundary — `grantRowsOf` / `grantsFromRows` in
+ * `RiderEditor.tsx`, which `GrantsEditor` itself calls — and the rendered affordance is driven in
+ * `pick-fields.test.tsx`. Writing through this exemption proves nothing about a control and no test
+ * should do it.
  */
 export const RIDER_EXEMPT: readonly string[] = ["grants"];
 

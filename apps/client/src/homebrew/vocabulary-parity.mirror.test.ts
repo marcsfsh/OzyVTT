@@ -37,9 +37,10 @@
  * Four rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
  * monster actions), **a monster's to-hit bonus** (U10 — 423 monster actions, and until that unit the
  * shape could not be published at all), **a two-band range** (U11 — 45 records, ending at the
- * long-range disadvantage die), and **what an effect DOES** (U6 — and it is the one that crosses
+ * long-range disadvantage die), **what an effect DOES** (U6 — and it is the one that crosses
  * carriers: the editor half authors an ITEM's effect, the SRD half reads a FEATURE's, and the two
- * reach the same kept die down two entirely different roads).
+ * reach the same kept die down two entirely different roads), and **an always-prepared spell grant**
+ * (U9 — 41 records, ending at a row on the character's own spell list).
  *
  * ## The census, and the standing warning about what it does NOT prove
  *
@@ -67,6 +68,7 @@ import { startEncounter } from "../../../server/src/encounter.js";
 import {
   applyField, authored, authoredRow, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
 } from "./authoring-harness";
+import { grantRowsOf, grantsFromRows } from "./RiderEditor";
 import { SCHEMAS } from "./schemas";
 import type { Draft } from "./schema";
 import type { HomebrewType } from "./types";
@@ -785,6 +787,179 @@ describe("what an effect DOES — through both paths, across two carriers", () =
   });
 });
 
+/* ------------- U9: `grants.spells` — the eleventh of eleven grant arrays ---------- */
+
+/**
+ * The row: `FeatureGrantsSchema.spells` — "you always have this spell prepared".
+ *
+ * Ten of the eleven arrays `GrantsEditor` writes reached parity long ago. This one did not, and it
+ * failed in the quietest possible way: the component **preserved** whatever `grants.spells` was
+ * already in the body on its way past, so a duplicated SRD record kept its domain spells and a GM
+ * could not add, remove or even see one. Preserving is not a control. 41 SRD records author it —
+ * 19 class features, 14 species traits, 8 subclass features — and `character-build.ts` turns each
+ * into a spell that is on the sheet, prepared, and uncharged against the prepared cap.
+ *
+ * **Two things measured here that the plan had wrong, and both change the control:**
+ *
+ *  1. the authored shape is `FeatureGrantsSchema.spells` — `{id, level?, alwaysPrepared, ability?}` —
+ *     NOT `SpellcastingSchema.spells` (`{id, name, level, prepared, alwaysPrepared, actionId?,
+ *     classId?}`), which is the BUILT sheet's shape and the reader's output rather than its input;
+ *  2. `grants.spells` is read on the FEATURE road only. `takeGrants` in `equipment-derivation.ts`
+ *     folds nine grant arrays for an equipped item and `spells` is not among them, so an item's
+ *     spell grant would parse, store and do nothing. The carrier here is a FEAT.
+ *
+ * One sheet carries both paths: a Human Paladin 1 whose class feature grants Divine Smite (the SRD
+ * half) and whose Human origin-feat pick is a homebrew feat granting Bless (the editor half).
+ */
+const GRANTED = {
+  srdFeatureId: "paladins-smite",
+  srdSpellId: "divine-smite",
+  featId: "hb-wayfarers-blessing-a1b2",
+  featName: "Wayfarer's Blessing",
+  featSpellId: "bless"
+} as const;
+
+/** The feat a GM builds in `/homebrew`: the record shell through the real form, and the grant
+    through `GrantsEditor`'s OWN write path.
+
+    Why not `applyField`: `grants` is the one key still on `RIDER_EXEMPT`, because all eleven kinds
+    are bespoke JSX inside `GrantsEditor` with no `FieldDef` to look up — writing through the
+    exemption would be this test hand-building the body and proving nothing. `grantsFromRows` is the
+    function the component itself calls, and the rendered affordance (a `CatalogPicker` over the
+    merged spell catalog, not a `TagInput`) is driven in `pick-fields.test.tsx`. */
+function authoredFeat(withGrant = true): Draft {
+  const shell = authored("feat", GRANTED.featName, [
+    ["category", "origin"],
+    ["summary", "A blessing for the road."],
+    ["description", "You always have the Bless spell prepared."]
+  ]);
+  const grants = withGrant ? grantsFromRows([{ rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }]) : undefined;
+  // The feature's own name and description are plain text boxes on `FeatureEditor`, which is 651
+  // lines of hand-written JSX with no `FieldDef` — invisible to the harness for the same reason
+  // `grants` is, and R1's whole subject. Set here rather than pretended about.
+  return {
+    ...shell,
+    feature: { ...(shell.feature as Record<string, unknown>), name: GRANTED.featName, description: "You always have the Bless spell prepared.", grants }
+  };
+}
+
+/**
+ * A Human Paladin 2 — level 2 because that is where `paladins-smite` sits, and Human because its
+ * Versatile trait is the origin-feat slot the homebrew feat is taken in. Neither granted spell is
+ * chosen anywhere in this ledger: both arrive as grants, which is the whole claim.
+ */
+const paladinInput = (): CharacterCreateRequestInput => ({
+  name: "Sera", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+    { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
+    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: GRANTED.featId, payload: { featureId: "human-versatile" } },
+    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },
+    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "javelin" },
+    { level: 2, classId: "paladin", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+    { level: 1, classId: "paladin", kind: "spell", id: "cure-wounds" },
+    { level: 1, classId: "paladin", kind: "spell", id: "heroism" },
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "paladin-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** The sheet, built by the REAL builder against the REAL bundles, with the authored feat merged in
+    through a real homebrew slice — the same merge a published record takes. */
+function paladinSheet({ withGrant }: { withGrant: boolean }): ActorDefinition {
+  const record = HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", authoredFeat(withGrant), GRANTED.featId));
+  const homebrew: HomebrewContentSource = {
+    revision: 1,
+    publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [record] }),
+    monsterForInstance: () => undefined
+  };
+  return buildCharacterDefinition(paladinInput(), new ContentLibrary(homebrew).forAudience("gm"), BuilderPolicySchema.parse({}));
+}
+
+/** THE assertion body: is this spell on the sheet, and is it there the way a GRANT puts it there? */
+const preparedSpell = (definition: ActorDefinition, id: string) =>
+  (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
+
+describe("an always-prepared spell grant — through both paths", () => {
+  it("1. the editor can author it: the picked spell becomes `{id, alwaysPrepared}` and the feat publishes", () => {
+    const draft = authoredFeat();
+    const verdict = publishVerdict("feat", draft, GRANTED.featId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("feat", draft, GRANTED.featId) as { feature: { grants?: { spells?: unknown } } };
+    expect(body.feature.grants?.spells).toEqual([{ id: GRANTED.featSpellId, alwaysPrepared: true }]);
+
+    // The round trip, through the component's own read: what was written comes back as the ids the
+    // picker shows, so re-opening the record does not lose the grant (which is what "preserved on
+    // write" looked like from the outside, right up until a GM tried to change one).
+    expect(grantRowsOf(body.feature.grants as Record<string, unknown>)).toEqual([
+      { rowId: "spells", kind: "spells", values: [GRANTED.featSpellId] }
+    ]);
+
+    // And the standing warning, stated where it applies: this key is NOT visible to the harness, so
+    // the census cannot see it and `applyField` would wave it through. `grants` stays exempt because
+    // all eleven kinds are bespoke JSX — U9 made the eleventh EDITABLE, not declarative.
+    expect(RIDER_EXEMPT).toEqual(["grants"]);
+    expect(hasControl("feat", "grants")).toBe(false);
+  });
+
+  it("2. SRD content authors the same shape — and it is 41 records, not a lone one", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const carriers: string[] = [];
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const grants = record.grants as { spells?: unknown[] } | undefined;
+      if (Array.isArray(grants?.spells) && grants.spells.length > 0) carriers.push(String(record.id ?? "?"));
+      for (const value of Object.values(record)) walk(value);
+    };
+    for (const summary of library.classSummaries()) walk(library.classRecord(summary.id));
+    for (const summary of library.speciesSummaries()) walk(library.speciesRecord(summary.id));
+    for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
+
+    // Measured at the time of writing: 41 — 19 class features, 14 species traits, 8 subclass
+    // features. The Paladin's own carrier is one of them and is named, so the fixture below cannot
+    // drift silently away from the bundle.
+    expect(carriers.length).toBeGreaterThanOrEqual(40);
+    expect(carriers).toContain(GRANTED.srdFeatureId);
+  });
+
+  it("3. one assertion body over both: each spell is on the sheet, prepared, and always prepared", () => {
+    const definition = paladinSheet({ withGrant: true });
+    const paths: ReadonlyArray<readonly [string, string]> = [
+      ["SRD content", GRANTED.srdSpellId],
+      ["the homebrew editor", GRANTED.featSpellId]
+    ];
+
+    for (const [label, spellId] of paths) {
+      const spell = preparedSpell(definition, spellId);
+      // The far end: a row on the character's own spell list, ready to cast without preparing it.
+      expect(spell, label).toMatchObject({ id: spellId, prepared: true, alwaysPrepared: true });
+      // The name is resolved from the catalog rather than from the grant, so a picked id is a real
+      // spell on the sheet and not a slug the player has to decode.
+      expect(spell?.name, label).not.toBe(spellId);
+    }
+
+    // THE NEGATIVE CONTROL, and it drops the VALUE rather than the carrier: the same Paladin, taking
+    // the same homebrew feat, whose only difference is that the GM picked no spell. Divine Smite is
+    // still there — it is the class's — and Bless is gone, so it is the GRANT that put it on the
+    // sheet and not the feat, the species, or any other part of the build.
+    const without = paladinSheet({ withGrant: false });
+    expect(preparedSpell(without, GRANTED.srdSpellId)).toBeDefined();
+    expect(preparedSpell(without, GRANTED.featSpellId)).toBeUndefined();
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -892,7 +1067,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
      */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
-      ["equipment", "grants.spells", [], "U9 — 41 SRD records author an always-prepared spell"],
       ["equipment", "uses.scaling.id", [], "U7 — `class-resource`, 19 SRD features"],
       ["equipment", "uses.recharge", [], "U8 — `recharge`, 86 monster actions"],
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],

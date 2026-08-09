@@ -39,6 +39,7 @@
 import { useMemo } from "react";
 import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../lib/ids";
+import { CatalogPicker } from "./CatalogPicker";
 import { FieldRenderer } from "./FieldRenderer";
 import { damagePartsField, diceValidate, grouped, opt, suggestionLabel, type Draft, type FieldDef, type SchemaContext, type SelectOption } from "./schema";
 
@@ -795,10 +796,57 @@ const GRANT_KINDS: ReadonlyArray<{ key: string; label: string; help?: string }> 
   { key: "saves", label: "Saving throws" },
   { key: "damageResistances", label: "Damage resistances" },
   { key: "damageImmunities", label: "Damage immunities" },
-  { key: "conditionImmunities", label: "Condition immunities" }
+  { key: "conditionImmunities", label: "Condition immunities" },
+  // The eleventh, and the last of the eleven arrays to become editable. 41 SRD records author it —
+  // domain spells, racial spells, every "you always have X prepared" — and until this landed the
+  // editor merely PRESERVED whatever was already in the body on its way past.
+  { key: "spells", label: "Spells", help: "Always ready, and they don't count against what the character can prepare." }
 ];
 
-type GrantRow = Readonly<{ rowId: string; kind: string; values: readonly string[] }>;
+export type GrantRow = Readonly<{ rowId: string; kind: string; values: readonly string[] }>;
+
+/**
+ * **The two ends of the grants boundary, exported — and this is the honest half of `RIDER_EXEMPT`.**
+ *
+ * `GrantsEditor` is the one rider surface with no `FieldDef` anywhere: eleven parallel arrays behind
+ * one `[What ▾][Which…]` row, written whole-body. So `authoring-harness.ts` cannot look a grant key
+ * up and waves `grants` through — which means a test that called `applyField(…, "grants.spells", …)`
+ * would be writing the body itself and proving nothing about a control.
+ *
+ * These two functions are the component's OWN read and write, so a test that drives them is driving
+ * the control's real path rather than a parallel one. (The rendered affordance is driven in
+ * `pick-fields.test.tsx`, the same split the damage-type grant kinds already use.) The exemption
+ * stays until every one of the eleven has a `FieldDef`; it must never grow.
+ *
+ * **`spells` is the one kind whose values are not slugs**, and the mapping is here rather than in
+ * the renderer so both directions are one sentence: the GM picks spell ids, the body carries
+ * `{id, alwaysPrepared}`. `level` and `ability` are deliberately NOT written — `character-build.ts`
+ * resolves the level from the spell record itself (`grantedSpell.level ?? record?.level`), which is
+ * righter than a number the editor would have to guess (the client's catalog entry carries only
+ * prose), and `ability` is authored by exactly one SRD record and falls back to the caster's own.
+ */
+export function grantRowsOf(grants: Record<string, unknown>): readonly GrantRow[] {
+  return GRANT_KINDS
+    .filter((kind) => Array.isArray(grants[kind.key]))
+    .map((kind) => ({
+      rowId: kind.key,
+      kind: kind.key,
+      values: kind.key === "spells"
+        ? (grants.spells as ReadonlyArray<{ id?: string }>).map((spell) => String(spell?.id ?? ""))
+        : ((grants[kind.key] as string[]) ?? [])
+    }));
+}
+
+export function grantsFromRows(rows: readonly GrantRow[]): Record<string, unknown> | undefined {
+  const bag: Record<string, unknown> = {};
+  for (const row of rows) {
+    if (!row.kind) continue;
+    bag[row.kind] = row.kind === "spells"
+      ? row.values.map((id) => ({ id, alwaysPrepared: true }))
+      : row.values;
+  }
+  return Object.keys(bag).length > 0 ? bag : undefined;
+}
 
 /**
  * The canonical vocabulary each open-slug grant kind draws on, so "Which" is a complete list plus
@@ -835,23 +883,22 @@ function GrantsEditor({
 }: Readonly<{ value: Draft; onChange: (next: Draft) => void; ctx: SchemaContext; scope: RiderScope }>) {
   const grants = (value.grants ?? {}) as Record<string, unknown>;
 
-  const rows = useMemo<readonly GrantRow[]>(
-    () =>
-      GRANT_KINDS.filter((kind) => Array.isArray(grants[kind.key]) && (grants[kind.key] as unknown[]).length >= 0)
-        .filter((kind) => Array.isArray(grants[kind.key]))
-        .map((kind) => ({ rowId: kind.key, kind: kind.key, values: (grants[kind.key] as string[]) ?? [] })),
-    [grants]
-  );
+  const rows = useMemo<readonly GrantRow[]>(() => grantRowsOf(grants), [grants]);
 
-  const write = (next: readonly GrantRow[]) => {
-    const bag: Record<string, unknown> = {};
-    for (const row of next) if (row.kind) bag[row.kind] = row.values;
-    const spells = grants.spells;
-    if (Array.isArray(spells) && spells.length > 0) bag.spells = spells;
-    onChange({ ...value, grants: Object.keys(bag).length > 0 ? bag : undefined });
-  };
+  // `spells` used to be re-attached HERE, verbatim, after the bag was rebuilt — the editor preserved
+  // what it could not edit. It is a kind like the other ten now, so the boundary is one function.
+  const write = (next: readonly GrantRow[]) => onChange({ ...value, grants: grantsFromRows(next) });
 
-  const unused = GRANT_KINDS.filter((kind) => !rows.some((row) => row.kind === kind.key));
+  /**
+   * **Ten kinds on an item, eleven everywhere else — and the missing one is a refusal, not an
+   * oversight.** `EquipmentReferenceSchema` spreads `featureRiders`, so an item's body PARSES a
+   * `grants.spells`; nothing reads it. `takeGrants` in `equipment-derivation.ts` folds nine grant
+   * arrays for an equipped item and `spells` is not among them, while `character-build.ts` reads it
+   * only off a FEATURE. Offering it here would be a box that stores a value the fight never sees,
+   * which is the one thing this form exists not to do.
+   */
+  const kinds = GRANT_KINDS.filter((kind) => kind.key !== "spells" || scope !== "item");
+  const unused = kinds.filter((kind) => !rows.some((row) => row.kind === kind.key));
 
   return (
     <div className="hb-field">
@@ -872,18 +919,23 @@ function GrantsEditor({
         onAdd={() => ({ rowId: newId(), kind: unused[0]?.key ?? "", values: [] })}
         addLabel="Grant something"
         emptyText="Nothing granted yet."
-        max={GRANT_KINDS.length}
+        max={kinds.length}
         maxReachedReason="Every kind of grant is already on the list."
         reorderable={false}
         ariaLabel="Grants"
         rowLabel={(row) => {
           const label = GRANT_KINDS.find((kind) => kind.key === row.kind)?.label ?? "Grant";
-          return row.values.length > 0 ? `${label}: ${row.values.join(", ")}` : label;
+          // A collapsed spells row reads the NAMES the GM picked, not the slugs it stores.
+          const shown = row.kind === "spells" ? row.values.map((id) => ctx.spells.find((entry) => entry.id === id)?.name ?? id) : row.values;
+          return shown.length > 0 ? `${label}: ${shown.join(", ")}` : label;
         }}
         renderRow={(row, index) => {
           const meta = GRANT_KINDS.find((kind) => kind.key === row.kind);
           const options = row.kind === "saves" ? ABILITIES : row.kind === "skills" || row.kind === "expertise" ? ctx.skills : null;
           const replace = (patch: Partial<GrantRow>) => write(rows.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)));
+          // A body that already carries a kind this scope does not offer (an imported item with a
+          // spell grant) still shows its own row rather than a blank select the GM cannot read.
+          const kindOptions = kinds.some((kind) => kind.key === row.kind) ? kinds : [...kinds, ...GRANT_KINDS.filter((kind) => kind.key === row.kind)];
           return (
             <FieldGrid>
               <Field label="What">
@@ -891,7 +943,7 @@ function GrantsEditor({
                   value={row.kind}
                   onChange={(event) => replace({ kind: event.target.value, values: [] })}
                 >
-                  {GRANT_KINDS.map((kind) => (
+                  {kindOptions.map((kind) => (
                     <option key={kind.key} value={kind.key} disabled={kind.key !== row.kind && rows.some((entry) => entry.kind === kind.key)}>
                       {kind.label}
                     </option>
@@ -899,7 +951,38 @@ function GrantsEditor({
                 </Select>
               </Field>
               <Field label="Which" help={meta?.help} className="nh-fieldgrid-wide">
-                {options ? (
+                {row.kind === "spells" ? (
+                  /* THE ELEVENTH KIND, and the one that could not be a `TagInput`. The other ten are
+                     slug sets a GM can reasonably type; a spell id is one of 339 and a character
+                     wrong is a grant that silently hands out nothing. So "Which" here is the same
+                     `CatalogPicker` the item's cast row already uses — a searchable modal over the
+                     merged catalog, homebrew included — with the chosen spells shown as removable
+                     chips beside it. Multi-pick, so the picker itself holds no value: it appends and
+                     resets, and the chips ARE the value. */
+                  <div className="hb-chips" role="group" aria-label="Which spells">
+                    {row.values.map((id) => {
+                      const name = ctx.spells.find((entry) => entry.id === id)?.name ?? id;
+                      return (
+                        <Chip
+                          key={id}
+                          onRemove={() => replace({ values: row.values.filter((entry) => entry !== id) })}
+                          removeLabel={`Remove ${name}`}
+                        >
+                          {name}
+                        </Chip>
+                      );
+                    })}
+                    <CatalogPicker
+                      entries={ctx.spells.filter((entry) => !row.values.includes(entry.id))}
+                      value={null}
+                      onChange={(next) => { if (next) replace({ values: [...row.values, next] }); }}
+                      emptyLabel="Add a spell"
+                      title="Spells this grants"
+                      searchPlaceholder="Search spells…"
+                      ariaLabel="Which spells"
+                    />
+                  </div>
+                ) : options ? (
                   <div className="hb-chips" role="group" aria-label={`Which ${meta?.label.toLowerCase() ?? "grants"}`}>
                     {options.map((option) => {
                       const on = row.values.includes(option.value);
@@ -969,8 +1052,13 @@ export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", 
  *
  * **`grants` is deliberately absent**, and it is the one honest gap: it is authored by
  * `GrantsEditor` above, a bespoke component that writes eleven parallel arrays whole-body and has no
- * `FieldDef` to export. It stays on the harness's exemption list WITH that reason (U9 closes it by
- * making the eleventh grant kind — `spells` — editable at all).
+ * `FieldDef` to export. It stays on the harness's exemption list WITH that reason. **U9 did not
+ * retire it, and the reason is worth keeping straight:** U9 made the eleventh array — `spells` —
+ * editable rather than merely preserved, so all eleven kinds now have a control. But a control is
+ * not a `FieldDef`, and the exemption is about the LOOKUP: all eleven are bespoke JSX behind one
+ * `[What ▾][Which…]` row, so there is still nothing for `fieldsOf` to find. Retiring it means
+ * converting `GrantsEditor` itself, which has no vocabulary of its own and is therefore a refactor,
+ * not a unit. `grantRowsOf`/`grantsFromRows` are what a test drives in the meantime.
  */
 export function riderFieldsForTest(scope: RiderScope): readonly FieldDef[] {
   return [

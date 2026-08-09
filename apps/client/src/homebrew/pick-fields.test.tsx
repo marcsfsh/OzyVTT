@@ -365,3 +365,125 @@ describe("3d — every damage-type control is a visible chooser that still takes
     expect((value.grants as { languages?: readonly string[] }).languages).toEqual(["elvish"]);
   });
 });
+
+describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id cannot be typed", () => {
+  /**
+   * The other ten grant kinds are slug sets a GM can reasonably type — six skills, four armour
+   * families, a handful of damage types. A spell id is one of 339, and one character wrong is a
+   * grant that hands out nothing, silently, forever. So this "Which" is not a `TagInput` at all: it
+   * is the `CatalogPicker` the item's cast row already uses, plus removable chips for what has been
+   * picked.
+   *
+   * Driven through the RENDERED form for the same reason the damage-type grant test above is:
+   * `GrantsEditor` has no `FieldDef` anywhere, so no census in this repo can see it and
+   * `authoring-harness.ts` still exempts `grants`. The body half — that the picked ids become
+   * `{id, alwaysPrepared}` and reach a prepared spell on a real sheet — is
+   * `vocabulary-parity.mirror.test.ts`.
+   */
+  const SPELL_CTX = {
+    ...EMPTY_CONTEXT,
+    spells: [
+      { id: "bless", name: "Bless", origin: "srd" as const, meta: "Level 1 enchantment" },
+      { id: "cure-wounds", name: "Cure Wounds", origin: "srd" as const, meta: "Level 1 abjuration" },
+      { id: "shield-of-faith", name: "Shield of Faith", origin: "srd" as const, meta: "Level 1 abjuration" }
+    ]
+  };
+
+  function mountGrants() {
+    let value: Draft = {};
+    function Harness() {
+      const [held, setHeld] = useState<Draft>({});
+      return (
+        <RiderEditor
+          value={held}
+          onChange={(next) => { setHeld(next); value = next; }}
+          enabled={["grants"]}
+          scope="feature"
+          ctx={SPELL_CTX}
+          idPrefix="hb-class"
+        />
+      );
+    }
+    const { container } = render(<Harness />);
+    return { container, grants: () => value.grants as { spells?: ReadonlyArray<Record<string, unknown>> } | undefined };
+  }
+
+  it("“Spells” is offered as a kind at all — the eleventh array stops being write-only", async () => {
+    const user = userEvent.setup();
+    const { container } = mountGrants();
+    await user.click(screen.getByRole("button", { name: "Grant something" }));
+    const what = container.querySelector("select")!;
+    expect([...what.options].map((option) => option.textContent)).toContain("Spells");
+  });
+
+  it("...and it is NOT offered on an item, because nothing on that road reads it", async () => {
+    // `EquipmentReferenceSchema` spreads `featureRiders`, so an item's body PARSES `grants.spells`
+    // and `takeGrants` folds nine grant arrays without it. Offering the kind here would store a
+    // value the fight never sees. The other ten stay.
+    const user = userEvent.setup();
+    let value: Draft = {};
+    function Harness() {
+      const [held, setHeld] = useState<Draft>({});
+      return (
+        <RiderEditor
+          value={held}
+          onChange={(next) => { setHeld(next); value = next; }}
+          enabled={["grants"]}
+          scope="item"
+          ctx={SPELL_CTX}
+          idPrefix="hb-equipment"
+        />
+      );
+    }
+    const { container } = render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Grant something" }));
+    const labels = [...container.querySelector("select")!.options].map((option) => option.textContent);
+    expect(labels).not.toContain("Spells");
+    expect(labels).toContain("Damage resistances");
+    expect(value.grants).toBeDefined();
+  });
+
+  it("picking Bless writes `{id, alwaysPrepared}` — the shape 41 SRD records author", async () => {
+    const user = userEvent.setup();
+    const { container, grants } = mountGrants();
+    await user.click(screen.getByRole("button", { name: "Grant something" }));
+    await user.selectOptions(container.querySelector("select")!, "spells");
+
+    // Not a text box: there is nothing to type into, and that is the point of the row.
+    expect(screen.queryByRole("combobox", { name: "Which spells" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Add a spell" }));
+    await user.click(screen.getByRole("radio", { name: /^Bless/ }));
+
+    expect(grants()?.spells).toEqual([{ id: "bless", alwaysPrepared: true }]);
+  });
+
+  it("a second spell joins the first, and a chip takes one back off", async () => {
+    const user = userEvent.setup();
+    const { container, grants } = mountGrants();
+    await user.click(screen.getByRole("button", { name: "Grant something" }));
+    await user.selectOptions(container.querySelector("select")!, "spells");
+
+    await user.click(screen.getByRole("button", { name: "Add a spell" }));
+    await user.click(screen.getByRole("radio", { name: /^Bless/ }));
+    await user.click(screen.getByRole("button", { name: "Add a spell" }));
+    await user.click(screen.getByRole("radio", { name: /^Cure Wounds/ }));
+    expect(grants()?.spells?.map((spell) => spell.id)).toEqual(["bless", "cure-wounds"]);
+
+    // The chips ARE the value, so removing one is how a grant is taken back.
+    await user.click(screen.getByRole("button", { name: "Remove Bless" }));
+    expect(grants()?.spells).toEqual([{ id: "cure-wounds", alwaysPrepared: true }]);
+  });
+
+  it("an already-picked spell is not offered a second time", async () => {
+    const user = userEvent.setup();
+    const { container } = mountGrants();
+    await user.click(screen.getByRole("button", { name: "Grant something" }));
+    await user.selectOptions(container.querySelector("select")!, "spells");
+
+    await user.click(screen.getByRole("button", { name: "Add a spell" }));
+    await user.click(screen.getByRole("radio", { name: /^Bless/ }));
+    await user.click(screen.getByRole("button", { name: "Add a spell" }));
+    expect(screen.queryByRole("radio", { name: /^Bless/ })).toBeNull();
+    expect(screen.getByRole("radio", { name: /^Cure Wounds/ })).toBeTruthy();
+  });
+});

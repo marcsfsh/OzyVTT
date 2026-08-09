@@ -149,9 +149,10 @@ feature carrier and `apps/server/src/equipment-derivation.ts:566` for an item ca
 | `grants.damageResistances` | `:164` | `character-build.ts:550`; `equipment-derivation.ts:574` | ✓ | `RiderEditor.tsx:584` | `parity` |
 | `grants.damageImmunities` | `:165` | `character-build.ts:551`; `equipment-derivation.ts:576` | ✓ | `RiderEditor.tsx:585` | `parity` |
 | `grants.conditionImmunities` | `:166` | `character-build.ts:552`; `equipment-derivation.ts:577` | ✓ | `RiderEditor.tsx:586` | `parity` |
-| **`grants.spells`** | `:168` | `character-build.ts:553` (`grantedSpells`, → always-prepared) | **41** | **none** — `GRANT_KINDS` (`RiderEditor.tsx:576`) has ten entries; `spells` is *preserved* on write at `RiderEditor.tsx:637` and never editable | `SRD-only` |
-| `grants.spells[].alwaysPrepared` | `:168` | `character-build.ts:553` | 34 | **none** | `SRD-only` |
-| `grants.spells[].level` / `.ability` | `:168` | `character-build.ts:553` | ✓ | **none** | `SRD-only` |
+| **`grants.spells`** | `:168` | `character-build.ts:553` (`grantedSpells`, → always-prepared). **Feature road ONLY** — `takeGrants` in `equipment-derivation.ts` folds nine grant arrays for an equipped item and `spells` is not one of them, so an item's spell grant parses and does nothing | **41** (19 class · 14 species · 8 subclass) | an eleventh `GRANT_KINDS` entry whose "Which" is a `CatalogPicker` over the merged spell catalog, not a `TagInput` — **U9, landed.** It was *preserved* on write before, never editable | `parity` |
+| `grants.spells[].alwaysPrepared` | `:168` | `character-build.ts:553` | 34 (and it defaults `true`, so all 41 mean it) | written as `true` by the picker — **U9, landed** | `parity` |
+| `grants.spells[].level` | `:168` | `character-build.ts:553` | 41 | **none, deliberately** — `grantedSpellEntry` resolves it from the spell record (`grantedSpell.level ?? record?.level`), which is righter than a number the editor would guess: the client's `CatalogEntry` carries prose, not a level | `SRD-only` |
+| `grants.spells[].ability` | `:168` | `character-build.ts:1548` (the non-caster fallback) | **1** (`high-elf-cantrip`) | **none** — one author, and the fallback is the caster's own ability. Ships the day a second record needs it | `SRD-only` |
 
 Ten of eleven arrays reach parity. The eleventh — domain spells, racial spells, every
 "you always have X prepared" clause, 41 SRD records — is the one with no control.
@@ -409,7 +410,7 @@ added to an existing declarative field list. No schema change, no server change,
 | `EffectGrant.endsWithTag` | `effectsField` | `kind: "text"` |
 | `EffectGrant.voidWhileIncapacitated` | `effectsField` | `kind: "switch"` |
 | **`uses.scaling: class-resource`** | the `mode` select at `RiderEditor.tsx:428` + one `uses.scaling.id` text row | a fifth option and one sibling field |
-| `grants.spells` | `GRANT_KINDS` (`RiderEditor.tsx:576`) | an eleventh kind whose "Which" is the spell picker, not a `TagInput` |
+| `grants.spells` — **U9, landed** | `GRANT_KINDS` (`RiderEditor.tsx`) | an eleventh kind whose "Which" is the spell picker, not a `TagInput`. Shipped as written. **What it did NOT do:** retire `grants` from `RIDER_EXEMPT`. The exemption is about the LOOKUP, and all eleven kinds are still bespoke JSX with no `FieldDef` — U9 made the eleventh *editable*, not *declarative*, so retiring it means converting `GrantsEditor`, which is a refactor with no vocabulary of its own |
 | `attack.rangeNormalFeet` · `attack.count` · `attack.criticalBonusDice` | `actionsField`'s attack group (`RiderEditor.tsx:521`) | three `kind: "number"` rows |
 
 Effect `modifiers` alone converts every GM-authored effect from decorative to mechanical. It is the
@@ -600,9 +601,10 @@ the first run, before four agents trip over it.
   `packages/content-srd-5.2.1/scripts/class-mechanics/index.ts` is the *source* of
   `classes.v1.json`, so counting the bundle counts it once, correctly, rather than twice.
 - **Editor controls** are `FieldDef`s reachable from `SCHEMAS`
-  (`apps/client/src/homebrew/schemas.ts:855`), from `RiderEditor`'s five field factories, or from
-  `FeatureEditor`'s JSX. A `read`/`write` pair that merely *preserves* a key (as `GrantsEditor` does
-  for `grants.spells` at `RiderEditor.tsx:637`) is **not** a control.
+  (`apps/client/src/homebrew/schemas.ts:855`), from `RiderEditor`'s field factories, or from
+  `FeatureEditor`'s JSX. A `read`/`write` pair that merely *preserves* a key is **not** a control —
+  which is exactly what `GrantsEditor` did for `grants.spells` until U9, and the reason that row read
+  `SRD-only` while ten sibling arrays read `parity`.
 - **Engine readers** are the line that consumes the value at the moment it fires. Where a value is
   only collected into a derivation struct and never applied — `spell-attack-bonus` at
   `equipment-derivation.ts:676` is the canonical case — the row is `declared, no reader`, and the
