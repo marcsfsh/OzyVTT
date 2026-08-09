@@ -55,23 +55,24 @@ const suggestionsOf = (field: FieldDef): readonly string[] => resolveSuggestions
 const damageTypeFields = () => everyField().filter(({ field }) => suggestionsOf(field) === DAMAGE_TYPE_IDS);
 
 describe("enumerated fields offer the complete SRD list", () => {
-  it("every damage-type field offers the canonical list, and there are nine of them", () => {
+  it("every damage-type field offers the canonical list, and there are ten of them", () => {
     const fields = damageTypeFields();
     /**
-     * **NINE, exactly** — the client's `3d` counted at HEAD, so a tenth input is covered on the day
-     * it lands rather than on the day someone notices "fire" never triggered.
+     * **TEN, exactly** — the client's `3d` counted nine at HEAD, so an eleventh input is covered on
+     * the day it lands rather than on the day someone notices "fire" never triggered.
      *
-     * The nine, and the two things worth knowing about the count:
+     * The ten, and the two things worth knowing about the count:
      *
      *  1 spell `damage.types` · 2 equipment `weapon.damageType` · 3–5 monster
      *  `damageResistances`/`damageImmunities`/`damageVulnerabilities` · 6 the `damage-type-is` gate
      *  (`when > damageTypes`) · 7 the `extra-damage` rider's `damageType` · 8 `damagePartsField`'s
-     *  `type`, mounted once per action.
+     *  `type`, mounted once per action · 9 **U6's `damage-resistance` effect modifier**
+     *  (`effects > modifiers > damageTypes`), which is what Superior Defense authors.
      *
-     *  - That is EIGHT rendered controls, and this census sees nine entries, because
+     *  - That is NINE rendered controls, and this census sees ten entries, because
      *    `RIDER_FIELDS_FOR_TEST` exports a bare top-level `whenField()` alongside the one nested in
      *    `modifiersField` — the same factory, counted twice. Only the nested one is ever mounted.
-     *  - The NINTH rendered control is `GrantsEditor`'s "Which" box for the `damageResistances` and
+     *  - The TENTH rendered control is `GrantsEditor`'s "Which" box for the `damageResistances` and
      *    `damageImmunities` grant kinds. It has no `FieldDef` at all, so it is structurally invisible
      *    here — the same `RIDER_EXEMPT` gap `authoring-harness.ts` names, and the reason
      *    `pick-fields.test.tsx` drives that one through the rendered form instead.
@@ -85,7 +86,8 @@ describe("enumerated fields offer the complete SRD list", () => {
       "equipment.damageTypes",
       "equipment.damageType",
       "equipment.damageTypes",
-      "equipment.type"
+      "equipment.type",
+      "equipment.damageTypes"
     ]);
     for (const { type, field } of fields) {
       expect(suggestionsOf(field), `${type}.${field.key}`).toEqual(DAMAGE_TYPE_IDS);
@@ -181,11 +183,11 @@ describe("an open slug always keeps its “other”", () => {
     // exactly the class of defect this file exists for. Counted, not just checked: the day a tenth
     // `pick` lands it is covered here rather than on the day a GM finds it.
     const picks = everyField().filter(({ field }) => field.pick === true);
-    // Rarity (`3a`) plus the nine damage-type entries this file censuses above (`3d`) — eight
+    // Rarity (`3a`) plus the ten damage-type entries this file censuses above (`3d`) — nine
     // distinct controls, one of them counted twice because `whenField()` is exported both bare and
     // nested. An exact number, so a `pick` that lands without a unit behind it fails here on the way
     // in, which is the mirror-defect guard the phase is built on.
-    expect(picks.length).toBe(10);
+    expect(picks.length).toBe(11);
     for (const { type, field } of picks) {
       expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
       // A FLAG ON TWO KINDS, never a kind of its own. `text` renders `Combobox` directly; `tags`

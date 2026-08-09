@@ -351,6 +351,14 @@ const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critic
  */
 const ITEM_REFUSED = ["ability-score", "hit-points-per-level"];
 
+/** The seven rolls and the two ways, spelled once: `RollModeVariantSchema` is carried by BOTH rider
+    vocabularies (the record's own modifiers and an effect's), so both controls read this list. */
+const ROLL_MODE_ROLLS: readonly SelectOption[] = [
+  opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"),
+  opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")
+];
+const ROLL_MODE_WAYS: readonly SelectOption[] = [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")];
+
 const signed = (amount: number) => `${amount >= 0 ? "+" : ""}${amount}`;
 
 const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
@@ -417,8 +425,8 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
        own words. The box stays open, so a GM who really wants the word can still type it. */
     { key: "damageType", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("extra-damage") },
     { key: "doubleOnCritical", label: "Doubled on a critical hit", kind: "switch", visibleWhen: hasType("extra-damage"), help: "Off is the 5e rule — dice added after the attack aren't doubled." },
-    { key: "roll", label: "On which roll", kind: "select", options: [opt("attack", "Attack rolls"), opt("incoming-attack", "Attacks against you"), opt("save", "Saving throws"), opt("check", "Ability checks"), opt("initiative", "Initiative"), opt("death-save", "Death saves"), opt("concentration", "Concentration")], visibleWhen: hasType("roll-mode") },
-    { key: "mode", label: "Which way", kind: "select", options: [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")], visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a cursed item bites." },
+    { key: "roll", label: "On which roll", kind: "select", options: ROLL_MODE_ROLLS, visibleWhen: hasType("roll-mode") },
+    { key: "mode", label: "Which way", kind: "select", options: ROLL_MODE_WAYS, visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a cursed item bites." },
     { key: "classId", label: "For one class only", kind: "select", options: (ctx) => ctx.classes, visibleWhen: hasType("spell-save-dc", "spell-attack-bonus"), help: "Leave empty for every class on the sheet." },
     { key: "level", label: "Slot level", kind: "stepper", min: 1, max: 9, visibleWhen: hasType("spell-slot") },
     { key: "poolId", label: "Which pool", placeholder: "lay-on-hands", validate: slugValidate, visibleWhen: hasType("resource-bonus"), help: "The shared-pool name a feature already uses. One more of whatever that pool counts." },
@@ -625,17 +633,131 @@ const actionsField = (scope: RiderScope): FieldDef => ({
     see is a key the both-paths harness waves through. */
 const tagsField = (label: string): FieldDef => ({ key: "tags", label, kind: "tags", help: "Grouping only — no mechanical effect." });
 
-const effectsField = (): FieldDef => ({
+/* ------------------------------------------------------- effect modifiers ------ */
+
+/**
+ * **What an effect DOES — the row that made every GM-authored effect decorative.**
+ *
+ * `EffectGrant.modifiers` is `EffectModifierSchema`, and that is **not** the union
+ * `modifiersField` above authors. `FeatureModifierSchema` is 21 variants; `EffectModifierSchema` is
+ * 12, and they overlap by exactly three (`attack-bonus`, `extra-damage`, `roll-mode`, declared once
+ * in `@vtt/schemas` and spread into both). Mounting `modifiersField` here would have offered
+ * eighteen variants an effect cannot hold and hidden nine it can — Reckless Attack's own pair among
+ * them — so this is its own list.
+ *
+ * **Four of the twelve are offered, and each omission is a ruling:**
+ *
+ *  - **`roll-mode` is the general form**, so `attack-disadvantage`, `incoming-attack-disadvantage`,
+ *    `save-advantage` and `save-disadvantage` are not offered beside it: the actor side normalises
+ *    every one of them through `toRollModes` and the item side through `asRiderModifiers`, into
+ *    exactly this. Two spellings of one sentence is how a vocabulary drifts.
+ *  - **`attack-advantage` stays** even though `roll-mode` looks like it covers it, because it does
+ *    not: `action-resolution.ts` applies `attack-advantage` **only on the bearer's own turn**
+ *    (Reckless Attack semantics) and applies `roll-mode` always. That gate is the whole difference
+ *    and it is in the label. `incoming-attack-advantage` stays beside it because the two are one
+ *    authored sentence — Reckless Attack's benefit and its cost — and the SRD writes them together.
+ *  - **`damage-bonus` is refused rather than forgotten.** `asRiderModifiers` returns nothing for it,
+ *    in writing: a flat +N with no type has no rider equivalent, so on an ITEM it is inert by
+ *    construction. A control for it would be a box that does nothing, which is the failure this form
+ *    exists to avoid. Say it as `extra-damage` on the record's own modifier list instead.
+ *  - `damage-vulnerability`, and `attack-bonus`/`extra-damage` **inside** an effect, have zero SRD
+ *    authors and the last two already have a control one level up. Each ships the day a record
+ *    authors it, not by default.
+ *
+ * **No `when` list here, deliberately.** The two carriers disagree about it: `attackRollSources`
+ * reads a live effect's modifiers straight through `toRollModes` and never evaluates a gate, while
+ * an item's effect goes through `collectRiders` and would. A gate that fires on one carrier and not
+ * the other is worse than no gate — the effect's own duration and tags are what bound it.
+ */
+const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = [
+  ROLLS("roll-mode", "Advantage or disadvantage"),
+  ROLLS("attack-advantage", "Advantage on your attacks, on your turn"),
+  ROLLS("incoming-attack-advantage", "Attacks against you have advantage"),
+  HARM("damage-resistance", "Resistance to damage")
+];
+
+/** Same rule as `blankModifier`: the union is `.strict()`, so switching variant REPLACES the row. */
+function blankEffectModifier(type: string): Draft {
+  switch (type) {
+    case "roll-mode": return { type, roll: "attack", mode: "advantage" };
+    case "damage-resistance": return { type, damageTypes: [] };
+    default: return { type };
+  }
+}
+
+const effectModifiersField = (): FieldDef => ({
+  key: "modifiers",
+  label: "What it does",
+  kind: "rows",
+  wide: true,
+  help: "An effect with nothing here is a label the fight cannot feel.",
+  addLabel: "Add a modifier",
+  emptyText: "Nothing yet — this effect changes no numbers.",
+  maxRows: 8,
+  maxRowsReason: "Eight modifiers is as many as one effect carries.",
+  rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
+  newRow: () => ({ rowId: newId(), ...blankEffectModifier("roll-mode") }),
+  rowLabel: (row) => {
+    const modifier = row as Record<string, unknown>;
+    const name = EFFECT_MODIFIER_TYPES.find((entry) => entry.value === modifier.type)?.label ?? "Modifier";
+    if (modifier.type === "roll-mode") return `${modifier.mode === "disadvantage" ? "Disadvantage" : "Advantage"} on ${String(modifier.roll ?? "attack").replace(/-/g, " ")}`;
+    const types = Array.isArray(modifier.damageTypes) ? modifier.damageTypes.map(String) : [];
+    return types.length > 0 ? `${name} — ${types.slice(0, 3).join(", ")}${types.length > 3 ? "…" : ""}` : name;
+  },
+  rows: [
+    {
+      key: "type",
+      label: "What it does",
+      kind: "select",
+      options: EFFECT_MODIFIER_TYPES,
+      write: (next, row) => ({ rowId: (row as { rowId?: string }).rowId ?? newId(), ...blankEffectModifier(String(next)) })
+    },
+    { key: "roll", label: "On which roll", kind: "select", options: ROLL_MODE_ROLLS, visibleWhen: hasType("roll-mode") },
+    { key: "mode", label: "Which way", kind: "select", options: ROLL_MODE_WAYS, visibleWhen: hasType("roll-mode"), help: "Disadvantage is how a curse bites." },
+    // `3d`, site 10 of 9 — the count in `vocabularies.test.ts` moves with this list rather than
+    // being restated. Half damage of every type named here, and the SRD's own carrier (Superior
+    // Defense) names twelve of the thirteen at once.
+    { key: "damageTypes", label: "Damage types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes, visibleWhen: hasType("damage-resistance") }
+  ]
+});
+
+/**
+ * The effects a record grants — and **how many of them the engine really reads is the carrier's
+ * business, not one number for all three.**
+ *
+ * The cap used to be 1 everywhere, with the reason "only the first effect is applied by the rules
+ * engine today". That sentence is true of a FEATURE (`character-build.ts` synthesises an activation
+ * carrying `feature.effects[0]` and nothing after it) and **false of an ITEM**: `takeEffects` in
+ * `equipment-derivation.ts` iterates `block.effects` entire, so an item's second effect was refused
+ * by the form for a limit the engine does not have. Four is `featureRiders.effects`'s own maximum.
+ *
+ * A STAT BLOCK gets one, and for a third reason again: `ActorDefinitionSchema` has no record-level
+ * `effects` array at all — a creature's effects hang off `ActionSchema.grants`, which is a SINGLE
+ * `EffectGrant`, not a list. So "one" is the schema's number rather than the engine's. (No monster
+ * mounts this field today: `RecordDetail` enables only `["actions", "tags"]` on a stat block. The
+ * cap is written for the day one does, the same way `usesField`'s copy is.)
+ */
+const effectsField = (scope: RiderScope): FieldDef => ({
   key: "effects",
   label: "Effects",
   kind: "rows",
-  // Stated ONCE, and it is why the cap exists — authoring mechanics that silently vanish
-  // is worse than not offering the field.
-  help: "Only the first effect is applied by the rules engine today.",
+  // Stated ONCE, per carrier, and it is why the cap is what it is — authoring mechanics that
+  // silently vanish is worse than not offering the field.
+  help:
+    scope === "item"
+      ? "Each of these applies while the item is equipped."
+      : scope === "statblock"
+        ? "A stat block's action carries one effect, not a list."
+        : "Only the first effect is applied by the rules engine today.",
   addLabel: "Add an effect",
   emptyText: "No effects yet.",
-  maxRows: 1,
-  maxRowsReason: "Only the first effect is applied by the rules engine today.",
+  maxRows: scope === "item" ? 4 : 1,
+  maxRowsReason:
+    scope === "item"
+      ? "Four effects is as many as one item carries."
+      : scope === "statblock"
+        ? "A stat block's action carries one effect, not a list."
+        : "Only the first effect is applied by the rules engine today.",
   rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
   newRow: () => ({ rowId: newId(), name: "", tags: [], duration: { type: "encounter" }, modifiers: [], onEnd: [] }),
   rowLabel: (row) => (row as { name?: string }).name || "Unnamed effect",
@@ -644,7 +766,11 @@ const effectsField = (): FieldDef => ({
     { key: "tags", label: "Tags", kind: "tags", help: "The sheet groups effects by these.", suggestions: ["raging", "blessed", "concentrating", "inspired"] },
     { key: "duration.type", label: "Lasts", kind: "select", options: [opt("rounds", "A number of rounds"), opt("until-source-next-turn", "Until your next turn"), opt("encounter", "The whole encounter"), opt("manual", "Until removed by hand")] },
     { key: "duration.rounds", label: "Rounds", kind: "number", min: 1, max: 100, visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "rounds" },
-    { key: "concentration", label: "Needs concentration", kind: "switch" }
+    { key: "concentration", label: "Needs concentration", kind: "switch" },
+    // A `rows` field inside a `rows` field, which is the depth `whenField` inside `modifiersField`
+    // has always rendered at — `RowEditor` is nesting-safe by construction and `FieldRenderer`'s
+    // `rows` case recurses through itself, so this needs no new primitive.
+    effectModifiersField()
   ]
 });
 
@@ -854,7 +980,7 @@ export function riderFieldsForTest(scope: RiderScope): readonly FieldDef[] {
     usesField(scope === "item" ? "Charges" : "Limited uses", scope),
     tagsField("Tags"),
     actionsField(scope),
-    effectsField()
+    effectsField(scope)
   ];
 }
 
@@ -891,7 +1017,7 @@ export function RiderEditor({
     if (enabled.includes("uses")) list.push(usesField(label("uses", scope === "item" ? "Charges" : "Limited uses"), scope));
     if (enabled.includes("tags")) list.push(tagsField(label("tags", "Tags")));
     if (enabled.includes("actions")) list.push(actionsField(scope));
-    if (enabled.includes("effects")) list.push(effectsField());
+    if (enabled.includes("effects")) list.push(effectsField(scope));
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, scope, labels]);
@@ -990,7 +1116,9 @@ export function riderSummary(value: Draft): string {
   if (modifiers) parts.push(`${modifiers} ${modifiers === 1 ? "modifier" : "modifiers"}`);
   if (grants) parts.push(`${grants} ${grants === 1 ? "grant" : "grants"}`);
   if (actions) parts.push(`${actions} ${actions === 1 ? "action" : "actions"}`);
-  if (effects) parts.push("an effect");
+  // An item may carry four (see `effectsField`), so this stopped being "an effect" the day the cap
+  // became the carrier's rather than one number for all three.
+  if (effects) parts.push(effects === 1 ? "an effect" : `${effects} effects`);
   if (value.uses) parts.push("limited uses");
   return parts.join(" · ");
 }

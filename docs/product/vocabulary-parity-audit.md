@@ -217,17 +217,24 @@ takes on the other side of the mirror.
 `effects[].modifiers`, which has no control at all (section F), so every row here is unauthorable
 from the editor by construction.
 
+**This union is NOT `FeatureModifierSchema`** — a distinction the "mount `modifiersField(...)`"
+recommendation in §1 below got wrong, corrected there. The two overlap by exactly three members
+(`attack-bonus`, `extra-damage`, `roll-mode`, declared once in `@vtt/schemas` and spread into both);
+`FeatureModifierSchema`'s other eighteen are illegal inside an effect and this union's other nine are
+illegal outside one. U6's control is therefore its own list, not a re-mount.
+
 | item | schema | engine reader | SRD authors | editor control | verdict |
 | --- | --- | --- | ---: | --- | --- |
-| `damage-bonus` | `:233` | `action-resolution.ts:916` | 0 | **none** | `unused` |
-| `damage-resistance` | `:234` | `equipment-derivation.ts:591` | 2 (Superior Defense) | **none** | `SRD-only` |
-| `attack-advantage` | `:235` | `action-resolution.ts:548` | 1 (Reckless Attack) | **none** | `SRD-only` |
-| `incoming-attack-advantage` | `:236` | `action-resolution.ts:556` | 1 (Reckless Attack) | **none** | `SRD-only` |
-| `attack-disadvantage` | `:238` | `packages/schemas/src/index.ts:261` → `action-resolution.ts:548` | 0 | **none** | `unused` |
-| `incoming-attack-disadvantage` | `:240` | `action-resolution.ts:556` | 0 (only `apps/server/src/builtin-actions.ts:41`) | **none** | `unused` |
-| `save-advantage` | `:242` | `saving-throws.ts:44` | 0 (only `builtin-actions.ts:41`) | **none** | `unused` |
-| `save-disadvantage` | `:243` | `saving-throws.ts:44` | 0 | **none** | `unused` |
-| shared `attack-bonus` / `extra-damage` / `roll-mode` in an effect | `:244`–`:246` | as section D | 0 | **none** | `unused` |
+| `damage-bonus` | `:233` | `action-resolution.ts:924` | 0 | **none, and deliberately** — `asRiderModifiers` (`equipment-derivation.ts:718`) returns nothing for it in writing, so on an ITEM carrier it is inert by construction; a control would be a box that does nothing | `unused` |
+| `damage-resistance` | `:234` | `equipment-derivation.ts:591` | 2 (Superior Defense) | `effectModifiersField` (`RiderEditor.tsx`) — **U6, landed** | `parity` |
+| `attack-advantage` | `:235` | `action-resolution.ts:545` | 1 (Reckless Attack) | `effectModifiersField` — **U6, landed** | `parity` |
+| `incoming-attack-advantage` | `:236` | `action-resolution.ts:554` | 1 (Reckless Attack) | `effectModifiersField` — **U6, landed** | `parity` |
+| `attack-disadvantage` | `:238` | `packages/schemas/src/index.ts:261` → `action-resolution.ts:545` | 0 | **none** — `roll-mode` is the general form and both sides normalise this into it (`toRollModes`, `asRiderModifiers`), so a second spelling is not offered | `unused` |
+| `incoming-attack-disadvantage` | `:240` | `action-resolution.ts:554` | 0 (only `apps/server/src/builtin-actions.ts:41`) | **none** — as above | `unused` |
+| `save-advantage` | `:242` | `saving-throws.ts:44` | 0 (only `builtin-actions.ts:41`) | **none** — as above | `unused` |
+| `save-disadvantage` | `:243` | `saving-throws.ts:44` | 0 | **none** — as above | `unused` |
+| shared `roll-mode` in an effect | `:246` | as section D | 0 | `effectModifiersField` — **U6, landed**; it is the general advantage/disadvantage form the four rows above normalise into | `editor-only` |
+| shared `attack-bonus` / `extra-damage` in an effect | `:244`–`:245` | as section D | 0 | **none** — both already have a control on the record's own modifier list one level up; each ships the day a record authors it inside an effect | `unused` |
 
 ---
 
@@ -243,22 +250,32 @@ from the editor by construction.
 | `name` | `packages/schemas/src/index.ts:552` | `apps/server/src/effects.ts:117` | 2 | `RiderEditor.tsx:557` | `parity` |
 | `tags` | `:553` | `effects.ts:123`; `equipment-derivation.ts:586` (`itemEffectTags`) | 2 | `RiderEditor.tsx:558` | `parity` |
 | `duration` | `:554` | `effects.ts` (all transitions) | 2 | `RiderEditor.tsx:559`, `:560` | `parity` |
-| **`modifiers`** | **`:560`** | **`equipment-derivation.ts:588`–`:595`; `action-resolution.ts:1075`** | **2** | **none** | **`SRD-only`** |
+| **`modifiers`** | **`:584`** | **`equipment-derivation.ts:591` (`takeEffects`, the ITEM road); `action-resolution.ts:545`, `:554`, `:924` (the live-effect road).** *(This row used to name `action-resolution.ts:1075`, which is the Sap mastery minting an effect of its own, not a reader; re-measured and corrected when U6 landed.)* | **2** | `effectModifiersField`, nested inside `effectsField` (`RiderEditor.tsx`) — **U6, landed** | **`parity`** |
 | `onEnd` | `:561` | `effects.ts:115` | 0 | **none** | `unused` |
 | `endsWithTag` | `:563` | `effects.ts:123` | 0 | **none** | `unused` |
 | `target` (`self` / `target`) | `:565` | `action-resolution.ts:680`, `:690` | 0 | **none** | `unused` |
 | `voidWhileIncapacitated` | `:567` | `saving-throws.ts:44`; `action-resolution.ts:543` | 0 | **none** | `unused` |
 | `concentration` | `:569` | `apps/server/src/hit-points.ts:175` | 0 | `RiderEditor.tsx:561` | `editor-only` |
 
-> ### The single highest-value row in this document
+> ### ~~The single highest-value row in this document.~~ Closed by U6.
 >
-> **`EffectGrantSchema.modifiers` has no control, and it defaults to `[]`
-> (`packages/schemas/src/index.ts:560`). Every effect a GM authors from the editor is therefore
-> mechanically empty** — a name, some tags, a duration, and nothing that changes a number. The
-> engine reads it in two places. The SRD authors it twice (Reckless Attack, Superior Defense) and
-> both would be inexpressible in the editor as it stands. The form offers a control that produces
-> a decorative object and says nothing about it: `effectsField`'s only honesty line
-> (`RiderEditor.tsx:548`) explains the one-row cap, not the empty payload.
+> It was true: **`EffectGrantSchema.modifiers` had no control and defaults to `[]`, so every effect a
+> GM authored was mechanically empty** — a name, some tags, a duration, and nothing that changes a
+> number. The engine reads it in four places across two roads, and the SRD authors it twice (Reckless
+> Attack, Superior Defense), both of them FEATURES, because `equipment.v1.json` authors no `effects`
+> at all. `effectModifiersField` closes it, and the both-paths test in
+> `apps/client/src/homebrew/vocabulary-parity.mirror.test.ts` is the one that crosses carriers: the
+> editor half authors an ITEM's effect, the SRD half reads a FEATURE's, and one assertion body ends
+> at the same kept d20.
+>
+> **Two things measured while closing it, both of which this document had wrong:**
+>
+> 1. the control is **not** a re-mount of `modifiersField` — see the note above section E's table;
+> 2. `effectsField`'s `maxRows: 1` cited an engine limit that is real for a FEATURE
+>    (`character-build.ts:538` takes `effects[0]`) and **false for an ITEM** (`takeEffects` iterates
+>    all of them). The cap is now the carrier's: 4 on an item, 1 on a feature, 1 on a stat block —
+>    where the reason is different again, since `ActorDefinitionSchema` has no record-level `effects`
+>    array and a creature's effects hang off `ActionSchema.grants`, a single grant.
 
 ---
 
@@ -386,7 +403,7 @@ added to an existing declarative field list. No schema change, no server change,
 
 | row | where the control goes | shape |
 | --- | --- | --- |
-| **`EffectGrant.modifiers`** | `effectsField` (`RiderEditor.tsx:542`) | mount `modifiersField(...)` as a nested `rows` field — the component already nests (`whenField` proves it) |
+| **`EffectGrant.modifiers`** — **U6, landed** | `effectsField` (`RiderEditor.tsx`) | ~~mount `modifiersField(...)` as a nested `rows` field~~ — **wrong, and measured wrong when U6 landed.** The nesting half was right (`whenField` inside `modifiersField` is the same depth and renders); the re-mount half was not. `EffectGrant.modifiers` is `EffectModifierSchema`, not `FeatureModifierSchema`, and mounting the latter would have offered eighteen variants an effect cannot hold while hiding nine it can — Reckless Attack's own pair among them. Shipped as `effectModifiersField`, its own four-option list |
 | `EffectGrant.onEnd` | `effectsField` | `kind: "rows"` — condition id + level |
 | `EffectGrant.target` | `effectsField` | `kind: "select"` — self / the target |
 | `EffectGrant.endsWithTag` | `effectsField` | `kind: "text"` |

@@ -34,10 +34,12 @@
  * literal. A far end is mandatory: the bar for every unit in this phase is a rolled number, a spent
  * counter, a refusal or rendered text — never "the value survived into the struct".
  *
- * Three rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
+ * Four rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
  * monster actions), **a monster's to-hit bonus** (U10 — 423 monster actions, and until that unit the
- * shape could not be published at all), and **a two-band range** (U11 — 45 records, ending at the
- * long-range disadvantage die).
+ * shape could not be published at all), **a two-band range** (U11 — 45 records, ending at the
+ * long-range disadvantage die), and **what an effect DOES** (U6 — and it is the one that crosses
+ * carriers: the editor half authors an ITEM's effect, the SRD half reads a FEATURE's, and the two
+ * reach the same kept die down two entirely different roads).
  *
  * ## The census, and the standing warning about what it does NOT prove
  *
@@ -52,12 +54,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
-import type { ActorDefinition } from "@vtt/schemas";
+import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../../../server/src/action-resolution.js";
-import { ContentLibrary } from "../../../server/src/content-library.js";
+import { importActorDefinition } from "../../../server/src/actor-roster.js";
+import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../../../server/src/character-build.js";
+import { ContentLibrary, EMPTY_HOMEBREW_SLICE, type HomebrewContentSource } from "../../../server/src/content-library.js";
 import { effectiveActions } from "../../../server/src/effective-actions.js";
+import { equipmentCatalogOf } from "../../../server/src/equipment-derivation.js";
 import { startEncounter } from "../../../server/src/encounter.js";
 import {
   applyField, authored, authoredRow, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
@@ -556,6 +561,230 @@ describe("a two-band range — through both paths", () => {
   });
 });
 
+/* ---------- U6: what an effect DOES — an ITEM effect and a FEATURE effect --------- */
+
+/**
+ * The row: `EffectGrant.modifiers` — **the highest-value gap in the phase, and the one that
+ * crosses carriers.**
+ *
+ * Until this unit, every effect a GM authored was a name, some tags, a duration and nothing that
+ * changes a number: `effectsField` offered no control for `modifiers` at all, while the engine read
+ * it in two places and the SRD authored it twice. Both SRD carriers are FEATURES — Reckless Attack
+ * and Superior Defense, the only two records in the whole bundle set that carry `effects[].modifiers`
+ * — and `equipment.v1.json` carries none, so this row cannot be proved on one carrier.
+ *
+ * **The two paths reach the same die down two genuinely different roads**, which is the point:
+ *
+ *  - the FEATURE road: `character-build.ts` synthesises an activation carrying `feature.effects[0]`,
+ *    resolving it writes a live `EffectInstance` on the actor, and `attackRollSources` reads
+ *    `attacker.effects[].modifiers` through `toRollModes`;
+ *  - the ITEM road: nothing is written to the actor at all. `takeEffects` in
+ *    `equipment-derivation.ts` reads the equipped item's effects as STANDING riders, normalising
+ *    `attack-advantage` into `roll-mode` on the way, and `attackRollSources` collects them from
+ *    `moment.attacker.carriers`.
+ *
+ * One sheet, one greataxe, one pair of faces, one assertion body: the swing rolls two d20s and keeps
+ * the higher, 3 becomes 15, and a single-die roll would have kept the 3.
+ */
+const RECKLESS = {
+  classId: "barbarian",
+  featureId: "reckless-attack",
+  /** The pair the SRD authors on ONE effect: the benefit and the cost, in one sentence. */
+  srdModifiers: ["attack-advantage", "incoming-attack-advantage"],
+  itemId: "hb-bracers-a1b2c3",
+  itemName: "Bracers of the Headlong Rush",
+  swingId: "item-greataxe",
+  /** Two d20s then the greataxe's d12. The low face is FIRST, so "kept the higher" is visible. */
+  advantageFaces: [3, 15, 8],
+  /** The same swing with nothing helping it: one d20, and the 3 stands. */
+  plainFaces: [3, 8],
+  natural: 15,
+  plainNatural: 3
+} as const;
+
+/**
+ * A Halfling Barbarian 2 — the lowest level that has Reckless Attack, and Halfling because it is the
+ * one SRD species with no ability bonus, no modifier and no choice of its own, so nothing below can
+ * be blamed on the species. Built through the REAL builder against the REAL bundles.
+ */
+const BARBARIAN: CharacterCreateRequestInput = {
+  name: "Ozar", speciesId: "halfling", backgroundId: "soldier", classId: "barbarian", level: 2,
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
+    { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
+    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "greataxe" },
+    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "handaxe" },
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "barbarian-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput;
+
+type Table = Readonly<{ definition: ActorDefinition; state: GameState; hero: Actor; catalog: ReturnType<typeof equipmentCatalogOf> }>;
+
+/** The Barbarian, on a map, with the hero first in the order — `attack-advantage` is gated to the
+    bearer's OWN turn, so the order is part of the fixture rather than decoration. */
+function barbarianTable(homebrew?: HomebrewContentSource): Table {
+  const view = new ContentLibrary(homebrew).forAudience("gm");
+  const catalog = equipmentCatalogOf(view);
+  const definition = buildCharacterDefinition(BARBARIAN, view, BuilderPolicySchema.parse({}));
+  const state: GameState = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [{ id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 200, maximum: 200 }, armorClass: 12 }]
+  });
+  importActorDefinition(state, definition, IDS.caster, "public", catalog);
+  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+  return { definition, state, hero: state.actors.find((actor) => actor.id === IDS.caster)!, catalog };
+}
+
+let recklessCommand = 0;
+const nextCommand = () => `50000000-0000-4000-8000-${String(++recklessCommand).padStart(12, "0")}`;
+
+function resolveOn(table: Table, actionId: string, faces: readonly number[], targetIds: readonly string[] = []) {
+  const action = effectiveActions(table.definition, table.hero, table.catalog).find((entry) => entry.id === actionId);
+  if (!action) throw new Error(`${table.definition.name} has no "${actionId}" action.`);
+  const queue = [...faces];
+  let roll = 0;
+  return resolveDefinitionAction(
+    table.state,
+    action,
+    { actorId: IDS.caster, targetIds: [...targetIds], commandId: nextCommand() },
+    {
+      random: () => {
+        const face = queue.shift();
+        if (face === undefined) throw new Error("dice queue empty");
+        return face;
+      },
+      newRollId: () => `40000000-0000-4000-8000-0000000001${String(roll++).padStart(2, "0")}`,
+      gmSessionId: IDS.gmSession,
+      now: () => "2026-08-09T00:00:00.000Z",
+      definition: table.definition,
+      catalog: table.catalog
+    }
+  );
+}
+
+/** THE assertion body. Swing the greataxe at the dummy and report the d20 the engine kept. */
+const swingGreataxe = (table: Table, faces: readonly number[]) => resolveOn(table, RECKLESS.swingId, faces, [IDS.target]);
+
+/** The item a GM builds in `/homebrew`: an effect whose ONE modifier is the row this unit adds. */
+function authoredBracers(): Draft {
+  // THE ROW, and it is nested two containers deep. `authoredRow` throws when a key has no control,
+  // so before U6 this line — not an assertion below it — is what failed.
+  const modifier = authoredRow("equipment", ["effects", "modifiers"], [["type", "attack-advantage"]]);
+  const effect = authoredRow("equipment", ["effects"], [
+    ["name", "Headlong Rush"],
+    ["tags", ["reckless"]],
+    ["duration.type", "encounter"],
+    ["modifiers", [modifier]]
+  ]);
+  return authored("equipment", RECKLESS.itemName, [
+    ["description", "Iron bracers that pull the wearer forward into the swing."],
+    ["category", "wondrous"],
+    ["slot", "hands"],
+    ["isMagic", true],
+    ["effects", [effect]]
+  ]);
+}
+
+/** The Barbarian again, wearing the authored bracers — a real `ContentLibrary` with a real homebrew
+    slice, so the item reaches the fight through the same merge a published record does. */
+function barbarianWearingBracers(): Table {
+  const record = HOMEBREW_BODY_SCHEMAS.equipment.parse(storedBody("equipment", authoredBracers(), RECKLESS.itemId));
+  const table = barbarianTable({
+    revision: 1,
+    publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, equipment: [record] }),
+    monsterForInstance: () => undefined
+  });
+  table.hero.inventory.push(InventoryItemSchema.parse({ id: RECKLESS.itemId, name: RECKLESS.itemName, quantity: 1, equipped: true, category: "wondrous" }));
+  return table;
+}
+
+/** The SRD's own carrier, read out of the shipped bundle through the server's content view. */
+const srdRecklessAttack = () => {
+  const record = new ContentLibrary().forAudience("gm").classRecord(RECKLESS.classId);
+  const feature = record?.features.find((entry) => entry.id === RECKLESS.featureId);
+  if (!feature) throw new Error("The SRD bundle no longer ships Reckless Attack — this fixture needs a new carrier.");
+  return feature;
+};
+
+describe("what an effect DOES — through both paths, across two carriers", () => {
+  it("1. the editor can author it: an effect's `modifiers` goes through a real control, and the body publishes", () => {
+    const draft = authoredBracers();
+    const verdict = publishVerdict("equipment", draft, RECKLESS.itemId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("equipment", draft, RECKLESS.itemId) as { effects: Array<Record<string, unknown>> };
+    expect(body.effects[0]).toMatchObject({
+      name: "Headlong Rush",
+      tags: ["reckless"],
+      duration: { type: "encounter" },
+      modifiers: [{ type: "attack-advantage" }]
+    });
+
+    // The row is looked up in the EFFECT's own fields, never the record's. A flat lookup would have
+    // resolved it against the top-level `modifiersField` — the 21-variant FEATURE union, which an
+    // effect cannot hold — and called the row authorable while it was not.
+    expect(hasControl("equipment", "modifiers", ["effects"])).toBe(true);
+    expect(hasControl("equipment", "damageTypes", ["effects", "modifiers"])).toBe(true);
+    // ...and the two unions really are different, which is why this is its own list: `armor-class` is
+    // a `FeatureModifier` and NOT an `EffectModifier`, so it is offered one level up and not here.
+    const offered = (kind: string) =>
+      (applyField("equipment", { rowId: "r" }, "type", kind, ["effects", "modifiers"]) as { type?: string }).type;
+    expect(offered("attack-advantage")).toBe("attack-advantage");
+    expect(() => applyField("equipment", {}, "armor-class", 1, ["effects", "modifiers"])).toThrow();
+  });
+
+  it("2. SRD content authors the same shape — and both carriers of it are FEATURES", () => {
+    const feature = srdRecklessAttack();
+    expect(feature.effects[0]).toMatchObject({ tags: ["reckless-attack"], modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }] });
+    expect(feature.effects[0].modifiers.map((modifier) => modifier.type)).toEqual([...RECKLESS.srdModifiers]);
+
+    // Measured at the time of writing: exactly TWO records in the whole bundle set author
+    // `effects[].modifiers`, Reckless Attack and Superior Defense, and both are Barbarian class
+    // features. `equipment.v1.json` authors none — which is why this unit's editor half has to be an
+    // ITEM and its SRD half a FEATURE, and why the assertion below has to run over both.
+    const library = new ContentLibrary().forAudience("gm");
+    const carriers = library.classSummaries()
+      .flatMap((summary) => library.classRecord(summary.id)?.features ?? [])
+      .filter((entry) => entry.effects.some((effect) => effect.modifiers.length > 0));
+    expect(carriers.map((entry) => entry.id).sort()).toEqual(["reckless-attack", "superior-defense"]);
+  });
+
+  it("3. one assertion body over both: the swing rolls two d20s and keeps the higher", () => {
+    const paths: ReadonlyArray<readonly [string, () => Table]> = [
+      // The FEATURE carrier: enter Reckless Attack first, which writes the live effect.
+      ["SRD content", () => { const table = barbarianTable(); resolveOn(table, RECKLESS.featureId, []); return table; }],
+      // The ITEM carrier: nothing is entered. Wearing the bracers IS the effect.
+      ["the homebrew editor", barbarianWearingBracers]
+    ];
+
+    for (const [label, tableOf] of paths) {
+      const table = tableOf();
+      const swung = swingGreataxe(table, RECKLESS.advantageFaces);
+      // The far end: the die. Two d20s offered, the higher kept, and the roll card says why.
+      expect(swung.rollMode?.mode, label).toBe("advantage");
+      expect(swung.attack?.naturalRoll, label).toBe(RECKLESS.natural);
+      expect(swung.attack?.outcome, label).toBe("hit");
+    }
+
+    // THE NEGATIVE CONTROL, and it is what makes the two above mean anything: the same sheet, the
+    // same greataxe and the same first face, with neither carrier contributing. One die, and the 3
+    // stands — so a test that only ever swung under advantage would have passed on advantage from
+    // any source at all.
+    const bare = swingGreataxe(barbarianTable(), RECKLESS.plainFaces);
+    expect(bare.rollMode).toBeUndefined();
+    expect(bare.attack?.naturalRoll).toBe(RECKLESS.plainNatural);
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -570,13 +799,15 @@ describe("the guard itself refuses what the editor cannot author", () => {
   });
 
   it("a row scope is looked up in the ROW's own fields, not the whole form's", () => {
-    // The second face of the same hole. An effect row has no `modifiers` control today (U6 adds it);
-    // a flat lookup would resolve it against the top-level `modifiersField` and wave the row through
-    // — a false pass on the single highest-value row in the phase.
+    // The second face of the same hole, and it used to be shown on the EFFECT row — which U6 closed
+    // with a control of its own. An ACTION row is the case that remains and it is the same shape: an
+    // action carries a name, a cost, damage, an attack and a save, and no `modifiers` of its own. A
+    // flat lookup would resolve it against the record's top-level `modifiersField` and wave the row
+    // through, which is a false pass rather than a missing test.
     expect(hasControl("equipment", "modifiers")).toBe(true);
-    expect(hasControl("equipment", "modifiers", ["effects"])).toBe(false);
-    expect(() => applyField("equipment", {}, "modifiers", [], ["effects"])).toThrow(
-      'No field "modifiers" in the equipment form (effects row) — the test is addressing a field that does not exist.'
+    expect(hasControl("equipment", "modifiers", ["actions"])).toBe(false);
+    expect(() => applyField("equipment", {}, "modifiers", [], ["actions"])).toThrow(
+      'No field "modifiers" in the equipment form (actions row) — the test is addressing a field that does not exist.'
     );
   });
 
@@ -666,7 +897,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
       ["equipment", "uses.recharge", [], "U8 — `recharge`, 86 monster actions"],
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
-      ["equipment", "modifiers", ["effects"], "U6 — every GM-authored effect is mechanically empty"],
       ["class", "choices", [], "U12 (after R1) — 3 feat records, a hard compile error from twelve class modules"],
       ["class", "extraPicks", [], "U13 — the extra-cantrip case that started the area, 8 SRD authors"],
       ["class", "replaces", [], "U14 — wired through a command, actor state, rests and a projection"],
