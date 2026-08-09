@@ -424,37 +424,19 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   and each control is scrolled to the centre before hit-testing (`scripts/tap-audit.mjs:185-187`). The
   "25-59 per surface" range this entry quoted described a column that no longer exists.
 
-- **[content/feats] All seven Epic Boon feats print "to a maximum of 30" and none of them sets
-  `maximum`, so the boon's ability point is clamped at 20 and does nothing for the character who has
-  one.** `featureChoiceBase.maximum` in `packages/content-srd-5.2.1/src/character-content.ts` exists
-  for exactly this sentence — its own docstring says all seven boons "silently did nothing for a
-  character already at 20" — but the field was added to the schema and never authored into
-  `bundles/feats.v1.json`. Every one of `boon-of-{combat-prowess,dimensional-travel,fate,
-  irresistible-offense,spell-recall,the-night-spirit,truesight}` has `feature.choice.maximum` unset,
-  and `buildCharacterDefinition` then applies `Math.min(offer.maximum ?? 20, …)`. Reproducible at
-  HEAD: the level-20 Wizard in `apps/server/test/warlock-sorcerer-wizard.test.ts` reaches INT 20 from
-  its ASIs and the boon's +1 is swallowed; that test pins the current value at 20 with a comment
-  saying the fix makes it 21. Found by Stage 4 lane B4; `bundles/feats.v1.json` is lane B3's file, so
-  it is reported rather than edited. Fix: set `maximum: 30` on all seven and flip that expectation.
-
-- **[content/vocabulary] Four rider gaps Stage 4 lane B4 hit and authored around, each blocking a
-  record that would otherwise be sayable.** All four are authoring limits, not defects in shipped
+- **[content/vocabulary] Three rider gaps Stage 4 lane B4 hit and authored around, each blocking a
+  record that would otherwise be sayable.** All three are authoring limits, not defects in shipped
   behaviour, and each has a record standing on it today:
-  (1) **`maxSpellLevel` has no `minSpellLevel` sibling** — the one-line follow-up
-  `docs/product/stage-4-authoring-assignments.md` §5H asks for. Warlock's four Mystic Arcanum records
-  are authored with the ceiling set to the arcanum's own level, so a level-11 Warlock may take a
-  level-3 spell as their level-6 arcanum. Needs the schema field plus the two consumers that already
-  read `maxSpellLevel` (`character-build.ts` `matchRow`, `build-payload.ts` `featurePickOffer`).
-  (2) **Wizard's Spell Mastery is still authored as ONE `choice`** — "choose a level 1 AND a level
+  (1) **Wizard's Spell Mastery is still authored as ONE `choice`** — "choose a level 1 AND a level
   2 spell" ships as a single pick with `maxSpellLevel: 2`, so a Wizard may take two level-1 spells.
   The limit that forced it is gone: `overlay.ts`'s `FeatureMechanics` carries `choices` in both of
   its unions and the homebrew editor authors the plural form (U12, 2026-08-09), so the record can
   now be re-authored from `wizard.ts`; it has not been.
-  (3) **`ExtraDamageVariantSchema` requires `damageType`** and has no "same type as the triggering
+  (2) **`ExtraDamageVariantSchema` requires `damageType`** and has no "same type as the triggering
   damage" form, so Evoker's Empowered Evocation ("add your Intelligence modifier to one damage roll
   of any Wizard Evocation spell") has no correct type to author — Fireball is Fire, Lightning Bolt is
   Lightning.
-  (4) **Two rider filters are authorable but have no producer, so they fail closed.**
+  (3) **Two rider filters are authorable but have no producer, so they fail closed.**
   `RiderContext.spellSchool` is declared in `packages/rules-5e/src/riders.ts` and set by nothing, so
   `spell-school-is` never matches; and `attackKindsOf` in `apps/server/src/action-resolution.ts`
   derives melee/ranged/thrown/unarmed/reaction and never "spell", so `attack-kind-is: ["spell"]`

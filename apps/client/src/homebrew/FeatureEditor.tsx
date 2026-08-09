@@ -433,6 +433,14 @@ const replacesFeatureIdField = (): FieldDef => ({
   validate: (value, feature) => (value && value === feature.id ? "A feature cannot supersede itself — pick the earlier one it replaces." : null)
 });
 
+/** The two kinds whose options carry a spell level, plus any block already holding a
+    bound. `kind` is an OPEN slug, so this is a visibility rule and never a gate: an
+    authored window survives on any kind, it simply has nothing to compare against unless
+    the options came from a spell catalog. */
+const showsSpellWindow = (block: Draft): boolean =>
+  block.kind === "spell" || block.kind === "cantrip"
+  || block.maxSpellLevel !== undefined || block.minSpellLevel !== undefined;
+
 /**
  * The controls of ONE choice block, keys relative to the block — the shape every block
  * in the list shares, spelled once. `renderFeature` renders every block through these,
@@ -452,6 +460,65 @@ function choiceBlockFields(): readonly FieldDef[] {
       write: (next, block) => ({ ...block, kind: asChoiceSlug(String(next ?? "")) })
     },
     { key: "choose", label: "How many they pick", kind: "stepper", min: 1, max: 10 },
+    /**
+     * THE SPELL WINDOW — a ceiling, a floor, or both, on ONE block.
+     *
+     * "Choose two Cleric cantrips" is `maxSpellLevel: 0`; "choose one level 6 Warlock
+     * spell as this arcanum" is the pair set to 6, because a ceiling alone reads as "6 or
+     * lower" and let an eleventh-level Warlock spend the arcanum on Eldritch Blast. Both
+     * are read by `withinSpellWindow` in `character-build.ts` and mirrored by the wizard's
+     * own filter, and 16 + 4 SRD records author them.
+     *
+     * **The bounds are compared against the option's own SPELL level, which only a catalog
+     * carries** — `optionLevels` is built from `resolveCatalogChoice`, and a hand-typed
+     * `from` list has no levels for the engine to read (a missing level counts as 0, so a
+     * ceiling over one never bites and a floor above 0 refuses everything). Every one of
+     * the 20 SRD authors draws on a `*-spells` catalog. The help says so rather than
+     * leaving a GM to discover it from a refusal.
+     *
+     * Offered on the two kinds whose options carry a level, plus any block that already
+     * holds a bound — so a duplicated SRD record never hides its own numbers.
+     */
+    {
+      key: "maxSpellLevel",
+      label: "Highest spell level",
+      kind: "number",
+      min: 0,
+      max: 9,
+      help: "0 is cantrips only. Compared against the catalog's own spell levels — a list typed by hand has none.",
+      visibleWhen: showsSpellWindow
+    },
+    {
+      key: "minSpellLevel",
+      label: "Lowest spell level",
+      kind: "number",
+      min: 0,
+      max: 9,
+      help: "Set both to the same number for “exactly a level 6 spell”.",
+      visibleWhen: showsSpellWindow
+    },
+    /**
+     * THE ASI CEILING — the score an ability-score pick from THIS block may reach.
+     *
+     * The sibling of the `ability-score` MODIFIER's own `maximum` (`RiderEditor`'s "Raises
+     * the cap to"), and separate because the two are different mechanisms: a modifier
+     * raises a NAMED ability, while a choice lets the player pick which — and all seven
+     * epic boons do the second. `character-build.ts` clamps each chosen point at
+     * `offer.maximum ?? 20`; the clamp used to be a hard 20, which made every boon do
+     * nothing at all for the level-19 character who has one.
+     *
+     * Offered on the kind the reader filters for (`offers.filter(kind === "ability-score")`)
+     * and on any block already carrying one.
+     */
+    {
+      key: "maximum",
+      label: "Raises a score to at most",
+      kind: "number",
+      min: 1,
+      max: 30,
+      help: "Leave empty to keep the usual 20. The epic boons print 30.",
+      visibleWhen: (block) => block.kind === "ability-score" || block.maximum !== undefined
+    },
     {
       /* Slugs separated by commas, in one box, because a `from` list is written by hand
          against no catalog — there is nothing to suggest. `read` joins and `write`
@@ -1024,6 +1091,15 @@ export function FeatureEditor({
               }}
             />
           )}
+
+          {/* The three numbers that NARROW what an answer may be — after the source,
+              because each of them is read against the list it produced. Each declares its
+              own `visibleWhen`, so at most two of the three ever draw. */}
+          <FieldGrid>
+            {blockControl("maxSpellLevel")}
+            {blockControl("minSpellLevel")}
+            {blockControl("maximum")}
+          </FieldGrid>
 
           {blockControl("repeatable")}
 

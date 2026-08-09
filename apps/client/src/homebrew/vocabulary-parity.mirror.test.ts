@@ -2255,6 +2255,319 @@ const fighterInput = (level: 5 | 11): CharacterCreateRequestInput => ({
   ]
 } as CharacterCreateRequestInput);
 
+/* ---- U15: the spell window and the ASI ceiling — three numbers, through both paths ---- */
+
+/**
+ * The rows: `FeatureChoiceSchema.maxSpellLevel` / `minSpellLevel` — the ceiling and floor a spell
+ * pick is answered inside — and `maximum`, the score an ability-score pick may raise a score TO.
+ *
+ * **The schema half of all three already shipped in full**, which is what makes this unit small and
+ * what makes it a parity gap rather than a feature: the columns, the cross-field refinement, both
+ * consumers (`character-build.ts` `withinSpellWindow` and `matchRow`'s clamp,
+ * `build-payload.ts`'s own filter), the wire type, the OpenAPI property, twenty SRD records and a
+ * named server test — and no control anywhere. The panel could say what kind of pick and how many,
+ * and nothing about what an answer is allowed to BE.
+ *
+ * **Both bounds are compared against the option's own SPELL level, and only a catalog carries one.**
+ * `optionLevels` is built from `resolveCatalogChoice`; a hand-typed `from` list produces none, and a
+ * missing level reads as 0. Measured, at HEAD: all 20 SRD authors of the window draw on a `*-spells`
+ * catalog, a ceiling authored over a typed list therefore never refuses anything, and a floor above 0
+ * refuses everything. R1's standing ruling is that `fromCatalog` is unreachable from `applyField`
+ * (two controls over one composed slug held in React state), so the editor half of the window drives
+ * the FLOOR — a bound that really does refuse over a typed list — while the SRD half proves both
+ * bounds against real spell levels. The control's own help says where the levels come from, so the
+ * trap is named on the form rather than discovered from a build refusal.
+ *
+ * The ASI ceiling has no such asymmetry: all seven epic boons author it over a plain `from` list of
+ * ability slugs, which is exactly what the panel writes, so the editor's half is the SRD's shape
+ * byte for byte and both end at the same score.
+ */
+const WINDOW = {
+  /** The SRD's exact-level pick: `minSpellLevel` and `maxSpellLevel` both 6 over `warlock-spells`. */
+  arcanumFeatureId: "mystic-arcanum-level-6-spell",
+  arcanumLabel: "Mystic Arcanum Level 6 Spell",
+  belowFloor: "hex",
+  aboveCeiling: "power-word-kill",
+  inWindow: "true-seeing",
+  windowLevel: 6,
+  featId: "hb-borrowed-mystery-a1b2",
+  featureId: "borrowed-mystery",
+  featName: "Borrowed Mystery",
+  /** The editor's authored floor. Five, so the refusal names a number nothing else in the build has. */
+  authoredFloor: 5,
+  /** The ASI ceiling: one 20 the boon pushes past, and the score it stops at without one. */
+  boonFeatId: "hb-boon-of-the-keen-mind-a1b2",
+  boonFeatureId: "boon-of-the-keen-mind",
+  boonFeatName: "Boon of the Keen Mind",
+  srdBoonId: "boon-of-the-night-spirit",
+  raised: "wis",
+  ceiling: 30,
+  withCeiling: 21,
+  withoutCeiling: 20
+} as const;
+
+/** The feat a GM builds in `/homebrew`: one spell pick with the window the GM typed on it. */
+function authoredMystery(window: { min?: number; max?: number }): Draft {
+  const shell = authored("feat", WINDOW.featName, [
+    ["category", "origin"],
+    ["summary", "A mystery beyond your years."],
+    ["description", "You learn one spell of a level you should not yet reach."]
+  ]);
+  const edits: Array<readonly [string, unknown]> = [
+    ["kind", "spell"],
+    ["choose", 1],
+    ["from", "bless, cure-wounds"]
+  ];
+  // THE ROWS. `authoredRow` throws when a key has no control, so before U15 these lines — not an
+  // assertion below them — is what failed.
+  if (window.max !== undefined) edits.push(["maxSpellLevel", window.max]);
+  if (window.min !== undefined) edits.push(["minSpellLevel", window.min]);
+  const block = authoredRow("feat", ["feature", "choices"], edits);
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "name", WINDOW.featName, ["feature"]);
+  feature = applyField("feat", feature, "description", "You learn one spell of a level you should not yet reach.", ["feature"]);
+  feature = applyField("feat", feature, "choices", [block], ["feature"]);
+  return { ...shell, feature: { ...feature, id: WINDOW.featureId } };
+}
+
+/** The epic boon a GM builds: the SRD's own boon shape — one ability-score pick over the six
+    abilities, with the ceiling that makes the point worth taking. `ceiling: undefined` is the
+    negative control, and it is the bug the column was added for. */
+function authoredBoon(ceiling?: number): Draft {
+  const shell = authored("feat", WINDOW.boonFeatName, [
+    ["category", "epic-boon"],
+    ["summary", "Your mind sharpens past mortal limits."],
+    ["description", "Increase one ability score of your choice by 1, to a maximum of 30."]
+  ]);
+  const edits: Array<readonly [string, unknown]> = [
+    ["kind", "ability-score"],
+    ["choose", 1],
+    ["from", "str, dex, con, int, wis, cha"]
+  ];
+  if (ceiling !== undefined) edits.push(["maximum", ceiling]);
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "name", WINDOW.boonFeatName, ["feature"]);
+  feature = applyField("feat", feature, "description", "Increase one ability score of your choice by 1, to a maximum of 30.", ["feature"]);
+  feature = applyField("feat", feature, "choices", [authoredRow("feat", ["feature", "choices"], edits)], ["feature"]);
+  return { ...shell, feature: { ...feature, id: WINDOW.boonFeatureId } };
+}
+
+/** A merged view carrying one authored feat under `recordId`. */
+const featView = (draft: Draft, recordId: string) => new ContentLibrary({
+  revision: 1,
+  publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", draft, recordId))] }),
+  monsterForInstance: () => undefined
+}).forAudience("gm");
+
+/**
+ * A Halfling Warrior of the Open Hand 19 — the level an Epic Boon arrives at — whose Wisdom is
+ * already 20 when the boon lands.
+ *
+ * The arithmetic is the fixture: Wis 15, +2 at 4, +2 at 8, +1 at 12 = **20**, which is where the
+ * SRD's own ASI clamp stops. Every remaining point goes to Dex, so nothing but the boon can move Wis
+ * one more.
+ */
+const boonMonk = (boonId: string, tagId: string): CharacterCreateRequestInput => ({
+  name: "Shan", speciesId: "halfling", backgroundId: "criminal", classId: "monk", level: 19,
+  subclassId: "warrior-of-the-open-hand", abilityMethod: "standard-array",
+  baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
+  backgroundBonusAllocation: [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
+    { level: 1, classId: "monk", kind: "skill", id: "insight" },
+    { level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" },
+    ...([[4, "wis", "wis"], [8, "wis", "wis"], [12, "wis", "dex"], [16, "dex", "dex"]] as const).flatMap(([at, first, second]) => [
+      { level: at, classId: "monk", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: at, kind: "ability-score", id: first, payload: { featureId: "ability-score-improvement" } },
+      { level: at, kind: "ability-score", id: second, payload: { featureId: "ability-score-improvement" } }
+    ]),
+    // The Epic Boon slot, and the point it spends. `tagId` is the FEATURE's id, which is what the
+    // offer key is built from — the SRD's boons name feat and feature identically.
+    { level: 19, classId: "monk", kind: "feat", id: boonId, payload: { featureId: "epic-boon" } },
+    { level: 19, kind: "ability-score", id: WINDOW.raised, payload: { featureId: tagId } },
+    { level: 1, kind: "equipment", id: "monk-a" },
+    { level: 1, kind: "equipment", id: "criminal-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** A Human Acolyte Fiend-Patron Warlock 11 — the level the first Mystic Arcanum arrives at — whose
+    arcanum is `arcanum`. The SRD's only exact-level pick, and the one carrier of BOTH bounds. */
+const arcanumWarlock = (arcanum: string): CharacterCreateRequestInput => ({
+  ...resilientWarlock(REOPENED.built),
+  level: 11,
+  choices: [
+    ...resilientWarlock(REOPENED.built).choices,
+    { level: 11, kind: "spell", id: arcanum, payload: { featureId: WINDOW.arcanumFeatureId } }
+  ]
+} as CharacterCreateRequestInput);
+
+describe("the spell window and the ASI ceiling — through both paths", () => {
+  it("1. the editor can author all three numbers, and on any block — not only the first", () => {
+    const draft = authoredMystery({ min: WINDOW.authoredFloor });
+    expect(publishVerdict("feat", draft, WINDOW.featId).why).toBe("");
+    const body = storedBody("feat", draft, WINDOW.featId) as { feature: { choice?: Record<string, unknown> } };
+    expect(body.feature.choice).toMatchObject({ kind: "spell", choose: 1, minSpellLevel: WINDOW.authoredFloor });
+
+    // The census's two rows, inverted: both keys resolve from the CLASS form, which is the form the
+    // census asks its questions of, and from a feat's singular container as well.
+    for (const key of ["maxSpellLevel", "minSpellLevel", "maximum"]) {
+      expect(hasControl("class", key), `class.${key}`).toBe(true);
+      expect(hasControl("feat", key, ["feature", "choices"]), `feat: feature > choices > ${key}`).toBe(true);
+      // ...and as the FIRST block's alias, the surface R1 built and U12 kept live.
+      expect(hasControl("feat", `choice.${key}`, ["feature"]), `feat: feature > choice.${key}`).toBe(true);
+    }
+
+    // EVERY BLOCK, not just block 0 — U12's standing requirement for anything added to this panel.
+    // Magic Initiate's own shape: cantrips at 0, the level-1 spell at 1, on one record.
+    const initiate = ((): Draft => {
+      const cantrips = authoredRow("feat", ["feature", "choices"], [["kind", "cantrip"], ["choose", 2], ["from", "guidance, light"], ["maxSpellLevel", 0]]);
+      const spell = authoredRow("feat", ["feature", "choices"], [["kind", "spell"], ["choose", 1], ["from", "bless"], ["maxSpellLevel", 1]]);
+      const shell = authored("feat", "Twin Mysteries", [["category", "origin"], ["summary", "Two mysteries."], ["description", "Two mysteries."]]);
+      let feature = applyField("feat", shell.feature as Draft, "name", "Twin Mysteries", ["feature"]);
+      feature = applyField("feat", feature, "description", "Two mysteries.", ["feature"]);
+      return { ...shell, feature: applyField("feat", feature, "choices", [cantrips, spell], ["feature"]) };
+    })();
+    const plural = storedBody("feat", initiate, WINDOW.featId) as { feature: { choices?: Array<Record<string, unknown>> } };
+    expect(plural.feature.choices?.map((block) => block.maxSpellLevel)).toEqual([0, 1]);
+    // ...and the first-block alias still reaches block 0 of that same plural record, unchanged.
+    expect((applyField("feat", initiate.feature as Draft, "choice.maxSpellLevel", 3, ["feature"]).choices as Array<{ maxSpellLevel?: number }>)
+      .map((block) => block.maxSpellLevel)).toEqual([3, 1]);
+
+    // The window draws for the two kinds whose options carry a level, and for any block already
+    // holding a bound (a duplicated SRD record must never hide its own numbers). The ceiling draws
+    // for the kind its reader filters for. `kind` is an open slug, so these are visibility rules and
+    // never gates: an authored value survives on any kind.
+    const blockField = (key: string) => fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === key)!;
+    for (const key of ["maxSpellLevel", "minSpellLevel"]) {
+      expect(blockField(key).visibleWhen?.({ kind: "spell" }, {}), key).toBe(true);
+      expect(blockField(key).visibleWhen?.({ kind: "cantrip" }, {}), key).toBe(true);
+      expect(blockField(key).visibleWhen?.({ kind: "skill" }, {}), key).toBe(false);
+      expect(blockField(key).visibleWhen?.({ kind: "skill", minSpellLevel: 2 }, {}), key).toBe(true);
+    }
+    expect(blockField("maximum").visibleWhen?.({ kind: "ability-score" }, {})).toBe(true);
+    expect(blockField("maximum").visibleWhen?.({ kind: "spell" }, {})).toBe(false);
+    expect(blockField("maximum").visibleWhen?.({ kind: "spell", maximum: 25 }, {})).toBe(true);
+
+    // The two numbers are ONE window, and the form's own pair can say something no spell satisfies —
+    // so the schema's cross-field refinement is the far end of authoring them together, by name.
+    const upsideDown = publishVerdict("feat", authoredMystery({ min: 6, max: 2 }), WINDOW.featId);
+    expect(upsideDown.publishable).toBe(false);
+    expect(upsideDown.why).toContain("minSpellLevel 6 is above maxSpellLevel 2");
+  });
+
+  it("2. SRD content authors the same shapes — 16 ceilings, 4 floors, 7 epic boons", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const found: Array<{ id: string; kind: string; max?: number; min?: number; maximum?: number; fromCatalog?: string }> = [];
+    // A choice block carries no id of its own, so the nearest enclosing one travels with the walk —
+    // which for every hit here is the FEATURE that owns the pick.
+    const walk = (node: unknown, owner: string) => {
+      if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const held = typeof record.id === "string" ? record.id : owner;
+      if (typeof record.kind === "string" && (record.maxSpellLevel !== undefined || record.minSpellLevel !== undefined || record.maximum !== undefined)) {
+        found.push({
+          id: held, kind: record.kind,
+          max: record.maxSpellLevel as number | undefined, min: record.minSpellLevel as number | undefined,
+          maximum: record.maximum as number | undefined, fromCatalog: record.fromCatalog as string | undefined
+        });
+      }
+      for (const value of Object.values(record)) walk(value, held);
+    };
+    const carriers = <T,>(list: readonly { id: string }[], read: (id: string) => T) => { for (const entry of list) walk(read(entry.id), "?"); };
+    carriers(library.classSummaries(), (id) => library.classRecord(id));
+    carriers(library.subclassSummaries(), (id) => library.subclassRecord(id));
+    carriers(library.featSummaries(), (id) => library.featRecord(id));
+
+    // Measured at the time of writing: 16 ceilings (9 class, 6 feat, 1 subclass), 4 floors — all
+    // four Mystic Arcana, each with its ceiling set to the SAME number, which is what makes the pick
+    // exact — and 7 ceilings on the epic boons.
+    const ceilings = found.filter((entry) => entry.max !== undefined);
+    const floors = found.filter((entry) => entry.min !== undefined);
+    const maxima = found.filter((entry) => entry.maximum !== undefined);
+    expect(ceilings).toHaveLength(16);
+    expect(floors.map((entry) => entry.id).sort()).toEqual([
+      "mystic-arcanum-level-6-spell", "mystic-arcanum-level-7-spell",
+      "mystic-arcanum-level-8-spell", "mystic-arcanum-level-9-spell"
+    ]);
+    expect(floors.every((entry) => entry.min === entry.max)).toBe(true);
+    expect(maxima).toHaveLength(7);
+    expect(maxima.every((entry) => entry.maximum === WINDOW.ceiling && entry.kind === "ability-score")).toBe(true);
+
+    // The measurement the unit's shape rests on, asserted rather than asserted-about: every window
+    // author draws on a spell CATALOG (which is what carries the level the bounds compare against),
+    // and every ceiling author draws on a hand-written list of ability slugs (which is what the
+    // panel's own `from` box writes).
+    expect(ceilings.every((entry) => (entry.fromCatalog ?? "").endsWith("-spells"))).toBe(true);
+    expect(maxima.every((entry) => entry.fromCatalog === undefined)).toBe(true);
+  });
+
+  it("3. one assertion body over both: a pick outside the window is refused, naming the bound it broke", () => {
+    const srdView = new ContentLibrary().forAudience("gm");
+    const editorView = featView(authoredMystery({ min: WINDOW.authoredFloor }), WINDOW.featId);
+    const mysteryRows = [{ kind: "spell", id: "bless" }];
+    const paths: ReadonlyArray<readonly [string, () => unknown, RegExp]> = [
+      // SRD: an eleventh-level Warlock's level-6 arcanum, spent on a level-1 spell.
+      ["SRD content", () => buildCharacterDefinition(arcanumWarlock(WINDOW.belowFloor), srdView, BuilderPolicySchema.parse({})),
+        new RegExp(`"${WINDOW.belowFloor}" is level 1, below the minimum spell level \\(${WINDOW.windowLevel}\\)`)],
+      // The editor: the authored floor, refusing the answer the GM's own list offers.
+      ["the homebrew editor", () => buildCharacterDefinition(initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows), editorView, BuilderPolicySchema.parse({})),
+        new RegExp(`"bless" is level 0, below the minimum spell level \\(${WINDOW.authoredFloor}\\)`)]
+    ];
+    for (const [label, build, message] of paths) {
+      expect(build, label).toThrowError(message);
+    }
+
+    // THE NEGATIVE CONTROL, dropping the VALUE rather than the carrier: the same feat, the same
+    // ledger, no window at all. The spell lands on the sheet — so the refusal above was the floor's
+    // and not the pick's.
+    const open = featView(authoredMystery({}), WINDOW.featId);
+    const sheet = buildCharacterDefinition(initiateInput(WINDOW.featId, WINDOW.featureId, mysteryRows), open, BuilderPolicySchema.parse({}));
+    expect(preparedSpell(sheet, "bless")).toMatchObject({ id: "bless", prepared: true });
+
+    // The SRD's carrier proves the CEILING on the same reader, which the editor's cannot: `hex` broke
+    // the floor above, `power-word-kill` breaks the ceiling, and the level-6 spell the arcanum really
+    // prints lands on the sheet AT level 6. A hand-written list has no levels for either bound to
+    // compare against, which is the measurement in this section's header and the reason the control's
+    // help names the catalog.
+    expect(() => buildCharacterDefinition(arcanumWarlock(WINDOW.aboveCeiling), srdView, BuilderPolicySchema.parse({})))
+      .toThrowError(new RegExp(`"${WINDOW.aboveCeiling}" is level 9, above the maximum spell level \\(${WINDOW.windowLevel}\\)`));
+    const arcanum = preparedSpell(buildCharacterDefinition(arcanumWarlock(WINDOW.inWindow), srdView, BuilderPolicySchema.parse({})), WINDOW.inWindow);
+    expect(arcanum).toMatchObject({ id: WINDOW.inWindow, level: WINDOW.windowLevel });
+  });
+
+  it("4. one assertion body over both: the ceiling carries a 20 to 21, and without it the point is thrown away", () => {
+    const srdView = new ContentLibrary().forAudience("gm");
+    const paths: ReadonlyArray<readonly [string, ActorDefinition]> = [
+      ["SRD content", buildCharacterDefinition(boonMonk(WINDOW.srdBoonId, WINDOW.srdBoonId), srdView, BuilderPolicySchema.parse({}))],
+      ["the homebrew editor", buildCharacterDefinition(
+        boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
+        featView(authoredBoon(WINDOW.ceiling), WINDOW.boonFeatId),
+        BuilderPolicySchema.parse({})
+      )]
+    ];
+    for (const [label, definition] of paths) {
+      // The far end: a score the SRD's own ASI clamp cannot reach. Wisdom is 20 the moment before
+      // the boon lands, and the authored ceiling is what lets the point be spent at all.
+      expect(definition.abilityScores[WINDOW.raised], label).toBe(WINDOW.withCeiling);
+    }
+
+    // THE NEGATIVE CONTROL, and it IS the bug the column was added for: the same boon, the same
+    // sheet, the same spent point — with the ceiling left empty. The clamp falls back to 20 and the
+    // point vanishes in silence, which is precisely what all seven epic boons did for the level-19
+    // character who has one.
+    const uncapped = buildCharacterDefinition(
+      boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
+      featView(authoredBoon(), WINDOW.boonFeatId),
+      BuilderPolicySchema.parse({})
+    );
+    expect(uncapped.abilityScores[WINDOW.raised]).toBe(WINDOW.withoutCeiling);
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -2511,9 +2824,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
       ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"],
-      ["class", "fromPicks", [], "U16 — 3 records"],
-      ["class", "maxSpellLevel", [], "U15 — 16 records; the schema half already ships in full"],
-      ["class", "minSpellLevel", [], "U15 — 4 records, Warlock's Mystic Arcanum"]
+      ["class", "fromPicks", [], "U16 — 3 records"]
     ];
     const stillOwed = owed.filter(([type, key, within]) => !hasControl(type, key, within));
     expect(stillOwed.map(([type, key, within]) => `${type}.${within.length > 0 ? `${within.join(".")}[].` : ""}${key}`))
