@@ -39,7 +39,7 @@
 import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
 import { blankDraft, forStorage } from "./defaults";
 import { setAt } from "./paths";
-import { riderFieldsForTest } from "./RiderEditor";
+import { riderFieldsForTest, type RiderScope } from "./RiderEditor";
 import { EMPTY_CONTEXT, type Draft, type FieldDef, type SchemaContext } from "./schema";
 import { SCHEMAS } from "./schemas";
 import type { HomebrewType } from "./types";
@@ -59,13 +59,19 @@ export const RIDER_EXEMPT: readonly string[] = ["grants"];
 /**
  * At which scope does this record type mount `RiderEditor`, if it mounts one at all?
  *
- * Mirrors `RecordDetail.tsx` — equipment is the only `item` scope, everything else that mounts the
- * component is a `feature` — and is derived from the form data rather than from a second hand-kept
- * list, so a tenth type that grows a rider surface is covered the day it lands. `custom: "features"`
- * counts too: `FeatureEditor` mounts the same `RiderEditor` once per feature, which is why a class's
- * `uses` block is authorable even though the class form itself has no rider field.
+ * Mirrors `RecordDetail.tsx` — equipment is the only `item`, a monster is the only `statblock`,
+ * everything else that mounts the component is a `feature` — and is derived from the form data
+ * rather than from a second hand-kept list, so a tenth type that grows a rider surface is covered
+ * the day it lands. `custom: "features"` counts too: `FeatureEditor` mounts the same `RiderEditor`
+ * once per feature, which is why a class's `uses` block is authorable even though the class form
+ * itself has no rider field.
+ *
+ * **The third value is what the harness was blind to.** While this returned `"feature"` for a
+ * monster, `fieldsOf("monster")` walked the feature-scoped action controls, so `hasControl("monster",
+ * "attack.bonus", ["actions"])` asked its question of the wrong form — and would have kept answering
+ * for a shape no stat block can publish.
  */
-export function riderScopeOf(type: HomebrewType): "feature" | "item" | null {
+export function riderScopeOf(type: HomebrewType): RiderScope | null {
   const customs = new Set<string>();
   const walk = (fields: readonly FieldDef[]) => {
     for (const field of fields) {
@@ -75,7 +81,7 @@ export function riderScopeOf(type: HomebrewType): "feature" | "item" | null {
   };
   for (const section of SCHEMAS[type].sections) walk(section.fields);
   if (!customs.has("riders") && !customs.has("features")) return null;
-  return type === "equipment" ? "item" : "feature";
+  return type === "equipment" ? "item" : type === "monster" ? "statblock" : "feature";
 }
 
 /**

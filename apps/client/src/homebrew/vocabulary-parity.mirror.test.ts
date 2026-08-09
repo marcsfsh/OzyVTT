@@ -24,15 +24,20 @@
  *
  * ## The shape, and what makes it not theatre
  *
- * One fixture — **a saving-throw action that rolls typed damage** — and three tests:
+ * One fixture per row of vocabulary, and three tests over it:
  *
  *   1. the **editor** can author it, through the real controls, to a publishable body;
- *   2. **SRD content** authors the same shape (123 monster actions do);
- *   3. **one assertion body** runs over both and ends at a rolled number and a pending save.
+ *   2. **SRD content** authors the same shape, and it is **not a lone record** — a count is asserted;
+ *   3. **one assertion body** runs over both and ends at an engine outcome.
  *
  * Test 3 is the only one that matters, and 1 and 2 are what stop it being satisfiable by a fixture
  * literal. A far end is mandatory: the bar for every unit in this phase is a rolled number, a spent
  * counter, a refusal or rendered text — never "the value survived into the struct".
+ *
+ * Three rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
+ * monster actions), **a monster's to-hit bonus** (U10 — 423 monster actions, and until that unit the
+ * shape could not be published at all), and **a two-band range** (U11 — 45 records, ending at the
+ * long-range disadvantage die).
  *
  * ## The census, and the standing warning about what it does NOT prove
  *
@@ -243,6 +248,160 @@ describe("a saving-throw action that rolls typed damage — through both paths",
   });
 });
 
+/* ------------------------------ U10: a monster's to-hit bonus, through both paths -- */
+
+/**
+ * The row: `attack.bonus`, the flat printed to-hit a stat block carries.
+ *
+ * It is the sharpest carrier bug the audit found. `actionsField` served three carriers and wrote
+ * `attack.ability` at all of them — the FEATURE shape, where the builder derives the number from the
+ * character's own scores. `ActionSchema.attack` has no `ability` key and REQUIRES `bonus`, so a GM
+ * who filled in "Uses: Strength" on a monster's Scimitar got `actions[].attack.bonus: Required` from
+ * the publish gate, with no control anywhere in the form that could satisfy it. **A monster action
+ * with an attack roll could not be published at all**, while 423 bundled monster actions author the
+ * key.
+ *
+ * The Bandit is the carrier because it is the plainest one in the bundle: +3 to hit, reach 5, one
+ * damage part, and no riders, multiattack or on-hit conditions to confuse the far end.
+ */
+const BANDIT = {
+  monsterId: "bandit",
+  actionId: "scimitar",
+  actionName: "Scimitar",
+  description: "Melee Attack Roll: +3, reach 5 ft. 4 (1d6 + 1) Slashing damage.",
+  bonus: 3,
+  reachFeet: 5,
+  formula: "1d6 + 1",
+  damageType: "slashing",
+  /** The d20, then the d6. Both exact, so the far end is a number and not a range. */
+  attackFace: 15,
+  damageFace: 4,
+  attackTotal: 18,
+  damageTotal: 5,
+  targetAc: 12
+} as const;
+
+function authoredBandit(): Draft {
+  const damagePart = authoredRow("monster", ["actions", "damage"], [
+    ["formula", BANDIT.formula],
+    ["type", BANDIT.damageType]
+  ]);
+  const action = authoredRow("monster", ["actions"], [
+    ["name", BANDIT.actionName],
+    ["activation", "action"],
+    ["description", BANDIT.description],
+    ["damage", [damagePart]],
+    // THE ROW. `authoredRow` throws when a key has no control, so before U10 this line — not an
+    // assertion below it — is what failed, which is the honest place for the failure to be.
+    ["attack.bonus", BANDIT.bonus],
+    ["attack.reachFeet", BANDIT.reachFeet]
+  ]);
+  return authored("monster", "Road Bandit", [
+    ["abilityScores.str", 11], ["abilityScores.dex", 12], ["abilityScores.con", 12],
+    ["abilityScores.int", 10], ["abilityScores.wis", 10], ["abilityScores.cha", 10],
+    ["armorClass", 12],
+    ["hitPoints.maximum", 11],
+    ["proficiencyBonus", 2],
+    ["actions", [{ ...action, id: BANDIT.actionId }]]
+  ]);
+}
+
+const srdBandit = (): ActorDefinition => {
+  const definition = new ContentLibrary().forAudience("gm").monster(BANDIT.monsterId);
+  if (!definition) throw new Error("The SRD bundle no longer ships a Bandit — this fixture needs a new carrier.");
+  return definition;
+};
+
+/** Swing the fixture's melee attack at a dummy and report the roll. No `distanceFeet`, so the range
+    rules stay out of it entirely — this row is about the to-hit number and nothing else. */
+function swing(definition: ActorDefinition) {
+  const state: GameState = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: IDS.caster, name: definition.name, kind: "monster", visibility: "public", hp: { current: 11, maximum: 11 }, armorClass: 12, definitionId: "def-caster" },
+      { id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: BANDIT.targetAc }
+    ]
+  });
+  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+
+  const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === BANDIT.actionId);
+  if (!action) throw new Error(`${definition.name} has no "${BANDIT.actionId}" action.`);
+
+  const queue = [BANDIT.attackFace, BANDIT.damageFace];
+  return resolveDefinitionAction(
+    state,
+    action,
+    { actorId: IDS.caster, targetIds: [IDS.target], commandId: IDS.command },
+    {
+      random: () => {
+        const face = queue.shift();
+        if (face === undefined) throw new Error("dice queue empty");
+        return face;
+      },
+      newRollId: () => IDS.roll,
+      gmSessionId: IDS.gmSession,
+      now: () => "2026-08-08T00:00:00.000Z",
+      definition
+    }
+  );
+}
+
+describe("a monster's to-hit bonus — through both paths", () => {
+  it("1. the editor can author it: `attack.bonus` goes through a real control, and the body publishes", () => {
+    const draft = authoredBandit();
+    const verdict = publishVerdict("monster", draft, RECORD_ID);
+    // Before U10 this read `actions[].attack.bonus: Required` — and no control could answer it.
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("monster", draft, RECORD_ID) as { actions: Array<Record<string, unknown>> };
+    expect(body.actions[0]).toMatchObject({
+      id: BANDIT.actionId,
+      attack: { bonus: BANDIT.bonus, reachFeet: BANDIT.reachFeet }
+    });
+    // The FEATURE key must not ride along. `ActionSchema` would strip `ability` in silence, which is
+    // the failure mode this form exists to avoid — so a stat block is offered `bonus` INSTEAD.
+    expect(hasControl("monster", "attack.ability", ["actions"])).toBe(false);
+    expect(hasControl("equipment", "attack.bonus", ["actions"])).toBe(false);
+    expect(hasControl("equipment", "attack.ability", ["actions"])).toBe(true);
+  });
+
+  it("2. SRD content authors the same shape — and it is not a lone record", () => {
+    expect(srdBandit().actions.find((entry) => entry.id === BANDIT.actionId)).toMatchObject({
+      attack: { bonus: BANDIT.bonus, reachFeet: BANDIT.reachFeet },
+      damage: [{ formula: BANDIT.formula, type: BANDIT.damageType }]
+    });
+
+    // Measured at the time of writing: 423 bundled monster actions carry an attack bonus.
+    const library = new ContentLibrary().forAudience("gm");
+    const carriers = library.monsterSummaries()
+      .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
+      .filter((entry) => entry.attack !== undefined);
+    expect(carriers.length).toBeGreaterThanOrEqual(400);
+  });
+
+  it("3. one assertion body over both: the same d20 total against the same AC", () => {
+    const editorBody = storedBody("monster", authoredBandit(), RECORD_ID);
+    const paths: ReadonlyArray<readonly [string, ActorDefinition]> = [
+      ["SRD content", srdBandit()],
+      ["the homebrew editor", HOMEBREW_BODY_SCHEMAS.monster.parse(editorBody)]
+    ];
+
+    for (const [label, definition] of paths) {
+      const resolution = swing(definition);
+      // The far end: a natural 15 plus the AUTHORED +3 is 18, which beats AC 12, and the hit rolls
+      // its damage. Change the bonus and this number changes — it is the value, not a proxy for it.
+      expect(resolution.attack, label).toMatchObject({
+        naturalRoll: BANDIT.attackFace,
+        total: BANDIT.attackTotal,
+        targetAc: BANDIT.targetAc,
+        outcome: "hit"
+      });
+      expect(resolution.damage, label).toEqual([{ formula: BANDIT.formula, type: BANDIT.damageType, total: BANDIT.damageTotal }]);
+    }
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -352,7 +511,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
       ["equipment", "uses.scaling.id", [], "U7 — `class-resource`, 19 SRD features"],
       ["equipment", "uses.recharge", [], "U8 — `recharge`, 86 monster actions"],
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
-      ["monster", "attack.bonus", ["actions"], "U10 — 423 SRD monster actions; a monster attack cannot be published at all"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
       ["equipment", "modifiers", ["effects"], "U6 — every GM-authored effect is mechanically empty"],
       ["class", "choices", [], "U12 (after R1) — 3 feat records, a hard compile error from twelve class modules"],

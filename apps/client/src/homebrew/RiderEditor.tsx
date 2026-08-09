@@ -44,6 +44,25 @@ import { damagePartsField, diceValidate, grouped, opt, suggestionLabel, type Dra
 
 export type RiderKind = "modifiers" | "grants" | "uses" | "tags" | "actions" | "effects";
 
+/**
+ * WHICH CARRIER is mounting this form — and the third value is a bug fix, not a nicety.
+ *
+ * `RecordDetail.tsx` has always branched THREE ways for `enabled` (equipment / monster / feature)
+ * and then collapsed to TWO for `scope` (`doc.type === "equipment" ? "item" : "feature"`), so a
+ * monster was handed `"feature"`. That mismatch is not cosmetic: a feature's attack is
+ * `FeatureAttackSchema` (`ability`, and the builder derives the number from the character's scores),
+ * a stat block's is `ActionSchema.attack` (`bonus`, a flat printed to-hit, and it is REQUIRED). One
+ * `actionsField` served both and wrote `ability`, so **a monster action with an attack roll could
+ * not be published at all** — the GM filled in "Uses: Strength" and the publish gate answered
+ * `actions[].attack.bonus: Required`. 423 SRD monster actions author `attack.bonus`.
+ *
+ * Three-valued, so the next divergence is a compile error rather than a silent wrong body. An
+ * ITEM's actions are `featureRiders.actions` — the same `FeatureActionSchema` a feature carries — so
+ * `"item"` is feature-shaped wherever the ACTION vocabulary is concerned, and diverges only where
+ * the CARRIER is what differs (which riders an item may hold, what a rest gives back).
+ */
+export type RiderScope = "feature" | "item" | "statblock";
+
 const ABILITIES = [
   opt("str", "Strength"), opt("dex", "Dexterity"), opt("con", "Constitution"),
   opt("int", "Intelligence"), opt("wis", "Wisdom"), opt("cha", "Charisma")
@@ -334,7 +353,7 @@ const ITEM_REFUSED = ["ability-score", "hit-points-per-level"];
 
 const signed = (amount: number) => `${amount >= 0 ? "+" : ""}${amount}`;
 
-const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => ({
+const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
   key: "modifiers",
   label,
   kind: "rows",
@@ -358,6 +377,10 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
       key: "type",
       label: "What it changes",
       kind: "select",
+      // `"statblock"` behaves like `"feature"` here, deliberately: the refusal belongs to the ITEM
+      // carrier — `EquipmentReferenceSchema` is the schema that rejects these two — and a stat block
+      // is not an item. Written as `=== "item"` rather than `!== "feature"` so the reason and the
+      // test are the same sentence.
       options: scope === "item" ? MODIFIER_TYPES.filter((entry) => !ITEM_REFUSED.includes(entry.value)) : MODIFIER_TYPES,
       // The whole row is replaced, so no key from the previous variant survives.
       write: (next, row) => ({ rowId: (row as { rowId?: string }).rowId ?? newId(), ...blankModifier(String(next)) })
@@ -418,10 +441,15 @@ const modifiersField = (label: string, scope: "feature" | "item"): FieldDef => (
   ]
 });
 
-const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
+const usesField = (label: string, scope: RiderScope): FieldDef => ({
   key: "uses",
   label,
   kind: "group",
+  // Only an ITEM has charges. A stat block's action is used a number of times before a rest gives
+  // it back, exactly as a feature's is — so `"statblock"` takes the feature sentence rather than
+  // being handed the item one. (No monster mounts this field today: `RecordDetail` enables only
+  // `["actions", "tags"]` on a stat block. U8 is the unit that changes that, and it will find the
+  // copy already correct.)
   help:
     scope === "item"
       ? "Charges the item spends and gets back on a rest."
@@ -520,14 +548,33 @@ const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
       options: [opt("turn", "Every turn"), opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"), opt("long-rest", "On a long rest")],
       // "Once per day" is the phrase every printed item uses and there is no "day" here
       // on purpose: a long rest already IS this app's day (`legendary.resistancesPerDay`
-      // says so in the schema). Said once, where a GM looking for "day" will read it.
+      // says so in the schema). Said once, where a GM looking for "day" will read it —
+      // which is on an ITEM, so a stat block gets no extra sentence.
       ...(scope === "item" ? { help: "A long rest is this table's day, so “once per day” is “on a long rest”." } : {})
     },
+    // A pool is shared by whatever names it. The item wording names both carriers because an item's
+    // charges can share a feature's pool; a stat block's actions share pools with each other, which
+    // is what the feature sentence already says.
     { key: "uses.pool", label: "Shared pool", help: scope === "item" ? "Items and features sharing a pool share one counter." : "Features sharing a pool share one counter.", placeholder: "channel-divinity" }
   ]
 });
 
-const actionsField = (): FieldDef => ({
+/**
+ * The to-hit half of an attack, which is the ONE place the three carriers genuinely disagree.
+ *
+ * A feature and an item both author `FeatureAttackSchema` — they name the ABILITY and the builder
+ * resolves the number from the character's own scores, because a class feature cannot know them. A
+ * stat block authors `ActionSchema.attack`, whose `bonus` is a flat printed integer and is
+ * **required**; there is no `ability` key for it to fall back on, and Zod would strip one silently.
+ * So this is `instead of`, not `alongside`: offering both would let a GM fill in a box whose value
+ * is dropped on the way to the store, which is the exact failure this form exists to avoid.
+ */
+const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
+  scope === "statblock"
+    ? [{ key: "attack.bonus", label: "To hit", kind: "number", allowNegative: true, min: -5, max: 20, help: "The flat bonus the stat block prints — the +9 in “+9 to hit”." }]
+    : [{ key: "attack.ability", label: "Uses", kind: "select", options: [...ABILITIES, opt("spellcasting", "Spellcasting ability")] }];
+
+const actionsField = (scope: RiderScope): FieldDef => ({
   key: "actions",
   label: "Actions",
   kind: "rows",
@@ -549,7 +596,7 @@ const actionsField = (): FieldDef => ({
       label: "Attack roll",
       kind: "group",
       rows: [
-        { key: "attack.ability", label: "Uses", kind: "select", options: [...ABILITIES, opt("spellcasting", "Spellcasting ability")] },
+        ...toHitFields(scope),
         { key: "attack.reachFeet", label: "Reach", kind: "number", min: 1, max: 120, unit: "ft" },
         { key: "attack.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft" }
       ]
@@ -652,7 +699,7 @@ function GrantsEditor({
   onChange,
   ctx,
   scope
-}: Readonly<{ value: Draft; onChange: (next: Draft) => void; ctx: SchemaContext; scope: "feature" | "item" }>) {
+}: Readonly<{ value: Draft; onChange: (next: Draft) => void; ctx: SchemaContext; scope: RiderScope }>) {
   const grants = (value.grants ?? {}) as Record<string, unknown>;
 
   const rows = useMemo<readonly GrantRow[]>(
@@ -680,6 +727,9 @@ function GrantsEditor({
           authored shape, two lifecycles, because the two carriers have two lifecycles. */}
       <p className="nh-field-help">
         Proficiencies and languages this hands out for free.
+        {/* The extra sentence is the ITEM's lifecycle — layered on while equipped, removed when it
+            comes off. A stat block's grants are simply part of the creature, like a feature's, so
+            there is nothing extra to say and nothing is said. */}
         {scope === "item" ? " They come back off the sheet when the item comes off." : ""}
       </p>
       <RowEditor
@@ -789,13 +839,14 @@ export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", 
  * `FieldDef` to export. It stays on the harness's exemption list WITH that reason (U9 closes it by
  * making the eleventh grant kind — `spells` — editable at all).
  */
-export function riderFieldsForTest(scope: "feature" | "item"): readonly FieldDef[] {
+export function riderFieldsForTest(scope: RiderScope): readonly FieldDef[] {
   return [
     whenField(),
     modifiersField("What it does", scope),
+    // "Charges" is an item's word for it; a stat block's action has uses, like a feature's.
     usesField(scope === "item" ? "Charges" : "Limited uses", scope),
     tagsField("Tags"),
-    actionsField(),
+    actionsField(scope),
     effectsField()
   ];
 }
@@ -820,7 +871,7 @@ export function RiderEditor({
   value: Draft;
   onChange: (next: Draft) => void;
   enabled?: readonly RiderKind[];
-  scope: "feature" | "item";
+  scope: RiderScope;
   labels?: Partial<Record<RiderKind, string>>;
   ctx: SchemaContext;
   idPrefix: string;
@@ -832,7 +883,7 @@ export function RiderEditor({
     if (enabled.includes("modifiers")) list.push(modifiersField(label("modifiers", "Modifiers"), scope));
     if (enabled.includes("uses")) list.push(usesField(label("uses", scope === "item" ? "Charges" : "Limited uses"), scope));
     if (enabled.includes("tags")) list.push(tagsField(label("tags", "Tags")));
-    if (enabled.includes("actions")) list.push(actionsField());
+    if (enabled.includes("actions")) list.push(actionsField(scope));
     if (enabled.includes("effects")) list.push(effectsField());
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -840,13 +891,18 @@ export function RiderEditor({
 
   return (
     <div className="hb-riders">
-      {/* The one sentence that carries the mental model, derived and stated ONCE. */}
+      {/* The one sentence that carries the mental model, derived and stated ONCE — and it needed
+          the third carrier as much as the attack control did. A monster editing its own Bite was
+          being told "These apply as soon as the feature is granted", which names a thing a stat
+          block does not have. */}
       <p className="hb-riders-when">
         {scope === "item"
           ? (value.attunement as { required?: boolean } | undefined)?.required === true
             ? "These apply while the item is equipped and attuned."
             : "These apply while the item is equipped."
-          : "These apply as soon as the feature is granted."}
+          : scope === "statblock"
+            ? "These are the creature's own — always available to it."
+            : "These apply as soon as the feature is granted."}
       </p>
 
       {/* What the SHEET will show, derived live from the four inputs above it. A GM
