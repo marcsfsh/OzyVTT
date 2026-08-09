@@ -119,15 +119,20 @@ unreachable. **This is the family that started this area** — see the cheap bat
 | `uses.scaling: proficiency-bonus` | `:71` | `character-build.ts:325` | 20 | `RiderEditor.tsx:431` | `parity` |
 | `uses.scaling: ability-modifier` | `:72` | `character-build.ts:326` | 7 | `RiderEditor.tsx:472`, `:473` | `parity` |
 | `uses.scaling: by-level` | `:73` | `character-build.ts:334` | 4 | `RiderEditor.tsx:475` | `parity` |
-| **`uses.scaling: class-resource`** | `:84` | `character-build.ts:327`–`:332` | **19** | **none** — the `mode` select at `RiderEditor.tsx:431` offers four scalings, not five | `SRD-only` |
+| `uses.scaling: class-resource` | `:84` | `character-build.ts:327`–`:332` | **19** | `RiderEditor.tsx` `usesField` — the fifth `mode` option + `uses.scaling.id`, **feature scope only** (U7) | `parity` |
 | `uses.per` | `:86` | `rests.ts:77`; `apps/server/src/encounter.ts:24` | 92 | `RiderEditor.tsx:490` | `parity` |
 | `uses.pool` | `:87` | `effective-actions.ts:113`, `:154`; `rests.ts:78`; `apps/server/src/action-resolution.ts:177` | 40 | `RiderEditor.tsx:499` | `parity` |
 | `ActionUses` on an action (monster) | `packages/schemas/src/index.ts:618` | `action-resolution.ts:236` | 114 | **none** — the monster mounts only `["actions","tags"]` (`RecordDetail.tsx:231`) and `actionsField` has no uses row | `SRD-only` |
 | `ActionUses.per: "recharge"` + `recharge` | `packages/schemas/src/index.ts:579` | `rests.ts:77`; `encounter.ts:24` | 86 | **none** — `uses.per` offers four options, no `recharge` | `SRD-only` |
 
-`class-resource` is the single highest-count gap in this family: 19 SRD features read the printed
-class column for their use count (Rage, Bardic Inspiration, Channel Divinity), and a homebrew class
-cannot say it — it has to duplicate its own printed table into a `by-level` list beside the table.
+`class-resource` was the single highest-count gap in this family: 19 SRD features read the printed
+class column for their use count (Rage, Wild Shape, Channel Divinity, the eight Metamagics), and a
+homebrew class could not say it — it had to duplicate its own printed table into a `by-level` list
+beside the table. **U7 closed it at FEATURE scope, and the scope is a measurement.** `scaledLimit`
+(`equipment-derivation.ts`) answers `undefined` for `class-resource` in writing — a built definition
+no longer carries a class table — so an item authored this way would grant no charges however the GM
+filled it in. The row this audit filed under `equipment` is authored 19 times by class and subclass
+features and 0 times by items, and the one carrier it named is the one carrier that cannot read it.
 
 ---
 
@@ -409,7 +414,7 @@ added to an existing declarative field list. No schema change, no server change,
 | `EffectGrant.target` | `effectsField` | `kind: "select"` — self / the target |
 | `EffectGrant.endsWithTag` | `effectsField` | `kind: "text"` |
 | `EffectGrant.voidWhileIncapacitated` | `effectsField` | `kind: "switch"` |
-| **`uses.scaling: class-resource`** | the `mode` select at `RiderEditor.tsx:428` + one `uses.scaling.id` text row | a fifth option and one sibling field |
+| `uses.scaling: class-resource` — **U7, landed** | the `mode` select in `usesField` + one `uses.scaling.id` text row | a fifth option and one sibling field. Shipped as written, with one correction: **feature scope only.** An item's `class-resource` resolves to `undefined` in `scaledLimit`, so the option and the row are both absent at item scope rather than offered and inert |
 | `grants.spells` — **U9, landed** | `GRANT_KINDS` (`RiderEditor.tsx`) | an eleventh kind whose "Which" is the spell picker, not a `TagInput`. Shipped as written. **What it did NOT do:** retire `grants` from `RIDER_EXEMPT`. The exemption is about the LOOKUP, and all eleven kinds are still bespoke JSX with no `FieldDef` — U9 made the eleventh *editable*, not *declarative*, so retiring it means converting `GrantsEditor`, which is a refactor with no vocabulary of its own |
 | `attack.rangeNormalFeet` · `attack.count` · `attack.criticalBonusDice` | `actionsField`'s attack group (`RiderEditor.tsx:521`) | three `kind: "number"` rows |
 

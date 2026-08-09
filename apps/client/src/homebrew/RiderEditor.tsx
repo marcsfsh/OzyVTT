@@ -473,7 +473,23 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
       key: "mode",
       label: "Uses are",
       kind: "select",
-      options: [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level")],
+      /**
+       * **The fifth option is a FEATURE's, and the omission elsewhere is a refusal.**
+       *
+       * `class-resource` reads the count off the class table's own printed column at this
+       * character's level, which is why Rage 2 → 3 → 4 needs no `by-level` table beside the table
+       * it would be copying. 19 SRD features stand on it (16 class, 3 subclass).
+       *
+       * An ITEM is not offered it because it can never resolve: `scaledLimit` in
+       * `equipment-derivation.ts` answers `undefined` for `class-resource` **in writing** — a built
+       * definition no longer carries a class table, the builder having already flattened it — so an
+       * item authored this way would grant no charges no matter what a GM typed. Offering it there
+       * would be a box that stores a value the fight can never read, which is the one thing this
+       * form exists not to do.
+       */
+      options: scope === "feature"
+        ? [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level"), opt("class-resource", "A column on the class table")]
+        : [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level")],
       // `mode` is NOT stored — it is read back out of the shape, so there is no second
       // place the answer lives and nothing to keep in sync.
       //
@@ -485,11 +501,11 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
       // saving correctly the whole time; only the readback was missing. Not a controlled
       // input, not `defaults.ts`, not `useAutosave.ts`.
       //
-      // The three literals below are the schema's own (`FeatureUsesSchema.scaling`'s
+      // The four literals below are the schema's own (`FeatureUsesSchema.scaling`'s
       // discriminator) and are byte-identical to the option values above, so there is no
-      // mapping table to drift. `class-resource` is the fourth discriminator and has no
-      // option yet — it reads back as "Not set" until U7 adds one, which is honest and is
-      // what U7's own test changes.
+      // mapping table to drift. All four now have an option at feature scope; an item sees the
+      // first three plus `flat`, and a body imported with a `class-resource` scaling reads back as
+      // "Not set" there — which is the truth about a shape that carrier cannot resolve.
       read: (scope_) => {
         const uses = scope_.uses as { limit?: unknown; scaling?: { type?: string } } | undefined;
         if (!uses) return undefined;
@@ -506,6 +522,12 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
         } else if (next === "by-level") {
           delete uses.limit;
           uses.scaling = { type: "by-level", table: [{ level: 1, limit: 1 }] };
+        } else if (next === "class-resource") {
+          delete uses.limit;
+          // Seeded EMPTY rather than with a guess: "rage" would silently point a homebrew feature
+          // at the Barbarian's column, and `ContentIdSchema` refuses `""`, so the publish checklist
+          // names the field until the GM fills it. Same discipline as `resource-bonus`'s `poolId`.
+          uses.scaling = { type: "class-resource", id: "" };
         } else {
           delete uses.limit;
           uses.scaling = { type: "proficiency-bonus" };
@@ -535,6 +557,23 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
     },
     { key: "uses.scaling.ability", label: "Which ability", kind: "select", options: ABILITIES, visibleWhen: (scope_) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier" },
     { key: "uses.scaling.minimum", label: "At least", kind: "number", min: 0, max: 5, visibleWhen: (scope_) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "ability-modifier" },
+    // The `classResources` id off the level table — "rage", "channel-divinity", "sorcery-points".
+    // A slug typed one character wrong resolves to 0 uses and the feature silently carries none,
+    // which is why the id is checked while typing rather than at publish.
+    //
+    // ABSENT at the other scopes rather than merely hidden: the mode select offers no
+    // `class-resource` option there, so the row could never become visible — and a field the census
+    // can see is a claim that a GM can reach the key, which at item scope would be false.
+    ...(scope === "feature"
+      ? [{
+        key: "uses.scaling.id",
+        label: "Which column",
+        placeholder: "rage",
+        validate: slugValidate,
+        help: "The column's id on the class's level table — the count is read from it at the character's own level.",
+        visibleWhen: (scope_: Draft) => (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "class-resource"
+      }]
+      : []),
     {
       key: "uses.scaling.table",
       label: "By level",

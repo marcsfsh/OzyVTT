@@ -34,13 +34,15 @@
  * literal. A far end is mandatory: the bar for every unit in this phase is a rolled number, a spent
  * counter, a refusal or rendered text — never "the value survived into the struct".
  *
- * Four rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
+ * Six rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
  * monster actions), **a monster's to-hit bonus** (U10 — 423 monster actions, and until that unit the
  * shape could not be published at all), **a two-band range** (U11 — 45 records, ending at the
  * long-range disadvantage die), **what an effect DOES** (U6 — and it is the one that crosses
  * carriers: the editor half authors an ITEM's effect, the SRD half reads a FEATURE's, and the two
- * reach the same kept die down two entirely different roads), and **an always-prepared spell grant**
- * (U9 — 41 records, ending at a row on the character's own spell list).
+ * reach the same kept die down two entirely different roads), **an always-prepared spell grant**
+ * (U9 — 41 records, ending at a row on the character's own spell list), and **uses read off the
+ * class table's own column** (U7 — 19 records, ending at a count that moves 2 → 3 with the level
+ * while the authored line never changes).
  *
  * ## The census, and the standing warning about what it does NOT prove
  *
@@ -48,10 +50,11 @@
  * editor cannot author today. It is asserted as an EXACT set, so the unit that closes a row deletes
  * its line here in the same commit.
  *
- * **A key existing is not parity.** `uses.scaling.type` has a control (the "Uses are" select writes
- * it) and `class-resource` is still unauthorable, because the select has no such OPTION. Key
- * existence is what the census can see; value round-tripping is what tests 1–3 see. Both halves are
- * needed and neither substitutes for the other — that is the audit's §N3 finding restated as code.
+ * **A key existing is not parity, and U7 is the worked example.** `uses.scaling.type` had a control
+ * — the "Uses are" select wrote it — while `class-resource` stayed unauthorable, because that
+ * select had no such OPTION. No census over keys could have seen it. Key existence is what the
+ * census can see; value round-tripping is what tests 1–3 see. Both halves are needed and neither
+ * substitutes for the other — that is the audit's §N3 finding restated as code.
  */
 
 import { describe, expect, it } from "vitest";
@@ -66,12 +69,19 @@ import { effectiveActions } from "../../../server/src/effective-actions.js";
 import { equipmentCatalogOf } from "../../../server/src/equipment-derivation.js";
 import { startEncounter } from "../../../server/src/encounter.js";
 import {
-  applyField, authored, authoredRow, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
+  applyField, authored, authoredRow, fieldsWithin, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
 } from "./authoring-harness";
 import { grantRowsOf, grantsFromRows } from "./RiderEditor";
+import { EMPTY_CONTEXT } from "./schema";
 import { SCHEMAS } from "./schemas";
-import type { Draft } from "./schema";
+import type { Draft, FieldDef } from "./schema";
 import type { HomebrewType } from "./types";
+
+/** The values a `select` offers, whether its list is a literal or a function of the context. An
+    option MISSING is what "the key exists and the value is still unauthorable" looks like — the
+    census sees keys, and this is the other half of that sentence. */
+const optionValues = (field: FieldDef | undefined): readonly string[] =>
+  (typeof field?.options === "function" ? field.options(EMPTY_CONTEXT, {}) : field?.options ?? []).map((option) => option.value);
 
 const IDS = {
   caster: "10000000-0000-4000-8000-000000000101",
@@ -960,6 +970,194 @@ describe("an always-prepared spell grant — through both paths", () => {
   });
 });
 
+/* ---------- U7: `uses.scaling: class-resource` — the class table's own column ----- */
+
+/**
+ * The row: `FeatureUsesSchema.scaling` variant `class-resource` — *"you can Rage the number of
+ * times shown in the Rages column of the Barbarian Features table."*
+ *
+ * It is the highest-count single gap in the `uses` family and the schema half has shipped all
+ * along: `character-content.ts` declares the fourth discriminator, `character-build.ts`'s
+ * `resolvedUseLimit` reads the printed column off `classResources` at the character's own level,
+ * and **19 SRD features stand on it** — 16 class features and 3 subclass features. The select that
+ * writes `uses.scaling.type` simply had no such option, so the one thing a homebrew class most
+ * needs to say was the one thing it could not: without it a GM must re-type the printed column into
+ * a `by-level` list sitting beside the printed column it copies, which is the second copy that
+ * drifts.
+ *
+ * **The far end is a count that MOVES with the level, from one authored record.** Rage prints 2 at
+ * level 1 and 3 at level 3, and neither number is anywhere in the feature — the feature names a
+ * column. A test at one level would pass on a hard-coded 3.
+ *
+ * **The control is offered at FEATURE scope only, and that is a measurement rather than a
+ * shortcut.** `scaledLimit` in `equipment-derivation.ts` answers `undefined` for `class-resource`
+ * in writing — a built definition no longer carries a class table — so an item authored this way
+ * grants no charges however the GM fills it in. The census row this unit deletes named `equipment`;
+ * the 19 authors are class and subclass features, and the carrier the census named is the one
+ * carrier that can never read it.
+ */
+const RAGES = {
+  classId: "barbarian",
+  featureId: "rage",
+  resourceId: "rage",
+  /** The Rages column, straight off `classes.v1.json`: 2 at levels 1-2, 3 at level 3. */
+  atLevel1: 2,
+  atLevel3: 3,
+  featId: "hb-bottled-fury-a1b2",
+  featName: "Bottled Fury",
+  /** A column the BARBARIAN's table does not print — the Sorcerer's. The negative control. */
+  wrongResourceId: "sorcery-points"
+} as const;
+
+/** The feat a GM builds in `/homebrew`, through the real controls: `RiderEditor` is mounted by
+    `FeatureEditor` with the FEATURE itself as its value, so the `uses` block is written against the
+    feature draft exactly the way the form writes it. `applyField` throws when a key has no control,
+    so before U7 the `uses.scaling.id` line — not an assertion below it — is what failed. */
+function authoredFuryFeat(resourceId: string): Draft {
+  const shell = authored("feat", RAGES.featName, [
+    ["category", "origin"],
+    ["summary", "Fury you can keep in a bottle."],
+    ["description", "You can bottle your fury as often as you can Rage."]
+  ]);
+  // Addressed INSIDE the `uses` group, and it has to be: `usesField`'s "Uses are" and
+  // `modifiersField`'s "Which way" are both keyed `mode`, and the flat `fieldsOf` lookup finds the
+  // modifier's first — which has no `write`, so it would `setAt` a literal `mode` key on the
+  // feature and the publish gate would answer `Unrecognized key(s): 'mode'`. That is the same false
+  // pass `fieldsWithin` exists for, met on a GROUP rather than a row.
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "mode", "class-resource", ["uses"]);
+  feature = applyField("feat", feature, "uses.scaling.id", resourceId, ["uses"]);
+  feature = applyField("feat", feature, "uses.per", "long-rest", ["uses"]);
+  // Name and description are plain boxes on `FeatureEditor`, which has zero `FieldDef`s and is
+  // invisible to the harness — R1's whole subject. Set here rather than pretended about.
+  return { ...shell, feature: { ...feature, name: RAGES.featName, description: "You can bottle your fury as often as you can Rage." } };
+}
+
+const furyFeatureId = (draft: Draft) => String((draft.feature as { id?: unknown }).id ?? "");
+
+/** A Human Barbarian at the level asked for. Human because its Versatile trait is the origin-feat
+    slot the homebrew feat is taken in; Berserker at 3 because every 2024 class picks a subclass
+    there. Built by the REAL builder against the REAL bundles. */
+const barbarianInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput => ({
+  name: "Ozar", speciesId: "human", backgroundId: "soldier", classId: "barbarian", level,
+  ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "barbarian", kind: "skill", id: "perception" },
+    { level: 1, classId: "barbarian", kind: "skill", id: "survival" },
+    // Primal Knowledge (level 3) raises `class-skills` 2 -> 3.
+    ...(level >= 3 ? [{ level: 3, classId: "barbarian", kind: "skill", id: "nature" }] : []),
+    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "greataxe" },
+    { level: 1, classId: "barbarian", kind: "weapon-mastery", id: "handaxe" },
+    ...(level >= 3 ? [{ level: 3, classId: "barbarian", kind: "subclass", id: "path-of-the-berserker" }] : []),
+    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+    ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : []),
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "barbarian-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** The sheet, with the authored feat merged in through a real homebrew slice — the same merge a
+    published record takes. */
+function barbarianSheet(level: 1 | 3, feat?: Draft): ActorDefinition {
+  const homebrew: HomebrewContentSource | undefined = feat
+    ? {
+      revision: 1,
+      publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, RAGES.featId))] }),
+      monsterForInstance: () => undefined
+    }
+    : undefined;
+  return buildCharacterDefinition(
+    barbarianInput(level, feat ? RAGES.featId : undefined),
+    new ContentLibrary(homebrew).forAudience("gm"),
+    BuilderPolicySchema.parse({})
+  );
+}
+
+/** THE assertion body: how many uses did the builder resolve for this action? */
+const useLimit = (definition: ActorDefinition, actionId: string) =>
+  definition.actions.find((entry) => entry.id === actionId)?.uses?.limit;
+
+describe("uses read off the class table's own column — through both paths", () => {
+  it("1. the editor can author it: the fifth mode and its column id go through real controls, and the feat publishes", () => {
+    const draft = authoredFuryFeat(RAGES.resourceId);
+    const verdict = publishVerdict("feat", draft, RAGES.featId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("feat", draft, RAGES.featId) as { feature: { uses?: unknown } };
+    expect(body.feature.uses).toEqual({ scaling: { type: "class-resource", id: RAGES.resourceId }, per: "long-rest" });
+
+    // The mode select reads its own answer back out of the shape, so re-opening the record shows
+    // "A column on the class table" rather than "Not set" — `3b`(a)'s repair, on the fifth option.
+    const mode = fieldsWithin("feat", ["uses"]).find((field) => field.key === "mode");
+    expect(mode?.read?.(draft.feature as Draft)).toBe("class-resource");
+    expect(optionValues(mode)).toContain("class-resource");
+
+    // ...and an ITEM is not offered it, because `scaledLimit` can never resolve it there. The key
+    // exists at item scope (the other three scalings share it); the OPTION does not.
+    expect(hasControl("equipment", "uses.scaling.id")).toBe(false);
+    expect(optionValues(fieldsWithin("equipment", ["uses"]).find((field) => field.key === "mode"))).not.toContain("class-resource");
+  });
+
+  it("2. SRD content authors the same shape — and it is 19 records, not a lone one", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const rage = library.classRecord(RAGES.classId)?.features.find((entry) => entry.id === RAGES.featureId);
+    expect(rage?.uses).toEqual({ scaling: { type: "class-resource", id: RAGES.resourceId }, per: "long-rest" });
+
+    const carriers: string[] = [];
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const uses = record.uses as { scaling?: { type?: string } } | undefined;
+      if (uses?.scaling?.type === "class-resource") carriers.push(String(record.id ?? "?"));
+      for (const value of Object.values(record)) walk(value);
+    };
+    for (const summary of library.classSummaries()) walk(library.classRecord(summary.id));
+    for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
+
+    // Measured at the time of writing: 19 — 16 in `classes.v1.json`, 3 in `subclasses.v1.json`.
+    // Four of them are named, so the fixture below cannot drift silently away from the bundle.
+    expect(carriers.length).toBeGreaterThanOrEqual(15);
+    for (const id of ["rage", "wild-shape", "channel-divinity", "font-of-magic"]) expect(carriers).toContain(id);
+  });
+
+  it("3. one assertion body over both: the count is the printed column, and it moves with the level", () => {
+    const feat = authoredFuryFeat(RAGES.resourceId);
+    const bottled = furyFeatureId(feat);
+    const paths: ReadonlyArray<readonly [string, string]> = [
+      ["SRD content", RAGES.featureId],
+      ["the homebrew editor", bottled]
+    ];
+
+    const level1 = barbarianSheet(1, feat);
+    const level3 = barbarianSheet(3, feat);
+    for (const [label, actionId] of paths) {
+      // The far end: a use count neither record states. 2 at level 1, 3 at level 3, off the same
+      // authored line — which is what a `by-level` table beside the printed table would have had to
+      // restate, and what an option-less select made unsayable.
+      expect(useLimit(level1, actionId), label).toBe(RAGES.atLevel1);
+      expect(useLimit(level3, actionId), label).toBe(RAGES.atLevel3);
+    }
+
+    // THE NEGATIVE CONTROL, and it drops the VALUE rather than the carrier: the same Barbarian
+    // taking the same feat, whose only difference is that the column named is the SORCERER's. An
+    // unmatched column resolves to 0 uses, so the feature carries no pool at all — while Rage,
+    // reading a column this table really prints, still says 3.
+    const wrongFeat = authoredFuryFeat(RAGES.wrongResourceId);
+    const wrong = barbarianSheet(3, wrongFeat);
+    expect(useLimit(wrong, RAGES.featureId)).toBe(RAGES.atLevel3);
+    expect(wrong.actions.find((entry) => entry.id === furyFeatureId(wrongFeat))).toBeUndefined();
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -1061,13 +1259,13 @@ describe("the guard itself refuses what the editor cannot author", () => {
      * unit that ships the control deletes its line here in the same commit, and a control that
      * appears without a unit fails this test on the way in.
      *
-     * Read with the standing warning in the header: this sees KEYS. `uses.scaling.type` is absent
-     * from the list because the "Uses are" select writes it — and `class-resource` is still
-     * unauthorable, because that select has no such option. U7's test is what catches that.
+     * Read with the standing warning in the header: this sees KEYS, and a key can be reachable
+     * while a VALUE of it is not. `uses.scaling.type` was never on this list — the "Uses are"
+     * select always wrote it — and `class-resource` was unauthorable all the same, for want of an
+     * option. U7's own test is what caught that, and no row here could have.
      */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
-      ["equipment", "uses.scaling.id", [], "U7 — `class-resource`, 19 SRD features"],
       ["equipment", "uses.recharge", [], "U8 — `recharge`, 86 monster actions"],
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
