@@ -100,6 +100,10 @@ const CHOICE_KINDS = [
   "skill", "tool", "language", "skill-or-tool", "expertise", "ability-score", "weapon-mastery"
 ];
 
+/** The four ways a choice states its list — one UI mode over three stored keys plus the
+    ledger source. Held in React state, never in the draft; see the note by `featureFields`. */
+type SourceMode = "catalog" | "list" | "options" | "picks";
+
 type CatalogFamily = "" | "subclasses" | "feats" | "spells" | "lineages" | "skills" | "weapons";
 
 const FAMILY_OPTIONS: ReadonlyArray<{ value: CatalogFamily; label: string }> = [
@@ -214,6 +218,52 @@ const offerValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "" || /^[a-z0-9-]+(:[a-z0-9-]+)?$/.test(text)) return null;
   return "Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.";
+};
+
+/**
+ * THE OPTIONS ARE THE CHARACTER'S OWN EARLIER ANSWERS — `fromPicks`, and it is the FOURTH
+ * source, not a modifier of the other three.
+ *
+ * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast), "…that
+ * has a range of 10+ feet" (Eldritch Spear), "…that requires an attack roll" (Repelling
+ * Blast). The list is the LEDGER, narrowed by a closed predicate, which is why no
+ * `fromCatalog` slug can express it: `offer` names the budget holding those answers in the
+ * same key namespace `extraPicks` and `replaces` use, and `where` is a three-value enum
+ * (ADR-0008 — a closed slug list, never an expression), each member a field the spell
+ * catalog already carries.
+ *
+ * **Exclusive with the other three, and the write is what makes that true.** The reader's
+ * chain (`character-build.ts` `featurePickOffer`) tests `fromPicks` FIRST and only then
+ * `from`/`fromCatalog`/`options`, so a block carrying `fromPicks` beside any of them
+ * SILENTLY ignores the other — the schema permits the pair and the engine answers with one
+ * of them. Every write below therefore deletes the other three, the source switch clears
+ * all four ways round, and `from`/`options` clear `fromPicks` in return. The misleading
+ * shape is unauthorable rather than merely caught, which is the standard the recharge pair
+ * and the `choice`/`choices` spelling are already held to.
+ */
+const writeFromPicks = (block: Draft, leaf: "offer" | "where", next: unknown): Draft => {
+  const held = block.fromPicks && typeof block.fromPicks === "object" && !Array.isArray(block.fromPicks)
+    ? (block.fromPicks as Record<string, unknown>)
+    : {};
+  const text = typeof next === "string" ? next.trim() : "";
+  const merged: Record<string, unknown> = { ...held };
+  if (text) merged[leaf] = text;
+  else delete merged[leaf];
+  const out: Record<string, unknown> = { ...block };
+  delete out.from;
+  delete out.fromCatalog;
+  delete out.options;
+  if (Object.keys(merged).length === 0) delete out.fromPicks;
+  else out.fromPicks = merged;
+  return out;
+};
+
+/** Drop `fromPicks` when another source is written, so the exclusivity holds in both
+    directions rather than only away from the ledger. */
+const withoutPicks = (block: Draft, changes: Readonly<Record<string, unknown>>): Draft => {
+  const out: Record<string, unknown> = { ...block, ...changes };
+  delete out.fromPicks;
+  return out;
 };
 
 /** Every feature this record declares, whichever key its type stores them under. */
@@ -532,13 +582,58 @@ function choiceBlockFields(): readonly FieldDef[] {
         const from = block.from;
         return (Array.isArray(from) ? from : []).map(String).join(", ");
       },
-      write: (next, block) => ({
-        ...block,
+      write: (next, block) => withoutPicks(block, {
         from: String(next ?? "")
           .split(",")
           .map((entry) => asChoiceSlug(entry.trim()))
           .filter(Boolean)
       })
+    },
+    {
+      /**
+       * THE FOURTH SOURCE — the options are the character's own earlier answers. See
+       * `writeFromPicks` for the exclusivity ruling this pair is written under.
+       *
+       * A `group` rather than two loose keys because the two halves are ONE clause: the
+       * budget alone is a complete source ("any cantrip you know"), the predicate alone
+       * names nothing, and the fieldset is what says so on a phone without a sentence of
+       * help per box. `fieldsWithin` flattens groups, so `fromPicks`, `fromPicks.offer`
+       * and `fromPicks.where` are all addressable at the block's own scope.
+       */
+      key: "fromPicks",
+      label: "Which earlier pick",
+      kind: "group",
+      help: "The player picks from answers they already gave. Nothing eligible chosen yet defers the pick rather than showing an empty list.",
+      visibleWhen: (block) => Boolean(block.fromPicks),
+      rows: [
+        {
+          key: "fromPicks.offer",
+          label: "Answers to",
+          placeholder: "class-cantrips",
+          // The same open box `extraPicks` and `replaces` use, and for the same reason: the
+          // eight named budgets are closed but `feature:<id>` is open over this record's own
+          // features, and one shared namespace must not grow a second, narrower list.
+          help: "A named budget, or feature:<id> for one of this record's own features.",
+          suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+          validate: offerValidate,
+          write: (next, block) => writeFromPicks(block, "offer", next)
+        },
+        {
+          key: "fromPicks.where",
+          label: "Narrowed to",
+          kind: "select",
+          // CLOSED, unlike every other slug box in this panel — `where` is a three-value
+          // enum in the schema and each member is a spell fact the resolver reads by name,
+          // so a homebrew word here would match nothing rather than invent something.
+          options: [
+            { value: "deals-damage", label: "Ones that deal damage" },
+            { value: "attack-roll", label: "Ones that need an attack roll" },
+            { value: "ranged", label: "Ones with a range of 10 ft or more" }
+          ],
+          help: "Leave unset to offer every answer to that pick. All three read the spell catalog, so they narrow spell picks only.",
+          write: (next, block) => writeFromPicks(block, "where", next)
+        }
+      ]
     },
     {
       /**
@@ -561,7 +656,7 @@ function choiceBlockFields(): readonly FieldDef[] {
       rowKey: (row) => String((row as { id?: unknown }).id ?? ""),
       newRow: () => ({ id: newId(), name: "", description: "" }),
       rowLabel: (row) => String((row as { name?: unknown }).name || "Unnamed option"),
-      write: (next, block) => ({ ...block, options: next }),
+      write: (next, block) => withoutPicks(block, { options: next }),
       rows: [
         { key: "name", label: "Name" },
         { key: "description", label: "Description", kind: "textarea", wide: true },
@@ -590,10 +685,19 @@ function choiceBlockFields(): readonly FieldDef[] {
  * spells it), and retiring them would strand every existing test on the panel. They are
  * ALIASES, not a second surface: read and write both go through the same block helpers
  * the rendered per-block controls use, so the two cannot drift.
+ *
+ * **A `group`'s children are re-aliased too, and that is a correctness rule rather than a
+ * convenience.** `fieldsWithin` flattens groups, so an aliased group whose rows kept their
+ * block-relative keys would surface `fromPicks.offer` at FEATURE scope — a key that looks
+ * addressable and writes `feature.fromPicks.offer`, which no form can produce and no reader
+ * reads. Re-aliasing turns it into `choice.fromPicks.offer` over block 0, the same thing the
+ * group's own controls write. A `rows` field is deliberately NOT re-aliased: a row's keys
+ * belong to the row and `fieldsWithin` does not flatten through them.
  */
 const firstBlockField = (field: FieldDef): FieldDef => ({
   ...field,
   key: `choice.${field.key}`,
+  ...(field.kind === "group" && field.rows ? { rows: field.rows.map(firstBlockField) } : {}),
   visibleWhen: asksAChoice,
   read: (feature) => {
     const block = (choiceBlocksOf(feature)[0] ?? {}) as Draft;
@@ -627,9 +731,11 @@ const firstBlockField = (field: FieldDef): FieldDef => ({
  *  - **the level chips** — `feature.level` AND `levelTable[].features[]` in one edit; see
  *    the top of this file. `CustomField` exists for exactly this shape.
  *  - **"Where the options come from"** — a `SegmentedControl` over a UI MODE held in React
- *    state, whose change writes THREE draft keys at once (`options`/`from`/`fromCatalog`).
- *    There is no stored value for a `FieldDef` to read. Per block since U12, keyed
- *    `<feature id>:<block index>`.
+ *    state, whose change writes FOUR draft keys at once
+ *    (`options`/`from`/`fromCatalog`/`fromPicks`). There is no stored value for a `FieldDef`
+ *    to read. Per block since U12, keyed `<feature id>:<block index>`. The fourth way is
+ *    `fromPicks` (U16) and widening the control is what makes the sources mutually
+ *    exclusive from the form — see `writeFromPicks`.
  *  - **"Which catalog" + "Of which"** — two controls over ONE key, the block's
  *    `fromCatalog`. A slug is `<which>-<family>`, so picking the family before the which
  *    composes to NOTHING, and the half-made pair is held in state precisely because the
@@ -740,7 +846,7 @@ export function FeatureEditor({
    * took the half-finished panel away mid-selection. This is a UI mode, not draft data;
    * there is nothing to invalidate and nothing to store.
    */
-  const [sourceMode, setSourceMode] = useState<Readonly<Record<string, "catalog" | "list" | "options">>>({});
+  const [sourceMode, setSourceMode] = useState<Readonly<Record<string, SourceMode>>>({});
   /** Same reason, one level down: a catalog slug is `<which>-<family>`, so picking the
       family before the `which` composes to nothing and the family select would snap back
       to "Not set" under the GM's finger. Held here until the pair is complete. */
@@ -909,11 +1015,15 @@ export function FeatureEditor({
       const catalogSlug = typeof block.fromCatalog === "string" ? block.fromCatalog : "";
       const parsed = parseCatalog(catalogSlug);
       const family = familyMode[stateKey] ?? parsed.family;
-      const derivedSource: "catalog" | "list" | "options" = Array.isArray(block.options)
-        ? "options"
-        : catalogSlug
-          ? "catalog"
-          : "list";
+      // Read in the READER's own precedence: `featurePickOffer` tests `fromPicks` before the
+      // other three, so a block that somehow holds two shows the one the engine would use.
+      const derivedSource: SourceMode = block.fromPicks
+        ? "picks"
+        : Array.isArray(block.options)
+          ? "options"
+          : catalogSlug
+            ? "catalog"
+            : "list";
       const source = sourceMode[stateKey] ?? derivedSource;
       const optionsField = blockFieldFor("options");
       const optionRows = Array.isArray(block.options) ? (block.options as Array<Record<string, unknown>>) : [];
@@ -965,13 +1075,21 @@ export function FeatureEditor({
               options={[
                 { value: "catalog", label: "A catalog" },
                 { value: "list", label: "A list I choose" },
-                { value: "options", label: "Options I write" }
+                { value: "options", label: "Options I write" },
+                { value: "picks", label: "Their earlier picks" }
               ]}
+              /* FOUR ways now, and each clears the other three in the same edit. The reader
+                 reads `fromPicks` first and the rest in order, so a block holding two answers
+                 with one and silently drops the other — that shape has to be unreachable from
+                 the form, not merely refused at publish (the schema permits the pair). The
+                 offer is seeded EMPTY, the ruling `extraPicks`' column id already lives under:
+                 a guessed "class-cantrips" would silently point the pick at the wrong budget. */
               onChange={(next) => {
-                setSourceMode((prev) => ({ ...prev, [stateKey]: next as "catalog" | "list" | "options" }));
-                if (next === "catalog") setChoice({ options: undefined, from: undefined, fromCatalog: "skills" });
-                else if (next === "list") setChoice({ options: undefined, fromCatalog: undefined, from: [] });
-                else setChoice({ fromCatalog: undefined, from: undefined, options: [] });
+                setSourceMode((prev) => ({ ...prev, [stateKey]: next as SourceMode }));
+                if (next === "catalog") setChoice({ options: undefined, from: undefined, fromPicks: undefined, fromCatalog: "skills" });
+                else if (next === "list") setChoice({ options: undefined, fromCatalog: undefined, fromPicks: undefined, from: [] });
+                else if (next === "picks") setChoice({ options: undefined, from: undefined, fromCatalog: undefined, fromPicks: { offer: "" } });
+                else setChoice({ fromCatalog: undefined, from: undefined, fromPicks: undefined, options: [] });
               }}
             />
           </div>
@@ -1043,6 +1161,8 @@ export function FeatureEditor({
           )}
 
           {source === "list" && blockControl("from")}
+
+          {source === "picks" && blockControl("fromPicks")}
 
           {/* The FIELD says what an option row is; this says how it is drawn, because a
               row that mounts `RiderEditor` cannot go through `FieldRenderer`'s rows

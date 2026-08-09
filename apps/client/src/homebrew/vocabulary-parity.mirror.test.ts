@@ -2568,6 +2568,315 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
   });
 });
 
+/* ---- U16: `fromPicks` — the options ARE the character's own earlier answers ---- */
+
+/**
+ * The row: `FeatureChoiceSchema.fromPicks` — `{offer, where?}`, the FOURTH way a choice states its
+ * list and the only one that is not a list at all.
+ *
+ * "Choose one of your known Warlock cantrips that deals damage" (Agonizing Blast), "…that has a
+ * range of 10+ feet" (Eldritch Spear), "…that requires an attack roll" (Repelling Blast). No
+ * `fromCatalog` slug can say that and no `from` list can either: the options are the LEDGER,
+ * narrowed by a closed predicate, and every Warlock's list is a different list. The schema, both
+ * consumers (`character-build.ts` `featurePickOffer` and `build-payload.ts` `resolveChoice`, through
+ * one shared `resolvePickChoice`), the wire type and three SRD records all shipped — and the panel
+ * offered three sources where the engine reads four.
+ *
+ * **The far end is the LIST, and it is proved by contrast rather than by presence.** One ledger of
+ * three cantrips answers the three predicates three different ways, and a fourth damaging cantrip
+ * the character really has — Sacred Flame, off the Acolyte's Magic Initiate — is in NONE of them,
+ * because it is not one of their known WARLOCK cantrips. A test that only asserted "the list is
+ * non-empty" would pass on any source at all.
+ *
+ * **And it is the one member of this family that carries spell LEVELS from the editor end.** U15
+ * measured and wrote down that `optionLevels` is built only by `resolveCatalogChoice`, so a window
+ * authored over a hand-typed `from` list can never refuse anything and R1's ruling leaves
+ * `fromCatalog` unreachable from `applyField`. `resolvePickChoice` builds them too — it looks every
+ * answer up in the spell catalog — so an authored floor over `fromPicks` really does bite, which is
+ * the case U15 could not reach and said so.
+ */
+const LEDGER = {
+  /** The three Warlock cantrips this fixture knows. Chosen so the three predicates disagree:
+      Chill Touch is Touch range, True Strike has damage types but no attack roll, and only
+      Eldritch Blast answers all three. */
+  cantrips: ["eldritch-blast", "chill-touch", "true-strike"],
+  dealsDamage: ["chill-touch", "eldritch-blast", "true-strike"],
+  attackRoll: ["chill-touch", "eldritch-blast"],
+  ranged: ["eldritch-blast"],
+  /** Tagged to Magic Initiate, so NOT a class cantrip: a damaging cantrip the character really
+      has and no invocation may point at. This is the line no catalog can draw. */
+  otherSource: "sacred-flame",
+  /** The three SRD invocations, and the predicate each one asks. */
+  srdOffers: [
+    ["feature:agonizing-blast", "deals-damage"],
+    ["feature:repelling-blast", "attack-roll"],
+    ["feature:eldritch-spear", "ranged"]
+  ],
+  invocations: ["agonizing-blast", "repelling-blast", "eldritch-spear", "devils-sight", "eldritch-mind", "armor-of-shadows", "ascendant-step"],
+  featId: "hb-borrowed-blast-a1b2",
+  featureId: "borrowed-blast",
+  featName: "Borrowed Blast",
+  /** The prepared spells the same ledger holds, for the spell-level half. */
+  spells: [["hex", 1], ["hold-person", 2], ["fly", 5]],
+  spellLevels: { hex: 1, "hold-person": 2, fly: 3 },
+  floor: 2,
+  belowFloor: "hex",
+  inWindow: "fly"
+} as const;
+
+/**
+ * The feat a GM builds in `/homebrew`: one pick over answers the character already gave.
+ *
+ * `from` is the alternative source, so passing it is the negative control that keeps `fromPicks`
+ * from being a decoration — the same feat, the same carrier, a list typed by hand instead.
+ */
+function authoredBorrowedBlast(over: Readonly<{ where?: string; offer?: string; kind?: string; min?: number; from?: string }> = {}): Draft {
+  const shell = authored("feat", LEDGER.featName, [
+    ["category", "origin"],
+    ["summary", "A trick borrowed from a spell you already know."],
+    ["description", "Choose one of the cantrips you already know."]
+  ]);
+  const edits: Array<readonly [string, unknown]> = [["kind", over.kind ?? "cantrip"], ["choose", 1]];
+  if (over.from !== undefined) edits.push(["from", over.from]);
+  else {
+    // THE ROW. `authoredRow` throws when a key has no control, so before U16 these lines — not an
+    // assertion below them — is what failed.
+    edits.push(["fromPicks.offer", over.offer ?? "class-cantrips"]);
+    if (over.where) edits.push(["fromPicks.where", over.where]);
+  }
+  if (over.min !== undefined) edits.push(["minSpellLevel", over.min]);
+  const block = authoredRow("feat", ["feature", "choices"], edits);
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "name", LEDGER.featName, ["feature"]);
+  feature = applyField("feat", feature, "description", "Choose one of the cantrips you already know.", ["feature"]);
+  feature = applyField("feat", feature, "choices", [block], ["feature"]);
+  return { ...shell, feature: { ...feature, id: LEDGER.featureId } };
+}
+
+/**
+ * A Human Acolyte Fiend-Patron Warlock 10 whose known cantrips are the fixture's three, holding
+ * `featId` in the Human origin-feat slot when one is given.
+ *
+ * Level 10 because the Invocations column is at 7 there, which is room for the three that ask a
+ * `fromPicks` question plus four that do not. Every invocation pick is answered, so the same input
+ * both surveys and builds.
+ */
+const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cantrips): CharacterCreateRequestInput => ({
+  name: "Vex", speciesId: "human", backgroundId: "acolyte", classId: "warlock", level: 10,
+  subclassId: "fiend-patron", abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: featId ?? "alert", payload: { featureId: "human-versatile" } },
+    // The Acolyte's own origin feat is Magic Initiate (Cleric) — where Sacred Flame comes from.
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: LEDGER.otherSource, payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
+    { level: 1, classId: "warlock", kind: "skill", id: "deception" },
+    ...LEDGER.invocations.map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } })),
+    // THE ANSWERS THE INVOCATIONS THEMSELVES ASK. Eldritch Blast for all three, because it is the
+    // one cantrip that satisfies every predicate — so swapping the ledger below never invalidates
+    // an answer and the lists are the only thing that moves.
+    ...["agonizing-blast", "repelling-blast", "eldritch-spear"]
+      .map((featureId) => ({ level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId } })),
+    { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
+    // Fiendish Resilience arrives at 10 and asks its own question; unanswered, the BUILD refuses.
+    { level: 10, kind: "damage-type", id: "fire", payload: { featureId: "fiendish-resilience" } },
+    ...[4, 8].flatMap((at) => [
+      { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+      { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+    ]),
+    // THE LEDGER the picks above are drawn from: untagged rows, which is what a NAMED budget is.
+    ...cantrips.map((id) => ({ level: 1, kind: "cantrip", id })),
+    ...LEDGER.spells.map(([id, level]) => ({ level, kind: "spell", id })),
+    { level: 1, kind: "equipment", id: "warlock-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** One offer's option list, off the SERVER's own computation. Sorted, because a Set has no order
+    and the assertion is about membership. */
+function offeredIds(survey: ReturnType<typeof computeServerOffers>, key: string): readonly string[] {
+  const offer = survey.offers.find((candidate) => candidate.key === key);
+  if (!offer) throw new Error(`No offer "${key}" in this build — the fixture no longer asks that question.`);
+  return [...offer.options].sort();
+}
+
+const surveyOf = (input: CharacterCreateRequestInput, view: ReturnType<ContentLibrary["forAudience"]>) =>
+  computeServerOffers(input, view, BuilderPolicySchema.parse({}));
+
+describe("a pick over the character's own earlier answers (`fromPicks`) — through both paths", () => {
+  it("1. the editor can author it: the budget and the predicate go through real controls, and it excludes the other three sources", () => {
+    const draft = authoredBorrowedBlast({ where: "attack-roll" });
+    const verdict = publishVerdict("feat", draft, LEDGER.featId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("feat", draft, LEDGER.featId) as { feature: { choice?: Record<string, unknown> } };
+    // Agonizing Blast's shape, byte for byte — bar the predicate this feat asks for instead.
+    expect(body.feature.choice).toMatchObject({ kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } });
+    // ...and no other source key beside it. The reader tests `fromPicks` FIRST, so a block carrying
+    // both would silently answer with one and drop the other.
+    for (const key of ["from", "fromCatalog", "options"]) {
+      expect(key in (body.feature.choice ?? {}), `choice.${key} rode along`).toBe(false);
+    }
+    // The budget alone is a complete source: `where` is optional and omitting it offers every answer.
+    const open = storedBody("feat", authoredBorrowedBlast({}), LEDGER.featId) as { feature: { choice?: { fromPicks?: unknown } } };
+    expect(open.feature.choice?.fromPicks).toEqual({ offer: "class-cantrips" });
+
+    // The census's row, inverted: the clause resolves from the CLASS form — the form the census asks
+    // its questions of — at the block's own scope, and as the FIRST block's alias.
+    for (const key of ["fromPicks", "fromPicks.offer", "fromPicks.where"]) {
+      expect(hasControl("class", key), `class.${key}`).toBe(true);
+      expect(hasControl("feat", key, ["feature", "choices"]), `feat: feature > choices > ${key}`).toBe(true);
+    }
+    for (const key of ["choice.fromPicks", "choice.fromPicks.offer", "choice.fromPicks.where"]) {
+      expect(hasControl("feat", key, ["feature"]), `feat: feature > ${key}`).toBe(true);
+    }
+    // ...and the group's children are RE-ALIASED rather than leaked: `fieldsWithin` flattens groups,
+    // so an un-aliased row would offer `fromPicks.offer` at FEATURE scope — a key that writes
+    // `feature.fromPicks.offer`, which no form produces and no reader reads.
+    expect(hasControl("feat", "fromPicks.offer", ["feature"])).toBe(false);
+
+    // EVERY BLOCK, not just block 0 — U12's standing requirement for anything added to this panel.
+    const twinned = ((): Draft => {
+      const first = authoredRow("feat", ["feature", "choices"], [["kind", "cantrip"], ["choose", 1], ["fromPicks.offer", "class-cantrips"], ["fromPicks.where", "deals-damage"]]);
+      const second = authoredRow("feat", ["feature", "choices"], [["kind", "spell"], ["choose", 1], ["fromPicks.offer", "class-spells"]]);
+      const shell = authored("feat", "Twin Echoes", [["category", "origin"], ["summary", "Two echoes."], ["description", "Two echoes."]]);
+      let feature = applyField("feat", shell.feature as Draft, "name", "Twin Echoes", ["feature"]);
+      feature = applyField("feat", feature, "description", "Two echoes.", ["feature"]);
+      return { ...shell, feature: applyField("feat", feature, "choices", [first, second], ["feature"]) };
+    })();
+    const plural = storedBody("feat", twinned, LEDGER.featId) as { feature: { choices?: Array<{ fromPicks?: unknown }> } };
+    expect(plural.feature.choices?.map((block) => block.fromPicks))
+      .toEqual([{ offer: "class-cantrips", where: "deals-damage" }, { offer: "class-spells" }]);
+
+    // THE EXCLUSIVITY, driven both ways round through the fields themselves: writing the ledger
+    // source clears a hand-typed list, and writing a hand-typed list clears the ledger source. The
+    // schema permits the pair and the ENGINE silently prefers one, so the form must refuse to make it.
+    const listed = applyField("feat", { kind: "cantrip", choose: 1 }, "from", "guidance, light", ["feature", "choices"]);
+    const swapped = applyField("feat", listed, "fromPicks.offer", "class-cantrips", ["feature", "choices"]);
+    expect(swapped).toEqual({ kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips" } });
+    expect(applyField("feat", swapped, "from", "guidance", ["feature", "choices"]))
+      .toEqual({ kind: "cantrip", choose: 1, from: ["guidance"] });
+
+    // `where` is the one CLOSED control in this panel, and it is closed because the schema is: three
+    // slugs, each a spell fact the resolver reads by name, so a homebrew word would match nothing.
+    const whereField = fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === "fromPicks.where");
+    expect(optionValues(whereField)).toEqual(["deals-damage", "attack-roll", "ranged"]);
+  });
+
+  it("2. SRD content authors the same shape — three invocations, three predicates, one budget", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const found: Array<{ id: string; source: Record<string, unknown> }> = [];
+    const walk = (node: unknown, owner: string) => {
+      if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const held = typeof record.id === "string" ? record.id : owner;
+      if (record.fromPicks) found.push({ id: held, source: record.fromPicks as Record<string, unknown> });
+      for (const value of Object.values(record)) walk(value, held);
+    };
+    for (const summary of library.classSummaries()) walk(library.classRecord(summary.id), "?");
+    for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id), "?");
+    for (const summary of library.featSummaries()) walk(library.featRecord(summary.id), "?");
+
+    // Measured at the time of writing: exactly three, all Warlock invocations, all over ONE budget
+    // and each asking a different question of it.
+    expect(found.map((entry) => `${entry.id}: ${entry.source.offer} where ${entry.source.where}`).sort()).toEqual([
+      "agonizing-blast: class-cantrips where deals-damage",
+      "eldritch-spear: class-cantrips where ranged",
+      "repelling-blast: class-cantrips where attack-roll"
+    ]);
+  });
+
+  it("3. one assertion body over both: the list is exactly the answers this character gave, narrowed by the predicate", () => {
+    const srdView = new ContentLibrary().forAudience("gm");
+    const editorView = featView(authoredBorrowedBlast({ where: "attack-roll" }), LEDGER.featId);
+
+    const paths: ReadonlyArray<readonly [string, ReturnType<typeof computeServerOffers>, string, readonly string[]]> = [
+      // SRD: Repelling Blast, whose "requires an attack roll" is the same predicate the feat asks.
+      ["SRD content", surveyOf(blastWarlock(), srdView), "feature:repelling-blast", LEDGER.attackRoll],
+      // The editor: the authored feat, over the SAME ledger, reaching the same list.
+      ["the homebrew editor", surveyOf(blastWarlock(LEDGER.featId), editorView), `feature:${LEDGER.featureId}`, LEDGER.attackRoll]
+    ];
+    for (const [label, survey, key, expected] of paths) {
+      // THE FAR END: not "an option list", but THIS character's, narrowed. Sacred Flame deals damage
+      // and rolls no attack — and even under `deals-damage` it is absent, because it is not one of
+      // their known WARLOCK cantrips. No catalog slug can draw that line, which is the whole row.
+      const offered = offeredIds(survey, key);
+      expect(offered, label).toEqual([...expected]);
+      expect(offered, label).not.toContain(LEDGER.otherSource);
+    }
+
+    // THE SAME LEDGER, THREE PREDICATES, THREE LISTS — the contrast that makes the assertion above
+    // mean the predicate rather than "a list came back". All three read the same three cantrips.
+    const srd = surveyOf(blastWarlock(), srdView);
+    expect(offeredIds(srd, "feature:agonizing-blast")).toEqual([...LEDGER.dealsDamage]);
+    expect(offeredIds(srd, "feature:repelling-blast")).toEqual([...LEDGER.attackRoll]);
+    expect(offeredIds(srd, "feature:eldritch-spear")).toEqual([...LEDGER.ranged]);
+
+    // ...and it is the LEDGER and not the class: change which cantrips this Warlock took and every
+    // one of the three lists moves with them, without a content record changing.
+    const other = surveyOf(blastWarlock(undefined, ["eldritch-blast", "mage-hand", "minor-illusion"]), srdView);
+    expect(offeredIds(other, "feature:agonizing-blast")).toEqual(["eldritch-blast"]);
+    expect(offeredIds(other, "feature:eldritch-spear")).toEqual(["eldritch-blast", "mage-hand", "minor-illusion"]);
+
+    // THE NEGATIVE CONTROLS, dropping the VALUE rather than the carrier. Same feat, same ledger:
+    // with the predicate gone the list widens to every class cantrip...
+    const wide = surveyOf(blastWarlock(LEDGER.featId), featView(authoredBorrowedBlast({}), LEDGER.featId));
+    expect(offeredIds(wide, `feature:${LEDGER.featureId}`)).toEqual([...LEDGER.cantrips].sort());
+    // ...and with the source made a hand-typed list, the ledger stops being read at all — the GM's
+    // two slugs are offered to a Warlock who knows neither.
+    const typed = surveyOf(blastWarlock(LEDGER.featId), featView(authoredBorrowedBlast({ from: "guidance, light" }), LEDGER.featId));
+    expect(offeredIds(typed, `feature:${LEDGER.featureId}`)).toEqual(["guidance", "light"]);
+  });
+
+  it("4. the editor end can finally prove a SPELL LEVEL — the hole U15 measured and left open", () => {
+    /**
+     * U15's standing measurement: both spell bounds are compared against `optionLevels`, which is
+     * built only by `resolveCatalogChoice`; a hand-typed `from` list produces none and a missing
+     * level reads as 0, so a ceiling authored over one can never refuse anything. R1's ruling leaves
+     * `fromCatalog` unreachable from `applyField`, so U15's editor half could drive only the FLOOR
+     * and said as much.
+     *
+     * `resolvePickChoice` builds `optionLevels` too — it looks every answer up in the spell catalog
+     * — so `fromPicks` is the one source an authored window really bites over from the editor end.
+     */
+    const view = featView(authoredBorrowedBlast({ kind: "spell", offer: "class-spells", min: LEDGER.floor }), LEDGER.featId);
+    const survey = surveyOf(blastWarlock(LEDGER.featId), view);
+    const offer = survey.offers.find((candidate) => candidate.key === `feature:${LEDGER.featureId}`)!;
+    // The levels are THERE, off the catalog, for a list no catalog holds.
+    expect(offer.optionLevels).not.toBeNull();
+    expect(Object.fromEntries([...offer.optionLevels!].sort())).toEqual(LEDGER.spellLevels);
+
+    // ...and they refuse. The character's own level-1 spell is below the authored floor, named by
+    // the number the catalog carries rather than by the 0 a typed list would have produced.
+    const below = { ...blastWarlock(LEDGER.featId) };
+    below.choices = [...below.choices, { level: 10, kind: "spell", id: LEDGER.belowFloor, payload: { featureId: LEDGER.featureId } }] as typeof below.choices;
+    expect(() => buildCharacterDefinition(below, view, BuilderPolicySchema.parse({})))
+      .toThrowError(new RegExp(`"${LEDGER.belowFloor}" is level 1, below the minimum spell level \\(${LEDGER.floor}\\)`));
+
+    // THE NEGATIVE CONTROL: the same floor over a hand-typed list of the same two spells. Every
+    // option reads as level 0, so the floor refuses the answer the GM's own list offers — which is
+    // exactly the trap U15's help text names, still standing, and still not this unit's to fix.
+    const listed = featView(authoredBorrowedBlast({ kind: "spell", from: "hex, fly", min: LEDGER.floor }), LEDGER.featId);
+    const listedOffer = surveyOf(blastWarlock(LEDGER.featId), listed).offers.find((candidate) => candidate.key === `feature:${LEDGER.featureId}`)!;
+    expect(listedOffer.optionLevels).toBeNull();
+
+    // ...and the character's own level-3 spell is INSIDE the window when the levels are real.
+    const inside = { ...blastWarlock(LEDGER.featId) };
+    inside.choices = [...inside.choices, { level: 10, kind: "spell", id: LEDGER.inWindow, payload: { featureId: LEDGER.featureId } }] as typeof inside.choices;
+    expect(() => buildCharacterDefinition(inside, view, BuilderPolicySchema.parse({}))).not.toThrow();
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -2823,8 +3132,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
       // [type, key, container path, the unit that closes it]
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
-      ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"],
-      ["class", "fromPicks", [], "U16 — 3 records"]
+      ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"]
     ];
     const stillOwed = owed.filter(([type, key, within]) => !hasControl(type, key, within));
     expect(stillOwed.map(([type, key, within]) => `${type}.${within.length > 0 ? `${within.join(".")}[].` : ""}${key}`))
