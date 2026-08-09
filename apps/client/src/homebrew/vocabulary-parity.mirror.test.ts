@@ -73,7 +73,7 @@ import { nextInitiativeTurn, startEncounter } from "../../../server/src/encounte
 import {
   applyField, authored, authoredRow, fieldsWithin, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
 } from "./authoring-harness";
-import { blankDraft } from "./defaults";
+import { blankDraft, forStorage } from "./defaults";
 import { grantRowsOf, grantsFromRows } from "./RiderEditor";
 import { EMPTY_CONTEXT } from "./schema";
 import { SCHEMAS } from "./schemas";
@@ -2877,6 +2877,287 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
   });
 });
 
+/* ---- U16: `FeatureOption.requires` — an option gated on an earlier answer ---- */
+
+/**
+ * The row: `FeatureOptionSchema.requires` — `{offer, id}`, the clause that says an inline option is
+ * legal only for a character whose ledger already holds one particular answer.
+ *
+ * "The option you chose for Blessed Strikes grows more powerful" (Improved Blessed Strikes),
+ * Improved Elemental Fury, Nature's Ward's Resistance "associated with your current land choice".
+ * Each is one later feature whose mechanics were DECIDED levels earlier, and before the key they
+ * were prose because nothing in the vocabulary could read an earlier row. Eight SRD options author
+ * it — four class, four subclass — both consumers gate on it (`character-build.ts` `featurePickOffer`
+ * and `build-payload.ts` `featurePickOffer`, in the same two steps), and the option row had a name,
+ * a description and no way to say when it applies.
+ *
+ * **The far end is the OPTION LIST, and gating collapses it twice over.** An option whose gate is
+ * unmet leaves the offer entirely; and when the survivors exactly FILL the capacity the answer is a
+ * consequence rather than a choice, so both consumers ADOPT it and render no card at all — a pick
+ * with one option on it is worse than the prose it replaces. So the list is read where it ends up:
+ * `survey.granted`, whose option-origin entries ARE the survivors, against the same feature's
+ * ungated offer of two.
+ *
+ * The two paths cross carriers again: the SRD half is a SUBCLASS feature (Nature's Ward, whose four
+ * options each name a different land) and the editor half a homebrew SPECIES with two traits — the
+ * cheapest carrier that can hold both halves of the read-back, because `feature:<id>` has to name a
+ * pick the same record asks.
+ */
+const GATED = {
+  srdFeatureId: "natures-ward",
+  srdOffer: "feature:natures-ward",
+  srdGate: "feature:circle-of-the-land-spells",
+  /** The SRD's own table: which land answer grants which Resistance. */
+  lands: [["arid", "fire"], ["polar", "cold"], ["temperate", "lightning"], ["tropical", "poison"]],
+  speciesId: "hb-echokin-a1b2",
+  speciesName: "Echokin",
+  /** Pinned rather than minted, for U12's reason: the ledger tags its answer with the FEATURE id,
+      and the gate names that id back. */
+  heritageId: "echo-heritage",
+  wardId: "echo-ward",
+  gate: "feature:echo-heritage",
+  answers: [["emberborn", "ember-ward", "fire"], ["frostborn", "frost-ward", "cold"]]
+} as const;
+
+/** One gated option of the authored ward trait. `requires` goes through the option row's own
+    controls; the resistance it grants goes through `GrantsEditor`'s own write, for U9's reason. */
+const echoOption = (id: string, name: string, gate: string | null, resistance: string): Draft => ({
+  ...authoredRow("species", ["traits", "choice.options"], [
+    ["name", name],
+    ["description", `Your heritage answered this for you, so you have Resistance to ${resistance} damage.`],
+    // THE ROW. `authoredRow` throws when a key has no control, so before U16 these lines — not an
+    // assertion below them — is what failed.
+    ...(gate ? ([["requires.offer", GATED.gate], ["requires.id", gate]] as Array<readonly [string, unknown]>) : [])
+  ]),
+  id,
+  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [resistance] }])
+});
+
+/** The species a GM builds in `/homebrew`: one trait that asks which heritage, and a second whose
+    two options are each legal for exactly one answer to it. `gated: false` is the negative control. */
+function authoredEchokin(gated = true): Draft {
+  const heritage = {
+    ...authoredRow("species", ["traits"], [
+      ["name", "Echoed Heritage"],
+      ["description", "Choose the echo you were born under."],
+      ["choice", true],
+      ["choice.kind", "heritage"],
+      ["choice.from", "emberborn, frostborn"]
+    ]),
+    id: GATED.heritageId
+  };
+  const ward = {
+    ...authoredRow("species", ["traits"], [
+      ["name", "Echoed Ward"],
+      ["description", "The echo you were born under wards you."],
+      ["choice", true],
+      ["choice.kind", "echo-ward"],
+      ["choice.options", GATED.answers.map(([answer, optionId, resistance]) =>
+        echoOption(optionId, `${resistance[0].toUpperCase()}${resistance.slice(1)} Ward`, gated ? answer : null, resistance))]
+    ]),
+    id: GATED.wardId
+  };
+  return authored("species", GATED.speciesName, [
+    ["summary", "Kin of an echo, warded by the heritage they were born under."],
+    ["description", "Echokin carry one ward, and never choose it twice."],
+    ["sizes", ["medium"]],
+    ["speedFeet", 30],
+    ["traits", [heritage, ward]]
+  ]);
+}
+
+const echokinView = (species: Draft) => new ContentLibrary({
+  revision: 1,
+  publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, species: [HOMEBREW_BODY_SCHEMAS.species.parse(storedBody("species", species, GATED.speciesId))] }),
+  monsterForInstance: () => undefined
+}).forAudience("gm");
+
+/** An Echokin Fighter 1 who has answered the heritage — the earlier answer the ward reads back. */
+const echokinInput = (heritage: string): CharacterCreateRequestInput => ({
+  name: "Ash", speciesId: GATED.speciesId, backgroundId: "soldier", classId: "fighter", level: 1,
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    // THE EARLIER ANSWER. Everything the ward does follows from this one row.
+    { level: 1, kind: "heritage", id: heritage, payload: { featureId: GATED.heritageId } },
+    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
+    { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+    ...["longsword", "javelin", "greatsword"].map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id })),
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "fighter-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** A Human Acolyte Circle-of-the-Land Druid 10 — the level Nature's Ward arrives at — whose land was
+    answered at 3. The SRD's own carrier, read through the real bundles. */
+const landDruid = (land: string): CharacterCreateRequestInput => ({
+  name: "Rowan", speciesId: "human", backgroundId: "acolyte", classId: "druid", level: 10,
+  subclassId: "circle-of-the-land", abilityMethod: "standard-array",
+  baseScores: { str: 12, dex: 14, con: 13, int: 10, wis: 15, cha: 8 },
+  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "int", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, classId: "druid", kind: "skill", id: "nature" },
+    { level: 1, classId: "druid", kind: "skill", id: "perception" },
+    { level: 1, kind: "primal-order", id: "warden", payload: { featureId: "primal-order" } },
+    { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
+    // THE EARLIER ANSWER, seven levels before the feature that reads it back.
+    { level: 3, kind: "land", id: land, payload: { featureId: "circle-of-the-land-spells" } },
+    { level: 7, kind: "elemental-fury", id: "primal-strike", payload: { featureId: "elemental-fury" } },
+    ...[4, 8].flatMap((at) => [
+      { level: at, classId: "druid", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+      { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+    ]),
+    { level: 1, kind: "cantrip", id: "druidcraft" },
+    { level: 1, kind: "cantrip", id: "produce-flame" },
+    { level: 1, kind: "equipment", id: "druid-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** THE assertion body: which of a feature's inline options SURVIVED the gate, read off the server's
+    own survey. An adopted option joins `granted` with `origin.kind === "option"` and its parent's id
+    as the source — so this is the narrowed list itself, not a proxy for it. */
+const survivorsOf = (survey: ReturnType<typeof computeServerOffers>, parentId: string): readonly string[] =>
+  survey.granted
+    .filter((entry) => entry.origin?.kind === "option" && entry.origin.sourceId === parentId)
+    .map((entry) => entry.record.id)
+    .sort();
+
+describe("an option gated on an earlier answer (`requires`) — through both paths", () => {
+  it("1. the editor can author it: the gate goes through real controls on the OPTION row", () => {
+    const draft = authoredEchokin();
+    const verdict = publishVerdict("species", draft, GATED.speciesId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("species", draft, GATED.speciesId) as { traits: Array<{ choice?: { options?: Array<Record<string, unknown>> } }> };
+    // Nature's Ward's shape, byte for byte: one gate per option, each naming a different answer to
+    // the same earlier pick.
+    expect(body.traits[1].choice?.options?.map((option) => option.requires)).toEqual([
+      { offer: GATED.gate, id: "emberborn" },
+      { offer: GATED.gate, id: "frostborn" }
+    ]);
+    // ...and no gate means no key. `requires` is `.optional()`, so a half-cleared clause must not
+    // survive as `{}` and refuse the record for a question the GM answered "no" to.
+    const open = storedBody("species", authoredEchokin(false), GATED.speciesId) as typeof body;
+    expect(open.traits[1].choice?.options?.every((option) => !("requires" in option))).toBe(true);
+    expect(applyField("species", { id: "o1", requires: { offer: GATED.gate } }, "requires.offer", "", ["traits", "choice.options"]))
+      .toEqual({ id: "o1" });
+
+    // The census's standing assertion, inverted: an option can finally say which earlier answer
+    // legalises it. Looked up in the OPTION's own fields, never the feature's — `choice.kind` is
+    // still not reachable there, which is the guard that stops a flat lookup calling this a pass.
+    for (const key of ["requires", "requires.offer", "requires.id"]) {
+      expect(hasControl("feat", key, ["feature", "choice.options"]), `feat: option > ${key}`).toBe(true);
+      expect(hasControl("species", key, ["traits", "choice.options"]), `species: option > ${key}`).toBe(true);
+    }
+    expect(hasControl("feat", "choice.kind", ["feature", "choice.options"])).toBe(false);
+    // It is an OPTION's key and not a feature's: `FeatureRecordSchema` has no `requires` at all, so
+    // offering one beside the level chips would be an editor-only row on every carrier.
+    expect(hasControl("feat", "requires", ["feature"])).toBe(false);
+
+    // The "Which answer" box suggests the record's OWN option ids and the ids of its typed lists —
+    // which for the SRD's four gated features is exactly where the answer comes from.
+    const idField = fieldsWithin("species", ["traits", "choice.options"]).find((field) => field.key === "requires.id")!;
+    const suggested = typeof idField.suggestions === "function" ? idField.suggestions(EMPTY_CONTEXT, forStorage(draft)) : idField.suggestions ?? [];
+    expect([...suggested].sort()).toEqual(["ember-ward", "emberborn", "frost-ward", "frostborn"]);
+  });
+
+  it("2. SRD content authors the same shape — 8 gated options over 4 features", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const gates: Array<{ owner: string; option: string; offer: string; id: string }> = [];
+    // An option carries an id of its own, so the OWNER is tracked explicitly: it is the last object
+    // with an id that was not itself an option, which for every hit here is the feature that owns
+    // the pick (a `choice` block has no id at all, so it passes the feature's id through).
+    const walk = (node: unknown, owner: string) => {
+      if (Array.isArray(node)) { for (const entry of node) walk(entry, owner); return; }
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const held = typeof record.id === "string" ? record.id : owner;
+      for (const [key, value] of Object.entries(record)) {
+        if (key !== "options" || !Array.isArray(value)) { walk(value, held); continue; }
+        for (const entry of value as Array<Record<string, unknown>>) {
+          const clause = entry?.requires as Record<string, unknown> | undefined;
+          if (clause) gates.push({ owner: held, option: String(entry.id ?? "?"), offer: String(clause.offer), id: String(clause.id) });
+          walk(entry, held);
+        }
+      }
+    };
+    for (const summary of library.classSummaries()) walk(library.classRecord(summary.id), "?");
+    for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id), "?");
+    for (const summary of library.featSummaries()) walk(library.featRecord(summary.id), "?");
+
+    // Measured at the time of writing: eight, over four features — and every one names a
+    // `feature:<id>` pick of its OWN record, which is the open half of the offer-key namespace.
+    expect(gates).toHaveLength(8);
+    expect([...new Set(gates.map((gate) => gate.owner))].sort())
+      .toEqual(["improved-blessed-strikes", "improved-elemental-fury", "natures-ward"]);
+    expect(gates.every((gate) => gate.offer.startsWith("feature:"))).toBe(true);
+    // Nature's Ward is the fixture's carrier: four options, four different lands, one budget.
+    expect(gates.filter((gate) => gate.owner === GATED.srdFeatureId).map((gate) => `${gate.id} → ${gate.option}`))
+      .toEqual(GATED.lands.map(([land]) => `${land} → natures-ward-${land}`));
+  });
+
+  it("3. one assertion body over both: the option list is the earlier answer, and no second question is asked", () => {
+    const srdView = new ContentLibrary().forAudience("gm");
+    const editorView = echokinView(authoredEchokin());
+    const paths: ReadonlyArray<readonly [string, () => ReturnType<typeof computeServerOffers>, () => ActorDefinition, string, string, string]> = [
+      ["SRD content", () => surveyOf(landDruid("polar"), srdView), () => buildCharacterDefinition(landDruid("polar"), srdView, BuilderPolicySchema.parse({})),
+        GATED.srdFeatureId, "natures-ward-polar", "cold"],
+      ["the homebrew editor", () => surveyOf(echokinInput("frostborn"), editorView), () => buildCharacterDefinition(echokinInput("frostborn"), editorView, BuilderPolicySchema.parse({})),
+        GATED.wardId, "frost-ward", "cold"]
+    ];
+
+    for (const [label, survey, build, parentId, survivor, resistance] of paths) {
+      const computed = survey();
+      // THE FAR END: the list, narrowed to the one option the earlier answer legalises...
+      expect(survivorsOf(computed, parentId), label).toEqual([survivor]);
+      // ...and it is not a pick at all, so nothing is asked a second time.
+      expect(computed.offers.map((offer) => offer.key), label).not.toContain(`feature:${parentId}`);
+      // ...and what the survivor grants is on the sheet, which is where an option list has to end.
+      expect(build().damageResistances, label).toContain(resistance);
+    }
+
+    // IT IS THE ANSWER AND NOT THE RECORD: the same content, a different earlier row, a different
+    // survivor and a different number. All four SRD lands, and both authored heritages.
+    for (const [land, resistance] of GATED.lands) {
+      const built = buildCharacterDefinition(landDruid(land), srdView, BuilderPolicySchema.parse({}));
+      expect(survivorsOf(surveyOf(landDruid(land), srdView), GATED.srdFeatureId), land).toEqual([`natures-ward-${land}`]);
+      expect((built.damageResistances ?? []).filter((type) => GATED.lands.some(([, held]) => held === type)), land).toEqual([resistance]);
+    }
+    for (const [heritage, survivor, resistance] of GATED.answers) {
+      const built = buildCharacterDefinition(echokinInput(heritage), editorView, BuilderPolicySchema.parse({}));
+      expect(survivorsOf(surveyOf(echokinInput(heritage), editorView), GATED.wardId), heritage).toEqual([survivor]);
+      expect(built.damageResistances, heritage).toEqual([resistance]);
+    }
+
+    // THE NEGATIVE CONTROL, dropping the CLAUSE rather than the carrier: the same species, the same
+    // two options, the same answered heritage — with no gate on either. The list is no longer
+    // narrowed, so both options are offered as a REAL pick the character now owes, nothing is
+    // adopted, and no resistance reaches the sheet until they answer it.
+    const ungated = echokinView(authoredEchokin(false));
+    const survey = surveyOf(echokinInput("frostborn"), ungated);
+    expect(survivorsOf(survey, GATED.wardId)).toEqual([]);
+    const offered = survey.offers.find((offer) => offer.key === `feature:${GATED.wardId}`);
+    expect([...(offered?.options ?? [])].sort()).toEqual(["ember-ward", "frost-ward"]);
+    expect(() => buildCharacterDefinition(echokinInput("frostborn"), ungated, BuilderPolicySchema.parse({})))
+      .toThrowError(/needs 1 pick\(s\) of kind "echo-ward"/);
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -2996,8 +3277,9 @@ describe("the guard itself refuses what the editor cannot author", () => {
     // effect-`modifiers` row above relies on. An option carries no level and no `choice.kind`.
     expect(hasControl("feat", "name", ["feature", "choice.options"])).toBe(true);
     expect(hasControl("feat", "choice.kind", ["feature", "choice.options"])).toBe(false);
-    // U16's own row, still owed: an option cannot yet say which earlier answer legalises it.
-    expect(hasControl("feat", "requires", ["feature", "choice.options"])).toBe(false);
+    // U16's own row, and it landed here: an option can say which earlier answer legalises it, as a
+    // `FieldDef` beside `name` and `description` rather than as JSX this file cannot see.
+    expect(hasControl("feat", "requires", ["feature", "choice.options"])).toBe(true);
   });
 
   it("a row scope is looked up in the ROW's own fields, not the whole form's", () => {

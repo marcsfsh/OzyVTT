@@ -277,6 +277,97 @@ const featuresOf = (draft: Draft): readonly Draft[] => [
 const featureIdsOf = (draft: Draft): readonly string[] =>
   featuresOf(draft).map((feature) => String((feature as { id?: unknown })?.id ?? "")).filter(Boolean);
 
+/**
+ * Every ANSWER any pick on this record could hold — the id half of a `requires` clause.
+ *
+ * A gate names one option of an earlier pick, and the SRD's four gated features all name a
+ * SIBLING feature's option (`feature:blessed-strikes` → `divine-strike`), so the record
+ * being edited already declares every id the box wants. Both spellings of a pick are read
+ * through `featurePicks`, and both ways of stating its list contribute: the inline options
+ * carry their own ids and a hand-typed `from` list IS ids.
+ */
+const optionIdsOf = (draft: Draft): readonly string[] => {
+  const ids = new Set<string>();
+  for (const feature of featuresOf(draft)) {
+    for (const block of choiceBlocksOf(feature)) {
+      for (const option of Array.isArray(block.options) ? (block.options as Draft[]) : []) {
+        const id = String((option as { id?: unknown })?.id ?? "");
+        if (id) ids.add(id);
+      }
+      for (const id of Array.isArray(block.from) ? (block.from as unknown[]) : []) {
+        if (typeof id === "string" && id) ids.add(id);
+      }
+    }
+  }
+  return [...ids];
+};
+
+/**
+ * THIS OPTION IS ONLY LEGAL WHEN AN EARLIER ANSWER SAYS SO — `requires`, on an inline
+ * option, and the read-back the SRD keeps asking for.
+ *
+ * "The option you chose for Blessed Strikes grows more powerful" (Improved Blessed
+ * Strikes), Improved Elemental Fury, Nature's Ward's Resistance "associated with your
+ * current land choice". Each is one later feature whose mechanics are DECIDED by a pick
+ * already on the ledger, and before the key existed they were prose. Eight SRD options
+ * author it — four class, four subclass — and no control anywhere could say it.
+ *
+ * **AND IT IS NOT ALWAYS A PICK.** When gating leaves exactly as many legal options as the
+ * choice's capacity the answer is a consequence rather than a choice, so both consumers
+ * ADOPT the survivors and render no card at all. That is the whole point of the ruling: a
+ * pick with one option on it is worse than the prose it replaces. The help says so, because
+ * a GM who authors two gated options and then sees no pick appear has to be told it worked.
+ *
+ * A `group`, like `fromPicks`, and for the same reason: the two halves are one clause and
+ * neither half alone means anything. Both boxes are open text — `offer` because it is the
+ * SAME namespace `extraPicks` and `replaces` are checked against, and `id` because an
+ * option id is an open slug the record may not have authored yet.
+ */
+function requiresField(): FieldDef {
+  const write = (leaf: "offer" | "id") => (next: unknown, option: Draft): Draft => {
+    const held = option.requires && typeof option.requires === "object" && !Array.isArray(option.requires)
+      ? (option.requires as Record<string, unknown>)
+      : {};
+    const text = typeof next === "string" ? next.trim() : "";
+    const merged: Record<string, unknown> = { ...held };
+    if (text) merged[leaf] = text;
+    else delete merged[leaf];
+    const out: Record<string, unknown> = { ...option };
+    // An emptied pair removes the clause rather than leaving `{}` behind: `requires` is
+    // `.optional()`, and a half-cleared gate would refuse the record at publish for a
+    // question the GM had just answered "no" to.
+    if (Object.keys(merged).length === 0) delete out.requires;
+    else out.requires = merged;
+    return out;
+  };
+  return {
+    key: "requires",
+    label: "Only when an earlier pick chose",
+    kind: "group",
+    help: "Leave both empty to offer this option to everyone. When the gates leave exactly as many options as the choice takes, the player is asked nothing and the survivor is simply granted.",
+    rows: [
+      {
+        key: "requires.offer",
+        label: "Which pick",
+        placeholder: "feature:my-feature",
+        help: "A named budget, or feature:<id> for one of this record's own features.",
+        suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+        validate: offerValidate,
+        write: write("offer")
+      },
+      {
+        key: "requires.id",
+        label: "Which answer",
+        placeholder: "divine-strike",
+        help: "The option they must have chosen there.",
+        suggestions: (_ctx, draft) => optionIdsOf(draft),
+        validate: slugValidate,
+        write: write("id")
+      }
+    ]
+  };
+}
+
 /** What to CALL one of those ids in a picker. A feature the GM has not named yet still has
     to be pickable, so the id stands in rather than an empty row. */
 const featureLabelOf = (draft: Draft, id: string): string => {
@@ -660,6 +751,10 @@ function choiceBlockFields(): readonly FieldDef[] {
       rows: [
         { key: "name", label: "Name" },
         { key: "description", label: "Description", kind: "textarea", wide: true },
+        // WHETHER THIS OPTION IS OFFERED AT ALL, before anything it grants — see the
+        // factory. An option's own gate, and the only key here that can make the pick
+        // stop being a pick.
+        requiresField(),
         // An OPTION raises budgets too — Divine Order's Thaumaturge is the SRD's own
         // case — and the reader treats a chosen option as a feature (`optionAsFeature`),
         // so the control is the same factory at the option's own row scope.
