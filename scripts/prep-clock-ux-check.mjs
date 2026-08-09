@@ -33,6 +33,7 @@ const EXEC = process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium/chrome-linu
 const BASE = process.env.AUDIT_URL ?? "http://localhost:5173/";
 const PASSWORD = process.env.AUDIT_PASSWORD ?? "testpassword123";
 const W = Number(process.argv[2] || 375);
+const at = (path) => `${BASE}${path.replace(/^\//, "")}`.replace(/([^:])\/\//g, "$1/");
 const log = (...a) => console.log(...a);
 let failures = 0;
 const ok = (cond, label, extra = "") => { log(`${cond ? "  PASS" : "  FAIL"}  ${label}${extra ? ` — ${extra}` : ""}`); if (!cond) failures += 1; };
@@ -43,15 +44,43 @@ const ok = (cond, label, extra = "") => { log(`${cond ? "  PASS" : "  FAIL"}  ${
  * Published behind current is the only state the warning exists for, and it takes three writes to reach:
  * set current, publish it, then move current ahead.
  */
-const API = "http://localhost:3001/api/v1";
-const token = (await (await fetch("http://localhost:3001/api/gm/login", {
+// `AUDIT_API` for the same reason `AUDIT_URL` exists beside it: the server origin was the one hardcoded
+// value left, so this could only ever run against the default port.
+const ORIGIN = process.env.AUDIT_API ?? "http://localhost:3001";
+const API = `${ORIGIN}/api/v1`;
+const token = (await (await fetch(`${ORIGIN}/api/gm/login`, {
   method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: PASSWORD })
 })).json()).token;
-const cal = (day, month) => ({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["Mon", "Tue"], currentDate: { year: 1492, month, day } });
+const cal = (day, month, eras = []) => ({ yearName: "DR", eras, months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["Mon", "Tue"], currentDate: { year: 1492, month, day } });
 const put = (body) => fetch(`${API}/codex/calendar`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+const publishNow = () => fetch(`${API}/codex/calendar/publish`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+/**
+ * A REAL player token, from the same open LAN-trust route a headless player client uses
+ * (`POST /api/v1/sessions/player`). Reading the calendar as the GM and inspecting `publishedDate` would be
+ * the GM's own view of the party's clock; this reads what a player is actually served, which is the only
+ * claim worth making about a projection.
+ */
+const playerToken = (await (await fetch(`${API}/sessions/player`, { method: "POST" })).json()).data.token;
+const playersDate = async () =>
+  (await (await fetch(`${API}/codex/calendar`, { headers: { authorization: `Bearer ${playerToken}` } })).json())?.data?.calendar?.currentDate ?? null;
+
+/**
+ * **D6 (`5f`), asserted at the API before the browser starts: setting the GM's date does NOT move the
+ * party's.** This used to be untrue — `writeCalendar` published the first date any codex was ever given
+ * (K7) — and it is the whole of what the client reported as "setting a date sets both at once". This codex
+ * holds the six records below, so it is in USE, which is the case the exemption no longer covers.
+ *
+ * The seeding case D6 KEPT is deliberately not exercised here: it needs a codex with nothing in it, which
+ * this fixture is the opposite of. `codex-http.test.ts` owns both arms.
+ */
+const partyBefore = await playersDate();
 await put(cal(10, 0));
-await fetch(`${API}/codex/calendar/publish`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+const afterSet = await playersDate();
+ok(JSON.stringify(afterSet) === JSON.stringify(partyBefore), "D6: setting the GM's date leaves the party's date alone", `party was ${JSON.stringify(partyBefore)}, now ${JSON.stringify(afterSet)}`);
+await publishNow();
+ok(JSON.stringify(await playersDate()) === JSON.stringify({ year: 1492, month: 0, day: 10 }), "D6: publishing — and only publishing — moves it");
 await put(cal(28, 1));
+ok(JSON.stringify(await playersDate()) === JSON.stringify({ year: 1492, month: 0, day: 10 }), "D6: running the prep clock ahead leaves the party where they were");
 
 /**
  * Reveal state is seeded EXPLICITLY too, for the same reason: the run itself flips switches, so a second
@@ -81,13 +110,21 @@ await pw.fill(PASSWORD);
 await pw.press("Enter");
 await p.waitForTimeout(2500);
 
-const codexTab = p.getByRole("tab", { name: "Codex", exact: true });
-await codexTab.waitFor({ state: "visible", timeout: 20_000 });
-await codexTab.click({ force: true });
-await p.waitForTimeout(1000);
-await p.getByRole("tab", { name: "Journal", exact: true }).click({ force: true });
-await p.waitForTimeout(1500);
-log(`\n=== ${W}px — Journal ===`);
+/**
+ * Codex sections are ROUTES, so this navigates by URL the way `tap-audit.mjs` does.
+ *
+ * It used to click `getByRole("tab", { name: "Journal" })`, and that had rotted: the Codex sidebar is
+ * `<button class="codex-navitem">` — role `button`, not `tab` — and it renders TWICE (rail and drawer),
+ * only one of them visible at a phone width. The run died on a 30s timeout before reaching a single
+ * assertion. A URL is what the section actually is, and it cannot go stale behind a markup change.
+ */
+const section = async (path, label) => {
+  await p.goto(at(path), { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await p.waitForSelector(".codex-root", { timeout: 25_000 });
+  await p.waitForTimeout(1500);
+  log(`\n=== ${W}px — ${label} ===`);
+};
+await section("/codex/journal", "Journal");
 
 /** §4's authoritative measurement: the paint OR the ::after box, whichever is bigger. */
 const tapFloor = async (root) => {
@@ -203,6 +240,61 @@ await noOverflow("after publishing");
 // ---- 5. The whole Journal's tap floor, with the new controls on screen.
 const journalUnder = await tapFloor(".codex-journal");
 ok(journalUnder.length === 0, "every Journal control meets the 44px floor", journalUnder.map((u) => `${u.text} ${u.w}x${u.h}`).join("; "));
+
+/**
+ * ---- 5b. THE CALENDAR (`5f`(i)/(ii), D6). The far-end proof, in a real browser: a GM sets their date and
+ * the players' clock does not move; publishing moves it.
+ *
+ * This section is why the harness's assertions changed with D6. Publish used to render only while the
+ * clocks had diverged, and the server auto-published the first date any codex was given — so from the unset
+ * state there was no visible publish act at all, and the two readouts behaved as one clock. Publish is now
+ * always on screen, and the GM's clock is a button rather than a label.
+ *
+ * Step 4 above published, so the two clocks AGREE when this section opens. That is the state that used to
+ * render nothing, which makes it the right one to start from.
+ */
+await section("/codex/calendar", "Calendar (5f)");
+
+const publishBtn = p.getByRole("button", { name: "Publish the date" }).first();
+ok(await publishBtn.isVisible(), "D6: Publish is on screen even with the clocks in agreement");
+ok(await publishBtn.isDisabled(), "...and disabled, because there is nothing to publish");
+ok(await p.getByText(/The party is on your date/).isVisible(), "the relationship is stated, not inferred");
+
+// `5f`(i): the GM's clock is a door. The players' clock is not, and must never become one (D11-H).
+const clockDoor = p.locator(".codex-calendar-clockset").first();
+ok(await clockDoor.count() === 1, "exactly one clock is settable — the GM's", `found ${await p.locator(".codex-calendar-clockset").count()}`);
+const doorBox = await clockDoor.evaluate((el) => {
+  const r = el.getBoundingClientRect(), a = getComputedStyle(el, "::after");
+  return { paintH: Math.round(r.height), afterH: Math.round(parseFloat(a.height) || 0) };
+});
+ok(doorBox.paintH >= 44 && doorBox.afterH === 0, "the clock door takes §4 route 1 (paint, no ::after overhang)", JSON.stringify(doorBox));
+
+await clockDoor.click();
+await p.waitForTimeout(800);
+const dateSheet = p.locator('dialog[open][aria-label="Your date"]').first();
+ok(await dateSheet.isVisible(), "`5f`(i): the clock opens a date editor of its own, not the world's structure");
+const dateUnder = await tapFloor('dialog[open][aria-label="Your date"]');
+ok(dateUnder.length === 0, "every control in the date editor meets the 44px floor", dateUnder.map((u) => `${u.text} ${u.w}x${u.h}`).join("; "));
+await noOverflow("the date editor open");
+
+// Move the GM's clock forward BY HAND, through the new editor, and watch the party stay put.
+const partyBeforeSet = await playersDate();
+await dateSheet.getByRole("spinbutton", { name: "Day" }).fill("29");
+await dateSheet.getByRole("button", { name: "Set the date" }).click({ force: true });
+await p.waitForTimeout(1800);
+ok(JSON.stringify(await playersDate()) === JSON.stringify(partyBeforeSet), "D6, far end: the GM sets a date in the browser and the party's clock does NOT move",
+  `party was ${JSON.stringify(partyBeforeSet)}, now ${JSON.stringify(await playersDate())}`);
+ok(/Alturiak 29, 1492 DR/.test((await p.locator(".codex-calendar-clocks").first().textContent()) ?? ""), "...and the GM's own clock did");
+const publishAgain = p.getByRole("button", { name: "Publish the date" }).first();
+ok(await publishAgain.isEnabled(), "Publish arms itself once the clocks diverge");
+ok(await p.getByText(/You are running ahead of the party/).isVisible(), "and the row says which way the two clocks are apart");
+await publishAgain.click();
+await p.waitForTimeout(1800);
+ok(JSON.stringify(await playersDate()) === JSON.stringify({ year: 1492, month: 1, day: 29 }), "D6, far end: publishing — and only publishing — moves the party");
+
+const calendarUnder = await tapFloor(".codex-calendar");
+ok(calendarUnder.length === 0, "every Calendar control meets the 44px floor", calendarUnder.map((u) => `${u.text} ${u.w}x${u.h}`).join("; "));
+await noOverflow("the Calendar after publishing");
 
 // ---- 6. The reveal audit badges a chronicle row's kind.
 log(`\n=== ${W}px — Reveal audit ===`);

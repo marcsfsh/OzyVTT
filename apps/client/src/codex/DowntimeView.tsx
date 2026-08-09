@@ -57,6 +57,8 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /** `5e.4`: a Confirm failure belongs to the row it was pressed on, not to the composer 450px above it. */
+  const [rowError, setRowError] = useState<Readonly<{ id: string; message: string }> | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editWho, setEditWho] = useState("");
   const [editActivity, setEditActivity] = useState("");
@@ -133,10 +135,30 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
     } catch (logError) { setFormError(logError instanceof Error ? logError.message : "Couldn't log that downtime."); }
     finally { setBusy(false); }
   };
+  /**
+   * `5e.4` — Confirm either works or says why, **beside the row that was pressed**.
+   *
+   * The reported symptom was "Confirm does nothing". It was never a no-op: the click fired, the route was
+   * right, the store write was right, and the server answered with a reason. The reason rendered in the
+   * `formError` Alert at the TOP of this view — above a ~450px `Log downtime` section, and the Pending list
+   * is the section below it. From where the GM was looking, a correct 400 was indistinguishable from a dead
+   * button. Errors from a row belong to that row.
+   *
+   * TWO failure modes, and one branch is not enough. `applyDowntime` throws:
+   *  - **400** when the campaign has no current date — `proposedDateFor` returns null because there is
+   *    nothing to advance FROM. Handled before the click, by disabling Confirm and stating the fix inline.
+   *  - **409** when the record is already applied. That cannot come from this list (it renders only
+   *    `!applied` rows), so it means the PAGE IS STALE — someone confirmed it elsewhere, or this is a
+   *    double-submit. `onChanged()` is the actual repair, so it is called on failure as well as on success:
+   *    a refetch drops the row out of Pending and the message explains the row that just vanished.
+   */
   const confirmRow = async (row: DowntimeRow) => {
-    setFormError(null);
+    setRowError(null);
     try { await journalApi.applyDowntime(gmToken, row.record.id); onChanged(); }
-    catch (applyError) { setFormError(applyError instanceof Error ? applyError.message : "Couldn't move the clock."); }
+    catch (applyError) {
+      setRowError({ id: row.record.id, message: applyError instanceof Error ? applyError.message : "Couldn't move the clock." });
+      onChanged();
+    }
   };
   const saveEdit = async (id: string) => {
     setBusy(true); setFormError(null);
@@ -155,6 +177,16 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
     const passes = deadlinesPassedBy(records, calendar, target);
     return `Move your date to ${formatWorldDate(calendar, target)}${passes > 0 ? ` (passes ${passes} deadline${passes === 1 ? "" : "s"})` : ""}`;
   };
+  /**
+   * `5e.4`, the first of the two branches: with no campaign date there is nothing to advance FROM, so the
+   * server refuses (`proposedDateFor` → null → 400). Both halves of the old symptom are this same null —
+   * the refusal AND the bare "Confirm" label, which is `confirmLabel`'s fallback above.
+   *
+   * Read from the CALENDAR rather than from `record.proposedDate`, even though the two agree here: the
+   * calendar is the cause, so it is what the sentence can name. `proposedDate` is null on an applied record
+   * too, and this list holds none of those.
+   */
+  const noCampaignDate = !calendar?.currentDate;
 
   if (loading && rows.length === 0) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
 
@@ -197,6 +229,11 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
       {pending.length > 0 && (
         <section className="codex-downtime-section">
           <h3 className="codex-campaign-h">Pending confirmations</h3>
+          {/* Once, above the list, not once per row: the cause is the campaign's, not any one record's, and
+              repeating it on five pending rows would say the same sentence five times. */}
+          {noCampaignDate && (
+            <Alert tone="warning">Set your date on the Calendar before passing time — confirming moves it forward, and there is nothing to move it from.</Alert>
+          )}
           <ul className="codex-downtime-pending">
             {pending.map((row) => (
               <li key={row.record.id} className="codex-downtime-pendingrow">
@@ -204,7 +241,8 @@ export function DowntimeView({ gmToken, records, calendar, pages, actors = [], l
                 <span className="codex-list-title">{downtimeSummaryLabel(row.payload)}</span>
                 {/* Secondary, not primary: the row already states the consequence in words, and this view's
                     one primary action is "Log downtime" above (§5, one primary per view). */}
-                <Button variant="secondary" size="sm" onClick={() => void confirmRow(row)}>{confirmLabel(row.record.proposedDate)}</Button>
+                <Button variant="secondary" size="sm" disabled={noCampaignDate} onClick={() => void confirmRow(row)}>{confirmLabel(row.record.proposedDate)}</Button>
+                {rowError?.id === row.record.id && <Alert tone="danger">{rowError.message}</Alert>}
               </li>
             ))}
           </ul>

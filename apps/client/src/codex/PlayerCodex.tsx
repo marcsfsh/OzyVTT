@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Checklist, Chip, Combobox, Drawer, IconButton, IconChevron, Input, Kbd, Select, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
 import {
-  formatWorldDate, playerCodexApi,
+  formatWorldDate, formatWorldYear, playerCodexApi,
   type CodexCalendar, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexConnection,
   type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageConnection,
   type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession, type PlayerCodexStanding
@@ -708,7 +708,10 @@ function PlayerJournal({ records, calendar, pages, token, focusedId, onNavigate,
     }
     return [...buckets.keys()]
       .sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b))
-      .map((key) => ({ key: key === null ? "none" : String(key), label: key === null ? "Undated" : `${key}${calendar?.yearName ? ` ${calendar.yearName}` : ""}`, records: buckets.get(key)! }));
+      // `formatWorldYear` rather than a fourth inline copy of "year plus era suffix": once eras lead the
+      // year (`5f`(iii)) an inline copy would head the player's timeline "1492 DR" while every date INSIDE
+      // it read "Third Age 1492 DR". One formatter, one answer.
+      .map((key) => ({ key: key === null ? "none" : String(key), label: key === null ? "Undated" : calendar ? formatWorldYear(calendar, key) : String(key), records: buckets.get(key)! }));
   }, [filtered, calendar]);
   const todayYear = calendar?.currentDate
     ? Math.floor(((calendar.months.slice(0, calendar.currentDate.month).reduce((sum, month) => sum + month.days, 0) + calendar.currentDate.day - 1) + calendar.currentDate.year * (calendar.months.reduce((sum, month) => sum + month.days, 0) || 1)) / (calendar.months.reduce((sum, month) => sum + month.days, 0) || 1))

@@ -13,6 +13,44 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-09 — the calendar's two clocks are independent, and an era is derived from the year
+
+Client report (`5f`): *"Your date and Players' date give no indication of how to set them, setting a date
+sets **both** at once, and there is no era field."* Three rulings, one of which **reverses a dated decision
+in this log** and is recorded here rather than edited quietly into the code it contradicts.
+
+- **REVERSED: K7's auto-publish now covers seeding ONLY.** `writeCalendar` published the first campaign date
+  a codex was ever given. K7's reasoning — v15 backfills `published_*` for pre-M11 campaigns, so a post-M11
+  one would otherwise set a date and leave every player blank — was sound, and its scope was too wide. A GM
+  who has run a campaign for months, never published a date, and finally sets one **while prepping** had it
+  broadcast to the table by a write that says nothing about publishing. That is what the client reported as
+  "setting a date sets both at once", and no arrangement of the UI could have decoupled it, because the
+  coupling was one line in the store. Auto-publish now requires `isUnusedCodex()` — no pages, journal, maps,
+  markers, quests, sessions, standing, connections or folders — which is the case K7 was actually protecting:
+  a codex being **set up** rather than run. `importBundle` is unaffected; it wipes every table and then
+  writes the bundle's own published date over the result. (`apps/server/src/codex-store.ts`, `writeCalendar`.)
+- **Publish is always visible, disabled when there is nothing to publish.** It used to render only while the
+  clocks had diverged (`CalendarView.tsx`). Combined with the auto-publish above, that meant that **from the
+  unset state there was no visible publish act at all** — the GM set a date, the server published it, the
+  clocks agreed, and no control ever appeared. Two clocks with no visible act between them read as one clock
+  with two readouts, and that absence, not the server line alone, is why they felt welded. A disabled button
+  with the reason beside it protects against a no-op click without concealing that the act exists.
+- **The GM's clock is a door; the players' is not.** "Not set" was plain text, and the only way in was a
+  ghost "Edit calendar" button opening the world's structure, where the date is the *fourth* field. It is now
+  a button opening a dedicated date editor (`CampaignDateEditor`). The players' clock deliberately gains no
+  such affordance: **D11-H stands** — the published date is a COPY made by `publishCampaignDate()` and by
+  nothing else, so a "set the players' date" control is one that cannot exist. Its one door is Publish.
+- **An era is DERIVED from the year, never stored on a date.** `CodexCalendar.eras` is a list of
+  `{name, startYear}` inside `calendar_json`; a date's era is the last era whose start its year has reached.
+  So the whole migration is `normalizeCalendar` reading `eras ?? []` — no `ALTER`, no backfill, no stored
+  date rewritten, and an existing calendar upgrades by being read. The rejected alternative (an `era` field on
+  `CodexInWorldDate`) needs `in_world_era` on two tables plus three `published_*` siblings, a backfill that
+  must **invent** a value for every date already written, and it makes `calendar_instant` ambiguous. Eras are
+  **projected to both audiences, never filtered** — structure on the footing of `months` and `weekdays`, which
+  a player has always received. `yearName` ("Era suffix") is kept and unchanged: with no eras defined, every
+  label is byte-identical to what it was. Where an era applies it **leads** the year — "Third Age 1492" —
+  which is the "suffix rather than a leading component" defect the report named.
+
 ## 2026-08-09 — a quest has five statuses, "open" means not finished, and a new quest is Not started
 
 Client report (`5d`): *"Quests need to expand their status options, it at least needs 'Not started'
@@ -483,6 +521,12 @@ was "STOP and report the contradiction", and it went unreported until the advers
 expected red on handoff.** The first is simpler and is what the rule should have said.
 
 ## 2026-07-29 — M11: the first campaign date a codex is ever given publishes itself
+
+> **SUPERSEDED (2026-08-09, D6 — "the calendar's two clocks are independent", top of this file).** The
+> reasoning below stands; its **scope** was too wide. Auto-publish now fires only for a codex holding **no
+> records at all** — the seeding case this entry was actually protecting — because on a campaign that
+> already exists, the first date is set while *prepping*, and prep is private. The narrowing is
+> `isUnusedCodex()` in `apps/server/src/codex-store.ts`.
 
 O-1 makes the GM's clock private, and migration v15 backfills the published date so an existing campaign
 sees no change. A campaign created *after* M11 has nothing to backfill — so the GM would set "Current

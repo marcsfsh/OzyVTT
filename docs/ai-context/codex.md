@@ -64,6 +64,17 @@ of record the GM is editing* is itself GM information.
   record rather than recomputing.
 - The player calendar and the GM calendar are two clocks. Advancing the GM's campaign "now"
   never moves the players'; a campaign date reaches players only when it is published.
+  **One exemption, and it is the only one (D6, 2026-08-09):** `writeCalendar` still
+  auto-publishes the first date given to a codex that holds **no records at all** — the
+  seeding case. K7 used to exempt the first date of *any* codex, which meant an existing
+  campaign's first date was broadcast by a write that says nothing about publishing;
+  `isUnusedCodex()` is what narrowed it.
+- An era is **derived, never stored on a date** (`5f`). `CodexCalendar.eras` is a list inside
+  `calendar_json`, and a date's era is the last era whose `startYear` its year has reached
+  (`eraForYear`). There is no `in_world_era` column and there must not be one: it would make
+  `calendar_instant` ambiguous and force a backfill to invent a value for every date already
+  written. Changing the list re-labels dated records through `writeCalendar`'s reflow; it
+  never moves one.
 - Codex projections are a *second* boundary, separate from the table viewer's. If you are
   changing them, `.claude/rules/viewer-safety.md` is the rule to load, and
   `docs/ai-context/viewer-mode.md` covers the other half.

@@ -430,6 +430,25 @@ const SURFACES = [
     }) },
   { name: "journal", path: "/codex/journal" },
   { name: "calendar", path: "/codex/calendar" },
+  // The GM's clock on its own (`5f`(i)). The date used to be the FOURTH field of the structure modal, so
+  // the only surface a run ever measured was `calendar-editor`; this dialog is new, it is the one a GM
+  // opens most, and its three date boxes plus two footer buttons exist only once it is opened.
+  { name: "calendar-date-editor", path: "/codex/calendar", open: async (page) => {
+      const door = page.locator(".codex-calendar-clockset").first();
+      if (await door.count() === 0) throw new Error("the Calendar has no clock button to open the date editor");
+      await door.click({ timeout: 8_000 });
+      await page.locator('dialog[open][aria-label="Your date"]').waitFor({ state: "visible", timeout: 8_000 });
+      await page.waitForTimeout(500);
+    } },
+  // The world's structure, which grew the era list in `5f`(iii) — one row of two inputs and a remove
+  // button per era, none of which a closed modal has.
+  { name: "calendar-editor", path: "/codex/calendar", open: async (page) => {
+      await page.getByRole("button", { name: "Edit calendar" }).first().click({ timeout: 8_000 });
+      const sheet = page.locator('dialog[open][aria-label="Calendar"]');
+      await sheet.waitFor({ state: "visible", timeout: 8_000 });
+      await sheet.getByRole("button", { name: "Add era" }).click({ timeout: 8_000 });
+      await page.waitForTimeout(500);
+    } },
   // …with the "Who" chooser OPEN (`5e.3`): same reason as `session-editor` above. The list carries one
   // row per character page, marked "Archived" where the table has retired one, and a closed box shows
   // none of them.

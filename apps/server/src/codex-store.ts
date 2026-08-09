@@ -281,10 +281,24 @@ export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind
 export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageIds?: readonly string[]; subMapId?: string | null; sceneIds?: readonly string[]; actorId?: string | null; tags?: readonly string[] }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
 
-/** The world's calendar: ordered months (each with a length), weekday names, and an era suffix. */
+/** The world's calendar: ordered months (each with a length), weekday names, named eras, and an era suffix. */
 export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
+/**
+ * A named era, starting at `startYear` and running until the next one starts (`5f`(iii)).
+ *
+ * **Era is DERIVED, never stored on a date.** A date's era is the last era whose `startYear` it has reached,
+ * which is the whole of the read rule (`eraForYear`). The alternative - an `era` field on `CodexInWorldDate` -
+ * needs `in_world_era` columns on `codex_journal` and `codex_pages` plus three `published_*` siblings, and a
+ * backfill that would have to INVENT a value for every date already stored. This shape needs neither: it
+ * lives inside `calendar_json`, so an existing calendar upgrades by being read, and no stored date is
+ * touched. It also keeps `calendar_instant` unambiguous, which a per-date era would not.
+ *
+ * Empty is the default and is exactly today's behaviour: with no eras, `yearName` remains the trailing suffix
+ * it has always been and every label is byte-identical.
+ */
+export type CodexCalendarEra = Readonly<{ name: string; startYear: number }>;
 /** The world's calendar; `currentDate` is the campaign's "now" (a Today marker on the timeline), optional. */
-export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
+export type CodexCalendar = Readonly<{ yearName: string; eras?: readonly CodexCalendarEra[]; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
 /** A structured in-world date (month is a 0-based index into the calendar's months). */
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
 
@@ -1941,7 +1955,46 @@ function normalizeCalendar(input: CodexCalendar): CodexCalendar {
   const currentDate = current && Number.isFinite(current.year) && Number.isFinite(current.month) && Number.isFinite(current.day)
     ? { year: Math.trunc(current.year), month: Math.max(0, Math.min(Math.trunc(current.month), months.length - 1)), day: Math.max(1, Math.trunc(current.day)) }
     : null;
-  return { yearName: shortLabel(input.yearName, 20, "era") ?? "", months, weekdays, currentDate };
+  /**
+   * `5f`(iii). **Additive and defaulted, which is the entire migration**: this function returns a fresh
+   * literal over one `calendar_json` blob, so a calendar written before eras existed reads back with `[]`
+   * and formats byte-identically. No ALTER, no backfill, no stored date rewritten.
+   *
+   * SORTED here rather than trusted from input, because `eraForYear` is a "last one reached" scan and an
+   * out-of-order list would silently name the wrong era. Doing it on the way IN means every reader gets the
+   * invariant for free - including a hand-edited blob, which is the case a read-side sort would also cover
+   * but a write-side check would not. Bounded at 20 to match the weekday cap, for the same reason: this
+   * whole object arrives from client input on `PUT /codex/calendar`.
+   */
+  const eras = (input.eras ?? []).slice(0, 20)
+    .map((era) => ({ name: shortLabel(era.name, 40, "era name") ?? "Era", startYear: Number.isFinite(era.startYear) ? Math.trunc(era.startYear) : 0 }))
+    .sort((a, b) => a.startYear - b.startYear);
+  return { yearName: shortLabel(input.yearName, 20, "era") ?? "", eras, months, weekdays, currentDate };
+}
+/**
+ * The era a year falls in, or null - `5f`(iii)'s one read rule, stated once and used by every label.
+ *
+ * "The last era whose start the year has reached." A year before the first era's start has no era, and is
+ * rendered exactly as an era-less calendar renders it, so a half-configured calendar degrades to today's
+ * behaviour rather than to a wrong name.
+ */
+function eraForYear(calendar: CodexCalendar, year: number): CodexCalendarEra | null {
+  let found: CodexCalendarEra | null = null;
+  for (const era of calendar.eras ?? []) { if (Math.trunc(year) >= era.startYear) found = era; else break; }
+  return found;
+}
+/**
+ * A year with whatever qualifies it: the ERA LEADS when one applies, and `yearName` trails when none does.
+ *
+ * That split is the fix `5f`(iii) actually asked for. `yearName` ("Era suffix" in the editor) was already an
+ * era, but singular and a SUFFIX - "1492 DR". A named era is a leading component - "Third Age 1492" - and a
+ * calendar that has never defined one keeps the suffix it has always had, byte for byte. Both at once is a
+ * GM's choice and reads "Third Age 1492 DR", which is the honest rendering of a world that has both.
+ */
+function formatWorldYear(calendar: CodexCalendar, year: number): string {
+  const era = eraForYear(calendar, year);
+  const truncated = Math.trunc(year);
+  return `${era ? `${era.name} ` : ""}${truncated}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
 }
 function calendarDaysPerYear(calendar: CodexCalendar): number { return calendar.months.reduce((sum, month) => sum + month.days, 0); }
 /** An absolute, monotonically-increasing day number for chronological sorting (negative years allowed). */
@@ -1987,7 +2040,7 @@ function formatInWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): str
   const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
   const month = calendar.months[monthIdx];
   const day = Math.max(1, Math.min(Math.trunc(date.day), month.days));
-  const base = `${month.name} ${day}, ${Math.trunc(date.year)}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
+  const base = `${month.name} ${day}, ${formatWorldYear(calendar, date.year)}`;
   if (calendar.weekdays.length > 0) {
     const instant = calendarInstantOf(calendar, date);
     const index = ((instant % calendar.weekdays.length) + calendar.weekdays.length) % calendar.weekdays.length; // non-negative for negative years
@@ -4281,21 +4334,51 @@ export class CodexStore {
       for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
     }
     /**
-     * The FIRST campaign date a codex is ever given publishes itself.
+     * The first campaign date an EMPTY codex is given publishes itself. Nothing else does.
      *
-     * v15 backfills `published_*` from `currentDate`, so an EXISTING campaign sees no change on upgrade
-     * (K7). A campaign created after M11 has no such row to backfill, and without this the GM would set
-     * "Current date - the world's now" in the calendar editor and every player's date would stay blank,
-     * with the only explanation living on a different screen. That is a silent regression against the
-     * behaviour every pre-M11 campaign had, and nobody approved removing it.
+     * **K7, narrowed (D6, 2026-08-09).** K7 read "the FIRST campaign date a codex is ever given publishes
+     * itself", on the reasoning that v15 backfills `published_*` for pre-M11 campaigns and a post-M11
+     * campaign would otherwise set a date and leave every player blank. The reasoning was sound and the
+     * scope was too wide: a GM who has been running a campaign for months, has never published a date, and
+     * finally sets one while PREPPING had it broadcast to the table by a write that says nothing about
+     * publishing. That is the coupling the client reported as "setting a date sets both at once", and no
+     * amount of client work could undo it because it happens in the store.
+     *
+     * The seeding case K7 was actually protecting survives intact, and is now stated as itself: a codex
+     * with **no records at all** is being set up, not run, and its first date is a starting position rather
+     * than prep. `importBundle` is unaffected either way - it wipes every table before calling this and then
+     * writes the bundle's own published date over whatever this produced.
      *
      * Publishing here cannot leak anything: the prep clock exists to run AHEAD of the party, and there is
-     * no "ahead" of a date they have never been given. Only the transition from "no published date" to
-     * "a published date" is automatic - once players have a date, every later move of the GM's clock is
-     * private until published, which is the whole of O-1.
+     * no "ahead" of a date they have never been given - and in the seeding case there is no campaign yet to
+     * be ahead of. Every later move of the GM's clock is private until published, which is the whole of O-1.
+     *
+     * The visible publish act D6 pairs with this lives on the Calendar (`CalendarView.tsx`): Publish is
+     * rendered whether or not the clocks have diverged, so the GM can see the act exists before they need it.
      */
-    if (calendar.currentDate && this.getPublishedDate() === null) this.writePublishedDate(calendar.currentDate);
+    if (calendar.currentDate && this.getPublishedDate() === null && this.isUnusedCodex()) this.writePublishedDate(calendar.currentDate);
     this.bumpRevision();
+  }
+
+  /**
+   * True while the codex holds no authored record of any kind - the "being seeded" state `writeCalendar`'s
+   * auto-publish is scoped to (D6).
+   *
+   * Authored tables only. `codex_links`, `codex_search_player`, `codex_search_gm` and `codex_page_revisions`
+   * are DERIVED from pages and journal entries, so counting them would say nothing a page count does not
+   * already say - and `codex_folders` is included because registering a folder is an authoring act even
+   * before a page lands in it.
+   *
+   * `EXISTS` rather than `COUNT(*)`: this runs on every calendar write and the question is "any at all",
+   * which stops at the first row. Ordered cheapest-first is pointless here for the same reason - each arm
+   * is O(1) - but pages and journal lead because they are what a real campaign has first.
+   */
+  private isUnusedCodex(): boolean {
+    const database = this.requireDatabase();
+    const clauses = ["codex_pages", "codex_journal", "codex_maps", "codex_markers", "codex_quests", "codex_sessions", "codex_standing", "codex_relationships", "codex_folders"]
+      .map((table) => `EXISTS(SELECT 1 FROM ${table})`).join(" OR ");
+    const row = database.prepare(`SELECT (${clauses}) AS used`).get() as { used: number } | undefined;
+    return !row?.used;
   }
 
   /**

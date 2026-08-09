@@ -1,5 +1,5 @@
 import { deadlineFired } from "./codex-store.js";
-import type { CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexConnectionRow, CodexConnectionSourceKind, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexPageConnectionRow, CodexRecordKind, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
+import type { CodexCalendar, CodexCalendarEra, CodexCalendarMonth, CodexChronicleRecord, CodexConnectionRow, CodexConnectionSourceKind, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexPageConnectionRow, CodexRecordKind, CodexSessionRow, CodexStandingRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -1005,6 +1005,7 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
  */
 export type GmCodexCalendar = Readonly<{
   yearName: string;
+  eras: readonly CodexCalendarEra[];
   months: readonly CodexCalendarMonth[];
   weekdays: readonly string[];
   /** The GM's clock - the campaign's authoritative "now". Never reaches a player by any path. */
@@ -1030,20 +1031,29 @@ export type GmCodexCalendar = Readonly<{
  *
  * `publishedDate` is deliberately NOT echoed back to a player: for a player `currentDate` already IS the
  * published date, so a second key could only duplicate it or lie about it.
+ *
+ * **`eras` is projected, not filtered (`5f`(iii)).** It is STRUCTURE, on the same footing as `months`,
+ * `weekdays` and `yearName`, all three of which a player has always received: an era is what the world calls
+ * a span of its own years, and a player who is shown a date must be able to read it. A player's date is the
+ * PUBLISHED one, so the era they compute from it is the era of a day they have already been given - naming
+ * a future era in the list tells them a period exists, exactly as naming a month they have not lived through
+ * does. Nothing GM-only is derivable from it: it carries no dates the party has not been shown, and
+ * `currentDate` is still the only clock on this object.
  */
 export type PlayerCodexCalendar = Readonly<{
   yearName: string;
+  eras: readonly CodexCalendarEra[];
   months: readonly CodexCalendarMonth[];
   weekdays: readonly string[];
   currentDate: CodexInWorldDate | null;
 }>;
 
 export function projectGmCalendar(calendar: CodexCalendar, publishedDate: CodexInWorldDate | null): GmCodexCalendar {
-  return { yearName: calendar.yearName, months: calendar.months, weekdays: calendar.weekdays, currentDate: calendar.currentDate ?? null, publishedDate };
+  return { yearName: calendar.yearName, eras: calendar.eras ?? [], months: calendar.months, weekdays: calendar.weekdays, currentDate: calendar.currentDate ?? null, publishedDate };
 }
 
 export function projectPlayerCalendar(calendar: CodexCalendar, publishedDate: CodexInWorldDate | null): PlayerCodexCalendar {
-  return { yearName: calendar.yearName, months: calendar.months, weekdays: calendar.weekdays, currentDate: publishedDate };
+  return { yearName: calendar.yearName, eras: calendar.eras ?? [], months: calendar.months, weekdays: calendar.weekdays, currentDate: publishedDate };
 }
 
 // ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----

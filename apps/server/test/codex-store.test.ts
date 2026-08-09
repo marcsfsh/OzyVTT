@@ -2368,6 +2368,164 @@ describe("CodexStore migration v26 — two more quest statuses, no quest touched
 });
 
 /**
+ * `5f`(iii) — **eras arrive with no migration, and this describe is the proof rather than the claim.**
+ *
+ * The design that made that possible: an era is a CALENDAR-LEVEL list and a date's era is DERIVED from its
+ * year. Nothing is stored on a date, so there is no `in_world_era` column, no `published_era` sibling, and
+ * no backfill that would have had to invent a value for every date a campaign has already written down. The
+ * whole of the upgrade is `normalizeCalendar` reading `input.eras ?? []` out of one `calendar_json` blob.
+ *
+ * The worst outcome available here is a change that loses or mangles a live campaign's dates, so the four
+ * tests below are stated as byte-identity rather than as behaviour. The fixture is built through the
+ * store's own write path and then DOWNGRADED — the `eras` key is deleted straight out of the stored blob,
+ * which is exactly what is on disk in every campaign written before today.
+ */
+describe("CodexStore eras — additive inside calendar_json, no stored date touched (5f)", () => {
+  /** Every dated row's derived and raw columns, read as raw SQL so a projection cannot paper over a loss. */
+  const datedRows = (path: string) => {
+    const database = new DatabaseSync(path);
+    const read = (table: string) => database.prepare(`SELECT id, in_world_year, in_world_month, in_world_day, calendar_instant, in_world_label FROM ${table} WHERE in_world_year IS NOT NULL ORDER BY id`).all();
+    const out = { journal: read("codex_journal"), pages: read("codex_pages"), meta: database.prepare("SELECT published_year, published_month, published_day, calendar_json FROM codex_meta WHERE id = 1").get() };
+    database.close();
+    return out;
+  };
+  /** A campaign of the shape a real one has: a custom calendar, a published clock, dated entries and events. */
+  const seedCampaign = (target: CodexStore) => {
+    target.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 28 }], weekdays: ["Sul", "Mol"], currentDate: { year: 1491, month: 0, day: 4 } });
+    target.publishCampaignDate();
+    target.setCalendar({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 28 }], weekdays: ["Sul", "Mol"], currentDate: { year: 1492, month: 1, day: 9 } });
+    return {
+      entry: target.createEntry({ playerText: "The party met in Daggerford.", inWorldDate: { year: 1491, month: 0, day: 4 } }),
+      deadline: target.createDeadline({ playerText: "The tax falls due.", inWorldDate: { year: 1492, month: 1, day: 20 } }),
+      event: target.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1200, month: 1, day: 3 } })
+    };
+  };
+  /** Strip `eras` from the stored blob — the pre-`5f` shape, byte for byte. */
+  const downgradeCalendarJson = (path: string) => {
+    const database = new DatabaseSync(path);
+    const row = database.prepare("SELECT calendar_json FROM codex_meta WHERE id = 1").get() as { calendar_json: string };
+    const parsed = JSON.parse(row.calendar_json) as Record<string, unknown>;
+    expect(parsed).toHaveProperty("eras");                                   // the fixture is a real downgrade
+    delete parsed.eras;
+    database.prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(parsed));
+    database.close();
+  };
+
+  /**
+   * SAFETY TEST 1 + 2. A file written before eras existed, reopened by a store that knows about them:
+   * every dated row's raw date, sort instant and display label byte-identical, and both clocks unmoved.
+   *
+   * `migrate()` runs on `initialize()`, so simply reopening the file is the migration. It is a no-op by
+   * construction and this is what proves it rather than asserting it.
+   */
+  it("upgrades a pre-eras file by reading it: every dated row and both clocks byte-identical", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-eras-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let first: CodexStore | undefined;
+    let reopened: CodexStore | undefined;
+    try {
+      first = new CodexStore(path);
+      await first.initialize();
+      const seeded = seedCampaign(first);
+      const clocksBefore = { published: first.getPublishedDate(), current: first.getCalendar().currentDate };
+      first.close(); first = undefined;
+
+      downgradeCalendarJson(path);
+      const before = datedRows(path);
+      expect(before.journal).toHaveLength(2);
+      expect(before.pages).toHaveLength(1);
+      expect(JSON.parse(String(before.meta!.calendar_json))).not.toHaveProperty("eras");
+
+      reopened = new CodexStore(path);
+      await reopened.initialize();                                            // <- migrate() runs here
+      const after = datedRows(path);
+
+      // 1. Raw dates, sort instants and display labels: whole-row equality, nothing excused.
+      expect(after.journal).toEqual(before.journal);
+      expect(after.pages).toEqual(before.pages);
+      // 2. Both clocks, through the store's own reads and through the raw columns beneath them.
+      expect(reopened.getPublishedDate()).toEqual(clocksBefore.published);
+      expect(reopened.getCalendar().currentDate).toEqual(clocksBefore.current);
+      expect([after.meta!.published_year, after.meta!.published_month, after.meta!.published_day]).toEqual([1491, 0, 4]);
+      // ...and the blob on disk is STILL the pre-eras one: reading it does not rewrite it, so a file opened
+      // by this version and then by an older one is unchanged.
+      expect(after.meta!.calendar_json).toBe(before.meta!.calendar_json);
+      // The calendar reads back with the default, and every label still formats exactly as it was written.
+      expect(reopened.getCalendar().eras).toEqual([]);
+      expect(reopened.getEntry(seeded.entry.id)!.inWorldLabel).toBe(String(before.journal.find((row) => (row as { id: string }).id === seeded.entry.id)!["in_world_label"]));
+      expect(reopened.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, 1491 DR");
+      expect(reopened.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, 1200 DR");
+    } finally {
+      first?.close(); reopened?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * SAFETY TEST 3. `exportBundle`/`importBundle` round-trips with and WITHOUT `eras`, and an old bundle -
+   * one made before the key existed - imports to `[]` rather than to undefined or to a crash. A GM's backup
+   * is the only copy of their campaign; a restore that half-understands it is worse than one that refuses.
+   */
+  it("round-trips eras through export/import, and imports a pre-eras bundle to an empty list", () => {
+    const eras = [{ name: "Third Age", startYear: 1400 }, { name: "Age of Ruin", startYear: 1000 }];
+    seedCampaign(store);
+    store.setCalendar({ ...store.getCalendar(), eras });
+    const withEras = store.exportBundle();
+    // Sorted on the way in, so the bundle carries the invariant rather than the order it was typed in.
+    expect(withEras.calendar.eras).toEqual([{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }]);
+
+    store.importBundle(JSON.parse(JSON.stringify(withEras)));
+    expect(store.getCalendar().eras).toEqual([{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }]);
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 9 });
+    expect(store.getPublishedDate()).toEqual({ year: 1491, month: 0, day: 4 });
+    expect(store.listTimeline().map((entry) => entry.inWorldLabel)).toEqual(["Mol, Hammer 4, Third Age 1491 DR", "Mol, Alturiak 20, Third Age 1492 DR"]);
+
+    // A bundle made before `5f`: the key is not merely empty, it is ABSENT.
+    const legacy = JSON.parse(JSON.stringify(withEras)) as { calendar: Record<string, unknown> };
+    delete legacy.calendar.eras;
+    expect(legacy.calendar).not.toHaveProperty("eras");
+    store.importBundle(legacy);
+    expect(store.getCalendar().eras).toEqual([]);
+    // ...and with no eras, every label is back to exactly what a pre-`5f` campaign renders.
+    expect(store.listTimeline().map((entry) => entry.inWorldLabel)).toEqual(["Mol, Hammer 4, 1491 DR", "Mol, Alturiak 20, 1492 DR"]);
+  });
+
+  /**
+   * SAFETY TEST 4. Changing the eras is a calendar write, so `writeCalendar`'s reflow must run over every
+   * dated row in `codex_journal` AND `codex_pages` - K3's rule, which existed for month lengths and now has
+   * a second reason to hold. A reflow that skipped either table would leave half the chronicle labelled by
+   * an era it no longer belongs to.
+   *
+   * The two properties that matter are opposite ones: LABELS change, RAW DATES and INSTANTS do not. An era
+   * is a naming layer over the year, so it cannot move a record by a single day.
+   */
+  it("re-labels every dated row when eras change, and moves not one of them", () => {
+    const seeded = seedCampaign(store);
+    const instantsBefore = { entry: store.getEntry(seeded.entry.id)!.calendarInstant, deadline: store.getEntry(seeded.deadline.id)!.calendarInstant, event: store.getPage(seeded.event.id)!.calendarInstant };
+    expect(store.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, 1491 DR");
+
+    store.setCalendar({ ...store.getCalendar(), eras: [{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }] });
+
+    // Journal AND pages, both re-labelled, each by the era its own year falls in - the event is at 1200 and
+    // must NOT pick up the era that starts at 1400.
+    expect(store.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, Third Age 1491 DR");
+    expect(store.getEntry(seeded.deadline.id)!.inWorldLabel).toBe("Mol, Alturiak 20, Third Age 1492 DR");
+    expect(store.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, Age of Ruin 1200 DR");
+    // Nothing moved: raw dates verbatim, instants identical, chronicle order unchanged.
+    expect(store.getEntry(seeded.entry.id)!.inWorldDate).toEqual({ year: 1491, month: 0, day: 4 });
+    expect(store.getPage(seeded.event.id)!.inWorldDate).toEqual({ year: 1200, month: 1, day: 3 });
+    expect({ entry: store.getEntry(seeded.entry.id)!.calendarInstant, deadline: store.getEntry(seeded.deadline.id)!.calendarInstant, event: store.getPage(seeded.event.id)!.calendarInstant }).toEqual(instantsBefore);
+    // ...and a year BEFORE the first era keeps the bare rendering rather than guessing at one.
+    store.setCalendar({ ...store.getCalendar(), eras: [{ name: "Third Age", startYear: 1400 }] });
+    expect(store.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, 1200 DR");
+    // Removing every era returns every label to the exact string it started with.
+    store.setCalendar({ ...store.getCalendar(), eras: [] });
+    expect(store.getEntry(seeded.entry.id)!.inWorldLabel).toBe("Mol, Hammer 4, 1491 DR");
+    expect(store.getPage(seeded.event.id)!.inWorldLabel).toBe("Sul, Alturiak 3, 1200 DR");
+  });
+});
+
+/**
  * The session projection, called POINT-BLANK. `codex-http.test.ts` proves the pipeline; only this proves
  * the layer. That distinction is not pedantry here — this file's own CI-1 lesson is that a weakened SQL
  * gate left all 787 tests passing because a projection quietly caught it, and the same blind spot exists

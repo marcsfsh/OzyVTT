@@ -3459,6 +3459,7 @@ Replaces the world calendar and reflows every dated record's sort instant and la
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `yearName` | string | yes |  |
+| `eras` | CodexCalendarEra[] | no | Optional so a caller written before eras existed is not met with a 400. It is replaced like every other field on this route: omitting it CLEARS the stored eras. |
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | no |  |
@@ -3635,6 +3636,7 @@ The world's calendar as the **GM** receives it. The campaign has two clocks (M11
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `yearName` | string | yes |  |
+| `eras` | CodexCalendarEra[] | yes | The world's named eras, ascending by `startYear`. Empty on every calendar written before eras existed, which is exactly today's rendering: `yearName` stays the trailing suffix. Where an era applies it LEADS the year instead ("Third Age 1492"). |
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | yes | The GM's own clock - where the campaign is now. Null until a date is set. Never reaches a player by any path. |
@@ -3645,6 +3647,15 @@ The world's calendar as the **GM** receives it. The campaign has two clocks (M11
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `calendar` | CodexCalendar | yes |  |
+
+### `CodexCalendarEra`
+
+A named era, running from `startYear` until the next era begins (`5f`). A date's era is DERIVED - the last era whose `startYear` the date's year has reached - and is never stored on the date, so adding one re-labels existing records without rewriting any of them. Sorted ascending by `startYear` on the way in.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `startYear` | integer (-100000–100000) | yes |  |
 
 ### `CodexCalendarMonth`
 
@@ -3660,6 +3671,7 @@ The world calendar as a PLAYER receives it. `currentDate` keeps its name and its
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `yearName` | string | yes |  |
+| `eras` | CodexCalendarEra[] | yes | Projected, never filtered: an era is STRUCTURE on the same footing as `months` and `weekdays`, which a player has always received. It carries no clock - `currentDate` is still the published date and the only one on this object. |
 | `months` | CodexCalendarMonth[] | yes |  |
 | `weekdays` | string[] | yes |  |
 | `currentDate` | CodexInWorldDate \| null | yes | The PUBLISHED date. Null until the GM publishes one. |

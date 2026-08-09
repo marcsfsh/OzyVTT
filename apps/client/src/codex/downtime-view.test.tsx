@@ -223,6 +223,60 @@ describe("Pending confirmations", () => {
     await user.click(screen.getByRole("button", { name: /^Move your date to/ }));
     expect(await screen.findByText("Couldn't move the clock.")).toBeInTheDocument();
   });
+
+  /**
+   * `5e.4` — reported as "Confirm does nothing." It never did nothing: the click fired, the route was
+   * right, the store write was right, and the server answered with a reason. The reason rendered at the TOP
+   * of this view, above a ~450px `Log downtime` section, and this list is the section below it — so from
+   * where the GM was looking, a correct 400 and a dead button are the same thing.
+   *
+   * Both branches are asserted, because a one-branch fix re-creates the silence for the other one.
+   */
+  it("`5e.4`: with no campaign date, says why in view and does not fire a request it knows will fail", async () => {
+    const user = userEvent.setup();
+    renderDowntime({
+      // The exact cause: `proposedDateFor` has nothing to advance FROM, so the server 400s. `proposedDate`
+      // arrives null with it, which is also what made the button read a bare "Confirm".
+      calendar: { ...CALENDAR, currentDate: null, publishedDate: null },
+      records: [{ ...downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }), proposedDate: null } as CodexChronicleRecord]
+    });
+
+    // The section headed "Pending confirmations", found by its heading rather than by DOM position: the
+    // claim is that the reason is beside the control, and a positional selector would not be making it.
+    const pending = within(screen.getByRole("heading", { name: "Pending confirmations" }).closest("section")!);
+    const confirm = pending.getByRole("button", { name: "Confirm" });
+    expect(confirm).toBeDisabled();
+    // The reason is IN the Pending section, beside the control it explains — not 450px above it.
+    expect(pending.getByText(/Set your date on the Calendar before passing time/)).toBeInTheDocument();
+
+    await user.click(confirm);
+    expect(applyDowntime).not.toHaveBeenCalled();
+  });
+
+  it("`5e.4`: renders a stale-page conflict on the row that was pressed, and refetches", async () => {
+    const user = userEvent.setup();
+    const onChanged = vi.fn();
+    renderDowntime({
+      onChanged,
+      records: [
+        downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }),
+        downtime("d2", { who: "Ireena", activity: "Praying", days: 3, applied: false })
+      ]
+    });
+
+    // The 409 arm: this list renders only unapplied rows, so "already applied" means the page is stale -
+    // someone confirmed it elsewhere, or this is a double-submit.
+    applyDowntime.mockRejectedValueOnce(new Error("That downtime has already passed - the clock has already moved."));
+    const rows = within(document.querySelector(".codex-downtime-pending")!).getAllByRole("listitem");
+    await user.click(within(rows[0]).getByRole("button", { name: /^Move your date to/ }));
+
+    // On the row that was pressed, and on that row ALONE - which is the whole difference from the old
+    // top-of-view Alert.
+    expect(await within(rows[0]).findByText(/already passed/)).toBeInTheDocument();
+    expect(within(rows[1]).queryByText(/already passed/)).toBeNull();
+    // ...and the refetch is the actual repair for a stale page, so it runs on failure too.
+    expect(onChanged).toHaveBeenCalled();
+  });
 });
 
 describe("Adopting an old row (the Edit path)", () => {

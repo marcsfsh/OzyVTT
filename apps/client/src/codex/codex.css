@@ -1395,6 +1395,18 @@
 .codex-calendar-clocks { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; border: 1px solid transparent; padding: var(--space-3); }
 .codex-calendar-clock { display: flex; align-items: baseline; gap: var(--space-2); }
 .codex-calendar-clocklabel { color: var(--text-muted); font-size: var(--fs-sm); }
+/* `5f`(i) — the GM's clock is a door, so it has to look like one while still reading as the clock's value.
+   §4 ROUTE 1: `min-height` grows the paint itself. A route-2 ::after box would be a 44px rectangle centred
+   on ~20px of text, overhanging the players' clock beside it and the month bar below. */
+.codex-calendar-clockset {
+  min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: var(--space-1) var(--space-2); margin: calc(var(--space-1) * -1) calc(var(--space-2) * -1);
+  background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+  color: inherit; font: inherit; font-weight: 700; cursor: pointer; text-align: left;
+}
+.codex-calendar-clockset:hover { border-color: var(--line-hover); background: var(--surface-2); }
+.codex-calendar-clockset:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.codex-calendar-clockhint { margin: 0; padding: 0 var(--space-3); color: var(--text-muted); font-size: var(--fs-sm); }
 .codex-calendar-monthbar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .codex-calendar-monthname { margin: 0; flex: 1 1 auto; font: 700 var(--fs-h3) / 1.2 var(--font-display); }
 .codex-calendar-yearjump { max-width: 8rem; }
@@ -1428,6 +1440,10 @@
 .codex-downtime-pending, .codex-downtime-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-downtime-pendingrow, .codex-downtime-historyrow { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-height: var(--tap-min); }
 .codex-downtime-pendingrow > .codex-list-title, .codex-downtime-historyrow > .codex-campaign-recentitem { flex: 1 1 14rem; min-width: 0; }
+/* `5e.4` — a Confirm failure renders INSIDE its own row (the reason it was invisible is that it used to
+   render 450px above, at the top of the view). Full-basis so it takes the whole next line of the wrap
+   rather than squeezing in beside the button that produced it. */
+.codex-downtime-pendingrow > .nh-alert { flex: 1 0 100%; }
 .codex-downtime-edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); width: 100%; }
 .codex-downtime-totals { width: 100%; }
 

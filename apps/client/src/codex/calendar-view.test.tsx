@@ -163,7 +163,18 @@ describe("The two clocks (D17)", () => {
     expect(screen.getByText("GM only")).toBeInTheDocument();
   });
 
-  it("offers publishing only while the clocks differ", async () => {
+  /**
+   * **D6 (2026-08-09) reverses half of this test's premise.** It used to assert that Publish is RENDERED
+   * only while the clocks differ. That was the client half of the coupling the client reported: with the
+   * server auto-publishing a codex's first date (K7), setting a date made the clocks agree, so the control
+   * never appeared — from the unset state there was no visible publish act at all, and two clocks with no
+   * visible act between them read as one clock with two readouts.
+   *
+   * It is now always rendered and DISABLED when there is nothing to publish, which is the same protection
+   * against a no-op click and none of the concealment. The reason is on screen beside it, so a disabled
+   * control is not a puzzle either.
+   */
+  it("always offers publishing, and disables it only when the party is already on the GM's date", async () => {
     const user = userEvent.setup();
     const onChanged = vi.fn();
     publish.mockResolvedValue(undefined);
@@ -176,8 +187,38 @@ describe("The two clocks (D17)", () => {
     view.unmount();
     render(<CalendarView gmToken="gm" calendar={{ ...CALENDAR, publishedDate: CALENDAR.currentDate ?? null }} records={[]} loading={false} error={null}
       onChanged={vi.fn()} year={null} month={null} onMonthChange={vi.fn()} onOpenEntry={vi.fn()} onOpenPage={vi.fn()} />);
-    // Nothing to publish when the party is already on the GM's date — a button that would do nothing.
-    expect(screen.queryByRole("button", { name: "Publish the date" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Publish the date" })).toBeDisabled();
+    expect(screen.getByText(/The party is on your date/)).toBeInTheDocument();
+  });
+
+  /**
+   * `5f`(i) / D6, the state the client actually reported: a GM sets their date and the party's does NOT
+   * move. Under K7 this state was unreachable — the server published the first date itself — so the fix is
+   * only observable here now that it is.
+   */
+  it("offers the publish act from the unset state, where the party has no date at all", () => {
+    renderCalendar({ calendar: { ...CALENDAR, publishedDate: null } });
+    expect(screen.getByText("Not shared yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish the date" })).toBeEnabled();
+    expect(screen.getByText(/The party has no date yet/)).toBeInTheDocument();
+  });
+
+  /**
+   * `5f`(i). "Not set" was a plain `<strong>`: the only door to the GM's clock was a ghost "Edit calendar"
+   * button opening the world's structure, where the date is the FOURTH field. A GM setting tonight's date
+   * is not editing the world's months.
+   */
+  it("makes the GM's own clock a door, and gives the players' clock none", async () => {
+    const user = userEvent.setup();
+    renderCalendar({ calendar: { ...CALENDAR, currentDate: null, publishedDate: null } });
+
+    const door = screen.getByRole("button", { name: "Set your date" });
+    await user.click(door);
+    expect(await screen.findByRole("dialog", { name: "Your date" })).toBeInTheDocument();
+
+    // D11-H: the players' clock is a COPY, made by publish and by nothing else. It has no editor and must
+    // not grow one — a "set the players' date" control is a control that cannot exist.
+    expect(screen.queryByRole("button", { name: /Not shared yet/ })).toBeNull();
   });
 
   it("surfaces a failed publish instead of leaving the GM to guess", async () => {
@@ -187,6 +228,41 @@ describe("The two clocks (D17)", () => {
 
     await user.click(screen.getByRole("button", { name: "Publish the date" }));
     expect(await screen.findByText("Couldn't reach the table.")).toBeInTheDocument();
+  });
+});
+
+/**
+ * `5f`(iii) — the client half of the era rule, which has to agree with the server's `formatWorldYear`
+ * exactly: the server writes `in_world_label` into the database, this view labels the month bar and the
+ * composer's preview, and a disagreement between them is the divergence D17 was blocked on once already.
+ */
+describe("Eras (5f)", () => {
+  const ERAS = [{ name: "Age of Ruin", startYear: 1000 }, { name: "Third Age", startYear: 1400 }];
+
+  it("leads the year with the era the year has reached, and keeps the suffix", () => {
+    renderCalendar({ calendar: { ...CALENDAR, eras: ERAS }, year: "1491", month: "0" });
+    expect(screen.getByRole("heading", { name: "Hammer Third Age 1491 DR" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Your date is Hammer 4, Third Age 1491 DR/ })).toBeInTheDocument();
+  });
+
+  it("names the EARLIER era for a year that has not reached the later one", () => {
+    renderCalendar({ calendar: { ...CALENDAR, eras: ERAS }, year: "1200", month: "0" });
+    expect(screen.getByRole("heading", { name: "Hammer Age of Ruin 1200 DR" })).toBeInTheDocument();
+  });
+
+  it("renders exactly as it always has for a year before every era, and for a calendar with none", () => {
+    const { unmount } = renderCalendar({ calendar: { ...CALENDAR, eras: ERAS }, year: "900", month: "0" });
+    expect(screen.getByRole("heading", { name: "Hammer 900 DR" })).toBeInTheDocument();
+    unmount();
+    renderCalendar({ year: "1491", month: "0" });                       // no `eras` key at all
+    expect(screen.getByRole("heading", { name: "Hammer 1491 DR" })).toBeInTheDocument();
+  });
+
+  /** Structure, not secrets: the player's own calendar reads its dates with the same eras (projected on both). */
+  it("gives the player's calendar the same reading of the year", () => {
+    render(<PlayerCalendarView calendar={{ yearName: "DR", eras: ERAS, months: CALENDAR.months, weekdays: CALENDAR.weekdays, currentDate: { year: 1491, month: 0, day: 2 } }}
+      records={[]} year={null} month={null} onMonthChange={vi.fn()} onOpenEntry={vi.fn()} />);
+    expect(screen.getByText("Hammer 2, Third Age 1491 DR")).toBeInTheDocument();
   });
 });
 

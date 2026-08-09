@@ -1519,7 +1519,10 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     expect(playerCalendar.currentDate).toEqual({ year: 1492, month: 0, day: 10 });
     // On the serialized body: the GM's clock parts (month 1, day 20) are nowhere in what the player received,
     // under any key, and neither is the `publishedDate` key that would duplicate their own `currentDate`.
-    expect(Object.keys(playerCalendar).sort()).toEqual(["currentDate", "months", "weekdays", "yearName"]);
+    // `eras` joined this list in `5f`(iii) and is structure, not a clock - see `codex-projections.ts`. The
+    // assertion stays EXACT rather than becoming a subset check: naming every key is what makes adding one
+    // a decision somebody had to write down.
+    expect(Object.keys(playerCalendar).sort()).toEqual(["currentDate", "eras", "months", "weekdays", "yearName"]);
     expect(JSON.stringify(playerCalendar.currentDate)).not.toContain("20");
 
     // Publishing catches the party up, through the one route that does it.
@@ -1620,14 +1623,60 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)
     expect((await body(applied)).data.calendar.currentDate).toEqual({ year: 1492, month: 0, day: 18 });
     expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 18 });
     // Applying moved the GM's clock and NOT the party's - only publish does that (D11-H). The party is on
-    // the FIRST date this codex was given, which publishes itself; every move after that one is private,
-    // and applying downtime is such a move. Asserting the party is on day 10 rather than merely "not day
-    // 18" is the stronger claim: it proves the two clocks diverged, not just that one of them is empty.
+    // the first date this codex was given: the PUT above landed on an empty codex, which is the seeding case
+    // D6 kept auto-publish for, so day 10 reached them. Every move after that one is private, and applying
+    // downtime is such a move. Asserting the party is on day 10 rather than merely "not day 18" is the
+    // stronger claim: it proves the two clocks diverged, not just that one of them is empty.
     expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 0, day: 10 });
 
     const again = await post(base, `/api/v1/codex/journal/${created.entry.id}/apply-downtime`, GM, {});
     expect([400, 409]).toContain(again.status);
     expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 18 });   // and still nothing moved
+  });
+
+  /**
+   * **D6 (2026-08-09), the reversal of K7's scope.** The test above is the half of K7 that survives: a codex
+   * with nothing in it is being SET UP, and its first date is a starting position. This is the half that is
+   * gone - a campaign that already exists gets its first date set while PREPPING, and prep is private.
+   *
+   * The client reported this as "setting a date sets both at once", and it was never a client bug: one line
+   * in `writeCalendar` copied the GM's clock to the party's, so no arrangement of the Calendar UI could have
+   * decoupled them. The party is told the date by `POST /codex/calendar/publish` and by nothing else.
+   *
+   * Two arms, because "the party did not move" is only half the claim worth making. The second arm proves
+   * the publish route still works from this state, so the fix is a decoupling and not a lockout.
+   */
+  it("does NOT publish the first date of a codex that already holds records, and publishes on request", async () => {
+    const { base } = await fixture();
+    // One record, authored before any date exists - the ordinary shape of a campaign started without a calendar.
+    await post(base, "/api/v1/codex/journal", GM, { playerText: "The party met in Daggerford." });
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    const gmCalendar = await calendar(base, GM);
+    expect(gmCalendar.currentDate).toEqual({ year: 1492, month: 0, day: 10 });   // the GM's clock moved...
+    expect(gmCalendar.publishedDate).toBeNull();                                 // ...and the party's did not
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+    // Moving it again is private too - the first write is not a special case that merely deferred by one.
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 1, day: 3 } });
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+
+    // ...and the one deliberate act still does exactly what it always did.
+    expect((await post(base, "/api/v1/codex/calendar/publish", GM, {})).status).toBe(200);
+    expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 1, day: 3 });
+  });
+
+  /**
+   * The seeding exemption is about the CODEX being empty, not about the journal being empty: a GM who
+   * builds the world first (a page, a map, a quest) and dates it afterwards is prepping, not seeding.
+   * Without this, `isUnusedCodex` could be narrowed back to one table and the suite would not notice.
+   */
+  it("treats a codex holding only a page as in use, so its first date stays private", async () => {
+    const { base } = await fixture();
+    await post(base, "/api/v1/codex/pages", GM, { title: "Daggerford", entityType: "location" });
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    expect((await calendar(base, GM)).publishedDate).toBeNull();
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
   });
 
   /**
