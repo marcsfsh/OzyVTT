@@ -1274,8 +1274,24 @@ export function FeatureEditor({
               ariaLabel={optionsField.label}
               rowLabel={(option, optionIndex) => optionsField.rowLabel!(option, optionIndex)}
               renderRow={(option, optionIndex) => {
-                const setOption = (changes: Readonly<Record<string, unknown>>) =>
-                  setChoice({ options: optionRows.map((entry, i) => (i === optionIndex ? { ...entry, ...changes } : entry)) });
+                /**
+                 * REPLACE the row, never merge into it — the same thing `FieldRenderer`'s own
+                 * `rows` branch does (`copy[index] = nextRow`), and both callers below hand over
+                 * a WHOLE option: a `FieldDef.write` returns its container and `RiderEditor`
+                 * writes whole-body.
+                 *
+                 * Merging looked harmless and was not: `{...entry, ...next}` restores every key
+                 * the write DELETED, so on an option row a control could add and change but
+                 * never REMOVE. Measured, at HEAD: the writes that reshape by assigning
+                 * `undefined` survive a merge (a spread copies the key), and the ones that
+                 * `delete` do not — which until U16 was nothing, because `requires` is the first
+                 * control on this row whose own ruling is a removal ("clearing both boxes drops
+                 * the clause, so a half-cleared gate never refuses the record"). The rendered
+                 * form disagreed with `applyField` about that, which is exactly the drift the
+                 * field-declares-the-row split exists to prevent.
+                 */
+                const setOption = (next: Readonly<Record<string, unknown>>) =>
+                  setChoice({ options: optionRows.map((entry, i) => (i === optionIndex ? next : entry)) });
                 return (
                   <>
                     <FieldGrid>
