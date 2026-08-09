@@ -263,6 +263,41 @@ describe("The dashboard's open-quests card (M10)", () => {
   });
 });
 
+/**
+ * 5d, the GM's end: the client's literal ask was that the STATUS PICKER offer the new options, so this
+ * drives the real `<select>` rather than asserting on `QUEST_STATUS_ORDER` a second time.
+ *
+ * Both pickers, because they are two separate controls that used to hold two hand-written lists: the
+ * rail's "Filter by status" and the editor's "Status". A widening that reached only one of them would
+ * leave a GM able to SET "Canceled" and then unable to filter for it — or the reverse.
+ */
+describe("The GM can actually pick the new statuses (5d)", () => {
+  it("offers all five in both pickers, and sends the chosen one to the server", async () => {
+    gmDefaults([OPEN]);
+    updateQuest.mockResolvedValue(QUEST());
+    const user = userEvent.setup();
+    await renderWorkspace();
+
+    // The rail's filter: "All quests" plus every status, in lifecycle order.
+    await user.click(screen.getAllByRole("button", { name: "Quests" })[0]);
+    const filter = await screen.findByLabelText("Filter by status");
+    expect(within(filter).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["All quests", "Not started", "Active", "Completed", "Failed", "Canceled"]);
+
+    await user.click(await screen.findByRole("button", { name: /The Sunless Crown/ }));
+    await user.click(await screen.findByRole("button", { name: "Details" }));
+    const status = await screen.findByLabelText(/Status/);
+    expect(within(status).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["Not started", "Active", "Completed", "Failed", "Canceled"]);
+
+    // Chosen through the control, and it reaches the wire as the id rather than the label.
+    await user.selectOptions(status, "Canceled");
+    await waitFor(() => expect(updateQuest).toHaveBeenCalled(), { timeout: 3000 });
+    const [, , input] = updateQuest.mock.calls[0] as [string, string, { status: string }];
+    expect(input.status).toBe("canceled");
+  });
+});
+
 describe("The GM's objective checklist (M10)", () => {
   it("adds a BLANK row and saves it in place — order is content and a blank line is a real state", async () => {
     // The server's `ObjectiveSchema` deliberately omits `.min(1)` for exactly this flow. If the client
