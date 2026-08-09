@@ -460,15 +460,19 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   never matches either. Both would ship inert if authored, which is why Innate Sorcery's advantage
   and Empowered Evocation stay prose.
 
-- **[server/riders] A damage rider gated on `damage-type-is` cannot fire on a save-only action.**
-  `apps/server/src/action-resolution.ts` populates `riderFilters.damageTypes` only inside the
-  `action.attack && targets.length === 1` branch, so a spell that forces a save and rolls no attack
-  (Fireball, Burning Hands) reaches the `extra-damage` pass with no damage types to filter on and the
-  rider is skipped. Draconic Sorcery's Elemental Affinity is the record standing on it: it adds the
-  Sorcerer's Charisma to an attack-roll spell of the chosen type and not to a save-only one. Not a
-  correctness hazard — it under-applies, which is the safe direction — and pinned by a test in
-  `apps/server/test/warlock-sorcerer-wizard.test.ts` so widening that context is noticed. Fix: build
-  the filter set once for both branches.
+- **[server/test] `typed-damage-feed.test.ts`'s two reaction cases fail at random, roughly once in
+  a few dozen full-suite runs.** Both `explains the halved reaction damage when the reaction is USED`
+  and its sibling `... when the reaction is DECLINED` have each failed once, on different runs, for
+  three different agents on 2026-08-09 — and each passes in isolation (measured: 5 consecutive clean
+  runs of the file at `7d386d9`). The fixture's bite rolls an **unseeded** `4d6 + 6`
+  (`apps/server/test/typed-damage-feed.test.ts:56`) and both cases then assert a feed string built
+  from whatever it rolled, so the assertion's expected text changes run to run. The mechanism past
+  that is **not proven** — do not treat a red run here as a regression until you have re-run the file
+  alone. One asymmetry worth checking first: the USED case guards the parked prompt with
+  `expect(prompt, "the bite parked no reaction prompt").toBeDefined()` and the DECLINED case
+  dereferences `prompt.proposedDamage` with no guard, so if the bite can ever fail to park a prompt,
+  the two cases fail differently. Fix: seed the roll, or force the dice the way
+  `warlock-sorcerer-wizard.test.ts` does.
 
 ## Unverified — needs a browser, a contrast check, or a runtime repro
 
