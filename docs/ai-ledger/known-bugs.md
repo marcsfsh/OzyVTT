@@ -446,12 +446,15 @@ reason. They are **findings, not unknowns** — don't re-discover them.
 - **[server/test] `typed-damage-feed.test.ts`'s two reaction cases fail at random, roughly once in
   a few dozen full-suite runs.** Both `explains the halved reaction damage when the reaction is USED`
   and its sibling `... when the reaction is DECLINED` have each failed once, on different runs, for
-  three different agents on 2026-08-09 — and each passes in isolation (measured: 5 consecutive clean
-  runs of the file at `7d386d9`). The fixture's bite rolls an **unseeded** `4d6 + 6`
+  three different agents on 2026-08-09. **Running the file alone does NOT clear it, and the entry
+  used to say it did** — "5 consecutive clean runs of the file at `7d386d9`" was a small sample, not
+  a property: measured again at `13656ca`, the DECLINED case failed **1 of 3** isolated runs of the
+  file on its own. So isolation is evidence about the rate and not a test that distinguishes flake
+  from regression; run it several times. The fixture's bite rolls an **unseeded** `4d6 + 6`
   (`apps/server/test/typed-damage-feed.test.ts:56`) and both cases then assert a feed string built
   from whatever it rolled, so the assertion's expected text changes run to run. The mechanism past
   that is **not proven** — do not treat a red run here as a regression until you have re-run the file
-  alone. One asymmetry worth checking first: the USED case guards the parked prompt with
+  alone several times. One asymmetry worth checking first: the USED case guards the parked prompt with
   `expect(prompt, "the bite parked no reaction prompt").toBeDefined()` and the DECLINED case
   dereferences `prompt.proposedDamage` with no guard, so if the bite can ever fail to park a prompt,
   the two cases fail differently. Fix: seed the roll, or force the dice the way
