@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Alert, Button, Field, Modal, Panel, PanelHeader, SegmentedControl, useToast } from "@vtt/ui";
 import { codexApi, type CodexImportBundle, type CodexImportCounts } from "./api";
+import { BODY_LAYER, type BodyLayer } from "./TwoLayerBodyTabs";
 import { newId } from "../lib/ids";
 
 /**
@@ -26,7 +27,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<readonly string[]>([]);
   const [pending, setPending] = useState<{ bundle: CodexImportBundle; counts: Partial<CodexImportCounts>; name: string } | null>(null);
-  const [notesSide, setNotesSide] = useState<"gm" | "player">("gm");
+  const [notesSide, setNotesSide] = useState<BodyLayer>("gm");
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const notesInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,9 +168,14 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
       <Panel>
         <PanelHeader title="Bring in notes" />
         <p>Turns Markdown or text files into pages, one page per file. This adds pages and replaces nothing.</p>
+        {/* The seventh surface of the two-layer split, and the one that cannot use `TwoLayerBodyTabs`:
+            it names an import DESTINATION rather than the layer being written, so it offers the GM
+            option first (the default, and what a GM importing raw notes almost always wants) and lives
+            inside a `Field`. It shares the WORDS instead of the component, which is the part that was
+            drifting — this control used to be the only place that called the two layers "sides". */}
         <Field label="Import into" htmlFor="codex-notes-side" help="New pages start hidden from players either way.">
-          <SegmentedControl ariaLabel="Which side to import into" value={notesSide} onChange={(value) => setNotesSide(value as "gm" | "player")}
-            options={[{ value: "gm", label: "GM-only side" }, { value: "player", label: "Player-facing side" }]} />
+          <SegmentedControl ariaLabel="Which layer to import into" value={notesSide} onChange={(value) => setNotesSide(value as BodyLayer)}
+            options={[BODY_LAYER.gm, BODY_LAYER.player]} />
         </Field>
         <Button variant="secondary" onClick={() => notesInputRef.current?.click()}>Choose files</Button>
         <input ref={notesInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importNotes(event.target.files); event.target.value = ""; }} />

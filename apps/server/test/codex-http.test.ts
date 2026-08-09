@@ -1317,6 +1317,70 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
     expect((await get(base, `/api/v1/codex/quests/${secretId}`, GM)).status).toBe(200);
   });
 
+  /**
+   * 5d, end to end: the two statuses added in v26 travel the WHOLE pipeline — route schema, store, SQL
+   * CHECK, quest projection and chronicle projection — and arrive at a PLAYER as themselves.
+   *
+   * Every link here has its own way of silently swallowing a new status. `QuestStatusSchema` would 400 it
+   * at the door; the v14 CHECK would reject the INSERT if v26 had not run; `coerceQuestStatus` would read
+   * either one back as a bland "active" if the read path were left behind. None of those three failures
+   * shows up in a type error, and the last one shows up nowhere at all — which is why this asserts on the
+   * PLAYER's copy after a round trip rather than on the create call's return value.
+   *
+   * The chronicle half is the part a player actually READS: `questEventLabel` on the client turns this
+   * payload into "<title> has not started" / "<title> was canceled", so a status that reached the quest
+   * record but not the timeline would leave the party's own history saying the wrong thing.
+   */
+  it("carries not-started and canceled the whole way to a player, on the quest AND on the chronicle", async () => {
+    const { base } = await fixture();
+    const timeline = async (headers: Record<string, string>) =>
+      (await body(await get(base, "/api/v1/codex/timeline", headers))).data.records as Json[];
+    const questRows = async (headers: Record<string, string>) => (await timeline(headers)).filter((row) => row.kind === "quest");
+
+    // No `status` in the create body: the DEFAULT is what lands, and since 5d that is `not-started`.
+    const created = await body(await post(base, "/api/v1/codex/quests", GM, { title: "A rumour in Vallaki", playerBody: "Someone is buying coffins.", gmBody: GM_BODY }));
+    const questId = created.data.quest.id as string;
+    expect(created.data.quest.status).toBe("not-started");
+    await post(base, `/api/v1/codex/quests/${questId}/reveal`, GM, { revealed: true });
+
+    // The PLAYER's copy of the quest, re-read through the player route rather than echoed back.
+    const asPlayer = async () => (await body(await get(base, `/api/v1/codex/quests/${questId}`, PLAYER))).data.quest as Json;
+    expect((await asPlayer()).status).toBe("not-started");
+
+    // ...and the player's CHRONICLE row for it. R5's create record is hidden by default, so reveal it —
+    // the whole-row quest gate is already satisfied because the quest itself is revealed above.
+    const recordFor = async (status: string) => (await questRows(GM)).find((row) => (row.payload as Json).status === status)!;
+    const startRecord = await recordFor("not-started");
+    expect(startRecord, "R5 writes a history record on create, carrying the status the quest was created in").toBeDefined();
+    await post(base, `/api/v1/codex/journal/${startRecord.id}/reveal`, GM, { revealed: true });
+    const playerStart = (await questRows(PLAYER))[0]!;
+    expect((playerStart.payload as Json).status, "the row a player reads as “… has not started”").toBe("not-started");
+    expect((playerStart.payload as Json).questId).toBe(questId);
+
+    // Now the other end of the lifecycle, through the ordinary PATCH.
+    const canceled = await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status: "canceled" });
+    expect(canceled.status).toBe(200);
+    expect((await asPlayer()).status).toBe("canceled");
+    // A status change appends a SECOND history record carrying the status reached.
+    expect(await questRows(GM)).toHaveLength(2);
+    await post(base, `/api/v1/codex/journal/${(await recordFor("canceled")).id}/reveal`, GM, { revealed: true });
+    // Sorted, deliberately: `fixture()` freezes the clock, so both records share a date and the timeline
+    // falls through to its own tiebreak. ORDER is asserted in `codex-store.test.ts`, where the clock
+    // ticks; the claim here is that BOTH statuses reached the party's timeline as themselves.
+    const playerRows = await questRows(PLAYER);
+    expect(playerRows.map((row) => (row.payload as Json).status).sort(), "both statuses on the party's own timeline").toEqual(["canceled", "not-started"]);
+
+    // Every intermediate status is accepted by the route too, so the widening is the whole enum and not
+    // the two literals this test happens to name.
+    for (const status of ["active", "completed", "failed", "not-started"]) {
+      expect((await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status })).status, status).toBe(200);
+      expect((await asPlayer()).status, status).toBe(status);
+    }
+    // ...and a status outside the five is still a 400 at the door, so `.strict()` did not become a pass-through.
+    expect((await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status: "cancelled" })).status).toBe(400);
+    expect((await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status: "abandoned" })).status).toBe(400);
+  });
+
   it("hands a player only the linked entities that are themselves revealed", async () => {
     const { base } = await fixture();
     const shown = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Vallaki", revealedToPlayers: true }));

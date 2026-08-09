@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Field, GmOnlyTag, IconButton, IconX, Input, Modal, RevealSwitch, SaveState, SegmentedControl, Select, TagInput, Textarea } from "@vtt/ui";
+import { Alert, Button, Field, GmOnlyTag, IconButton, IconX, Input, Modal, RevealSwitch, SaveState, Select, TagInput, Textarea } from "@vtt/ui";
 import { calendarApi, codexApi, uploadCodexAsset, type CodexAutosaveSettings, type CodexCalendar, type CodexPage, type CodexPageConnection, type CodexPageRevision, type CodexPageSummary, type CodexSettings } from "./api";
 import { CodexImage } from "./CodexImage";
 import { CodexEditor } from "./CodexEditor";
+import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
 import { PageTimeline } from "./PageTimeline";
 import { PageMarkers } from "./PageMarkers";
 import { ConnectionsPanel } from "./ConnectionsPanel";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
-
-type BodyTab = "player" | "gm";
 
 /**
  * Ruling 11 — **the context column is summonable, and so is everything else that is not the writing.**
@@ -72,7 +71,7 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
-  const [tab, setTab] = useState<BodyTab>("player");
+  const [tab, setTab] = useState<BodyLayer>("player");
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [revisions, setRevisions] = useState<CodexPageRevision[]>([]);
   const [settings, setSettings] = useState<CodexSettings | null>(null);
@@ -250,18 +249,15 @@ export function PageEditor({ gmToken, page, pages, connections, autosave, onChan
 
       <div className="codex-editor-cols">
         <div className="codex-editor-center">
-          <div className="codex-body-bar">
-            <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
-              options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM only" }]} />
-          </div>
+          <TwoLayerBodyTabs value={tab} onChange={setTab} />
 
           {/* D13: the ONE editor. Toolbar, `[[` autocomplete, image drop/paste and the Edit/View switch
               are the primitive's; the Codex supplies its reader, its page list and its violet chrome.
               `fill` is ruling 11's second half: the surface takes the frame's height instead of the
               primitive's 14rem floor. */}
           <CodexEditor token={gmToken} value={body} onChange={setBody} fill
-            ariaLabel={tab === "player" ? "Player-facing body" : "GM secret body"}
-            placeholder={tab === "player" ? "Player-facing description…" : "GM-only notes: secrets, hooks, stats…"}
+            ariaLabel={BODY_LAYER[tab].label}
+            placeholder={tab === "player" ? "What players can read about this page…" : "Hidden from players: hooks, stats, the twist…"}
             pages={pages} excludePageId={page.id} onNavigate={onNavigate} gmLayer={tab === "gm"} />
         </div>
 

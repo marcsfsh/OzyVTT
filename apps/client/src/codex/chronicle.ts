@@ -9,7 +9,7 @@
  */
 
 import type { BadgeTone, MeterTone } from "@vtt/ui";
-import { calendarDaysPerYear, calendarYearOf, dateToInstant, formatWorldYear, instantToDate, type CodexCalendar, type CodexChronicleKind, type CodexChronicleRecord, type CodexDowntimeSummary, type CodexInWorldDate, type CodexJournalKind, type CodexJournalPayload, type CodexMilestonePayload, type CodexPlayerChroniclePayload, type CodexStandingChange, type GmCodexCalendar } from "./api";
+import { calendarDaysPerYear, calendarYearOf, dateToInstant, formatWorldYear, instantToDate, type CodexCalendar, type CodexChronicleKind, type CodexChronicleRecord, type CodexDowntimeSummary, type CodexInWorldDate, type CodexJournalKind, type CodexJournalPayload, type CodexMilestonePayload, type CodexPlayerChroniclePayload, type CodexQuestStatus, type CodexStandingChange, type GmCodexCalendar } from "./api";
 
 /**
  * How a record says *when* it happened, in the chronicle's own order of preference.
@@ -95,15 +95,30 @@ export const CHRONICLE_KIND_META: Readonly<Record<CodexChronicleKind, Readonly<{
  * than about the payload, so this deliberately does not try to say it. The quest's own title is
  * resolved by the caller against the quest feed it holds — there is no cached title on the record, so a
  * renamed quest renames its history.
+ *
+ * **This is copy a PLAYER reads** — `questEventOf` accepts a `CodexPlayerChroniclePayload`, and a
+ * revealed quest's history rows land on the party's own timeline. Each entry completes the sentence
+ * `<Quest title> ___`, so the two 5d additions were chosen on how that sentence reads and not on how the
+ * status id looks:
+ *
+ *  - `not-started` → **"has not started"**. It is now the state EVERY quest is created in, so this is by
+ *    far the most-written row in the table, and at creation it says exactly the right thing: a lead was
+ *    written into the log and the party has not taken it up. It also stays true in the other direction,
+ *    when a GM pushes a quest back — which "was noted" or "was added" would not. Same discipline as
+ *    "reopened" above: state the payload, never guess the sequence.
+ *  - `canceled` → **"was canceled"**, and the passive is not optional. "The Missing Cask canceled" reads
+ *    as the quest doing the cancelling, the way "the meeting canceled" does. Matching the badge's own
+ *    word ("Canceled") also keeps R2's promise that the status reads as one word wherever it appears,
+ *    rather than the chronicle inventing a livelier synonym the quest log never uses.
  */
-export const QUEST_EVENT_VERB: Readonly<Record<"active" | "completed" | "failed", string>> = {
-  active: "started", completed: "completed", failed: "failed"
+export const QUEST_EVENT_VERB: Readonly<Record<CodexQuestStatus, string>> = {
+  "not-started": "has not started", active: "started", completed: "completed", failed: "failed", canceled: "was canceled"
 };
-export function questEventLabel(payload: Readonly<{ status: "active" | "completed" | "failed" }>, questTitle: string | null): string {
+export function questEventLabel(payload: Readonly<{ status: CodexQuestStatus }>, questTitle: string | null): string {
   return `${questTitle?.trim() || "A quest"} ${QUEST_EVENT_VERB[payload.status]}`;
 }
 /** The kind gate for a quest-history payload, on `downtimeOf`'s exact terms. */
-export function questEventOf(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>): Readonly<{ questId: string | null; status: "active" | "completed" | "failed" }> | null {
+export function questEventOf(record: ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload>): Readonly<{ questId: string | null; status: CodexQuestStatus }> | null {
   const payload = record.payload;
   return record.kind === "quest" && payload !== null && "questId" in payload ? payload : null;
 }
@@ -237,7 +252,7 @@ export function standingMeterTone(value: number): MeterTone {
  */
 export type ChroniclePayloadRef<P> = Readonly<{ kind: CodexChronicleKind; payload: P | null }>;
 /** D11: the narrowest shape a quest-history payload satisfies in BOTH projections (the player's id is nullable). */
-export type CodexQuestEventRef = Readonly<{ questId: string | null; status: "active" | "completed" | "failed" }>;
+export type CodexQuestEventRef = Readonly<{ questId: string | null; status: CodexQuestStatus }>;
 
 export function downtimeOf<P extends CodexDowntimeSummary>(record: ChroniclePayloadRef<P | CodexMilestonePayload | CodexStandingChange | CodexQuestEventRef>): P | null {
   const payload = record.payload;

@@ -981,7 +981,18 @@ export const sessionApi = {
 
 // ----- Quests (M10 / CT-4: what is still open) -----
 
-export type CodexQuestStatus = "active" | "completed" | "failed";
+/**
+ * The five states, in LIFECYCLE order — the order every picker offers them in, and the order
+ * `CodexQuestStatus` in `apps/server/src/codex-store.ts` declares them.
+ *
+ * The line that matters is **open / finished**, not old / new: `not-started` and `active` are quests the
+ * party can still do (`openQuests` in `./quests` counts both), and `completed`, `failed` and `canceled`
+ * are three different ways of being done with one. `canceled` is not a synonym for `failed` — a lead the
+ * party never took up did not fail.
+ *
+ * A quest created without a status is `not-started`; the server decides that, and no client re-states it.
+ */
+export type CodexQuestStatus = "not-started" | "active" | "completed" | "failed" | "canceled";
 /**
  * One line on a quest's checklist. Deliberately exactly `{ text, done }` — the store, the route schema
  * and `@vtt/ui`'s `Checklist` all publish this same pair, and anything richer is unapproved scope.

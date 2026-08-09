@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, RevealSwitch, SaveState, SegmentedControl, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
 import { questApi, type CodexAutosaveSettings, type CodexQuest, type CodexQuestObjective, type CodexQuestStatus } from "./api";
-import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
+import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, questProgress, questStatusTone } from "./quests";
 import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";
 import { CodexIcon, EntityIcon } from "./icons";
@@ -89,9 +89,9 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
           <div className="codex-rail-tools">
             <Select aria-label="Filter by status" value={statusFilter ?? ""} onChange={(event) => onFilterChange?.({ status: event.target.value || null })}>
               <option value="">All quests</option>
-              <option value="active">{QUEST_STATUS_LABEL.active}</option>
-              <option value="completed">{QUEST_STATUS_LABEL.completed}</option>
-              <option value="failed">{QUEST_STATUS_LABEL.failed}</option>
+              {/* Built from `QUEST_STATUS_ORDER`, not hand-written: two hand-written lists is exactly how
+                  the filter ends up offering four statuses and the editor below offers five. */}
+              {QUEST_STATUS_ORDER.map((status) => <option key={status} value={status}>{QUEST_STATUS_LABEL[status]}</option>)}
             </Select>
           </div>
           {listError && <Alert tone="danger">{listError}</Alert>}
@@ -266,11 +266,13 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
           </div>
 
           {/* D11: the server writes a dated Journal record on every status change, so the control says so. */}
-          <Field label="Status" htmlFor="q-status" help="Only Active quests appear on Home. Status changes are recorded in the Journal.">
+          {/* 5d: "Only Active" stopped being true when `not-started` arrived — `openQuests` counts BOTH
+              open states, and since a new quest is created Not started, the old wording said the exact
+              opposite of what a GM would see. It names the three that DROP OFF instead, which is the
+              shorter list and the one with a consequence. */}
+          <Field label="Status" htmlFor="q-status" help="Completed, Failed and Canceled quests drop off Home. Status changes are recorded in the Journal.">
             <Select id="q-status" value={draft.status} onChange={(event) => patch({ status: event.target.value as CodexQuestStatus })}>
-              <option value="active">{QUEST_STATUS_LABEL.active}</option>
-              <option value="completed">{QUEST_STATUS_LABEL.completed}</option>
-              <option value="failed">{QUEST_STATUS_LABEL.failed}</option>
+              {QUEST_STATUS_ORDER.map((status) => <option key={status} value={status}>{QUEST_STATUS_LABEL[status]}</option>)}
             </Select>
           </Field>
 

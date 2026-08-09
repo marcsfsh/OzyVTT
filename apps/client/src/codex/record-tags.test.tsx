@@ -129,7 +129,7 @@ describe("Journal entry tags (CI-2)", () => {
     createEntry.mockResolvedValue(ENTRY());
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Player-facing summary"), "They crossed the mists.");
+    await user.type(screen.getByLabelText("Player-visible notes"), "They crossed the mists.");
     await openEntryDetails(user);
     // Two words with a capital: the server would REJECT "Session Recap" outright.
     await user.type(screen.getByLabelText("Tags"), "Session Recap{Enter}");
