@@ -1389,6 +1389,83 @@ describe("a recharging action — through both paths", () => {
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
+  /**
+   * **R1's far end, and it is the only one a refactor with no user-visible change can have.**
+   *
+   * `fieldsOf` walks the form schema. `FeatureEditor` is mounted as a `custom` field, so before R1
+   * it had no fields to walk and **every control in the choice panel was invisible to `applyField`
+   * in both directions** — `extraPicks`, `choices`, `replaces`, `fromPicks`, the spell window and
+   * the ASI ceiling all live in that panel, and each of the five units behind this refactor would
+   * have had to ship with the fourth part of the rule ("a test through BOTH paths") structurally
+   * unavailable. Converting is what puts the pick family under the guard.
+   *
+   * Asserted in two halves, because a presence check on its own proves nothing: the KEY is
+   * reachable from the class form (the form the census below asks its questions of), and the VALUE
+   * a control writes survives `forStorage` + `bodyForPublish` into the body the save path sends —
+   * through the field's own `write`, including the slugging a GM's typing goes through.
+   */
+  it("R1: the choice panel is reachable from `fieldsOf`, and what it writes reaches the wire", () => {
+    // Half one. Every one of these threw `No field "…" in the class form` before R1, and the three
+    // that stay bespoke are named beside `featureFields()` with the reason: the level chips write
+    // two draft keys in one edit, and the source switcher and the catalog pair are driven by a UI
+    // mode held in React state that no `read` can recover from the draft.
+    for (const key of ["name", "description", "choice", "choice.kind", "choice.choose", "choice.from", "choice.repeatable"]) {
+      expect(hasControl("class", key, ["features"]), `class: features > ${key}`).toBe(true);
+    }
+    expect(hasControl("class", "choice.fromCatalog", ["features"])).toBe(false);
+
+    // Half two, on a FEAT: the cheapest publishable carrier of a `FeatureRecord`, because a feat IS
+    // one feature and needs no level table to grant it. `authoredRow` mints the row with the field's
+    // own `newRow` and refuses any key with no control, so the reduce below is the assertion.
+    const feature = authoredRow("feat", ["feature"], [
+      ["name", "Divine Order"],
+      ["description", "You gain one of the following options of your choice."],
+      ["choice", true],
+      // Typed the way a GM types it, not the way the column stores it — `ContentIdSchema` is
+      // `/^[a-z0-9-]+$/`, and the slugging lives in the field's `write` where the panel's own
+      // handler used to keep it.
+      ["choice.kind", "ASI or Feat"],
+      ["choice.choose", 2],
+      ["choice.from", "Protector, thaumaturge"],
+      ["choice.repeatable", true]
+    ]);
+    const draft: Draft = {
+      ...authored("feat", "Divine Order", [
+        ["category", "general"],
+        ["summary", "Pick an order."],
+        ["description", "Pick your order."]
+      ]),
+      feature
+    };
+
+    const verdict = publishVerdict("feat", draft, RECORD_ID);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("feat", draft, RECORD_ID) as { feature: { choice?: Record<string, unknown> } };
+    expect(body.feature.choice).toEqual({
+      kind: "asi-or-feat",
+      choose: 2,
+      from: ["protector", "thaumaturge"],
+      repeatable: true
+    });
+
+    // The switch is the SHAPE and not a flag — `FeatureRecordSchema.choice` is `.optional()` and
+    // has no "off" value to hold, so turning it off has to remove the key rather than write one.
+    expect("choice" in applyField("feat", feature, "choice", false, ["feature"])).toBe(false);
+
+    // ...and a choice key written on a feature that has none seeds the same three the switch does,
+    // so the harness cannot build a half-made shape no form could produce.
+    expect(applyField("feat", { id: "f1" }, "choice.choose", 3, ["feature"]).choice)
+      .toEqual({ kind: "feat", choose: 3, repeatable: false });
+
+    // R1 added no vocabulary, and this is what says so: the census's own worked example still
+    // throws. U12 is what makes `choices` reachable; R1 only made the lookup possible.
+    expect(() => applyField("feat", feature, "choices", [], ["feature"])).toThrow(
+      'No field "choices" in the feat form (feature row) — the test is addressing a field that does not exist.'
+    );
+  });
+
   it("`choices` throws, naming the form — the canonical SRD-only row", () => {
     // The worked example the plan names: `choices` (plural) is read by `character-build.ts` and
     // authored by three feat records, and `FeatureEditor`'s choice panel is 651 lines of hand-written

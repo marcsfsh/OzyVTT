@@ -65,18 +65,20 @@
  * are declared once, rendered through the ONE renderer, and mounted as the row shape of
  * the `custom: "features"` field so the harness can address them.
  *
- * **The level chips stay bespoke**, deliberately: one control writing `feature.level` AND
- * `levelTable[].features[]` in one edit is what `CustomField` exists for, and forcing it
- * into a `FieldDef` would break the invariant this file opens with.
+ * **Three controls stay bespoke, each because it writes something a `FieldDef` cannot:**
+ * the level chips (two draft keys in one edit — the invariant this file opens with),
+ * "Where the options come from" and the "Which catalog"/"Of which" pair (both driven by a
+ * UI mode held in React state, which no `read` can recover from the draft). The reasons
+ * are written out beside `featureFields()`, where the consequences are.
  */
 
 import { useId, useMemo, useState } from "react";
-import { Chip, Field, FieldGrid, Input, RowEditor, SegmentedControl, Select, Stepper, Switch, Textarea } from "@vtt/ui";
+import { Chip, Field, FieldGrid, Input, RowEditor, SegmentedControl, Select, Textarea } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { FieldRenderer } from "./FieldRenderer";
 import { RiderEditor, riderSummary, type RiderKind } from "./RiderEditor";
 import { LEVELS, blankFeature } from "./defaults";
-import { setAt } from "./paths";
+import { getAt, setAt } from "./paths";
 import { namesOwnRecord } from "./schema";
 import type { Draft, FieldDef, SchemaContext } from "./schema";
 
@@ -137,6 +139,39 @@ const DEFAULT_GRANT_LEVEL = 1;
 
 /* -------------------------------------------------------- the field schema ------ */
 
+/** The choice a feature is seeded with the moment the switch goes on — spelled once,
+    because `setChoice`'s merge base and the switch's own write have to agree or turning
+    the switch on twice produces two different shapes. */
+const NEW_CHOICE: Readonly<Record<string, unknown>> = { kind: "feat", choose: 1, repeatable: false };
+
+/** The slug this panel has always taken: lowercase, and every run of anything else
+    becomes one hyphen. `FeatureChoiceSchema.kind` is `ContentIdSchema`, so a value that
+    skips this is unpublishable at a gate that names a regex. */
+const asChoiceSlug = (text: string): string => text.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+
+/**
+ * `setChoice`'s merge, as a pure write against the FEATURE — the container every choice
+ * field is keyed relative to (`choice.kind`, not `kind`, the same way `uses.limit` is
+ * keyed inside its group).
+ *
+ * Seeding is the point rather than a convenience: a choice key written on a feature that
+ * has no `choice` yet mints the same `{kind, choose, repeatable}` the switch does, so
+ * `applyField(type, feature, "choice.choose", 2)` produces a body a GM could have
+ * produced, and not a half-built one no form can make.
+ */
+function writeChoice(feature: Draft, changes: Readonly<Record<string, unknown>>): Draft {
+  const merged: Record<string, unknown> = { ...((feature.choice as Record<string, unknown> | undefined) ?? NEW_CHOICE) };
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === undefined) delete merged[key];
+    else merged[key] = value;
+  }
+  return { ...feature, choice: merged };
+}
+
+/** Does this feature ask a question at all? Every control below the switch depends on it,
+    and says so rather than relying on the caller's `{choice && …}` gate. */
+const asksAChoice = (feature: Draft) => feature.choice !== undefined;
+
 /**
  * **One feature's controls, as data — the declarative surface this file used to be off.**
  *
@@ -150,11 +185,90 @@ const DEFAULT_GRANT_LEVEL = 1;
  * Every write here is the write the panel already made, lifted out of an event handler
  * and into the field. That is what makes the harness's guarantee true rather than
  * decorative: a test drives the same function the GM's finger does.
+ *
+ * **What is NOT here, and why each one is a ruling rather than an omission:**
+ *
+ *  - **the level chips** — `feature.level` AND `levelTable[].features[]` in one edit; see
+ *    the top of this file. `CustomField` exists for exactly this shape.
+ *  - **"Where the options come from"** — a `SegmentedControl` over a UI MODE held in React
+ *    state, whose change writes THREE draft keys at once (`options`/`from`/`fromCatalog`).
+ *    There is no stored value for a `FieldDef` to read.
+ *  - **"Which catalog" + "Of which"** — two controls over ONE key, `choice.fromCatalog`.
+ *    A slug is `<which>-<family>`, so picking the family before the which composes to
+ *    NOTHING, and the half-made pair is held in state precisely because the draft has
+ *    nowhere to put it. A `FieldDef` for either half could not round-trip, which is the
+ *    one thing a control on this surface must do. **Consequence for the units behind
+ *    this refactor: `choice.fromCatalog` stays unreachable from `applyField`, so a test
+ *    that needs a catalog-sourced choice drives `choice.from` instead.**
  */
 export function featureFields(): readonly FieldDef[] {
   return [
     { key: "name", label: "Name" },
-    { key: "description", label: "Description", kind: "textarea", wide: true }
+    { key: "description", label: "Description", kind: "textarea", wide: true },
+    {
+      /* The switch is the CHOICE ITSELF: on mints the seed, off removes the key. Stored
+         as a shape rather than a flag, which is why it needs the `read`/`write` pair —
+         `FeatureRecordSchema.choice` is `.optional()` and has no "off" value to hold. */
+      key: "choice",
+      label: "This feature asks the player to choose",
+      kind: "switch",
+      read: asksAChoice,
+      write: (on, feature) => {
+        if (on === true) return { ...feature, choice: { ...NEW_CHOICE } };
+        const next = { ...feature };
+        delete next.choice;
+        return next;
+      }
+    },
+    {
+      key: "choice.kind",
+      label: "What kind of choice",
+      help: "Type your own if none of these fit.",
+      // An OPEN slug with the reserved list as suggestions, never a closed `<select>`:
+      // homebrew is allowed to invent a kind and a closed control would make it
+      // impossible. Deliberately NOT `pick` — see the note in `featureFields`' docblock.
+      suggestions: CHOICE_KINDS,
+      visibleWhen: asksAChoice,
+      write: (next, feature) => writeChoice(feature, { kind: asChoiceSlug(String(next ?? "")) })
+    },
+    {
+      key: "choice.choose",
+      label: "How many they pick",
+      kind: "stepper",
+      min: 1,
+      max: 10,
+      visibleWhen: asksAChoice,
+      write: (next, feature) => writeChoice(feature, { choose: next })
+    },
+    {
+      /* Slugs separated by commas, in one box, because a `from` list is written by hand
+         against no catalog — there is nothing to suggest. `read` joins and `write`
+         splits, so the stored value is the array the schema wants and the displayed one
+         is the sentence a GM typed. */
+      key: "choice.from",
+      label: "Which options",
+      help: "Type slugs, separated by commas.",
+      placeholder: "athletics, perception",
+      visibleWhen: asksAChoice,
+      read: (feature) => {
+        const from = getAt(feature, "choice.from");
+        return (Array.isArray(from) ? from : []).map(String).join(", ");
+      },
+      write: (next, feature) =>
+        writeChoice(feature, {
+          from: String(next ?? "")
+            .split(",")
+            .map((entry) => asChoiceSlug(entry.trim()))
+            .filter(Boolean)
+        })
+    },
+    {
+      key: "choice.repeatable",
+      label: "The same option can be chosen more than once",
+      kind: "switch",
+      visibleWhen: asksAChoice,
+      write: (next, feature) => writeChoice(feature, { repeatable: next === true })
+    }
   ];
 }
 
@@ -434,40 +548,13 @@ export function FeatureEditor({
           </div>
         )}
 
-        <div className="hb-field">
-          <Switch
-            checked={!!choice}
-            label="This feature asks the player to choose"
-            onChange={(on) => setChoice(on ? { kind: "feat", choose: 1, repeatable: false } : undefined)}
-          />
-        </div>
+        {control("choice")}
 
         {choice && (
           <div className="hb-choice">
             <FieldGrid>
-              <Field label="What kind of choice" htmlFor={`${autoId}-kind-${feature.id}`} help="Type your own if none of these fit.">
-                <Input
-                  id={`${autoId}-kind-${feature.id}`}
-                  list={`${autoId}-kinds`}
-                  value={String(choice.kind ?? "")}
-                  onChange={(event) => setChoice({ kind: event.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-") })}
-                />
-                <datalist id={`${autoId}-kinds`}>
-                  {CHOICE_KINDS.map((kind) => (
-                    <option key={kind} value={kind} />
-                  ))}
-                </datalist>
-              </Field>
-
-              <div className="hb-field">
-                <Stepper
-                  value={choose}
-                  min={1}
-                  max={10}
-                  label="How many they pick"
-                  onChange={(next) => setChoice({ choose: next })}
-                />
-              </div>
+              {control("choice.kind")}
+              {control("choice.choose")}
             </FieldGrid>
 
             <div className="hb-field">
@@ -556,22 +643,7 @@ export function FeatureEditor({
               </>
             )}
 
-            {source === "list" && (
-              <Field label="Which options" help="Type slugs, separated by commas.">
-                <Input
-                  value={(Array.isArray(choice.from) ? (choice.from as string[]) : []).join(", ")}
-                  placeholder="athletics, perception"
-                  onChange={(event) =>
-                    setChoice({
-                      from: event.target.value
-                        .split(",")
-                        .map((entry) => entry.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-"))
-                        .filter(Boolean)
-                    })
-                  }
-                />
-              </Field>
-            )}
+            {source === "list" && control("choice.from")}
 
             {source === "options" && (
               <RowEditor
@@ -616,13 +688,7 @@ export function FeatureEditor({
               />
             )}
 
-            <div className="hb-field">
-              <Switch
-                checked={repeatable}
-                label="The same option can be chosen more than once"
-                onChange={(on) => setChoice({ repeatable: on })}
-              />
-            </div>
+            {control("choice.repeatable")}
 
             {/* The readout that makes `choose × grants` legible. Derived, stated
                 once, in words, updating live. Never a stored duplicate. */}
