@@ -122,8 +122,8 @@ unreachable. **This is the family that started this area** — see the cheap bat
 | `uses.scaling: class-resource` | `:84` | `character-build.ts:327`–`:332` | **19** | `RiderEditor.tsx` `usesField` — the fifth `mode` option + `uses.scaling.id`, **feature scope only** (U7) | `parity` |
 | `uses.per` | `:86` | `rests.ts:77`; `apps/server/src/encounter.ts:24` | 92 | `RiderEditor.tsx:490` | `parity` |
 | `uses.pool` | `:87` | `effective-actions.ts:113`, `:154`; `rests.ts:78`; `apps/server/src/action-resolution.ts:177` | 40 | `RiderEditor.tsx:499` | `parity` |
-| `ActionUses` on an action (monster) | `packages/schemas/src/index.ts:618` | `action-resolution.ts:236` | 114 | **none** — the monster mounts only `["actions","tags"]` (`RecordDetail.tsx:231`) and `actionsField` has no uses row | `SRD-only` |
-| `ActionUses.per: "recharge"` + `recharge` | `packages/schemas/src/index.ts:579` | `rests.ts:77`; `encounter.ts:24` | 86 | **none** — `uses.per` offers four options, no `recharge` | `SRD-only` |
+| `ActionUses` on an action | `packages/schemas/src/index.ts:603` | `action-resolution.ts:239`, `:413`, `:1237` | 114 | `actionUsesField` inside `actionsField` (U8) — every carrier that mounts an action | `parity` |
+| `ActionUses.per: "recharge"` + `recharge` | `packages/schemas/src/index.ts:603` | `rests.ts:77`; `encounter.ts:281`–`:301` | 86 | `actionUsesField`'s fifth `per` option + the threshold row (U8) | `parity` |
 
 `class-resource` was the single highest-count gap in this family: 19 SRD features read the printed
 class column for their use count (Rage, Wild Shape, Channel Divinity, the eight Metamagics), and a
@@ -133,6 +133,19 @@ beside the table. **U7 closed it at FEATURE scope, and the scope is a measuremen
 no longer carries a class table — so an item authored this way would grant no charges however the GM
 filled it in. The row this audit filed under `equipment` is authored 19 times by class and subclass
 features and 0 times by items, and the one carrier it named is the one carrier that cannot read it.
+
+**`recharge` was filed under the same wrong carrier, and U8 corrected it the same way.** The row
+this document names as `equipment.uses.recharge` is an ITEM's record-level `uses`, which is
+`FeatureUsesSchema` — four `per` values, no threshold key. Widening it was measured and rejected
+twice over: (1) an item's record-level `uses` **has no reader at all today** — `usesOf` has exactly
+two call sites, an action's uses and a cast's, and the equipped loop never reads `record.uses`
+(that is U24); and (2) the same schema is shared with FEATURES, where `character-build.ts` folds a
+feature's uses into an action at **two** sites (`interpretAction`'s "the FEATURE's limited uses ride
+the action", and the synthesised-activation path) and **neither forwards a threshold** — so a
+feature authoring `per: "recharge"` would build `{limit, per: "recharge"}` and `ActionUsesSchema`
+refuses it by name, turning a schema-valid record into an unbuildable character. The control
+therefore went to the ACTION's `uses`, which is `ActionUsesSchema`, which is what the 86 SRD authors
+use and what `encounter.ts` reads.
 
 ---
 

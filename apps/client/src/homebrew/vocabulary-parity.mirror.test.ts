@@ -34,15 +34,16 @@
  * literal. A far end is mandatory: the bar for every unit in this phase is a rolled number, a spent
  * counter, a refusal or rendered text — never "the value survived into the struct".
  *
- * Six rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
+ * Seven rows are pinned this way today: **a saving-throw action that rolls typed damage** (123
  * monster actions), **a monster's to-hit bonus** (U10 — 423 monster actions, and until that unit the
  * shape could not be published at all), **a two-band range** (U11 — 45 records, ending at the
  * long-range disadvantage die), **what an effect DOES** (U6 — and it is the one that crosses
  * carriers: the editor half authors an ITEM's effect, the SRD half reads a FEATURE's, and the two
  * reach the same kept die down two entirely different roads), **an always-prepared spell grant**
- * (U9 — 41 records, ending at a row on the character's own spell list), and **uses read off the
+ * (U9 — 41 records, ending at a row on the character's own spell list), **uses read off the
  * class table's own column** (U7 — 19 records, ending at a count that moves 2 → 3 with the level
- * while the authored line never changes).
+ * while the authored line never changes), and **a recharging action** (U8 — 86 records, ending at a
+ * d6 the table watches and the two sentences it narrates).
  *
  * ## The census, and the standing warning about what it does NOT prove
  *
@@ -67,7 +68,7 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../.
 import { ContentLibrary, EMPTY_HOMEBREW_SLICE, type HomebrewContentSource } from "../../../server/src/content-library.js";
 import { effectiveActions } from "../../../server/src/effective-actions.js";
 import { equipmentCatalogOf } from "../../../server/src/equipment-derivation.js";
-import { startEncounter } from "../../../server/src/encounter.js";
+import { nextInitiativeTurn, startEncounter } from "../../../server/src/encounter.js";
 import {
   applyField, authored, authoredRow, fieldsWithin, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
 } from "./authoring-harness";
@@ -1158,6 +1159,230 @@ describe("uses read off the class table's own column — through both paths", ()
   });
 });
 
+/* --------------- U8: `recharge` — the d6 at the start of the creature's turn ------ */
+
+/**
+ * The row: `ActionUsesSchema.per: "recharge"` and its `recharge` threshold — the *(Recharge 5–6)*
+ * every printed breath weapon carries.
+ *
+ * **The reader is the best-proved in the wave and it had no author but the bundle.** `encounter.ts`
+ * rolls a d6 at the start of the owner's turn, clears the pool on a roll at or above the threshold,
+ * and narrates BOTH outcomes by name — *"recharges (rolled 6)"* and *"stays spent (rolled 5, needs
+ * 6+)"*; `rests.ts` clears recharge pools on a short rest and a fresh fight re-arms them.
+ * `ActionUsesSchema` has carried the fifth `per` value, the threshold and a refinement PAIR
+ * enforcing them together for as long as any of it shipped. 86 bundled monster actions author it
+ * (67 at 5, 14 at 6, 5 at 4). **And no carrier had a control at all** — `actionsField` had no `uses`
+ * block at any scope, so an action's own uses were unsayable on a monster, an item and a feature
+ * alike.
+ *
+ * **Where the control went, and why not where the census said.** The census row named
+ * `equipment.uses.recharge`, which is the ITEM's record-level `uses` — `FeatureUsesSchema`, whose
+ * `per` has four values and no threshold key. Widening THAT was measured and rejected twice over:
+ * an item's record-level `uses` is read by nothing at all today (`usesOf` has exactly two call
+ * sites, an action's uses and a cast's, and the equipped loop never reads `record.uses` — that is
+ * U24), and the same schema is shared with FEATURES, where `character-build.ts` folds a feature's
+ * uses into an action at two sites and neither forwards a threshold. A feature authoring
+ * `per: "recharge"` would build `{limit, per: "recharge"}`, which `ActionUsesSchema` refuses with
+ * *"Recharge uses need the d6 threshold"* — a schema-valid record that makes its own bearer
+ * unbuildable. So the control went to the ACTION's `uses`, which is the schema the engine actually
+ * reads, on every carrier that mounts an action.
+ *
+ * The Ankheg is the carrier because it is the plainest recharge in the bundle: two actions, a
+ * save-only Acid Spray at **Recharge 6**, so exactly one face on the die re-arms it and a test
+ * cannot pass on a lucky range.
+ */
+const RECHARGE = {
+  monsterId: "ankheg",
+  srdActionId: "acid-spray",
+  /** 6, so `5` is a miss by one and `6` is the only re-arm. */
+  threshold: 6,
+  saveAbility: "dex",
+  saveDc: 12,
+  formula: "4d6",
+  damageType: "acid",
+  /** 4d6, all fours — the resolver needs the faces before anything below can look at the counter. */
+  damageFaces: [4, 4, 4, 4],
+  drakeActionId: "ember-breath",
+  drakeActionName: "Ember Breath (Recharge 6)"
+} as const;
+
+function authoredDrake(): Draft {
+  const damagePart = authoredRow("monster", ["actions", "damage"], [
+    ["formula", RECHARGE.formula],
+    ["type", RECHARGE.damageType]
+  ]);
+  const edits: ReadonlyArray<readonly [string, unknown]> = [
+    ["name", RECHARGE.drakeActionName],
+    ["activation", "action"],
+    ["description", "Dexterity Saving Throw: DC 12. Failure: 14 (4d6) Acid damage."],
+    ["damage", [damagePart]],
+    ["save.ability", RECHARGE.saveAbility],
+    ["save.dc", RECHARGE.saveDc],
+    // THE ROW, authored the way a GM meets it: the count, then how it comes back, then the die.
+    // `authoredRow` throws when a key has no control, so before U8 the first of these three lines —
+    // not an assertion below it — is what failed, on every carrier.
+    ["uses.limit", 1],
+    ["uses.per", "recharge"],
+    ["uses.recharge", RECHARGE.threshold]
+  ];
+  const action = authoredRow("monster", ["actions"], edits);
+  return authored("monster", "Cinder Drake", [
+    ["abilityScores.str", 17], ["abilityScores.dex", 11], ["abilityScores.con", 14],
+    ["abilityScores.int", 3], ["abilityScores.wis", 13], ["abilityScores.cha", 6],
+    ["armorClass", 14],
+    ["hitPoints.maximum", 45],
+    ["proficiencyBonus", 2],
+    ["actions", [{ ...action, id: RECHARGE.drakeActionId }]]
+  ]);
+}
+
+const srdAnkheg = (): ActorDefinition => {
+  const definition = new ContentLibrary().forAudience("gm").monster(RECHARGE.monsterId);
+  if (!definition) throw new Error("The SRD bundle no longer ships an Ankheg — this fixture needs a new carrier.");
+  return definition;
+};
+
+type Narration = NonNullable<Parameters<typeof nextInitiativeTurn>[1]>;
+
+/**
+ * THE assertion body. Spend the action in a real fight, then hand the creature its next turn twice
+ * — once with a die one short of the threshold and once with the threshold itself — and report what
+ * the table would see. Four far ends in one pass: a spent counter, a rolled die, a narrated refusal
+ * and a re-armed pool.
+ */
+function spendThenRecharge(definition: ActorDefinition, actionId: string) {
+  const state: GameState = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: IDS.caster, name: definition.name, kind: "monster", visibility: "public", hp: { current: 45, maximum: 45 }, armorClass: 14, definitionId: "def-caster" },
+      { id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 80, maximum: 80 }, armorClass: 12 }
+    ]
+  });
+  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+
+  const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === actionId);
+  if (!action) throw new Error(`${definition.name} has no "${actionId}" action.`);
+
+  const queue = [...RECHARGE.damageFaces];
+  resolveDefinitionAction(
+    state,
+    action,
+    { actorId: IDS.caster, targetIds: [IDS.target], commandId: IDS.command },
+    {
+      random: () => {
+        const face = queue.shift();
+        if (face === undefined) throw new Error("dice queue empty");
+        return face;
+      },
+      newRollId: () => IDS.roll,
+      gmSessionId: IDS.gmSession,
+      now: () => "2026-08-09T00:00:00.000Z",
+      definition
+    }
+  );
+  const actor = state.actors.find((entry) => entry.id === IDS.caster)!;
+  const spent = actor.actionUses[actionId] ?? 0;
+
+  /** Give the creature its next turn with a fixed d6. Two advances: the dummy, then back round. */
+  const roundWith = (face: number): Narration => {
+    const events: Narration = [];
+    const deps = { resolveDefinition: () => definition, rollDie: () => face };
+    nextInitiativeTurn(state, events, deps);
+    nextInitiativeTurn(state, events, deps);
+    return events;
+  };
+
+  const short = roundWith(RECHARGE.threshold - 1);
+  const stillSpent = actor.actionUses[actionId] ?? 0;
+  const hit = roundWith(RECHARGE.threshold);
+  const armed = actor.actionUses[actionId] === undefined;
+
+  return { actionName: action.name, spent, short, stillSpent, hit, armed };
+}
+
+describe("a recharging action — through both paths", () => {
+  it("1. the editor can author it: `per: recharge` and its threshold go through real controls, and the body publishes", () => {
+    const draft = authoredDrake();
+    const verdict = publishVerdict("monster", draft, RECORD_ID);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("monster", draft, RECORD_ID) as { actions: Array<Record<string, unknown>> };
+    expect(body.actions[0]).toMatchObject({ id: RECHARGE.drakeActionId, uses: { limit: 1, per: "recharge", recharge: RECHARGE.threshold } });
+
+    // The control is an ACTION's, on every carrier that mounts one — and it is NOT the record's
+    // `uses` block, whose `FeatureUsesSchema` has no `recharge` key to write into.
+    for (const type of ["monster", "equipment", "class"] as const) {
+      expect(hasControl(type, "uses.recharge", ["actions"]), type).toBe(true);
+    }
+    expect(hasControl("equipment", "uses.recharge")).toBe(true);   // reachable — inside an action row
+    expect(fieldsWithin("equipment", ["uses"]).some((field) => field.key === "uses.recharge")).toBe(false);
+  });
+
+  it("1b. the two halves of one authored fact are held together by the form and by the schema", () => {
+    // Picking the die SEEDS the SRD's commonest threshold rather than leaving the pair half-said —
+    // so the ordinary path never reaches the refusal at all.
+    const seeded = authoredRow("monster", ["actions"], [["uses.limit", 1], ["uses.per", "recharge"]]);
+    expect(seeded.uses).toEqual({ limit: 1, per: "recharge", recharge: 5 });
+
+    // ...and switching away DELETES it, so the schema's other refusal — "the recharge threshold only
+    // applies when per is recharge" — cannot be reached from the form either.
+    const backToRest = applyField("monster", seeded, "uses.per", "long-rest", ["actions"]);
+    expect(backToRest.uses).toEqual({ limit: 1, per: "long-rest" });
+
+    // The refinement is still load-bearing, because emptying the number is one keystroke away on a
+    // real form. The refusal a GM meets there is the schema's own sentence, named.
+    const emptied = applyField("monster", seeded, "uses.recharge", undefined, ["actions"]);
+    const drake = authoredDrake();
+    const half = { ...drake, actions: [{ ...emptied, id: RECHARGE.drakeActionId, name: RECHARGE.drakeActionName, description: "Half-said." }] };
+    const verdict = publishVerdict("monster", half, RECORD_ID);
+    expect(verdict.publishable).toBe(false);
+    expect(verdict.why).toContain("Recharge uses need the d6 threshold");
+  });
+
+  it("2. SRD content authors the same shape — and it is 86 records, not a lone one", () => {
+    const spray = srdAnkheg().actions.find((entry) => entry.id === RECHARGE.srdActionId);
+    expect(spray?.uses).toEqual({ limit: 1, per: "recharge", recharge: RECHARGE.threshold });
+
+    // Measured at the time of writing: 86 bundled monster actions come back on a die.
+    const library = new ContentLibrary().forAudience("gm");
+    const carriers = library.monsterSummaries()
+      .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
+      .filter((entry) => entry.uses?.per === "recharge");
+    expect(carriers.length).toBeGreaterThanOrEqual(80);
+    // Every one of them carries the threshold, which is the refinement pair doing its job on real
+    // content rather than on a fixture.
+    expect(carriers.every((entry) => typeof entry.uses?.recharge === "number")).toBe(true);
+  });
+
+  it("3. one assertion body over both: one short of the die it stays spent, on the die it comes back", () => {
+    const editorBody = storedBody("monster", authoredDrake(), RECORD_ID);
+    const paths: ReadonlyArray<readonly [string, ActorDefinition, string]> = [
+      ["SRD content", srdAnkheg(), RECHARGE.srdActionId],
+      ["the homebrew editor", HOMEBREW_BODY_SCHEMAS.monster.parse(editorBody), RECHARGE.drakeActionId]
+    ];
+
+    for (const [label, definition, actionId] of paths) {
+      const seen = spendThenRecharge(definition, actionId);
+
+      // 1. a spent counter — the use was really taken by the resolver, not set by this test.
+      expect(seen.spent, label).toBe(1);
+
+      // 2. a rolled die and 3. a narration that says why, in the table's own words. One short of
+      //    the threshold is the contrast that makes the re-arm mean something: without it, an
+      //    action that came back every turn regardless would pass.
+      expect(seen.short.map((event) => event.text), label)
+        .toContain(`${definition.name}'s ${seen.actionName} stays spent (rolled ${RECHARGE.threshold - 1}, needs ${RECHARGE.threshold}+).`);
+      expect(seen.stillSpent, label).toBe(1);
+
+      // 4. a re-armed pool, and the line the table reads when it happens.
+      expect(seen.hit.map((event) => event.text), label)
+        .toContain(`${definition.name}'s ${seen.actionName} recharges (rolled ${RECHARGE.threshold}).`);
+      expect(seen.armed, label).toBe(true);
+    }
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -1192,11 +1417,39 @@ describe("the guard itself refuses what the editor cannot author", () => {
     expect(RIDER_EXEMPT).toEqual(["grants"]);
     const carriers = (Object.keys(SCHEMAS) as HomebrewType[]).filter((type) => riderScopeOf(type) !== null);
     expect(carriers).toEqual(["class", "subclass", "species", "background", "feat", "equipment", "monster"]);
+
+    /**
+     * **A STAT BLOCK CARRIES TWO OF THE FIVE, and this test used to claim it carried all five.**
+     *
+     * `RecordDetail` enables exactly `["actions", "tags"]` on a monster and that is not a UI
+     * preference: `ActorDefinitionSchema` has no record-level `modifiers`, `uses` or `effects`, and
+     * being a plain `z.object` it drops them in silence. `riderFieldsForTest("statblock")` built all
+     * six anyway, so `hasControl("monster", "uses")` answered `true` for a key no stat block can
+     * hold — a false PASS on the harness's own question, left standing because `usesField`'s comment
+     * said U8 would make it true. **U8 measured the opposite and narrowed the claim instead.**
+     */
+    // Asked of the RECORD's own fields, not of the flat lookup. `hasControl(type, key)` answers "is
+    // this key reachable anywhere in the form", which is the right question for the census and the
+    // wrong one here: an action row carries a `uses` block of its own now, so the flat walk finds
+    // `uses` on a monster while no monster RECORD mounts one. `fieldsWithin(type, [])` flattens
+    // through groups and not through rows, which is exactly the record scope.
+    const onTheRecord = (type: HomebrewType, key: string) => fieldsWithin(type, []).some((field) => field.key === key);
+    const RECORD_RIDERS = ["modifiers", "uses", "actions", "effects", "tags"];
     for (const type of carriers) {
-      for (const key of ["modifiers", "uses", "actions", "effects", "tags"]) {
-        expect(hasControl(type, key), `${type}.${key}`).toBe(true);
+      const mounted = type === "monster" ? ["actions", "tags"] : RECORD_RIDERS;
+      for (const key of RECORD_RIDERS) {
+        expect(onTheRecord(type, key), `${type}.${key}`).toBe(mounted.includes(key));
       }
       expect(hasControl(type, "grants"), `${type}.grants`).toBe(false);
+    }
+
+    // ...and a creature's uses are not missing, they are one level down — on its ACTIONS, which is
+    // where `ActionSchema.uses` really lives and where all 86 recharge authors are. Every carrier
+    // that mounts an action mounts them, because every carrier's actions read the same schema.
+    for (const type of carriers) {
+      for (const key of ["uses.limit", "uses.per", "uses.recharge", "uses.pool"]) {
+        expect(hasControl(type, key, ["actions"]), `${type}: actions > ${key}`).toBe(true);
+      }
     }
   });
 
@@ -1230,13 +1483,20 @@ describe("the guard itself refuses what the editor cannot author", () => {
       expect(hasControl(type, key), `${type}.${key} — the GM has no way to say it`).toBe(true);
     }
 
+    const carriers = (Object.keys(SCHEMAS) as HomebrewType[]).filter((type) => riderScopeOf(type) !== null);
+    // Every carrier that mounts an action mounts its damage parts, stat blocks included.
+    for (const type of carriers) {
+      expect(hasControl(type, "type", ["actions", "damage"]), `${type}: actions > damage > type`).toBe(true);
+    }
+
+    // The record's OWN modifier list, which is six carriers and not seven: a stat block does not
+    // mount `modifiersField` (see the narrowing above — `ActorDefinitionSchema` has nowhere to put
+    // one), so asserting it here would be asserting a control that never renders.
     const riderSites: ReadonlyArray<readonly [string, readonly string[]]> = [
-      ["type", ["actions", "damage"]],       // every action's damage parts
       ["damageType", ["modifiers"]],         // the `extra-damage` rider — the mace's +1d6 lightning
       ["damageTypes", ["modifiers", "when"]] // the `damage-type-is` gate
     ];
-    const carriers = (Object.keys(SCHEMAS) as HomebrewType[]).filter((type) => riderScopeOf(type) !== null);
-    for (const type of carriers) {
+    for (const type of carriers.filter((entry) => entry !== "monster")) {
       for (const [key, within] of riderSites) {
         expect(hasControl(type, key, within), `${type}: ${within.join(" > ")} > ${key}`).toBe(true);
       }
@@ -1266,7 +1526,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
      */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
-      ["equipment", "uses.recharge", [], "U8 — `recharge`, 86 monster actions"],
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
       ["class", "choices", [], "U12 (after R1) — 3 feat records, a hard compile error from twelve class modules"],

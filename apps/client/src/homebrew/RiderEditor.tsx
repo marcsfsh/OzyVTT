@@ -454,11 +454,14 @@ const usesField = (label: string, scope: RiderScope): FieldDef => ({
   key: "uses",
   label,
   kind: "group",
-  // Only an ITEM has charges. A stat block's action is used a number of times before a rest gives
-  // it back, exactly as a feature's is — so `"statblock"` takes the feature sentence rather than
-  // being handed the item one. (No monster mounts this field today: `RecordDetail` enables only
-  // `["actions", "tags"]` on a stat block. U8 is the unit that changes that, and it will find the
-  // copy already correct.)
+  // Only an ITEM has charges; a feature carrier gets the plainer sentence.
+  //
+  // **No stat block mounts this field, and U8 measured that it never should.** The comment here used
+  // to say U8 would change it and "will find the copy already correct". It found the opposite:
+  // `ActorDefinitionSchema` has no record-level `uses` at all, so a monster mounting this would be
+  // writing a key Zod strips in silence. A creature's uses are its ACTIONS' uses
+  // (`ActionSchema.uses`, 86 recharge authors among them) and that is where the control went — see
+  // `actionUsesField`. `riderFieldsForTest` no longer claims this field at `"statblock"`.
   help:
     scope === "item"
       ? "Charges the item spends and gets back on a rest."
@@ -622,6 +625,102 @@ const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
     ? [{ key: "attack.bonus", label: "To hit", kind: "number", allowNegative: true, min: -5, max: 20, help: "The flat bonus the stat block prints — the +9 in “+9 to hit”." }]
     : [{ key: "attack.ability", label: "Uses", kind: "select", options: [...ABILITIES, opt("spellcasting", "Spellcasting ability")] }];
 
+/**
+ * **An ACTION's own limited uses — and it is a different schema from the record's, which is why it
+ * is a different control.**
+ *
+ * `usesField` above writes `FeatureUsesSchema`: `limit` OPTIONAL, four `scaling` rules, four `per`
+ * values, no `recharge` key at all. An action's `uses` is `ActionUsesSchema` (`@vtt/schemas`), which
+ * `ActionSchema` declares and `FeatureActionSchema` inherits: `limit` REQUIRED, **no `scaling` at
+ * all** (the union is `.strict()`, so a scaling rule here is a parse error), a FIFTH `per` value
+ * `"recharge"`, and a `recharge` threshold. Mounting `usesField` here would have offered four
+ * scalings an action cannot hold and hidden the one thing 86 SRD monster actions say — the same
+ * mistake `effectModifiersField` exists to avoid one level up.
+ *
+ * **`recharge` is the row this control exists for, and its reader is the best-proved in the wave.**
+ * `encounter.ts` rolls a d6 at the start of the owner's turn, clears the pool on `>= threshold`, and
+ * narrates BOTH outcomes by name; `rests.ts` clears recharge pools on a short rest and a fresh fight
+ * re-arms them. 86 bundled monster actions author it (67 at 5, 14 at 6, 5 at 4) and **no carrier had
+ * a control**: `actionsField` had no `uses` block at any scope, and `RecordDetail` mounts nothing
+ * else on a stat block. Offered at all three scopes because all three really read it — a monster's
+ * through `ActionSchema` directly, an item's through `usesOf` in `equipment-derivation.ts`, a
+ * feature's through `interpretAction`, and all three arrive at the same `ActorAction.uses`.
+ *
+ * **`FeatureUsesSchema` is deliberately NOT widened to match**, and the reason is a measurement:
+ * `character-build.ts` folds a feature's record-level uses into an action at TWO sites, and neither
+ * forwards a threshold. A feature authoring `per: "recharge"` would therefore build an
+ * `ActorAction.uses` with no `recharge`, which `ActionUsesSchema`'s own refinement rejects with
+ * *"Recharge uses need the d6 threshold"* — turning a schema-valid authored record into an
+ * unbuildable character. An item's record-level `uses` has no reader at all yet (U24), so widening
+ * it there would be a value the fight cannot see. The recharge vocabulary belongs where the engine
+ * already reads it, which is the action.
+ */
+const ACTION_USES_PER: readonly SelectOption[] = [
+  opt("turn", "Every turn"), opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"),
+  opt("long-rest", "On a long rest"), opt("recharge", "On a die roll")
+];
+
+const actionUses = (scope_: Draft) => ({ ...(scope_.uses as Record<string, unknown> | undefined) });
+
+const actionUsesField = (): FieldDef => ({
+  key: "uses",
+  label: "Limited uses",
+  kind: "group",
+  help: "How many times this action can be used before something gives it back.",
+  rows: [
+    {
+      key: "uses.limit",
+      label: "How many",
+      kind: "number",
+      min: 1,
+      max: 20,
+      // `ActionUsesSchema.limit` is REQUIRED and there is no `scaling` to supply it, so clearing the
+      // count is how a GM removes the whole block — and `per` is seeded here so a count typed first
+      // never publishes as uses with no recovery.
+      write: (next, scope_) => {
+        const uses = actionUses(scope_);
+        if (next === null || next === undefined) return { ...scope_, uses: undefined };
+        uses.limit = next;
+        uses.per ??= "long-rest";
+        return { ...scope_, uses };
+      }
+    },
+    {
+      key: "uses.per",
+      label: "Comes back",
+      kind: "select",
+      options: ACTION_USES_PER,
+      // The threshold and the mode are ONE authored fact and the schema refuses them apart, in both
+      // directions: `per: "recharge"` with no threshold, and a threshold with any other `per`, are
+      // each their own named refusal. So switching to recharge seeds the SRD's commonest 5 and
+      // switching away deletes it — the same replace-the-row discipline `blankModifier` follows.
+      write: (next, scope_) => {
+        const uses = actionUses(scope_);
+        if (next === null || next === undefined || next === "") {
+          delete uses.per;
+          delete uses.recharge;
+          return uses.limit === undefined ? { ...scope_, uses: undefined } : { ...scope_, uses };
+        }
+        uses.per = next;
+        uses.limit ??= 1;
+        if (next === "recharge") uses.recharge ??= 5;
+        else delete uses.recharge;
+        return { ...scope_, uses };
+      }
+    },
+    {
+      key: "uses.recharge",
+      label: "Recharges on",
+      kind: "number",
+      min: 2,
+      max: 6,
+      help: "A d6 at the start of its turn: 5 is a printed “Recharge 5–6”. The table sees the die either way.",
+      visibleWhen: (scope_) => (scope_.uses as { per?: string } | undefined)?.per === "recharge"
+    },
+    { key: "uses.pool", label: "Shared pool", placeholder: "breath-weapon", validate: slugValidate, help: "Actions sharing a pool share one counter — and one recharge roll." }
+  ]
+});
+
 const actionsField = (scope: RiderScope): FieldDef => ({
   key: "actions",
   label: "Actions",
@@ -664,7 +763,8 @@ const actionsField = (scope: RiderScope): FieldDef => ({
         { key: "save.ability", label: "Target rolls", kind: "select", options: ABILITIES },
         { key: "save.dc", label: "DC", kind: "number", min: 1, max: 40, help: "Leave empty to use the character's own spell save DC." }
       ]
-    }
+    },
+    actionUsesField()
   ]
 });
 
@@ -1085,9 +1185,19 @@ export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", 
  * **Scoped, because the harness asks a second question of it.** `vocabularies.test.ts` asks "does
  * this control offer the whole vocabulary", which one scope answers. `authoring-harness.ts` asks
  * "does a control for this key exist AT ALL", and it asks it of a feature carrier as often as an
- * item one — so the builder takes the scope the carrier is mounted at
- * (`RecordDetail.tsx:232` is the one place that decision is made). The two scopes differ only in
- * option lists and labels, never in keys; `vocabulary-parity.mirror.test.ts` pins that.
+ * item one — so the builder takes the scope the carrier is mounted at (`RecordDetail.tsx` is the one
+ * place that decision is made).
+ *
+ * **A STAT BLOCK MOUNTS TWO OF THE SIX, and this list used to claim all six.** `RecordDetail` enables
+ * exactly `["actions", "tags"]` on a monster, and that is not a UI choice — `ActorDefinitionSchema`
+ * has **no record-level `modifiers`, `uses` or `effects`** to hold the other three, and being a plain
+ * `z.object` it would drop them in silence. So while this returned the whole list for `"statblock"`,
+ * `hasControl("monster", "uses")` answered `true` for a key no stat block can carry and no monster
+ * form renders: a false PASS on the exact question the harness exists to ask. `usesField`'s own
+ * comment said U8 was the unit that would change that, and U8 measured the opposite — a stat block's
+ * uses live on its ACTIONS, where `ActionSchema.uses` really is and where all 86 SRD recharge
+ * authors are. Narrowed rather than made true, and `vocabulary-parity.mirror.test.ts` asserts the
+ * narrow shape per carrier.
  *
  * **`grants` is deliberately absent**, and it is the one honest gap: it is authored by
  * `GrantsEditor` above, a bespoke component that writes eleven parallel arrays whole-body and has no
@@ -1100,10 +1210,13 @@ export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", 
  * not a unit. `grantRowsOf`/`grantsFromRows` are what a test drives in the meantime.
  */
 export function riderFieldsForTest(scope: RiderScope): readonly FieldDef[] {
+  // The two `RecordDetail` really enables on a monster, in the order it renders them. `whenField` is
+  // absent with `modifiersField`, which is the only place it nests.
+  if (scope === "statblock") return [tagsField("Tags"), actionsField(scope)];
   return [
     whenField(),
     modifiersField("What it does", scope),
-    // "Charges" is an item's word for it; a stat block's action has uses, like a feature's.
+    // "Charges" is an item's word for it; a feature carrier's is plainer.
     usesField(scope === "item" ? "Charges" : "Limited uses", scope),
     tagsField("Tags"),
     actionsField(scope),
