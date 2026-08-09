@@ -974,6 +974,22 @@
 .codex-composer-gm-label { display: flex; align-items: center; gap: var(--space-2); }
 .codex-composer-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; }
 .codex-composer-meta > * { flex: 1 1 130px; }
+/* A FIELD KEEPS ITS OWN HEIGHT IN A ROW OF FIELDS — 5b / 5e.1 / 5e.2, all one mechanism.
+   `.nh-field` is `display: grid` with a gap and NO `align-content` (`forms.css:12`), so when its parent
+   stretches it (flex and grid both default to it), its auto rows grow and take the control with them.
+   Put one 3-row field — label + control + help sentence — beside two 2-row ones and it is the SIBLINGS
+   that move: the helped field sets the line height and stays put while everyone else's input drops and,
+   where the control is a bare `<input class="nh-input">` with no wrapper to absorb it, visibly grows.
+   Measured at 1280px before this rule: the session meta row spread 23.5px and downtime's Activity input
+   stood 67.5px tall against Who's and Days' 44px; the downtime EDIT row — which keeps its help string
+   deliberately — spread 33.25px.
+
+   Scoped to these three containers, never to bare `.nh-field`: `CodexEditor fill` and every textarea
+   field want exactly the stretch this turns off. The three parents are one flex (`.codex-composer-meta`)
+   and two grids (below), which stretch their items under the same default. */
+.codex-composer-meta > .nh-field,
+.codex-downtime-form > .nh-field,
+.codex-downtime-edit > .nh-field { align-content: start; }
 .codex-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 /* M11: the composer's kind switch. Layout only — `SegmentedControl` is the `@vtt/ui` primitive and owns
    its own 44px story (route 2, 36px paint, 4px overhang). §4's gap budget is met by the composer's own

@@ -332,6 +332,22 @@ const GM_ROUTES = [
   { path: "/scenes/maps", ready: ".scenes-maps-view" },
   { path: "/roster", ready: ".party-heading-actions" },
   { path: "/codex", ready: ".codex-root" },
+  // The Codex's two COMPOSERS, which `/codex` alone never renders: `/codex` is the campaign dashboard,
+  // so the field rows where `5b`/`5e.1`/`5e.2` lived were outside this audit entirely. Downtime's is at
+  // its own address; a session's is behind a record, so the address is resolved from the rail below.
+  { path: "/codex/downtime", ready: ".codex-downtime-form" },
+  {
+    path: "/codex/sessions/:id", ready: ".codex-session-editor",
+    /** D3: which session is open IS the address, so opening the first row yields a real route to probe. */
+    resolve: async (page) => {
+      await go(page, "/codex/sessions", ".codex-shell-content");
+      const row = page.locator(".codex-shell-content button.codex-session-row").first();
+      if ((await row.count()) === 0) return null;
+      await row.click({ timeout: 8_000 });
+      await page.waitForTimeout(900);
+      return await page.evaluate(() => location.pathname);
+    }
+  },
   { path: "/homebrew", ready: ".hb-root" },
   { path: "/viewer-controls", ready: ".viewer-controls" },
   { path: "/replays", ready: ".replay-panel" },

@@ -211,7 +211,11 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
 
       <div className="codex-composer-meta">
         <Field label="Session #" htmlFor="s-number"><Input id="s-number" type="number" inputMode="numeric" value={draft.sessionNumber} onChange={(event) => patch({ sessionNumber: event.target.value })} /></Field>
-        <Field label="Date played" htmlFor="s-date" help="The real-world date. The Calendar holds in-world dates."><Input id="s-date" value={draft.realDate} placeholder="2026-07-26" onChange={(event) => patch({ realDate: event.target.value })} /></Field>
+        {/* No help string. "Date played" beside a Session # and a Status is already unambiguous, and the
+            sentence cost the row its alignment: a 3-row `.nh-field` set the flex line's height and its
+            2-row neighbours stretched to match, dropping THEIR inputs 23.5px (measured at 1280px). The
+            scoped `align-content: start` in codex.css is the other half — this one is the copy half. */}
+        <Field label="Date played" htmlFor="s-date"><Input id="s-date" value={draft.realDate} placeholder="2026-07-26" onChange={(event) => patch({ realDate: event.target.value })} /></Field>
         <Field label="Status" htmlFor="s-status">
           <Select id="s-status" value={draft.status} onChange={(event) => patch({ status: event.target.value as CodexSessionStatus })}>
             <option value="planned">Planned</option>

@@ -577,8 +577,8 @@ and its one consumer, the root scroll recipe, retired when the shell locked.)
 ## 10. Enforcement & migration *(in force since 2026-08-04 — nothing here weakens an existing check)*
 
 - **In repo:** `scripts/no-scroll-audit.mjs` — a real GM login and a real player join, then
-  the route × role table (19 rows: landing, viewer entry, every GM address including
-  resolved `/replays/:id` and `/characters/:id(/level)`, the player's four) at 1280×900,
+  the route × role table (23 rows: landing, viewer entry, 16 GM addresses including resolved
+  `/replays/:id`, `/characters/:id(/level)` and `/codex/sessions/:id`, the player's five) at 1280×900,
   1280×720 and 390×844, failing (exit non-zero) on any document scroll, either axis, or any
   unmeasured route. Scripted-manual on the same terms as `tap-audit.mjs` (needs a browser
   and a live dev server, honestly outside vitest) — `docs/ai-context/testing.md` has the

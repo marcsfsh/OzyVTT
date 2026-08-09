@@ -151,7 +151,13 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
         <h3 className="codex-campaign-h">Log downtime</h3>
         {/* The SAME write the Journal composer uses — one write path, two doors. */}
         <div className="codex-downtime-form">
-          <Field label="Who" htmlFor="codex-downtime-who" help="Pick a character page, or type a name.">
+          {/* No help string. The control's own placeholder already says "Search characters, or type a
+              name", so the sentence below it was a second copy of the same instruction — and it cost
+              the row its alignment: this 3-row `.nh-field` set the grid row's height and its 2-row
+              neighbours stretched to match, which is what made Activity a visibly taller box than Who
+              and Days (5e.2). Measured at 1280px: Activity's input was 67.5px against everyone else's
+              44px, sitting 23.5px low. `align-content: start` in codex.css is the other half. */}
+          <Field label="Who" htmlFor="codex-downtime-who">
             {characterOptions.length > 0
               ? <Combobox id="codex-downtime-who" options={characterOptions} value={whoValue} onChange={setWhoValue} allowFreeText limit={characterLimit}
                   ariaLabel="Who spent the time" placeholder="Search characters, or type a name" />
