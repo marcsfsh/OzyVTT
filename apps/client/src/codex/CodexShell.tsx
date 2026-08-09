@@ -56,7 +56,12 @@ const SIDEBAR_KEY = "codex-sidebar";
 const DRAWER_TRANSIENT = "codex-nav";
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
-type WorkspaceActor = Readonly<{ id: string; name: string }>;
+/**
+ * `archived` and `kind` are optional because the Atlas half of this prop never needed them and a caller
+ * with no table state is legitimate — but the two character pickers (`5a`, `5e.3`) read them, and
+ * `codex/characters.ts` explains why they cannot come from a Codex page instead.
+ */
+type WorkspaceActor = Readonly<{ id: string; name: string; archived?: boolean; kind?: string }>;
 
 export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {}, onOpenReplay }: Readonly<{
   gmToken: string;
@@ -420,7 +425,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
           {section === "sessions" && (
             <SessionsView gmToken={gmToken} sessions={sessions} activeSessionId={activeSessionId}
               loading={sessionsLoading} error={sessionsError} onChanged={loadSessions}
-              autosave={autosave} pages={pages}
+              autosave={autosave} pages={pages} actors={actors}
               openSessionId={recordId} onOpenSession={(id) => navigate(id ? sessionPath(id) : pathForSection("sessions"))}
               filter={route.query.get("q") ?? ""} statusFilter={route.query.get("status")}
               onFilterChange={setListFilter}
@@ -461,7 +466,7 @@ export function CodexShell({ gmToken, scenes = [], actors = [], activeSceneId = 
           )}
 
           {section === "downtime" && (
-            <DowntimeView gmToken={gmToken} records={campaign.records} calendar={campaign.calendar} pages={pages}
+            <DowntimeView gmToken={gmToken} records={campaign.records} calendar={campaign.calendar} pages={pages} actors={actors}
               loading={campaignLoading} error={campaignError} onChanged={loadCampaign}
               onOpenEntry={(entryId) => navigate(journalEntryPath(entryId))}
               onOpenPage={(pageId) => navigate(pagePath(pageId))} />

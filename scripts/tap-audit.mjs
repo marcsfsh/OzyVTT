@@ -33,6 +33,9 @@
  * number this script prints, on the surface a phone actually holds. It also opens the pin inspector's
  * collapsed Appearance disclosure (about sixty icon buttons that had no rendered box), the quick-create
  * dialog, the session editor and the cross-type tag view — surfaces the plan named and the audit missed.
+ * It also OPENS the two codex character choosers ("Who played" and downtime's "Who"): their option rows
+ * are the densest cluster on either surface and do not exist until the box is tapped. That was worth 4
+ * rows apiece at the seed's party size — session-editor 46 controls to 50, downtime 30 to 34.
  *
  * A SURFACE IT CANNOT REACH IS REPORTED, NEVER SUBSTITUTED. Two openers used to be
  * `if (await x.count() > 0) { … }` with no else, so a missing pin measured the plain Atlas a second time
@@ -256,6 +259,20 @@ const MEASURE = `((rootSelector) => {
  * "Select a page" state on screen and measure THAT under an editor's heading — the substitution
  * failure the docblock's third paragraph is about.
  */
+/**
+ * Tap a `Combobox` open and wait for its listbox, so the option rows are measured rather than the
+ * closed box. Throws when there is nothing to open — a picker that silently failed to open would
+ * report its surface clean on the strength of the controls around it.
+ */
+async function openCombobox(page, selector, missing) {
+  const box = page.locator(`${selector}[role=combobox]`).first();
+  if (await box.count() === 0) throw new Error(missing);
+  await box.scrollIntoViewIfNeeded();
+  await box.click({ timeout: 8_000 });
+  await page.waitForSelector(".nh-combobox-list", { timeout: 8_000 });
+  await page.waitForTimeout(600);
+}
+
 async function openFirstRecord(page, { rows, expect, what }) {
   const row = page.locator(rows).first();
   if (await row.count() === 0) throw new Error(`no ${what} row in the rail to open the editor with`);
@@ -396,16 +413,28 @@ const SURFACES = [
   // Was `hasText: /^Session \d/`, which is not a fixture reference but is the same coupling one step
   // weaker: it passes only while `sessionTitle()` is falling back to its numbered default, and a
   // campaign whose sessions carry real names would have reported this surface unmeasured.
-  { name: "session-editor", path: "/codex/sessions", open: (page) => openFirstRecord(page, {
-      rows: ".codex-shell-content button.codex-session-row", expect: ".codex-session-editor", what: "session"
-    }) },
+  { name: "session-editor", path: "/codex/sessions", open: async (page) => {
+      await openFirstRecord(page, {
+        rows: ".codex-shell-content button.codex-session-row", expect: ".codex-session-editor", what: "session"
+      });
+      // …with "Who played" OPEN (`5a`). Since it became a `TagInput pick` chooser, its option rows are
+      // the densest control cluster on this surface and they do not exist until the box is tapped —
+      // a closed picker measures one 44px input and reports the party's rows as if they were not there.
+      // Same shape as `play-homebrew-picker`; the run's third overlay mechanism excludes the fields
+      // BENEATH the open list from the reach verdict while still measuring the list's own rows.
+      await openCombobox(page, "#s-attendees", 'the session editor has no "Who played" chooser to open');
+    } },
   { name: "quests", path: "/codex/quests" },
   { name: "quest-editor", path: "/codex/quests", open: (page) => openFirstRecord(page, {
       rows: ".codex-shell-content button.codex-quest-row", expect: ".codex-quest-editor", what: "quest"
     }) },
   { name: "journal", path: "/codex/journal" },
   { name: "calendar", path: "/codex/calendar" },
-  { name: "downtime", path: "/codex/downtime" },
+  // …with the "Who" chooser OPEN (`5e.3`): same reason as `session-editor` above. The list carries one
+  // row per character page, marked "Archived" where the table has retired one, and a closed box shows
+  // none of them.
+  { name: "downtime", path: "/codex/downtime", open: (page) =>
+      openCombobox(page, "#codex-downtime-who", 'the downtime composer has no "Who" chooser to open') },
   { name: "audit", path: "/codex/audit" },
   { name: "backup", path: "/codex/backup" },
   { name: "settings", path: "/codex/settings" },

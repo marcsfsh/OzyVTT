@@ -5,6 +5,7 @@ import {
   type CodexChronicleRecord, type CodexDowntimePayload, type CodexInWorldDate, type CodexPageSummary,
   type GmCodexCalendar, type PlayerCodexChronicleRecord
 } from "./api";
+import { ARCHIVED_META, charactersFor, type ArchivableActor } from "./characters";
 import { deadlinesPassedBy, downtimeOf, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
 import { CodexEditor } from "./CodexEditor";
 import { CodexIcon, EntityIcon } from "./icons";
@@ -28,6 +29,9 @@ export type DowntimeViewProps = Readonly<{
   records: readonly CodexChronicleRecord[];
   calendar: GmCodexCalendar | null;
   pages: readonly CodexPageSummary[];
+  /** `5e.3`: the table's roster, for the one thing a Codex page cannot say — whether a character is
+      archived. See `codex/characters.ts`; absent is a campaign with no table state, not an error. */
+  actors?: readonly ArchivableActor[];
   loading: boolean;
   error: string | null;
   onChanged: () => void;
@@ -37,7 +41,7 @@ export type DowntimeViewProps = Readonly<{
 
 type DowntimeRow = Readonly<{ record: CodexChronicleRecord; payload: CodexDowntimePayload }>;
 
-export function DowntimeView({ gmToken, records, calendar, pages, loading, error, onChanged, onOpenEntry, onOpenPage }: DowntimeViewProps) {
+export function DowntimeView({ gmToken, records, calendar, pages, actors = [], loading, error, onChanged, onOpenEntry, onOpenPage }: DowntimeViewProps) {
   /**
    * ONE control, one state. "Who" used to be two text boxes bound to the same `who`: a Combobox that
    * rendered while `who` was empty and a bare Input beside it that was always there. Typing a free-text
@@ -65,9 +69,21 @@ export function DowntimeView({ gmToken, records, calendar, pages, loading, error
     [records]
   );
   const pending = useMemo(() => rows.filter((row) => !row.payload.applied), [rows]);
+  /**
+   * `5e.3` — the same list "Who played" offers, in the same order and with the same word for it:
+   * active characters first, archived ones last carrying a muted `Archived` suffix. The rule lives in
+   * `characters.ts` because "archived" is a TABLE flag that no Codex page has (see that file).
+   *
+   * `meta` rather than a grouped listbox: `Combobox` already renders a muted suffix per option, and a
+   * <details> fold would be new API on a control four lanes touched today for no reachability the
+   * ordering does not already give.
+   */
   const characterOptions = useMemo(
-    () => pages.filter((page) => page.entityType === "character").map((page) => ({ id: page.id, label: page.title, icon: <EntityIcon type="character" /> })),
-    [pages]
+    () => charactersFor(pages, actors).map((option) => ({
+      id: option.id, label: option.title, icon: <EntityIcon type="character" />,
+      ...(option.archived ? { meta: ARCHIVED_META } : {})
+    })),
+    [pages, actors]
   );
   /**
    * **The whole party is reachable, not the first eight of it.** `Combobox` pages at `limit = 8` by

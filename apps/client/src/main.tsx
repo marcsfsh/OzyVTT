@@ -822,10 +822,14 @@ function App() {
           it). Unshared ids are 404 at the server, so the list is the truth. */}
       {mode === "player" && playerView === "table" && route.segments[0] === "replays" && mapToken &&
         <ReplayList role="player" token={mapToken} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} onBack={() => navigate("/table")} />}
-      {/* THE CODEX OWNS ITS FRAME (B2), GM half — same shell, same regions, one more section list. */}
+      {/* THE CODEX OWNS ITS FRAME (B2), GM half — same shell, same regions, one more section list.
+          `actors` carries `archived` and `kind` as well as the id and name: the Codex's character
+          pickers order archived characters last, and "archived" is a TABLE flag with no equivalent on
+          a Codex page (see `codex/characters.ts` for the join). Dropping the two here is what left
+          those pickers unable to tell a retired character from a live one. */}
       {mode === "gm" && gmToken && route.segments[0] === "codex" && <CodexShell gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
-        actors={(state as GmView | null)?.actors?.map((actor) => ({ id: actor.id, name: actor.name })) ?? []}
+        actors={(state as GmView | null)?.actors?.map((actor) => ({ id: actor.id, name: actor.name, archived: actor.archived, kind: actor.kind })) ?? []}
         activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
         onActivateScene={(sceneId: string) => { makeSceneLive(sceneId); navigate(pathForGmTab("table")); }}
         onOpenReplay={(archiveId: number) => navigate(`/replays/${archiveId}`)} />}

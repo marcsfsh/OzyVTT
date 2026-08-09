@@ -5,6 +5,7 @@ import { pickNextSession, sessionTitle } from "./sessions";
 import { createSession } from "./creates";
 import { CodexEditor } from "./CodexEditor";
 import { TagChip } from "./TagChip";
+import { archivedOptionLabel, charactersFor, type ArchivableActor } from "./characters";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 
@@ -41,10 +42,13 @@ type SessionsViewProps = Readonly<{
   autosave: CodexAutosaveSettings;
   /** For the editor's `[[` autocomplete — the shell's one page feed, never a second fetch. */
   pages: readonly CodexPageSummary[];
+  /** `5a`: the table's roster, for the one thing a Codex page cannot say — whether a character is
+      archived. See `codex/characters.ts`; absent is a campaign with no table state, not an error. */
+  actors?: readonly ArchivableActor[];
   onPickTag?: (tag: string) => void;
 }>;
 
-export function SessionsView({ gmToken, sessions, activeSessionId, loading, error, openSessionId = null, onOpenSession, onChanged, autosave, pages, onPickTag, filter = "", statusFilter = null, onFilterChange }: SessionsViewProps) {
+export function SessionsView({ gmToken, sessions, activeSessionId, loading, error, openSessionId = null, onOpenSession, onChanged, autosave, pages, actors = [], onPickTag, filter = "", statusFilter = null, onFilterChange }: SessionsViewProps) {
   const [listError, setListError] = useState<string | null>(null);
 
   const selected = openSessionId ? sessions.find((session) => session.id === openSessionId) ?? null : null;
@@ -118,7 +122,7 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
           {error && <Alert tone="danger" title="Couldn't load the sessions">{error}</Alert>}
           {selected
             ? <SessionEditor key={selected.id} gmToken={gmToken} session={selected} isActive={selected.id === activeSessionId}
-                autosave={autosave} pages={pages} onPickTag={onPickTag}
+                autosave={autosave} pages={pages} actors={actors} onPickTag={onPickTag}
                 onChanged={onChanged} onDeleted={() => { onOpenSession(null); void onChanged(); }} />
             : !loading && !error && <div className="codex-main-empty"><h3>No session selected</h3><p>A session holds GM-only prep and a recap for players. While a session is active, new journal entries and logged battles are filed under it.</p><Button variant="primary" onClick={create}>New session</Button></div>}
         </section>
@@ -137,9 +141,9 @@ export function SessionsView({ gmToken, sessions, activeSessionId, loading, erro
  */
 type SessionDraft = Readonly<{ sessionNumber: string; realDate: string; attendees: readonly string[]; status: CodexSessionStatus; prepBody: string; recapBody: string; tags: readonly string[] }>;
 
-function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag, onChanged, onDeleted }: Readonly<{
+function SessionEditor({ gmToken, session, isActive, autosave, pages, actors = [], onPickTag, onChanged, onDeleted }: Readonly<{
   gmToken: string; session: CodexSession; isActive: boolean; autosave: CodexAutosaveSettings;
-  pages: readonly CodexPageSummary[]; onPickTag?: (tag: string) => void;
+  pages: readonly CodexPageSummary[]; actors?: readonly ArchivableActor[]; onPickTag?: (tag: string) => void;
   onChanged: () => void | Promise<void>; onDeleted: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -150,6 +154,15 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
   const [error, setError] = useState<string | null>(null);
   const revRef = useRef(session.rev);
   const patch = (next: Partial<SessionDraft>) => setDraft((prev) => ({ ...prev, ...next }));
+
+  /** `5a`: the character list "Who played" offers — names, because that is what the field stores. */
+  const characters = useMemo(() => charactersFor(pages, actors), [pages, actors]);
+  const attendeeSuggestions = useMemo(() => characters.map((option) => option.title), [characters]);
+  /** Display only (`TagInput.optionLabel`): the value picked, normalised and stored is the name itself. */
+  const attendeeLabel = useCallback(
+    (name: string) => archivedOptionLabel(name, characters.find((option) => option.title === name)?.archived ?? false),
+    [characters]
+  );
 
   const write = useCallback(async (next: SessionDraft) => {
     const updated = await sessionApi.update(gmToken, session.id, {
@@ -237,9 +250,16 @@ function SessionEditor({ gmToken, session, isActive, autosave, pages, onPickTag,
 
       {/* Its own full-width row rather than a cell in `.codex-composer-meta`, whose `flex: 1 1 130px`
           columns would squeeze a wrapping chip cloud into a 130px gutter on a phone. */}
+      {/* `5a` — bound to the characters that exist, and still open. `TagInput`'s `pick` swaps its entry
+          box for a visible chooser over the campaign's character pages, active ones first and archived
+          ones last and marked (`characters.ts` owns that order and that word). It changes what a GM can
+          SEE, never what the field accepts: `allowFreeText` rides through, so a guest who has no page
+          still commits, and the wire shape stays `string[]` of NAMES — binding this to page ids would
+          put a GM-only list of ids on a record whose attendees are deliberately GM-only anyway. */}
       <Field label="Who played" htmlFor="s-attendees">
         <TagInput id="s-attendees" ariaLabel="Who played" placeholder="Add a name" values={draft.attendees}
           onChange={(attendees: readonly string[]) => patch({ attendees })} max={24} maxReachedReason="A session may list at most 24 people."
+          suggestions={attendeeSuggestions} pick optionLabel={attendeeLabel}
           /* The default slugify normalizer is OVERRIDDEN here, and this is the one place in the Codex
              where that is right: these are people's names, not tags. The server takes any trimmed
              string up to 40 characters (`AttendeesSchema`), so "Garrett P." must survive as typed —
