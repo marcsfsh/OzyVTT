@@ -325,3 +325,55 @@ describe("ruling E - `fromPicks` offers the character's own answers, narrowed by
     expect(offer!.options.map((option) => option.id)).toEqual(["spare-the-dying", "sacred-flame"]);
   });
 });
+
+/**
+ * An ASI feature's levels stay SEPARATE decisions, whichever spelling holds its picks (U12).
+ *
+ * Each ASI level is its own decision — the player picks feat-or-scores separately at 4, 8, 12 — so
+ * `computeOffers` must never hand two levels one key, or an answer at 4 satisfies the offer at 8.
+ *
+ * The singular spelling earns that with an ASI-specific `@<level>` suffix read off
+ * `feature.choice.kind`, which was the only spelling a record could carry until `choices` became
+ * authorable. A plural record has no `choice` at all, so that suffix stops applying — and the
+ * levels stay separate anyway, because the multi-block path carries its own generic suffixes:
+ * `/N` for the Nth choice block and `#N` for the Nth grant of the same feature.
+ *
+ * Written after chasing a suspected collision that turned out not to exist. It is kept because the
+ * two spellings reach uniqueness by two different mechanisms, and only one of them is obvious from
+ * reading the ASI code — a later change to either could merge the levels without touching the other.
+ */
+describe("an ASI feature's levels stay separate decisions, under either spelling", () => {
+  const asiBlock = {
+    kind: "asi-or-feat", choose: 1, from: [], fromCatalog: null,
+    maxSpellLevel: null, minSpellLevel: null, fromPicks: null, options: []
+  };
+  const asiFeature = (over: Partial<ContentFeatureSummary>): ContentFeatureSummary => feature({
+    id: "ability-score-improvement", name: "Ability Score Improvement",
+    description: "Increase one ability score by 2, or take a feat.",
+    grantedAtLevels: [4, 8], ...over
+  });
+  const keysFor = (features: readonly ContentFeatureSummary[]) =>
+    computeOffers({ ...draftWith(), level: 8 }, catalogsWith(clericWith(features, { asiLevels: [4, 8] })))
+      .map((offer) => offer.key)
+      .filter((key) => key.startsWith("feature:ability-score-improvement"));
+
+  it("names the level itself when the picks are stored SINGULAR", () => {
+    expect(keysFor([asiFeature({ choice: asiBlock as never })]))
+      .toEqual(["feature:ability-score-improvement@4", "feature:ability-score-improvement@8"]);
+  });
+
+  it("keeps every grant distinct when the picks are stored PLURAL — the shape U12 made authorable", () => {
+    // Two blocks over two granted levels is four decisions, and all four must be addressable.
+    // `@<level>` is absent here by construction; uniqueness comes from `/2` and `#2` instead.
+    const keys = keysFor([asiFeature({ choices: [asiBlock, { ...asiBlock, kind: "feat" }] as never })]);
+    expect(keys).toHaveLength(4);
+    expect(new Set(keys).size).toBe(4);
+    expect(keys.filter((key) => key.endsWith("#2"))).toHaveLength(2);
+  });
+
+  it("keeps the two grants of a ONE-block plural feature apart too", () => {
+    const keys = keysFor([asiFeature({ choices: [{ ...asiBlock, kind: "feat" }] as never })]);
+    expect(new Set(keys).size).toBe(2);
+    expect(keys).toEqual(["feature:ability-score-improvement", "feature:ability-score-improvement#2"]);
+  });
+});
