@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, RevealSwitch, SaveState, SegmentedControl, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
+import { Alert, Badge, Button, Checklist, Combobox, Field, IconButton, IconChevron, IconPlus, IconX, Input, RevealSwitch, SaveState, Select, Skeleton, TagInput, VisibilityBadge } from "@vtt/ui";
 import { questApi, type CodexAutosaveSettings, type CodexQuest, type CodexQuestObjective, type CodexQuestStatus } from "./api";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, questProgress, questStatusTone } from "./quests";
 import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";
+import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
 import { CodexIcon, EntityIcon } from "./icons";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
@@ -138,13 +139,12 @@ export function QuestsView({ gmToken, quests, pages, loading, error, openQuestId
  * your work" exists to end. `expectedRev` still travels, so the 409 path is unchanged.
  */
 type QuestDraft = Readonly<{ title: string; status: CodexQuestStatus; playerBody: string; gmBody: string; objectives: readonly CodexQuestObjective[]; entityIds: readonly string[]; tags: readonly string[] }>;
-type QuestBodyTab = "player" | "gm";
 
 /**
  * Ruling 57 — **a quest is a document, so it wears the page editor's shape and not one of its own.**
  *
  * Literally the same classes (`.codex-editor`, `-head`, `-cols`, `-center`, `-context`) and the same two
- * controls: one body at a time behind a Player-facing / GM only switch, and everything that is not the
+ * controls: one body at a time behind the shared `TwoLayerBodyTabs` switch, and everything that is not the
  * writing behind Details. Two shapes in the Codex, not five — per-surface composition is what produced
  * the "stitched-together panels" complaint, and a quest editor that stacked title, status, objectives,
  * tags, TWO 224px writing fields and a link picker down one scrolling column was one of the five.
@@ -157,7 +157,7 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
   onChanged: () => void | Promise<void>; onOpenPage: (pageId: string) => void; onDeleted: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [tab, setTab] = useState<QuestBodyTab>("player");
+  const [tab, setTab] = useState<BodyLayer>("player");
   const detailsRef = useRef<HTMLElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(() => {
     try { return localStorage.getItem(QUEST_DETAILS_KEY) === "open"; } catch { return false; }
@@ -212,7 +212,7 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
     catch { setError("Couldn't change who can see this quest."); }
   };
   const remove = async () => {
-    if (!(await confirm({ title: "Delete quest", body: `Delete “${quest.title}”? Its objectives and your GM notes are lost. Pages it links to are not deleted.`, confirmLabel: "Delete", danger: true }))) return;
+    if (!(await confirm({ title: "Delete quest", body: `Delete “${quest.title}”? Its objectives and your GM-only notes are lost. Pages it links to are not deleted.`, confirmLabel: "Delete", danger: true }))) return;
     try { await questApi.remove(gmToken, quest.id); onDeleted(); }
     catch { setError("Couldn't delete the quest."); }
   };
@@ -238,19 +238,16 @@ function QuestEditor({ gmToken, quest, pages, autosave, onPickTag, onChanged, on
 
       <div className="codex-editor-cols">
         <div className="codex-editor-center">
-          <div className="codex-body-bar">
-            <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as QuestBodyTab)}
-              options={[{ value: "player", label: "What the party was told" }, { value: "gm", label: "GM notes" }]} />
-          </div>
+          <TwoLayerBodyTabs value={tab} onChange={setTab} />
           {/* D13: the SAME writing surface a page body gets, so a quest body renders as markdown for the
               party instead of as the deliberate plain text it used to be. R5 is unchanged: the GM layer
               still wears the violet block and the "GM only" pill, now as the tab's own surface. */}
           {tab === "player"
             ? <CodexEditor id="q-player" token={gmToken} value={draft.playerBody} onChange={(playerBody) => patch({ playerBody })} fill
-                ariaLabel="What the party was told" placeholder="What players have been told about this quest"
+                ariaLabel={BODY_LAYER.player.label} placeholder="What players have been told about this quest"
                 pages={pages} onNavigate={() => undefined} />
             : <CodexEditor id="q-gm" token={gmToken} value={draft.gmBody} onChange={(gmBody) => patch({ gmBody })} fill
-                ariaLabel="GM notes" placeholder="Details players cannot see"
+                ariaLabel={BODY_LAYER.gm.label} placeholder="Details players cannot see"
                 pages={pages} onNavigate={() => undefined} gmLayer />}
           <p className="codex-composer-hint">
             {tab === "player" ? "Players see this once the quest is shown to them." : "Never sent to a player, whatever the quest's reveal state."}

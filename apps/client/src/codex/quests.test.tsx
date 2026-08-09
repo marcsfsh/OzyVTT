@@ -219,8 +219,8 @@ describe("The dashboard's open-quests card (M10)", () => {
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
     // Ruling 57: a quest wears the page editor's shape, so one body is on screen at a time. The GM half
     // is one switch away and still the record's own text, not a second copy of it.
-    await user.click(screen.getByRole("button", { name: "GM notes" }));
-    expect(screen.getByRole("textbox", { name: /GM notes/ })).toHaveValue("The vestiges are still bargaining.");
+    await user.click(screen.getByRole("button", { name: "GM-only notes" }));
+    expect(screen.getByRole("textbox", { name: /GM-only notes/ })).toHaveValue("The vestiges are still bargaining.");
 
     // The card is a view: one read for the whole workspace, and no write anywhere on the way here.
     expect(listQuests).toHaveBeenCalledTimes(1);
