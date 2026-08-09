@@ -13,6 +13,46 @@ an ADR.
 newer entry beside it without marking the older one — an unmarked superseded decision is the
 worst artifact this file can produce, because it reads as current.
 
+## 2026-08-09 — a quest has five statuses, "open" means not finished, and a new quest is Not started
+
+Client report (`5d`): *"Quests need to expand their status options, it at least needs 'Not started'
+and 'Canceled'."* `CodexQuestStatus` is now
+`"not-started" | "active" | "completed" | "failed" | "canceled"`, in lifecycle order. Two rulings
+came with it, and both **reverse a position this repo had written down**, so they are dated here
+rather than quietly edited into the code they contradict.
+
+- **`canceled` is not a synonym for `failed`, and does not wear `danger`.** A lead the party never
+  took up did not fail. Recording it as a failure both misreports the campaign and puts a red badge
+  on something nobody lost, so the tone silently contradicting the word beside it is the specific
+  defect this avoids. `not-started` and `canceled` share `neutral` — the two states that want no
+  attention (`apps/client/src/codex/quests.ts`, `questStatusTone`).
+- **REVERSED: the default for a new quest is `not-started`, not `active`.** A quest record is created
+  the moment a lead is NAMED — `CodexQuestCreateRequest` requires nothing but a title, precisely so a
+  rumour can be written down mid-session — and a rumour nobody has acted on is not an active quest.
+  With three statuses `active` was the least wrong of them; now that "not started" exists, keeping it
+  would mean the honest state is the one a GM must select by hand. Nothing is lost from the dashboard
+  because of the next ruling. (`apps/server/src/codex-store.ts`, `questStatus`.)
+- **REVERSED: "open" is NOT FINISHED — `not-started` or `active`.** `openQuests`' docblock asserted
+  "open is `active`, and nothing else"; that reading is retired and the docblock now says so
+  (`apps/client/src/codex/quests.ts`). The card is headed "Open quests", not "In progress", and a
+  lead is open. The decisive consequence: with the new default, the old reading would have meant a GM
+  writes down a quest and watches it never appear on Home. The three TERMINAL states — `completed`,
+  `failed`, `canceled` — are what leaves the card.
+- **Existing campaigns are unaffected, by construction.** Migration **v26** rewrites no stored status,
+  so no quest that was closed yesterday is open today. It is the SECOND table rebuild in
+  `codex-store.ts` and it follows the 2026-07-29 entry below (*"M11: rebuild the journal table rather
+  than drop its CHECK"*) rather than re-deciding it: SQLite cannot widen a `CHECK` in place, and
+  dropping it would leave `questStatus()` guarding the process but not the file. The copying `SELECT`
+  is column-for-column with no `CASE` and no default, and `codex_quests_status` is recreated with the
+  table.
+- **The chronicle verbs are player-facing copy, not internal labels.** `QUEST_EVENT_VERB`
+  (`apps/client/src/codex/chronicle.ts`) completes the sentence `<Quest title> ___` on the party's own
+  timeline, so the two additions were chosen on how that sentence reads: **"has not started"** (true
+  at creation AND when a GM pushes a quest back, which "was noted" would not be) and **"was
+  canceled"** — the passive is not optional, because "The Amber Bargain canceled" reads as the quest
+  doing the cancelling. Same discipline the file already states for "reopened": say the payload, never
+  guess the sequence.
+
 ## 2026-08-03 — One Language: the play glossary, and where it is kept honest
 
 The play-facing unification (D1–D33; the full decision record is the engagement's master plan,
