@@ -598,7 +598,14 @@ const actionsField = (scope: RiderScope): FieldDef => ({
       rows: [
         ...toHitFields(scope),
         { key: "attack.reachFeet", label: "Reach", kind: "number", min: 1, max: 120, unit: "ft" },
-        { key: "attack.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft" }
+        { key: "attack.rangeFeet", label: "Range", kind: "number", min: 1, max: 1000, unit: "ft", help: "The farthest this can reach at all." },
+        /* The second half of a printed "range 80/320" — and it is the ONE number in this group the
+           engine turns into a die rather than a refusal. `Range` alone says where the shot becomes
+           impossible; this says where it becomes hard, and past it the attack rolls 2d20 keeping the
+           lower (`action-resolution.ts`, the `Long range (beyond N ft)` source). 45 SRD records author
+           it — every two-band weapon a monster carries. Offered at every scope because both schemas
+           have the key: `ActionSchema.attack.rangeNormalFeet` and `FeatureAttackSchema`'s twin. */
+        { key: "attack.rangeNormalFeet", label: "Normal range", kind: "number", min: 1, max: 1000, unit: "ft", help: "The 80 in “range 80/320”. Past it, up to the range, the attack rolls at disadvantage." }
       ]
     },
     {

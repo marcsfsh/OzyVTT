@@ -320,11 +320,11 @@ cross-carrier defect lives.
 | --- | --- | --- | ---: | --- | --- |
 | `id` / `name` / `activation` / `description` | `packages/schemas/src/index.ts:590` | `action-resolution.ts` throughout | 54 char · 989 monster | `RiderEditor.tsx:513`–`:518` | `parity` |
 | `damage[]` | `:601` | `action-resolution.ts:940` | 19 char · 524 monster | `RiderEditor.tsx:519` | `parity` |
-| `attack.ability` (feature only) | `character-content.ts:99` | `character-build.ts:343` | derived | `RiderEditor.tsx:525` | `parity` |
-| **`attack.bonus`** (monster / item) | `packages/schemas/src/index.ts:592` | `action-resolution.ts:827` | **423** | **none** — the same control writes `attack.ability`, which `ActionSchema` has no key for and cannot supply `bonus` from | `SRD-only` |
+| `attack.ability` (feature and item) | `character-content.ts:99` | `character-build.ts:343` | derived | `toHitFields` (`RiderEditor.tsx`), at the `feature` / `item` scopes | `parity` |
+| **`attack.bonus`** (monster) | `packages/schemas/src/index.ts:615` | `action-resolution.ts:836` | **423** | `toHitFields` (`RiderEditor.tsx`), at the `statblock` scope — **U10, landed.** `RiderScope` is three-valued and `actionsField` branches on it, so a stat block is offered "To hit" instead of the feature's "Uses" | `parity` |
 | `attack.proficient` | `character-content.ts:100` | `character-build.ts:346` | default only | **none** | `unused` |
-| `attack.reachFeet` / `.rangeFeet` | `:101`, `:102` | `action-resolution.ts:512` | 376 / 68 | `RiderEditor.tsx:526`, `:527` | `parity` |
-| `attack.rangeNormalFeet` | `:103` | `action-resolution.ts:512` (long-range disadvantage) | 45 | **none** | `SRD-only` |
+| `attack.reachFeet` / `.rangeFeet` | `:101`, `:102` | `action-resolution.ts:347`–`:369` (the range/reach refusals) | 376 / 68 | `actionsField`'s attack group | `parity` |
+| `attack.rangeNormalFeet` | `:103` | **`action-resolution.ts:635`** — `attackRollSources`, the `Long range (beyond N ft)` disadvantage. *(This row used to name `:512`, which is `attackKindsOf` and reads only reach and range; re-measured and corrected when U11 landed.)* | 45 | `actionsField`'s attack group, every scope — **U11, landed** | `parity` |
 | `attack.count` | `:104` | `effective-actions.ts:101` | 0 | **none** | `unused` |
 | `attack.criticalBonusDice` | `:105` | `effective-actions.ts:50` | 0 | **none** | `unused` |
 | `save.ability` | `:134` | `saving-throws.ts` | 18 char · 184 monster | `RiderEditor.tsx:535` | `parity` |
@@ -343,11 +343,14 @@ cross-carrier defect lives.
 | `reaction` | `:639` | `reactions.ts` | 1 | **none** (deliberate) | `SRD-only` |
 | `legendary.cost` | `:641` | `action-resolution.ts:311`–`:316` | 82 | **none** — the editor offers `legendary.actionsPerRound` / `.resistancesPerDay` (`schemas.ts:848`, `:849`) but never the per-action cost | `SRD-only` |
 
-> **A monster action with an attack roll cannot be published from the editor.** `actionsField` writes
-> `attack.ability`; `ActionSchema.attack` requires `bonus` (`packages/schemas/src/index.ts:592`) and
-> the monster body is validated by `ActorDefinitionSchema` (`HOMEBREW_BODY_SCHEMAS`,
-> `packages/content-srd-5.2.1/src/schemas.ts:407`). The GM fills in "Uses: Strength" and the publish
-> gate answers `actions[].attack.bonus: Required`. One control, two schemas, one of them wrong.
+> **~~A monster action with an attack roll cannot be published from the editor.~~ Closed by U10.**
+> It could not: `actionsField` wrote `attack.ability`, `ActionSchema.attack` requires `bonus`
+> (`packages/schemas/src/index.ts:615`) and the monster body is validated by `ActorDefinitionSchema`
+> (`HOMEBREW_BODY_SCHEMAS`, `packages/content-srd-5.2.1/src/schemas.ts:407`), so the GM filled in
+> "Uses: Strength" and the publish gate answered `actions[].attack.bonus: Required`. One control, two
+> schemas, one of them wrong. The repair is the one §3 item 4 below recommends — `RiderScope` gained
+> a third value, `"statblock"`, and `actionsField` now takes it. Pinned end to end by
+> `apps/client/src/homebrew/vocabulary-parity.mirror.test.ts`.
 
 ---
 

@@ -402,6 +402,160 @@ describe("a monster's to-hit bonus — through both paths", () => {
   });
 });
 
+/* ------------------------- U11: the normal-range band, through both paths ---------- */
+
+/**
+ * The row: `attack.rangeNormalFeet` — the 80 in a printed "range 80/320".
+ *
+ * The reader already shipped and had no author but the bundle: `attackRollSources` in
+ * `action-resolution.ts` pushes a `Long range (beyond N ft)` disadvantage when the measured distance
+ * passes it, and `Range` alone only ever produces a REFUSAL ("beyond the 320 ft maximum range"). So
+ * this is the one number in the attack group that the engine turns into a die, and a GM had no way
+ * to say it. 45 bundled records author it.
+ *
+ * **The far end is the die, and it is proved by contrast.** The same shot is resolved twice from one
+ * definition — inside the band and past it — and the second one rolls `2d20` keeping the lower, which
+ * turns a natural 17 into a natural 6 and a hit into a miss. A test that only fired at long range
+ * would pass on any disadvantage from any source; the near shot is what pins it to this value.
+ */
+const CROSSBOW = {
+  actionId: "light-crossbow",
+  actionName: "Light Crossbow",
+  description: "Ranged Attack Roll: +3, range 80/320 ft. 5 (1d8 + 1) Piercing damage.",
+  bonus: 3,
+  rangeFeet: 320,
+  rangeNormalFeet: 80,
+  formula: "1d8 + 1",
+  damageType: "piercing",
+  nearFeet: 50,
+  farFeet: 200,
+  /** Inside the band: one d20 shows 17, +3 is 20, which beats AC 12 and rolls a 5 on the d8. */
+  nearFaces: [17, 5],
+  nearTotal: 20,
+  nearDamage: 6,
+  /** Past it: 2d20kl1 sees 17 and 6, keeps the 6, and +3 is 9 — a miss, so nothing is rolled after. */
+  farFaces: [17, 6],
+  farNatural: 6,
+  farTotal: 9,
+  targetAc: 12
+} as const;
+
+function authoredCrossbow(): Draft {
+  const damagePart = authoredRow("monster", ["actions", "damage"], [
+    ["formula", CROSSBOW.formula],
+    ["type", CROSSBOW.damageType]
+  ]);
+  const action = authoredRow("monster", ["actions"], [
+    ["name", CROSSBOW.actionName],
+    ["activation", "action"],
+    ["description", CROSSBOW.description],
+    ["damage", [damagePart]],
+    ["attack.bonus", CROSSBOW.bonus],
+    ["attack.rangeFeet", CROSSBOW.rangeFeet],
+    // THE ROW.
+    ["attack.rangeNormalFeet", CROSSBOW.rangeNormalFeet]
+  ]);
+  return authored("monster", "Road Bandit", [
+    ["abilityScores.str", 11], ["abilityScores.dex", 12], ["abilityScores.con", 12],
+    ["abilityScores.int", 10], ["abilityScores.wis", 10], ["abilityScores.cha", 10],
+    ["armorClass", 12],
+    ["hitPoints.maximum", 11],
+    ["proficiencyBonus", 2],
+    ["actions", [{ ...action, id: CROSSBOW.actionId }]]
+  ]);
+}
+
+/** Shoot from `feet` away. The distance is what makes this row readable at all, so unlike `swing`
+    this one hands the resolver a real `distanceFeet`. */
+function shoot(definition: ActorDefinition, feet: number, faces: readonly number[]) {
+  const state: GameState = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: IDS.caster, name: definition.name, kind: "monster", visibility: "public", hp: { current: 11, maximum: 11 }, armorClass: 12, definitionId: "def-caster" },
+      { id: IDS.target, name: "Target Dummy", kind: "monster", visibility: "public", hp: { current: 40, maximum: 40 }, armorClass: CROSSBOW.targetAc }
+    ]
+  });
+  startEncounter(state, { mapAssetId: IDS.map, entries: [{ actorId: IDS.caster, score: 20 }, { actorId: IDS.target, score: 10 }] }, () => 1, GEOMETRY);
+
+  const action = effectiveActions(definition, state.actors[0], undefined).find((entry) => entry.id === CROSSBOW.actionId);
+  if (!action) throw new Error(`${definition.name} has no "${CROSSBOW.actionId}" action.`);
+
+  const queue = [...faces];
+  return resolveDefinitionAction(
+    state,
+    action,
+    { actorId: IDS.caster, targetIds: [IDS.target], commandId: IDS.command },
+    {
+      random: () => {
+        const face = queue.shift();
+        if (face === undefined) throw new Error("dice queue empty");
+        return face;
+      },
+      newRollId: () => IDS.roll,
+      gmSessionId: IDS.gmSession,
+      now: () => "2026-08-08T00:00:00.000Z",
+      definition,
+      distanceFeet: () => feet
+    }
+  );
+}
+
+describe("a two-band range — through both paths", () => {
+  it("1. the editor can author it: `attack.rangeNormalFeet` goes through a real control, and the body publishes", () => {
+    const draft = authoredCrossbow();
+    const verdict = publishVerdict("monster", draft, RECORD_ID);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("monster", draft, RECORD_ID) as { actions: Array<Record<string, unknown>> };
+    expect(body.actions[0]).toMatchObject({
+      attack: { bonus: CROSSBOW.bonus, rangeFeet: CROSSBOW.rangeFeet, rangeNormalFeet: CROSSBOW.rangeNormalFeet }
+    });
+    // The key is on both attack schemas, so every carrier that mounts an action can say it.
+    for (const type of ["monster", "equipment", "class"] as const) {
+      expect(hasControl(type, "attack.rangeNormalFeet", ["actions"]), type).toBe(true);
+    }
+  });
+
+  it("2. SRD content authors the same shape — and it is not a lone record", () => {
+    expect(srdBandit().actions.find((entry) => entry.id === CROSSBOW.actionId)).toMatchObject({
+      attack: { bonus: CROSSBOW.bonus, rangeFeet: CROSSBOW.rangeFeet, rangeNormalFeet: CROSSBOW.rangeNormalFeet }
+    });
+
+    // Measured at the time of writing: 45 bundled monster actions carry a normal-range band.
+    const library = new ContentLibrary().forAudience("gm");
+    const carriers = library.monsterSummaries()
+      .flatMap((summary) => library.monster(summary.id)?.actions ?? [])
+      .filter((entry) => entry.attack?.rangeNormalFeet !== undefined);
+    expect(carriers.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it("3. one assertion body over both: inside the band it is one die, past it two and the lower kept", () => {
+    const editorBody = storedBody("monster", authoredCrossbow(), RECORD_ID);
+    const paths: ReadonlyArray<readonly [string, ActorDefinition]> = [
+      ["SRD content", srdBandit()],
+      ["the homebrew editor", HOMEBREW_BODY_SCHEMAS.monster.parse(editorBody)]
+    ];
+
+    for (const [label, definition] of paths) {
+      // Inside 80 ft: a plain d20. Nothing contributed, so the resolution carries no `rollMode` at
+      // all, and the 17 stands.
+      const near = shoot(definition, CROSSBOW.nearFeet, CROSSBOW.nearFaces);
+      expect(near.rollMode, label).toBeUndefined();
+      expect(near.attack, label).toMatchObject({ naturalRoll: 17, total: CROSSBOW.nearTotal, outcome: "hit" });
+      expect(near.damageTotal, label).toBe(CROSSBOW.nearDamage);
+
+      // Past 80 ft and inside 320: the SAME action, the SAME first face, and a second die the near
+      // shot never rolled. The lower is kept, so 17 becomes 6 and a hit becomes a miss.
+      const far = shoot(definition, CROSSBOW.farFeet, CROSSBOW.farFaces);
+      expect(far.rollMode?.mode, label).toBe("disadvantage");
+      expect(far.rollMode?.disadvantage, label).toContain(`Long range (beyond ${CROSSBOW.rangeNormalFeet} ft)`);
+      expect(far.attack, label).toMatchObject({ naturalRoll: CROSSBOW.farNatural, total: CROSSBOW.farTotal, outcome: "miss" });
+      expect(far.damageTotal, label).toBe(0);
+    }
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
