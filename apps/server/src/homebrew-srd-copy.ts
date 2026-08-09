@@ -96,10 +96,19 @@ export function findCatalogRecord(catalog: ContentView, id: string): HomebrewSou
 function asAuthoredBody(body: HomebrewBody): HomebrewBody {
   const next = body as Record<string, unknown>;
   for (const feature of featureBearingRecords(next)) {
-    const choice = feature.choice;
-    if (isObject(choice) && Array.isArray(choice.options)) delete choice.from;
+    for (const choice of choiceBlocksOn(feature)) {
+      if (Array.isArray(choice.options)) delete choice.from;
+    }
   }
   return next as HomebrewBody;
+}
+
+/** Every choice block a feature carries, whichever spelling holds it — the untyped twin of
+    `featurePicks`, over a body this walker deliberately reads as `Record<string, unknown>`. */
+function choiceBlocksOn(feature: Record<string, unknown>): Record<string, unknown>[] {
+  const plural = asArray(feature.choices).filter(isObject);
+  if (plural.length > 0) return plural;
+  return isObject(feature.choice) ? [feature.choice] : [];
 }
 
 /**
@@ -133,13 +142,12 @@ export function rewriteForNewId(type: HomebrewContentType, body: HomebrewBody, o
       return slug;
     };
     for (const feature of featureBearingRecords(next)) {
-      const choice = feature.choice;
-      if (!isObject(choice)) continue;
-      choice.fromCatalog = rename(choice.fromCatalog);
-      for (const option of asArray(choice.options)) {
-        if (!isObject(option)) continue;
-        const nested = option.choice;
-        if (isObject(nested)) nested.fromCatalog = rename(nested.fromCatalog);
+      for (const choice of choiceBlocksOn(feature)) {
+        choice.fromCatalog = rename(choice.fromCatalog);
+        for (const option of asArray(choice.options)) {
+          if (!isObject(option)) continue;
+          for (const nested of choiceBlocksOn(option)) nested.fromCatalog = rename(nested.fromCatalog);
+        }
       }
     }
   }

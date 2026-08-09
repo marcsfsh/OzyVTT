@@ -278,6 +278,10 @@
   display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;
   border-left: 2px solid var(--line-strong); padding-left: var(--space-3);
 }
+/* One block's header when a feature asks SEVERAL choices — the count and its Remove.
+   Wraps at narrow widths rather than squeezing the button under the 44px floor. */
+.hb-choice-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.hb-choice-add { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
 /* The `choose × grants` readout. Words, not a colour: it is arithmetic, not a state. */
 .hb-picks { margin: 0; color: var(--text); font-size: var(--fs-sm); }
 

@@ -1386,6 +1386,200 @@ describe("a recharging action — through both paths", () => {
   });
 });
 
+/* -------------- U12: several picks on ONE record (`choices`) — through both paths -- */
+
+/**
+ * The row: `FeatureRecordSchema.choices` — one feature that asks MORE THAN ONE question.
+ *
+ * The purest built-but-unwired case of the session: `featurePicks` has read the plural spelling on
+ * both consumers since Magic Initiate shipped (`character-build.ts` builds one offer per pick,
+ * `build-payload.ts` mirrors it), three feat records author it, the wire type carries it, the
+ * class-mechanics overlay accepts it — and the census's own worked example was that
+ * `applyField("class", draft, "choices", …)` THREW, because the panel edited exactly one `choice`.
+ * A homebrew Magic Initiate was unauthorable: its level-1 spell had nowhere to go.
+ *
+ * **The `choice`/`choices` relationship, taken from the reader.** `featurePicks` reads the pair as
+ * ONE list with two spellings — `choices` wins when non-empty — and the schema's `oneChoiceForm`
+ * refinement REFUSES a record carrying both. So the panel never asks the GM to pick a spelling:
+ * every write funnels through `writeChoiceBlocks`, which spells the list canonically from its
+ * length (one block → `choice`, several → `choices`, zero → neither). That is what the SRD itself
+ * authors — every one-pick record is singular, all three plural records have two picks, none has
+ * both keys — and it makes the refused both-keys shape unauthorable rather than merely caught.
+ *
+ * **The far end is the SECOND pick reaching a built character's sheet.** The first pick was always
+ * reachable through `choice`; the plural read is what makes pick 2 exist at all, so the negative
+ * control drops the second block and watches the same ledger row be REFUSED by name.
+ */
+const SEVERAL = {
+  srdFeatId: "magic-initiate-cleric",
+  /** The SRD's own two-pick shape: two cantrips and one level-1 spell, both off one list. */
+  srdRows: [
+    { kind: "cantrip", id: "guidance" },
+    { kind: "cantrip", id: "thaumaturgy" },
+    { kind: "spell", id: "bless" }
+  ],
+  hbFeatId: "hb-twin-disciplines-a1b2",
+  /** The feature's own id, pinned the way U10's fixture pins an action id: the ledger tags its
+      answers with the FEATURE id (`feature:<id>` is the offer key), and a random minted id would
+      put the tag out of reach of the fixture. */
+  hbFeatureId: "twin-disciplines",
+  hbFeatName: "Twin Disciplines",
+  /** The editor half drives `from` lists — `fromCatalog` is the bespoke pair, unreachable from
+      `applyField` by R1's standing ruling — so the options are named ids off the same real spells. */
+  hbCantrips: ["guidance", "sacred-flame"],
+  hbSpells: ["bless", "cure-wounds"],
+  hbRows: [
+    { kind: "cantrip", id: "guidance" },
+    { kind: "cantrip", id: "sacred-flame" },
+    { kind: "spell", id: "bless" }
+  ]
+} as const;
+
+/** The feat a GM builds in `/homebrew`: TWO choice blocks, each authored through the block's own
+    controls at the `choices` row scope, then the list written through the field's own write —
+    which is where the canonical spelling lives. `withSecondPick: false` is the negative control's
+    version: the same feat whose plural list holds only the cantrip block. */
+function authoredTwinFeat(withSecondPick = true): Draft {
+  const shell = authored("feat", SEVERAL.hbFeatName, [
+    ["category", "origin"],
+    ["summary", "Two disciplines, one teacher."],
+    ["description", "You learn two cantrips and one level 1 spell."]
+  ]);
+  const cantrips = authoredRow("feat", ["feature", "choices"], [
+    ["kind", "cantrip"],
+    ["choose", 2],
+    // Typed the way a GM types it: one box of commas. The block's own `write` splits and slugs.
+    ["from", SEVERAL.hbCantrips.join(", ")]
+  ]);
+  const spell = authoredRow("feat", ["feature", "choices"], [
+    ["kind", "spell"],
+    ["choose", 1],
+    ["from", SEVERAL.hbSpells.join(", ")]
+  ]);
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "name", SEVERAL.hbFeatName, ["feature"]);
+  feature = applyField("feat", feature, "description", "You learn two cantrips and one level 1 spell.", ["feature"]);
+  feature = applyField("feat", feature, "choices", withSecondPick ? [cantrips, spell] : [cantrips], ["feature"]);
+  return { ...shell, feature: { ...feature, id: SEVERAL.hbFeatureId } };
+}
+
+/** A Human Paladin 2 taking `featId` in the Human Versatile slot, answering `rows` against the
+    feat's FEATURE (`tagId` — offers are keyed `feature:<feature id>`, and the SRD's initiates name
+    feat and feature identically) — the same carrier shape U9 proved, because Versatile is the one
+    slot that takes any origin feat. */
+const initiateInput = (featId: string, tagId: string, rows: ReadonlyArray<{ kind: string; id: string }>): CharacterCreateRequestInput => ({
+  name: "Sera", speciesId: "human", backgroundId: "soldier", classId: "paladin", level: 2,
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+    { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
+    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } },
+    ...rows.map((row) => ({ level: 1, kind: row.kind, id: row.id, payload: { featureId: tagId } })),
+    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "longsword" },
+    { level: 1, classId: "paladin", kind: "weapon-mastery", id: "javelin" },
+    { level: 2, classId: "paladin", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+    { level: 1, classId: "paladin", kind: "spell", id: "cure-wounds" },
+    { level: 1, classId: "paladin", kind: "spell", id: "heroism" },
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "paladin-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** The sheet, with the authored feat merged in through a real homebrew slice when one is given. */
+function initiateSheet(featId: string, tagId: string, rows: ReadonlyArray<{ kind: string; id: string }>, feat?: Draft): ActorDefinition {
+  const homebrew: HomebrewContentSource | undefined = feat
+    ? {
+      revision: 1,
+      publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, SEVERAL.hbFeatId))] }),
+      monsterForInstance: () => undefined
+    }
+    : undefined;
+  return buildCharacterDefinition(initiateInput(featId, tagId, rows), new ContentLibrary(homebrew).forAudience("gm"), BuilderPolicySchema.parse({}));
+}
+
+describe("several picks on one record (`choices`) — through both paths", () => {
+  it("1. the editor can author it: two blocks through the block's own controls, spelled canonically", () => {
+    const draft = authoredTwinFeat();
+    const verdict = publishVerdict("feat", draft, SEVERAL.hbFeatId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    // TWO blocks → the plural spelling, and never both keys: `featurePicks` reads `choices` first
+    // and the schema refuses a record carrying both, so the form derives the spelling from the
+    // count instead of asking the GM to know it.
+    const body = storedBody("feat", draft, SEVERAL.hbFeatId) as { feature: { choice?: unknown; choices?: unknown } };
+    expect(body.feature.choice).toBeUndefined();
+    expect(body.feature.choices).toEqual([
+      { kind: "cantrip", choose: 2, from: [...SEVERAL.hbCantrips], repeatable: false },
+      { kind: "spell", choose: 1, from: [...SEVERAL.hbSpells], repeatable: false }
+    ]);
+
+    // ONE block → the singular spelling, which is how every existing draft already reads. The
+    // panel's own seed (the switch) and a one-element `choices` write land on the same body.
+    const oneBlock = storedBody("feat", authoredTwinFeat(false), SEVERAL.hbFeatId) as { feature: { choice?: unknown; choices?: unknown } };
+    expect(oneBlock.feature.choices).toBeUndefined();
+    expect(oneBlock.feature.choice).toEqual({ kind: "cantrip", choose: 2, from: [...SEVERAL.hbCantrips], repeatable: false });
+
+    // The `choice.*` keys stay live as the FIRST block's controls — R1's surface, un-stranded:
+    // editing through them reaches block 0 of a plural feature and keeps the plural spelling.
+    const feature = (draft.feature ?? {}) as Draft;
+    const edited = applyField("feat", feature, "choice.choose", 3, ["feature"]);
+    expect((edited.choices as Array<{ choose?: number }>)[0]?.choose).toBe(3);
+    expect(edited.choice).toBeUndefined();
+
+    // ...and the switch is the whole question, however it is spelled: off removes BOTH keys.
+    const off = applyField("feat", feature, "choice", false, ["feature"]);
+    expect("choice" in off).toBe(false);
+    expect("choices" in off).toBe(false);
+  });
+
+  it("2. SRD content authors the same shape — three records, every one a Magic Initiate", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const carriers = library.featSummaries()
+      .map((summary) => library.featRecord(summary.id))
+      .filter((feat) => feat !== undefined && (feat.feature.choices?.length ?? 0) > 0)
+      .map((feat) => feat!.id)
+      .sort();
+    // Measured at the time of writing: exactly three, each authoring two picks and no `choice` key.
+    expect(carriers).toEqual(["magic-initiate-cleric", "magic-initiate-druid", "magic-initiate-wizard"]);
+
+    const initiate = library.featRecord(SEVERAL.srdFeatId)!.feature;
+    expect(initiate.choice).toBeUndefined();
+    expect(initiate.choices).toHaveLength(2);
+    expect(initiate.choices![0]).toMatchObject({ kind: "cantrip", choose: 2, fromCatalog: "cleric-spells" });
+    expect(initiate.choices![1]).toMatchObject({ kind: "spell", choose: 1, fromCatalog: "cleric-spells" });
+  });
+
+  it("3. one assertion body over both: every pick — the second included — is a spell on the sheet", () => {
+    const paths: ReadonlyArray<readonly [string, ActorDefinition, ReadonlyArray<{ kind: string; id: string }>]> = [
+      ["SRD content", initiateSheet(SEVERAL.srdFeatId, SEVERAL.srdFeatId, SEVERAL.srdRows), SEVERAL.srdRows],
+      ["the homebrew editor", initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat()), SEVERAL.hbRows]
+    ];
+    for (const [label, definition, rows] of paths) {
+      for (const row of rows) {
+        const spell = preparedSpell(definition, row.id);
+        // The far end: a row on the character's own spell list. The cantrips arrive always-prepared,
+        // the level-1 spell as an ordinary prepared spell — and neither is anywhere else in the build.
+        expect(spell, `${label}: ${row.id}`).toMatchObject({ id: row.id, prepared: true });
+        expect(spell?.name, `${label}: ${row.id}`).not.toBe(row.id);
+      }
+    }
+
+    // THE NEGATIVE CONTROL, and it is the census's old throw inverted: the same feat authored with
+    // only its FIRST block, the same ledger. The spell row now targets a pick that does not exist,
+    // and the build refuses it BY NAME — the second pick exists exactly when the plural list says so.
+    expect(() => initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat(false)))
+      .toThrow(`No feature "${SEVERAL.hbFeatureId}" offers a "spell" choice.`);
+  });
+});
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -1459,11 +1653,10 @@ describe("the guard itself refuses what the editor cannot author", () => {
     expect(applyField("feat", { id: "f1" }, "choice.choose", 3, ["feature"]).choice)
       .toEqual({ kind: "feat", choose: 3, repeatable: false });
 
-    // R1 added no vocabulary, and this is what says so: the census's own worked example still
-    // throws. U12 is what makes `choices` reachable; R1 only made the lookup possible.
-    expect(() => applyField("feat", feature, "choices", [], ["feature"])).toThrow(
-      'No field "choices" in the feat form (feature row) — the test is addressing a field that does not exist.'
-    );
+    // R1 made the lookup possible and U12 made `choices` real: the census's old worked example —
+    // this exact call throwing — is inverted in U12's own section above, and the key resolves at
+    // the feature scope the census asks its questions of.
+    expect(hasControl("feat", "choices", ["feature"])).toBe(true);
   });
 
   /**
@@ -1508,16 +1701,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
     expect(hasControl("feat", "choice.kind", ["feature", "choice.options"])).toBe(false);
     // U16's own row, still owed: an option cannot yet say which earlier answer legalises it.
     expect(hasControl("feat", "requires", ["feature", "choice.options"])).toBe(false);
-  });
-
-  it("`choices` throws, naming the form — the canonical SRD-only row", () => {
-    // The worked example the plan names: `choices` (plural) is read by `character-build.ts` and
-    // authored by three feat records, and `FeatureEditor`'s choice panel is 651 lines of hand-written
-    // JSX with ZERO `FieldDef`s — so the harness cannot see it, and says so instead of passing.
-    // R1 + U12 delete this expectation; until then it is what stops a class unit shipping one-ended.
-    expect(() => applyField("class", {}, "choices", [])).toThrow(
-      'No field "choices" in the class form — the test is addressing a field that does not exist.'
-    );
   });
 
   it("a row scope is looked up in the ROW's own fields, not the whole form's", () => {
@@ -1652,7 +1835,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
       // [type, key, container path, the unit that closes it]
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
-      ["class", "choices", [], "U12 (after R1) — 3 feat records, a hard compile error from twelve class modules"],
       ["class", "extraPicks", [], "U13 — the extra-cantrip case that started the area, 8 SRD authors"],
       ["class", "replaces", [], "U14 — wired through a command, actor state, rests and a projection"],
       ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"],
