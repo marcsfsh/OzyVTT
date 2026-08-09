@@ -170,8 +170,9 @@ const hasType = (...types: readonly string[]) => (row: Draft) => types.includes(
 
 /** These fields are ids, not prose — `ContentIdSchema` is `/^[a-z0-9-]+$/`. Caught while
     typing rather than as a publish refusal, because "Lay on Hands" being wrong is the
-    field being wrong NOW, and the corrected form is one the GM can read off the message. */
-const slugValidate = (value: unknown): string | null => {
+    field being wrong NOW, and the corrected form is one the GM can read off the message.
+    Exported for `FeatureEditor`'s `extraPicks` column id — the same rule, one definition. */
+export const slugValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "" || /^[a-z0-9-]+$/.test(text)) return null;
   return `Write it as ${text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "lowercase-with-dashes"} — lowercase, no spaces.`;

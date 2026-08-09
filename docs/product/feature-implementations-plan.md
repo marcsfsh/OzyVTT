@@ -70,8 +70,6 @@ drift. An unknown key is a **loud rejection** (`character-build.ts:781-785`), ne
 Non-vacuity measured per line: **12 tests fail** with composition disabled (7 of 9 client, 5 of 52 server).
 A **census test** now walks every feature and inline option of every record and fails on any authored key
 that resolves to nothing — the guard for Stage 4's authoring.
-**Known limit:** `amount` is a flat 1–5. Level-scaled capacity (Invocations, Weapon Mastery) is not yet
-expressible; see the audit's three column-scaled cases.
 
 > **Correction to D8 — the overlay does NOT apply to every class.** The plan said to author mechanics
 > through the mechanics overlay. That is right for the **nine generated classes** and **wrong for cleric,

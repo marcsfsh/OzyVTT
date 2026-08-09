@@ -64,7 +64,7 @@ import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
 import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../../../server/src/action-resolution.js";
 import { importActorDefinition } from "../../../server/src/actor-roster.js";
-import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../../../server/src/character-build.js";
+import { buildCharacterDefinition, computeServerOffers, type CharacterCreateRequestInput } from "../../../server/src/character-build.js";
 import { ContentLibrary, EMPTY_HOMEBREW_SLICE, type HomebrewContentSource } from "../../../server/src/content-library.js";
 import { effectiveActions } from "../../../server/src/effective-actions.js";
 import { equipmentCatalogOf } from "../../../server/src/equipment-derivation.js";
@@ -1580,6 +1580,259 @@ describe("several picks on one record (`choices`) — through both paths", () =>
   });
 });
 
+/* --------- U13: a budget raised past the printed row (`extraPicks`) — both paths --- */
+
+/**
+ * The row: `extraPicks` — a feature (or a chosen option) that RAISES a pick budget instead of
+ * granting an outcome. **This is the extra-cantrip case that started the whole area**: Divine
+ * Order's Thaumaturge is `extraPicks: [{offer: "class-cantrips", amount: 1}]`, authored 8 times in
+ * the SRD (6 features, 2 inline options), read by `grantExtraPicks` on the server and
+ * `addExtraPicks` in the wizard through ONE shared resolver (`extraPickAmount`) — and unauthorable
+ * from the editor.
+ *
+ * **The far end is a capacity, never a surviving field.** A flat grant is proved at the cantrip
+ * cap: a Cleric prints 3 cantrips at level 1, the raise makes a fourth LEGAL, and the negative
+ * control watches the same fourth cantrip be refused by the cap's own sentence when nothing raises
+ * it. The scaling form (`class-resource-growth`, 3 SRD authors — so it is part of this unit, not
+ * held back) is proved at `computeServerOffers`: an offer's `capacity` follows the printed column
+ * while the authored line never changes, which is U7's "moves with the level" bar applied to a
+ * budget.
+ *
+ * **The two paths cross carriers**, the way U6's do: the SRD half is an inline OPTION
+ * (Thaumaturge, folded after pass A2) and the editor half is a chosen FEAT's feature (folded after
+ * pass A), so one assertion body covers both fold points.
+ */
+const RAISED = {
+  /** Cleric 1: the printed row. Guidance/Sacred Flame/Thaumaturgy fill it; Light is the FOURTH. */
+  printedCantrips: 3,
+  cantrips: ["guidance", "sacred-flame", "thaumaturgy", "light"],
+  capSentence: "Cleric knows 3 cantrips at level 1; got 4.",
+  featId: "hb-whispered-lore-a1b2",
+  featName: "Whispered Lore",
+  /** The scaling half's editor carrier: a feat whose skill budget grows with the Rages column. */
+  scaleFeatId: "hb-bottled-instinct-a1b2",
+  scaleFeatName: "Bottled Instinct",
+  /** Barbarian class-skills: 2 printed; at level 3 Primal Knowledge adds 1 and the Rages column
+      (2 → 3) has grown by 1, so the offer reads 2 at level 1 and 4 at level 3 with the feat. */
+  scaleColumn: "rage"
+} as const;
+
+/** The feat a GM builds in `/homebrew`: ONE `extraPicks` row through the row's own controls —
+    Thaumaturge's shape verbatim. `newRow` seeds the flat form at 1, so naming the budget is the
+    whole edit. */
+function authoredLoreFeat(): Draft {
+  const shell = authored("feat", RAISED.featName, [
+    ["category", "origin"],
+    ["summary", "Lore whispers one more trick."],
+    ["description", "You know one extra cantrip from your class's list."]
+  ]);
+  const grant = authoredRow("feat", ["feature", "extraPicks"], [["offer", "class-cantrips"]]);
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "name", RAISED.featName, ["feature"]);
+  feature = applyField("feat", feature, "description", "You know one extra cantrip from your class's list.", ["feature"]);
+  feature = applyField("feat", feature, "extraPicks", [grant], ["feature"]);
+  return { ...shell, feature };
+}
+
+/** The scaling form, through the same controls: the mode select swaps the flat amount for the
+    column rule, and the column id goes through its own box. */
+function authoredInstinctFeat(): Draft {
+  const shell = authored("feat", RAISED.scaleFeatName, [
+    ["category", "origin"],
+    ["summary", "Instinct grows with fury."],
+    ["description", "You gain extra skill proficiencies as your rage deepens."]
+  ]);
+  const grant = authoredRow("feat", ["feature", "extraPicks"], [
+    ["offer", "class-skills"],
+    ["mode", "column-growth"],
+    ["scaling.id", RAISED.scaleColumn]
+  ]);
+  let feature = shell.feature as Draft;
+  feature = applyField("feat", feature, "name", RAISED.scaleFeatName, ["feature"]);
+  feature = applyField("feat", feature, "description", "You gain extra skill proficiencies as your rage deepens.", ["feature"]);
+  feature = applyField("feat", feature, "extraPicks", [grant], ["feature"]);
+  return { ...shell, feature };
+}
+
+/** A merged content view carrying one authored feat, or the plain bundles when none is given. */
+function raisedView(featId?: string, feat?: Draft) {
+  const homebrew: HomebrewContentSource | undefined = featId && feat
+    ? {
+      revision: 1,
+      publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, feats: [HOMEBREW_BODY_SCHEMAS.feat.parse(storedBody("feat", feat, featId))] }),
+      monsterForInstance: () => undefined
+    }
+    : undefined;
+  return new ContentLibrary(homebrew).forAudience("gm");
+}
+
+/**
+ * A Human Cleric 1 with FOUR cantrips in the ledger. `order` decides what raises the cap:
+ * Thaumaturge (the SRD's option-level grant), Protector plus the authored feat (the editor's
+ * feature-level grant), or Protector alone — the negative control, which the cap refuses.
+ */
+const clericInput = (order: "protector" | "thaumaturge", featId?: string): CharacterCreateRequestInput => ({
+  name: "Sister Ael", speciesId: "human", backgroundId: "soldier", classId: "cleric", level: 1,
+  abilityMethod: "standard-array",
+  baseScores: { str: 10, dex: 12, con: 14, int: 8, wis: 15, cha: 13 },
+  // Soldier spreads STR/DEX/CON; the scores play no part in a capacity, so legality is all.
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "cleric", kind: "skill", id: "history" },
+    { level: 1, classId: "cleric", kind: "skill", id: "insight" },
+    { level: 1, classId: "cleric", kind: "divine-order", id: order, payload: { featureId: "divine-order" } },
+    ...RAISED.cantrips.map((id) => ({ level: 1, kind: "cantrip", id })),
+    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+    ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : []),
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "cleric-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** A Human Barbarian at `level`, holding the scaling feat when given — `computeServerOffers`' own
+    input shape, so the capacity read below is the server's own offer computation. */
+const instinctInput = (level: 1 | 3, featId?: string): CharacterCreateRequestInput => ({
+  name: "Ozar", speciesId: "human", backgroundId: "soldier", classId: "barbarian", level,
+  ...(level >= 3 ? { subclassId: "path-of-the-berserker" } : {}),
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    ...(featId ? [{ level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } }] : [])
+  ]
+} as CharacterCreateRequestInput);
+
+/** THE capacity read: one offer's `capacity`, straight off `computeServerOffers`. */
+const capacityOf = (input: CharacterCreateRequestInput, key: string, featId?: string, feat?: Draft): number | undefined =>
+  computeServerOffers(input, raisedView(featId, feat), BuilderPolicySchema.parse({}))
+    .offers.find((offer) => offer.key === key)?.capacity;
+
+describe("a budget raised past the printed row (`extraPicks`) — through both paths", () => {
+  it("1. the editor can author it: offer, amount and the column rule go through real controls, exactly one of the pair stored", () => {
+    const draft = authoredLoreFeat();
+    const verdict = publishVerdict("feat", draft, RAISED.featId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+    const body = storedBody("feat", draft, RAISED.featId) as { feature: { extraPicks?: unknown } };
+    // Thaumaturge's shape, byte for byte — and no `scaling` key beside it.
+    expect(body.feature.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
+
+    const scaled = storedBody("feat", authoredInstinctFeat(), RAISED.scaleFeatId) as { feature: { extraPicks?: unknown } };
+    // The scaling form — and no `amount` key beside it. The schema demands exactly one of the
+    // pair, and the mode select's write is what makes the both-keys shape unauthorable.
+    expect(scaled.feature.extraPicks).toEqual([{ offer: "class-skills", scaling: { type: "class-resource-growth", id: RAISED.scaleColumn } }]);
+
+    // Switching the mode back deletes the column rule and re-seeds the flat amount, so the
+    // refinement's refusal cannot be reached from the form...
+    const grant = authoredRow("feat", ["feature", "extraPicks"], [
+      ["offer", "class-skills"], ["mode", "column-growth"], ["scaling.id", RAISED.scaleColumn]
+    ]);
+    expect(applyField("feat", grant, "mode", "flat", ["feature", "extraPicks"])).toMatchObject({ offer: "class-skills", amount: 1 });
+    expect("scaling" in applyField("feat", grant, "mode", "flat", ["feature", "extraPicks"])).toBe(false);
+
+    // ...while the seeded-EMPTY column id keeps the publish gate honest: a half-said scaling is
+    // refused by name rather than silently pointed at nothing.
+    const half = authoredRow("feat", ["feature", "extraPicks"], [["offer", "class-skills"], ["mode", "column-growth"]]);
+    const feature = applyField("feat", (authoredInstinctFeat().feature ?? {}) as Draft, "extraPicks", [half], ["feature"]);
+    expect(publishVerdict("feat", { ...authoredInstinctFeat(), feature }, RAISED.scaleFeatId).publishable).toBe(false);
+
+    // The OPTION mounts the same factory — Divine Order's Thaumaturge is authorable as authored.
+    expect(hasControl("class", "extraPicks", ["features", "choice.options"])).toBe(true);
+    const option = authoredRow("feat", ["feature", "choice.options"], [
+      ["name", "Thaumaturge"],
+      ["description", "You know one extra cantrip from the Cleric spell list."],
+      ["extraPicks", [authoredRow("feat", ["feature", "choice.options", "extraPicks"], [["offer", "class-cantrips"]])]]
+    ]);
+    expect(option).toMatchObject({ name: "Thaumaturge", extraPicks: [{ offer: "class-cantrips", amount: 1 }] });
+  });
+
+  it("2. SRD content authors the same shape — 8 grants, 6 on features and 2 on inline options", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const carriers: Array<{ id: string; grant: Record<string, unknown> }> = [];
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      if (Array.isArray(record.extraPicks) && record.extraPicks.length > 0) {
+        for (const grant of record.extraPicks) carriers.push({ id: String(record.id ?? "?"), grant: grant as Record<string, unknown> });
+      }
+      for (const value of Object.values(record)) walk(value);
+    };
+    for (const summary of library.classSummaries()) walk(library.classRecord(summary.id));
+
+    // Measured at the time of writing: 8 — weapon-mastery (×2, Barbarian and Fighter),
+    // primal-knowledge, deft-explorer, thieves-cant, eldritch-invocations on features;
+    // thaumaturge and magician on inline options.
+    expect(carriers.length).toBe(8);
+    expect(carriers.find((entry) => entry.id === "thaumaturge")?.grant).toEqual({ offer: "class-cantrips", amount: 1 });
+    // Three of the eight scale off a printed column, which is why the scaling form is part of
+    // this unit rather than held back as editor-only.
+    const scaled = carriers.filter((entry) => entry.grant.scaling !== undefined);
+    expect(scaled.map((entry) => entry.id).sort()).toEqual(["eldritch-invocations", "weapon-mastery", "weapon-mastery"]);
+    expect(carriers.find((entry) => entry.id === "eldritch-invocations")?.grant).toEqual({
+      offer: "feature:eldritch-invocations",
+      scaling: { type: "class-resource-growth", id: "eldritch-invocations" }
+    });
+  });
+
+  it("3. one assertion body over both: the raised cap makes a fourth cantrip legal, and nothing else does", () => {
+    const paths: ReadonlyArray<readonly [string, "protector" | "thaumaturge", string, Draft | undefined]> = [
+      // The SRD's grant rides the CHOSEN OPTION: Thaumaturge, folded after pass A2. Versatile is
+      // spent on Alert, which asks for nothing and raises nothing.
+      ["SRD content", "thaumaturge", "alert", undefined],
+      // The editor's rides a CHOSEN FEAT's feature, folded after pass A — Protector on purpose,
+      // so the only thing raising the cap is the authored grant.
+      ["the homebrew editor", "protector", RAISED.featId, authoredLoreFeat()]
+    ];
+    for (const [label, order, featId, feat] of paths) {
+      const definition = buildCharacterDefinition(clericInput(order, featId), raisedView(feat ? featId : undefined, feat), BuilderPolicySchema.parse({}));
+      // The far end: all four cantrips on the sheet, prepared — the fourth is the raise.
+      for (const id of RAISED.cantrips) {
+        expect(preparedSpell(definition, id), `${label}: ${id}`).toMatchObject({ id, prepared: true });
+      }
+    }
+
+    // THE NEGATIVE CONTROL: the same Cleric, the same four cantrips, and nothing raising the cap —
+    // Protector and Alert, no grant anywhere. The fourth cantrip is refused by the cap's own
+    // sentence, so the two builds above passed BECAUSE of the grant, not because the cap is loose.
+    expect(() => buildCharacterDefinition(clericInput("protector", "alert"), raisedView(), BuilderPolicySchema.parse({})))
+      .toThrow(RAISED.capSentence);
+  });
+
+  it("4. the scaling form: an offer's capacity follows the printed column, from both paths", () => {
+    // SRD: Eldritch Invocations. The Warlock table prints 1 at level 1 and 3 at level 2; the
+    // feature's own `choose` covers the first, and the grant adds the GROWTH — so the offer the
+    // server computes reads 1, then 3, off one authored line.
+    expect(capacityOf(warlockInput(1), "feature:eldritch-invocations")).toBe(1);
+    expect(capacityOf(warlockInput(2), "feature:eldritch-invocations")).toBe(3);
+
+    // The editor: the authored feat's skill budget grows with the Rages column (2 at level 1,
+    // 3 at level 3). At level 1 the growth is ZERO — the grant reads the column, not a flat —
+    // and at level 3 it composes by ADDITION over Primal Knowledge's own +1: 2 + 1 + 1.
+    const feat = authoredInstinctFeat();
+    expect(capacityOf(instinctInput(1, RAISED.scaleFeatId), "class-skills", RAISED.scaleFeatId, feat)).toBe(2);
+    expect(capacityOf(instinctInput(3, RAISED.scaleFeatId), "class-skills", RAISED.scaleFeatId, feat)).toBe(4);
+    // Without the feat the level-3 offer is Primal Knowledge's 3 — the +1 above was the grant's.
+    expect(capacityOf(instinctInput(3), "class-skills")).toBe(3);
+  });
+});
+
+/** A Warlock at `level` with an empty ledger — `computeServerOffers` needs identity and scores,
+    not answers, which is exactly what makes it the right far end for a capacity. */
+const warlockInput = (level: 1 | 2): CharacterCreateRequestInput => ({
+  name: "Vex", speciesId: "human", backgroundId: "soldier", classId: "warlock", level,
+  abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: []
+} as CharacterCreateRequestInput);
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -1835,7 +2088,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
       // [type, key, container path, the unit that closes it]
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
-      ["class", "extraPicks", [], "U13 — the extra-cantrip case that started the area, 8 SRD authors"],
       ["class", "replaces", [], "U14 — wired through a command, actor state, rests and a projection"],
       ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"],
       ["class", "fromPicks", [], "U16 — 3 records"],

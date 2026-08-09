@@ -203,7 +203,10 @@ export type FieldDef = Readonly<{
   searchable?: boolean;
   /** `kind: "select"` + `searchable` — which catalog to pick from. */
   catalog?: "spells" | "equipment";
-  suggestions?: readonly string[] | ((ctx: SchemaContext) => readonly string[]);
+  /** `draft` is the whole record, so a list can be derived from what the GM has already
+      authored — the `extraPicks` offer box suggests `feature:<id>` over the record's own
+      features. Most callbacks ignore it. */
+  suggestions?: readonly string[] | ((ctx: SchemaContext, draft: Draft) => readonly string[]);
   /**
    * **`suggestions` — render the CHOOSER instead of a bare box with a `<datalist>`.**
    *
@@ -474,10 +477,10 @@ export function resolveOptions(field: FieldDef, ctx: SchemaContext, draft: Draft
   return typeof options === "function" ? options(ctx, draft) : options;
 }
 
-export function resolveSuggestions(field: FieldDef, ctx: SchemaContext): readonly string[] {
+export function resolveSuggestions(field: FieldDef, ctx: SchemaContext, draft: Draft = {}): readonly string[] {
   const { suggestions } = field;
   if (!suggestions) return [];
-  return typeof suggestions === "function" ? suggestions(ctx) : suggestions;
+  return typeof suggestions === "function" ? suggestions(ctx, draft) : suggestions;
 }
 
 /**

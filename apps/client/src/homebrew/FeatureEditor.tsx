@@ -73,11 +73,11 @@
  */
 
 import { useId, useMemo, useState } from "react";
-import { featurePicks } from "@vtt/content-srd-5.2.1/schemas";
+import { featurePicks, NAMED_PICK_BUDGET_KEYS } from "@vtt/content-srd-5.2.1/schemas";
 import { Button, Chip, Field, FieldGrid, RowEditor, SegmentedControl, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { FieldRenderer } from "./FieldRenderer";
-import { RiderEditor, riderSummary, type RiderKind } from "./RiderEditor";
+import { RiderEditor, riderSummary, slugValidate, type RiderKind } from "./RiderEditor";
 import { LEVELS, blankFeature } from "./defaults";
 import { getAt, setAt } from "./paths";
 import { namesOwnRecord } from "./schema";
@@ -207,6 +207,121 @@ function writeChoiceAt(feature: Draft, index: number, changes: Readonly<Record<s
     and it reads the BLOCKS, not the singular key — a plural record asks too. */
 const asksAChoice = (feature: Draft) => choiceBlocksOf(feature).length > 0;
 
+/** The offer key's own shape, caught while typing — `PickBudgetKeySchema` is
+    `/^[a-z0-9-]+(:[a-z0-9-]+)?$/`, one colon wider than a plain slug, so `slugValidate`
+    would refuse the `feature:<id>` form the key exists to allow. */
+const offerValidate = (value: unknown): string | null => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text === "" || /^[a-z0-9-]+(:[a-z0-9-]+)?$/.test(text)) return null;
+  return "Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.";
+};
+
+/** Every feature id this record declares, whichever key its type stores them under — the
+    targets a `feature:<id>` offer may name. */
+const featureIdsOf = (draft: Draft): readonly string[] => {
+  const held: unknown[] = [
+    ...(Array.isArray(draft.features) ? draft.features : []),
+    ...(Array.isArray(draft.traits) ? draft.traits : []),
+    ...(draft.feature && typeof draft.feature === "object" && !Array.isArray(draft.feature) ? [draft.feature] : [])
+  ];
+  return held.map((feature) => String((feature as { id?: unknown })?.id ?? "")).filter(Boolean);
+};
+
+/**
+ * EXTRA PICKS — the rider by which a feature (or a chosen option) RAISES a pick budget
+ * instead of granting an outcome. "You know one extra cantrip from the Cleric spell
+ * list" is `{offer: "class-cantrips", amount: 1}`; the server folds every grant into the
+ * budget by ADDITION and refuses a key naming no budget the build has, loudly.
+ *
+ * **The offer box is an open text with suggestions, never a closed select** — the same
+ * ruling as the choice kind box, and for the same reason twice over: the eight named
+ * budgets are a closed list but `feature:<id>` is an open form over the record's own
+ * features, so a closed control could not say the very case that started this area
+ * (Eldritch Invocations raises its own feature's pick). The suggestions are the eight
+ * canonical keys (`NAMED_PICK_BUDGET_KEYS`, the list the server's rejection sentence
+ * names) plus `feature:<id>` for every feature the record declares.
+ *
+ * **`amount` and `scaling` are exactly one, and the pair is held by the mode select** the
+ * way `usesField` holds `limit`/`scaling`: picking "As a class-table column grows" swaps
+ * the flat amount for `{type: "class-resource-growth", id}` and back, deleting the other
+ * half, so the schema's "exactly one" refinement cannot be reached from the form. The
+ * column id is seeded EMPTY — a guessed "rage" would silently point a homebrew grant at
+ * the Barbarian's column — and the publish checklist names it until the GM fills it.
+ *
+ * One factory, two mounts: a feature's own list, and an inline option's (Divine Order's
+ * Thaumaturge is option-level — 2 of the SRD's 8 authors are).
+ */
+function extraPicksField(): FieldDef {
+  return {
+    key: "extraPicks",
+    label: "Extra picks",
+    kind: "rows",
+    wide: true,
+    help: "Budgets this raises — an extra cantrip, one more skill. The player still makes the pick.",
+    addLabel: "Add an extra pick",
+    emptyText: "Raises no budgets.",
+    maxRows: 4,
+    maxRowsReason: "Four extra picks is as many as one feature may grant.",
+    rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
+    newRow: () => ({ rowId: newId(), offer: "", amount: 1 }),
+    rowLabel: (row) => {
+      const grant = row as { offer?: unknown; amount?: unknown; scaling?: { id?: unknown } };
+      const offer = String(grant.offer || "no pick named");
+      return grant.scaling ? `${offer} — grows with ${String(grant.scaling.id || "a column")}` : `${offer} +${Number(grant.amount ?? 1)}`;
+    },
+    rows: [
+      {
+        key: "offer",
+        label: "Which pick",
+        placeholder: "class-cantrips",
+        help: "A named budget, or feature:<id> for one of this record's own features.",
+        suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+        validate: offerValidate
+      },
+      {
+        key: "mode",
+        label: "The extra is",
+        kind: "select",
+        // `mode` is NOT stored — read back out of the shape, the same derivation the
+        // "Uses are" select rides. The two literals below are this control's own; the
+        // stored discriminator is `scaling.type`, seeded by the write.
+        options: [
+          { value: "flat", label: "A flat number" },
+          { value: "column-growth", label: "As a class-table column grows" }
+        ],
+        read: (row) => ((row as { scaling?: unknown }).scaling ? "column-growth" : "flat"),
+        write: (next, row) => {
+          const out: Record<string, unknown> = { ...row };
+          if (next === "column-growth") {
+            delete out.amount;
+            out.scaling = { type: "class-resource-growth", id: "" };
+          } else {
+            delete out.scaling;
+            out.amount ??= 1;
+          }
+          return out;
+        }
+      },
+      {
+        key: "amount",
+        label: "How many more",
+        kind: "number",
+        min: 1,
+        max: 5,
+        visibleWhen: (row) => !(row as { scaling?: unknown }).scaling
+      },
+      {
+        key: "scaling.id",
+        label: "Which column",
+        placeholder: "eldritch-invocations",
+        help: "The class-table column it grows with. The grant adds how far the column has grown past its first printed value.",
+        validate: slugValidate,
+        visibleWhen: (row) => Boolean((row as { scaling?: unknown }).scaling)
+      }
+    ]
+  };
+}
+
 /**
  * The controls of ONE choice block, keys relative to the block — the shape every block
  * in the list shares, spelled once. `renderFeature` renders every block through these,
@@ -271,7 +386,11 @@ function choiceBlockFields(): readonly FieldDef[] {
       write: (next, block) => ({ ...block, options: next }),
       rows: [
         { key: "name", label: "Name" },
-        { key: "description", label: "Description", kind: "textarea", wide: true }
+        { key: "description", label: "Description", kind: "textarea", wide: true },
+        // An OPTION raises budgets too — Divine Order's Thaumaturge is the SRD's own
+        // case — and the reader treats a chosen option as a feature (`optionAsFeature`),
+        // so the control is the same factory at the option's own row scope.
+        extraPicksField()
       ]
     },
     {
@@ -383,7 +502,8 @@ export function featureFields(): readonly FieldDef[] {
       newRow: () => ({ ...NEW_CHOICE }),
       rowLabel: (row, index) => `Choice ${index + 1} — ${String((row as { kind?: unknown }).kind ?? "")}`,
       rows: blockFields
-    }
+    },
+    extraPicksField()
   ];
 }
 
@@ -891,6 +1011,8 @@ export function FeatureEditor({
             </div>
           </>
         )}
+
+        {control("extraPicks")}
 
         <RiderEditor
           value={feature}

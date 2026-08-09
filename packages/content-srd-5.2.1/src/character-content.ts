@@ -306,6 +306,21 @@ export const PickBudgetKeySchema = z.string()
   .max(80);
 
 /**
+ * The eight budgets a fixed key may name — the schema's own docblock, as code, so the two consumers
+ * that offer or check them read ONE list: `character-build.ts` re-exports it as `NAMED_PICK_BUDGETS`
+ * (its rejection sentences and offer keys), and the homebrew editor suggests exactly these on an
+ * `extraPicks` row's offer box. It lives beside `PickBudgetKeySchema` for the same reason
+ * `DAMAGE_TYPE_IDS` lives in this package: a client-local copy is a second list that drifts.
+ *
+ * NOT a closed enum, deliberately — `feature:<featureId>` is the ninth, open form, validated by the
+ * server against the features the build really has.
+ */
+export const NAMED_PICK_BUDGET_KEYS = [
+  "class-skills", "class-tools", "background-skills", "background-tools",
+  "background-languages", "species-languages", "class-cantrips", "class-spells"
+] as const;
+
+/**
  * ONE extra pick a feature (or a chosen option) adds to a budget that already exists.
  *
  * `amount` composes by ADDITION across every source: two features each granting +1 to the same

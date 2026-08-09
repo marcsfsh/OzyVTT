@@ -13,7 +13,7 @@ import type {
   BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureModifier, FeatureOption,
   FeatureRecord, SpeciesReference, SpellReference, SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import { featurePicks } from "@vtt/content-srd-5.2.1";
+import { featurePicks, NAMED_PICK_BUDGET_KEYS } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, UNARMED_STRIKE_ACTION_ID, type CharacterFeatureRef } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -186,14 +186,13 @@ export const withinOfferSpellWindow = withinSpellWindow;
  * offers - `cantripsKnown` and `preparedCount`/`spellsKnown`, read at step 9 - which is exactly why
  * an unmatched key cannot simply be "no offer has this key".
  *
- * These strings are also the wizard's own offer keys, verbatim (`build-payload.ts` `computeOffers`).
- * That is the whole client/server agreement: one namespace, spelled once on each side, so a grant
- * the wizard honours is a grant this validator honours.
+ * These strings are also the wizard's own offer keys, verbatim (`build-payload.ts` `computeOffers`),
+ * AND the suggestions the homebrew editor's `extraPicks` offer box shows. That is the whole
+ * agreement: one namespace, spelled ONCE - in the content package beside `PickBudgetKeySchema`,
+ * where the third consumer can reach it without importing this server module - so a grant the
+ * editor offers is a grant the wizard honours is a grant this validator honours.
  */
-export const NAMED_PICK_BUDGETS = [
-  "class-skills", "class-tools", "background-skills", "background-tools",
-  "background-languages", "species-languages", "class-cantrips", "class-spells"
-] as const;
+export const NAMED_PICK_BUDGETS = NAMED_PICK_BUDGET_KEYS;
 export type NamedPickBudget = (typeof NAMED_PICK_BUDGETS)[number];
 
 /**

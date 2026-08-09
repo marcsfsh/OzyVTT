@@ -254,7 +254,7 @@ export function FieldRenderer(props: FieldRendererProps) {
           ariaLabel={field.label}
           values={asStrings(raw)}
           onChange={(next) => set(next)}
-          suggestions={resolveSuggestions(field, ctx)}
+          suggestions={resolveSuggestions(field, ctx, draft)}
           /* THE SAME FLAG THE TEXT BRANCH READS, meaning the same thing: put the list on screen.
              Six of the client's nine `3d` sites are lists rather than single values — the monster's
              three defence rows, a spell's damage types, the `damage-type-is` gate, the damage-type
@@ -369,7 +369,7 @@ export function FieldRenderer(props: FieldRendererProps) {
        * was a bare box a GM had to spell "bludgeoning" into from memory. Reading it here is the
        * whole fix; no new `FieldKind`, per the standing rule at the top of `schema.ts`.
        */
-      const suggestions = resolveSuggestions(field, ctx);
+      const suggestions = resolveSuggestions(field, ctx, draft);
 
       /**
        * **`pick`: the same contract, with the list on screen.** See `FieldDef.pick`.
