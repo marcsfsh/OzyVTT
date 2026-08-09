@@ -216,15 +216,22 @@ const offerValidate = (value: unknown): string | null => {
   return "Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.";
 };
 
-/** Every feature id this record declares, whichever key its type stores them under — the
-    targets a `feature:<id>` offer may name. */
-const featureIdsOf = (draft: Draft): readonly string[] => {
-  const held: unknown[] = [
-    ...(Array.isArray(draft.features) ? draft.features : []),
-    ...(Array.isArray(draft.traits) ? draft.traits : []),
-    ...(draft.feature && typeof draft.feature === "object" && !Array.isArray(draft.feature) ? [draft.feature] : [])
-  ];
-  return held.map((feature) => String((feature as { id?: unknown })?.id ?? "")).filter(Boolean);
+/** Every feature this record declares, whichever key its type stores them under. */
+const featuresOf = (draft: Draft): readonly Draft[] => [
+  ...(Array.isArray(draft.features) ? (draft.features as Draft[]) : []),
+  ...(Array.isArray(draft.traits) ? (draft.traits as Draft[]) : []),
+  ...(draft.feature && typeof draft.feature === "object" && !Array.isArray(draft.feature) ? [draft.feature as Draft] : [])
+];
+
+/** Every feature id this record declares — the targets a `feature:<id>` offer may name. */
+const featureIdsOf = (draft: Draft): readonly string[] =>
+  featuresOf(draft).map((feature) => String((feature as { id?: unknown })?.id ?? "")).filter(Boolean);
+
+/** What to CALL one of those ids in a picker. A feature the GM has not named yet still has
+    to be pickable, so the id stands in rather than an empty row. */
+const featureLabelOf = (draft: Draft, id: string): string => {
+  const named = featuresOf(draft).find((feature) => (feature as { id?: unknown }).id === id);
+  return String((named as { name?: unknown } | undefined)?.name || id);
 };
 
 /**
@@ -321,6 +328,110 @@ function extraPicksField(): FieldDef {
     ]
   };
 }
+
+/**
+ * PICKS THIS FEATURE RE-OPENS — `replaces`, the only rider whose answer is re-made after
+ * the character is built.
+ *
+ * "Whenever you finish a Long Rest, choose one type of land"; "choose one damage type
+ * whenever you finish a Short or Long Rest." The clause names a pick budget the character
+ * already answered and says WHEN that answer may be taken back, and the two halves live in
+ * different places: `level-up` is a build-time permission over the choices ledger, while
+ * `short-rest`/`long-rest` become runtime state on the actor — written by `actor.rechoose`,
+ * cleared by the matching rest, read at damage time. It is wired end to end through a
+ * command, actor state, rest clearing and a gated projection, and until this field there
+ * was no control for it anywhere.
+ *
+ * **The offer box is the same open text with suggestions `extraPicks` uses**, and it has to
+ * be: the server validates a `replaces` clause against the SAME namespace an `extraPicks`
+ * grant is validated against (`character-build.ts` reuses `namesARealBudget` for both and
+ * says so), so a closed select here would be a second, narrower list beside one shared
+ * check. Both SRD authors name the feature's own pick — `feature:circle-of-the-land-spells`,
+ * `feature:fiendish-resilience` — which is exactly the open half of that namespace.
+ */
+function replacesField(): FieldDef {
+  return {
+    key: "replaces",
+    label: "Picks it re-opens",
+    kind: "rows",
+    wide: true,
+    help: "Answers the player may take back later — a land type on a long rest, a damage type on a short one.",
+    addLabel: "Add a re-openable pick",
+    emptyText: "Re-opens nothing.",
+    maxRows: 4,
+    maxRowsReason: "Four re-openable picks is as many as one feature may declare.",
+    rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
+    // `when` is seeded, `offer` is not: a guessed budget would silently point the clause at
+    // someone else's pick, the same ruling `extraPicks`' column id is seeded empty under.
+    newRow: () => ({ rowId: newId(), offer: "", when: "long-rest", amount: 1 }),
+    rowLabel: (row) => {
+      const clause = row as { offer?: unknown; when?: unknown; amount?: unknown };
+      const amount = Number(clause.amount ?? 1);
+      const each = amount > 1 ? `${amount} at a time` : "one";
+      return `${String(clause.offer || "no pick named")} — ${each}, ${WHEN_LABELS[String(clause.when ?? "")] ?? "when?"}`;
+    },
+    rows: [
+      {
+        key: "offer",
+        label: "Which pick",
+        placeholder: "feature:my-feature",
+        help: "A named budget, or feature:<id> for one of this record's own features — usually this one.",
+        suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
+        validate: offerValidate
+      },
+      {
+        key: "when",
+        label: "Re-made",
+        kind: "select",
+        options: [
+          { value: "level-up", label: "At level-up" },
+          { value: "short-rest", label: "On a short rest" },
+          { value: "long-rest", label: "On a long rest" }
+        ]
+      },
+      { key: "amount", label: "How many at once", kind: "number", min: 1, max: 5 }
+    ]
+  };
+}
+
+const WHEN_LABELS: Readonly<Record<string, string>> = {
+  "level-up": "at level-up",
+  "short-rest": "on a short rest",
+  "long-rest": "on a long rest"
+};
+
+/**
+ * SUPERSEDES — `replacesFeatureId`, the feature that takes an earlier one's place.
+ *
+ * Extra Attack (2) replaces Extra Attack; Indomitable 9/13/17 replaces its own predecessor.
+ * `grantedClassFeatures` drops the named feature from the granted set once the replacement
+ * is granted, so the sheet prints one line rather than two contradicting ones.
+ *
+ * **Offered on a CLASS only, and that is a measurement rather than a shortcut** — the same
+ * call U7 made about `class-resource` on an item. The reader is `grantedClassFeatures`,
+ * which walks a CLASS's own level table and nothing else: `subclassFeatures` is a plain
+ * filter with no supersession step, so a subclass feature carrying the key is inert. The
+ * SRD proves it rather than assumes it — Champion's `superior-critical` authors
+ * `replacesFeatureId: "improved-critical"` and a level-15 Champion holds both records, which
+ * `class-mechanics/fighter.ts` writes down at the record itself. Showing the control on the
+ * other four carriers would be an editor-only row on all four.
+ */
+const replacesFeatureIdField = (): FieldDef => ({
+  key: "replacesFeatureId",
+  label: "Supersedes",
+  kind: "select",
+  help: "An earlier feature this one takes the place of. The class stops granting it once this arrives.",
+  // Only a class has a level table, and only a class's own features are read for this.
+  visibleWhen: (_feature, draft) => Array.isArray(draft.levelTable),
+  options: (_ctx, draft) => [
+    { value: "", label: "Nothing — this is a feature of its own" },
+    ...featureIdsOf(draft).map((id) => ({ value: id, label: featureLabelOf(draft, id) }))
+  ],
+  // The list cannot exclude the feature being edited (`options` is handed the RECORD, never
+  // the row), and naming itself would make the class delete the very feature that arrived.
+  // So the illegal answer is named while it is made, the way every other `validate` is.
+  validate: (value, feature) => (value && value === feature.id ? "A feature cannot supersede itself — pick the earlier one it replaces." : null)
+});
 
 /**
  * The controls of ONE choice block, keys relative to the block — the shape every block
@@ -503,7 +614,9 @@ export function featureFields(): readonly FieldDef[] {
       rowLabel: (row, index) => `Choice ${index + 1} — ${String((row as { kind?: unknown }).kind ?? "")}`,
       rows: blockFields
     },
-    extraPicksField()
+    extraPicksField(),
+    replacesField(),
+    replacesFeatureIdField()
   ];
 }
 
@@ -988,6 +1101,11 @@ export function FeatureEditor({
           </div>
         )}
 
+        {/* Beside the levels, because it is the other half of the same question: WHEN does
+            the class grant this, and what does granting it take off the sheet. Renders on a
+            class only — see the field's own note. */}
+        {control("replacesFeatureId")}
+
         {control("choice")}
 
         {blocks.length > 0 && (
@@ -1013,6 +1131,7 @@ export function FeatureEditor({
         )}
 
         {control("extraPicks")}
+        {control("replaces")}
 
         <RiderEditor
           value={feature}

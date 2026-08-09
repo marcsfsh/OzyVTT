@@ -65,6 +65,7 @@ import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../../../server/src/action-resolution.js";
 import { importActorDefinition } from "../../../server/src/actor-roster.js";
 import { buildCharacterDefinition, computeServerOffers, type CharacterCreateRequestInput } from "../../../server/src/character-build.js";
+import { choiceOverrideDefenses, replaceableOffers } from "../../../server/src/choice-overrides.js";
 import { ContentLibrary, EMPTY_HOMEBREW_SLICE, type HomebrewContentSource } from "../../../server/src/content-library.js";
 import { effectiveActions } from "../../../server/src/effective-actions.js";
 import { equipmentCatalogOf } from "../../../server/src/equipment-derivation.js";
@@ -72,6 +73,7 @@ import { nextInitiativeTurn, startEncounter } from "../../../server/src/encounte
 import {
   applyField, authored, authoredRow, fieldsWithin, hasControl, publishVerdict, riderScopeOf, RIDER_EXEMPT, storedBody
 } from "./authoring-harness";
+import { blankDraft } from "./defaults";
 import { grantRowsOf, grantsFromRows } from "./RiderEditor";
 import { EMPTY_CONTEXT } from "./schema";
 import { SCHEMAS } from "./schemas";
@@ -1833,6 +1835,426 @@ const warlockInput = (level: 1 | 2): CharacterCreateRequestInput => ({
   choices: []
 } as CharacterCreateRequestInput);
 
+/* ------- U14: a settled pick re-opened (`replaces`, `replacesFeatureId`) — both paths --- */
+
+/**
+ * The rows: `FeatureRecordSchema.replaces` — *"choose one damage type whenever you finish a Short
+ * or Long Rest"* — and `replacesFeatureId`, the feature that takes an earlier one's place.
+ *
+ * **The sharpest case in the audit: wired end to end and a GM could not author one.** `replaces` is
+ * validated at build time against the same offer-key namespace `extraPicks` uses
+ * (`character-build.ts` reuses `namesARealBudget` and says so), turned into rest-time permissions by
+ * `replaceableOffers`, written by the `actor.rechoose` command, cleared by `rests.ts` on the matching
+ * rest, read back at damage time by `choiceOverrideDefenses`, and projected to the owning player
+ * under the same gate as `actionUses`. Five consumers, two SRD authors, and no control anywhere.
+ *
+ * **This unit is control-only, and the server was not touched.** The command already validates and
+ * authorises (owner-or-GM, legality decided from the CONTENT on the GM audience so a player gets the
+ * same answer), and the projection already carries `choiceOverrides` behind `resourcesVisible` — so
+ * an authored clause reaches exactly the surface the SRD's own clauses reach, and nothing new is
+ * disclosed to anybody.
+ *
+ * **The far end is a SETTLED ROW ANSWERED AGAIN**, never a surviving field: the build bakes the
+ * character's own answer into `damageResistances`, `replaceableOffers` says that answer may be taken
+ * back and with which options, and re-answering it moves the resistance — the new type in, the old
+ * one suppressed, and the feature named as the reason. The negative control drops only the CLAUSE:
+ * the same sheet, the same pick, and nothing on it is re-choosable at all.
+ *
+ * The two paths cross carriers the way U6's and U13's do: the SRD half is a SUBCLASS feature
+ * (Fiendish Resilience, twelve inline options) and the editor half is a homebrew SPECIES trait —
+ * because a feat is recorded on `character.feats` rather than `character.features`, and
+ * `replaceableOffers` walks the latter. A `replaces` clause on a feat is read by nothing.
+ */
+const REOPENED = {
+  srcSubclassId: "fiend-patron",
+  srdFeatureId: "fiendish-resilience",
+  srdOffer: "feature:fiendish-resilience",
+  speciesId: "hb-emberkin-a1b2",
+  speciesName: "Emberkin",
+  /** Pinned the way U12 pins its feature id: the ledger tags its answer with the FEATURE id, and a
+      minted uuid would put the `feature:<id>` offer key out of the fixture's reach. */
+  traitId: "ember-ward",
+  traitName: "Ember Ward",
+  offer: "feature:ember-ward",
+  /** The build's answer, and the one the rest-time re-choice replaces it with. */
+  built: "fire",
+  rechosen: "cold",
+  /** `replacesFeatureId`'s carriers: the Fighter's own second attack tier, and an authored class. */
+  fighterReplaced: "extra-attack",
+  fighterReplacing: "two-extra-attacks",
+  classId: "hb-warden-a1b2",
+  wardId: "ward",
+  greaterWardId: "greater-ward"
+} as const;
+
+/** One inline option of the authored trait: a name, a description, and the resistance it grants.
+    The grant goes through `GrantsEditor`'s own write (`grantsFromRows`) for the reason U9 states —
+    `grants` is the one key with no `FieldDef` to look up, and writing through the exemption would
+    prove nothing. Everything else on the row is the option row's own control. */
+const wardOption = (id: string, name: string): Draft => ({
+  ...authoredRow("species", ["traits", "choice.options"], [
+    ["name", name],
+    ["description", `You have Resistance to ${name} damage until you choose a different type.`]
+  ]),
+  id,
+  grants: grantsFromRows([{ rowId: "damageResistances", kind: "damageResistances", values: [id] }])
+});
+
+/** The species a GM builds in `/homebrew`: one trait that asks a question, and the clause saying the
+    answer may be taken back on a short rest. `withClause: false` is the negative control. */
+function authoredEmberkin(withClause = true): Draft {
+  let trait = authoredRow("species", ["traits"], [
+    ["name", REOPENED.traitName],
+    ["description", "Choose one damage type whenever you finish a Short or Long Rest."],
+    ["choice", true],
+    ["choice.kind", "damage-type"],
+    ["choice.options", [wardOption(REOPENED.built, "Fire"), wardOption(REOPENED.rechosen, "Cold")]]
+  ]);
+  trait = { ...trait, id: REOPENED.traitId };
+  if (withClause) {
+    // THE ROW. `authoredRow` throws when a key has no control, so before U14 this line — not an
+    // assertion below it — is what failed.
+    const clause = authoredRow("species", ["traits", "replaces"], [
+      ["offer", REOPENED.offer],
+      ["when", "short-rest"]
+    ]);
+    trait = applyField("species", trait, "replaces", [clause], ["traits"]);
+  }
+  return authored("species", REOPENED.speciesName, [
+    ["summary", "Kin of the cinder, warded against one element at a time."],
+    ["description", "Emberkin carry a ward they re-tune whenever they rest."],
+    ["sizes", ["medium"]],
+    ["speedFeet", 30],
+    ["traits", [trait]]
+  ]);
+}
+
+/** A merged view carrying the authored species, the same merge a published record takes. */
+const emberkinView = (species: Draft) => {
+  const record = HOMEBREW_BODY_SCHEMAS.species.parse(storedBody("species", species, REOPENED.speciesId));
+  return new ContentLibrary({
+    revision: 1,
+    publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, species: [record] }),
+    monsterForInstance: () => undefined
+  }).forAudience("gm");
+};
+
+/** An Emberkin Fighter 1 who has ALREADY answered the ward — the settled row this unit re-opens. */
+const emberkinInput = (): CharacterCreateRequestInput => ({
+  name: "Ash", speciesId: REOPENED.speciesId, backgroundId: "soldier", classId: "fighter", level: 1,
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "damage-type", id: REOPENED.built, payload: { featureId: REOPENED.traitId } },
+    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
+    { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longsword" },
+    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "javelin" },
+    { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "fighter-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** A Human Acolyte Fiend-Patron Warlock 10 — the level Fiendish Resilience arrives at — whose
+    damage type is already chosen. The SRD's own carrier, built by the real builder. */
+const resilientWarlock = (damageType: string): CharacterCreateRequestInput => ({
+  name: "Vex", speciesId: "human", backgroundId: "acolyte", classId: "warlock", level: 10,
+  subclassId: REOPENED.srcSubclassId, abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+  backgroundBonusAllocation: [{ ability: "cha", amount: 2 }, { ability: "wis", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+    // The Acolyte's own origin feat is Magic Initiate (Cleric), which asks for three picks.
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
+    { level: 1, classId: "warlock", kind: "skill", id: "deception" },
+    ...["agonizing-blast", "devils-sight", "eldritch-mind", "repelling-blast", "armor-of-shadows", "ascendant-step", "fiendish-vigor"]
+      .map((id) => ({ level: 1, classId: "warlock", kind: "eldritch-invocation", id, payload: { featureId: "eldritch-invocations" } })),
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
+    { level: 3, classId: "warlock", kind: "subclass", id: REOPENED.srcSubclassId },
+    // THE SETTLED ROW.
+    { level: 10, kind: "damage-type", id: damageType, payload: { featureId: REOPENED.srdFeatureId } },
+    ...[4, 8].flatMap((at) => [
+      { level: at, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+      { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+    ]),
+    { level: 1, kind: "cantrip", id: "eldritch-blast" },
+    { level: 1, kind: "cantrip", id: "prestidigitation" },
+    { level: 1, kind: "cantrip", id: "minor-illusion" },
+    { level: 1, kind: "spell", id: "hex" },
+    { level: 1, kind: "spell", id: "hold-person" },
+    { level: 5, kind: "spell", id: "fly" },
+    { level: 1, kind: "equipment", id: "warlock-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/**
+ * THE assertion body. Given a built sheet and the view it was built against: what does the build
+ * say the character resists, what may they take back on a rest, and what happens when they do?
+ *
+ * `choiceOverrideDefenses` is handed the override `actor.rechoose` would have written — the command
+ * itself is a socket/HTTP operation over a live store, and what this unit adds is the CONTENT half
+ * it validates against, so the seam driven here is exactly the one an authored clause reaches.
+ */
+function reopen(definition: ActorDefinition, view: ReturnType<ContentLibrary["forAudience"]>, offer: string, rechosen: string) {
+  const offers = replaceableOffers(definition, view);
+  const overrides = { [offer]: { id: rechosen, per: "short-rest" as const } };
+  const after = choiceOverrideDefenses(definition, overrides, (ref) => view.featureRecord(ref));
+  return { built: definition.damageResistances, offers, after };
+}
+
+describe("a settled pick the character may re-make (`replaces`) — through both paths", () => {
+  it("1. the editor can author it: the clause goes through real controls, and the record publishes", () => {
+    const draft = authoredEmberkin();
+    const verdict = publishVerdict("species", draft, REOPENED.speciesId);
+    expect(verdict.why).toBe("");
+    expect(verdict.publishable).toBe(true);
+
+    const body = storedBody("species", draft, REOPENED.speciesId) as { traits: Array<Record<string, unknown>> };
+    // Fiendish Resilience's shape, byte for byte — the `when` seeded by the row, the `offer` typed.
+    expect(body.traits[0].replaces).toEqual([{ offer: REOPENED.offer, when: "short-rest", amount: 1 }]);
+    // ...and no row means no key: `replacesField` writes the list the form holds, and an empty one
+    // is dropped on the way out rather than shipped as `[]` (`FeatureRecordSchema` defaults it back).
+    const noRows = storedBody("species", authoredEmberkin(false), REOPENED.speciesId) as { traits: Array<Record<string, unknown>> };
+    expect("replaces" in noRows.traits[0]).toBe(false);
+
+    // The clause is a FEATURE's, on every carrier that mounts one...
+    for (const [type, within] of [["class", ["features"]], ["subclass", ["features"]], ["species", ["traits"]], ["feat", ["feature"]]] as const) {
+      expect(hasControl(type, "replaces", within), `${type}: ${within.join(" > ")} > replaces`).toBe(true);
+    }
+    // ...and NOT an inline option's, deliberately. `FeatureOptionSchema` carries the key and ZERO
+    // SRD records author it; the option row inherits U14's reader for free the day one does, and a
+    // dedicated control today would mint an editor-only row. Same ruling as `FeatureOption.choices`.
+    expect(hasControl("feat", "replaces", ["feature", "choice.options"])).toBe(false);
+  });
+
+  it("1b. `replacesFeatureId` is offered where it is READ, and nowhere else", () => {
+    // The reader is `grantedClassFeatures`, which walks a CLASS's own level table. `subclassFeatures`
+    // is a plain level filter with no supersession step, so the key is inert on the other four
+    // carriers — and the SRD proves it rather than assuming it: Champion's `superior-critical`
+    // authors `replacesFeatureId: "improved-critical"` and a level-15 Champion holds both records,
+    // which `class-mechanics/fighter.ts` writes down at the record itself.
+    const gate = (type: HomebrewType, within: readonly string[]) =>
+      fieldsWithin(type, within).find((field) => field.key === "replacesFeatureId");
+    expect(gate("class", ["features"])?.visibleWhen?.({}, blankDraft("class"))).toBe(true);
+    for (const [type, within] of [["subclass", ["features"]], ["species", ["traits"]], ["background", ["features"]], ["feat", ["feature"]]] as const) {
+      expect(gate(type, within)?.visibleWhen?.({}, blankDraft(type)), `${type} shows "Supersedes"`).toBe(false);
+    }
+    // A feature naming ITSELF would make the class delete the very feature that arrived. The select's
+    // options are handed the RECORD and never the row, so the illegal answer is named as it is made.
+    const field = gate("class", ["features"])!;
+    expect(field.validate?.("f1", { id: "f1" }, EMPTY_CONTEXT)).toContain("cannot supersede itself");
+    expect(field.validate?.("f1", { id: "f2" }, EMPTY_CONTEXT)).toBeNull();
+  });
+
+  it("2. SRD content authors the same shape — 2 replaceable picks and 3 superseding features", () => {
+    const library = new ContentLibrary().forAudience("gm");
+    const clauses: Array<{ id: string; clause: Record<string, unknown> }> = [];
+    const supersedes: Array<{ id: string; replaced: string }> = [];
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) { for (const entry of node) walk(entry); return; }
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      if (Array.isArray(record.replaces)) {
+        for (const clause of record.replaces) clauses.push({ id: String(record.id ?? "?"), clause: clause as Record<string, unknown> });
+      }
+      if (typeof record.replacesFeatureId === "string") supersedes.push({ id: String(record.id ?? "?"), replaced: record.replacesFeatureId });
+      for (const value of Object.values(record)) walk(value);
+    };
+    for (const summary of library.classSummaries()) walk(library.classRecord(summary.id));
+    for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
+    for (const summary of library.featSummaries()) walk(library.featRecord(summary.id));
+
+    // Measured at the time of writing: exactly two `replaces` clauses, both on subclass features,
+    // one per rest length — and each names its OWN feature's pick, which is the open half of the
+    // offer-key namespace the box suggests.
+    expect(clauses.map((entry) => entry.id).sort()).toEqual(["circle-of-the-land-spells", "fiendish-resilience"]);
+    expect(clauses.find((entry) => entry.id === REOPENED.srdFeatureId)?.clause)
+      .toEqual({ offer: REOPENED.srdOffer, when: "short-rest", amount: 1 });
+    expect(clauses.find((entry) => entry.id === "circle-of-the-land-spells")?.clause)
+      .toMatchObject({ when: "long-rest" });
+
+    // ...and three superseding features. Two are the Fighter's attack tiers, which the builder reads;
+    // the third is Champion's, which it does not (see 1b) — so the count is 3 and the carriers differ.
+    expect(supersedes.map((entry) => `${entry.id} → ${entry.replaced}`).sort()).toEqual([
+      "superior-critical → improved-critical",
+      "three-extra-attacks → two-extra-attacks",
+      "two-extra-attacks → extra-attack"
+    ]);
+  });
+
+  it("3. one assertion body over both: the settled answer is offered again, and re-answering it moves the resistance", () => {
+    const srdView = new ContentLibrary().forAudience("gm");
+    const editorSpecies = authoredEmberkin();
+    const editorView = emberkinView(editorSpecies);
+    const paths: ReadonlyArray<readonly [string, ActorDefinition, ReturnType<ContentLibrary["forAudience"]>, string, string]> = [
+      ["SRD content", buildCharacterDefinition(resilientWarlock(REOPENED.built), srdView, BuilderPolicySchema.parse({})), srdView, REOPENED.srdOffer, "Fiendish Resilience"],
+      ["the homebrew editor", buildCharacterDefinition(emberkinInput(), editorView, BuilderPolicySchema.parse({})), editorView, REOPENED.offer, REOPENED.traitName]
+    ];
+
+    for (const [label, definition, view, offer, featureName] of paths) {
+      const { built, offers, after } = reopen(definition, view, offer, REOPENED.rechosen);
+      // The row really was settled: the build baked the character's own answer onto the sheet.
+      expect(built, label).toContain(REOPENED.built);
+
+      // THE FAR END, part one — the settled row is answerable again, on the rest the clause names,
+      // over exactly the options the original pick had. Nothing here is a client's list.
+      const reopened = offers.find((candidate) => candidate.offer === offer);
+      expect(reopened, `${label}: ${offer} should be re-choosable`).toBeTruthy();
+      expect(reopened!.per, label).toBe("short-rest");
+      expect(reopened!.label, label).toBe(featureName);
+      expect(reopened!.options, label).toEqual(expect.arrayContaining([REOPENED.built, REOPENED.rechosen]));
+
+      // Part two — re-answering it MOVES the resistance: the new type in force, the build's own
+      // answer suppressed, and the feature named as the reason the table sees on the damage line.
+      expect(after.resistances, label).toContain(REOPENED.rechosen);
+      expect([...after.suppressed], label).toContain(REOPENED.built);
+      expect(after.sources.get(REOPENED.rechosen), label).toBe(featureName);
+    }
+
+    // THE NEGATIVE CONTROL, and it drops the CLAUSE rather than the carrier: the same species, the
+    // same trait, the same answered pick — with no `replaces` row. The build still stands and fire
+    // is still on the sheet, and NOTHING is re-choosable, so the two passes above passed because of
+    // the authored clause and not because a rest re-opens everything.
+    const bare = authoredEmberkin(false);
+    const bareView = emberkinView(bare);
+    const bareSheet = buildCharacterDefinition(emberkinInput(), bareView, BuilderPolicySchema.parse({}));
+    expect(bareSheet.damageResistances).toContain(REOPENED.built);
+    expect(replaceableOffers(bareSheet, bareView)).toEqual([]);
+  });
+
+  it("4. `replacesFeatureId`: the class stops granting what its successor replaces, from both paths", () => {
+    const classFeatureIds = (definition: ActorDefinition, sourceId: string) =>
+      (definition.character?.features ?? []).filter((ref) => ref.kind === "class" && ref.sourceId === sourceId).map((ref) => ref.id);
+
+    // SRD: the Fighter's own attack tiers. At 5 the sheet lists Extra Attack; at 11 it lists Two
+    // Extra Attacks and NOT Extra Attack — one line rather than two contradicting ones.
+    const srdView = new ContentLibrary().forAudience("gm");
+    const fighter5 = classFeatureIds(buildCharacterDefinition(fighterInput(5), srdView, BuilderPolicySchema.parse({})), "fighter");
+    const fighter11 = classFeatureIds(buildCharacterDefinition(fighterInput(11), srdView, BuilderPolicySchema.parse({})), "fighter");
+    expect(fighter5).toContain(REOPENED.fighterReplaced);
+    expect(fighter11).toContain(REOPENED.fighterReplacing);
+    expect(fighter11).not.toContain(REOPENED.fighterReplaced);
+
+    // The editor: an authored class whose level-2 feature supersedes its level-1 one. Level 1 grants
+    // the first; level 2 grants the second ALONE.
+    const view = wardenView(authoredWarden());
+    const level1 = classFeatureIds(buildCharacterDefinition(wardenInput(1), view, BuilderPolicySchema.parse({})), REOPENED.classId);
+    const level2 = classFeatureIds(buildCharacterDefinition(wardenInput(2), view, BuilderPolicySchema.parse({})), REOPENED.classId);
+    expect(level1).toEqual([REOPENED.wardId]);
+    expect(level2).toEqual([REOPENED.greaterWardId]);
+
+    // THE NEGATIVE CONTROL, dropping the VALUE rather than the carrier: the same class, the same two
+    // features on the same two rows, with the "Supersedes" box left at "Nothing". Level 2 now grants
+    // BOTH — so the line that vanished above vanished because of the authored id.
+    const bare = wardenView(authoredWarden(false));
+    expect(classFeatureIds(buildCharacterDefinition(wardenInput(2), bare, BuilderPolicySchema.parse({})), REOPENED.classId))
+      .toEqual([REOPENED.wardId, REOPENED.greaterWardId]);
+  });
+});
+
+/**
+ * The class a GM builds in `/homebrew`: two features, the second superseding the first.
+ *
+ * **The grant is written through the `levelTable` field itself, and that is R1's ruling met rather
+ * than dodged.** The level chips are the one control that writes `feature.level` AND
+ * `levelTable[].features[]` in a single edit, and they stay `custom` precisely because a `FieldDef`
+ * cannot express a two-target write — so a test cannot press them. What it can drive is the key they
+ * write, which is the class form's own `levelTable` field: the rows below are what the chips would
+ * have produced, and every other control on both features is the feature panel's own.
+ */
+function authoredWarden(supersede = true): Draft {
+  const ward = { ...authoredRow("class", ["features"], [["name", "Ward"], ["description", "A ward against harm."]]), id: REOPENED.wardId };
+  let greater: Draft = { ...authoredRow("class", ["features"], [["name", "Greater Ward"], ["description", "A better ward against harm."]]), id: REOPENED.greaterWardId };
+  // THE ROW. `applyField` throws when a key has no control, so before U14 this line — not an
+  // assertion below it — is what failed.
+  if (supersede) greater = applyField("class", greater, "replacesFeatureId", REOPENED.wardId, ["features"]);
+  const draft = authored("class", "Warden", [
+    ["summary", "A warden of the deep wood."],
+    ["description", "Wardens stand between the wood and what comes for it."],
+    ["hitDie", "d10"],
+    ["primaryAbilities", ["str"]],
+    ["savingThrows", ["str", "con"]],
+    // No subclass before 20, so a level-2 build asks no question this fixture does not answer.
+    ["subclassLevel", 20],
+    ["skillChoices.choose", 2],
+    ["skillChoices.from", ["athletics", "survival", "perception"]],
+    ["features", [ward, greater]]
+  ]);
+  return applyField("class", draft, "levelTable", (draft.levelTable as Array<Record<string, unknown>>).map((row, index) => ({
+    ...row,
+    features: index === 0 ? [REOPENED.wardId] : index === 1 ? [REOPENED.greaterWardId] : []
+  })));
+}
+
+const wardenView = (warden: Draft) => {
+  const record = HOMEBREW_BODY_SCHEMAS.class.parse(storedBody("class", warden, REOPENED.classId));
+  return new ContentLibrary({
+    revision: 1,
+    publishedFor: () => ({ ...EMPTY_HOMEBREW_SLICE, classes: [record] }),
+    monsterForInstance: () => undefined
+  }).forAudience("gm");
+};
+
+const wardenInput = (level: 1 | 2): CharacterCreateRequestInput => ({
+  name: "Ash", speciesId: "halfling", backgroundId: "soldier", classId: REOPENED.classId, level,
+  abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: REOPENED.classId, kind: "skill", id: "athletics" },
+    { level: 1, classId: REOPENED.classId, kind: "skill", id: "survival" },
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
+/** A Halfling Champion at `level` — the SRD's own `replacesFeatureId` carrier. The mastery column
+    and the ASI ladder are the only things that move with the level here. */
+const fighterInput = (level: 5 | 11): CharacterCreateRequestInput => ({
+  name: "Borin", speciesId: "halfling", backgroundId: "soldier", classId: "fighter", level,
+  subclassId: "champion", abilityMethod: "standard-array",
+  baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+  backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, kind: "language", id: "dwarvish" },
+    { level: 1, kind: "language", id: "giant" },
+    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "perception" },
+    { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+    ...["greatsword", "flail", "longbow", "rapier", "handaxe"].slice(0, level >= 9 ? 5 : 4)
+      .map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id })),
+    { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
+    ...(level >= 7 ? [{ level: 7, classId: "fighter", kind: "fighting-style", id: "great-weapon-fighting", payload: { featureId: "additional-fighting-style" } }] : []),
+    ...([[4, "str"], [6, "con"], [8, "con"]] as const).filter(([at]) => at <= level).flatMap(([at, ability]) => [
+      { level: at, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: at, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } },
+      { level: at, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } }
+    ]),
+    { level: 1, kind: "tool", id: "gaming-set-dice" },
+    { level: 1, kind: "equipment", id: "fighter-a" },
+    { level: 1, kind: "equipment", id: "soldier-a" }
+  ]
+} as CharacterCreateRequestInput);
+
 /* ------------------------------------------------------------- the mechanism ----- */
 
 describe("the guard itself refuses what the editor cannot author", () => {
@@ -2088,7 +2510,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
       // [type, key, container path, the unit that closes it]
       ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
-      ["class", "replaces", [], "U14 — wired through a command, actor state, rests and a projection"],
       ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"],
       ["class", "fromPicks", [], "U16 — 3 records"],
       ["class", "maxSpellLevel", [], "U15 — 16 records; the schema half already ships in full"],
