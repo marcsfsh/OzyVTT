@@ -319,9 +319,10 @@ const optionIdsOf = (draft: Draft): readonly string[] => {
  * a GM who authors two gated options and then sees no pick appear has to be told it worked.
  *
  * A `group`, like `fromPicks`, and for the same reason: the two halves are one clause and
- * neither half alone means anything. Both boxes are open text — `offer` because it is the
+ * neither half alone means anything. Both boxes stay OPEN — `offer` because it is the
  * SAME namespace `extraPicks` and `replaces` are checked against, and `id` because an
- * option id is an open slug the record may not have authored yet.
+ * option id is an open slug the record may not have authored yet — and both are `pick`,
+ * which shows the list without closing the column (`FieldDef.pick`, `allowFreeText`).
  */
 function requiresField(): FieldDef {
   const write = (leaf: "offer" | "id") => (next: unknown, option: Draft): Draft => {
@@ -349,6 +350,7 @@ function requiresField(): FieldDef {
       {
         key: "requires.offer",
         label: "Which pick",
+        pick: true,
         placeholder: "feature:my-feature",
         help: "A named budget, or feature:<id> for one of this record's own features.",
         suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
@@ -358,6 +360,7 @@ function requiresField(): FieldDef {
       {
         key: "requires.id",
         label: "Which answer",
+        pick: true,
         placeholder: "divine-strike",
         help: "The option they must have chosen there.",
         suggestions: (_ctx, draft) => optionIdsOf(draft),
@@ -421,6 +424,7 @@ function extraPicksField(): FieldDef {
       {
         key: "offer",
         label: "Which pick",
+        pick: true,
         placeholder: "class-cantrips",
         help: "A named budget, or feature:<id> for one of this record's own features.",
         suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
@@ -515,6 +519,7 @@ function replacesField(): FieldDef {
       {
         key: "offer",
         label: "Which pick",
+        pick: true,
         placeholder: "feature:my-feature",
         help: "A named budget, or feature:<id> for one of this record's own features — usually this one.",
         suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
@@ -596,7 +601,11 @@ function choiceBlockFields(): readonly FieldDef[] {
       help: "Type your own if none of these fit.",
       // An OPEN slug with the reserved list as suggestions, never a closed `<select>`:
       // homebrew is allowed to invent a kind and a closed control would make it
-      // impossible. Deliberately NOT `pick` — see the note in `featureFields`' docblock.
+      // impossible. `pick` is what puts that list on SCREEN — `allowFreeText` keeps the
+      // slug open, so the reserved fourteen are one tap away and a fifteenth is still
+      // typeable. It was a bare `<input list>` until the Wave-2 back-fill, which on iOS
+      // Safari is no control at all; see `FieldDef.pick`.
+      pick: true,
       suggestions: CHOICE_KINDS,
       write: (next, block) => ({ ...block, kind: asChoiceSlug(String(next ?? "")) })
     },
@@ -700,6 +709,7 @@ function choiceBlockFields(): readonly FieldDef[] {
         {
           key: "fromPicks.offer",
           label: "Answers to",
+          pick: true,
           placeholder: "class-cantrips",
           // The same open box `extraPicks` and `replaces` use, and for the same reason: the
           // eight named budgets are closed but `feature:<id>` is open over this record's own
