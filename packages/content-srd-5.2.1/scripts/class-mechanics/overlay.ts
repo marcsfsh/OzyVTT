@@ -50,8 +50,12 @@
  *
  *   1. IDEMPOTENT. Clearing an absent key is a no-op, never an error - so the second and later builds
  *      are clean and the module stays truthful instead of becoming a build error the moment it works.
- *   2. NEVER DELETE-ONLY. A `clears` entry is a build error unless the same feature also authors a
- *      rider, so the verb can never be used to quietly remove content.
+ *   2. NEVER DELETE-ONLY, per KEY rather than per entry. Every key a `clears` names must be
+ *      replaced by the same entry or the build fails, so the verb can never be used to quietly
+ *      remove content. Per entry would be the weaker promise it sounds like: authoring any
+ *      unrelated rider would then license deleting a whole `choice` and replacing nothing.
+ *      "Replaced" means the key itself, or the other form of it for `choice`/`choices` - see
+ *      `isReplaced`, which is what keeps the one-becomes-several case authorable.
  *   3. THE REVIEW BAR IS THE `git diff` OF `bundles/classes.v1.json` IN THE SAME COMMIT. That is
  *      stated here because the collision guard's whole argument was that an overwrite would be
  *      "unreviewable and un-revertable" (see `applyMechanics` below); `clears` makes the overwrite
@@ -160,6 +164,18 @@ export type ClassMechanicsModule = Readonly<{
 const isAbsent = (value: unknown) => value === undefined || (Array.isArray(value) && value.length === 0);
 
 /**
+ * Which riders count as REPLACING a superseded key, for mitigation 2's per-key test.
+ *
+ * Almost every key replaces only itself. `choice` and `choices` are the exception because they are
+ * two shapes of one concern and cannot coexist on a record (`oneChoiceForm`): a feature whose single
+ * choice becomes several MUST clear one form and author the other, which is the measured case the
+ * verb was built for. Requiring the identical key back would forbid exactly that.
+ */
+const CHOICE_FORMS = ["choice", "choices"] as const;
+const isReplaced = (riders: Record<string, unknown>, key: string): boolean =>
+  ((CHOICE_FORMS as readonly string[]).includes(key) ? CHOICE_FORMS : [key]).some((form) => !isAbsent(riders[form]));
+
+/**
  * Merge the overlay into one record's features, in place, and report keys that matched nothing.
  *
  * Returns the unmatched `record.feature` (and `record.feature.option`) keys so the caller can FAIL
@@ -195,12 +211,19 @@ export function applyMechanics(
     if (!feature) { unmatched.push(`${recordId}.${featureId}`); continue; }
     const { options, clears, ...riders } = mechanics;
     if (clears?.length) {
-      // MITIGATION 2 - never a delete-only tool. A rider authored as `[]` is "not authored at all"
-      // (see `isAbsent`), so it does not license a delete either. Nothing is deleted on this path:
-      // the build exits on any miss, but an invalid entry contributes NOTHING rather than half of
-      // itself, because the thing it half-does is irreversible.
-      if (Object.entries(riders).every(([, value]) => isAbsent(value))) {
-        unmatched.push(`${recordId}.${featureId}.clears [${clears.join(", ")}] (deletes without replacing - author the rider that supersedes the key in the same entry)`);
+      // MITIGATION 2 - never a delete-only tool, and the test is PER CLEARED KEY. Asking only that
+      // the entry author SOME rider is a weaker guarantee than the one this mitigation is written to
+      // give: `{ clears: ["choice"], tags: [...] }` satisfies it, deletes the whole `choice`, and
+      // replaces nothing - on a hand-authored record that is precisely the irreversible unreplaced
+      // delete the verb is fenced against. Each key a feature supersedes must be re-authored by the
+      // same entry. A rider authored as `[]` is "not authored at all" (see `isAbsent`), so it does
+      // not license a delete either.
+      //
+      // Nothing is deleted on this path: the build exits on any miss, but an invalid entry
+      // contributes NOTHING rather than half of itself, because the thing it half-does is one-way.
+      const unreplaced = clears.filter((key) => !isReplaced(riders as Record<string, unknown>, key));
+      if (unreplaced.length > 0) {
+        unmatched.push(`${recordId}.${featureId}.clears [${unreplaced.join(", ")}] (deletes without replacing - author the superseding ${unreplaced.length === 1 ? "rider" : "riders"} in the same entry)`);
         continue;
       }
       // MITIGATION 1 - idempotent. `delete` on an absent key is a no-op, which is what makes the

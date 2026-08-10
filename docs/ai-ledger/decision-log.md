@@ -105,9 +105,16 @@ part of the ruling:
 1. **`clears` is idempotent.** Clearing an absent key is a no-op, never an error — so the second and
    later builds are clean and the module stays truthful instead of becoming a build error the moment
    it works.
-2. **A `clears` entry is a build error unless the same feature also authors a rider.** The verb can
-   never be a silent delete-only tool. An invalid entry deletes *nothing*: it contributes none of
-   itself rather than the irreversible half.
+2. **Every key a `clears` names must be replaced by the same entry, or the build fails.** The verb
+   can never be a silent delete-only tool. An invalid entry deletes *nothing*: it contributes none
+   of itself rather than the irreversible half. *Corrected 2026-08-10, same day:* this first shipped
+   as the weaker "unless the same feature also authors **a** rider", which is a per-entry test — so
+   `{ clears: ["choice"], tags: [...] }` satisfied it, deleted a whole `choice`, replaced nothing and
+   returned clean. That is the irreversible unreplaced delete the mitigation exists to fence, so the
+   code was tightened to the promise rather than the promise weakened to the code. "Replaced" means
+   the key itself or the other form of it for `choice`/`choices`, which cannot coexist on a record
+   (`oneChoiceForm`) and so must supersede each other — the one-becomes-several case the verb was
+   built for, and the reason the test is not simply "the identical key comes back".
 3. **The review bar is the `git diff` of `classes.v1.json` in the same commit.** Stated here because
    the collision guard's whole argument was that an unannounced overwrite would be *"unreviewable and
    un-revertable"*. `clears` makes the overwrite authorable, so the review is what has to make it

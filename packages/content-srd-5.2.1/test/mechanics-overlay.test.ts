@@ -99,14 +99,17 @@ describe("the mechanics overlay", () => {
     //
     // `modifiers` is cleared too and the record does not carry one: MITIGATION 1, idempotence. A
     // `clears` that has already done its work must stay legal, or the module becomes a build error
-    // the moment it succeeds and the next author deletes the line that explains the deletion.
+    // the moment it succeeds and the next author deletes the line that explains the deletion. It is
+    // authored beside its `clears` like any other superseded key - mitigation 2 is per KEY - which
+    // is the shape the SECOND build of a hand-authored record takes anyway: run 1 writes the new
+    // value into the bundle, run 2 clears what run 1 wrote and authors the identical thing.
     const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
     const misses = applyMechanics("barbarian", features, {
-      barbarian: { rage: { clears: ["tags", "modifiers"], tags: ["raging"] } }
+      barbarian: { rage: { clears: ["tags", "modifiers"], tags: ["raging"], modifiers: [{ type: "speed", amount: 10 }] } }
     });
     expect(misses).toEqual([]);
     expect(features[0].tags).toEqual(["raging"]);
-    expect("modifiers" in features[0]).toBe(false);
+    expect(features[0].modifiers).toEqual([{ type: "speed", amount: 10 }]);
   });
 
   it("REFUSES a `clears` with no rider beside it, and deletes nothing", () => {
@@ -117,7 +120,23 @@ describe("the mechanics overlay", () => {
     // NOTHING rather than half of itself.
     const features = [{ id: "rage", name: "Rage", description: "x", tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
     const misses = applyMechanics("barbarian", features, { barbarian: { rage: { clears: ["tags"] } } });
-    expect(misses).toEqual(["barbarian.rage.clears [tags] (deletes without replacing - author the rider that supersedes the key in the same entry)"]);
+    expect(misses).toEqual(["barbarian.rage.clears [tags] (deletes without replacing - author the superseding rider in the same entry)"]);
+    expect(features[0].tags).toEqual(["already-here"]);
+  });
+
+  it("REFUSES a `clears` whose key is unreplaced even when the entry authors a DIFFERENT rider", () => {
+    // The hole the per-entry form of mitigation 2 left open, and the reason it is now per KEY.
+    // Asking only "does this entry author something" is satisfied by any unrelated rider, so
+    // `{ clears: ["choice"], tags: [...] }` passed while deleting a whole `choice` and replacing
+    // nothing - on a hand-authored record, an irreversible edit to committed JSON, which is the one
+    // outcome the verb was fenced against. Only `choice` is named; `tags` is legitimately authored.
+    const features = [{ id: "rage", name: "Rage", description: "x", choice: { id: "c", options: [{ id: "o", name: "O" }] }, tags: ["already-here"] }] as Array<{ id: string } & Record<string, unknown>>;
+    const misses = applyMechanics("barbarian", features, {
+      barbarian: { rage: { clears: ["choice", "tags"], tags: ["raging"] } }
+    });
+    expect(misses).toEqual(["barbarian.rage.clears [choice] (deletes without replacing - author the superseding rider in the same entry)"]);
+    // Nothing is deleted on the refusal path - the entry contributes NOTHING, not half of itself.
+    expect(features[0].choice).toEqual({ id: "c", options: [{ id: "o", name: "O" }] });
     expect(features[0].tags).toEqual(["already-here"]);
   });
 
